@@ -78,7 +78,11 @@
       </Addresses>
     </Publisher>
     <RootComponents>
+      <RootComponent type="1" schemaName="al_Checklist" behavior="0" />
+      <RootComponent type="1" schemaName="al_FailReason" behavior="0" />
+      <RootComponent type="1" schemaName="al_Question" behavior="0" />
       <RootComponent type="1" schemaName="al_ReviewRoute" behavior="0" />
+      <RootComponent type="1" schemaName="al_Section" behavior="0" />
     </RootComponents>
     <MissingDependencies />
   </SolutionManifest>
