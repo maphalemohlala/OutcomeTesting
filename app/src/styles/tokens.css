@@ -41,9 +41,9 @@
    * Amber and red have no brand equivalent and await brand owner sign-off.
    */
   --colour-outcome-pass: var(--brand-green-accessible);
-  --colour-outcome-issues: #c26a00;
+  --colour-outcome-issues: #b87a3d;
   --colour-outcome-insufficient: var(--brand-purple);
-  --colour-outcome-harm: #c22b21;
+  --colour-outcome-harm: #b65a52;
   --colour-outcome-none: var(--colour-border-strong);
 
   /* Lifecycle stages */
