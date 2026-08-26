@@ -15,7 +15,7 @@ Single register for open decisions and resolved architecture decisions. Agents m
 | OD-008 | Confirm Tax wrong-route/no-check-required status and whether replacement cases link to the original | Product owner | Status model | Open | |
 | OD-009 | Confirm notification channels per event and whether Teams is required | Product owner | Flow templates | Open | |
 | OD-010 | Confirm retention, audit retention and data subject policies | Compliance/DPO | Data lifecycle | Open | |
-| OD-011 | Confirm Code Apps production readiness, tenant availability and licensing for all personas | Platform owner | Architecture gate | Open, blocking | Code app operations are disabled in Env_AQ_Dev. `pa app push` fails with HTTP 403 `CodeAppOperationNotAllowedInEnvironment`. An environment admin must enable code app operations before any code app can be published. Evidence recorded 2026-08-26. |
+| OD-011 | Confirm Code Apps production readiness, tenant availability and licensing for all personas | Platform owner | Architecture gate | Partially resolved | 2026-08-26: code app operations enabled on Env_AQ_Dev by an environment admin; `pa app push` now succeeds (app `5d9fc475-ee75-4386-917e-fc182307b0c2`). Still open: enabling TEST and PROD, and confirming licensing for every persona. |
 | OD-012 | Confirm Power BI audience and RLS segmentation | MI owner | Reporting security | Open | |
 
 ## Resolved architecture decisions
@@ -41,7 +41,7 @@ Boundaries that still apply:
 - Neither value is a secret, but both are environment-specific, so `power.config.json` must not be copied between environments.
 - No other file may hardcode an environment ID, tenant ID, org URL, connection ID or group ID.
 - Runtime configuration such as URLs, queue identifiers and export locations continues to use Dataverse environment variables, not this file.
-- The DEV values currently recorded are environment `d50d27e8-cb3b-e718-b6e2-30aa92d944aa` (Env_AQ_Dev) and solution `c7f447ab-35a1-f111-b8dd-e4fade069307` (OutcomeTesting).
+- The DEV values currently recorded are environment `d50d27e8-cb3b-e718-b6e2-30aa92d944aa` (Env_AQ_Dev), solution `c7f447ab-35a1-f111-b8dd-e4fade069307` (OutcomeTesting) and app `5d9fc475-ee75-4386-917e-fc182307b0c2`.
 - Revisit this exception if the CLI later supports token substitution for `power.config.json`.
 
 ## Recording rules
