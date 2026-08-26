@@ -13,6 +13,7 @@ This repository builds an enterprise Outcome Testing solution on Power Platform 
 8. Do not expose credentials, personal information or production data in prompts, fixtures, logs or commits.
 9. Prefer the current `pa` CLI for new Code Apps. Verify live Microsoft Learn syntax before commands. Use PAC CLI for platform/solution operations supported by its current documentation.
 10. A task is not complete until relevant tests pass and evidence is reported.
+11. Any task touching UI must activate `skills/ascot-lloyd-design/SKILL.md` first. `brand/` is the only authoritative source of colours, fonts, logos and imagery. Never guess or substitute brand values.
 
 ## Architecture invariants
 - Dataverse is the system of record.

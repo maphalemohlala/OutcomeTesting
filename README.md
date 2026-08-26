@@ -10,7 +10,7 @@ Repository-ready Copilot and agent guidance for the Outcome Testing solution.
 5. If using GitHub Copilot CLI with Superpowers, install Superpowers separately using its official repository instructions.
 
 ## Included
-- 13 project-specific skills
+- 14 project-specific skills
 - Phase-to-skill orchestration
 - Repository-wide and path-specific Copilot instructions
 - Reusable prompt files
@@ -20,6 +20,7 @@ Repository-ready Copilot and agent guidance for the Outcome Testing solution.
 ## Repository layout
 - `src/` unpacked Dataverse solution root, packaged in full; flows unpack to `src/Workflows/`
 - `app/` Power Apps Code App, deliberately outside the solution root
+- `brand/` authoritative Ascot Lloyd visual resources; the only source of colours, fonts and marks
 - `knowledge/` domain context, requirements index, decision log, knowledge sources
 - `skills/` phase skills; `.github/` Copilot instructions and prompts
 

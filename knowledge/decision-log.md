@@ -17,6 +17,9 @@ Single register for open decisions and resolved architecture decisions. Agents m
 | OD-010 | Confirm retention, audit retention and data subject policies | Compliance/DPO | Data lifecycle | Open | |
 | OD-011 | Confirm Code Apps production readiness, tenant availability and licensing for all personas | Platform owner | Architecture gate | Partially resolved | 2026-08-26: code app operations enabled on Env_AQ_Dev by an environment admin; `pa app push` now succeeds (app `5d9fc475-ee75-4386-917e-fc182307b0c2`). Still open: enabling TEST and PROD, and confirming licensing for every persona. |
 | OD-012 | Confirm Power BI audience and RLS segmentation | MI owner | Reporting security | Open | |
+| OD-013 | Resolve the Light Teal conflict in the brand palette: the sheet states hex `CCDFF3` but RGB `204/253/243`, which is `#CCFDF3`. The printed swatch renders mint, matching the RGB. | Brand owner | Blocks the Light Teal design token | Open | Working assumption is `#CCFDF3`; the token must not be treated as verified until confirmed. |
+| OD-014 | Approve or replace the two non-brand outcome colours in AD-008 (`#C26A00` amber, `#C22B21` red) and confirm whether Tertiary Purple may carry the Insufficient evidence meaning. | Brand owner | Outcome and status tokens across every review screen | Open | Implemented on instruction pending brand sign-off. |
+| OD-015 | Supply licensed Roundo font files, or approve Outfit as the permanent heading typeface. | Brand owner | Heading typography throughout the app | Open | Outfit is in use under AD-009. |
 
 ## Resolved architecture decisions
 | ID | Decision | Rationale | Date |
@@ -28,6 +31,8 @@ Single register for open decisions and resolved architecture decisions. Agents m
 | AD-005 | Publisher prefix is `al`; the unpacked solution root is `src` and the Code App lives in `app/` | Matches `AscotLloydOutcomeTesting.cdsproj` `SolutionRootPath` and keeps app build output out of the solution | 2026-08-26 |
 | AD-006 | A completed check with a non-pass outcome enters remediation; only invalid or wrong-route cases are returned or cancelled | Resolves the conflict between the early stop-and-restart description and later process confirmation | 2026-08-26 |
 | AD-007 | `app/power.config.json` may contain `environmentId` and `appId` as an approved exception to the no-hardcoded-identifiers rule | The Power Apps CLI generates and owns this file, and both values are required for `pa app run` and `pa app push`. See the exception note below. | 2026-08-26 |
+| AD-008 | Outcome status colours for BR-005 are `Pass #00A800` (brand Accessible Green), `Pass with issues #C26A00`, `Insufficient evidence #8758E4` (brand Tertiary Purple), `Potential harm #C22B21` | The brand palette contains no warning or danger colour, but BR-005 requires four visually distinct outcomes. Amber and red were added on explicit instruction. Each outcome also carries a distinct shape and its text label, so colour is never the sole signal. | 2026-08-26 |
+| AD-009 | Outfit is used as the heading typeface in place of Roundo, and Inter is self-hosted through `@fontsource-variable` | No font files exist in `brand/` and Roundo is licence-restricted. Self-hosting avoids an external CDN, which a code app host may block by CSP. Both are declared only in `--font-heading` and `--font-body`. | 2026-08-26 |
 
 ## Approved exceptions to the no-hardcoded-identifiers rule
 `AGENTS.md` rule 7 forbids hardcoding tenant or environment identifiers. AD-007 grants one narrow exception.

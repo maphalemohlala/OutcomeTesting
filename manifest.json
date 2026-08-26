@@ -1,12 +1,13 @@
 {
   "name": "ascot-lloyd-copilot-skills",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "skills": [
     "project-orchestrator",
     "requirements-traceability",
     "dataverse-solution-design",
     "power-platform-security",
     "code-app-development",
+    "ascot-lloyd-design",
     "command-concurrency",
     "outcome-testing-routing",
     "power-automate-engineering",

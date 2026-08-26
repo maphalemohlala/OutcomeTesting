@@ -48,6 +48,7 @@ A single Review Instance carries `reviewType` (Tax or AQS) rather than separate 
 ## Repository layout
 - `src/` is the unpacked Dataverse solution root and is packaged in full. Flows unpack to `src/Workflows/`.
 - `app/` holds the Power Apps Code App. It must stay outside `src/`.
+- `brand/` holds the authoritative Ascot Lloyd visual resources. It must stay outside `src/` so brand assets are not packaged into the solution.
 - `knowledge/` holds domain context, the requirements index and the decision log.
 - `skills/` holds the phase skills; `.github/` holds Copilot instructions and prompts.
 
