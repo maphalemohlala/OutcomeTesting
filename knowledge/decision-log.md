@@ -1,0 +1,50 @@
+# Decision log
+
+Single register for open decisions and resolved architecture decisions. Agents must read this before implementing anything that depends on an open item, and must not invent a resolution. Record a resolution only when a named owner has confirmed it, with the date and the evidence source.
+
+## Open decisions
+| ID | Decision required | Owner | Build impact | Status | Resolution and date |
+|---|---|---|---|---|---|
+| OD-001 | Confirm exact V8 sections, questions, response types, mandatory flags and role ownership | Advice Quality Manager | Blocks checklist seed data and UAT | Open | |
+| OD-002 | Confirm Tax queue versus skills-based named allocation | Tax Team Manager | Allocation model | Open | |
+| OD-003 | Confirm canonical cross-system identifier: employee ID, work email, or both | Ascot Lloyd IT/business | Import and export keys | Open | |
+| OD-004 | Provide final Trail Light template, formats and validation rules | Trail Light/Ascot Lloyd | Export build | Open | |
+| OD-005 | Confirm whether automated SFTP is in MVP and approve connection, DLP and authentication | IT/security | Integration scope | Open | |
+| OD-006 | Confirm CRP visibility rule | Advice Quality | Conditional rendering | Open | |
+| OD-007 | Define override, reopen and regrade roles and mandatory reason | Advice Quality/Compliance | Security and command logic | Open | |
+| OD-008 | Confirm Tax wrong-route/no-check-required status and whether replacement cases link to the original | Product owner | Status model | Open | |
+| OD-009 | Confirm notification channels per event and whether Teams is required | Product owner | Flow templates | Open | |
+| OD-010 | Confirm retention, audit retention and data subject policies | Compliance/DPO | Data lifecycle | Open | |
+| OD-011 | Confirm Code Apps production readiness, tenant availability and licensing for all personas | Platform owner | Architecture gate | Open, blocking | Code app operations are disabled in Env_AQ_Dev. `pa app push` fails with HTTP 403 `CodeAppOperationNotAllowedInEnvironment`. An environment admin must enable code app operations before any code app can be published. Evidence recorded 2026-08-26. |
+| OD-012 | Confirm Power BI audience and RLS segmentation | MI owner | Reporting security | Open | |
+
+## Resolved architecture decisions
+| ID | Decision | Rationale | Date |
+|---|---|---|---|
+| AD-001 | Dataverse is the system of record | Signed target solution supersedes earlier fixed-column Excel/Word designs | 2026-08-26 |
+| AD-002 | The frontend is a single Power Apps Code App; Power Pages is superseded for operational users | Explicit direction recorded in the build package assumptions | 2026-08-26 |
+| AD-003 | Privileged lifecycle transitions run as server-side commands, not unrestricted client updates | Security must not depend on UI enforcement | 2026-08-26 |
+| AD-004 | Checklist content is data-driven and versioned; responses reference an immutable question version | Protects historic submissions and MI when questions change | 2026-08-26 |
+| AD-005 | Publisher prefix is `al`; the unpacked solution root is `src` and the Code App lives in `app/` | Matches `AscotLloydOutcomeTesting.cdsproj` `SolutionRootPath` and keeps app build output out of the solution | 2026-08-26 |
+| AD-006 | A completed check with a non-pass outcome enters remediation; only invalid or wrong-route cases are returned or cancelled | Resolves the conflict between the early stop-and-restart description and later process confirmation | 2026-08-26 |
+| AD-007 | `app/power.config.json` may contain `environmentId` and `appId` as an approved exception to the no-hardcoded-identifiers rule | The Power Apps CLI generates and owns this file, and both values are required for `pa app run` and `pa app push`. See the exception note below. | 2026-08-26 |
+
+## Approved exceptions to the no-hardcoded-identifiers rule
+`AGENTS.md` rule 7 forbids hardcoding tenant or environment identifiers. AD-007 grants one narrow exception.
+
+| Item | File | Why it is allowed | Boundaries |
+|---|---|---|---|
+| `environmentId` | `app/power.config.json` | Written by `pa app init`; the CLI has no environment-variable indirection for it | DEV identifier only. TEST and PROD values must be supplied at deployment time, never committed |
+| `appId` | `app/power.config.json` | Written by `pa app push`; identifies the published app for subsequent pushes | Same as above |
+
+Boundaries that still apply:
+- Neither value is a secret, but both are environment-specific, so `power.config.json` must not be copied between environments.
+- No other file may hardcode an environment ID, tenant ID, org URL, connection ID or group ID.
+- Runtime configuration such as URLs, queue identifiers and export locations continues to use Dataverse environment variables, not this file.
+- The DEV values currently recorded are environment `d50d27e8-cb3b-e718-b6e2-30aa92d944aa` (Env_AQ_Dev) and solution `c7f447ab-35a1-f111-b8dd-e4fade069307` (OutcomeTesting).
+- Revisit this exception if the CLI later supports token substitution for `power.config.json`.
+
+## Recording rules
+- Never move an OD to resolved without a named owner, a date and a source reference.
+- When an OD is resolved, update `project-context.md` and the affected skill in the same change.
+- If implementation is blocked by an open OD, state the OD ID in the work output rather than assuming a rule.

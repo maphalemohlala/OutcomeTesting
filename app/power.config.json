@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "appId": null,
+  "appDisplayName": "Ascot Lloyd Outcome Testing",
+  "region": "prod",
+  "appType": "CodeApp",
+  "environmentId": "d50d27e8-cb3b-e718-b6e2-30aa92d944aa",
+  "description": " ",
+  "buildPath": "./dist",
+  "buildEntryPoint": "index.html",
+  "localAppUrl": "http://localhost:3000",
+  "logoPath": "Default",
+  "connectionReferences": {},
+  "databaseReferences": {}
+}

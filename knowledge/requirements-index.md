@@ -1,0 +1,55 @@
+# Requirements index
+
+Authoritative wording lives in the build package documents `01-Solution-Vision` to `20-Open-Decisions`. This file is the stable ID register used by `skills/requirements-traceability/SKILL.md` and by the "Requirement IDs affected" output of every skill. If a requirement is not listed here, it is not approved.
+
+## ID schemes
+| Prefix | Meaning | Source document |
+|---|---|---|
+| BR-nnn | Business requirement | 02-Business-Requirements |
+| FR-nnn | Functional requirement | 03-Functional-Requirements |
+| NFR-xxx-nn | Non-functional requirement | 04-Non-Functional-Requirements |
+| OD-nnn | Open decision | 20-Open-Decisions, tracked in `decision-log.md` |
+| E-n | Delivery epic | 14-Development-Backlog |
+
+## Business requirements
+| ID | Summary | Status |
+|---|---|---|
+| BR-001 | Import case data from Intelligent Office Excel extracts | Confirmed |
+| BR-002 | Validate required fields; return invalid/missing-information cases with a reason | Confirmed |
+| BR-003 | Allocate to team queues and named individuals; support reassignment | Confirmed |
+| BR-004 | Support Tax-only, AQS-only and Tax-then-AQS routes; Tax precedes AQS | Confirmed |
+| BR-005 | Capture Pass, Pass with issues, Insufficient evidence, Potential harm | Confirmed |
+| BR-006 | Every non-pass outcome requires remediation; guidance-only stays Pass with observations | Confirmed |
+| BR-007 | Retain both initial and final outcomes | Confirmed |
+| BR-008 | Adviser completes remediation; T&C manager verifies Insufficient evidence and Potential harm | Confirmed |
+| BR-009 | Notify para-planners without granting operational access by default | Confirmed |
+| BR-010 | Capture structured MI including remediation ageing and accountability | Confirmed |
+| BR-011 | Produce Trail Light-compatible Excel output; automated transfer conditional | Export confirmed, transfer conditional |
+| BR-012 | Role-based security, edit protection and audit history | Confirmed |
+| BR-013 | Administrators maintain questions without corrupting historic data | Confirmed |
+
+## Functional requirements
+| Range | Area | IDs |
+|---|---|---|
+| Intake and allocation | Upload, validation, exceptions, worklist, assignment, reassignment | FR-001 to FR-006 |
+| Reviews and outcomes | Versioned review instances, section ownership, response types, fail reasons, Tax-before-AQS, Tax routing, Tax grade, submission locks | FR-010 to FR-017 |
+| Remediation and closure | Action generation, notification, attestation, T&C sign-off, final outcome, closure rules | FR-020 to FR-025 |
+| Administration and export | Question versioning, retire-and-succeed, Trail Light batches, audit history | FR-030 to FR-033 |
+
+## Non-functional requirements
+NFR-SEC-01, NFR-SEC-02, NFR-AUD-01, NFR-PERF-01, NFR-PERF-02, NFR-REL-01, NFR-REL-02, NFR-ALM-01, NFR-OPS-01, NFR-ACC-01 (WCAG 2.2 AA), NFR-DATA-01, NFR-OBS-01.
+
+## Traceability matrix columns
+Every implemented story records: requirement ID, source document, actor, workflow step, priority, Given/When/Then acceptance criteria, data entities, screens/routes, commands, flows, security roles affected, tests, and release version.
+
+## Epic to phase mapping
+| Epic | Scope | Phase (see `phase-skill-map.md`) |
+|---|---|---|
+| E1 | Foundation and data model | 0, 1 |
+| E2 | Intake and work management | 3, 4 |
+| E3 | Reviews and dynamic checklist | 4 |
+| E4 | Outcomes and remediation | 5 |
+| E5 | MI, export, administration, hardening | 6, 8 |
+
+## Blocking dependencies
+E1 is blocked by OD-001 to OD-004. E3 is blocked by OD-001. E5 export is blocked by OD-003 and OD-004. The architecture itself is gated by OD-011.

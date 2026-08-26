@@ -1,0 +1,31 @@
+{
+  "name": "ascot-lloyd-copilot-skills",
+  "version": "1.1.0",
+  "skills": [
+    "project-orchestrator",
+    "requirements-traceability",
+    "dataverse-solution-design",
+    "power-platform-security",
+    "code-app-development",
+    "command-concurrency",
+    "outcome-testing-routing",
+    "power-automate-engineering",
+    "reporting-export-integration",
+    "power-pages-development",
+    "power-platform-alm",
+    "test-quality-release",
+    "power-platform-debugging"
+  ],
+  "knowledge_sources": {
+    "Power Apps code apps overview": "https://learn.microsoft.com/en-us/power-apps/developer/code-apps/overview",
+    "Code apps documentation hub": "https://learn.microsoft.com/en-us/power-apps/developer/code-apps/",
+    "Code apps architecture": "https://learn.microsoft.com/en-us/power-apps/developer/code-apps/architecture",
+    "Code apps quickstart": "https://learn.microsoft.com/en-us/power-apps/developer/code-apps/how-to/create-an-app-from-scratch",
+    "Power Apps CLI reference": "https://learn.microsoft.com/en-us/power-apps/developer/code-apps/reference/cli",
+    "Power Platform CLI introduction": "https://learn.microsoft.com/en-us/power-platform/developer/cli/introduction",
+    "PAC code reference (legacy/deprecation awareness)": "https://learn.microsoft.com/en-us/power-platform/developer/cli/reference/code",
+    "GitHub Copilot repository instructions": "https://docs.github.com/en/copilot/how-tos/configure-custom-instructions-in-your-ide/add-repository-instructions-in-your-ide?tool=visualstudio",
+    "GitHub Copilot customisation concepts": "https://docs.github.com/en/copilot/concepts/prompting/response-customization?tool=vscode",
+    "Superpowers framework": "https://github.com/obra/superpowers"
+  }
+}
