@@ -1,0 +1,25 @@
+.not-built {
+  max-width: 60ch;
+  padding: var(--space-4);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-left: 3px solid var(--colour-border-strong);
+}
+
+.not-built h2 {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-lg);
+}
+
+.not-built p + p {
+  margin-top: var(--space-3);
+}
+
+.not-built__blockers {
+  color: var(--colour-text-muted);
+}
+
+.not-built__blockers span {
+  font-weight: 600;
+  color: var(--colour-text);
+}

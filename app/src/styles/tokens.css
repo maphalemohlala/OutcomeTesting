@@ -1,0 +1,77 @@
+/*
+ * Brand tokens. Colour and typography values trace to brand/.
+ * Status hues are recorded in knowledge/decision-log.md (AD-008).
+ */
+
+:root {
+  /* Brand palette — verified from brand/ */
+  --brand-teal: #2b5257;
+  --brand-teal-dark: #0a3535;
+  --brand-teal-light: #ccfdf3; /* OD-013: brand sheet hex and RGB disagree */
+  --brand-green-highlight: #b0ed70;
+  --brand-green-light: #ccffd6;
+  --brand-green-accessible: #00a800; /* large text only, above 18.66px on white */
+  --brand-purple: #8758e4;
+  --brand-blue: #57e0ea;
+  --brand-white: #ffffff;
+  --brand-black: #000000;
+
+  /* Neutrals derived from Dark Teal so greys stay in the brand family */
+  --colour-surface: var(--brand-white);
+  --colour-surface-sunken: #f4f7f7;
+  --colour-surface-raised: var(--brand-white);
+  --colour-surface-inverse: var(--brand-teal-dark);
+  --colour-border: #d3dcdc;
+  --colour-border-strong: #a8b8b8;
+
+  /* Text */
+  --colour-text: var(--brand-teal-dark);
+  --colour-text-muted: #4f6b6b;
+  --colour-text-inverse: var(--brand-white);
+  --colour-text-on-inverse-accent: var(--brand-green-highlight);
+
+  /* Action */
+  --colour-action: var(--brand-teal);
+  --colour-action-hover: var(--brand-teal-dark);
+  --colour-action-text: var(--brand-white);
+  --colour-focus: var(--brand-teal-dark);
+
+  /*
+   * Outcome hues for BR-005. Pass and Insufficient evidence use brand values.
+   * Amber and red have no brand equivalent and await brand owner sign-off.
+   */
+  --colour-outcome-pass: var(--brand-green-accessible);
+  --colour-outcome-issues: #c26a00;
+  --colour-outcome-insufficient: var(--brand-purple);
+  --colour-outcome-harm: #c22b21;
+  --colour-outcome-none: var(--colour-border-strong);
+
+  /* Lifecycle stages */
+  --colour-stage-waiting: var(--colour-border-strong);
+  --colour-stage-active: var(--brand-teal);
+  --colour-stage-blocked: var(--colour-outcome-harm);
+  --colour-stage-closed: var(--colour-text-muted);
+
+  /* Typography. Outfit stands in for Roundo until licensed files are supplied. */
+  --font-heading: 'Outfit Variable', 'Roundo', Arial, sans-serif;
+  --font-body: 'Inter Variable', Arial, sans-serif;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  /* Spacing tuned for operational density */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  --radius: 2px;
+  --rail-width: 15rem;
+  --header-height: 3.25rem;
+}

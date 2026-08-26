@@ -1,0 +1,59 @@
+.worklist__scroll {
+  overflow-x: auto;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+}
+
+.worklist {
+  min-width: 60rem;
+  font-size: var(--text-sm);
+}
+
+.worklist th,
+.worklist td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.worklist thead th {
+  position: sticky;
+  top: 0;
+  background: var(--colour-surface-sunken);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--colour-text-muted);
+}
+
+.worklist tbody th {
+  font-weight: 600;
+}
+
+.worklist__numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.worklist__empty {
+  padding: var(--space-5);
+  color: var(--colour-text-muted);
+}
+
+.worklist__unavailable {
+  max-width: 60ch;
+  padding: var(--space-4);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-left: 3px solid var(--colour-border-strong);
+}
+
+.worklist__unavailable h2 {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-lg);
+}
+
+.worklist__unavailable p + p {
+  margin-top: var(--space-3);
+}

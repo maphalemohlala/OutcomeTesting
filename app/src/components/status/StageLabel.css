@@ -1,0 +1,21 @@
+.stage {
+  display: inline-block;
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--colour-stage-waiting);
+  white-space: nowrap;
+}
+
+.stage[data-tone='active'] {
+  border-left-color: var(--colour-stage-active);
+  font-weight: 600;
+}
+
+.stage[data-tone='blocked'] {
+  border-left-color: var(--colour-stage-blocked);
+  font-weight: 600;
+}
+
+.stage[data-tone='closed'] {
+  border-left-color: var(--colour-stage-closed);
+  color: var(--colour-text-muted);
+}

@@ -1,0 +1,17 @@
+.page-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.page-intro__purpose {
+  margin-top: var(--space-1);
+  max-width: 60ch;
+  color: var(--colour-text-muted);
+}
+
+.page-intro__actions {
+  flex: none;
+}

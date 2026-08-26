@@ -1,0 +1,39 @@
+.outcome {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.outcome__mark {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  background: var(--colour-outcome-none);
+}
+
+/* Distinct silhouettes so the four BR-005 outcomes differ without colour. */
+.outcome__mark--pass {
+  background: var(--colour-outcome-pass);
+  border-radius: 50%;
+}
+
+.outcome__mark--issues {
+  background: var(--colour-outcome-issues);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.outcome__mark--insufficient {
+  background: var(--colour-outcome-insufficient);
+}
+
+.outcome__mark--harm {
+  background: var(--colour-outcome-harm);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+@media (forced-colors: active) {
+  .outcome__mark {
+    background: CanvasText;
+  }
+}
