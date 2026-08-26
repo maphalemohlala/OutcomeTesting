@@ -4,5 +4,8 @@
 /bin
 /obj
 
+# solution packaging scratch: exports, staging unpacks and packed zips
+/artifacts
+
 # MSBuild Binary and Structured Log
 *.binlog

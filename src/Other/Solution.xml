@@ -1,35 +1,24 @@
-<?xml version="1.0" encoding="utf-8"?>
-<ImportExportXml version="9.1.0.643" SolutionPackageVersion="9.1" languagecode="1033" generatedBy="CrmLive" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ImportExportXml version="9.2.26081.151" SolutionPackageVersion="9.2" languagecode="1033" generatedBy="CrmLive" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" OrganizationVersion="9.2.26081.151" OrganizationSchemaType="Standard" CRMServerServiceabilityVersion="9.2.26081.00151">
   <SolutionManifest>
-    <!-- Unique Name of Cds Solution-->
     <UniqueName>OutcomeTesting</UniqueName>
     <LocalizedNames>
-      <!-- Localized Solution Name in language code -->
       <LocalizedName description="Outcome Testing" languagecode="1033" />
     </LocalizedNames>
     <Descriptions />
     <Version>1.0.0.0</Version>
-    <!-- Solution Package Type: Unmanaged(0)/Managed(1)/Both(2)-->
-    <Managed>2</Managed>
+    <Managed>0</Managed>
     <Publisher>
-      <!-- Unique Publisher Name of Cds Solution -->
       <UniqueName>AscotLloyd</UniqueName>
       <LocalizedNames>
-        <!-- Localized Cds Publisher Name in language code-->
-        <LocalizedName description="AscotLloyd" languagecode="1033" />
+        <LocalizedName description="Ascot Lloyd" languagecode="1033" />
       </LocalizedNames>
-      <Descriptions>
-        <!-- Description of Cds Publisher in language code -->
-        <Description description="AscotLloyd" languagecode="1033" />
-      </Descriptions>
+      <Descriptions />
       <EMailAddress xsi:nil="true"></EMailAddress>
       <SupportingWebsiteUrl xsi:nil="true"></SupportingWebsiteUrl>
-      <!-- Customization Prefix for the Cds Publisher-->
       <CustomizationPrefix>al</CustomizationPrefix>
-      <!-- Derived Option Value Prefix for the Customization Prefix of Cds Publisher -->
-      <CustomizationOptionValuePrefix>30592</CustomizationOptionValuePrefix>
+      <CustomizationOptionValuePrefix>12091</CustomizationOptionValuePrefix>
       <Addresses>
-        <!-- Address of the Publisher-->
         <Address>
           <AddressNumber>1</AddressNumber>
           <AddressTypeCode>1</AddressTypeCode>
@@ -88,7 +77,9 @@
         </Address>
       </Addresses>
     </Publisher>
-    <RootComponents />
+    <RootComponents>
+      <RootComponent type="1" schemaName="al_ReviewRoute" behavior="0" />
+    </RootComponents>
     <MissingDependencies />
   </SolutionManifest>
 </ImportExportXml>
