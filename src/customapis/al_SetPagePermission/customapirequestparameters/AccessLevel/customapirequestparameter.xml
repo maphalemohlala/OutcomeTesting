@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="AccessLevel">
+  <description default="None, View, Edit or Manage.">
+    <label description="None, View, Edit or Manage." languagecode="1033" />
+  </description>
+  <displayname default="Access level">
+    <label description="Access level" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_SetPagePermission.AccessLevel</name>
+  <type>10</type>
+</customapirequestparameter>

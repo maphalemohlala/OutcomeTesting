@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="FinalOutcome">
+  <description default="The corrected final outcome: Pass, Pass with issues, Insufficient evidence or Potential harm.">
+    <label description="The corrected final outcome: Pass, Pass with issues, Insufficient evidence or Potential harm." languagecode="1033" />
+  </description>
+  <displayname default="Final outcome">
+    <label description="Final outcome" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_RegradeCase.FinalOutcome</name>
+  <type>10</type>
+</customapirequestparameter>

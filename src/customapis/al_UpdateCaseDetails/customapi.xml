@@ -1,0 +1,18 @@
+<customapi uniquename="al_UpdateCaseDetails">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="A manager amends the editable case header (status, review route, priority, due date) with a mandatory reason. Enforces the AD-041 page.cases Edit permission, optimistic concurrency and idempotency, and writes an immutable Audit Event recording the before/after of every changed field (BR-012).">
+    <label description="A manager amends the editable case header (status, review route, priority, due date) with a mandatory reason. Enforces the AD-041 page.cases Edit permission, optimistic concurrency and idempotency, and writes an immutable Audit Event recording the before/after of every changed field (BR-012)." languagecode="1033" />
+  </description>
+  <displayname default="Update Case Details">
+    <label description="Update Case Details" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_UpdateCaseDetails</name>
+  <plugintypeid>
+    <plugintypeexportkey>8cf2e849-2fa2-f111-b8dd-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

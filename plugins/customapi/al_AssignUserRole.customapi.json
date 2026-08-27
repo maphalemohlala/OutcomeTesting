@@ -1,0 +1,28 @@
+{
+  "$comment": "Contract for the AssignUserRole server-side command (AD-003, AD-041). Deployed via the registration console (plugins/OutcomeTesting.Registration) and added to the OutcomeTesting solution via a solution-file import. Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_AssignUserRole",
+    "name": "al_AssignUserRole",
+    "displayname": "Assign User Role",
+    "description": "Administrator maps a person (work email, AD-010) to an application role (AD-041). Enforces the caller holds Manage on permission.manage, upserts al_userrolemapping idempotently and writes an immutable Audit Event.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.AssignUserRolePlugin"
+  },
+  "requestParameters": [
+    { "uniquename": "UserEmail", "name": "UserEmail", "displayname": "User email", "description": "Work email of the person to assign (AD-010).", "type": 10, "isoptional": false },
+    { "uniquename": "AppRole", "name": "AppRole", "displayname": "App role", "description": "Built-in role label, e.g. Administrator or T&C Manager. Omit when RoleCode is supplied.", "type": 10, "isoptional": true },
+    { "uniquename": "RoleCode", "name": "RoleCode", "displayname": "Role code", "description": "Optional. Stable al_role code for a custom role (AD-044). When supplied, it takes precedence over AppRole.", "type": 10, "isoptional": true },
+    { "uniquename": "IdempotencyKey", "name": "IdempotencyKey", "displayname": "Idempotency key", "description": "Stable key for the intent; a replay returns the same mapping.", "type": 10, "isoptional": false }
+  ],
+  "responseProperties": [
+    { "uniquename": "MappingId", "name": "MappingId", "displayname": "Mapping id", "description": "Id of the al_userrolemapping written.", "type": 10 },
+    { "uniquename": "Status", "name": "Status", "displayname": "Status", "description": "Assigned.", "type": 10 },
+    { "uniquename": "AuditEventId", "name": "AuditEventId", "displayname": "Audit event id", "description": "Id of the Audit Event written.", "type": 10 },
+    { "uniquename": "Conflict", "name": "Conflict", "displayname": "Conflict", "description": "True when an optimistic-concurrency conflict was detected.", "type": 0 }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "$comment": "Contract for the UpdateUser server-side command (AD-003, AD-041). Deployed via the registration console (plugins/OutcomeTesting.Registration) and added to the OutcomeTesting solution via a solution-file import (src/customapis/al_UpdateUser). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_UpdateUser",
+    "name": "al_UpdateUser",
+    "displayname": "Update User",
+    "description": "An administrator amends an existing application user's display name (al_user). Work email is the stable identifier (AD-010) and is not changed here. Enforces the AD-041 permission.manage Manage permission, applies optimistic concurrency and idempotency, and writes an immutable Audit Event (BR-012).",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.UpdateUserPlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "UserId",
+      "name": "UserId",
+      "displayname": "User id",
+      "description": "Id of the al_user record to update.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "FullName",
+      "name": "FullName",
+      "displayname": "Full name",
+      "description": "The person's new full name.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "ExpectedRowVersion",
+      "name": "ExpectedRowVersion",
+      "displayname": "Expected row version",
+      "description": "Row version read by the client, for optimistic concurrency.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay returns the same result.",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "UserId",
+      "name": "UserId",
+      "displayname": "User id",
+      "description": "Id of the al_user record.",
+      "type": 10
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written for this command.",
+      "type": 10
+    },
+    {
+      "uniquename": "Conflict",
+      "name": "Conflict",
+      "displayname": "Conflict",
+      "description": "True when the command was rejected for a concurrency conflict.",
+      "type": 0
+    }
+  ]
+}

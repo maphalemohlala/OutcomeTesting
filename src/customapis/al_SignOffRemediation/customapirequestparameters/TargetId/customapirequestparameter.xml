@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="TargetId">
+  <description default="Id of the al_remediationaction to sign off.">
+    <label description="Id of the al_remediationaction to sign off." languagecode="1033" />
+  </description>
+  <displayname default="Target id">
+    <label description="Target id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_SignOffRemediation.TargetId</name>
+  <type>10</type>
+</customapirequestparameter>

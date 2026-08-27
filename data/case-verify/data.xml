@@ -1,0 +1,21 @@
+<entities>
+  <entity name="al_outcomecase" displayname="Outcome Case">
+    <records>
+      <record id="aaaa0000-0000-4c00-8000-000000000001">
+        <field name="al_name" value="DEV verification - IO-DEV-VERIFY-001" />
+        <field name="al_casereference" value="IO-DEV-VERIFY-001" />
+        <field name="al_casestatus" value="120910580" />
+      </record>
+      <record id="aaaa0000-0000-4c00-8000-000000000002">
+        <field name="al_name" value="DEV verification - IO-DEV-VERIFY-002" />
+        <field name="al_casereference" value="IO-DEV-VERIFY-002" />
+        <field name="al_casestatus" value="120910582" />
+      </record>
+      <record id="aaaa0000-0000-4c00-8000-000000000003">
+        <field name="al_name" value="DEV verification - IO-DEV-VERIFY-003" />
+        <field name="al_casereference" value="IO-DEV-VERIFY-003" />
+        <field name="al_casestatus" value="120910585" />
+      </record>
+    </records>
+  </entity>
+</entities>

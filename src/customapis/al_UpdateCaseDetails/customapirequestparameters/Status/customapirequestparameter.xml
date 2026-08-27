@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Status">
+  <description default="New al_casestatus option value. Omit to leave the status unchanged.">
+    <label description="New al_casestatus option value. Omit to leave the status unchanged." languagecode="1033" />
+  </description>
+  <displayname default="Status">
+    <label description="Status" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>al_UpdateCaseDetails.Status</name>
+  <type>10</type>
+</customapirequestparameter>

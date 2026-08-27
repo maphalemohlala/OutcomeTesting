@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="IdempotencyKey">
+  <description default="Stable key for the intent; a replay upserts the same Audit Event.">
+    <label description="Stable key for the intent; a replay upserts the same Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Idempotency key">
+    <label description="Idempotency key" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_CompleteRemediation.IdempotencyKey</name>
+  <type>10</type>
+</customapirequestparameter>

@@ -1,0 +1,18 @@
+<customapi uniquename="al_CreateExportBatch">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Opens one manual Trail Light export run in Draft (AD-039). Enforces the caller holds Edit on export.generate, upserts al_exportbatch idempotently and writes an immutable Audit Event.">
+    <label description="Opens one manual Trail Light export run in Draft (AD-039). Enforces the caller holds Edit on export.generate, upserts al_exportbatch idempotently and writes an immutable Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Create Export Batch">
+    <label description="Create Export Batch" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_CreateExportBatch</name>
+  <plugintypeid>
+    <plugintypeexportkey>f499b5af-20a2-f111-b8dd-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

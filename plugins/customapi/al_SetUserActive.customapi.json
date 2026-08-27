@@ -1,0 +1,65 @@
+{
+  "$comment": "Contract for the SetUserActive server-side command (AD-003, AD-041, AD-037/OD-010). Deployed via the registration console (plugins/OutcomeTesting.Registration) and added to the OutcomeTesting solution via a solution-file import (src/customapis/al_SetUserActive). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_SetUserActive",
+    "name": "al_SetUserActive",
+    "displayname": "Set User Active",
+    "description": "Activates or deactivates an application user (al_user). Deactivation is the sanctioned alternative to hard deletion for retained data (OD-010): the row and its history are preserved, only al_isactive is flipped. Enforces the AD-041 permission.manage Manage permission and writes an immutable Audit Event (BR-012).",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.SetUserActivePlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "UserId",
+      "name": "UserId",
+      "displayname": "User id",
+      "description": "Id of the al_user record to activate or deactivate.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "Active",
+      "name": "Active",
+      "displayname": "Active",
+      "description": "True to reactivate the user, false to deactivate.",
+      "type": 0,
+      "isoptional": false
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay returns the same result.",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "UserId",
+      "name": "UserId",
+      "displayname": "User id",
+      "description": "Id of the al_user record.",
+      "type": 10
+    },
+    {
+      "uniquename": "Active",
+      "name": "Active",
+      "displayname": "Active",
+      "description": "The resulting active state.",
+      "type": 0
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written for this command.",
+      "type": 10
+    }
+  ]
+}

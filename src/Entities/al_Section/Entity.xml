@@ -13,6 +13,45 @@
         <Description description="A section of a checklist version. FR-011 requires section ownership to be enforced." languagecode="1033" />
       </Descriptions>
       <attributes>
+        <attribute PhysicalName="al_checklistversionid">
+          <Type>lookup</Type>
+          <Name>al_checklistversionid</Name>
+          <LogicalName>al_checklistversionid</LogicalName>
+          <RequiredLevel>required</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <LookupStyle>single</LookupStyle>
+          <LookupTypes />
+          <displaynames>
+            <displayname description="Checklist version" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Sections belong to one checklist version, so re-issuing a checklist cannot reshape a version already in use." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_DisplayOrder">
           <Type>int</Type>
           <Name>al_displayorder</Name>
@@ -51,6 +90,107 @@
           </displaynames>
           <Descriptions>
             <Description description="Order in which records are presented to users." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_HelpText">
+          <Type>nvarchar</Type>
+          <Name>al_helptext</Name>
+          <LogicalName>al_helptext</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>1</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>textarea</Format>
+          <MaxLength>2000</MaxLength>
+          <Length>4000</Length>
+          <displaynames>
+            <displayname description="Help text" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Checker guidance shown with the section, such as the V8 outcome lens statements. Guidance is not an answerable question, so it belongs here rather than in al_Question." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_IsConditional">
+          <Type>bit</Type>
+          <Name>al_isconditional</Name>
+          <LogicalName>al_isconditional</LogicalName>
+          <RequiredLevel>required</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <AppDefaultValue>0</AppDefaultValue>
+          <optionset Name="al_section_isconditional">
+            <OptionSetType>bit</OptionSetType>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Conditional" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="Whether the section is shown only when the system decides it applies." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="0" IsHidden="0">
+                <labels>
+                  <label description="No" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="1" IsHidden="0">
+                <labels>
+                  <label description="Yes" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Conditional" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Marks a section whose applicability the system derives rather than always displaying, such as CRP. Holding it as data keeps AD-021 out of hardcoded section codes in the app." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_Name">
@@ -93,6 +233,82 @@
             <Description description="Business name of the section." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_OwnerRole">
+          <Type>picklist</Type>
+          <Name>al_ownerrole</Name>
+          <LogicalName>al_ownerrole</LogicalName>
+          <RequiredLevel>required</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid|RequiredForForm</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>1</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <AppDefaultValue>-1</AppDefaultValue>
+          <optionset Name="al_section_ownerrole">
+            <OptionSetType>picklist</OptionSetType>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Section owner role" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="Roles that may own a checklist section." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="120910100" IsHidden="0">
+                <labels>
+                  <label description="Tax team" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910101" IsHidden="0">
+                <labels>
+                  <label description="AQS checker" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910102" IsHidden="0">
+                <labels>
+                  <label description="Adviser" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910103" IsHidden="0">
+                <labels>
+                  <label description="T&amp;C Manager" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910104" IsHidden="0">
+                <labels>
+                  <label description="Manager / Admin" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Owner role" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Role that owns this section and may write to it. Enforced server-side, not in the UI. See AD-020." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_SectionCode">
           <Type>nvarchar</Type>
           <Name>al_sectioncode</Name>
@@ -124,8 +340,8 @@
           <IsRetrievable>0</IsRetrievable>
           <IsLocalizable>0</IsLocalizable>
           <Format>text</Format>
-          <MaxLength>20</MaxLength>
-          <Length>20</Length>
+          <MaxLength>100</MaxLength>
+          <Length>200</Length>
           <displaynames>
             <displayname description="Section code" languagecode="1033" />
           </displaynames>
@@ -722,6 +938,20 @@
           </Descriptions>
         </attribute>
       </attributes>
+      <EntityKeys>
+        <EntityKey>
+          <Name>al_SectionCodeKey</Name>
+          <LogicalName>al_sectioncodekey</LogicalName>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <EntityKeyAttributes>
+            <AttributeName>al_sectioncode</AttributeName>
+          </EntityKeyAttributes>
+          <displaynames>
+            <displayname description="Section code key" languagecode="1033" />
+          </displaynames>
+        </EntityKey>
+      </EntityKeys>
       <EntitySetName>al_sections</EntitySetName>
       <IsDuplicateCheckSupported>0</IsDuplicateCheckSupported>
       <IsBusinessProcessEnabled>0</IsBusinessProcessEnabled>

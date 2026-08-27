@@ -1,0 +1,18 @@
+<customapi uniquename="al_RegradeCase">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="T&amp;C Manager reopens, overrides or regrades a graded outcome by setting the final outcome with a mandatory reason (OD-007, AD-031). The initial outcome is preserved so both survive (BR-007). Enforces optimistic concurrency and idempotency, and writes an immutable Audit Event.">
+    <label description="T&amp;C Manager reopens, overrides or regrades a graded outcome by setting the final outcome with a mandatory reason (OD-007, AD-031). The initial outcome is preserved so both survive (BR-007). Enforces optimistic concurrency and idempotency, and writes an immutable Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Regrade Case">
+    <label description="Regrade Case" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_RegradeCase</name>
+  <plugintypeid>
+    <plugintypeexportkey>4b61d8ba-07a2-f111-b8dd-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

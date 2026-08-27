@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Conflict">
+  <description default="True when the command was rejected for an optimistic-concurrency conflict.">
+    <label description="True when the command was rejected for an optimistic-concurrency conflict." languagecode="1033" />
+  </description>
+  <displayname default="Conflict">
+    <label description="Conflict" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_RegradeCase.Conflict</name>
+  <type>0</type>
+</customapiresponseproperty>

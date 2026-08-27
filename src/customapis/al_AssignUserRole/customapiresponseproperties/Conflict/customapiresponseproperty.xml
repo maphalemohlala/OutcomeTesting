@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Conflict">
+  <description default="True when an optimistic-concurrency conflict was detected.">
+    <label description="True when an optimistic-concurrency conflict was detected." languagecode="1033" />
+  </description>
+  <displayname default="Conflict">
+    <label description="Conflict" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_AssignUserRole.Conflict</name>
+  <type>0</type>
+</customapiresponseproperty>

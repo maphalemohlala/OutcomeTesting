@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Status">
+  <description default="The decision recorded (Approved or Rejected).">
+    <label description="The decision recorded (Approved or Rejected)." languagecode="1033" />
+  </description>
+  <displayname default="Status">
+    <label description="Status" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_SignOffRemediation.Status</name>
+  <type>10</type>
+</customapiresponseproperty>

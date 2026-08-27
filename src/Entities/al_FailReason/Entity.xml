@@ -13,6 +13,77 @@
         <Description description="Controlled list of file and advice quality fail reasons. FR-013 permits multiple fail reasons on a response." languagecode="1033" />
       </Descriptions>
       <attributes>
+        <attribute PhysicalName="al_Category">
+          <Type>picklist</Type>
+          <Name>al_category</Name>
+          <LogicalName>al_category</LogicalName>
+          <RequiredLevel>required</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid|RequiredForForm</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>1</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <AppDefaultValue>-1</AppDefaultValue>
+          <optionset Name="al_failreason_category">
+            <OptionSetType>picklist</OptionSetType>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Fail reason category" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="The grouping headings the V8 fail point list is published under." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="120910400" IsHidden="0">
+                <labels>
+                  <label description="AML" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910401" IsHidden="0">
+                <labels>
+                  <label description="Breach" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910402" IsHidden="0">
+                <labels>
+                  <label description="Record Keeping" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910403" IsHidden="0">
+                <labels>
+                  <label description="Tax check" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Category" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Category the fail reason is published under in V8. Carrying it as data rather than parsing the code prefix is what lets BR-010 MI group fail reasons without string handling." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_DisplayOrder">
           <Type>int</Type>
           <Name>al_displayorder</Name>
@@ -84,8 +155,8 @@
           <IsRetrievable>0</IsRetrievable>
           <IsLocalizable>0</IsLocalizable>
           <Format>text</Format>
-          <MaxLength>20</MaxLength>
-          <Length>20</Length>
+          <MaxLength>100</MaxLength>
+          <Length>200</Length>
           <displaynames>
             <displayname description="Fail reason code" languagecode="1033" />
           </displaynames>
@@ -722,6 +793,20 @@
           </Descriptions>
         </attribute>
       </attributes>
+      <EntityKeys>
+        <EntityKey>
+          <Name>al_FailReasonCodeKey</Name>
+          <LogicalName>al_failreasoncodekey</LogicalName>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <EntityKeyAttributes>
+            <AttributeName>al_failreasoncode</AttributeName>
+          </EntityKeyAttributes>
+          <displaynames>
+            <displayname description="Fail reason code key" languagecode="1033" />
+          </displaynames>
+        </EntityKey>
+      </EntityKeys>
       <EntitySetName>al_failreasons</EntitySetName>
       <IsDuplicateCheckSupported>0</IsDuplicateCheckSupported>
       <IsBusinessProcessEnabled>0</IsBusinessProcessEnabled>

@@ -1,0 +1,65 @@
+{
+  "$comment": "Contract for the CompleteRemediation server-side command (AD-003, command-concurrency skill). Deployed by plugins/deploy/Register-CompleteRemediation.ps1. Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_CompleteRemediation",
+    "name": "al_CompleteRemediation",
+    "displayname": "Complete Remediation",
+    "description": "Adviser marks a remediation action Completed (BR-006, BR-008, FR-020..FR-023). Enforces caller, transition, optimistic concurrency and idempotency, and writes an immutable Audit Event.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.CompleteRemediationPlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "TargetId",
+      "name": "TargetId",
+      "displayname": "Target id",
+      "description": "Id of the al_remediationaction to complete.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "ExpectedRowVersion",
+      "name": "ExpectedRowVersion",
+      "displayname": "Expected row version",
+      "description": "Row version the client read, for optimistic concurrency. Omit to skip the check.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay upserts the same Audit Event.",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "Status",
+      "name": "Status",
+      "displayname": "Status",
+      "description": "The action status after the command (Completed).",
+      "type": 10
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written for this command.",
+      "type": 10
+    },
+    {
+      "uniquename": "Conflict",
+      "name": "Conflict",
+      "displayname": "Conflict",
+      "description": "True when the command was rejected for an optimistic-concurrency conflict.",
+      "type": 0
+    }
+  ]
+}

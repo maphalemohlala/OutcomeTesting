@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="CaseId">
+  <description default="Id of the al_outcomecase that was updated.">
+    <label description="Id of the al_outcomecase that was updated." languagecode="1033" />
+  </description>
+  <displayname default="Case id">
+    <label description="Case id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_UpdateCaseDetails.CaseId</name>
+  <type>10</type>
+</customapiresponseproperty>

@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="PermissionId">
+  <description default="Id of the al_pagepermission written.">
+    <label description="Id of the al_pagepermission written." languagecode="1033" />
+  </description>
+  <displayname default="Permission id">
+    <label description="Permission id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_SetPagePermission.PermissionId</name>
+  <type>10</type>
+</customapiresponseproperty>

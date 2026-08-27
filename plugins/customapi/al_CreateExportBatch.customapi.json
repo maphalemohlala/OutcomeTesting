@@ -1,0 +1,26 @@
+{
+  "$comment": "Contract for the CreateExportBatch server-side command (AD-003, AD-039, AD-034 manual only). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_CreateExportBatch",
+    "name": "al_CreateExportBatch",
+    "displayname": "Create Export Batch",
+    "description": "Opens one manual Trail Light export run in Draft (AD-039). Enforces the caller holds Edit on export.generate, upserts al_exportbatch idempotently and writes an immutable Audit Event.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.CreateExportBatchPlugin"
+  },
+  "requestParameters": [
+    { "uniquename": "Name", "name": "Name", "displayname": "Name", "description": "Optional label for the batch.", "type": 10, "isoptional": true },
+    { "uniquename": "IdempotencyKey", "name": "IdempotencyKey", "displayname": "Idempotency key", "description": "Stable key for the intent; a replay returns the same batch.", "type": 10, "isoptional": false }
+  ],
+  "responseProperties": [
+    { "uniquename": "BatchId", "name": "BatchId", "displayname": "Batch id", "description": "Id of the al_exportbatch created.", "type": 10 },
+    { "uniquename": "Status", "name": "Status", "displayname": "Status", "description": "Draft.", "type": 10 },
+    { "uniquename": "AuditEventId", "name": "AuditEventId", "displayname": "Audit event id", "description": "Id of the Audit Event written.", "type": 10 },
+    { "uniquename": "Conflict", "name": "Conflict", "displayname": "Conflict", "description": "True when an optimistic-concurrency conflict was detected.", "type": 0 }
+  ]
+}

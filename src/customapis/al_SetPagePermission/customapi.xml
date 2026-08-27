@@ -1,0 +1,18 @@
+<customapi uniquename="al_SetPagePermission">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Administrator sets the access level a role has on a resource key, a page or capability (AD-041). Enforces the caller holds Manage on permission.manage, upserts al_pagepermission idempotently and writes an immutable Audit Event.">
+    <label description="Administrator sets the access level a role has on a resource key, a page or capability (AD-041). Enforces the caller holds Manage on permission.manage, upserts al_pagepermission idempotently and writes an immutable Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Set Page Permission">
+    <label description="Set Page Permission" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_SetPagePermission</name>
+  <plugintypeid>
+    <plugintypeexportkey>0512aec1-20a2-f111-b8dd-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

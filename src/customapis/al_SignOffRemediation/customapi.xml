@@ -1,0 +1,18 @@
+<customapi uniquename="al_SignOffRemediation">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="T&amp;C Manager validates a completed remediation action (BR-008, FR-023). Records an Approved or Rejected sign-off; a Rejected sign-off requires notes and returns the action to the adviser. Enforces the transition guard, optimistic concurrency and idempotency, and writes an immutable Audit Event.">
+    <label description="T&amp;C Manager validates a completed remediation action (BR-008, FR-023). Records an Approved or Rejected sign-off; a Rejected sign-off requires notes and returns the action to the adviser. Enforces the transition guard, optimistic concurrency and idempotency, and writes an immutable Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Sign Off Remediation">
+    <label description="Sign Off Remediation" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_SignOffRemediation</name>
+  <plugintypeid>
+    <plugintypeexportkey>6ca40cc1-07a2-f111-b8dd-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

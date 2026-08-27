@@ -1,0 +1,29 @@
+{
+  "$comment": "Contract for the SetPagePermission server-side command (AD-003, AD-041). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_SetPagePermission",
+    "name": "al_SetPagePermission",
+    "displayname": "Set Page Permission",
+    "description": "Administrator sets the access level a role has on a resource key, a page or capability (AD-041). Enforces the caller holds Manage on permission.manage, upserts al_pagepermission idempotently and writes an immutable Audit Event.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.SetPagePermissionPlugin"
+  },
+  "requestParameters": [
+    { "uniquename": "AppRole", "name": "AppRole", "displayname": "App role", "description": "Built-in role the rule applies to. Omit when RoleCode is supplied.", "type": 10, "isoptional": true },
+    { "uniquename": "RoleCode", "name": "RoleCode", "displayname": "Role code", "description": "Optional. Stable al_role code for a custom role (AD-044). When supplied, it takes precedence over AppRole.", "type": 10, "isoptional": true },
+    { "uniquename": "ResourceKey", "name": "ResourceKey", "displayname": "Resource key", "description": "Governed page or capability key, e.g. page.exports or command.regrade.", "type": 10, "isoptional": false },
+    { "uniquename": "AccessLevel", "name": "AccessLevel", "displayname": "Access level", "description": "None, View, Edit or Manage.", "type": 10, "isoptional": false },
+    { "uniquename": "IdempotencyKey", "name": "IdempotencyKey", "displayname": "Idempotency key", "description": "Stable key for the intent; a replay returns the same rule.", "type": 10, "isoptional": false }
+  ],
+  "responseProperties": [
+    { "uniquename": "PermissionId", "name": "PermissionId", "displayname": "Permission id", "description": "Id of the al_pagepermission written.", "type": 10 },
+    { "uniquename": "Status", "name": "Status", "displayname": "Status", "description": "The access level recorded.", "type": 10 },
+    { "uniquename": "AuditEventId", "name": "AuditEventId", "displayname": "Audit event id", "description": "Id of the Audit Event written.", "type": 10 },
+    { "uniquename": "Conflict", "name": "Conflict", "displayname": "Conflict", "description": "True when an optimistic-concurrency conflict was detected.", "type": 0 }
+  ]
+}

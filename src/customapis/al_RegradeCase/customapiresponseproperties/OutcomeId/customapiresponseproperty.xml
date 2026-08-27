@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="OutcomeId">
+  <description default="Id of the al_outcome record that was regraded.">
+    <label description="Id of the al_outcome record that was regraded." languagecode="1033" />
+  </description>
+  <displayname default="Outcome id">
+    <label description="Outcome id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_RegradeCase.OutcomeId</name>
+  <type>10</type>
+</customapiresponseproperty>

@@ -11,5 +11,96 @@
   "localAppUrl": "http://localhost:3000",
   "logoPath": "Default",
   "connectionReferences": {},
-  "databaseReferences": {}
+  "databaseReferences": {
+    "default.cds": {
+      "dataSources": {
+        "outcomecases": {
+          "entitySetName": "al_outcomecases",
+          "logicalName": "al_outcomecase",
+          "isHidden": false
+        },
+        "sections": {
+          "entitySetName": "al_sections",
+          "logicalName": "al_section",
+          "isHidden": false
+        },
+        "questions": {
+          "entitySetName": "al_questions",
+          "logicalName": "al_question",
+          "isHidden": false
+        },
+        "questionversions": {
+          "entitySetName": "al_questionversions",
+          "logicalName": "al_questionversion",
+          "isHidden": false
+        },
+        "reviewinstances": {
+          "entitySetName": "al_reviewinstances",
+          "logicalName": "al_reviewinstance",
+          "isHidden": false
+        },
+        "responses": {
+          "entitySetName": "al_responses",
+          "logicalName": "al_response",
+          "isHidden": false
+        },
+        "importbatches": {
+          "entitySetName": "al_importbatches",
+          "logicalName": "al_importbatch",
+          "isHidden": false
+        },
+        "importexceptions": {
+          "entitySetName": "al_importexceptions",
+          "logicalName": "al_importexception",
+          "isHidden": false
+        },
+        "remediationactions": {
+          "entitySetName": "al_remediationactions",
+          "logicalName": "al_remediationaction",
+          "isHidden": false
+        },
+        "outcomes": {
+          "entitySetName": "al_outcomes",
+          "logicalName": "al_outcome",
+          "isHidden": false
+        },
+        "sign_offs": {
+          "entitySetName": "al_signoffs",
+          "logicalName": "al_signoff",
+          "isHidden": false
+        },
+        "userrolemappings": {
+          "entitySetName": "al_userrolemappings",
+          "logicalName": "al_userrolemapping",
+          "isHidden": false
+        },
+        "pagepermissions": {
+          "entitySetName": "al_pagepermissions",
+          "logicalName": "al_pagepermission",
+          "isHidden": false
+        },
+        "exportbatches": {
+          "entitySetName": "al_exportbatches",
+          "logicalName": "al_exportbatch",
+          "isHidden": false
+        },
+        "exportrecords": {
+          "entitySetName": "al_exportrecords",
+          "logicalName": "al_exportrecord",
+          "isHidden": false
+        },
+        "roles": {
+          "entitySetName": "al_roles",
+          "logicalName": "al_role",
+          "isHidden": false
+        },
+        "users": {
+          "entitySetName": "al_users",
+          "logicalName": "al_user",
+          "isHidden": false
+        }
+      },
+      "environmentVariableName": ""
+    }
+  }
 }

@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="WorkEmail">
+  <description default="The person's work email. This is the stable user identifier and the alternate key.">
+    <label description="The person's work email. This is the stable user identifier and the alternate key." languagecode="1033" />
+  </description>
+  <displayname default="Work email">
+    <label description="Work email" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_CreateUser.WorkEmail</name>
+  <type>10</type>
+</customapirequestparameter>

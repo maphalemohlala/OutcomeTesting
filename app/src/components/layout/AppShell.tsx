@@ -1,9 +1,10 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { NAV_GROUPS } from '../../app/navigation';
 import type { NavGroup } from '../../app/navigation';
 import { readCollapsedGroups, writeCollapsedGroups } from '../../app/navigationState';
 import { useCurrentUser } from '../../services/auth/useCurrentUser';
+import { usePermissions } from '../../app/permissions/permissionContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import './AppShell.css';
 
@@ -81,7 +82,19 @@ function SignedInUser() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
+  const { can } = usePermissions();
   const isCompact = useMediaQuery('(max-width: 60rem)');
+
+  // Only show pages the current role may view (AD-041). Empty groups drop out.
+  const navGroups = useMemo<NavGroup[]>(
+    () =>
+      NAV_GROUPS.map((group) => ({
+        ...group,
+        items: group.items.filter((item) => can(item.resource)),
+      })).filter((group) => group.items.length > 0),
+    [can],
+  );
+
   const [collapsed, setCollapsed] = useState<string[]>(() => {
     const stored = readCollapsedGroups();
     const active = NAV_GROUPS.find((group) => groupContainsRoute(group, pathname));
@@ -121,7 +134,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <nav className="shell__rail" aria-label="Sections">
-        {NAV_GROUPS.map((group) =>
+        {navGroups.map((group) =>
           isCompact ? (
             <div className="shell__group" key={group.heading}>
               <h2 className="visually-hidden">{group.heading}</h2>

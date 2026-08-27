@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Role id="{457c6daf-28a2-f111-b8dd-e4fade069307}" name="Outcome Testing App Admin" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <IsCustomizable>1</IsCustomizable>
+  <IsAutoAssigned>0</IsAutoAssigned>
+  <RolePrivileges>
+    <RolePrivilege name="prvAppendal_ExportBatch" level="Global" />
+    <RolePrivilege name="prvAppendal_ExportRecord" level="Global" />
+    <RolePrivilege name="prvAppendal_PagePermission" level="Global" />
+    <RolePrivilege name="prvAppendal_QuestionVersion" level="Global" />
+    <RolePrivilege name="prvAppendal_UserRoleMapping" level="Global" />
+    <RolePrivilege name="prvAppendToal_ExportBatch" level="Global" />
+    <RolePrivilege name="prvAppendToal_ExportRecord" level="Global" />
+    <RolePrivilege name="prvAppendToal_PagePermission" level="Global" />
+    <RolePrivilege name="prvAppendToal_Question" level="Global" />
+    <RolePrivilege name="prvAppendToal_QuestionVersion" level="Global" />
+    <RolePrivilege name="prvAppendToal_UserRoleMapping" level="Global" />
+    <RolePrivilege name="prvCreateal_ExportBatch" level="Global" />
+    <RolePrivilege name="prvCreateal_ExportRecord" level="Global" />
+    <RolePrivilege name="prvCreateal_PagePermission" level="Global" />
+    <RolePrivilege name="prvCreateal_QuestionVersion" level="Global" />
+    <RolePrivilege name="prvCreateal_UserRoleMapping" level="Global" />
+    <RolePrivilege name="prvCreateSharePointData" level="Global" />
+    <RolePrivilege name="prvDeleteal_PagePermission" level="Global" />
+    <RolePrivilege name="prvDeleteal_UserRoleMapping" level="Global" />
+    <RolePrivilege name="prvReadal_ExportBatch" level="Global" />
+    <RolePrivilege name="prvReadal_ExportRecord" level="Global" />
+    <RolePrivilege name="prvReadal_PagePermission" level="Global" />
+    <RolePrivilege name="prvReadal_Question" level="Global" />
+    <RolePrivilege name="prvReadal_QuestionVersion" level="Global" />
+    <RolePrivilege name="prvReadal_UserRoleMapping" level="Global" />
+    <RolePrivilege name="prvReadPluginAssembly" level="Global" />
+    <RolePrivilege name="prvReadPluginType" level="Global" />
+    <RolePrivilege name="prvReadSdkMessage" level="Global" />
+    <RolePrivilege name="prvReadSdkMessageProcessingStep" level="Global" />
+    <RolePrivilege name="prvReadSdkMessageProcessingStepImage" level="Global" />
+    <RolePrivilege name="prvReadSharePointData" level="Global" />
+    <RolePrivilege name="prvReadSharePointDocument" level="Global" />
+    <RolePrivilege name="prvWriteal_ExportBatch" level="Global" />
+    <RolePrivilege name="prvWriteal_ExportRecord" level="Global" />
+    <RolePrivilege name="prvWriteal_PagePermission" level="Global" />
+    <RolePrivilege name="prvWriteal_QuestionVersion" level="Global" />
+    <RolePrivilege name="prvWriteal_UserRoleMapping" level="Global" />
+    <RolePrivilege name="prvWriteSharePointData" level="Global" />
+  </RolePrivileges>
+</Role>

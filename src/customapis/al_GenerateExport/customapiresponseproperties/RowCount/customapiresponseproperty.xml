@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="RowCount">
+  <description default="Number of export records produced.">
+    <label description="Number of export records produced." languagecode="1033" />
+  </description>
+  <displayname default="Row count">
+    <label description="Row count" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_GenerateExport.RowCount</name>
+  <type>10</type>
+</customapiresponseproperty>

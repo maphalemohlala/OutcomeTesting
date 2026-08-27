@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="SignoffId">
+  <description default="Id of the al_signoff record written for this command.">
+    <label description="Id of the al_signoff record written for this command." languagecode="1033" />
+  </description>
+  <displayname default="Sign-off id">
+    <label description="Sign-off id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_SignOffRemediation.SignoffId</name>
+  <type>10</type>
+</customapiresponseproperty>

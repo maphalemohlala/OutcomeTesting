@@ -1,0 +1,11 @@
+IO reference,Client name,Adviser name,Adviser code,Adviser status,Paraplanner,Paraplanner code,Products,Case type,Advice date,Product / solution type,Sample source,Checker name,Check date,Pre or post check,Vulnerable client,Tax check required,Tax team disposition
+IO-100001,A. Client,Jane Adviser,ADV-01,CAS,Sam Paraplanner,PP-01,Pension; ISA,New advice,31/01/2026,Accumulation Pension,Random,Chris Checker,05/02/2026,Pre,N/A,No,Submit to AQS
+IO-100002,B. Client,Alex Adviser,ADV-02,PreCAS,Taylor Paraplanner,PP-02,ISA,Review,14/02/2026,Accumulation investment,Mandatory,Morgan Checker,20/02/2026,Post,No,No,Submit to AQS
+IO-100003,C. Client,Priya Adviser,ADV-03,Enhanced,Jordan Paraplanner,PP-03,Pension,New advice,03/03/2026,Accumulation Pension,High Risk,Casey Checker,10/03/2026,Pre,Yes,Yes,Return to paraplanner
+IO-100004,D. Client,Daniel Adviser,ADV-04,CAS,Riley Paraplanner,PP-04,Bond; ISA,Ongoing,18/03/2026,IHT,Thematic,Jamie Checker,25/03/2026,Post,Potentially vulnerable,Yes,Submit to AQS
+IO-100005,E. Client,Amira Adviser,ADV-05,Watchlist,Avery Paraplanner,PP-05,Pension; GIA,Switch/Transfer,07/04/2026,Accumulation Pension,Mandatory,Robin Checker,14/04/2026,Pre,No,Yes,Return to paraplanner
+IO-100006,F. Client,Lewis Adviser,ADV-06,CAS,Cameron Paraplanner,PP-06,Protection,New advice,22/04/2026,Protection,Random,Drew Checker,29/04/2026,Post,Yes,No,Submit to AQS
+IO-100007,G. Client,Sofia Adviser,ADV-07,PreCAS,Quinn Paraplanner,PP-07,Protection,New advice,09/05/2026,Protection,High Risk,Skyler Checker,15/05/2026,Pre,No,No,Submit to AQS
+IO-100008,H. Client,Noah Adviser,ADV-08,CAS,Reese Paraplanner,PP-08,Pension,Review,27/05/2026,No change reviews,Random,Emerson Checker,03/06/2026,Post,N/A,Yes,Submit to AQS
+IO-100009,I. Client,Grace Adviser,ADV-09,Enhanced,Hayden Paraplanner,PP-09,ISA; GIA,Ongoing,11/06/2026,Accumulation investment,Thematic,Finley Checker,18/06/2026,Pre,Yes,No,Submit to AQS
+IO-100010,J. Client,Omar Adviser,ADV-10,CAS,Parker Paraplanner,PP-10,Pension; Bond,Switch/Transfer,30/06/2026,IHT,Mandatory,Rowan Checker,07/07/2026,Post,No,Yes,Return to paraplanner

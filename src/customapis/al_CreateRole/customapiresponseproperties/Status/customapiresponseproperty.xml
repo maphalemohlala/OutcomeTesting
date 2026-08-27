@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Status">
+  <description default="Result status.">
+    <label description="Result status." languagecode="1033" />
+  </description>
+  <displayname default="Status">
+    <label description="Status" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_CreateRole.Status</name>
+  <type>10</type>
+</customapiresponseproperty>

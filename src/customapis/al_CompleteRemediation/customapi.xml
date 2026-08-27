@@ -1,0 +1,18 @@
+<customapi uniquename="al_CompleteRemediation">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Adviser marks a remediation action Completed (BR-006, BR-008, FR-020..FR-023). Enforces caller, transition, optimistic concurrency and idempotency, and writes an immutable Audit Event.">
+    <label description="Adviser marks a remediation action Completed (BR-006, BR-008, FR-020..FR-023). Enforces caller, transition, optimistic concurrency and idempotency, and writes an immutable Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Complete Remediation">
+    <label description="Complete Remediation" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_CompleteRemediation</name>
+  <plugintypeid>
+    <plugintypeexportkey>7d51d0d1-f5a1-f111-b8dd-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

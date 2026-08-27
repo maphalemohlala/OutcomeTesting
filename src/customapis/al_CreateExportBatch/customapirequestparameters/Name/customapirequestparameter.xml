@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Name">
+  <description default="Optional label for the batch.">
+    <label description="Optional label for the batch." languagecode="1033" />
+  </description>
+  <displayname default="Name">
+    <label description="Name" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>al_CreateExportBatch.Name</name>
+  <type>10</type>
+</customapirequestparameter>

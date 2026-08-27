@@ -1,0 +1,27 @@
+{
+  "$comment": "Contract for the GenerateExport server-side command (AD-003, AD-039, AD-034 manual only). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_GenerateExport",
+    "name": "al_GenerateExport",
+    "displayname": "Generate Export",
+    "description": "Snapshots each Closed case into an al_exportrecord in the AD-039 20-column Trail Light shape and marks the batch Generated. Enforces the caller holds Edit on export.generate, is idempotent per batch and writes an immutable Audit Event.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.GenerateExportPlugin"
+  },
+  "requestParameters": [
+    { "uniquename": "BatchId", "name": "BatchId", "displayname": "Batch id", "description": "Id of the al_exportbatch to populate.", "type": 10, "isoptional": false },
+    { "uniquename": "IdempotencyKey", "name": "IdempotencyKey", "displayname": "Idempotency key", "description": "Stable key for the intent; a replay returns the same result.", "type": 10, "isoptional": false }
+  ],
+  "responseProperties": [
+    { "uniquename": "BatchId", "name": "BatchId", "displayname": "Batch id", "description": "Id of the batch populated.", "type": 10 },
+    { "uniquename": "RowCount", "name": "RowCount", "displayname": "Row count", "description": "Number of export records produced.", "type": 10 },
+    { "uniquename": "Status", "name": "Status", "displayname": "Status", "description": "Generated.", "type": 10 },
+    { "uniquename": "AuditEventId", "name": "AuditEventId", "displayname": "Audit event id", "description": "Id of the Audit Event written.", "type": 10 },
+    { "uniquename": "Conflict", "name": "Conflict", "displayname": "Conflict", "description": "True when an optimistic-concurrency conflict was detected.", "type": 0 }
+  ]
+}
