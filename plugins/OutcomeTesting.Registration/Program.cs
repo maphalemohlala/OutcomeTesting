@@ -81,6 +81,11 @@ if (args.Length >= 2 && args[0].Equals("grantsecurity", StringComparison.Ordinal
     return GrantSecurity(args[1]);
 }
 
+if (args.Length >= 3 && args[0].Equals("seedadmin", StringComparison.OrdinalIgnoreCase))
+{
+    return SeedAdmin(args[1], args[2]);
+}
+
 if (args.Length < 1)
 {
     Console.Error.WriteLine("Usage: dotnet run -- <orgUrl> [<pluginDllPath>]   |   dotnet run -- verify <orgUrl>");
@@ -277,6 +282,80 @@ int Verify(string orgUrl)
 // component type for Custom APIs, so it is added via a solution-file import instead
 // (src/customapis/al_CompleteRemediation, pac solution import). ComponentType codes:
 // 90 = Plugin Type, 91 = Plugin Assembly.
+
+// Seeds an application Administrator (AD-041) directly into the app-RBAC tables, bypassing
+// the al_AssignUserRole/al_SetPagePermission command gate (which needs an existing admin).
+// Writes al_userrolemapping (email -> Administrator) and al_pagepermission rows granting
+// Administrator Manage on every resource key, so the named account can operate the whole app.
+int SeedAdmin(string orgUrl, string email)
+{
+    email = email.Trim();
+    const int administratorRole = 120910765; // al_approle Administrator
+    const int manageLevel = 120910769;       // al_accesslevel Manage
+    string[] resourceKeys =
+    {
+        "page.dashboard", "page.cases", "page.imports", "page.reviews", "page.remediation",
+        "page.reports", "page.exports", "page.admin.questions", "page.admin.security",
+        "page.admin.users", "command.assign", "command.regrade", "command.signoff",
+        "remediation.complete", "question.retire", "export.generate", "permission.manage",
+    };
+
+    using var svc = Connect(orgUrl);
+
+    Guid UpsertByCode(string table, string codeAttr, string code, Entity values)
+    {
+        var id = FindId(svc, table, (codeAttr, code));
+        if (id == Guid.Empty)
+        {
+            id = svc.Create(values);
+            Console.WriteLine($"  created {table}: {code}");
+        }
+        else
+        {
+            var update = new Entity(table, id);
+            foreach (var attr in values.Attributes)
+            {
+                if (attr.Key != codeAttr)
+                {
+                    update[attr.Key] = attr.Value;
+                }
+            }
+            svc.Update(update);
+            Console.WriteLine($"  updated {table}: {code}");
+        }
+        return id;
+    }
+
+    var mappingCode = "URM-" + email.ToLowerInvariant() + "-" + administratorRole;
+    UpsertByCode("al_userrolemapping", "al_userrolemappingcode", mappingCode, new Entity("al_userrolemapping")
+    {
+        ["al_name"] = "Administrator - " + email,
+        ["al_useremail"] = email,
+        ["al_approle"] = new OptionSetValue(administratorRole),
+        ["al_userrolemappingcode"] = mappingCode,
+        ["statecode"] = new OptionSetValue(0),
+        ["statuscode"] = new OptionSetValue(1),
+    });
+
+    foreach (var resourceKey in resourceKeys)
+    {
+        var permissionCode = "PP-" + administratorRole + "-" + resourceKey;
+        UpsertByCode("al_pagepermission", "al_pagepermissioncode", permissionCode, new Entity("al_pagepermission")
+        {
+            ["al_name"] = "Administrator / " + resourceKey,
+            ["al_approle"] = new OptionSetValue(administratorRole),
+            ["al_resourcekey"] = resourceKey,
+            ["al_accesslevel"] = new OptionSetValue(manageLevel),
+            ["al_pagepermissioncode"] = permissionCode,
+            ["statecode"] = new OptionSetValue(0),
+            ["statuscode"] = new OptionSetValue(1),
+        });
+    }
+
+    Console.WriteLine($"Done. {email} is an application Administrator with Manage on all {resourceKeys.Length} resources.");
+    return 0;
+}
+
 int AddToSolution(string orgUrl, string solutionUniqueName)
 {
     using var svc = Connect(orgUrl);
