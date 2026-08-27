@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Status">
+  <description default="The access level recorded.">
+    <label description="The access level recorded." languagecode="1033" />
+  </description>
+  <displayname default="Status">
+    <label description="Status" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_SetPagePermission.Status</name>
+  <type>10</type>
+</customapiresponseproperty>

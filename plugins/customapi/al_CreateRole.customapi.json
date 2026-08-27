@@ -1,0 +1,72 @@
+{
+  "$comment": "Contract for the CreateRole server-side command (AD-003, AD-041, AD-044). Deployed via the registration console (plugins/OutcomeTesting.Registration) and added to the OutcomeTesting solution via a solution-file import (src/customapis/al_CreateRole). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_CreateRole",
+    "name": "al_CreateRole",
+    "displayname": "Create Role",
+    "description": "An administrator adds a role to the extensible role registry (al_role). Enforces the AD-041 permission.manage Manage permission, upserts on the role business code (idempotent) and writes an immutable Audit Event (BR-012).",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.CreateRolePlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "RoleName",
+      "name": "RoleName",
+      "displayname": "Role name",
+      "description": "Name of the role to create.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "Description",
+      "name": "Description",
+      "displayname": "Description",
+      "description": "What the role is for. Optional.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay returns the same role.",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "RoleId",
+      "name": "RoleId",
+      "displayname": "Role id",
+      "description": "Id of the al_role record.",
+      "type": 10
+    },
+    {
+      "uniquename": "Status",
+      "name": "Status",
+      "displayname": "Status",
+      "description": "Result status.",
+      "type": 10
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written for this command.",
+      "type": 10
+    },
+    {
+      "uniquename": "Conflict",
+      "name": "Conflict",
+      "displayname": "Conflict",
+      "description": "True when the command was rejected for a conflict.",
+      "type": 0
+    }
+  ]
+}

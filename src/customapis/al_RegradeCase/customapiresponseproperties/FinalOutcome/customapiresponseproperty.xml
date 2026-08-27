@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="FinalOutcome">
+  <description default="The final outcome recorded.">
+    <label description="The final outcome recorded." languagecode="1033" />
+  </description>
+  <displayname default="Final outcome">
+    <label description="Final outcome" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_RegradeCase.FinalOutcome</name>
+  <type>10</type>
+</customapiresponseproperty>

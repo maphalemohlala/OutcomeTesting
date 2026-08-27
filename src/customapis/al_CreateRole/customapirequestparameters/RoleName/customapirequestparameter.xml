@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="RoleName">
+  <description default="Name of the role to create.">
+    <label description="Name of the role to create." languagecode="1033" />
+  </description>
+  <displayname default="Role name">
+    <label description="Role name" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_CreateRole.RoleName</name>
+  <type>10</type>
+</customapirequestparameter>

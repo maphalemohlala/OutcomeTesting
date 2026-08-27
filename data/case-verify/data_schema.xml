@@ -1,0 +1,10 @@
+<entities>
+  <entity name="al_outcomecase" displayname="Outcome Case" primaryidfield="al_outcomecaseid" primarynamefield="al_name" disableplugins="false">
+    <fields>
+      <field displayname="Case name" name="al_name" type="string" customfield="true" primaryKey="true" />
+      <field displayname="IO reference" name="al_casereference" type="string" customfield="true" />
+      <field displayname="Case status" name="al_casestatus" type="optionsetvalue" customfield="true" />
+    </fields>
+    <relationships />
+  </entity>
+</entities>

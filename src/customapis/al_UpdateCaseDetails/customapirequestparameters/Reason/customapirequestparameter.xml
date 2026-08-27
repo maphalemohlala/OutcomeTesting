@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Reason">
+  <description default="Mandatory reason for the change, recorded on the Audit Event (BR-012, NFR-AUD-01).">
+    <label description="Mandatory reason for the change, recorded on the Audit Event (BR-012, NFR-AUD-01)." languagecode="1033" />
+  </description>
+  <displayname default="Reason">
+    <label description="Reason" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_UpdateCaseDetails.Reason</name>
+  <type>10</type>
+</customapirequestparameter>

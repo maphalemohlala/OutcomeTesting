@@ -1,0 +1,16 @@
+.user-picker,
+.user-picker__fallback {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius);
+  background: var(--colour-surface);
+  color: var(--colour-text);
+  font: inherit;
+}
+
+.user-picker:focus-visible,
+.user-picker__fallback:focus-visible {
+  outline: 2px solid var(--colour-action);
+  outline-offset: 1px;
+}

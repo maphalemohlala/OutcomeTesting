@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Notes">
+  <description default="Sign-off notes. Required when the decision is Rejected (BR-008).">
+    <label description="Sign-off notes. Required when the decision is Rejected (BR-008)." languagecode="1033" />
+  </description>
+  <displayname default="Notes">
+    <label description="Notes" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>al_SignOffRemediation.Notes</name>
+  <type>10</type>
+</customapirequestparameter>

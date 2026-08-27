@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="AppRole">
+  <description default="Built-in role label, e.g. Administrator or T&amp;C Manager. Omit when RoleCode is supplied.">
+    <label description="Built-in role label, e.g. Administrator or T&amp;C Manager. Omit when RoleCode is supplied." languagecode="1033" />
+  </description>
+  <displayname default="App role">
+    <label description="App role" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>al_AssignUserRole.AppRole</name>
+  <type>10</type>
+</customapirequestparameter>

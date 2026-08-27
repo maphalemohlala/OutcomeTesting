@@ -16,7 +16,7 @@ For each command define: caller roles, preconditions and transition guard, input
 
 Concurrency rules: the client sends the row version it read; the command rejects a stale version with a distinct conflict failure code; the client surfaces a reload-and-retry path rather than silently overwriting. Retried commands with the same idempotency key must not duplicate records or actions.
 
-Immutability rules: submitted review responses and initial outcomes are never updated in place. Reopen, override and regrade require an elevated role and a mandatory reason, and remain blocked until OD-007 is resolved.
+Immutability rules: submitted review responses and initial outcomes are never updated in place (BR-007). Reopen, override and regrade require the elevated outcome-correction role (T&C Manager, with Outcome Testing Manager/Administrator escalation) and a mandatory reason written to an immutable Audit Event (OD-007 resolved, AD-031; BR-012, NFR-AUD-01).
 
 Produce unit tests for guards and idempotency, and integration tests for the conflict path, the unauthorised-caller path and the replay path.
 

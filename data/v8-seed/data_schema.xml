@@ -1,0 +1,64 @@
+<entities>
+  <entity name="al_checklist" displayname="Checklist" primaryidfield="al_checklistid" primarynamefield="al_name" disableplugins="false">
+    <fields>
+      <field displayname="Checklist name" name="al_name" type="string" customfield="true" primaryKey="true" />
+      <field displayname="Checklist code" name="al_checklistcode" type="string" customfield="true" />
+      <field displayname="Display order" name="al_displayorder" type="number" customfield="true" />
+    </fields>
+    <relationships />
+  </entity>
+  <entity name="al_checklistversion" displayname="Checklist Version" primaryidfield="al_checklistversionid" primarynamefield="al_name" disableplugins="false">
+    <fields>
+      <field displayname="Checklist version name" name="al_name" type="string" customfield="true" primaryKey="true" />
+      <field displayname="Checklist version code" name="al_checklistversioncode" type="string" customfield="true" />
+      <field displayname="Version number" name="al_versionnumber" type="number" customfield="true" />
+      <field displayname="Effective from" name="al_effectivefrom" type="datetime" customfield="true" />
+      <field displayname="Checklist" name="al_checklistid" type="entityreference" customfield="true" lookupType="al_checklist" />
+    </fields>
+    <relationships />
+  </entity>
+  <entity name="al_section" displayname="Section" primaryidfield="al_sectionid" primarynamefield="al_name" disableplugins="false">
+    <fields>
+      <field displayname="Section name" name="al_name" type="string" customfield="true" primaryKey="true" />
+      <field displayname="Section code" name="al_sectioncode" type="string" customfield="true" />
+      <field displayname="Display order" name="al_displayorder" type="number" customfield="true" />
+      <field displayname="Owner role" name="al_ownerrole" type="optionsetvalue" customfield="true" />
+      <field displayname="Help text" name="al_helptext" type="string" customfield="true" />
+      <field displayname="Conditional" name="al_isconditional" type="bool" customfield="true" />
+      <field displayname="Checklist version" name="al_checklistversionid" type="entityreference" customfield="true" lookupType="al_checklistversion" />
+    </fields>
+    <relationships />
+  </entity>
+  <entity name="al_question" displayname="Question" primaryidfield="al_questionid" primarynamefield="al_name" disableplugins="false">
+    <fields>
+      <field displayname="Question name" name="al_name" type="string" customfield="true" primaryKey="true" />
+      <field displayname="Question code" name="al_questioncode" type="string" customfield="true" />
+      <field displayname="Display order" name="al_displayorder" type="number" customfield="true" />
+      <field displayname="Section" name="al_sectionid" type="entityreference" customfield="true" lookupType="al_section" />
+    </fields>
+    <relationships />
+  </entity>
+  <entity name="al_questionversion" displayname="Question Version" primaryidfield="al_questionversionid" primarynamefield="al_name" disableplugins="false">
+    <fields>
+      <field displayname="Question version name" name="al_name" type="string" customfield="true" primaryKey="true" />
+      <field displayname="Question version code" name="al_questionversioncode" type="string" customfield="true" />
+      <field displayname="Question text" name="al_questiontext" type="string" customfield="true" />
+      <field displayname="Version number" name="al_versionnumber" type="number" customfield="true" />
+      <field displayname="Display order" name="al_displayorder" type="number" customfield="true" />
+      <field displayname="Effective from" name="al_effectivefrom" type="datetime" customfield="true" />
+      <field displayname="Mandatory" name="al_ismandatory" type="bool" customfield="true" />
+      <field displayname="Response type" name="al_responsetype" type="optionsetvalue" customfield="true" />
+      <field displayname="Question" name="al_questionid" type="entityreference" customfield="true" lookupType="al_question" />
+    </fields>
+    <relationships />
+  </entity>
+  <entity name="al_failreason" displayname="Fail Reason" primaryidfield="al_failreasonid" primarynamefield="al_name" disableplugins="false">
+    <fields>
+      <field displayname="Reason" name="al_name" type="string" customfield="true" primaryKey="true" />
+      <field displayname="Fail reason code" name="al_failreasoncode" type="string" customfield="true" />
+      <field displayname="Display order" name="al_displayorder" type="number" customfield="true" />
+      <field displayname="Category" name="al_category" type="optionsetvalue" customfield="true" />
+    </fields>
+    <relationships />
+  </entity>
+</entities>

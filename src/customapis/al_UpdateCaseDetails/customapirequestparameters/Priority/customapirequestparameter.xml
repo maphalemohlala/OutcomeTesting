@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Priority">
+  <description default="New al_priority option value. Omit to leave the priority unchanged.">
+    <label description="New al_priority option value. Omit to leave the priority unchanged." languagecode="1033" />
+  </description>
+  <displayname default="Priority">
+    <label description="Priority" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>al_UpdateCaseDetails.Priority</name>
+  <type>10</type>
+</customapirequestparameter>

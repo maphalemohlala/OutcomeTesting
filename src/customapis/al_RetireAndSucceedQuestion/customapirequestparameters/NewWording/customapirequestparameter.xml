@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="NewWording">
+  <description default="Wording for the new question version.">
+    <label description="Wording for the new question version." languagecode="1033" />
+  </description>
+  <displayname default="New wording">
+    <label description="New wording" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_RetireAndSucceedQuestion.NewWording</name>
+  <type>10</type>
+</customapirequestparameter>

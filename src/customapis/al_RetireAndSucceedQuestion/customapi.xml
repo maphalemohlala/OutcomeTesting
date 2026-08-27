@@ -1,0 +1,18 @@
+<customapi uniquename="al_RetireAndSucceedQuestion">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Retires the current question version by dating it out and creates a successor with new wording, preserving frozen history for submitted reviews (BR-013). Enforces the caller holds Edit on question.retire and writes an immutable Audit Event.">
+    <label description="Retires the current question version by dating it out and creates a successor with new wording, preserving frozen history for submitted reviews (BR-013). Enforces the caller holds Edit on question.retire and writes an immutable Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Retire And Succeed Question">
+    <label description="Retire And Succeed Question" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_RetireAndSucceedQuestion</name>
+  <plugintypeid>
+    <plugintypeexportkey>1ddeb4bb-20a2-f111-b8dd-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

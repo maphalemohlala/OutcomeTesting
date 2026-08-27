@@ -44,8 +44,8 @@
           <IsRetrievable>0</IsRetrievable>
           <IsLocalizable>0</IsLocalizable>
           <Format>text</Format>
-          <MaxLength>20</MaxLength>
-          <Length>20</Length>
+          <MaxLength>100</MaxLength>
+          <Length>200</Length>
           <displaynames>
             <displayname description="Checklist code" languagecode="1033" />
           </displaynames>
@@ -722,6 +722,20 @@
           </Descriptions>
         </attribute>
       </attributes>
+      <EntityKeys>
+        <EntityKey>
+          <Name>al_ChecklistCodeKey</Name>
+          <LogicalName>al_checklistcodekey</LogicalName>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <EntityKeyAttributes>
+            <AttributeName>al_checklistcode</AttributeName>
+          </EntityKeyAttributes>
+          <displaynames>
+            <displayname description="Checklist code key" languagecode="1033" />
+          </displaynames>
+        </EntityKey>
+      </EntityKeys>
       <EntitySetName>al_checklists</EntitySetName>
       <IsDuplicateCheckSupported>0</IsDuplicateCheckSupported>
       <IsBusinessProcessEnabled>0</IsBusinessProcessEnabled>

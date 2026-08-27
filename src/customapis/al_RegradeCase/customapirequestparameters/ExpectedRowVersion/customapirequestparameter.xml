@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="ExpectedRowVersion">
+  <description default="Row version of the outcome, for optimistic concurrency. Omit to skip the check.">
+    <label description="Row version of the outcome, for optimistic concurrency. Omit to skip the check." languagecode="1033" />
+  </description>
+  <displayname default="Expected row version">
+    <label description="Expected row version" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>al_RegradeCase.ExpectedRowVersion</name>
+  <type>10</type>
+</customapirequestparameter>

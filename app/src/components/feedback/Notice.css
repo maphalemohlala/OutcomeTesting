@@ -1,0 +1,19 @@
+.notice {
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  border: 1px solid var(--colour-border);
+  border-left: 3px solid var(--colour-border-strong);
+}
+
+.notice[data-tone='success'] {
+  border-left-color: var(--colour-action);
+}
+
+.notice[data-tone='error'] {
+  border-left-color: var(--colour-outcome-harm);
+}
+
+.notice[data-tone='info'] {
+  border-left-color: var(--colour-action);
+}

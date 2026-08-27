@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="FullName">
+  <description default="The person's full name.">
+    <label description="The person's full name." languagecode="1033" />
+  </description>
+  <displayname default="Full name">
+    <label description="Full name" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_CreateUser.FullName</name>
+  <type>10</type>
+</customapirequestparameter>

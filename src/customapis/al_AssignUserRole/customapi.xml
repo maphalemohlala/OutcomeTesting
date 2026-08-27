@@ -1,0 +1,18 @@
+<customapi uniquename="al_AssignUserRole">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Administrator maps a person (work email, AD-010) to an application role (AD-041). Enforces the caller holds Manage on permission.manage, upserts al_userrolemapping idempotently and writes an immutable Audit Event.">
+    <label description="Administrator maps a person (work email, AD-010) to an application role (AD-041). Enforces the caller holds Manage on permission.manage, upserts al_userrolemapping idempotently and writes an immutable Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Assign User Role">
+    <label description="Assign User Role" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_AssignUserRole</name>
+  <plugintypeid>
+    <plugintypeexportkey>be558da9-20a2-f111-b8dd-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

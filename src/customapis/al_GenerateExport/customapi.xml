@@ -1,0 +1,18 @@
+<customapi uniquename="al_GenerateExport">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Snapshots each Closed case into an al_exportrecord in the AD-039 20-column Trail Light shape and marks the batch Generated. Enforces the caller holds Edit on export.generate, is idempotent per batch and writes an immutable Audit Event.">
+    <label description="Snapshots each Closed case into an al_exportrecord in the AD-039 20-column Trail Light shape and marks the batch Generated. Enforces the caller holds Edit on export.generate, is idempotent per batch and writes an immutable Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Generate Export">
+    <label description="Generate Export" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_GenerateExport</name>
+  <plugintypeid>
+    <plugintypeexportkey>a822aeb5-20a2-f111-b8dd-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

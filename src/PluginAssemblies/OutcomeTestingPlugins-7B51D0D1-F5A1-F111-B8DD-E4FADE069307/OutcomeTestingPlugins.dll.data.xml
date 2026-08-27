@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<PluginAssembly FullName="OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginAssemblyId="7b51d0d1-f5a1-f111-b8dd-e4fade069307" CustomizationLevel="1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <IsolationMode>2</IsolationMode>
+  <SourceType>0</SourceType>
+  <IntroducedVersion>1.0</IntroducedVersion>
+  <FileName>/PluginAssemblies/OutcomeTestingPlugins-7B51D0D1-F5A1-F111-B8DD-E4FADE069307/OutcomeTestingPlugins.dll</FileName>
+  <PluginTypes>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.AssignUserRolePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="be558da9-20a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.AssignUserRolePlugin">
+      <FriendlyName>OutcomeTesting.Plugins.AssignUserRolePlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CompleteRemediationPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="7d51d0d1-f5a1-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.CompleteRemediationPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.CompleteRemediationPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CreateExportBatchPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="f499b5af-20a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.CreateExportBatchPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.CreateExportBatchPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CreateRolePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="b8cb408b-35a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.CreateRolePlugin">
+      <FriendlyName>OutcomeTesting.Plugins.CreateRolePlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CreateUserPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="032c932d-3ea2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.CreateUserPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.CreateUserPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.GenerateExportPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="a822aeb5-20a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.GenerateExportPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.GenerateExportPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.RegradeCasePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="4b61d8ba-07a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.RegradeCasePlugin">
+      <FriendlyName>OutcomeTesting.Plugins.RegradeCasePlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.RetireAndSucceedQuestionPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="1ddeb4bb-20a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.RetireAndSucceedQuestionPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.RetireAndSucceedQuestionPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.SetPagePermissionPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="0512aec1-20a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.SetPagePermissionPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.SetPagePermissionPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.SignOffRemediationPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="6ca40cc1-07a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.SignOffRemediationPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.SignOffRemediationPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.UpdateCaseDetailsPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="8cf2e849-2fa2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.UpdateCaseDetailsPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.UpdateCaseDetailsPlugin</FriendlyName>
+    </PluginType>
+  </PluginTypes>
+</PluginAssembly>

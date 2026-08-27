@@ -1,0 +1,29 @@
+{
+  "$comment": "Contract for the RetireAndSucceedQuestion server-side command (AD-003, AD-004, FR-030/FR-031). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_RetireAndSucceedQuestion",
+    "name": "al_RetireAndSucceedQuestion",
+    "displayname": "Retire And Succeed Question",
+    "description": "Retires the current question version by dating it out and creates a successor with new wording, preserving frozen history for submitted reviews (BR-013). Enforces the caller holds Edit on question.retire and writes an immutable Audit Event.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.RetireAndSucceedQuestionPlugin"
+  },
+  "requestParameters": [
+    { "uniquename": "QuestionId", "name": "QuestionId", "displayname": "Question id", "description": "Id of the al_question to succeed.", "type": 10, "isoptional": false },
+    { "uniquename": "NewWording", "name": "NewWording", "displayname": "New wording", "description": "Wording for the new question version.", "type": 10, "isoptional": false },
+    { "uniquename": "ResponseType", "name": "ResponseType", "displayname": "Response type", "description": "Optional. Numeric al_responsetype option value for the new version. Absent carries the current value forward.", "type": 10, "isoptional": true },
+    { "uniquename": "Mandatory", "name": "Mandatory", "displayname": "Mandatory", "description": "Optional. 'true' or 'false' for whether the new version is mandatory. Absent carries the current value forward.", "type": 10, "isoptional": true },
+    { "uniquename": "IdempotencyKey", "name": "IdempotencyKey", "displayname": "Idempotency key", "description": "Stable key for the intent; a replay returns the same successor version.", "type": 10, "isoptional": false }
+  ],
+  "responseProperties": [
+    { "uniquename": "NewVersionId", "name": "NewVersionId", "displayname": "New version id", "description": "Id of the al_questionversion created.", "type": 10 },
+    { "uniquename": "VersionNumber", "name": "VersionNumber", "displayname": "Version number", "description": "Version number of the successor.", "type": 10 },
+    { "uniquename": "AuditEventId", "name": "AuditEventId", "displayname": "Audit event id", "description": "Id of the Audit Event written.", "type": 10 },
+    { "uniquename": "Conflict", "name": "Conflict", "displayname": "Conflict", "description": "True when an optimistic-concurrency conflict was detected.", "type": 0 }
+  ]
+}

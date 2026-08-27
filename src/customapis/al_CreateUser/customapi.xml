@@ -1,0 +1,18 @@
+<customapi uniquename="al_CreateUser">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="An administrator adds a person to the application user registry (al_user), keyed on work email (AD-010). Enforces the AD-041 permission.manage Manage permission, upserts on the work email (idempotent) and writes an immutable Audit Event (BR-012).">
+    <label description="An administrator adds a person to the application user registry (al_user), keyed on work email (AD-010). Enforces the AD-041 permission.manage Manage permission, upserts on the work email (idempotent) and writes an immutable Audit Event (BR-012)." languagecode="1033" />
+  </description>
+  <displayname default="Create User">
+    <label description="Create User" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_CreateUser</name>
+  <plugintypeid>
+    <plugintypeexportkey>032c932d-3ea2-f111-b8dd-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

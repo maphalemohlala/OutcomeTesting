@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="ResponseType">
+  <description default="Optional. Numeric al_responsetype option value for the new version. Absent carries the current value forward.">
+    <label description="Optional. Numeric al_responsetype option value for the new version. Absent carries the current value forward." languagecode="1033" />
+  </description>
+  <displayname default="Response type">
+    <label description="Response type" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>al_RetireAndSucceedQuestion.ResponseType</name>
+  <type>10</type>
+</customapirequestparameter>

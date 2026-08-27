@@ -1,0 +1,113 @@
+{
+  "$comment": "Contract for the UpdateCaseDetails server-side command (AD-003, AD-036, AD-041, command-concurrency skill). Deployed via the registration console (plugins/OutcomeTesting.Registration) and added to the OutcomeTesting solution via a solution-file import (src/customapis/al_UpdateCaseDetails). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_UpdateCaseDetails",
+    "name": "al_UpdateCaseDetails",
+    "displayname": "Update Case Details",
+    "description": "A manager amends the editable case header (status, review route, priority, due date) with a mandatory reason. Enforces the AD-041 page.cases Edit permission, optimistic concurrency and idempotency, and writes an immutable Audit Event recording the before/after of every changed field (BR-012).",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.UpdateCaseDetailsPlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "TargetId",
+      "name": "TargetId",
+      "displayname": "Target id",
+      "description": "Id of the al_outcomecase to update.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "Status",
+      "name": "Status",
+      "displayname": "Status",
+      "description": "New al_casestatus option value. Omit to leave the status unchanged.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "RouteId",
+      "name": "RouteId",
+      "displayname": "Route id",
+      "description": "New al_reviewroute id (the AD-036 Tax/AQS reassignment). Omit to leave the route unchanged.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "Priority",
+      "name": "Priority",
+      "displayname": "Priority",
+      "description": "New al_priority option value. Omit to leave the priority unchanged.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "DueDate",
+      "name": "DueDate",
+      "displayname": "Due date",
+      "description": "New due date (yyyy-MM-dd). Omit to leave the due date unchanged.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "Fields",
+      "name": "Fields",
+      "displayname": "Fields",
+      "description": "JSON object of editable al_outcomecase fields keyed by logical name (e.g. {\"al_clientname\":\"A. Client\",\"al_casetype\":\"120910510\"}). Choice fields take the numeric option value, dates yyyy-MM-dd. Only allowlisted fields are accepted; each change is audited. Omit to change nothing here.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "Reason",
+      "name": "Reason",
+      "displayname": "Reason",
+      "description": "Mandatory reason for the change, recorded on the Audit Event (BR-012, NFR-AUD-01).",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "ExpectedRowVersion",
+      "name": "ExpectedRowVersion",
+      "displayname": "Expected row version",
+      "description": "Row version of the case, for optimistic concurrency. Omit to skip the check.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay returns the same result.",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "CaseId",
+      "name": "CaseId",
+      "displayname": "Case id",
+      "description": "Id of the al_outcomecase that was updated.",
+      "type": 10
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written for this command.",
+      "type": 10
+    },
+    {
+      "uniquename": "Conflict",
+      "name": "Conflict",
+      "displayname": "Conflict",
+      "description": "True when the command was rejected for an optimistic-concurrency conflict.",
+      "type": 0
+    }
+  ]
+}

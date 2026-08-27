@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="IdempotencyKey">
+  <description default="Stable key for the intent; a replay returns the same batch.">
+    <label description="Stable key for the intent; a replay returns the same batch." languagecode="1033" />
+  </description>
+  <displayname default="Idempotency key">
+    <label description="Idempotency key" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_CreateExportBatch.IdempotencyKey</name>
+  <type>10</type>
+</customapirequestparameter>

@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="ResourceKey">
+  <description default="Governed page or capability key, e.g. page.exports or command.regrade.">
+    <label description="Governed page or capability key, e.g. page.exports or command.regrade." languagecode="1033" />
+  </description>
+  <displayname default="Resource key">
+    <label description="Resource key" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_SetPagePermission.ResourceKey</name>
+  <type>10</type>
+</customapirequestparameter>

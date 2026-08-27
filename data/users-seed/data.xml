@@ -1,0 +1,56 @@
+<entities>
+  <entity name="al_user" displayname="User">
+    <records>
+      <record id="cccc0000-0000-4c00-8000-000000000001">
+        <field name="al_name" value="Alex Admin" />
+        <field name="al_workemail" value="alex.admin@example.com" />
+        <field name="al_description" value="Fictional seed user for the Administrator role." />
+      </record>
+      <record id="cccc0000-0000-4c00-8000-000000000002">
+        <field name="al_name" value="Morgan Manager" />
+        <field name="al_workemail" value="morgan.manager@example.com" />
+        <field name="al_description" value="Fictional seed user for the Outcome Testing Manager role." />
+      </record>
+      <record id="cccc0000-0000-4c00-8000-000000000003">
+        <field name="al_name" value="Taylor Trainer" />
+        <field name="al_workemail" value="taylor.trainer@example.com" />
+        <field name="al_description" value="Fictional seed user for the T&amp;C Manager role." />
+      </record>
+      <record id="cccc0000-0000-4c00-8000-000000000004">
+        <field name="al_name" value="Casey Checker" />
+        <field name="al_workemail" value="casey.checker@example.com" />
+        <field name="al_description" value="Fictional seed user for the Tax Checker role." />
+      </record>
+      <record id="cccc0000-0000-4c00-8000-000000000005">
+        <field name="al_name" value="Jordan Quality" />
+        <field name="al_workemail" value="jordan.quality@example.com" />
+        <field name="al_description" value="Fictional seed user for the AQS Checker role." />
+      </record>
+      <record id="cccc0000-0000-4c00-8000-000000000006">
+        <field name="al_name" value="Riley Senior" />
+        <field name="al_workemail" value="riley.senior@example.com" />
+        <field name="al_description" value="Fictional seed user for the Senior Checker role." />
+      </record>
+      <record id="cccc0000-0000-4c00-8000-000000000007">
+        <field name="al_name" value="Jane Adviser" />
+        <field name="al_workemail" value="jane.adviser@example.com" />
+        <field name="al_description" value="Fictional seed user for the Adviser role." />
+      </record>
+      <record id="cccc0000-0000-4c00-8000-000000000008">
+        <field name="al_name" value="Sam Paraplanner" />
+        <field name="al_workemail" value="sam.paraplanner@example.com" />
+        <field name="al_description" value="Fictional seed user for the Paraplanner role." />
+      </record>
+      <record id="cccc0000-0000-4c00-8000-000000000009">
+        <field name="al_name" value="Robin Reviewer" />
+        <field name="al_workemail" value="robin.reviewer@example.com" />
+        <field name="al_description" value="Fictional seed user for the Reviewer role." />
+      </record>
+      <record id="cccc0000-0000-4c00-8000-00000000000a">
+        <field name="al_name" value="Quinn Reader" />
+        <field name="al_workemail" value="quinn.reader@example.com" />
+        <field name="al_description" value="Fictional seed user for the Read Only User role." />
+      </record>
+    </records>
+  </entity>
+</entities>

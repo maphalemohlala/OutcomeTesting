@@ -1,0 +1,10 @@
+<entities>
+  <entity name="al_user" displayname="User" primaryidfield="al_userid" primarynamefield="al_name" disableplugins="false">
+    <fields>
+      <field displayname="User" name="al_name" type="string" customfield="true" primaryKey="true" />
+      <field displayname="Work email" name="al_workemail" type="string" customfield="true" />
+      <field displayname="Description" name="al_description" type="string" customfield="true" />
+    </fields>
+    <relationships />
+  </entity>
+</entities>

@@ -31,6 +31,15 @@
   font-weight: 600;
 }
 
+.worklist tbody th a {
+  color: var(--colour-action);
+  text-decoration: none;
+}
+
+.worklist tbody th a:hover {
+  text-decoration: underline;
+}
+
 .worklist__numeric {
   text-align: right;
   font-variant-numeric: tabular-nums;

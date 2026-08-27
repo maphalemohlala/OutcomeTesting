@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Decision">
+  <description default="Approved or Rejected.">
+    <label description="Approved or Rejected." languagecode="1033" />
+  </description>
+  <displayname default="Decision">
+    <label description="Decision" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_SignOffRemediation.Decision</name>
+  <type>10</type>
+</customapirequestparameter>

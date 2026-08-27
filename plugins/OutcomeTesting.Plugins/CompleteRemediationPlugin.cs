@@ -1,0 +1,248 @@
+using System;
+using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
+
+namespace OutcomeTesting.Plugins
+{
+    /// <summary>
+    /// Server-side command CompleteRemediation (AD-003). Registered against the
+    /// Custom API message <c>al_CompleteRemediation</c>. An adviser drives their own
+    /// remediation action to Completed (BR-006, BR-008, FR-020..FR-023). The command
+    /// enforces the caller, the transition guard, optimistic concurrency and
+    /// idempotency, and writes an immutable Audit Event (BR-012, NFR-AUD-01).
+    /// </summary>
+    public class CompleteRemediationPlugin : PluginBase
+    {
+        // Custom API request parameters.
+        private const string InTargetId = "TargetId";
+        private const string InExpectedRowVersion = "ExpectedRowVersion";
+        private const string InIdempotencyKey = "IdempotencyKey";
+
+        // Custom API response parameters.
+        private const string OutStatus = "Status";
+        private const string OutAuditEventId = "AuditEventId";
+        private const string OutConflict = "Conflict";
+
+        // al_remediationaction.
+        private const string ActionEntity = "al_remediationaction";
+        private const string ActionStatus = "al_actionstatus";
+        private const string ActionCompletedOn = "al_completedon";
+        private const int StatusOpen = 120910600;
+        private const int StatusInProgress = 120910601;
+        private const int StatusCompleted = 120910602;
+
+        // al_auditevent.
+        private const string AuditEntity = "al_auditevent";
+        private const int CommandCompleteRemediation = 120910756;
+
+        // Distinct failure prefixes so the client can branch (command-concurrency skill).
+        private const string ConflictPrefix = "CONFLICT: ";
+        private const string UnauthorizedPrefix = "UNAUTHORIZED: ";
+        private const string PreconditionPrefix = "PRECONDITION: ";
+
+        public CompleteRemediationPlugin(string unsecureConfiguration, string secureConfiguration)
+            : base(typeof(CompleteRemediationPlugin))
+        {
+        }
+
+        protected override void ExecuteDataversePlugin(ILocalPluginContext localPluginContext)
+        {
+            if (localPluginContext == null)
+            {
+                throw new ArgumentNullException(nameof(localPluginContext));
+            }
+
+            var context = localPluginContext.PluginExecutionContext;
+            var service = localPluginContext.PluginUserService;
+
+            var targetId = ParseRequiredGuid(context, InTargetId);
+            var idempotencyKey = GetRequiredString(context, InIdempotencyKey);
+            var expectedRowVersion = GetOptionalString(context, InExpectedRowVersion);
+
+            // Idempotency: a replay with the same key is a success no-op (NFR-REL-01).
+            var existingAudit = FindAuditByKey(service, idempotencyKey);
+            if (existingAudit != null)
+            {
+                SetResponse(context, StatusName(StatusCompleted), existingAudit.Id, false);
+                return;
+            }
+
+            var action = service.Retrieve(
+                ActionEntity,
+                targetId,
+                new ColumnSet(ActionStatus, "ownerid"));
+
+            EnsureCaller(context, action);
+
+            var status = action.GetAttributeValue<OptionSetValue>(ActionStatus);
+            var currentStatus = status != null ? status.Value : -1;
+
+            // Already complete: idempotent success without a second write (BR-007 immutability).
+            if (currentStatus == StatusCompleted)
+            {
+                var replayAudit = WriteAuditEvent(service, targetId, idempotencyKey, context);
+                SetResponse(context, StatusName(StatusCompleted), replayAudit, false);
+                return;
+            }
+
+            if (currentStatus != StatusOpen && currentStatus != StatusInProgress)
+            {
+                throw new InvalidPluginExecutionException(
+                    PreconditionPrefix + "A remediation action can only be completed from Open or In progress.");
+            }
+
+            var update = new Entity(ActionEntity, targetId)
+            {
+                [ActionStatus] = new OptionSetValue(StatusCompleted),
+                [ActionCompletedOn] = DateTime.UtcNow,
+            };
+
+            // Optimistic concurrency: reject a stale write with a distinct conflict code.
+            if (!string.IsNullOrEmpty(expectedRowVersion))
+            {
+                update.RowVersion = expectedRowVersion;
+                var updateRequest = new Microsoft.Xrm.Sdk.Messages.UpdateRequest
+                {
+                    Target = update,
+                    ConcurrencyBehavior = ConcurrencyBehavior.IfRowVersionMatches,
+                };
+
+                try
+                {
+                    service.Execute(updateRequest);
+                }
+                catch (System.ServiceModel.FaultException<OrganizationServiceFault> fault)
+                {
+                    if (IsConcurrencyFault(fault))
+                    {
+                        throw new InvalidPluginExecutionException(
+                            ConflictPrefix + "This remediation action changed since you loaded it. Reload and try again.");
+                    }
+
+                    throw;
+                }
+            }
+            else
+            {
+                service.Update(update);
+            }
+
+            var auditId = WriteAuditEvent(service, targetId, idempotencyKey, context);
+            SetResponse(context, StatusName(StatusCompleted), auditId, false);
+        }
+
+        private static bool IsConcurrencyFault(System.ServiceModel.FaultException<OrganizationServiceFault> fault)
+        {
+            // ConcurrencyVersionMismatch (0x80060892); fall back to message text in case
+            // the exact code varies by platform build.
+            if (fault.Detail != null && fault.Detail.ErrorCode == unchecked((int)0x80060892))
+            {
+                return true;
+            }
+
+            var message = fault.Message ?? string.Empty;
+            return message.IndexOf("row version", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("concurrency", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static void EnsureCaller(IPluginExecutionContext context, Entity action)
+        {
+            var owner = action.GetAttributeValue<EntityReference>("ownerid");
+
+            // The adviser completes their own action. Dataverse security is the primary
+            // gate; this rejects a caller acting on an action owned by someone else.
+            if (owner != null && owner.LogicalName == "systemuser" && owner.Id != context.InitiatingUserId)
+            {
+                throw new InvalidPluginExecutionException(
+                    UnauthorizedPrefix + "Only the adviser who owns this remediation action can complete it.");
+            }
+        }
+
+        private static Entity FindAuditByKey(IOrganizationService service, string idempotencyKey)
+        {
+            var query = new QueryExpression(AuditEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_idempotencykey", ConditionOperator.Equal, idempotencyKey);
+
+            var result = service.RetrieveMultiple(query);
+            return result.Entities.Count > 0 ? result.Entities[0] : null;
+        }
+
+        private static Guid WriteAuditEvent(
+            IOrganizationService service,
+            Guid targetId,
+            string idempotencyKey,
+            IPluginExecutionContext context)
+        {
+            var audit = new Entity(AuditEntity)
+            {
+                ["al_name"] = "CompleteRemediation " + targetId.ToString("D"),
+                ["al_command"] = new OptionSetValue(CommandCompleteRemediation),
+                ["al_targettable"] = ActionEntity,
+                ["al_targetid"] = targetId.ToString("D"),
+                ["al_actorid"] = context.InitiatingUserId.ToString("D"),
+                ["al_idempotencykey"] = idempotencyKey,
+                ["al_correlationid"] = context.CorrelationId.ToString("D"),
+                ["al_occurredon"] = DateTime.UtcNow,
+            };
+
+            return service.Create(audit);
+        }
+
+        private static void SetResponse(IPluginExecutionContext context, string status, Guid auditEventId, bool conflict)
+        {
+            context.OutputParameters[OutStatus] = status;
+            context.OutputParameters[OutAuditEventId] = auditEventId.ToString("D");
+            context.OutputParameters[OutConflict] = conflict;
+        }
+
+        private static string StatusName(int status)
+        {
+            switch (status)
+            {
+                case StatusOpen: return "Open";
+                case StatusInProgress: return "In progress";
+                case StatusCompleted: return "Completed";
+                default: return "Unknown";
+            }
+        }
+
+        private static Guid ParseRequiredGuid(IPluginExecutionContext context, string name)
+        {
+            var raw = GetRequiredString(context, name);
+            Guid value;
+            if (!Guid.TryParse(raw, out value) || value == Guid.Empty)
+            {
+                throw new InvalidPluginExecutionException(PreconditionPrefix + name + " must be a valid record id.");
+            }
+
+            return value;
+        }
+
+        private static string GetRequiredString(IPluginExecutionContext context, string name)
+        {
+            var value = GetOptionalString(context, name);
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new InvalidPluginExecutionException(PreconditionPrefix + name + " is required.");
+            }
+
+            return value;
+        }
+
+        private static string GetOptionalString(IPluginExecutionContext context, string name)
+        {
+            object value;
+            if (context.InputParameters.TryGetValue(name, out value) && value is string)
+            {
+                return (string)value;
+            }
+
+            return null;
+        }
+    }
+}

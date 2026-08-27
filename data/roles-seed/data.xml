@@ -1,0 +1,56 @@
+<entities>
+  <entity name="al_role" displayname="Role">
+    <records>
+      <record id="bbbb0000-0000-4c00-8000-000000000001">
+        <field name="al_name" value="Administrator" />
+        <field name="al_rolecode" value="ROLE-ADMINISTRATOR" />
+        <field name="al_description" value="Full platform administration: manages configuration, security and the permission model." />
+      </record>
+      <record id="bbbb0000-0000-4c00-8000-000000000002">
+        <field name="al_name" value="Outcome Testing Manager" />
+        <field name="al_rolecode" value="ROLE-OUTCOME-TESTING-MANAGER" />
+        <field name="al_description" value="Oversees the outcome testing process, allocation and reporting." />
+      </record>
+      <record id="bbbb0000-0000-4c00-8000-000000000003">
+        <field name="al_name" value="T&amp;C Manager" />
+        <field name="al_rolecode" value="ROLE-T-C-MANAGER" />
+        <field name="al_description" value="Owns outcome corrections, remediation validation and sign-off (AD-020, AD-031)." />
+      </record>
+      <record id="bbbb0000-0000-4c00-8000-000000000004">
+        <field name="al_name" value="Tax Checker" />
+        <field name="al_rolecode" value="ROLE-TAX-CHECKER" />
+        <field name="al_description" value="Performs the Tax section of the review (AD-020)." />
+      </record>
+      <record id="bbbb0000-0000-4c00-8000-000000000005">
+        <field name="al_name" value="AQS Checker" />
+        <field name="al_rolecode" value="ROLE-AQS-CHECKER" />
+        <field name="al_description" value="Performs the advice quality and file quality sections of the review (AD-020)." />
+      </record>
+      <record id="bbbb0000-0000-4c00-8000-000000000006">
+        <field name="al_name" value="Senior Checker" />
+        <field name="al_rolecode" value="ROLE-SENIOR-CHECKER" />
+        <field name="al_description" value="Experienced checker who may handle escalations and complex cases." />
+      </record>
+      <record id="bbbb0000-0000-4c00-8000-000000000007">
+        <field name="al_name" value="Adviser" />
+        <field name="al_rolecode" value="ROLE-ADVISER" />
+        <field name="al_description" value="Completes remediation actions raised against their cases (BR-006)." />
+      </record>
+      <record id="bbbb0000-0000-4c00-8000-000000000008">
+        <field name="al_name" value="Paraplanner" />
+        <field name="al_rolecode" value="ROLE-PARAPLANNER" />
+        <field name="al_description" value="Supports advice preparation; may be accountable for file quality." />
+      </record>
+      <record id="bbbb0000-0000-4c00-8000-000000000009">
+        <field name="al_name" value="Reviewer" />
+        <field name="al_rolecode" value="ROLE-REVIEWER" />
+        <field name="al_description" value="Reviews cases and outcomes." />
+      </record>
+      <record id="bbbb0000-0000-4c00-8000-00000000000a">
+        <field name="al_name" value="Read Only User" />
+        <field name="al_rolecode" value="ROLE-READ-ONLY-USER" />
+        <field name="al_description" value="Can view cases and reports but cannot make changes." />
+      </record>
+    </records>
+  </entity>
+</entities>

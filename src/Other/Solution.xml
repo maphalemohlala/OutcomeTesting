@@ -78,11 +78,33 @@
       </Addresses>
     </Publisher>
     <RootComponents>
-      <RootComponent type="1" schemaName="al_Checklist" behavior="0" />
-      <RootComponent type="1" schemaName="al_FailReason" behavior="0" />
-      <RootComponent type="1" schemaName="al_Question" behavior="0" />
-      <RootComponent type="1" schemaName="al_ReviewRoute" behavior="0" />
-      <RootComponent type="1" schemaName="al_Section" behavior="0" />
+      <RootComponent type="1" schemaName="al_auditevent" behavior="0" />
+      <RootComponent type="1" schemaName="al_caseassignment" behavior="0" />
+      <RootComponent type="1" schemaName="al_checklist" behavior="0" />
+      <RootComponent type="1" schemaName="al_checklistversion" behavior="0" />
+      <RootComponent type="1" schemaName="al_exportbatch" behavior="0" />
+      <RootComponent type="1" schemaName="al_exportrecord" behavior="0" />
+      <RootComponent type="1" schemaName="al_failreason" behavior="0" />
+      <RootComponent type="1" schemaName="al_importbatch" behavior="0" />
+      <RootComponent type="1" schemaName="al_importexception" behavior="0" />
+      <RootComponent type="1" schemaName="al_outcome" behavior="0" />
+      <RootComponent type="1" schemaName="al_outcomecase" behavior="0" />
+      <RootComponent type="1" schemaName="al_pagepermission" behavior="0" />
+      <RootComponent type="1" schemaName="al_question" behavior="0" />
+      <RootComponent type="1" schemaName="al_questionversion" behavior="0" />
+      <RootComponent type="1" schemaName="al_remediationaction" behavior="0" />
+      <RootComponent type="1" schemaName="al_response" behavior="0" />
+      <RootComponent type="1" schemaName="al_reviewinstance" behavior="0" />
+      <RootComponent type="1" schemaName="al_reviewroute" behavior="0" />
+      <RootComponent type="1" schemaName="al_role" behavior="0" />
+      <RootComponent type="1" schemaName="al_section" behavior="0" />
+      <RootComponent type="1" schemaName="al_signoff" behavior="0" />
+      <RootComponent type="1" schemaName="al_user" behavior="0" />
+      <RootComponent type="1" schemaName="al_userrolemapping" behavior="0" />
+      <RootComponent type="20" id="{367c6daf-28a2-f111-b8dd-e4fade069307}" behavior="0" />
+      <RootComponent type="20" id="{457c6daf-28a2-f111-b8dd-e4fade069307}" behavior="0" />
+      <RootComponent type="300" schemaName="al_ascotlloydoutcometesting_72932" behavior="0" />
+      <RootComponent type="91" id="{7b51d0d1-f5a1-f111-b8dd-e4fade069307}" schemaName="OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" behavior="0" />
     </RootComponents>
     <MissingDependencies />
   </SolutionManifest>

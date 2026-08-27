@@ -1,0 +1,18 @@
+<customapi uniquename="al_CreateRole">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="An administrator adds a role to the extensible role registry (al_role). Enforces the AD-041 permission.manage Manage permission, upserts on the role business code (idempotent) and writes an immutable Audit Event (BR-012).">
+    <label description="An administrator adds a role to the extensible role registry (al_role). Enforces the AD-041 permission.manage Manage permission, upserts on the role business code (idempotent) and writes an immutable Audit Event (BR-012)." languagecode="1033" />
+  </description>
+  <displayname default="Create Role">
+    <label description="Create Role" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_CreateRole</name>
+  <plugintypeid>
+    <plugintypeexportkey>b8cb408b-35a2-f111-b8dd-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

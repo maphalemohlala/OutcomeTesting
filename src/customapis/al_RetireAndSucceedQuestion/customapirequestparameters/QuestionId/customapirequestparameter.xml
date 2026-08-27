@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="QuestionId">
+  <description default="Id of the al_question to succeed.">
+    <label description="Id of the al_question to succeed." languagecode="1033" />
+  </description>
+  <displayname default="Question id">
+    <label description="Question id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_RetireAndSucceedQuestion.QuestionId</name>
+  <type>10</type>
+</customapirequestparameter>

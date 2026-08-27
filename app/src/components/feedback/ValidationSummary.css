@@ -1,0 +1,24 @@
+.validation-summary {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  background: var(--colour-surface-sunken);
+  border: 1px solid var(--colour-border);
+  border-left: 3px solid var(--colour-outcome-harm);
+}
+
+.validation-summary__title {
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+  color: var(--colour-text);
+}
+
+.validation-summary__list {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--colour-text-muted);
+}
+
+.validation-summary__list li {
+  margin-bottom: var(--space-1);
+}

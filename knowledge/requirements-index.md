@@ -52,4 +52,4 @@ Every implemented story records: requirement ID, source document, actor, workflo
 | E5 | MI, export, administration, hardening | 6, 8 |
 
 ## Blocking dependencies
-E1 is blocked by OD-001 to OD-004. E3 is blocked by OD-001. E5 export is blocked by OD-003 and OD-004. The architecture itself is gated by OD-011.
+E1 is unblocked: allocation is settled as a shared queue with manual manager assignment (OD-002 resolved, AD-040). E3 is unblocked: V8 content, response types, mandatory rule, section ownership and the CRP rule are settled in `checklist-v8.md` and AD-019 to AD-022. E5 export mapping is settled (OD-004 resolved, AD-039); the Export Batch and Export Record tables remain to build. The architecture gate OD-011 is deferred until the app is ready to promote.

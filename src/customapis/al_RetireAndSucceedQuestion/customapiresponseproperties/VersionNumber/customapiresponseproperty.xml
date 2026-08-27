@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="VersionNumber">
+  <description default="Version number of the successor.">
+    <label description="Version number of the successor." languagecode="1033" />
+  </description>
+  <displayname default="Version number">
+    <label description="Version number" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_RetireAndSucceedQuestion.VersionNumber</name>
+  <type>10</type>
+</customapiresponseproperty>

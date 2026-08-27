@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="UserEmail">
+  <description default="Work email of the person to assign (AD-010).">
+    <label description="Work email of the person to assign (AD-010)." languagecode="1033" />
+  </description>
+  <displayname default="User email">
+    <label description="User email" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_AssignUserRole.UserEmail</name>
+  <type>10</type>
+</customapirequestparameter>

@@ -7,7 +7,7 @@
   /* Brand palette — verified from brand/ */
   --brand-teal: #2b5257;
   --brand-teal-dark: #0a3535;
-  --brand-teal-light: #ccfdf3; /* OD-013: brand sheet hex and RGB disagree */
+  --brand-teal-light: #ccfdf3; /* mint, confirmed by the brand owner over the sheet's CCDFF3 (OD-013) */
   --brand-green-highlight: #b0ed70;
   --brand-green-light: #ccffd6;
   --brand-green-accessible: #00a800; /* large text only, above 18.66px on white */
@@ -52,8 +52,8 @@
   --colour-stage-blocked: var(--colour-outcome-harm);
   --colour-stage-closed: var(--colour-text-muted);
 
-  /* Typography. Outfit stands in for Roundo until licensed files are supplied. */
-  --font-heading: 'Outfit Variable', 'Roundo', Arial, sans-serif;
+  /* Typography */
+  --font-heading: 'Outfit Variable', Arial, sans-serif;
   --font-body: 'Inter Variable', Arial, sans-serif;
 
   --text-xs: 0.75rem;
