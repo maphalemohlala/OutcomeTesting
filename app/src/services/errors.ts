@@ -33,6 +33,17 @@ export function messageForFailure(failure: CommandFailure): string {
 
 /** Records technical detail for support without exposing it to the user. */
 export function logTechnical(context: string, detail: unknown): void {
-  const message = detail instanceof Error ? detail.message : String(detail ?? '');
+  let message: string;
+  if (detail instanceof Error) {
+    message = detail.stack ?? detail.message;
+  } else if (typeof detail === 'string') {
+    message = detail;
+  } else {
+    try {
+      message = JSON.stringify(detail);
+    } catch {
+      message = String(detail);
+    }
+  }
   console.error(`[OutcomeTesting] ${context}: ${message}`);
 }
