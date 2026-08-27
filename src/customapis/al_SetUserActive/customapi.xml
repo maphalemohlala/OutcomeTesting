@@ -1,0 +1,18 @@
+<customapi uniquename="al_SetUserActive">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Activates or deactivates an application user (al_user). Deactivation preserves the row and history (OD-010); only al_isactive is flipped. Enforces permission.manage Manage and writes an immutable Audit Event (BR-012).">
+    <label description="Activates or deactivates an application user (al_user). Deactivation preserves the row and history (OD-010); only al_isactive is flipped. Enforces permission.manage Manage and writes an immutable Audit Event (BR-012)." languagecode="1033" />
+  </description>
+  <displayname default="Set User Active">
+    <label description="Set User Active" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_SetUserActive</name>
+  <plugintypeid>
+    <plugintypeexportkey>fc908a8b-5ca2-f111-b8dd-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

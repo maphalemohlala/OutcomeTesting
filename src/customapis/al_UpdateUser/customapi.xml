@@ -1,0 +1,18 @@
+<customapi uniquename="al_UpdateUser">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="An administrator updates an application user&apos;s display name (al_user). Work email (AD-010) is not changed here. Enforces permission.manage Manage, applies optimistic concurrency and idempotency, and writes an immutable Audit Event (BR-012).">
+    <label description="An administrator updates an application user&apos;s display name (al_user). Work email (AD-010) is not changed here. Enforces permission.manage Manage, applies optimistic concurrency and idempotency, and writes an immutable Audit Event (BR-012)." languagecode="1033" />
+  </description>
+  <displayname default="Update User">
+    <label description="Update User" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_UpdateUser</name>
+  <plugintypeid>
+    <plugintypeexportkey>be8b7270-5da2-f111-b8dd-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>
