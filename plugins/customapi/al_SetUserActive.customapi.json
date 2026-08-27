@@ -4,7 +4,7 @@
     "uniquename": "al_SetUserActive",
     "name": "al_SetUserActive",
     "displayname": "Set User Active",
-    "description": "Activates or deactivates an application user (al_user). Deactivation is the sanctioned alternative to hard deletion for retained data (OD-010): the row and its history are preserved, only al_isactive is flipped. Enforces the AD-041 permission.manage Manage permission and writes an immutable Audit Event (BR-012).",
+    "description": "Activates or deactivates an application user (al_user). Deactivation preserves the row and history (OD-010); only al_isactive is flipped. Enforces permission.manage Manage and writes an immutable Audit Event (BR-012).",
     "bindingtype": 0,
     "boundentitylogicalname": null,
     "isfunction": false,
