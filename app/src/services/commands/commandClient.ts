@@ -46,8 +46,42 @@ export function newCorrelationKey(): string {
   return crypto.randomUUID();
 }
 
+/**
+ * Pulls a human-readable message out of whatever the platform throws. The Power Apps
+ * data client rejects with a plain object (not an Error), whose message can sit at
+ * `.message`, `.error.message` or deeper, so a naive `String(error)` yields
+ * "[object Object]" and both the classification and the support log lose the cause.
+ */
+export function extractErrorMessage(error: unknown, depth = 0): string {
+  if (error == null) return '';
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object') {
+    const obj = error as Record<string, unknown>;
+    for (const key of ['message', 'Message', 'description', 'ExceptionMessage']) {
+      const value = obj[key];
+      if (typeof value === 'string' && value.trim()) return value;
+    }
+    if (depth < 4) {
+      for (const key of ['error', 'innererror', 'InnerError', 'details', 'cause']) {
+        if (obj[key] != null && typeof obj[key] === 'object') {
+          const nested = extractErrorMessage(obj[key], depth + 1);
+          if (nested) return nested;
+        }
+      }
+    }
+    try {
+      const json = JSON.stringify(error);
+      if (json && json !== '{}') return json;
+    } catch {
+      // Non-serialisable (e.g. circular): fall through to the default string form.
+    }
+  }
+  return String(error);
+}
+
 function classify(error: unknown): CommandFailure {
-  const message = error instanceof Error ? error.message : String(error ?? '');
+  const message = extractErrorMessage(error);
   for (const prefix of Object.keys(FAILURE_PREFIXES)) {
     if (message.includes(prefix)) {
       return {
