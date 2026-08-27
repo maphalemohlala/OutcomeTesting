@@ -4,6 +4,10 @@
 /bin
 /obj
 
+# nested .NET build outputs (plugin + registration projects)
+plugins/**/bin/
+plugins/**/obj/
+
 # solution packaging scratch: exports, staging unpacks and packed zips
 /artifacts
 
