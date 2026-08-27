@@ -4,7 +4,7 @@
     "uniquename": "al_UpdateUser",
     "name": "al_UpdateUser",
     "displayname": "Update User",
-    "description": "An administrator amends an existing application user's display name (al_user). Work email is the stable identifier (AD-010) and is not changed here. Enforces the AD-041 permission.manage Manage permission, applies optimistic concurrency and idempotency, and writes an immutable Audit Event (BR-012).",
+    "description": "An administrator updates an application user's display name (al_user). Work email (AD-010) is not changed here. Enforces permission.manage Manage, applies optimistic concurrency and idempotency, and writes an immutable Audit Event (BR-012).",
     "bindingtype": 0,
     "boundentitylogicalname": null,
     "isfunction": false,
