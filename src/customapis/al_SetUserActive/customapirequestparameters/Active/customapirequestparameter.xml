@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Active">
+  <description default="True to reactivate the user, false to deactivate.">
+    <label description="True to reactivate the user, false to deactivate." languagecode="1033" />
+  </description>
+  <displayname default="Active">
+    <label description="Active" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_SetUserActive.Active</name>
+  <type>0</type>
+</customapirequestparameter>

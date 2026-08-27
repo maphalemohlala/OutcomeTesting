@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="UserId">
+  <description default="Id of the al_user record.">
+    <label description="Id of the al_user record." languagecode="1033" />
+  </description>
+  <displayname default="User id">
+    <label description="User id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_SetUserActive.UserId</name>
+  <type>10</type>
+</customapiresponseproperty>
