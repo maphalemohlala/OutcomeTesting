@@ -252,7 +252,26 @@ footer[data-component-theme],
 }
 
 footer.footer { padding: var(--space-4) 0; }
-footer a, .footer a { color: var(--brand-teal-light) !important; }
+
+/* The footer content comes from an editable snippet, so its markup can carry
+   its own colours. Force white on every descendant, then restore the link
+   colour, so the text always reads against the dark teal band. */
+footer, footer *,
+.footer, .footer * {
+  color: var(--colour-text-inverse) !important;
+}
+
+footer a, .footer a,
+footer a:hover, .footer a:hover,
+footer a:focus, .footer a:focus {
+  color: var(--brand-teal-light) !important;
+  text-decoration: underline;
+}
+
+footer a:focus-visible, .footer a:focus-visible {
+  outline: 2px solid var(--brand-green-highlight);
+  outline-offset: 2px;
+}
 
 /* ------------------------------------------------------------------
    Page shell
