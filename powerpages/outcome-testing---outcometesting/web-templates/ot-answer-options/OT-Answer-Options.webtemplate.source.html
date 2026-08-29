@@ -40,7 +40,7 @@
       <input type="radio"
              name="q-{{ question }}"
              value="{{ value }}"
-             data-ot-input{% if locked %} disabled{% endif %}
+             data-ot-input{% unless editable %} disabled{% endunless %}
              {% if selected and selected == value %}checked{% endif %} />
       <span>{{ labels[forloop.index0] }}</span>
     </label>

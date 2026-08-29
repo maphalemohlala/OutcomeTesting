@@ -36,6 +36,7 @@
       <attribute name="al_startedon" />
       <attribute name="al_submittedon" />
       <attribute name="al_checklistversionid" />
+      <attribute name="al_assignedcontactid" />
       <filter type="and">
         <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | xml_escape }}" />
       </filter>
@@ -83,6 +84,25 @@
       {% assign locked = false %}
     {% endif %}
 
+    {% comment %}
+      AD-056: a reviewer reads every review but changes only their own. Because reading
+      another reviewer's review is now intended, the page must say so and disable its
+      controls - otherwise a checker types into fields that the table permissions will
+      refuse on save. The permission chain is the actual boundary; this is what stops the
+      user discovering it the hard way.
+    {% endcomment %}
+    {% if rv.al_assignedcontactid.id and rv.al_assignedcontactid.id == user.id %}
+      {% assign mine = true %}
+    {% else %}
+      {% assign mine = false %}
+    {% endif %}
+
+    {% if locked or mine == false %}
+      {% assign editable = false %}
+    {% else %}
+      {% assign editable = true %}
+    {% endif %}
+
     <section class="ot-card" aria-labelledby="ot-review-summary">
       <h2 class="ot-card__title" id="ot-review-summary">
         {{ rv.al_reviewtype.label | escape }} review
@@ -114,6 +134,15 @@
         <strong>Submitted {{ rv.al_submittedon | date: 'dd MMM yyyy' }}.</strong>
         This review is locked. Reopening or regrading is a T&amp;C Manager action and
         requires a recorded reason (AD-031).
+      </div>
+    {% elsif mine == false %}
+      {% comment %}
+        Reading another reviewer's work is intended under AD-056; changing it is not.
+        Saying so plainly is better than presenting controls that fail on save.
+      {% endcomment %}
+      <div class="ot-notice" role="status">
+        <strong>This review is assigned to someone else.</strong>
+        You can read it, but only the assigned reviewer can record or change answers on it.
       </div>
     {% else %}
       {% comment %}
@@ -450,18 +479,18 @@
               {% if column == 'text' %}
                 {% if rt == 120910001 %}
                   <textarea class="ot-answer__input" rows="4"
-                            data-ot-input{% if locked %} disabled{% endif %}
+                            data-ot-input{% unless editable %} disabled{% endunless %}
                             aria-label="{{ qv.al_questiontext | escape }}">{{ existing.al_answertext | escape }}</textarea>
                 {% else %}
                   <input type="text" class="ot-answer__input"
-                         data-ot-input{% if locked %} disabled{% endif %}
+                         data-ot-input{% unless editable %} disabled{% endunless %}
                          value="{{ existing.al_answertext | escape }}"
                          aria-label="{{ qv.al_questiontext | escape }}" />
                 {% endif %}
 
               {% elsif column == 'date' %}
                 <input type="date" class="ot-answer__input"
-                       data-ot-input{% if locked %} disabled{% endif %}
+                       data-ot-input{% unless editable %} disabled{% endunless %}
                        value="{{ existing.al_answerdate | date: 'yyyy-MM-dd' }}"
                        aria-label="{{ qv.al_questiontext | escape }}" />
 
@@ -476,7 +505,7 @@
                 <div class="ot-answer__options">
                   {% for opt in mvalues %}
                     <label class="ot-answer__option">
-                      <input type="checkbox" data-ot-input value="{{ opt }}"{% if locked %} disabled{% endif %}
+                      <input type="checkbox" data-ot-input value="{{ opt }}"{% unless editable %} disabled{% endunless %}
                              {% if existing.al_answerchoices contains mlabels[forloop.index0] %}checked{% endif %} />
                       <span>{{ mlabels[forloop.index0] }}</span>
                     </label>
@@ -484,7 +513,7 @@
                 </div>
 
               {% else %}
-                {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id locked: locked %}
+                {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id editable: editable %}
               {% endif %}
 
               {% comment %}
@@ -498,7 +527,7 @@
                   <p class="ot-answer__note-label">Fail reasons — select all that apply</p>
                   {% for fr in failreasons.results.entities %}
                     <label class="ot-answer__option">
-                      {% capture pairkey %}|{{ existing.al_responseid }}~{{ fr.al_failreasonid }}{% endcapture %}<input type="checkbox" data-ot-reason value="{{ fr.al_failreasonid }}"{% if locked %} disabled{% endif %}{% if existing.al_responseid and selected_reason_pairs contains pairkey %} checked{% endif %} />
+                      {% capture pairkey %}|{{ existing.al_responseid }}~{{ fr.al_failreasonid }}{% endcapture %}<input type="checkbox" data-ot-reason value="{{ fr.al_failreasonid }}"{% unless editable %} disabled{% endunless %}{% if existing.al_responseid and selected_reason_pairs contains pairkey %} checked{% endif %} />
                       <span>{{ fr.al_category.label | escape }} — {{ fr.al_name | escape }}</span>
                     </label>
                   {% endfor %}
@@ -508,7 +537,7 @@
                     Evidence or observation (optional)
                   </label>
                   <textarea id="note-{{ qv_id }}" class="ot-answer__input" rows="3"
-                            data-ot-note-input{% if locked %} disabled{% endif %}>{{ existing.al_answertext | escape }}</textarea>
+                            data-ot-note-input{% unless editable %} disabled{% endunless %}>{{ existing.al_answertext | escape }}</textarea>
                 </div>
               {% endif %}
             </fieldset>
@@ -522,7 +551,7 @@
           {% endif %}
         {% endfor %}
         </div>
-        {% unless locked %}
+        {% if editable %}
         <script>
           /*
            * Answer autosave and fail reasons (PP-07, PP-08, FR-013, AD-053, AD-054).
@@ -748,7 +777,7 @@
             for (var i = 0; i < answers.length; i++) { bind(answers[i]); }
           })();
         </script>
-        {% endunless %}
+        {% endif %}
 
       {% endif %}
     {% endif %}

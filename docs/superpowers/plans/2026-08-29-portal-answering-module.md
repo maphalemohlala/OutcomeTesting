@@ -1190,12 +1190,15 @@ git commit -m "fix(seed): retype Q-TAX-02 to Pass/Fail/Insufficient evidence (AD
 
 ---
 
-### Task 5: Contact-scoped table permissions and Web API site settings
+### Task 5: Read-all / write-own table permissions and Web API site settings
 
 **Files:**
-- Create: `powerpages/outcome-testing---outcometesting/table-permissions/Review-Instance-Assigned.tablepermission.yml`
-- Create: `powerpages/outcome-testing---outcometesting/table-permissions/Response-Of-Assigned-Review.tablepermission.yml`
-- Create: `powerpages/outcome-testing---outcometesting/table-permissions/Fail-Reason-Read.tablepermission.yml`
+- Create: `.../table-permissions/Review-Instance-All-Read.tablepermission.yml` (Global read)
+- Create: `.../table-permissions/Review-Instance-Assigned.tablepermission.yml` (Contact, anchors write)
+- Create: `.../table-permissions/Response-All-Read.tablepermission.yml` (Global read)
+- Create: `.../table-permissions/Response-Of-Assigned-Review.tablepermission.yml` (Parent; **the edit boundary**)
+- Create: `.../table-permissions/Fail-Reason-Read.tablepermission.yml` (Global read)
+- Rename: `PROVISIONAL-DEV-ONLY---OutcomeCase` to `Outcome-Case-All-Read.tablepermission.yml`, keeping its id so upload updates the same row
 - Modify: `powerpages/outcome-testing---outcometesting/sitesetting.yml`
 - Delete: `powerpages/outcome-testing---outcometesting/table-permissions/PROVISIONAL-DEV-ONLY---ReviewInstance.tablepermission.yml`
 - Delete: `powerpages/outcome-testing---outcometesting/table-permissions/PROVISIONAL-DEV-ONLY---Response.tablepermission.yml`
@@ -1203,7 +1206,9 @@ git commit -m "fix(seed): retype Q-TAX-02 to Pass/Fail/Insufficient evidence (AD
 
 **Interfaces:**
 - Consumes: `al_reviewinstance.al_assignedcontactid` and the `contact_al_reviewinstance` relationship, both built under AD-050.
-- Produces: write access to `al_response` for the assigned checker only. Tasks 6–8 depend on this; without it every save returns 403.
+- Produces: read on all cases, reviews and responses, and write on `al_response` for the assigned checker only (AD-056). Tasks 6–8 depend on the write half; without it every save returns 403.
+
+Reviewers **read everything and change only what is assigned to them** (product owner direction 2026-08-29). Power Pages unions table permissions, so this is a Global read alongside a Contact-anchored write chain, and the edit boundary is the single `Response-Of-Assigned-Review` row. This supersedes the AD-047 no-Global-access clause for reviewer roles and retires the "cannot view an unassigned case by editing the URL" negative test for them; every write-side negative test is unchanged.
 
 Scope values: Global `756150000`, Contact `756150001`, Account `756150002`, Parent `756150003`, Self `756150004`, Custom `756150005`. Web role ids are the two already used by the provisional permissions: Tax Reviewer `c53b2908-1fc1-4470-89cd-6f5b95c17ffe`, AQS Reviewer `e24b50c5-1443-4725-84c9-70355724547f`.
 
@@ -1305,13 +1310,16 @@ The field list is the allowlist the Web API enforces. It names only the four ans
 
 Run: `pac pages upload --path powerpages/outcome-testing---outcometesting`
 
-Then, signed in as a Tax Reviewer contact, request a review assigned to a different contact:
+Then, signed in as a Tax Reviewer contact, against a review assigned to a **different** contact:
 
-```
-GET /_api/al_reviewinstances(<other-contacts-review-id>)
-```
+| Request | Expected |
+|---|---|
+| `GET /_api/al_reviewinstances(<other-review-id>)` | **Returns the record.** Reading all reviews is intended under AD-056. |
+| `GET /_api/al_responses?$filter=_al_reviewinstanceid_value eq <other-review-id>` | **Returns the answers.** Also intended. |
+| `PATCH /_api/al_responses(<other-reviewers-response-id>)` | **403.** This is the edit boundary and the only test that still gates release. |
+| `PATCH` a response on a review assigned to me | Succeeds. |
 
-Expected: 403 or an empty result, not the record. Repeat for `al_responses` filtered to that review. If either returns data, a provisional permission survived — re-check step 4.
+If the third row succeeds, the Contact-anchored write chain is not working: check that `Response-Of-Assigned-Review` still carries `adx_scope: 756150003` with its parent id, and that nothing grants Global write on `al_response`.
 
 - [ ] **Step 7: Commit**
 
