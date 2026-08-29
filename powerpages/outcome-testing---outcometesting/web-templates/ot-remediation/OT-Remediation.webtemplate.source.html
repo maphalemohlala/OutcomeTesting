@@ -37,7 +37,7 @@
 <div class="ot-notice" role="status">
   <strong>Shell stage.</strong> All remediation actions are listed. Filtering to your own
   actions, adviser response and T&amp;C attestation arrive in Phase&nbsp;6. Ageing is shown in
-  calendar days; the 10-working-day threshold is pending the business calendar (OD-018).
+  calendar dates only. Working-day ageing against the 10-day threshold is pending the business calendar (OD-018).
 </div>
 
 <section class="ot-card" aria-labelledby="ot-remediation-heading">
@@ -57,7 +57,7 @@
             <th scope="col">Action</th>
             <th scope="col">Description</th>
             <th scope="col">Status</th>
-            <th scope="col">Age (calendar days)</th>
+            <th scope="col">Opened</th>
             <th scope="col">Due</th>
             <th scope="col">Completed</th>
           </tr>
@@ -79,13 +79,7 @@
               <td>{{ a.al_name | escape }}</td>
               <td>{{ a.al_description | escape }}</td>
               <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
-              <td>
-                {% if a.al_completedon %}
-                  <span class="ot-badge ot-badge--closed">Complete</span>
-                {% else %}
-                  {{ now | date_diff: a.createdon, 'd' | default: '—' }}
-                {% endif %}
-              </td>
+              <td>{{ a.createdon | date: 'dd MMM yyyy' | default: '—' }}</td>
               <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
               <td>{{ a.al_completedon | date: 'dd MMM yyyy' | default: '—' }}</td>
             </tr>
