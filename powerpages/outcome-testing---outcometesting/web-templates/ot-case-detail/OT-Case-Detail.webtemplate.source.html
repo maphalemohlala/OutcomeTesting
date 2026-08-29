@@ -40,7 +40,7 @@
       <attribute name="al_taxteamdisposition" />
       <attribute name="al_checkername" />
       <filter type="and">
-        <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | escape }}" />
+        <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
       </filter>
     </entity>
   </fetch>
@@ -63,7 +63,7 @@
         <attribute name="al_startedon" />
         <attribute name="al_submittedon" />
         <filter type="and">
-          <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | escape }}" />
+          <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
         </filter>
         <order attribute="al_sequence" descending="false" />
       </entity>
@@ -80,7 +80,7 @@
         <attribute name="al_duedate" />
         <attribute name="al_completedon" />
         <filter type="and">
-          <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | escape }}" />
+          <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
         </filter>
         <order attribute="al_duedate" descending="false" />
       </entity>
