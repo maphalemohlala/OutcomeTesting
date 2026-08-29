@@ -97,6 +97,14 @@
 - adx_name: ThemeFeature
   adx_sitesettingid: 9f87bc38-4308-442b-b442-7c8ff6d8b364
   adx_value: '{"status":"enable","selectedThemeId":"329a43fa-5471-4678-8330-d3a0b404e9bb","version":"V2"}'
+- adx_description: "Exposes al_response to the portal Web API so a checker can save answers from the review page (AD-053). Answering needs no cloud flow because the Web API supports create and update; only actions are unsupported, which is why submission does need one."
+  adx_name: Webapi/al_response/enabled
+  adx_sitesettingid: a1000000-0000-4000-8000-0000000000a1
+  adx_value: 'true'
+- adx_description: "Allowlist of columns the browser may write on al_response. Deliberately the four answer columns only: al_responsecode, al_name and both lookups stay off the list so the guard plug-in remains the sole authority for the alternate key (AD-053)."
+  adx_name: Webapi/al_response/fields
+  adx_sitesettingid: a1000000-0000-4000-8000-0000000000a2
+  adx_value: al_answertext,al_answerchoice,al_answerchoices,al_answerdate
 - adx_description: "Trigger id of the \"Submit Review\" cloud flow for THIS environment, taken from the flow's Power Pages trigger URL (the guid after /trigger/). Environment specific: the flow must be registered against each site separately, so DEV, TEST and PROD each carry their own value. Leave empty until the flow exists; the review page then shows \"submitting is not configured\" rather than failing."
   adx_name: OutcomeTesting/Flow/SubmitReview
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a0
