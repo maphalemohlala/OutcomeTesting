@@ -6,7 +6,7 @@
  * Approved pairings used here are taken from the brand contrast sheet:
  * white on teal, light green on teal, dark teal on white, teal on white.
  *
- * Outcome hues AD-008. Mint OD-013. Outfit/Inter AD-009.
+ * Outcome hues AD-008. Mint OD-013. Roundo per the brand typography sheet; supersedes AD-009.
  * Accessible green #00a800 is large-text-only (>18.66px) per the brand sheet.
  */
 
@@ -55,9 +55,12 @@
   --colour-stage-active: var(--brand-teal);
   --colour-stage-closed: var(--colour-text-muted);
 
-  /* Type */
-  --font-heading: 'Outfit', 'Segoe UI', Arial, sans-serif;
-  --font-body: 'Inter', 'Segoe UI', Arial, sans-serif;
+  /* Type. brand/ specifies a single primary font, Roundo, in Light 300,
+     Regular 400, Medium 500 and SemiBold 600. One family for headings and
+     body is the brand's own instruction: "For clarity we've selected just
+     one primary font." */
+  --font-heading: 'Roundo', 'Segoe UI', Arial, sans-serif;
+  --font-body: 'Roundo', 'Segoe UI', Arial, sans-serif;
 
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
@@ -75,6 +78,29 @@
 
   --radius: 3px;
   --edge: 3px;
+}
+
+/* ------------------------------------------------------------------
+   Studio theme palette.
+
+   portalbasictheme.css drives the stock chrome from --portalThemeColorN
+   custom properties (navy #2E456B, orange #FEA002, tan #F3DBB1). Those are
+   template defaults, not Ascot Lloyd values. Redefining the variables
+   rebrands every component that reads them - navbar, footer, buttons and
+   anything carrying data-component-theme - instead of chasing each one
+   with a more specific selector.
+   ------------------------------------------------------------------ */
+
+:root {
+  --portalThemeColor1: #2b5257;   /* was navy   - primary chrome  */
+  --portalThemeColor2: #b0ed70;   /* was yellow - accent          */
+  --portalThemeColor3: #0a3535;   /* was blue                     */
+  --portalThemeColor4: #b0ed70;   /* was orange - hover/active    */
+  --portalThemeColor5: #0a3535;   /* was tan    - footer          */
+  --portalThemeColor6: #ccfdf3;   /* was sage                     */
+  --portalThemeColor7: #ffffff;
+  --portalThemeColor8: #0a3535;
+  --portalThemeColor9: #2b5257;   /* was dark orange              */
 }
 
 /* ------------------------------------------------------------------
@@ -105,12 +131,36 @@ footer.footer { margin-top: auto; flex-shrink: 0; }
 /* Brand the header. portalbasictheme.css paints .static-top.navbar-dark
    #2E456B with #FEA002 hover; both are overridden here at matching or
    higher specificity so the bar reads Ascot Lloyd teal. */
-.navbar,
-.navbar-dark,
-.static-top.navbar-dark,
-.navbar.static-top.navbar-dark {
+html body .navbar,
+html body .navbar-dark,
+html body .static-top.navbar-dark,
+html body .navbar.static-top.navbar-dark,
+html body div.navbar.navbar-dark.static-top {
   background-color: var(--brand-teal) !important;
   background-image: none !important;
+}
+
+/* The site name sits in an anchor, so the stock underline appears behind
+   "Ascot Lloyd" on hover. Suppress it on the brand link only; navigation
+   links keep their underline affordance. */
+html body .navbar-brand,
+html body .navbar-brand:hover,
+html body .navbar-brand:focus,
+html body .navbar-brand a,
+html body .navbar-brand a:hover,
+html body .navbar-brand a:focus,
+html body .navbar-header a,
+html body .navbar-header a:hover,
+html body .navbar-header a:focus {
+  text-decoration: none !important;
+  border-bottom: none !important;
+  background-color: transparent !important;
+}
+
+html body .navbar-brand a:focus-visible,
+html body .navbar-header a:focus-visible {
+  outline: 2px solid var(--brand-green-highlight);
+  outline-offset: 3px;
 }
 
 .navbar {
@@ -195,7 +245,14 @@ footer a, .footer a { color: var(--brand-teal-light) !important; }
   color: var(--colour-text);
   background: var(--colour-surface-sunken);
   padding: var(--space-5) var(--space-4) var(--space-6);
-  min-height: 60vh;
+
+  /* Two mechanisms, deliberately. The flex rules above push the footer down
+     when the footer is reachable as a flex item; this min-height guarantees
+     the content column fills the viewport regardless of where the footer
+     sits in the DOM, so a short page can never leave the footer floating
+     mid-page. 11rem covers the header and footer bands. */
+  flex: 1 0 auto;
+  min-height: calc(100vh - 11rem);
 }
 
 .ot-page__inner { max-width: 82rem; margin: 0 auto; }

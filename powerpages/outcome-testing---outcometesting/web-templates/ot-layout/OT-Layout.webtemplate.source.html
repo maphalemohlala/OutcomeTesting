@@ -7,10 +7,18 @@
   outcome-testing.css restyles those to Ascot Lloyd brand values.
 {% endcomment %}
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600&display=swap">
-<link rel="stylesheet" href="/outcome-testing.css">
+{% comment %}
+  Roundo is the brand's single primary font (brand/ typography sheet),
+  served from Fontshare, the source the sheet itself names. Weights are
+  Light 300, Regular 400, Medium 500, SemiBold 600.
+
+  The stylesheet carries a version querystring so a browser holding the
+  previous file picks up changes without a hard refresh. Bump it whenever
+  outcome-testing.css changes materially.
+{% endcomment %}
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=roundo@300,400,500,600&display=swap">
+<link rel="stylesheet" href="/outcome-testing.css?v=3">
 
 <main class="ot-page" id="ot-main">
   <div class="ot-page__inner">
