@@ -103,17 +103,24 @@ Authorization is deliberately **not** performed here. Power Pages Web API writes
 
 Current state: 13 permissions named `PROVISIONAL` or `PROVISIONAL-DEV-ONLY`, at Global scope, read-only, granted to 2 of 10 web roles. That is the portal design's unclosed phase-2 security gate. Granting write at Global scope would let any checker edit any other checker's answers, one of the negative tests section 10 of the portal design requires to fail.
 
-This module therefore replaces them for the review path with the AD-047 model:
+This module therefore replaces them for the review path. Reviewers **read everything and change only what is assigned to them** (AD-056, product owner direction 2026-08-29). Power Pages unions table permissions, so that shape is expressed as a Global read alongside a Contact-anchored write chain:
 
-| Table | Scope | Rights |
-|---|---|---|
-| `al_reviewinstance` | Contact, via `al_assignedcontactid` (built, AD-050) | Read |
-| `al_response` | Child permission of the above | Read, Write, Create, Append |
-| `al_failreason` | Global | Read, AppendTo |
+| Table | Scope | Rights | Purpose |
+|---|---|---|---|
+| `al_outcomecase` | Global | Read | See all cases (PP-04, PP-05, PP-17) |
+| `al_reviewinstance` | Global | Read | See all reviews |
+| `al_reviewinstance` | Contact, via `al_assignedcontactid` (built, AD-050) | Read | Anchors the write chain below |
+| `al_response` | Global | Read | See all answers |
+| `al_response` | Child of the Contact-scoped review | Read, Write, Create, Append | **The edit boundary** |
+| `al_failreason` | Global | Read, AppendTo | Reference data |
+
+The edit boundary is the one row that matters. Write is reachable only through the Contact-anchored parent chain, so a reviewer cannot alter another reviewer's response and cannot write across disciplines (PP-08) even though they can read both. `al_reviewinstance` is never writable from the portal at all — the status transition is the plug-in's job.
 
 Site settings added: `Webapi/al_response/enabled = true` and `Webapi/al_response/fields` listing only the four answer columns.
 
-OD-022 is not touched. It concerns case access; review access is already unblocked by the AD-050 Contact lookup.
+Two consequences to carry deliberately. This **supersedes the AD-047 clause** forbidding Global access to case, review and response data, for the reviewer roles only. And it **retires the portal design's negative test** "a user cannot view an unassigned case by editing the URL" for those roles: reading an unassigned case is now the intended behaviour, and must not be reported as a regression. The write-side negative tests are unchanged and still must pass.
+
+OD-022 is partially resolved. For reviewers the answer is neither proposed mechanic — Global read needs no case-level Contact relationship. It stays open for the Adviser and T&C Manager roles, where case readability cannot be Global.
 
 ## 8. Fail reasons
 
