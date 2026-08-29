@@ -1,0 +1,15 @@
+<customapi uniquename="al_SubmitReview">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Checker submits their own Tax or AQS review instance (FR-010..FR-017). Enforces caller, transition, mandatory questions, optimistic concurrency and idempotency, writes an immutable Audit Event, and locks the review.">
+    <label description="Checker submits their own Tax or AQS review instance (FR-010..FR-017). Enforces caller, transition, mandatory questions, optimistic concurrency and idempotency, writes an immutable Audit Event, and locks the review." languagecode="1033" />
+  </description>
+  <displayname default="Submit Review">
+    <label description="Submit Review" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_SubmitReview</name>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>
