@@ -1,0 +1,219 @@
+{% extends 'OT Layout' %}
+{% block content %}
+{% comment %}
+  Case detail (PP-05).
+
+  Sections follow the agreed reading order: case management, client, adviser and
+  paraplanner, advice and product, then review progress and remediation.
+  Administrative, integration and audit fields are deliberately not rendered.
+{% endcomment %}
+
+{% assign case_id = request.params['id'] %}
+
+{% if case_id == null or case_id == empty %}
+  {% include 'OT Empty State'
+     title: 'No case selected'
+     message: 'Open a case from the case list to see its detail.' %}
+{% else %}
+
+  {% fetchxml case %}
+  <fetch top="1">
+    <entity name="al_outcomecase">
+      <attribute name="al_outcomecaseid" />
+      <attribute name="al_casereference" />
+      <attribute name="al_casestatus" />
+      <attribute name="al_casetype" />
+      <attribute name="al_priority" />
+      <attribute name="al_samplesource" />
+      <attribute name="al_preorpostcheck" />
+      <attribute name="al_clientname" />
+      <attribute name="al_vulnerableclient" />
+      <attribute name="al_advisername" />
+      <attribute name="al_advisercode" />
+      <attribute name="al_adviserstatus" />
+      <attribute name="al_paraplanner" />
+      <attribute name="al_paraplannercode" />
+      <attribute name="al_advicedate" />
+      <attribute name="al_checkdate" />
+      <attribute name="al_duedate" />
+      <attribute name="al_products" />
+      <attribute name="al_productsolutiontype" />
+      <attribute name="al_taxcheckrequired" />
+      <attribute name="al_taxteamdisposition" />
+      <attribute name="al_checkername" />
+      <filter type="and">
+        <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | escape }}" />
+      </filter>
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+
+  {% assign c = case.results.entities[0] %}
+
+  {% if c == null %}
+    {% include 'OT Empty State'
+       title: 'Case not available'
+       message: 'This case does not exist, or you do not have permission to view it.' %}
+  {% else %}
+
+    {% fetchxml reviews %}
+    <fetch>
+      <entity name="al_reviewinstance">
+        <attribute name="al_reviewinstanceid" />
+        <attribute name="al_name" />
+        <attribute name="al_reviewtype" />
+        <attribute name="al_reviewstatus" />
+        <attribute name="al_sequence" />
+        <attribute name="al_startedon" />
+        <attribute name="al_submittedon" />
+        <filter type="and">
+          <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | escape }}" />
+        </filter>
+        <order attribute="al_sequence" descending="false" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+
+    {% fetchxml actions %}
+    <fetch>
+      <entity name="al_remediationaction">
+        <attribute name="al_remediationactionid" />
+        <attribute name="al_name" />
+        <attribute name="al_description" />
+        <attribute name="al_actionstatus" />
+        <attribute name="al_duedate" />
+        <attribute name="al_completedon" />
+        <filter type="and">
+          <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | escape }}" />
+        </filter>
+        <order attribute="al_duedate" descending="false" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+
+    <section class="ot-card" aria-labelledby="ot-case-mgmt">
+      <h2 class="ot-card__title" id="ot-case-mgmt">
+        {{ c.al_casereference | default: 'Case' | escape }}
+        {% include 'OT Status Badge' status: c.al_casestatus.label %}
+      </h2>
+      <dl class="ot-dl">
+        <div><dt>Case type</dt><dd>{{ c.al_casetype.label | default: '—' | escape }}</dd></div>
+        <div><dt>Priority</dt><dd>{{ c.al_priority.label | default: '—' | escape }}</dd></div>
+        <div><dt>Sample source</dt><dd>{{ c.al_samplesource.label | default: '—' | escape }}</dd></div>
+        <div><dt>Pre or post check</dt><dd>{{ c.al_preorpostcheck.label | default: '—' | escape }}</dd></div>
+        <div><dt>Checker</dt><dd>{{ c.al_checkername | default: '—' | escape }}</dd></div>
+        <div><dt>Due date</dt><dd>{{ c.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="ot-card" aria-labelledby="ot-case-client">
+      <h2 class="ot-card__title" id="ot-case-client">Client</h2>
+      <dl class="ot-dl">
+        <div><dt>Client name</dt><dd>{{ c.al_clientname | default: '—' | escape }}</dd></div>
+        <div>
+          <dt>Vulnerable client</dt>
+          <dd>{% if c.al_vulnerableclient %}Yes{% else %}No{% endif %}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="ot-card" aria-labelledby="ot-case-adviser">
+      <h2 class="ot-card__title" id="ot-case-adviser">Adviser and paraplanner</h2>
+      <dl class="ot-dl">
+        <div><dt>Adviser</dt><dd>{{ c.al_advisername | default: '—' | escape }}</dd></div>
+        <div><dt>Adviser code</dt><dd>{{ c.al_advisercode | default: '—' | escape }}</dd></div>
+        <div><dt>Adviser status</dt><dd>{{ c.al_adviserstatus.label | default: '—' | escape }}</dd></div>
+        <div><dt>Paraplanner</dt><dd>{{ c.al_paraplanner | default: '—' | escape }}</dd></div>
+        <div><dt>Paraplanner code</dt><dd>{{ c.al_paraplannercode | default: '—' | escape }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="ot-card" aria-labelledby="ot-case-advice">
+      <h2 class="ot-card__title" id="ot-case-advice">Advice and product</h2>
+      <dl class="ot-dl">
+        <div><dt>Advice date</dt><dd>{{ c.al_advicedate | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
+        <div><dt>Check date</dt><dd>{{ c.al_checkdate | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
+        <div><dt>Products</dt><dd>{{ c.al_products | default: '—' | escape }}</dd></div>
+        <div><dt>Product solution type</dt><dd>{{ c.al_productsolutiontype.label | default: '—' | escape }}</dd></div>
+        <div>
+          <dt>Tax check required</dt>
+          <dd>{% if c.al_taxcheckrequired %}Yes{% else %}No{% endif %}</dd>
+        </div>
+        <div><dt>Tax team disposition</dt><dd>{{ c.al_taxteamdisposition.label | default: '—' | escape }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="ot-card" aria-labelledby="ot-case-reviews">
+      <h2 class="ot-card__title" id="ot-case-reviews">Review progress</h2>
+      {% if reviews.results.entities.size > 0 %}
+        <div class="ot-table-wrap">
+          <table class="ot-table">
+            <caption>Tax runs before AQS when both are required (BR-004).</caption>
+            <thead>
+              <tr>
+                <th scope="col">Sequence</th>
+                <th scope="col">Review</th>
+                <th scope="col">Type</th>
+                <th scope="col">Status</th>
+                <th scope="col">Started</th>
+                <th scope="col">Submitted</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in reviews.results.entities %}
+                <tr>
+                  <td>{{ r.al_sequence | default: '—' }}</td>
+                  <td>{{ r.al_name | escape }}</td>
+                  <td>{{ r.al_reviewtype.label | escape }}</td>
+                  <td>{% include 'OT Status Badge' status: r.al_reviewstatus.label %}</td>
+                  <td>{{ r.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</td>
+                  <td>{{ r.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        {% include 'OT Empty State'
+           title: 'No reviews yet'
+           message: 'A review instance is created when the case is routed to Tax or AQS.' %}
+      {% endif %}
+    </section>
+
+    <section class="ot-card" aria-labelledby="ot-case-remediation">
+      <h2 class="ot-card__title" id="ot-case-remediation">Remediation</h2>
+      {% if actions.results.entities.size > 0 %}
+        <div class="ot-table-wrap">
+          <table class="ot-table">
+            <thead>
+              <tr>
+                <th scope="col">Action</th>
+                <th scope="col">Description</th>
+                <th scope="col">Status</th>
+                <th scope="col">Due</th>
+                <th scope="col">Completed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in actions.results.entities %}
+                <tr>
+                  <td>{{ a.al_name | escape }}</td>
+                  <td>{{ a.al_description | escape }}</td>
+                  <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
+                  <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+                  <td>{{ a.al_completedon | date: 'dd MMM yyyy' | default: '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        {% include 'OT Empty State'
+           title: 'No remediation'
+           message: 'A pass outcome requires no remediation. Actions appear here for any non-pass outcome.' %}
+      {% endif %}
+    </section>
+
+  {% endif %}
+{% endif %}
+{% endblock %}

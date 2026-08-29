@@ -1,0 +1,92 @@
+{% extends 'OT Layout' %}
+{% block content %}
+{% comment %}
+  Case worklist (PP-04).
+
+  Paging is server-side via a page-number querystring, so no unbounded
+  dataset is ever pulled into the browser (NFR-PERF-01). Filters by status,
+  route and assignee arrive in Phase 3 once option-set values and
+  al_assignedcontactid exist.
+{% endcomment %}
+
+{% assign page_size = 25 %}
+{% assign page_number = request.params['page'] | default: 1 | times: 1 %}
+{% if page_number < 1 %}{% assign page_number = 1 %}{% endif %}
+
+{% fetchxml cases %}
+<fetch count="{{ page_size }}" page="{{ page_number }}" returntotalrecordcount="true">
+  <entity name="al_outcomecase">
+    <attribute name="al_outcomecaseid" />
+    <attribute name="al_casereference" />
+    <attribute name="al_clientname" />
+    <attribute name="al_advisername" />
+    <attribute name="al_casetype" />
+    <attribute name="al_casestatus" />
+    <attribute name="al_priority" />
+    <attribute name="al_advicedate" />
+    <attribute name="al_duedate" />
+    <order attribute="al_casereference" descending="false" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign rows = cases.results.entities %}
+{% assign total = cases.results.total_record_count %}
+
+<section class="ot-card" aria-labelledby="ot-cases-heading">
+  <h2 class="ot-card__title" id="ot-cases-heading">All cases</h2>
+
+  {% if rows.size > 0 %}
+    <div class="ot-table-wrap">
+      <table class="ot-table">
+        <caption>
+          Showing {{ rows.size }} of {{ total }} cases, page {{ page_number }}.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Case reference</th>
+            <th scope="col">Client</th>
+            <th scope="col">Adviser</th>
+            <th scope="col">Case type</th>
+            <th scope="col">Status</th>
+            <th scope="col">Priority</th>
+            <th scope="col">Advice date</th>
+            <th scope="col">Due</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in rows %}
+            <tr>
+              <td>
+                <a href="/case-details?id={{ c.al_outcomecaseid }}">
+                  {{ c.al_casereference | default: 'Untitled case' | escape }}
+                </a>
+              </td>
+              <td>{{ c.al_clientname | escape }}</td>
+              <td>{{ c.al_advisername | escape }}</td>
+              <td>{{ c.al_casetype.label | escape }}</td>
+              <td>{% include 'OT Status Badge' status: c.al_casestatus.label %}</td>
+              <td>{{ c.al_priority.label | escape }}</td>
+              <td>{{ c.al_advicedate | date: 'dd MMM yyyy' }}</td>
+              <td>{{ c.al_duedate | date: 'dd MMM yyyy' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <nav aria-label="Pagination" style="margin-top: 1rem;">
+      {% if page_number > 1 %}
+        <a href="?page={{ page_number | minus: 1 }}">&laquo; Previous</a>
+      {% endif %}
+      {% if rows.size == page_size %}
+        <a href="?page={{ page_number | plus: 1 }}" style="margin-left: 1rem;">Next &raquo;</a>
+      {% endif %}
+    </nav>
+  {% else %}
+    {% include 'OT Empty State'
+       title: 'No cases found'
+       message: 'Cases appear here once an Intelligent Office extract has been imported and validated.' %}
+  {% endif %}
+</section>
+{% endblock %}
