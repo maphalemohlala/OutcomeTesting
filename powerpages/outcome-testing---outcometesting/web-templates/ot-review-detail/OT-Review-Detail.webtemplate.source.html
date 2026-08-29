@@ -33,7 +33,7 @@
       <attribute name="al_submittedon" />
       <attribute name="al_checklistversionid" />
       <filter type="and">
-        <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | escape }}" />
+        <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | xml_escape }}" />
       </filter>
       <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
         <attribute name="al_outcomecaseid" />
@@ -134,7 +134,7 @@
           <attribute name="al_answerchoices" />
           <attribute name="al_answerdate" />
           <filter type="and">
-            <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | escape }}" />
+            <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | xml_escape }}" />
           </filter>
         </entity>
       </fetch>

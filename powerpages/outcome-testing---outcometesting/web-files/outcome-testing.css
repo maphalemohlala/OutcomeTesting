@@ -131,12 +131,15 @@ footer.footer { margin-top: auto; flex-shrink: 0; }
 /* Brand the header. portalbasictheme.css paints .static-top.navbar-dark
    #2E456B with #FEA002 hover; both are overridden here at matching or
    higher specificity so the bar reads Ascot Lloyd teal. */
+/* Header sits on white so the Ascot Lloyd logo, which is dark, reads against
+   it. Bootstrap's navbar-dark class assumes a dark bar and paints its text
+   white, so every text colour in the header is restated below. */
 html body .navbar,
 html body .navbar-dark,
 html body .static-top.navbar-dark,
 html body .navbar.static-top.navbar-dark,
 html body div.navbar.navbar-dark.static-top {
-  background-color: var(--brand-teal) !important;
+  background-color: var(--brand-white) !important;
   background-image: none !important;
 }
 
@@ -164,59 +167,76 @@ html body .navbar-header a:focus-visible {
 }
 
 .navbar {
-  border-bottom: var(--edge) solid var(--brand-green-highlight);
+  border-bottom: 1px solid var(--colour-border);
+  box-shadow: inset 0 -4px 0 var(--brand-green-highlight);
   padding-top: var(--space-3);
   padding-bottom: var(--space-3);
 }
 
-.navbar-dark .navbar-nav > li > a:hover,
-.navbar-dark .navbar-nav > li.dropdown > a:hover,
-.navbar-dark .navbar-nav > li > a:focus,
-.navbar-dark .navbar-nav > li.dropdown > a:focus,
-.navbar-dark .navbar-nav > li > a:focus-visible,
-.navbar-dark .navbar-nav > li.dropdown > a:focus-visible,
-.static-top.navbar .menu-bar > .navbar-nav > li > a:hover {
+.navbar .navbar-brand img,
+.navbar .navbar-header img {
+  height: 34px !important;
+  width: auto !important;
+}
+
+html body .navbar .siteTitle,
+html body .navbar .custom-sitetitle {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--colour-text) !important;
+  margin: 0;
+}
+
+/* Navigation. The hovered item is marked by a filled mint chip, not by a
+   rule under the text: the theme already draws its own underline, so a
+   border here produced the double line. Underlines are suppressed on both
+   the link and its inner elements. */
+html body .navbar .nav-link,
+html body .navbar .weblink > a,
+html body .navbar-dark .navbar-nav > li > a,
+html body .navbar-dark .navbar-nav > li.dropdown > a {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--colour-text) !important;
+  padding: var(--space-2) var(--space-3);
+  border: none !important;
+  border-radius: var(--radius);
+  text-decoration: none !important;
   background-color: transparent !important;
-  color: var(--brand-green-highlight) !important;
+}
+
+html body .navbar .weblink > a:hover,
+html body .navbar .weblink > a:focus,
+html body .navbar .nav-link:hover,
+html body .navbar .nav-link:focus,
+html body .navbar-dark .navbar-nav > li > a:hover,
+html body .navbar-dark .navbar-nav > li > a:focus,
+html body .navbar-dark .navbar-nav > li.dropdown > a:hover,
+html body .navbar-dark .navbar-nav > li.dropdown > a:focus,
+html body .static-top.navbar .menu-bar > .navbar-nav > li > a:hover {
+  background-color: var(--brand-teal-light) !important;
+  color: var(--brand-teal-dark) !important;
+  text-decoration: none !important;
+  border: none !important;
+}
+
+html body .navbar a:hover span,
+html body .navbar a:focus span,
+html body .navbar a:hover h1,
+html body .navbar a:focus h1 { text-decoration: none !important; }
+
+html body .navbar a:focus-visible {
+  outline: 2px solid var(--colour-focus);
+  outline-offset: 2px;
 }
 
 .navbar-toggler,
 .navbar-dark .navbar-toggler:hover,
 .navbar-dark .navbar-toggler:focus {
-  background-color: var(--brand-green-highlight) !important;
-}
-
-.navbar .navbar-brand img,
-.navbar .navbar-header img {
-  height: 30px !important;
-  width: auto !important;
-}
-
-.navbar .siteTitle,
-.navbar .custom-sitetitle {
-  font-family: var(--font-heading);
-  font-size: var(--text-xl);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--colour-text-inverse);
-  margin: 0;
-}
-
-.navbar .nav-link,
-.navbar .weblink > a {
-  font-family: var(--font-body);
-  font-size: var(--text-base);
-  font-weight: 500;
-  color: var(--colour-text-inverse) !important;
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 2px solid transparent;
-}
-
-.navbar .weblink > a:hover,
-.navbar .weblink > a:focus {
-  color: var(--brand-green-highlight) !important;
-  border-bottom-color: var(--brand-green-highlight);
-  text-decoration: none;
+  background-color: var(--brand-teal) !important;
 }
 
 .navbar .divider-vertical { display: none; }
@@ -373,6 +393,124 @@ footer a, .footer a { color: var(--brand-teal-light) !important; }
 }
 
 .ot-tile--alert { border-left-color: var(--colour-outcome-issues); }
+
+/* ------------------------------------------------------------------
+   Filters. A working control strip, not a search hero: compact fields,
+   every one labelled, and a clear-filters action that only appears when
+   there is something to clear.
+   ------------------------------------------------------------------ */
+
+.ot-filters {
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.ot-filters__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+
+.ot-field { display: flex; flex-direction: column; }
+
+.ot-field label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--colour-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.ot-field input,
+.ot-field select {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--colour-text);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  min-height: 2.25rem;
+  width: 100%;
+}
+
+.ot-field input:focus-visible,
+.ot-field select:focus-visible {
+  outline: 2px solid var(--colour-focus);
+  outline-offset: 1px;
+  border-color: var(--colour-focus);
+}
+
+.ot-filters__actions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--colour-border);
+}
+
+.ot-btn {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: 1.4;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
+  background: var(--colour-surface);
+  color: var(--colour-text);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ot-btn:hover,
+.ot-btn:focus {
+  background: var(--brand-teal-light);
+  border-color: var(--colour-action);
+  color: var(--brand-teal-dark);
+  text-decoration: none;
+}
+
+.ot-btn--primary {
+  background: var(--colour-action);
+  border-color: var(--colour-action);
+  color: var(--colour-text-inverse);
+}
+
+.ot-btn--primary:hover,
+.ot-btn--primary:focus {
+  background: var(--colour-action-hover);
+  border-color: var(--colour-action-hover);
+  color: var(--colour-text-inverse);
+}
+
+.ot-count {
+  margin-left: auto;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--colour-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-pager {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-top: 1px solid var(--colour-border);
+}
+
+.ot-pager__pos {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
 
 /* ------------------------------------------------------------------
    Tables. Dense, scannable, sticky header for long worklists.
