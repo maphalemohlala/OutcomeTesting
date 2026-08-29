@@ -317,6 +317,10 @@ adx_pagetemplate:
   DisplayName: OT Remediation Page
   CheckSum: cc010df528ea03b84773545b9d6b565c3dfbd94b706000edf822be84b300bda8
   IsDeleted: false
+- RecordId: a1000000-0000-4000-8000-000000000026
+  DisplayName: OT Home Page
+  CheckSum: fdcbe8fc918a94a58ff7081f5d8d75493d28cbcfb6e2f45ead32242e0894a192
+  IsDeleted: false
 - RecordId: afc56284-6c3d-423a-8a4e-a38a497a98d3
   DisplayName: Profile
   CheckSum: 86abb633a4806e92df40cf703e718347c60d58fcb09daa6fd451d61e2d4ad253
@@ -735,7 +739,7 @@ adx_webpage:
   IsDeleted: false
 - RecordId: 257448e8-c86e-441b-b1be-7270eea5043d
   DisplayName: Home
-  CheckSum: 167e03e7348b41425362b89e1ecdcf3eb015c7bac6d54a621a976e46744aea4b
+  CheckSum: e151cd7345c7e8330992f11ce9f8ae3a70a425a0db4ce2469eda0657059883d9
   IsDeleted: false
 - RecordId: 2c479bb8-b2ec-42ca-8659-5436357fb008
   DisplayName: Access Denied
@@ -747,7 +751,7 @@ adx_webpage:
   IsDeleted: false
 - RecordId: 52570e2a-4d91-41f8-95c9-d0017a937039
   DisplayName: Home
-  CheckSum: 7d0d2cea58dba4a9a2cce5757a2835182afa03eda8daa3a6f4b55a47fb5f539e
+  CheckSum: 96a4a7c1777d2bc4d8aa91880fd8daa8f2e6364b2ce26c462ea40fa05b798e92
   IsDeleted: false
 - RecordId: 605f69d8-b6d5-4e75-9b82-d9d001b972e3
   DisplayName: Contact us
@@ -862,7 +866,7 @@ adx_webpageaccesscontrolrule_webrole:
 adx_webrole:
 - RecordId: c53b2908-1fc1-4470-89cd-6f5b95c17ffe
   DisplayName: Administrators
-  CheckSum: 8f6945361708df44825fbf72eba0e38bf7342ce189a32ab9205cc58d7fccc3aa
+  CheckSum: 68991855d7875c76e4de00acdff1ffaae8460df477dbd0728f8025ddea269e3a
   IsDeleted: false
 - RecordId: e24b50c5-1443-4725-84c9-70355724547f
   DisplayName: Authenticated Users
@@ -1016,6 +1020,10 @@ adx_webtemplate:
 - RecordId: a1000000-0000-4000-8000-000000000019
   DisplayName: OT Remediation
   CheckSum: f043bdce79df8b91c0b71f0f2d9e151e427120edc8b91ec28a6b61706494f358
+  IsDeleted: false
+- RecordId: a1000000-0000-4000-8000-00000000001a
+  DisplayName: OT Home
+  CheckSum: 0cd00b0748618776d6428962cd1ead5db0c6af4913bdabde596866ba4d360d86
   IsDeleted: false
 - RecordId: a4e0c9e2-1173-4978-b80a-a8b16f034731
   DisplayName: Languages Dropdown
