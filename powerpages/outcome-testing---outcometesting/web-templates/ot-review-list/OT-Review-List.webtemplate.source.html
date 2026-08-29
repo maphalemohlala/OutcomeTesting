@@ -1,0 +1,106 @@
+{% comment %}
+  Shared review worklist (PP-07, PP-08). Include with:
+    {% include 'OT Review List' reviewtype: 120910200 heading: 'Tax reviews' %}
+
+  al_reviewtype values are 120910200 Tax and 120910201 AQS.
+  A single al_ReviewInstance carries reviewType rather than separate
+  Tax and AQS tables, so both pages share this template.
+{% endcomment %}
+
+{% assign page_size = 25 %}
+{% assign page_number = request.params['page'] | default: 1 | times: 1 %}
+{% if page_number < 1 %}{% assign page_number = 1 %}{% endif %}
+
+{% fetchxml reviews %}
+<fetch count="{{ page_size }}" page="{{ page_number }}" returntotalrecordcount="true">
+  <entity name="al_reviewinstance">
+    <attribute name="al_reviewinstanceid" />
+    <attribute name="al_name" />
+    <attribute name="al_reviewstatus" />
+    <attribute name="al_sequence" />
+    <attribute name="al_startedon" />
+    <attribute name="al_submittedon" />
+    <filter type="and">
+      <condition attribute="al_reviewtype" operator="eq" value="{{ reviewtype }}" />
+    </filter>
+    <order attribute="al_startedon" descending="true" />
+    <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
+      <attribute name="al_outcomecaseid" />
+      <attribute name="al_casereference" />
+      <attribute name="al_clientname" />
+      <attribute name="al_advisername" />
+      <attribute name="al_duedate" />
+    </link-entity>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign rows = reviews.results.entities %}
+
+<div class="ot-notice" role="status">
+  <strong>Shell stage.</strong> This list shows every {{ heading | downcase }} instance in the
+  environment. Filtering to your own assigned work arrives with the Phase&nbsp;2 security build.
+</div>
+
+<section class="ot-card" aria-labelledby="ot-reviews-heading">
+  <h2 class="ot-card__title" id="ot-reviews-heading">{{ heading | escape }}</h2>
+
+  {% if rows.size > 0 %}
+    <div class="ot-table-wrap">
+      <table class="ot-table">
+        <caption>
+          Showing {{ rows.size }} of {{ reviews.results.total_record_count }} review instances,
+          page {{ page_number }}.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Case reference</th>
+            <th scope="col">Client</th>
+            <th scope="col">Adviser</th>
+            <th scope="col">Review</th>
+            <th scope="col">Sequence</th>
+            <th scope="col">Status</th>
+            <th scope="col">Started</th>
+            <th scope="col">Submitted</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>
+                {% assign cid = r['case.al_outcomecaseid'] %}
+                {% if cid %}
+                  <a href="/case-details?id={{ cid }}">
+                    {{ r['case.al_casereference'] | default: 'Untitled case' | escape }}
+                  </a>
+                {% else %}
+                  {{ r['case.al_casereference'] | default: '—' | escape }}
+                {% endif %}
+              </td>
+              <td>{{ r['case.al_clientname'] | escape }}</td>
+              <td>{{ r['case.al_advisername'] | escape }}</td>
+              <td>{{ r.al_name | escape }}</td>
+              <td>{{ r.al_sequence | default: '—' }}</td>
+              <td>{% include 'OT Status Badge' status: r.al_reviewstatus.label %}</td>
+              <td>{{ r.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</td>
+              <td>{{ r.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <nav aria-label="Pagination" style="margin-top: 1rem;">
+      {% if page_number > 1 %}
+        <a href="?page={{ page_number | minus: 1 }}">&laquo; Previous</a>
+      {% endif %}
+      {% if rows.size == page_size %}
+        <a href="?page={{ page_number | plus: 1 }}" style="margin-left: 1rem;">Next &raquo;</a>
+      {% endif %}
+    </nav>
+  {% else %}
+    {% include 'OT Empty State'
+       title: 'No review instances'
+       message: 'A review instance is created when a case is routed to this team.' %}
+  {% endif %}
+</section>

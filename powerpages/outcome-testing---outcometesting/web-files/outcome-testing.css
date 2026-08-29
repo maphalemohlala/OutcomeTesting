@@ -1,0 +1,301 @@
+/*
+ * Outcome Testing portal shell.
+ * Tokens trace to app/src/styles/tokens.css, which traces to brand/.
+ * Do not introduce colour or type values that are not defined here.
+ * Outcome hues are AD-008; mint is OD-013; Outfit/Inter are AD-009.
+ */
+
+:root {
+  --brand-teal: #2b5257;
+  --brand-teal-dark: #0a3535;
+  --brand-teal-light: #ccfdf3;
+  --brand-green-highlight: #b0ed70;
+  --brand-green-accessible: #00a800;
+  --brand-purple: #8758e4;
+  --brand-white: #ffffff;
+
+  --colour-surface: var(--brand-white);
+  --colour-surface-sunken: #f4f7f7;
+  --colour-surface-inverse: var(--brand-teal-dark);
+  --colour-border: #d3dcdc;
+  --colour-border-strong: #a8b8b8;
+
+  --colour-text: var(--brand-teal-dark);
+  --colour-text-muted: #4f6b6b;
+  --colour-text-inverse: var(--brand-white);
+
+  --colour-action: var(--brand-teal);
+  --colour-action-hover: var(--brand-teal-dark);
+  --colour-focus: var(--brand-teal-dark);
+
+  --colour-outcome-pass: var(--brand-green-accessible);
+  --colour-outcome-issues: #b87a3d;
+  --colour-outcome-insufficient: var(--brand-purple);
+  --colour-outcome-harm: #b65a52;
+  --colour-outcome-none: var(--colour-border-strong);
+
+  --colour-stage-waiting: var(--colour-border-strong);
+  --colour-stage-active: var(--brand-teal);
+  --colour-stage-blocked: var(--colour-outcome-harm);
+  --colour-stage-closed: var(--colour-text-muted);
+
+  --font-heading: 'Outfit', Arial, sans-serif;
+  --font-body: 'Inter', Arial, sans-serif;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  --radius: 2px;
+}
+
+/* ---------- shell ---------- */
+
+.ot-page {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--colour-text);
+  background: var(--colour-surface-sunken);
+  padding: var(--space-5) var(--space-4) var(--space-6);
+  min-height: 60vh;
+}
+
+.ot-page__inner {
+  max-width: 78rem;
+  margin: 0 auto;
+}
+
+.ot-page__header {
+  margin-bottom: var(--space-5);
+}
+
+.ot-page__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  margin: 0 0 var(--space-1);
+  color: var(--colour-text);
+}
+
+.ot-page__lede {
+  margin: 0;
+  color: var(--colour-text-muted);
+  font-size: var(--text-lg);
+}
+
+.ot-breadcrumb {
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-3);
+  color: var(--colour-text-muted);
+}
+
+.ot-breadcrumb a { color: var(--colour-action); }
+
+/* ---------- cards and tiles ---------- */
+
+.ot-card {
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.ot-card__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+}
+
+.ot-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  padding: 0;
+  list-style: none;
+}
+
+.ot-tile {
+  display: block;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-left: 3px solid var(--colour-action);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  text-decoration: none;
+  color: inherit;
+}
+
+.ot-tile:hover,
+.ot-tile:focus {
+  border-left-color: var(--colour-action-hover);
+  background: var(--brand-teal-light);
+  text-decoration: none;
+  color: inherit;
+}
+
+.ot-tile__count {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.1;
+  display: block;
+}
+
+.ot-tile__label {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ot-tile--alert { border-left-color: var(--colour-outcome-harm); }
+
+/* ---------- tables ---------- */
+
+.ot-table-wrap { overflow-x: auto; }
+
+.ot-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-base);
+  background: var(--colour-surface);
+}
+
+.ot-table caption {
+  text-align: left;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+  padding-bottom: var(--space-2);
+}
+
+.ot-table th,
+.ot-table td {
+  text-align: left;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--colour-border);
+  vertical-align: top;
+}
+
+.ot-table thead th {
+  font-family: var(--font-heading);
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--colour-text-muted);
+  background: var(--colour-surface-sunken);
+  border-bottom: 2px solid var(--colour-border-strong);
+  white-space: nowrap;
+}
+
+.ot-table tbody tr:hover { background: var(--colour-surface-sunken); }
+
+.ot-table a { color: var(--colour-action); font-weight: 500; }
+
+/* ---------- status badges (never colour alone: each carries text) ---------- */
+
+.ot-badge {
+  display: inline-block;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.4;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.ot-badge--pass         { color: var(--colour-outcome-pass); }
+.ot-badge--issues       { color: var(--colour-outcome-issues); }
+.ot-badge--insufficient { color: var(--colour-outcome-insufficient); }
+.ot-badge--harm         { color: var(--colour-outcome-harm); }
+.ot-badge--waiting      { color: var(--colour-stage-waiting); }
+.ot-badge--active       { color: var(--colour-stage-active); }
+.ot-badge--blocked      { color: var(--colour-stage-blocked); }
+.ot-badge--closed       { color: var(--colour-stage-closed); }
+.ot-badge--none         { color: var(--colour-outcome-none); }
+
+/* ---------- definition grid for case detail ---------- */
+
+.ot-dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-3) var(--space-5);
+  margin: 0;
+}
+
+.ot-dl div { margin: 0; }
+
+.ot-dl dt {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--colour-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.ot-dl dd {
+  margin: 0;
+  font-size: var(--text-base);
+}
+
+/* ---------- empty and error states ---------- */
+
+.ot-empty {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--colour-text-muted);
+  background: var(--colour-surface);
+  border: 1px dashed var(--colour-border-strong);
+  border-radius: var(--radius);
+}
+
+.ot-empty__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  color: var(--colour-text);
+  margin: 0 0 var(--space-2);
+}
+
+.ot-notice {
+  border-left: 3px solid var(--colour-outcome-issues);
+  background: var(--colour-surface);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+/* ---------- accessibility ---------- */
+
+.ot-page a:focus-visible,
+.ot-page button:focus-visible,
+.ot-tile:focus-visible {
+  outline: 2px solid var(--colour-focus);
+  outline-offset: 2px;
+}
+
+.ot-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 40rem) {
+  .ot-page { padding: var(--space-4) var(--space-3); }
+  .ot-tile__count { font-size: 1.5rem; }
+}

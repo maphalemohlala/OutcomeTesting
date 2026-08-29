@@ -57,12 +57,32 @@ pac pages upload `
 
 After uploading: refresh the site configuration cache, sync design studio if open, then test in an InPrivate session against each representative role.
 
-## Baseline state
+## Current state
 
-Downloaded 2026-08-29 from a freshly provisioned site. Stock content only:
+Shell and data wiring built 2026-08-29 and verified round-tripped from DEV.
 
-- Web roles: Administrators, Authenticated Users, Anonymous Users — the seven roles in the design do not exist yet.
-- Table permissions: one, granting **Anonymous Users create access on Feedback** at Global scope. PP-01 requires anonymous access removed entirely, so this is deleted in Phase 1.
+**Pages** — `/my-work`, `/cases`, `/case-details?id=`, `/tax-reviews`, `/aqs-reviews`, `/remediation`, all children of Home and in the primary navigation.
+
+**Web templates** — `ot-layout` is the shell; every page template extends it and fills the `content` block. `ot-status-badge` and `ot-empty-state` are shared partials. `ot-review-list` is shared by the Tax and AQS pages, parameterised by `al_reviewtype` (Tax `120910200`, AQS `120910201`).
+
+**Data** — bound with `{% fetchxml %}`, server-side paged at 25 rows with `returntotalrecordcount`. No unbounded retrieval, no client-side filtering of records the user should not have.
+
+**Styling** — `outcome-testing.css`, derived from `app/src/styles/tokens.css`. No second colour system.
+
+### Not yet built
+
+- **Web roles.** Only the three stock roles exist (Administrators, Authenticated Users, Anonymous Users). The seven in the design are Phase 2.
+- **Assignment filtering.** Every list is unfiltered and says so on the page. Filtering needs `al_assignedcontactid` (AD-047), which does not exist yet.
+- **Status and route filters.** Deferred until Phase 3.
+- **Working-day ageing.** Remediation shows calendar days, labelled as such, pending OD-018.
+
+### ⚠ Provisional table permissions — DEV only
+
+Nine permissions named `PROVISIONAL DEV ONLY - *` grant **Global read** to Authenticated Users so pages render during development. In Power Pages a list with no permission returns nothing, so data wiring cannot be built without them.
+
+**They must be deleted before TEST or PROD**, and replaced by the Contact-scoped matrix in the design (AD-047). Treat their presence in a release artefact as a release blocker.
+
+The stock `Feedback` permission granting **Anonymous Users create access** also remains and is removed in Phase 1 under PP-01.
 
 ## Rules
 

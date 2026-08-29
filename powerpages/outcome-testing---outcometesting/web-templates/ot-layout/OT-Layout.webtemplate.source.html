@@ -1,0 +1,39 @@
+{% comment %}
+  Outcome Testing page shell.
+  Every portal page extends this and fills the "content" block:
+
+    {% extends 'OT Layout' %}
+    {% block content %} ... {% endblock %}
+
+  Header, navigation and footer come from the site's header/footer templates.
+{% endcomment %}
+
+<link rel="stylesheet" href="/outcome-testing.css">
+
+<main class="ot-page" id="ot-main">
+  <div class="ot-page__inner">
+
+    <nav class="ot-breadcrumb" aria-label="Breadcrumb">
+      <a href="/">Home</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{{ page.title | escape }}</span>
+    </nav>
+
+    <header class="ot-page__header">
+      <h1 class="ot-page__title">{{ page.title | escape }}</h1>
+      {% if page.summary and page.summary != empty %}
+        <p class="ot-page__lede">{{ page.summary }}</p>
+      {% endif %}
+    </header>
+
+    {% unless user %}
+      <div class="ot-notice" role="status">
+        You are not signed in.
+        <a href="{{ website.sign_in_url_substitution }}">Sign in</a> to see your work.
+      </div>
+    {% endunless %}
+
+    {% block content %}{% endblock %}
+
+  </div>
+</main>
