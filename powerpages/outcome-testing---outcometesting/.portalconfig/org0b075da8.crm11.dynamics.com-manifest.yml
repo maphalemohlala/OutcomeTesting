@@ -983,15 +983,15 @@ adx_webtemplate:
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-000000000010
   DisplayName: OT Layout
-  CheckSum: 282419194db69f46421ba1c2e58e2f9589657e3d7cb236855a1c2602c57a904f
+  CheckSum: 9b4358ee5655cbfbe1ac372d0e1abff2780e64615724aa694dd24eab3f25f83c
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-000000000011
   DisplayName: OT Status Badge
-  CheckSum: 3be6dc6e4ffa17eb93226bba99cc511a61f79122dfde7c80d6e0207363d2fb27
+  CheckSum: 86edf61fcc256b9c6924a345006cc9aa83ee8f986f038c909159078ae1fa0021
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-000000000012
   DisplayName: OT Empty State
-  CheckSum: e6ea2c9d09dfd7386c26b0f667c3bc5cad1c29710f38c514327cb79f749be911
+  CheckSum: eb136e92c0d8bcaae5e69d1fc0341ebcb481238b33cded0d3777c1d783d2fc84
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-000000000013
   DisplayName: OT My Work
@@ -1007,7 +1007,7 @@ adx_webtemplate:
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-000000000016
   DisplayName: OT Review List
-  CheckSum: bee810d19f5aa11fe7672c1c3391e654dd6058abd3df9d32acfac7a2a0d24b00
+  CheckSum: 3b07dc7a2d616af782e368973279e8b838736fe96fa4f0fcd917d2f986a738aa
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-000000000017
   DisplayName: OT Tax Reviews
@@ -1019,7 +1019,7 @@ adx_webtemplate:
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-000000000019
   DisplayName: OT Remediation
-  CheckSum: f043bdce79df8b91c0b71f0f2d9e151e427120edc8b91ec28a6b61706494f358
+  CheckSum: 0280bccc57c3032cff7fcb7687ada695ffce54f0a58242df33ae4c38897653a2
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-00000000001a
   DisplayName: OT Home
