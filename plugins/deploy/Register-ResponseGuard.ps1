@@ -182,6 +182,10 @@ foreach ($step in @(
         name                                    = $step.Name
         entityalias                             = 'PreImage'
         imagetype                               = 0
+        # Required, and not defaulted: it names the InputParameter the image is taken
+        # from. For Create and Update that parameter is Target. Omitting it fails with
+        # 0x80040203 "Attribute messagepropertyname is required".
+        messagepropertyname                     = 'Target'
         attributes                              = "al_reviewinstanceid,al_questionversionid,$answerColumns"
         'sdkmessageprocessingstepid@odata.bind' = "/sdkmessageprocessingsteps($($step.Id))"
     }
