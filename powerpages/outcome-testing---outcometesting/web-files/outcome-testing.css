@@ -750,3 +750,23 @@ footer a, .footer a { color: var(--brand-teal-light) !important; }
   .ot-table-wrap { max-height: none; }
   .ot-table thead th { position: static; }
 }
+
+/* Support reference on the access-denied page. Deliberately quiet: it is for
+   quoting to support, not something a user needs to read. */
+.ot-support {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.ot-support code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  background: var(--colour-surface-sunken);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius);
+  padding: 1px var(--space-2);
+  color: var(--colour-text);
+}
+
+.ot-card p + p { margin-top: var(--space-3); }
+.ot-card .ot-btn + .ot-btn { margin-left: var(--space-2); }

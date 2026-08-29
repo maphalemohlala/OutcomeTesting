@@ -349,6 +349,14 @@ adx_pagetemplate:
   DisplayName: OT Review Detail Page
   CheckSum: f876a48341f8dbc3836a634b6dbeff82c7c4c77f305c5f3b6a331fef8a5190c8
   IsDeleted: false
+- RecordId: a1000000-0000-4000-8000-000000000028
+  DisplayName: OT Access Denied Page
+  CheckSum: 8dcc80c07571e17871eb620080a4e0cd47c514ef00ce13c13c9a1c6dc3097869
+  IsDeleted: false
+- RecordId: a1000000-0000-4000-8000-000000000029
+  DisplayName: OT Not Found Page
+  CheckSum: 85983e1c3d83aae8d840af4b2154bff74c6e13f017722d7c0a054f6e35be6dc6
+  IsDeleted: false
 - RecordId: afc56284-6c3d-423a-8a4e-a38a497a98d3
   DisplayName: Profile
   CheckSum: 86abb633a4806e92df40cf703e718347c60d58fcb09daa6fd451d61e2d4ad253
@@ -660,7 +668,7 @@ adx_webfile:
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-000000000050
   DisplayName: outcome-testing.css
-  CheckSum: c1401856432c00d7ae1ebda8b6dbe96db0ab5b770de0987fcd67ff6aec45cde7
+  CheckSum: c1bf27a4872f0422e0a6f583ef051c3b4f44e2a6a38c5ff9beaa05fb4ad4203d
   IsDeleted: false
 - RecordId: beef46c6-d961-4e8b-9131-e86b15d8345d
   DisplayName: Site-mockup-1.png
@@ -771,7 +779,7 @@ adx_webpage:
   IsDeleted: false
 - RecordId: 2c479bb8-b2ec-42ca-8659-5436357fb008
   DisplayName: Access Denied
-  CheckSum: 6ae9d78c01e2aa639e71f344e126bd00f6474bb0a8c9d42b5c3b227665b56408
+  CheckSum: 5916c5a6d02f7a2658a68d4957d1cafa6fff7744232883a2635f9e6f933ac876
   IsDeleted: false
 - RecordId: 3e94512c-620b-40c5-b216-909e561045d9
   DisplayName: Subpage 2
@@ -791,7 +799,7 @@ adx_webpage:
   IsDeleted: false
 - RecordId: 8787d0d8-73e7-46a5-a53b-034bca05c819
   DisplayName: Page Not Found
-  CheckSum: f55fa2ec5382e0c0749ed1ba4e33eebf4dd4243df2a73cd977418d1d38deff63
+  CheckSum: 9aa02eae9f8137f79f8f289cf4bf859438e9c1b7846cd2c753fdc7da2b20e90a
   IsDeleted: false
 - RecordId: 91b5f655-6160-4a64-87f7-294fe5010bf5
   DisplayName: Contact us
@@ -855,7 +863,7 @@ adx_webpage:
   IsDeleted: false
 - RecordId: ae538223-aef4-4e60-a2b8-21b89e1cc2c9
   DisplayName: Page Not Found
-  CheckSum: adbb9c4dfc9d3b201dcaa42ab7f0ee67f45401355835d9c09ae4fda392f1a196
+  CheckSum: db9f72e7fe3f9418655bdf08fa0f0e6a89864512549dc66daee904aa091dc84b
   IsDeleted: false
 - RecordId: b94ddf2d-4135-4acf-9490-881cc0e6184b
   DisplayName: Subpage 1
@@ -883,7 +891,7 @@ adx_webpage:
   IsDeleted: false
 - RecordId: fcab9128-7b4b-4674-826e-54fad60f6e6d
   DisplayName: Access Denied
-  CheckSum: 8aab8adfd8d8ee1b781617ad1d5241c7181ef0f8c34389c5776156f7134b31f3
+  CheckSum: 64ac289e591a3afc4291979c31ffc0e7f47e5b3bc09719337c38045f1f1125f0
   IsDeleted: false
 adx_webpageaccesscontrolrule:
 - RecordId: 563ee258-2962-4440-a6e8-d25296ac40bb
@@ -900,9 +908,37 @@ adx_webpageaccesscontrolrule_webrole:
   CheckSum: 1c88a17bc3b7ba75de95c9f9c9dc7feee150bc62d6e5a901d92849f453996bcb
   IsDeleted: false
 adx_webrole:
+- RecordId: a1000000-0000-4000-8000-000000000090
+  DisplayName: AL Portal - Tax Reviewer
+  CheckSum: 1d77bc8aa3dae50ab0dc37ef02442f7819f9941a7db7b645cc9258f3866c4d14
+  IsDeleted: false
+- RecordId: a1000000-0000-4000-8000-000000000091
+  DisplayName: AL Portal - AQS Reviewer
+  CheckSum: a4c005697466fb1c298d32c1b7d81e2f8ecad13055c3d92084ea420ae3a1c40b
+  IsDeleted: false
+- RecordId: a1000000-0000-4000-8000-000000000092
+  DisplayName: AL Portal - Adviser Remediation
+  CheckSum: 988d6e8c7ae628553337de9bdb68453a2fd176adb4400e131e25b9421c3b3cbe
+  IsDeleted: false
+- RecordId: a1000000-0000-4000-8000-000000000093
+  DisplayName: AL Portal - T&C Supervisor
+  CheckSum: b7bcd81b8821a803d3020247c178c33894593a8da3d388c881e93645f9b8eb14
+  IsDeleted: false
+- RecordId: a1000000-0000-4000-8000-000000000094
+  DisplayName: AL Portal - Regional Manager
+  CheckSum: b3304fe27bafba131c9ab6e6b5f1c79805dcdbd18e6d75ace2039d0ad3f41505
+  IsDeleted: false
+- RecordId: a1000000-0000-4000-8000-000000000095
+  DisplayName: AL Portal - Outcome Testing Manager
+  CheckSum: bd2ea478aad515ef9a555f5c573e56c9b2b81b4b3d97e1a8f3c246b86fa3de3b
+  IsDeleted: false
+- RecordId: a1000000-0000-4000-8000-000000000096
+  DisplayName: AL Portal - Portal Administrator
+  CheckSum: 2dcac7672d64c1306e4fe728df75561c8d3e749c23bbd297b4e121236247f119
+  IsDeleted: false
 - RecordId: c53b2908-1fc1-4470-89cd-6f5b95c17ffe
   DisplayName: Administrators
-  CheckSum: 14fe0df7ae5dfb70043718fea66c278cc9a60093e67cedf0be0eb8e6268e20fe
+  CheckSum: 8f6945361708df44825fbf72eba0e38bf7342ce189a32ab9205cc58d7fccc3aa
   IsDeleted: false
 - RecordId: e24b50c5-1443-4725-84c9-70355724547f
   DisplayName: Authenticated Users
@@ -1019,7 +1055,7 @@ adx_webtemplate:
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-000000000010
   DisplayName: OT Layout
-  CheckSum: 0d546e29faa23b8908bd5f9640b45d6be78c7e1cda17129c4ba37bb081919897
+  CheckSum: 72b519b8b6292c9985490e76ce7d3692e47bcf331714fe39a4161e2b9fd74f63
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-000000000011
   DisplayName: OT Status Badge
@@ -1064,6 +1100,14 @@ adx_webtemplate:
 - RecordId: a1000000-0000-4000-8000-00000000001b
   DisplayName: OT Review Detail
   CheckSum: 0807965038d3ad0d1b1dafa2eb52b32e9ce38e0ded65580ba52d81332f58016e
+  IsDeleted: false
+- RecordId: a1000000-0000-4000-8000-00000000001c
+  DisplayName: OT Access Denied
+  CheckSum: ba4203c05aa1ed8bf575b054f48f34d29e6031ddb40cb68316c9ccab435f278c
+  IsDeleted: false
+- RecordId: a1000000-0000-4000-8000-00000000001d
+  DisplayName: OT Not Found
+  CheckSum: 39f0539ed47db9a1631d751cf48093773f1a9afdd09f2225049ca83ade9671e5
   IsDeleted: false
 - RecordId: a4e0c9e2-1173-4978-b80a-a8b16f034731
   DisplayName: Languages Dropdown
@@ -1170,9 +1214,9 @@ annotation:
   DisplayName: Graph-1.png
   CheckSum: b241f61228f001129eaec69291839ab69f859da80c94cda2e3b6af8f81166c1c
   IsDeleted: false
-- RecordId: 8343a32d-a7a3-f111-aaac-e4fade069307
+- RecordId: b6e81b77-a8a3-f111-aaac-e4fade069307
   DisplayName: outcome-testing.css
-  CheckSum: 79f32e7cfb21b4052641bb795d3b3d31620507f6632035d07f680d60f7559901
+  CheckSum: 37b74e2e5600371822eff1adc93308b5d5d89fca7201897274776b4f71f09b96
   IsDeleted: false
 - RecordId: f3def71e-99a3-f111-aaac-e4fade069307
   DisplayName: PWAManifest.json
