@@ -1,0 +1,228 @@
+{% extends 'OT Layout' %}
+{% block content %}
+{% comment %}
+  Review detail: renders the questionnaire version issued to this review
+  (PP-07, PP-08, PP-09).
+
+  The chain is Checklist Version -> Section -> Question -> Question Version.
+  Questions are read from the version stamped on the review instance, never
+  from the current editable question record, so a historic review always
+  renders the wording, order and response type that applied when it was
+  answered (BR-013, FR-030, FR-031).
+
+  Read-only at this stage. Draft save and submit require the server-side
+  command and flow described in the design, section 6; there is no
+  submit-review custom API yet.
+{% endcomment %}
+
+{% assign review_id = request.params['id'] %}
+
+{% if review_id == null or review_id == empty %}
+  {% include 'OT Empty State' title: 'No review selected' message: 'Open a review from a worklist to see its questionnaire.' %}
+{% else %}
+
+  {% fetchxml review %}
+  <fetch top="1">
+    <entity name="al_reviewinstance">
+      <attribute name="al_reviewinstanceid" />
+      <attribute name="al_name" />
+      <attribute name="al_reviewtype" />
+      <attribute name="al_reviewstatus" />
+      <attribute name="al_sequence" />
+      <attribute name="al_startedon" />
+      <attribute name="al_submittedon" />
+      <attribute name="al_checklistversionid" />
+      <filter type="and">
+        <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | escape }}" />
+      </filter>
+      <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
+        <attribute name="al_outcomecaseid" />
+        <attribute name="al_casereference" />
+        <attribute name="al_clientname" />
+        <attribute name="al_advisername" />
+      </link-entity>
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+
+  {% assign rv = review.results.entities[0] %}
+
+  {% if rv == null %}
+    {% include 'OT Empty State' title: 'Review not available' message: 'This review does not exist, or you do not have permission to view it.' %}
+  {% else %}
+
+    {% assign cv_id = rv.al_checklistversionid.id %}
+
+    <section class="ot-card" aria-labelledby="ot-review-summary">
+      <h2 class="ot-card__title" id="ot-review-summary">
+        {{ rv.al_reviewtype.label | escape }} review
+        {% include 'OT Status Badge' status: rv.al_reviewstatus.label %}
+      </h2>
+      <dl class="ot-dl">
+        <div>
+          <dt>Case</dt>
+          <dd>
+            {% assign cid = rv['case.al_outcomecaseid'] %}
+            {% if cid %}
+              <a href="/case-details?id={{ cid }}">{{ rv['case.al_casereference'] | default: 'Untitled case' | escape }}</a>
+            {% else %}
+              {{ rv['case.al_casereference'] | default: '—' | escape }}
+            {% endif %}
+          </dd>
+        </div>
+        <div><dt>Client</dt><dd>{{ rv['case.al_clientname'] | default: '—' | escape }}</dd></div>
+        <div><dt>Adviser</dt><dd>{{ rv['case.al_advisername'] | default: '—' | escape }}</dd></div>
+        <div><dt>Checklist version</dt><dd>{{ rv.al_checklistversionid.name | default: '—' | escape }}</dd></div>
+        <div><dt>Sequence</dt><dd>{{ rv.al_sequence | default: '—' }}</dd></div>
+        <div><dt>Started</dt><dd>{{ rv.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
+        <div><dt>Submitted</dt><dd>{{ rv.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
+      </dl>
+    </section>
+
+    {% if rv.al_submittedon %}
+      <div class="ot-notice" role="status">
+        <strong>Submitted {{ rv.al_submittedon | date: 'dd MMM yyyy' }}.</strong>
+        This review is locked. Reopening or regrading is a T&amp;C Manager action and
+        requires a recorded reason (AD-031).
+      </div>
+    {% else %}
+      <div class="ot-notice" role="status">
+        <strong>Read only.</strong> Answering and submitting arrive with the server-side
+        submit command; this view renders the questionnaire issued to the review.
+      </div>
+    {% endif %}
+
+    {% if cv_id == null %}
+      {% include 'OT Empty State' title: 'No checklist version issued' message: 'This review has no checklist version, so no questions can be rendered.' %}
+    {% else %}
+
+      {% fetchxml questions %}
+      <fetch>
+        <entity name="al_questionversion">
+          <attribute name="al_questionversionid" />
+          <attribute name="al_questiontext" />
+          <attribute name="al_responsetype" />
+          <attribute name="al_ismandatory" />
+          <attribute name="al_versionnumber" />
+          <attribute name="al_displayorder" />
+          <link-entity name="al_question" from="al_questionid" to="al_questionid" alias="q">
+            <attribute name="al_displayorder" />
+            <link-entity name="al_section" from="al_sectionid" to="al_sectionid" alias="s">
+              <attribute name="al_sectionid" />
+              <attribute name="al_name" />
+              <attribute name="al_displayorder" />
+              <attribute name="al_helptext" />
+              <attribute name="al_ownerrole" />
+              <filter type="and">
+                <condition attribute="al_checklistversionid" operator="eq" value="{{ cv_id }}" />
+              </filter>
+            </link-entity>
+          </link-entity>
+          <order entityname="s" attribute="al_displayorder" />
+          <order entityname="q" attribute="al_displayorder" />
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+
+      {% fetchxml responses %}
+      <fetch>
+        <entity name="al_response">
+          <attribute name="al_responseid" />
+          <attribute name="al_questionversionid" />
+          <attribute name="al_answertext" />
+          <attribute name="al_answerchoice" />
+          <attribute name="al_answerchoices" />
+          <attribute name="al_answerdate" />
+          <filter type="and">
+            <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | escape }}" />
+          </filter>
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+
+      {% assign qrows = questions.results.entities %}
+      {% assign arows = responses.results.entities %}
+
+      {% if qrows.size == 0 %}
+        {% include 'OT Empty State' title: 'No questions in this version' message: 'The checklist version issued to this review has no sections or questions.' %}
+      {% else %}
+
+        {% assign current_section = '' %}
+        {% for qv in qrows %}
+          {% assign sid = qv['s.al_sectionid'] %}
+
+          {% if sid != current_section %}
+            {% unless forloop.first %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+            {% endunless %}
+            {% assign current_section = sid %}
+
+            <section class="ot-card" aria-labelledby="sec-{{ sid }}">
+              <h2 class="ot-card__title" id="sec-{{ sid }}">
+                {{ qv['s.al_name'] | escape }}
+                {% assign owner = qv['s.al_ownerrole'] %}
+                {% if owner and owner.label %}
+                  <span class="ot-badge ot-badge--waiting">{{ owner.label | escape }}</span>
+                {% endif %}
+              </h2>
+              {% if qv['s.al_helptext'] %}
+                <p class="ot-section-help">{{ qv['s.al_helptext'] | escape }}</p>
+              {% endif %}
+              <div class="ot-table-wrap">
+                <table class="ot-table ot-questions">
+                  <thead>
+                    <tr>
+                      <th scope="col" class="ot-col-q">Question</th>
+                      <th scope="col">Response type</th>
+                      <th scope="col">Answer</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+          {% endif %}
+
+                    <tr>
+                      <td class="ot-col-q">
+                        {{ qv.al_questiontext | escape }}
+                        {% if qv.al_ismandatory %}
+                          <abbr class="ot-required" title="Required">Required</abbr>
+                        {% endif %}
+                      </td>
+                      <td><span class="ot-type">{{ qv.al_responsetype.label | escape }}</span></td>
+                      <td>
+                        {% assign answered = false %}
+                        {% for a in arows %}
+                          {% if a.al_questionversionid.id == qv.al_questionversionid %}
+                            {% assign answered = true %}
+                            {% if a.al_answertext and a.al_answertext != empty %}
+                              {{ a.al_answertext | escape }}
+                            {% elsif a.al_answerchoices and a.al_answerchoices != empty %}
+                              {{ a.al_answerchoices | escape }}
+                            {% elsif a.al_answerdate %}
+                              {{ a.al_answerdate | date: 'dd MMM yyyy' }}
+                            {% elsif a.al_answerchoice %}
+                              {% include 'OT Status Badge' status: a.al_answerchoice.label %}
+                            {% endif %}
+                          {% endif %}
+                        {% endfor %}
+                        {% unless answered %}
+                          <span class="ot-unanswered">Not answered</span>
+                        {% endunless %}
+                      </td>
+                    </tr>
+
+          {% if forloop.last %}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          {% endif %}
+        {% endfor %}
+
+      {% endif %}
+    {% endif %}
+  {% endif %}
+{% endif %}
+{% endblock %}
