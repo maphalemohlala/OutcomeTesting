@@ -11,9 +11,7 @@
 {% assign case_id = request.params['id'] %}
 
 {% if case_id == null or case_id == empty %}
-  {% include 'OT Empty State'
-     title: 'No case selected'
-     message: 'Open a case from the case list to see its detail.' %}
+  {% include 'OT Empty State' title: 'No case selected' message: 'Open a case from the case list to see its detail.' %}
 {% else %}
 
   {% fetchxml case %}
@@ -51,9 +49,7 @@
   {% assign c = case.results.entities[0] %}
 
   {% if c == null %}
-    {% include 'OT Empty State'
-       title: 'Case not available'
-       message: 'This case does not exist, or you do not have permission to view it.' %}
+    {% include 'OT Empty State' title: 'Case not available' message: 'This case does not exist, or you do not have permission to view it.' %}
   {% else %}
 
     {% fetchxml reviews %}
@@ -174,9 +170,7 @@
           </table>
         </div>
       {% else %}
-        {% include 'OT Empty State'
-           title: 'No reviews yet'
-           message: 'A review instance is created when the case is routed to Tax or AQS.' %}
+        {% include 'OT Empty State' title: 'No reviews yet' message: 'A review instance is created when the case is routed to Tax or AQS.' %}
       {% endif %}
     </section>
 
@@ -208,9 +202,7 @@
           </table>
         </div>
       {% else %}
-        {% include 'OT Empty State'
-           title: 'No remediation'
-           message: 'A pass outcome requires no remediation. Actions appear here for any non-pass outcome.' %}
+        {% include 'OT Empty State' title: 'No remediation' message: 'A pass outcome requires no remediation. Actions appear here for any non-pass outcome.' %}
       {% endif %}
     </section>
 

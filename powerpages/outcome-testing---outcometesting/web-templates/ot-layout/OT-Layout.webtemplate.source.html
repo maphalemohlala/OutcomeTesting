@@ -1,23 +1,27 @@
 {% comment %}
   Outcome Testing page shell.
-  Every portal page extends this and fills the "content" block:
+  Every portal page extends this and fills the "content" block.
+  Usage: extends 'OT Layout', then a block named content.
 
-    (% extends 'OT Layout' %)
-    (% block content %) ... (% endblock %)
-
-  Header, navigation and footer come from the site's header/footer templates.
+  Header, navigation and footer come from the site's header/footer templates;
+  outcome-testing.css restyles those to Ascot Lloyd brand values.
 {% endcomment %}
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600&display=swap">
 <link rel="stylesheet" href="/outcome-testing.css">
 
 <main class="ot-page" id="ot-main">
   <div class="ot-page__inner">
 
-    <nav class="ot-breadcrumb" aria-label="Breadcrumb">
-      <a href="/">Home</a>
-      <span aria-hidden="true">/</span>
-      <span aria-current="page">{{ page.title | escape }}</span>
-    </nav>
+    {% unless page.url == '/' %}
+      <nav class="ot-breadcrumb" aria-label="Breadcrumb">
+        <a href="/">Home</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{{ page.title | escape }}</span>
+      </nav>
+    {% endunless %}
 
     <header class="ot-page__header">
       <h1 class="ot-page__title">{{ page.title | escape }}</h1>
