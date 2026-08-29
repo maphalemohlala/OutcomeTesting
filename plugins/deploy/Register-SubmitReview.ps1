@@ -24,6 +24,9 @@
     A bearer token for the Dataverse Web API of OrgUrl. Obtain one however your
     environment allows (for example an Azure CLI or MSAL token for the org).
 
+.PARAMETER PluginAssemblyId
+    Id of the existing OutcomeTestingPlugins assembly registered in the environment.
+
 .PARAMETER SolutionUniqueName
     Solution the components are added to. Defaults to OutcomeTesting.
 
@@ -34,7 +37,10 @@
 param(
     [Parameter(Mandatory = $true)][string]$OrgUrl,
     [Parameter(Mandatory = $true)][string]$AccessToken,
-    [string]$SolutionUniqueName = 'OutcomeTesting'
+    [string]$SolutionUniqueName = 'OutcomeTesting',
+
+    # Existing OutcomeTestingPlugins assembly in the solution.
+    [string]$PluginAssemblyId = '7b51d0d1-f5a1-f111-b8dd-e4fade069307'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -77,22 +83,16 @@ function Get-OrCreate {
 }
 
 Write-Host '1. Pushing plug-in assembly (pac plugin push)...'
-$settingsFile = Join-Path $pluginProject 'spkl.json'
-if (-not (Test-Path -LiteralPath $settingsFile)) {
-    # Fail here rather than at step 2. Without this file the push cannot run, and the
-    # only symptom downstream is "Plug-in type not found", which points at the wrong cause.
-    throw "Plug-in push settings file not found: $settingsFile. Create it, or push the assembly manually with 'pac plugin push' from $pluginProject and re-run this script (the Web API steps are idempotent)."
+# PAC CLI 2.11.2 takes --pluginId / --pluginFile / --type. It has no --settingsFile
+# parameter; that form belonged to an older CLI and fails outright on 2.11.2.
+$dll = Join-Path $pluginProject 'bin\Debug\net462\OutcomeTesting.Plugins.dll'
+if (-not (Test-Path -LiteralPath $dll)) {
+    throw "Plug-in assembly not found: $dll. Run 'dotnet build' in $pluginProject first."
 }
-Push-Location $pluginProject
-try {
-    # stderr is NOT discarded: when the push fails, its own message is the only thing that
-    # explains why, and step 2 can only report the symptom.
-    pac plugin push --settingsFile $settingsFile
-    if ($LASTEXITCODE -ne 0) {
-        throw "pac plugin push failed with exit code $LASTEXITCODE (see its output above). Fix the push, then re-run this script; the Web API steps below are idempotent."
-    }
+pac plugin push --pluginId $PluginAssemblyId --pluginFile $dll --type Assembly
+if ($LASTEXITCODE -ne 0) {
+    throw "pac plugin push failed with exit code $LASTEXITCODE (see its output above). Fix the push, then re-run this script; the Web API steps below are idempotent."
 }
-finally { Pop-Location }
 
 Write-Host '2. Resolving plug-in type id...'
 $typeName = $contract.customApi.pluginType
