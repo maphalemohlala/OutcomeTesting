@@ -86,10 +86,182 @@
         requires a recorded reason (AD-031).
       </div>
     {% else %}
-      <div class="ot-notice" role="status">
-        <strong>Read only.</strong> Answering and submitting arrive with the server-side
-        submit command; this view renders the questionnaire issued to the review.
-      </div>
+      {% comment %}
+        Submit panel. The button is only an affordance: al_SubmitReview re-checks
+        the caller, the status transition and every mandatory question server-side,
+        so hiding or showing it changes nothing about what is permitted
+        (NFR-SEC-01). The flow trigger id comes from a site setting so it differs
+        per environment and never appears in source.
+      {% endcomment %}
+      <section class="ot-card ot-submit"
+               data-ot-submit
+               data-review-id="{{ rv.al_reviewinstanceid }}"
+               data-flow-id="{{ settings['OutcomeTesting/Flow/SubmitReview'] | default: '' }}"
+               aria-labelledby="ot-submit-heading">
+        <h2 class="ot-card__title" id="ot-submit-heading">Submit this review</h2>
+        <p>
+          Submitting locks the review. Every question marked Required must be answered
+          first; the check runs server-side, so a missing answer is refused rather than
+          silently accepted.
+        </p>
+        <p>
+          <button type="button" class="ot-btn ot-btn--primary" data-ot-submit-button>
+            Submit review
+          </button>
+        </p>
+        <p class="ot-submit__status" data-ot-submit-status aria-live="polite"></p>
+        {% unless settings['OutcomeTesting/Flow/SubmitReview'] %}
+          <p class="ot-submit__status ot-submit__status--error" role="status">
+            Submitting is not configured in this environment yet. The
+            <code>OutcomeTesting/Flow/SubmitReview</code> site setting has no value.
+          </p>
+        {% endunless %}
+      </section>
+      <script>
+        /*
+         * Submit Review (PP-07, PP-08, PP-11).
+         *
+         * Path: portal page -> secured cloud flow -> al_SubmitReview custom API -> Dataverse.
+         *
+         * The hop through Power Automate is not a preference. The portals Web API
+         * explicitly does not support calling actions or functions, so a Custom API
+         * cannot be invoked from a page directly; a cloud flow with the "When Power
+         * Pages calls a flow" trigger is the supported route.
+         *
+         * This script is progressive enhancement only. Every rule that matters -
+         * caller, transition, mandatory questions, concurrency, idempotency, and the
+         * submission lock - is enforced in the plug-in. Disabling the button here is a
+         * courtesy to the user, never an access control (NFR-SEC-01).
+         */
+        (function () {
+          'use strict';
+
+          var root = document.querySelector('[data-ot-submit]');
+          if (!root) { return; }
+
+          var button = root.querySelector('[data-ot-submit-button]');
+          var status = root.querySelector('[data-ot-submit-status]');
+          var reviewId = root.getAttribute('data-review-id');
+          var flowId = root.getAttribute('data-flow-id');
+          var rowVersion = root.getAttribute('data-row-version') || '';
+
+          if (!button || !reviewId) { return; }
+
+          /*
+           * One idempotency key per review per browser session. A retry after a
+           * network failure replays the same key, so the command recognises it as the
+           * same intent and returns the original Audit Event instead of writing a
+           * second one (NFR-REL-01). A fresh page load starts a new attempt.
+           */
+          function idempotencyKey() {
+            var storageKey = 'ot.submit.' + reviewId;
+            var existing = null;
+            try { existing = window.sessionStorage.getItem(storageKey); } catch (e) { /* private mode */ }
+            if (existing) { return existing; }
+
+            var key;
+            if (window.crypto && window.crypto.randomUUID) {
+              key = window.crypto.randomUUID();
+            } else {
+              key = 'ot-' + reviewId + '-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+            }
+            try { window.sessionStorage.setItem(storageKey, key); } catch (e) { /* ignore */ }
+            return key;
+          }
+
+          function show(message, kind) {
+            if (!status) { return; }
+            status.textContent = message;
+            status.className = 'ot-submit__status ot-submit__status--' + (kind || 'info');
+            status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+          }
+
+          /*
+           * The plug-in prefixes its failures so the client can branch without parsing
+           * prose. Messages here say what happened, what is still safe, and what to do
+           * next, and never expose a table name, query, id or stack trace (PP-16).
+           */
+          function friendlyError(raw) {
+            var text = String(raw || '');
+            if (text.indexOf('CONFLICT:') !== -1) {
+              return 'This review changed since you opened it. Reload the page and try again - your answers are still saved.';
+            }
+            if (text.indexOf('UNAUTHORIZED:') !== -1) {
+              return 'You do not have permission to submit this review.';
+            }
+            if (text.indexOf('PRECONDITION:') !== -1) {
+              // Carries the actionable detail, e.g. how many required questions remain.
+              var idx = text.indexOf('PRECONDITION:');
+              return text.substring(idx + 'PRECONDITION:'.length).trim();
+            }
+            return 'We could not submit this review. Nothing has been changed. Please try again, and contact support if it keeps happening.';
+          }
+
+          function setBusy(busy) {
+            button.disabled = busy;
+            button.setAttribute('aria-busy', busy ? 'true' : 'false');
+            button.textContent = busy ? 'Submitting...' : 'Submit review';
+          }
+
+          button.addEventListener('click', function () {
+            if (button.disabled) { return; }
+
+            if (!flowId) {
+              show('Submitting is not configured for this environment yet. Contact your administrator.', 'error');
+              return;
+            }
+
+            if (!window.shell || typeof window.shell.ajaxSafePost !== 'function') {
+              show('This page did not load completely. Refresh and try again.', 'error');
+              return;
+            }
+
+            setBusy(true);
+            show('Submitting your review...', 'info');
+
+            var payload = {
+              TargetId: reviewId,
+              IdempotencyKey: idempotencyKey(),
+              ExpectedRowVersion: rowVersion
+            };
+
+            window.shell.ajaxSafePost({
+              type: 'POST',
+              url: '/_api/cloudflow/v1.0/trigger/' + flowId,
+              contentType: 'application/json',
+              data: { eventData: JSON.stringify(payload) }
+            })
+              .done(function (response) {
+                var body = response;
+                if (typeof body === 'string') {
+                  try { body = JSON.parse(body); } catch (e) { body = {}; }
+                }
+                body = body || {};
+
+                // The flow surfaces the plug-in's failure rather than throwing, so a
+                // 200 does not by itself mean the command succeeded.
+                if (body.Error || body.error) {
+                  show(friendlyError(body.Error || body.error), 'error');
+                  setBusy(false);
+                  return;
+                }
+
+                show('Review submitted. Reloading...', 'success');
+                try { window.sessionStorage.removeItem('ot.submit.' + reviewId); } catch (e) { /* ignore */ }
+                window.setTimeout(function () { window.location.reload(); }, 800);
+              })
+              .fail(function (xhr) {
+                var raw = '';
+                if (xhr) {
+                  raw = xhr.responseText || (xhr.statusText || '');
+                }
+                show(friendlyError(raw), 'error');
+                setBusy(false);
+              });
+          });
+        })();
+
+      </script>
     {% endif %}
 
     {% if cv_id == null %}

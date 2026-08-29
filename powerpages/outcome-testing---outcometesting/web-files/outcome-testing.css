@@ -789,3 +789,35 @@ footer a:focus-visible, .footer a:focus-visible {
 
 .ot-card p + p { margin-top: var(--space-3); }
 .ot-card .ot-btn + .ot-btn { margin-left: var(--space-2); }
+
+/* ------------------------------------------------------------------
+   Submit panel. A single decisive action, with its consequence stated
+   before the button rather than in a dialog afterwards.
+   ------------------------------------------------------------------ */
+
+.ot-submit p { max-width: 70ch; }
+
+.ot-submit__status {
+  font-size: var(--text-sm);
+  margin: 0;
+  min-height: 1.25rem;
+}
+
+.ot-submit__status--info    { color: var(--colour-text-muted); }
+.ot-submit__status--success { color: #067306; font-weight: 600; }
+.ot-submit__status--error   { color: var(--colour-outcome-harm); font-weight: 600; }
+
+.ot-submit__status code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  background: var(--colour-surface-sunken);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius);
+  padding: 1px var(--space-2);
+}
+
+.ot-btn[disabled],
+.ot-btn[aria-busy="true"] {
+  opacity: 0.65;
+  cursor: progress;
+}
