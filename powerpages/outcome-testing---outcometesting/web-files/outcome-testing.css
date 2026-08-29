@@ -821,3 +821,22 @@ footer a:focus-visible, .footer a:focus-visible {
   opacity: 0.65;
   cursor: progress;
 }
+
+/* Answer controls (PP-07, PP-08). Focus is always visible and status is never
+   conveyed by colour alone, both NFR-ACC-01 requirements. */
+.ot-answer { border-bottom: 1px solid var(--ot-rule, #e5e5e5); padding: 1rem 0; }
+.ot-answer:last-child { border-bottom: 0; }
+.ot-answer__field { border: 0; margin: 0; padding: 0; }
+.ot-answer__legend { font-weight: 500; margin-bottom: 0.5rem; padding: 0; }
+.ot-answer__options { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.ot-answer__option { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+.ot-answer__input { width: 100%; max-width: 46rem; padding: 0.5rem; font: inherit; }
+.ot-answer__input:focus-visible,
+.ot-answer__option input:focus-visible { outline: 3px solid var(--portalThemeColor1, #005a9e); outline-offset: 2px; }
+.ot-answer__note { margin-top: 0.75rem; }
+.ot-answer__note-label { display: block; margin-bottom: 0.25rem; font-size: 0.9rem; }
+.ot-answer__reasons { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.ot-answer__status { min-height: 1.25rem; margin: 0.35rem 0 0; font-size: 0.85rem; }
+.ot-answer__status--saving { color: var(--ot-muted, #595959); }
+.ot-answer__status--saved { color: var(--ot-muted, #595959); }
+.ot-answer__status--error { color: var(--ot-error, #a4262c); font-weight: 500; }

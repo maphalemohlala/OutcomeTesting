@@ -10,9 +10,13 @@
   renders the wording, order and response type that applied when it was
   answered (BR-013, FR-030, FR-031).
 
-  Read-only at this stage. Draft save and submit require the server-side
-  command and flow described in the design, section 6; there is no
-  submit-review custom API yet.
+  Answerable by the assigned checker (AD-053). Answers are written straight to
+  al_response over the portal Web API, which supports create and update; only
+  actions are unsupported, which is why submission still goes through a cloud
+  flow and answering does not. Every rule that matters - the submission lock,
+  the AD-023 column match, the option subset and AD-020 section ownership - is
+  enforced by ResponseGuardPlugin, so nothing here is a security boundary
+  (NFR-SEC-01).
 {% endcomment %}
 
 {% assign review_id = request.params['id'] %}
@@ -52,6 +56,20 @@
   {% else %}
 
     {% assign cv_id = rv.al_checklistversionid.id %}
+
+    {% comment %}
+      AD-020 section ownership, keyed by the review's discipline. Filtering in the query
+      rather than in the loop is what makes the Tax/AQS split structural: a Tax checker's
+      page never receives an AQS section's questions at all, which is what PP-08's
+      "no cross-discipline overwrite" needs. The same rule is enforced again server-side
+      by ResponseGuardPlugin, because a filter in a page is not a security boundary
+      (NFR-SEC-01).
+    {% endcomment %}
+    {% if rv.al_reviewtype.value == 120910200 %}
+      {% assign owner_role = 120910100 %}
+    {% else %}
+      {% assign owner_role = 120910101 %}
+    {% endif %}
 
     <section class="ot-card" aria-labelledby="ot-review-summary">
       <h2 class="ot-card__title" id="ot-review-summary">
@@ -287,6 +305,7 @@
               <attribute name="al_ownerrole" />
               <filter type="and">
                 <condition attribute="al_checklistversionid" operator="eq" value="{{ cv_id }}" />
+                <condition attribute="al_ownerrole" operator="eq" value="{{ owner_role }}" />
               </filter>
             </link-entity>
           </link-entity>
@@ -319,16 +338,20 @@
         {% include 'OT Empty State' title: 'No questions in this version' message: 'The checklist version issued to this review has no sections or questions.' %}
       {% else %}
 
+        {% comment %}
+          The questionnaire. Each question renders the control matching its response
+          type and writes the AD-023 typed column. The wrapper carries the review id so
+          the autosave script does not have to re-parse the query string.
+        {% endcomment %}
+        <div data-ot-questionnaire data-review-id="{{ rv.al_reviewinstanceid }}">
         {% assign current_section = '' %}
         {% for qv in qrows %}
           {% assign sid = qv['s.al_sectionid'] %}
 
           {% if sid != current_section %}
             {% unless forloop.first %}
-                </tbody>
-              </table>
-            </div>
-          </section>
+              </div>
+            </section>
             {% endunless %}
             {% assign current_section = sid %}
 
@@ -343,55 +366,102 @@
               {% if qv['s.al_helptext'] %}
                 <p class="ot-section-help">{{ qv['s.al_helptext'] | escape }}</p>
               {% endif %}
-              <div class="ot-table-wrap">
-                <table class="ot-table ot-questions">
-                  <thead>
-                    <tr>
-                      <th scope="col" class="ot-col-q">Question</th>
-                      <th scope="col">Response type</th>
-                      <th scope="col">Answer</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <div class="ot-answers">
           {% endif %}
 
-                    <tr>
-                      <td class="ot-col-q">
-                        {{ qv.al_questiontext | escape }}
-                        {% if qv.al_ismandatory %}
-                          <abbr class="ot-required" title="Required">Required</abbr>
-                        {% endif %}
-                      </td>
-                      <td><span class="ot-type">{{ qv.al_responsetype.label | escape }}</span></td>
-                      <td>
-                        {% assign answered = false %}
-                        {% for a in arows %}
-                          {% if a.al_questionversionid.id == qv.al_questionversionid %}
-                            {% assign answered = true %}
-                            {% if a.al_answertext and a.al_answertext != empty %}
-                              {{ a.al_answertext | escape }}
-                            {% elsif a.al_answerchoices and a.al_answerchoices != empty %}
-                              {{ a.al_answerchoices | escape }}
-                            {% elsif a.al_answerdate %}
-                              {{ a.al_answerdate | date: 'dd MMM yyyy' }}
-                            {% elsif a.al_answerchoice %}
-                              {% include 'OT Status Badge' status: a.al_answerchoice.label %}
-                            {% endif %}
-                          {% endif %}
-                        {% endfor %}
-                        {% unless answered %}
-                          <span class="ot-unanswered">Not answered</span>
-                        {% endunless %}
-                      </td>
-                    </tr>
+          {% assign qv_id = qv.al_questionversionid %}
+          {% assign rt = qv.al_responsetype.value %}
+
+          {% assign existing = null %}
+          {% for a in arows %}
+            {% if a.al_questionversionid.id == qv_id %}{% assign existing = a %}{% endif %}
+          {% endfor %}
+
+          {% if rt == 120910000 or rt == 120910001 %}{% assign column = 'text' %}
+          {% elsif rt == 120910002 %}{% assign column = 'date' %}
+          {% elsif rt == 120910004 %}{% assign column = 'choices' %}
+          {% else %}{% assign column = 'choice' %}
+          {% endif %}
+
+          <div class="ot-answer"
+               data-ot-answer
+               data-question-version="{{ qv_id }}"
+               data-response-id="{{ existing.al_responseid }}"
+               data-response-type="{{ rt }}"
+               data-column="{{ column }}">
+
+            <fieldset class="ot-answer__field">
+              <legend class="ot-answer__legend">
+                {{ qv.al_questiontext | escape }}
+                {% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}
+              </legend>
+
+              {% if column == 'text' %}
+                {% if rt == 120910001 %}
+                  <textarea class="ot-answer__input" rows="4"
+                            data-ot-input
+                            aria-label="{{ qv.al_questiontext | escape }}">{{ existing.al_answertext | escape }}</textarea>
+                {% else %}
+                  <input type="text" class="ot-answer__input"
+                         data-ot-input
+                         value="{{ existing.al_answertext | escape }}"
+                         aria-label="{{ qv.al_questiontext | escape }}" />
+                {% endif %}
+
+              {% elsif column == 'date' %}
+                <input type="date" class="ot-answer__input"
+                       data-ot-input
+                       value="{{ existing.al_answerdate | date: 'yyyy-MM-dd' }}"
+                       aria-label="{{ qv.al_questiontext | escape }}" />
+
+              {% elsif column == 'choices' %}
+                {% comment %}
+                  Tax check reason (Q-TAX-01), the only multi-select in V8. FetchXML returns
+                  a multi-select picklist as its comma-separated labels, so the checked test
+                  is a label match. None of the five labels is a substring of another.
+                {% endcomment %}
+                {% assign mvalues = '120910340,120910341,120910342,120910343,120910344' | split: ',' %}
+                {% assign mlabels = 'LSA/LSDBA/TTFAC,Trust,IHT,Tax calculation,Other' | split: ',' %}
+                <div class="ot-answer__options">
+                  {% for opt in mvalues %}
+                    <label class="ot-answer__option">
+                      <input type="checkbox" data-ot-input value="{{ opt }}"
+                             {% if existing.al_answerchoices contains mlabels[forloop.index0] %}checked{% endif %} />
+                      <span>{{ mlabels[forloop.index0] }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+
+              {% else %}
+                {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id %}
+              {% endif %}
+
+              {% comment %}
+                al_answertext doubles as the evidence note held with a structured answer,
+                which is how the Code App already reads the record
+                (app/src/features/reviews/useReviewDetail.ts, noteOf). The client reveals it
+                only for a non-pass selection; it stays optional under AD-019.
+              {% endcomment %}
+              {% if column == 'choice' or column == 'choices' %}
+                <div class="ot-answer__note" data-ot-note hidden>
+                  <label class="ot-answer__note-label" for="note-{{ qv_id }}">
+                    Evidence or observation (optional)
+                  </label>
+                  <textarea id="note-{{ qv_id }}" class="ot-answer__input" rows="3"
+                            data-ot-note-input>{{ existing.al_answertext | escape }}</textarea>
+                </div>
+              {% endif %}
+            </fieldset>
+
+            <p class="ot-answer__status" data-ot-status aria-live="polite"></p>
+          </div>
 
           {% if forloop.last %}
-                  </tbody>
-                </table>
               </div>
             </section>
           {% endif %}
         {% endfor %}
+        </div>
 
       {% endif %}
     {% endif %}
