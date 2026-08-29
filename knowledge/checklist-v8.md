@@ -41,7 +41,7 @@ Every displayed answerable question is mandatory before its section can be submi
 | `Text` | free text, single line | header fields |
 | `MultilineText` | free text, multi-line | case notes, fail observation, even better if |
 | `Date` | date only | advice date, check date |
-| `SingleSelect` | option list per question | header choices, primary root cause |
+| `SingleSelect` | one bespoke policy list | primary root cause (AD-055) |
 | `MultiSelect` | option list per question, several permitted | tax check reason |
 | `PassFail` | Pass, Fail | file quality outcome |
 | `PassFailInsufficient` | Pass, Fail, Insufficient evidence | suitability, CRP |
@@ -80,10 +80,12 @@ Owner: Tax team. Rendered only when the route includes Tax (BR-004).
 | Code | Question | Response type | Mandatory | Options |
 |---|---|---|---|---|
 | Q-TAX-01 | Tax check reason | MultiSelect | Yes | LSA/LSDBA/TTFAC, Trust, IHT, Tax calculation, Other |
-| Q-TAX-02 | Tax check outcome | SingleSelect | Yes | PASS, INSUFFICIENT EVIDENCE, FAIL |
+| Q-TAX-02 | Tax check outcome | PassFailInsufficient | Yes | PASS, INSUFFICIENT EVIDENCE, FAIL |
 | Q-TAX-03 | Case notes | MultilineText | No | |
 
 Notes: the Tax outcome is a three-value scale, not the four-value AQS grade in BR-005. Tax check reason is multi-select because a case can fail for several tax reasons at once (AD-022).
+
+Q-TAX-02 is recorded as `PassFailInsufficient`, not `SingleSelect`. Its options in the source document are PASS, INSUFFICIENT EVIDENCE, FAIL, which is exactly that scale; "SingleSelect" in the transcription described cardinality rather than a vocabulary. See AD-055.
 
 ## S-AMLCRA — File Quality, AML and CRA checking points
 
@@ -233,3 +235,4 @@ Two-part codes preserve the document's category prefix.
 1. Display order across sections. The document order is assumed to be the display order.
 2. The product/solution type values that make CRP applicable are not enumerated. AD-021 fixes the mechanism; the mapping table itself still needs the list, and the ad hoc investment withdrawal case is open as OD-016.
 3. Whether Fail observation becomes required when File quality outcome is Fail. AD-019 makes comment fields optional, so it is optional today. Flagged because a Fail with no observation gives remediation nothing to work from under BR-006.
+4. Per-question option lists for `SingleSelect`. The schema has none, so a `SingleSelect` question's options are fixed by its response type. Resolved for V8 by AD-055; a future question needing its own list would need the schema change AD-022 declined.
