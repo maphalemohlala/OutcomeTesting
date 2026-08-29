@@ -82,17 +82,58 @@
    portal reads as Ascot Lloyd rather than the default template.
    ------------------------------------------------------------------ */
 
+/* Sticky footer: the page column fills the viewport so the footer sits at the
+   bottom on short pages instead of floating under the content. Works whether
+   the footer is a direct child of body or nested in a wrapper. */
 body {
   font-family: var(--font-body);
   color: var(--colour-text);
   background: var(--colour-surface-sunken);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body *:has(> footer.footer) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+}
+
+footer.footer { margin-top: auto; flex-shrink: 0; }
+
+/* Brand the header. portalbasictheme.css paints .static-top.navbar-dark
+   #2E456B with #FEA002 hover; both are overridden here at matching or
+   higher specificity so the bar reads Ascot Lloyd teal. */
+.navbar,
+.navbar-dark,
+.static-top.navbar-dark,
+.navbar.static-top.navbar-dark {
+  background-color: var(--brand-teal) !important;
+  background-image: none !important;
 }
 
 .navbar {
-  background: var(--brand-teal) !important;
   border-bottom: var(--edge) solid var(--brand-green-highlight);
   padding-top: var(--space-3);
   padding-bottom: var(--space-3);
+}
+
+.navbar-dark .navbar-nav > li > a:hover,
+.navbar-dark .navbar-nav > li.dropdown > a:hover,
+.navbar-dark .navbar-nav > li > a:focus,
+.navbar-dark .navbar-nav > li.dropdown > a:focus,
+.navbar-dark .navbar-nav > li > a:focus-visible,
+.navbar-dark .navbar-nav > li.dropdown > a:focus-visible,
+.static-top.navbar .menu-bar > .navbar-nav > li > a:hover {
+  background-color: transparent !important;
+  color: var(--brand-green-highlight) !important;
+}
+
+.navbar-toggler,
+.navbar-dark .navbar-toggler:hover,
+.navbar-dark .navbar-toggler:focus {
+  background-color: var(--brand-green-highlight) !important;
 }
 
 .navbar .navbar-brand img,
@@ -131,13 +172,17 @@ body {
 .navbar .divider-vertical { display: none; }
 
 footer,
-.footer {
-  background: var(--brand-teal-dark) !important;
-  color: var(--colour-text-inverse);
+footer.footer,
+footer[data-component-theme],
+.footer .footer-bottom {
+  background-color: var(--brand-teal-dark) !important;
+  background-image: none !important;
+  color: var(--colour-text-inverse) !important;
   font-size: var(--text-sm);
 }
 
-footer a, .footer a { color: var(--brand-teal-light); }
+footer.footer { padding: var(--space-4) 0; }
+footer a, .footer a { color: var(--brand-teal-light) !important; }
 
 /* ------------------------------------------------------------------
    Page shell
@@ -360,6 +405,54 @@ footer a, .footer a { color: var(--brand-teal-light); }
 .ot-badge--blocked      { color: var(--colour-outcome-harm); }
 .ot-badge--closed       { color: var(--colour-stage-closed); }
 .ot-badge--none         { color: var(--colour-text-muted); }
+
+/* ------------------------------------------------------------------
+   Questionnaire. Question text carries the weight; response type and
+   answer stay secondary so a checker scans down the questions.
+   ------------------------------------------------------------------ */
+
+.ot-section-help {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) 0;
+  color: var(--colour-text-muted);
+  font-size: var(--text-sm);
+  max-width: 70ch;
+}
+
+.ot-questions .ot-col-q { width: 55%; min-width: 22rem; }
+
+.ot-questions td.ot-col-q {
+  font-size: var(--text-base);
+  color: var(--colour-text);
+  line-height: 1.45;
+  font-variant-numeric: normal;
+}
+
+.ot-required {
+  display: inline-block;
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--colour-outcome-issues);
+  text-decoration: none;
+  border-bottom: none;
+  cursor: help;
+}
+
+.ot-type {
+  font-size: var(--text-xs);
+  color: var(--colour-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.ot-unanswered {
+  color: var(--colour-text-muted);
+  font-style: italic;
+}
 
 /* ------------------------------------------------------------------
    Record detail

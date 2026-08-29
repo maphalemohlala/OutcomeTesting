@@ -79,7 +79,7 @@
               </td>
               <td>{{ r['case.al_clientname'] | escape }}</td>
               <td>{{ r['case.al_advisername'] | escape }}</td>
-              <td>{{ r.al_name | escape }}</td>
+              <td><a href="/review?id={{ r.al_reviewinstanceid }}">{{ r.al_name | default: 'Open review' | escape }}</a></td>
               <td>{{ r.al_sequence | default: '—' }}</td>
               <td>{% include 'OT Status Badge' status: r.al_reviewstatus.label %}</td>
               <td>{{ r.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</td>

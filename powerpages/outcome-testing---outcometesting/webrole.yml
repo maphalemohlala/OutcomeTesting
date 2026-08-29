@@ -1,4 +1,4 @@
-- adx_anonymoususersrole: false
+- adx_anonymoususersrole: true
   adx_authenticatedusersrole: true
   adx_name: Administrators
   adx_webroleid: c53b2908-1fc1-4470-89cd-6f5b95c17ffe
