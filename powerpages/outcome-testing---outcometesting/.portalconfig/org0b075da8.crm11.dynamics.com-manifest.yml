@@ -660,7 +660,7 @@ adx_webfile:
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-000000000050
   DisplayName: outcome-testing.css
-  CheckSum: 1a56bbf0b49cbd0b9f8b9e0238fbcea3df649ea5c886ada145fe0c3ec8845c5e
+  CheckSum: b769d602068d85fd2ff3f786e994e014051ad8f89ec644414eb7df454652cd38
   IsDeleted: false
 - RecordId: beef46c6-d961-4e8b-9131-e86b15d8345d
   DisplayName: Site-mockup-1.png
@@ -1019,7 +1019,7 @@ adx_webtemplate:
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-000000000010
   DisplayName: OT Layout
-  CheckSum: a449469521ae7c68ff843b3bc81deadeccd1c251a1dcc1d4afe9790b64730236
+  CheckSum: 984ce49e0fd86ce95444110859bafbc3c3e6b7efaccf96cfda3b073004c15473
   IsDeleted: false
 - RecordId: a1000000-0000-4000-8000-000000000011
   DisplayName: OT Status Badge
@@ -1150,10 +1150,6 @@ annotation:
   DisplayName: Site-mockup-1.png
   CheckSum: ee637e2f746d6e82fb42d73a7f9920634de855a1e8617a1748c050e6b398e39e
   IsDeleted: false
-- RecordId: 56ee83df-a3a3-f111-aaac-e4fade069307
-  DisplayName: outcome-testing.css
-  CheckSum: fd6c7b6f752e731253d5fb5903b4335ca541f22aa4bba567c50f9ba852ec8363
-  IsDeleted: false
 - RecordId: 58dff71e-99a3-f111-aaac-e4fade069307
   DisplayName: Geometric-2.png
   CheckSum: deec3ddef66d1a8b0e752ea6088213a785423398d29a0a2eaf91f144ce2d5f86
@@ -1173,6 +1169,10 @@ annotation:
 - RecordId: 70dff71e-99a3-f111-aaac-e4fade069307
   DisplayName: Graph-1.png
   CheckSum: b241f61228f001129eaec69291839ab69f859da80c94cda2e3b6af8f81166c1c
+  IsDeleted: false
+- RecordId: ce8a3467-a5a3-f111-aaac-e4fade069307
+  DisplayName: outcome-testing.css
+  CheckSum: 6f4c8fa048f55f873a3621633a17fa41f459e4ba7a5bece460164322011a1de5
   IsDeleted: false
 - RecordId: f3def71e-99a3-f111-aaac-e4fade069307
   DisplayName: PWAManifest.json
