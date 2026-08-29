@@ -11,5 +11,8 @@
   <isfunction>0</isfunction>
   <isprivate>0</isprivate>
   <name>al_SubmitReview</name>
+  <plugintypeid>
+    <plugintypeexportkey>0663d6eb-aea3-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
   <workflowsdkstepenabled>0</workflowsdkstepenabled>
 </customapi>

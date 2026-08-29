@@ -118,8 +118,30 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host '2. Resolving plug-in type id...'
 $typeName = $contract.customApi.pluginType
 $pt = Invoke-Dv -Method Get -Path "plugintypes`?`$filter=typename eq '$typeName'&`$select=plugintypeid"
-if ($pt.value.Count -eq 0) { throw "Plug-in type '$typeName' not found. Ensure pac plugin push succeeded." }
-$pluginTypeId = $pt.value[0].plugintypeid
+if ($pt.value.Count -gt 0) {
+    $pluginTypeId = $pt.value[0].plugintypeid
+    Write-Host "  exists: $typeName"
+}
+else {
+    # 'pac plugin push' refreshes the assembly binary but does not create plugintype
+    # rows for classes the environment has not seen before, so a brand new command
+    # has to have its type registered explicitly against the assembly.
+    Write-Host "  not registered yet, creating plug-in type..."
+    $asm = Invoke-Dv -Method Get -Path "pluginassemblies`?`$filter=pluginassemblyid eq $PluginAssemblyId&`$select=pluginassemblyid,name"
+    if ($asm.value.Count -eq 0) { throw "Plug-in assembly $PluginAssemblyId not found. Ensure pac plugin push succeeded." }
+    $shortName = $typeName -replace '^.*\.', ''
+    $typeBody = [ordered]@{
+        typename                     = $typeName
+        name                         = $typeName
+        friendlyname                 = $shortName
+        # Navigation property is lowercase 'pluginassemblyid', confirmed from
+        # EntityDefinitions(LogicalName='plugintype')/ManyToOneRelationships.
+        'pluginassemblyid@odata.bind' = "/pluginassemblies($PluginAssemblyId)"
+    }
+    $created = Invoke-RestMethod -Method Post -Uri "$api/plugintypes" -Headers ($headers + @{ Prefer = 'return=representation' }) -Body ($typeBody | ConvertTo-Json -Depth 4)
+    $pluginTypeId = $created.plugintypeid
+    Write-Host "  created: $typeName"
+}
 
 Write-Host '3. Creating Custom API...'
 $c = $contract.customApi
@@ -135,6 +157,19 @@ $apiBody = [ordered]@{
     'PluginTypeId@odata.bind'        = "/plugintypes($pluginTypeId)"
 }
 $customApiId = Get-OrCreate -Set 'customapis' -IdField 'customapiid' -Filter "uniquename eq '$($c.uniquename)'" -Body $apiBody
+
+# A solution import creates the Custom API from src/customapis/, but leaves it
+# UNBOUND when that customapi.xml carries no plugintypeid. Get-OrCreate would
+# then report "exists" and skip, leaving an API that executes nothing. Always
+# assert the binding rather than trusting existence.
+$bound = Invoke-Dv -Method Get -Path "customapis($customApiId)`?`$select=_plugintypeid_value"
+if ($bound._plugintypeid_value -ne $pluginTypeId) {
+    Invoke-Dv -Method Patch -Path "customapis($customApiId)" -Body @{ 'PluginTypeId@odata.bind' = "/plugintypes($pluginTypeId)" } | Out-Null
+    Write-Host "  bound to plug-in type: $typeName"
+}
+else {
+    Write-Host "  binding already correct"
+}
 
 Write-Host '4. Creating request parameters...'
 foreach ($p in $contract.requestParameters) {
