@@ -13,3 +13,14 @@ plugins/**/obj/
 
 # MSBuild Binary and Structured Log
 *.binlog
+
+# secrets and local environment files (never commit — see build guide 7.4)
+.env
+.env.*
+*.secrets.json
+
+# PAC local auth profiles and scratch
+.auth/
+.temp/
+
+# NOTE: powerpages/ metadata IS version controlled. Do not ignore it.

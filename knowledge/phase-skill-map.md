@@ -12,7 +12,7 @@ For every feature: discover -> design -> plan -> implement -> verify -> review -
 | 4 Routing and automation | outcome-testing-routing, command-concurrency, power-automate-engineering | Tax-only, AQS-only, Tax-to-AQS and invalid-case paths pass tests |
 | 5 Remediation | outcome-testing-routing, power-automate-engineering, power-platform-security | Initial/final outcomes, returns, sign-off and locks verified |
 | 6 MI, export and integrations | reporting-export-integration, power-automate-engineering | Reconciled export, failure handling and MI acceptance tests pass |
-| 7 Power Pages, only if approved | power-pages-development, power-platform-security | Web roles, table permissions and end-to-end portal tests pass |
+| 7 Power Pages portal (approved, AD-044) | power-pages-development, power-platform-security, ascot-lloyd-design | Web roles, table permissions and end-to-end portal tests pass; positive and negative access tests pass before any feature page is built |
 | 8 Test and release | test-quality-release, power-platform-alm | Managed deployment, smoke/UAT/security/performance checks and rollback runbook pass |
 
 ## Superpowers integration
