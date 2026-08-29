@@ -1,52 +1,69 @@
 /*
- * Outcome Testing portal shell.
- * Tokens trace to app/src/styles/tokens.css, which traces to brand/.
- * Do not introduce colour or type values that are not defined here.
- * Outcome hues are AD-008; mint is OD-013; Outfit/Inter are AD-009.
+ * Outcome Testing portal.
+ *
+ * Every colour traces to brand/ (verified from the palette sheet) and mirrors
+ * app/src/styles/tokens.css so the portal and the Code App cannot drift.
+ * Approved pairings used here are taken from the brand contrast sheet:
+ * white on teal, light green on teal, dark teal on white, teal on white.
+ *
+ * Outcome hues AD-008. Mint OD-013. Outfit/Inter AD-009.
+ * Accessible green #00a800 is large-text-only (>18.66px) per the brand sheet.
  */
 
 :root {
+  /* Brand palette */
   --brand-teal: #2b5257;
   --brand-teal-dark: #0a3535;
   --brand-teal-light: #ccfdf3;
   --brand-green-highlight: #b0ed70;
+  --brand-green-light: #ccffd6;
   --brand-green-accessible: #00a800;
   --brand-purple: #8758e4;
+  --brand-blue: #57e0ea;
   --brand-white: #ffffff;
 
+  /* Teal tints, from the brand sheet's 10/25/50/75 tint system */
+  --teal-tint-10: #eaeeee;
+  --teal-tint-25: #d4dcdd;
+  --teal-tint-50: #95acae;
+
+  /* Surfaces */
   --colour-surface: var(--brand-white);
   --colour-surface-sunken: #f4f7f7;
-  --colour-surface-inverse: var(--brand-teal-dark);
+  --colour-surface-header: var(--teal-tint-10);
+  --colour-surface-inverse: var(--brand-teal);
   --colour-border: #d3dcdc;
   --colour-border-strong: #a8b8b8;
 
+  /* Text */
   --colour-text: var(--brand-teal-dark);
   --colour-text-muted: #4f6b6b;
   --colour-text-inverse: var(--brand-white);
 
+  /* Action */
   --colour-action: var(--brand-teal);
   --colour-action-hover: var(--brand-teal-dark);
   --colour-focus: var(--brand-teal-dark);
 
+  /* Outcome and stage */
   --colour-outcome-pass: var(--brand-green-accessible);
   --colour-outcome-issues: #b87a3d;
   --colour-outcome-insufficient: var(--brand-purple);
   --colour-outcome-harm: #b65a52;
   --colour-outcome-none: var(--colour-border-strong);
-
-  --colour-stage-waiting: var(--colour-border-strong);
+  --colour-stage-waiting: var(--colour-text-muted);
   --colour-stage-active: var(--brand-teal);
-  --colour-stage-blocked: var(--colour-outcome-harm);
   --colour-stage-closed: var(--colour-text-muted);
 
-  --font-heading: 'Outfit', Arial, sans-serif;
-  --font-body: 'Inter', Arial, sans-serif;
+  /* Type */
+  --font-heading: 'Outfit', 'Segoe UI', Arial, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', Arial, sans-serif;
 
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
   --text-base: 0.875rem;
   --text-lg: 1rem;
-  --text-xl: 1.25rem;
+  --text-xl: 1.125rem;
   --text-2xl: 1.5rem;
 
   --space-1: 0.25rem;
@@ -56,184 +73,304 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
 
-  --radius: 2px;
+  --radius: 3px;
+  --edge: 3px;
 }
 
-/* ---------- shell ---------- */
+/* ------------------------------------------------------------------
+   Site chrome. Overrides the stock Bootstrap header and footer so the
+   portal reads as Ascot Lloyd rather than the default template.
+   ------------------------------------------------------------------ */
+
+body {
+  font-family: var(--font-body);
+  color: var(--colour-text);
+  background: var(--colour-surface-sunken);
+}
+
+.navbar {
+  background: var(--brand-teal) !important;
+  border-bottom: var(--edge) solid var(--brand-green-highlight);
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+
+.navbar .navbar-brand img,
+.navbar .navbar-header img {
+  height: 30px !important;
+  width: auto !important;
+}
+
+.navbar .siteTitle,
+.navbar .custom-sitetitle {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--colour-text-inverse);
+  margin: 0;
+}
+
+.navbar .nav-link,
+.navbar .weblink > a {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--colour-text-inverse) !important;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 2px solid transparent;
+}
+
+.navbar .weblink > a:hover,
+.navbar .weblink > a:focus {
+  color: var(--brand-green-highlight) !important;
+  border-bottom-color: var(--brand-green-highlight);
+  text-decoration: none;
+}
+
+.navbar .divider-vertical { display: none; }
+
+footer,
+.footer {
+  background: var(--brand-teal-dark) !important;
+  color: var(--colour-text-inverse);
+  font-size: var(--text-sm);
+}
+
+footer a, .footer a { color: var(--brand-teal-light); }
+
+/* ------------------------------------------------------------------
+   Page shell
+   ------------------------------------------------------------------ */
 
 .ot-page {
   font-family: var(--font-body);
   font-size: var(--text-base);
+  line-height: 1.5;
   color: var(--colour-text);
   background: var(--colour-surface-sunken);
   padding: var(--space-5) var(--space-4) var(--space-6);
   min-height: 60vh;
 }
 
-.ot-page__inner {
-  max-width: 78rem;
-  margin: 0 auto;
+.ot-page__inner { max-width: 82rem; margin: 0 auto; }
+
+.ot-breadcrumb {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--colour-text-muted);
+  margin-bottom: var(--space-3);
 }
+
+.ot-breadcrumb a { color: var(--colour-text-muted); text-decoration: none; }
+.ot-breadcrumb a:hover { color: var(--colour-action); text-decoration: underline; }
+.ot-breadcrumb span { margin: 0 var(--space-2); }
 
 .ot-page__header {
   margin-bottom: var(--space-5);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--colour-border);
 }
 
 .ot-page__title {
   font-family: var(--font-heading);
   font-size: var(--text-2xl);
   font-weight: 600;
+  letter-spacing: -0.015em;
   margin: 0 0 var(--space-1);
-  color: var(--colour-text);
 }
 
 .ot-page__lede {
   margin: 0;
   color: var(--colour-text-muted);
   font-size: var(--text-lg);
+  max-width: 60ch;
 }
 
-.ot-breadcrumb {
-  font-size: var(--text-sm);
-  margin-bottom: var(--space-3);
-  color: var(--colour-text-muted);
-}
-
-.ot-breadcrumb a { color: var(--colour-action); }
-
-/* ---------- cards and tiles ---------- */
+/* ------------------------------------------------------------------
+   Panels. One level of nesting only; no shadows, no rounded-inside-rounded.
+   ------------------------------------------------------------------ */
 
 .ot-card {
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
   border-radius: var(--radius);
-  padding: var(--space-4);
   margin-bottom: var(--space-4);
 }
 
 .ot-card__title {
   font-family: var(--font-heading);
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: 600;
-  margin: 0 0 var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--colour-border);
+  background: var(--colour-surface-header);
+  border-radius: var(--radius) var(--radius) 0 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
+
+.ot-card > *:not(.ot-card__title) { padding: 0 var(--space-4); }
+.ot-card > *:not(.ot-card__title):last-child { padding-bottom: var(--space-4); }
+.ot-card > .ot-table-wrap { padding: 0; }
+.ot-card > p:first-of-type { padding-top: var(--space-4); }
+
+/* ------------------------------------------------------------------
+   Metric strip. Counts read as data, not as marketing cards.
+   ------------------------------------------------------------------ */
 
 .ot-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1px;
+  margin: 0 0 var(--space-5);
   padding: 0;
   list-style: none;
+  background: var(--colour-border);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 
 .ot-tile {
   display: block;
   background: var(--colour-surface);
-  border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-action);
-  border-radius: var(--radius);
   padding: var(--space-4);
   text-decoration: none;
   color: inherit;
+  border-left: var(--edge) solid transparent;
 }
 
 .ot-tile:hover,
 .ot-tile:focus {
-  border-left-color: var(--colour-action-hover);
   background: var(--brand-teal-light);
+  border-left-color: var(--colour-action);
   text-decoration: none;
   color: inherit;
 }
 
 .ot-tile__count {
   font-family: var(--font-heading);
-  font-size: 2rem;
+  font-size: 1.75rem;
   font-weight: 600;
   line-height: 1.1;
   display: block;
+  font-variant-numeric: tabular-nums;
 }
 
 .ot-tile__label {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--colour-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
+  display: block;
+  margin-top: var(--space-1);
 }
 
-.ot-tile--alert { border-left-color: var(--colour-outcome-harm); }
+.ot-tile--alert { border-left-color: var(--colour-outcome-issues); }
 
-/* ---------- tables ---------- */
+/* ------------------------------------------------------------------
+   Tables. Dense, scannable, sticky header for long worklists.
+   ------------------------------------------------------------------ */
 
-.ot-table-wrap { overflow-x: auto; }
+.ot-table-wrap {
+  overflow-x: auto;
+  max-height: 34rem;
+  overflow-y: auto;
+}
 
 .ot-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: var(--text-base);
   background: var(--colour-surface);
 }
 
 .ot-table caption {
   text-align: left;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--colour-text-muted);
-  padding-bottom: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  caption-side: top;
 }
 
 .ot-table th,
 .ot-table td {
   text-align: left;
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--colour-border);
   vertical-align: top;
 }
 
 .ot-table thead th {
-  font-family: var(--font-heading);
-  font-size: var(--text-sm);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--colour-text-muted);
-  background: var(--colour-surface-sunken);
-  border-bottom: 2px solid var(--colour-border-strong);
+  background: var(--colour-surface-header);
+  border-bottom: 1px solid var(--colour-border-strong);
   white-space: nowrap;
 }
 
 .ot-table tbody tr:hover { background: var(--colour-surface-sunken); }
+.ot-table tbody tr:last-child td { border-bottom: none; }
 
-.ot-table a { color: var(--colour-action); font-weight: 500; }
+.ot-table a {
+  color: var(--colour-action);
+  font-weight: 500;
+  text-decoration: none;
+  border-bottom: 1px solid var(--teal-tint-50);
+}
 
-/* ---------- status badges (never colour alone: each carries text) ---------- */
+.ot-table a:hover { color: var(--colour-action-hover); border-bottom-color: currentColor; }
+
+/* Dates and references scan better in tabular figures */
+.ot-table td { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------
+   Status. Colour never carries meaning alone; the label is always text.
+   ------------------------------------------------------------------ */
 
 .ot-badge {
   display: inline-block;
   font-size: var(--text-xs);
   font-weight: 600;
   line-height: 1.4;
-  padding: var(--space-1) var(--space-2);
+  padding: 2px var(--space-2);
   border-radius: var(--radius);
   border: 1px solid currentColor;
   white-space: nowrap;
 }
 
-.ot-badge--pass         { color: var(--colour-outcome-pass); }
+.ot-badge--pass         { color: #067306; }
 .ot-badge--issues       { color: var(--colour-outcome-issues); }
-.ot-badge--insufficient { color: var(--colour-outcome-insufficient); }
+.ot-badge--insufficient { color: #6b3fc4; }
 .ot-badge--harm         { color: var(--colour-outcome-harm); }
 .ot-badge--waiting      { color: var(--colour-stage-waiting); }
 .ot-badge--active       { color: var(--colour-stage-active); }
-.ot-badge--blocked      { color: var(--colour-stage-blocked); }
+.ot-badge--blocked      { color: var(--colour-outcome-harm); }
 .ot-badge--closed       { color: var(--colour-stage-closed); }
-.ot-badge--none         { color: var(--colour-outcome-none); }
+.ot-badge--none         { color: var(--colour-text-muted); }
 
-/* ---------- definition grid for case detail ---------- */
+/* ------------------------------------------------------------------
+   Record detail
+   ------------------------------------------------------------------ */
 
 .ot-dl {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: var(--space-3) var(--space-5);
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-4) var(--space-5);
   margin: 0;
+  padding-top: var(--space-4);
 }
 
 .ot-dl div { margin: 0; }
@@ -241,23 +378,22 @@
 .ot-dl dt {
   font-size: var(--text-xs);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--colour-text-muted);
   margin-bottom: var(--space-1);
 }
 
-.ot-dl dd {
-  margin: 0;
-  font-size: var(--text-base);
-}
+.ot-dl dd { margin: 0; font-size: var(--text-base); }
 
-/* ---------- empty and error states ---------- */
+/* ------------------------------------------------------------------
+   Empty, notice and error states
+   ------------------------------------------------------------------ */
 
 .ot-empty {
   padding: var(--space-6) var(--space-4);
   text-align: center;
   color: var(--colour-text-muted);
-  background: var(--colour-surface);
+  margin: var(--space-4) 0;
   border: 1px dashed var(--colour-border-strong);
   border-radius: var(--radius);
 }
@@ -265,37 +401,64 @@
 .ot-empty__title {
   font-family: var(--font-heading);
   font-size: var(--text-lg);
+  font-weight: 600;
   color: var(--colour-text);
   margin: 0 0 var(--space-2);
 }
 
+.ot-empty p:last-child { margin: 0; max-width: 48ch; margin-inline: auto; }
+
 .ot-notice {
-  border-left: 3px solid var(--colour-outcome-issues);
+  border: 1px solid var(--colour-border);
+  border-left: var(--edge) solid var(--colour-outcome-issues);
   background: var(--colour-surface);
+  border-radius: var(--radius);
   padding: var(--space-3) var(--space-4);
   margin-bottom: var(--space-4);
   font-size: var(--text-sm);
+  color: var(--colour-text-muted);
 }
 
-/* ---------- accessibility ---------- */
+.ot-notice strong { color: var(--colour-text); }
+
+/* ------------------------------------------------------------------
+   Accessibility
+   ------------------------------------------------------------------ */
 
 .ot-page a:focus-visible,
 .ot-page button:focus-visible,
-.ot-tile:focus-visible {
+.ot-tile:focus-visible,
+.navbar a:focus-visible {
   outline: 2px solid var(--colour-focus);
   outline-offset: 2px;
+  border-radius: 1px;
 }
+
+.navbar a:focus-visible { outline-color: var(--brand-green-highlight); }
 
 .ot-visually-hidden {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  width: 1px; height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
 
-@media (max-width: 40rem) {
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+@media (prefers-contrast: more) {
+  .ot-card, .ot-table th, .ot-table td { border-color: var(--colour-text); }
+}
+
+/* ------------------------------------------------------------------
+   Responsive. Desktop and tablet are the operational widths.
+   ------------------------------------------------------------------ */
+
+@media (max-width: 48rem) {
   .ot-page { padding: var(--space-4) var(--space-3); }
-  .ot-tile__count { font-size: 1.5rem; }
+  .ot-tile__count { font-size: 1.375rem; }
+  .ot-table-wrap { max-height: none; }
+  .ot-table thead th { position: static; }
 }
