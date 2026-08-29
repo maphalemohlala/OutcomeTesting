@@ -40,7 +40,11 @@ param(
     [string]$SolutionUniqueName = 'OutcomeTesting',
 
     # Existing OutcomeTestingPlugins assembly in the solution.
-    [string]$PluginAssemblyId = '7b51d0d1-f5a1-f111-b8dd-e4fade069307'
+    [string]$PluginAssemblyId = '7b51d0d1-f5a1-f111-b8dd-e4fade069307',
+
+    # PAC CLI executable. The winget/MSI install is not always on PATH, so it is
+    # resolved rather than assumed; override if yours lives elsewhere.
+    [string]$PacPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -82,6 +86,23 @@ function Get-OrCreate {
     return $resp.$IdField
 }
 
+Write-Host '0. Resolving PAC CLI...'
+if (-not $PacPath) {
+    $onPath = Get-Command pac -ErrorAction SilentlyContinue
+    if ($onPath) {
+        $PacPath = $onPath.Source
+    }
+    else {
+        $found = Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerAppsCLI') -Filter 'pac.exe' -Recurse -ErrorAction SilentlyContinue |
+                 Sort-Object FullName -Descending | Select-Object -First 1
+        if ($found) { $PacPath = $found.FullName }
+    }
+}
+if (-not $PacPath -or -not (Test-Path -LiteralPath $PacPath)) {
+    throw "PAC CLI not found. Pass -PacPath with the full path to pac.exe, or add it to PATH."
+}
+Write-Host "  using: $PacPath"
+
 Write-Host '1. Pushing plug-in assembly (pac plugin push)...'
 # PAC CLI 2.11.2 takes --pluginId / --pluginFile / --type. It has no --settingsFile
 # parameter; that form belonged to an older CLI and fails outright on 2.11.2.
@@ -89,7 +110,7 @@ $dll = Join-Path $pluginProject 'bin\Debug\net462\OutcomeTesting.Plugins.dll'
 if (-not (Test-Path -LiteralPath $dll)) {
     throw "Plug-in assembly not found: $dll. Run 'dotnet build' in $pluginProject first."
 }
-pac plugin push --pluginId $PluginAssemblyId --pluginFile $dll --type Assembly
+& $PacPath plugin push --pluginId $PluginAssemblyId --pluginFile $dll --type Assembly
 if ($LASTEXITCODE -ne 0) {
     throw "pac plugin push failed with exit code $LASTEXITCODE (see its output above). Fix the push, then re-run this script; the Web API steps below are idempotent."
 }
