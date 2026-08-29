@@ -1205,7 +1205,9 @@ git commit -m "fix(seed): retype Q-TAX-02 to Pass/Fail/Insufficient evidence (AD
 - Consumes: `al_reviewinstance.al_assignedcontactid` and the `contact_al_reviewinstance` relationship, both built under AD-050.
 - Produces: write access to `al_response` for the assigned checker only. Tasks 6–8 depend on this; without it every save returns 403.
 
-Scope values: Global `756150000`, Contact `756150001`, Account `756150002`, Parent `756150003`, Self `756150004`. Web role ids are the two already used by the provisional permissions: Tax Reviewer `c53b2908-1fc1-4470-89cd-6f5b95c17ffe`, AQS Reviewer `e24b50c5-1443-4725-84c9-70355724547f`.
+Scope values: Global `756150000`, Contact `756150001`, Account `756150002`, Parent `756150003`, Self `756150004`, Custom `756150005`. Web role ids are the two already used by the provisional permissions: Tax Reviewer `c53b2908-1fc1-4470-89cd-6f5b95c17ffe`, AQS Reviewer `e24b50c5-1443-4725-84c9-70355724547f`.
+
+Column names verified against the live environment, not assumed. Every existing permission in the repository is Global scope, so none of them exercises the Contact or Parent keys. `pac modelbuilder build --entitynamesfilter mspp_entitypermission` against Env_AQ_Dev gives the authoritative set: `mspp_contactrelationship`, `mspp_parententitypermission`, `mspp_parentrelationship`. The site metadata table is `mspp_entitypermission` — `adx_entitypermission` does not exist in this environment — while `pac pages` YAML keeps the legacy `adx_` prefix, and every key in the downloaded files maps `mspp_*` to `adx_*` one for one.
 
 - [ ] **Step 1: Create the Contact-scoped review permission**
 
@@ -1243,8 +1245,8 @@ adx_entitypermission_webrole:
 - c53b2908-1fc1-4470-89cd-6f5b95c17ffe
 - e24b50c5-1443-4725-84c9-70355724547f
 adx_entitypermissionid: a1000000-0000-4000-8000-000000000072
-adx_parententitypermissionid: a1000000-0000-4000-8000-000000000071
-adx_parentrelationshipname: al_reviewinstance_response
+adx_parententitypermission: a1000000-0000-4000-8000-000000000071
+adx_parentrelationship: al_reviewinstance_response
 adx_read: true
 adx_scope: 756150003
 adx_write: true
