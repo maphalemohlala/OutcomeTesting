@@ -1,0 +1,48 @@
+{% comment %}
+  Radio group for one single-choice question. Include with:
+  (% include 'OT Answer Options' response_type: 120910005 selected: 120910301 question: '<guid>' %)
+
+  The permitted subset per response type is the AD-023 rule; it is mirrored here for
+  rendering and enforced server-side by ResponseRules.PermittedChoices, which is the
+  authority. A value added here without a matching change there is refused on save.
+
+  Single select falls to the else branch and means Primary root cause only. Q-TAX-02
+  was retyped to Pass / Fail / Insufficient evidence under AD-055, which is what makes
+  that unambiguous.
+{% endcomment %}
+{% case response_type %}
+  {% when 120910005 %}
+    {% assign values = '120910300,120910301' | split: ',' %}
+    {% assign labels = 'Pass,Fail' | split: ',' %}
+  {% when 120910006 %}
+    {% assign values = '120910300,120910301,120910302' | split: ',' %}
+    {% assign labels = 'Pass,Fail,Insufficient evidence' | split: ',' %}
+  {% when 120910007 %}
+    {% assign values = '120910305,120910306' | split: ',' %}
+    {% assign labels = 'Yes,No' | split: ',' %}
+  {% when 120910008 %}
+    {% assign values = '120910305,120910306,120910307' | split: ',' %}
+    {% assign labels = 'Yes,No,N/A' | split: ',' %}
+  {% when 120910009 %}
+    {% assign values = '120910305,120910306,120910302' | split: ',' %}
+    {% assign labels = 'Yes,No,Insufficient evidence' | split: ',' %}
+  {% when 120910010 %}
+    {% assign values = '120910300,120910303,120910302,120910304' | split: ',' %}
+    {% assign labels = 'Pass,Pass with issues,Insufficient evidence,Potential harm' | split: ',' %}
+  {% else %}
+    {% assign values = '120910320,120910321,120910322,120910323,120910324,120910325,120910326,120910327,120910328' | split: ',' %}
+    {% assign labels = 'FactFind quality,Risk / capacity mismatch,Research / rationale,Charges / value,Client communication,Process / documentation,AML / CRA,Retirement Proposition,Adviser judgement' | split: ',' %}
+{% endcase %}
+
+<div class="ot-answer__options">
+  {% for value in values %}
+    <label class="ot-answer__option">
+      <input type="radio"
+             name="q-{{ question }}"
+             value="{{ value }}"
+             data-ot-input
+             {% if selected and selected == value %}checked{% endif %} />
+      <span>{{ labels[forloop.index0] }}</span>
+    </label>
+  {% endfor %}
+</div>
