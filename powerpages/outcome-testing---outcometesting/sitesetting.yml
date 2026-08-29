@@ -97,6 +97,10 @@
 - adx_name: ThemeFeature
   adx_sitesettingid: 9f87bc38-4308-442b-b442-7c8ff6d8b364
   adx_value: '{"status":"enable","selectedThemeId":"329a43fa-5471-4678-8330-d3a0b404e9bb","version":"V2"}'
+- adx_description: "Trigger id of the \"Submit Review\" cloud flow for THIS environment, taken from the flow's Power Pages trigger URL (the guid after /trigger/). Environment specific: the flow must be registered against each site separately, so DEV, TEST and PROD each carry their own value. Leave empty until the flow exists; the review page then shows \"submitting is not configured\" rather than failing."
+  adx_name: OutcomeTesting/Flow/SubmitReview
+  adx_sitesettingid: a1000000-0000-4000-8000-0000000000a0
+  adx_value: ''
 - adx_name: Authentication/OpenAuth/Twitter/ConsumerKey
   adx_sitesettingid: a1f73c77-f5d0-4528-89a3-22ca4de8f870
 - adx_name: Authentication/OpenAuth/Facebook/AppId
