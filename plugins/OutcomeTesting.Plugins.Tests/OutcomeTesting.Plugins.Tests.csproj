@@ -3,7 +3,15 @@
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
     <IsPackable>false</IsPackable>
-    <SignAssembly>false</SignAssembly>
+    <!--
+      Signed with the same key as OutcomeTesting.Plugins so that project's
+      InternalsVisibleTo (a strong-named assembly can only grant friend access to another
+      strong-named assembly named by its exact public key) resolves to this assembly,
+      giving these tests access to internal members such as
+      GenerateExportPlugin.FlaggedText.
+    -->
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\OutcomeTesting.Plugins\OutcomeTesting.Plugins.snk</AssemblyOriginatorKeyFile>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
@@ -12,6 +20,7 @@
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.*" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>

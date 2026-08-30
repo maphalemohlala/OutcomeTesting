@@ -30,5 +30,16 @@
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.*" PrivateAssets="All" />
   </ItemGroup>
 
+  <!--
+    Grants the test project friend access to internal members (e.g.
+    GenerateExportPlugin.FlaggedText) so they can be unit-tested without a fake
+    IOrganizationService. This assembly is strong-named (Dataverse requires it), so the
+    friend assembly must be named by its exact public key, not just its name; the test
+    project is signed with the same key file for that reason (see its csproj).
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="OutcomeTesting.Plugins.Tests" Key="0024000004800000140100000602000000240000525341310008000001000100C570754B20C7EA06C3AEAF2A4DEACC803E88BC70352587D0A7CB8D0514DCF4CE8BB1354E52F7C01C21D308E4689D5C8B4DB58A2680E9A4E9E92349BC0FC19406755611AF53C8FCC40295CFBEE6BB997166DFA6A1502412EF70EAC3A683E42DE80FF7ECD501515E9CEB8DE62A9BD2724EBB60BA18C3708EBD7460373A468F9174460ACE06B2208AFC6139D9D91176143C58D2434A8B5EDEB29F817249189D1C75A01C95DFCB9A17626801CD61919A6203F803AECED14456AB42CAAB93A6BE6C860C7BDEBCDF9DC8B6691776138B3F412A223A9F5D2BC5AA5BE4DE5A4E25F570BF50315DFA82203C21BFB3C85E7E3B61CEDCAB5501CBB81B0151F26C61D21038B6" />
+  </ItemGroup>
+
   <Import Project="$(PowerAppsTargetsPath)\Microsoft.PowerApps.VisualStudio.Plugin.targets" Condition="Exists('$(PowerAppsTargetsPath)\Microsoft.PowerApps.VisualStudio.Plugin.targets')" />
 </Project>

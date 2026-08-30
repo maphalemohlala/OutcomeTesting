@@ -1182,10 +1182,19 @@ git commit -m "feat(plugins): populate the AD-039 fail accountability columns"
 
 ## Verification in DEV
 
-After Task 7, run the whole path against a case seeded for the purpose — never a live client case, per the guard added for audit finding I7:
+After Task 7, run the whole path against a case seeded for the purpose — never a live client case, per the guard added for audit finding I7.
+
+**Deployment is a hard sequence, not a checklist to run in any order.** `al_GenerateExport` refuses a non-pass Outcome that records no accountability, and only `al_SetFailAccountability` can record it. Push the assembly before the schema and route seed are in, or register the command before the assembly exists, and the export starts refusing batches nobody can satisfy — a real support hole if run out of order in DEV. Deploy in exactly this order:
+
+1. Import the Task 2 solution (the AD-013 export-and-replace round trip: pack, import unmanaged, export, replace `src/Entities/al_Outcome/Entity.xml` with what Dataverse emits).
+2. Import the route seed package, then import it a second time to prove idempotency (Task 2, Step 4).
+3. `pac plugin push` the assembly.
+4. Create the plug-in type (`Resolve-PluginType`, since `pac plugin push` does not create one for a class the environment has not seen — AD-052).
+5. Create the Custom API `al_SetFailAccountability` from its contract.
+6. Only then run the scenarios below.
 
 1. A Tax-only case: submit, confirm no Outcome, confirm the case closed on a Pass.
-2. A Tax-then-AQS case: submit Tax, confirm the case is `Queued`; attempt the AQS submit before Tax and confirm it is refused.
+2. A Tax-then-AQS case: submit Tax, confirm the case is `Queued`; attempt the AQS submit before Tax and confirm it is refused. Then, before submitting AQS for real: a manager must move the case from `Queued` to `Assigned` — allocation is manual (BR-003, AD-040), and the Tax submit only queues the case for allocation, it does not assign the AQS checker. Skip that hand-off and the AQS submit is refused for a second, unrelated reason (the review is not yet in a submittable state), which reads as a bug if you are not expecting it.
 3. An AQS Pass: confirm one Outcome with `al_initialoutcome` Pass, case `Closed`.
 4. An AQS Potential harm: confirm the Outcome and case `Awaiting Remediation`.
 5. Generate an export with a non-pass and no accountability: confirm refusal naming the case; record accountability and confirm it then succeeds with the correct pairs populated and the others blank.

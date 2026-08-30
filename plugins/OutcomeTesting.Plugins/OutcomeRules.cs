@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace OutcomeTesting.Plugins
 {
     /// <summary>
@@ -131,6 +133,35 @@ namespace OutcomeTesting.Plugins
             return TaxResultRequiresRemediation(answerChoice)
                 ? CaseLifecycle.AwaitingRemediation
                 : CaseLifecycle.Closed;
+        }
+
+        /// <summary>
+        /// The case statuses a submit moves through, in order, from the case's current
+        /// status. An AQS submit and a finalising Tax submit pass through Submitted before
+        /// their final state; a Tax handoff with AQS still to come goes straight to the
+        /// queue, because the case is not submitted — only its Tax review is. A case still
+        /// at Assigned is opened first, since a review may be submitted from Assigned and
+        /// nothing moves the case automatically.
+        ///
+        /// Pure so the chain can be asserted against CaseLifecycle.IsAllowed without a
+        /// Dataverse service; SubmitReviewPlugin performs the hops this returns.
+        /// </summary>
+        public static int[] HopsFor(int currentStatus, int finalStatus)
+        {
+            var hops = new List<int>();
+
+            if (currentStatus == CaseLifecycle.Assigned && finalStatus != CaseLifecycle.Queued)
+            {
+                hops.Add(CaseLifecycle.ReviewInProgress);
+            }
+
+            if (finalStatus != CaseLifecycle.Queued)
+            {
+                hops.Add(CaseLifecycle.Submitted);
+            }
+
+            hops.Add(finalStatus);
+            return hops.ToArray();
         }
     }
 }

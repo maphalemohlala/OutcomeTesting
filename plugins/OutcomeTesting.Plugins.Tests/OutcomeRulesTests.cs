@@ -171,5 +171,37 @@ namespace OutcomeTesting.Plugins.Tests
             var next = OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, true);
             Assert.True(CaseLifecycle.IsAllowed(CaseLifecycle.ReviewInProgress, next));
         }
+
+        [Theory]
+        [InlineData(CaseLifecycle.Assigned, CaseLifecycle.Closed)]
+        [InlineData(CaseLifecycle.Assigned, CaseLifecycle.AwaitingRemediation)]
+        [InlineData(CaseLifecycle.ReviewInProgress, CaseLifecycle.Closed)]
+        [InlineData(CaseLifecycle.ReviewInProgress, CaseLifecycle.AwaitingRemediation)]
+        [InlineData(CaseLifecycle.Assigned, CaseLifecycle.Queued)]
+        [InlineData(CaseLifecycle.ReviewInProgress, CaseLifecycle.Queued)]
+        public void Every_hop_a_submit_produces_is_one_the_lifecycle_permits(int from, int final)
+        {
+            // The chain, not just its endpoints: skipping a state is exactly what AD-057
+            // exists to prevent, so each hop must be legal from the one before it.
+            var current = from;
+            foreach (var hop in OutcomeRules.HopsFor(from, final))
+            {
+                Assert.True(
+                    CaseLifecycle.IsAllowed(current, hop),
+                    "Refused hop " + current + " -> " + hop);
+                current = hop;
+            }
+
+            Assert.Equal(final, current);
+        }
+
+        [Fact]
+        public void Sends_a_tax_handoff_straight_to_the_queue_without_submitting_the_case()
+        {
+            // The case is not submitted when only its Tax review is (BR-004).
+            Assert.DoesNotContain(
+                CaseLifecycle.Submitted,
+                OutcomeRules.HopsFor(CaseLifecycle.ReviewInProgress, CaseLifecycle.Queued));
+        }
     }
 }
