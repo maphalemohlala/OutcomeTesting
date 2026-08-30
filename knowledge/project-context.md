@@ -57,9 +57,22 @@ The Intake tables now exist in DEV (AD-033): `al_ImportBatch` tracks one uploade
 
 `No Check Required` is a terminal bypass state for cases that must not be graded (AD-036). Tax wrong-route is a manager-controlled reassignment between Tax and AQS with a mandatory reason, retaining prior assignment history, not a status.
 
+This sequence is enforced, not just documented (AD-057). `CaseLifecycle` in the plug-in assembly gates every `al_casestatus` write in `al_UpdateCaseDetails`, and `CASE_STATUS_TRANSITIONS` in the Code App offers the manager only the statuses the command would accept. `Closed` and `No Check Required` are terminal: reopening or regrading a closed outcome is the privileged T&C Manager correction (OD-007, AD-031), not a details edit.
+
+## Front ends
+Two front ends run over one Dataverse dataset, split by persona rather than by feature (AD-044, supersedes AD-002).
+
+| Audience | Front end | Surface |
+|---|---|---|
+| Managers and administrators | Power Apps Code App (`app/`) | Oversight, allocation and reassignment, imports, question administration, security administration, audit investigation, MI and export |
+| Tax checkers, AQS checkers, advisers, T&C Managers | Power Pages portal (`powerpages/`) | Where checks and remediation are performed |
+
+Code App screens for cases, dashboard and reviews are management oversight views, not the checker's working surface. Business logic lives in shared server-side commands (AD-003) and is never duplicated per front end. Portal identity is the Entra-synced `Contact`, joined to the application identity on work email; `systemuser` remains the record owner (AD-047). The whole remediation loop — adviser response and T&C attestation — runs in the portal (AD-045).
+
 ## Repository layout
 - `src/` is the unpacked Dataverse solution root and is packaged in full. Flows unpack to `src/Workflows/`.
 - `app/` holds the Power Apps Code App. It must stay outside `src/`.
+- `powerpages/` holds the Power Pages site metadata. It must stay outside `src/` and outside `app/`; the two front ends never share a directory (AD-048).
 - `brand/` holds the authoritative Ascot Lloyd visual resources. It must stay outside `src/` so brand assets are not packaged into the solution.
 - `knowledge/` holds domain context, the requirements index and the decision log.
 - `skills/` holds the phase skills; `.github/` holds Copilot instructions and prompts.

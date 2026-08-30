@@ -8,19 +8,27 @@ import type { AccessLevel, ResourceKey } from '../../types/permissions';
  * advisory: it hides UI the user cannot use, but the authoritative check runs
  * server-side. `fallback` is shown when the user is short of the required level;
  * a route-level gate defaults to a "no access" screen.
+ *
+ * Until the effective set is resolved the gate renders `pending` rather than deciding.
+ * The provider stands a permissive set in while it loads, so answering `can` during that
+ * window would open every gate for as long as the read takes — and indefinitely if it
+ * never returns. Waiting is what keeps the permissive set out of the decision.
  */
 export function PermissionGate({
   resource,
   need = 'View',
   children,
   fallback = null,
+  pending = null,
 }: {
   resource: ResourceKey;
   need?: AccessLevel;
   children: ReactNode;
   fallback?: ReactNode;
+  pending?: ReactNode;
 }) {
-  const { can } = usePermissions();
+  const { can, ready } = usePermissions();
+  if (!ready) return <>{pending}</>;
   return can(resource, need) ? <>{children}</> : <>{fallback}</>;
 }
 
@@ -38,6 +46,7 @@ export function RequirePermission({
     <PermissionGate
       resource={resource}
       need={need}
+      pending={<p role="status">Checking your access…</p>}
       fallback={
         <NotBuiltYet
           title="No access"

@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Status">
+  <description default="The review status after the command (Submitted).">
+    <label description="The review status after the command (Submitted)." languagecode="1033" />
+  </description>
+  <displayname default="Status">
+    <label description="Status" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_SubmitReview.Status</name>
+  <type>10</type>
+</customapiresponseproperty>

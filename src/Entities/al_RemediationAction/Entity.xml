@@ -239,6 +239,45 @@
             <Description description="Short label identifying the remediation action in lists." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_assignedcontactid">
+          <Type>lookup</Type>
+          <Name>al_assignedcontactid</Name>
+          <LogicalName>al_assignedcontactid</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <LookupStyle>single</LookupStyle>
+          <LookupTypes />
+          <displaynames>
+            <displayname description="Assigned contact" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Portal identity of the adviser responsible for this remediation action (AD-047). Set server-side at assignment from the work-email join (OD-003, AD-010). Contact-scoped Power Pages access binds to this; systemuser ownership is unchanged." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_outcomecaseid">
           <Type>lookup</Type>
           <Name>al_outcomecaseid</Name>

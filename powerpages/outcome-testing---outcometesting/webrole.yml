@@ -1,0 +1,40 @@
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: AL Portal - Tax Reviewer
+  adx_webroleid: a1000000-0000-4000-8000-000000000090
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: AL Portal - AQS Reviewer
+  adx_webroleid: a1000000-0000-4000-8000-000000000091
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: AL Portal - Adviser Remediation
+  adx_webroleid: a1000000-0000-4000-8000-000000000092
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: AL Portal - T&C Supervisor
+  adx_webroleid: a1000000-0000-4000-8000-000000000093
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: AL Portal - Regional Manager
+  adx_webroleid: a1000000-0000-4000-8000-000000000094
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: AL Portal - Outcome Testing Manager
+  adx_webroleid: a1000000-0000-4000-8000-000000000095
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: AL Portal - Portal Administrator
+  adx_webroleid: a1000000-0000-4000-8000-000000000096
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: Administrators
+  adx_webroleid: c53b2908-1fc1-4470-89cd-6f5b95c17ffe
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: true
+  adx_name: Authenticated Users
+  adx_webroleid: e24b50c5-1443-4725-84c9-70355724547f
+- adx_anonymoususersrole: true
+  adx_authenticatedusersrole: false
+  adx_name: Anonymous Users
+  adx_webroleid: eb1dfa60-6f53-4d61-8cbc-2f8b0a6ee08e

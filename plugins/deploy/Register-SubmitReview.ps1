@@ -1,0 +1,201 @@
+<#
+.SYNOPSIS
+    Deploys the SubmitReview server-side command (AD-003): registers the
+    plug-in assembly and creates the al_SubmitReview Custom API with its
+    request parameters and response properties.
+
+.DESCRIPTION
+    Run this AFTER the al_AuditEvent, al_ReviewInstance, al_Response, al_QuestionVersion,
+    al_Question and al_Section tables are imported (the plug-in reads or writes all of them)
+    and in coordination with anyone else changing the solution. Steps:
+      1. pac plugin push  - registers OutcomeTesting.Plugins into the solution.
+      2. Web API calls     - create the Custom API, its 3 request parameters and
+                             3 response properties, bound to the plug-in type, all
+                             inside the OutcomeTesting solution.
+
+    The Custom API contract is read from ..\customapi\al_SubmitReview.customapi.json
+    so the definition lives in one place.
+
+.PARAMETER OrgUrl
+    The Dataverse environment URL to deploy to, e.g. https://<your-org>.crm<n>.dynamics.com
+    Pass the environment you intend to target; no environment is assumed or defaulted.
+
+.PARAMETER AccessToken
+    A bearer token for the Dataverse Web API of OrgUrl. Obtain one however your
+    environment allows (for example an Azure CLI or MSAL token for the org).
+
+.PARAMETER PluginAssemblyId
+    Id of the existing OutcomeTestingPlugins assembly registered in the environment.
+
+.PARAMETER SolutionUniqueName
+    Solution the components are added to. Defaults to OutcomeTesting.
+
+.NOTES
+    Idempotent: existing components are looked up and reused rather than duplicated.
+#>
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)][string]$OrgUrl,
+    [Parameter(Mandatory = $true)][string]$AccessToken,
+    [string]$SolutionUniqueName = 'OutcomeTesting',
+
+    # Existing OutcomeTestingPlugins assembly in the solution.
+    [string]$PluginAssemblyId = '7b51d0d1-f5a1-f111-b8dd-e4fade069307',
+
+    # PAC CLI executable. The winget/MSI install is not always on PATH, so it is
+    # resolved rather than assumed; override if yours lives elsewhere.
+    [string]$PacPath
+)
+
+$ErrorActionPreference = 'Stop'
+$root = Split-Path -Parent $PSScriptRoot
+$contractPath = Join-Path $root 'customapi\al_SubmitReview.customapi.json'
+$pluginProject = Join-Path $root 'OutcomeTesting.Plugins'
+$contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+
+$api = "$($OrgUrl.TrimEnd('/'))/api/data/v9.2"
+$headers = @{
+    Authorization              = "Bearer $AccessToken"
+    'OData-MaxVersion'         = '4.0'
+    'OData-Version'            = '4.0'
+    Accept                     = 'application/json'
+    'Content-Type'             = 'application/json; charset=utf-8'
+    'MSCRM.SolutionUniqueName'  = $SolutionUniqueName
+}
+
+function Invoke-Dv {
+    param([string]$Method, [string]$Path, [object]$Body)
+    $uri = "$api/$Path"
+    $json = if ($Body) { $Body | ConvertTo-Json -Depth 6 } else { $null }
+    return Invoke-RestMethod -Method $Method -Uri $uri -Headers $headers -Body $json
+}
+
+# $IdField is passed in rather than derived from $Set. The primary-key column comes from
+# the entity's LOGICAL name, not its entity-set name, and the two differ by more than a
+# trailing 's' (customapiresponseproperties -> customapiresponsepropertyid), so deriving
+# it produces column names Dataverse rejects with HTTP 400.
+function Get-OrCreate {
+    param([string]$Set, [string]$IdField, [string]$Filter, [object]$Body)
+    $existing = Invoke-Dv -Method Get -Path "$Set`?`$filter=$Filter&`$select=$IdField"
+    if ($existing.value.Count -gt 0) {
+        Write-Host "  exists: $Filter"
+        return $existing.value[0].$IdField
+    }
+    $resp = Invoke-RestMethod -Method Post -Uri "$api/$Set" -Headers ($headers + @{ Prefer = 'return=representation' }) -Body ($Body | ConvertTo-Json -Depth 6)
+    Write-Host "  created: $Filter"
+    return $resp.$IdField
+}
+
+Write-Host '0. Resolving PAC CLI...'
+if (-not $PacPath) {
+    $onPath = Get-Command pac -ErrorAction SilentlyContinue
+    if ($onPath) {
+        $PacPath = $onPath.Source
+    }
+    else {
+        $found = Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA 'Microsoft\PowerAppsCLI') -Filter 'pac.exe' -Recurse -ErrorAction SilentlyContinue |
+                 Sort-Object FullName -Descending | Select-Object -First 1
+        if ($found) { $PacPath = $found.FullName }
+    }
+}
+if (-not $PacPath -or -not (Test-Path -LiteralPath $PacPath)) {
+    throw "PAC CLI not found. Pass -PacPath with the full path to pac.exe, or add it to PATH."
+}
+Write-Host "  using: $PacPath"
+
+Write-Host '1. Pushing plug-in assembly (pac plugin push)...'
+# PAC CLI 2.11.2 takes --pluginId / --pluginFile / --type. It has no --settingsFile
+# parameter; that form belonged to an older CLI and fails outright on 2.11.2.
+$dll = Join-Path $pluginProject 'bin\Debug\net462\OutcomeTesting.Plugins.dll'
+if (-not (Test-Path -LiteralPath $dll)) {
+    throw "Plug-in assembly not found: $dll. Run 'dotnet build' in $pluginProject first."
+}
+& $PacPath plugin push --pluginId $PluginAssemblyId --pluginFile $dll --type Assembly
+if ($LASTEXITCODE -ne 0) {
+    throw "pac plugin push failed with exit code $LASTEXITCODE (see its output above). Fix the push, then re-run this script; the Web API steps below are idempotent."
+}
+
+Write-Host '2. Resolving plug-in type id...'
+$typeName = $contract.customApi.pluginType
+$pt = Invoke-Dv -Method Get -Path "plugintypes`?`$filter=typename eq '$typeName'&`$select=plugintypeid"
+if ($pt.value.Count -gt 0) {
+    $pluginTypeId = $pt.value[0].plugintypeid
+    Write-Host "  exists: $typeName"
+}
+else {
+    # 'pac plugin push' refreshes the assembly binary but does not create plugintype
+    # rows for classes the environment has not seen before, so a brand new command
+    # has to have its type registered explicitly against the assembly.
+    Write-Host "  not registered yet, creating plug-in type..."
+    $asm = Invoke-Dv -Method Get -Path "pluginassemblies`?`$filter=pluginassemblyid eq $PluginAssemblyId&`$select=pluginassemblyid,name"
+    if ($asm.value.Count -eq 0) { throw "Plug-in assembly $PluginAssemblyId not found. Ensure pac plugin push succeeded." }
+    $shortName = $typeName -replace '^.*\.', ''
+    $typeBody = [ordered]@{
+        typename                     = $typeName
+        name                         = $typeName
+        friendlyname                 = $shortName
+        # Navigation property is lowercase 'pluginassemblyid', confirmed from
+        # EntityDefinitions(LogicalName='plugintype')/ManyToOneRelationships.
+        'pluginassemblyid@odata.bind' = "/pluginassemblies($PluginAssemblyId)"
+    }
+    $created = Invoke-RestMethod -Method Post -Uri "$api/plugintypes" -Headers ($headers + @{ Prefer = 'return=representation' }) -Body ($typeBody | ConvertTo-Json -Depth 4)
+    $pluginTypeId = $created.plugintypeid
+    Write-Host "  created: $typeName"
+}
+
+Write-Host '3. Creating Custom API...'
+$c = $contract.customApi
+$apiBody = [ordered]@{
+    uniquename                       = $c.uniquename
+    name                             = $c.name
+    displayname                      = $c.displayname
+    description                      = $c.description
+    bindingtype                      = $c.bindingtype
+    isfunction                       = $c.isfunction
+    isprivate                        = $c.isprivate
+    allowedcustomprocessingsteptype  = $c.allowedcustomprocessingsteptype
+    'PluginTypeId@odata.bind'        = "/plugintypes($pluginTypeId)"
+}
+$customApiId = Get-OrCreate -Set 'customapis' -IdField 'customapiid' -Filter "uniquename eq '$($c.uniquename)'" -Body $apiBody
+
+# A solution import creates the Custom API from src/customapis/, but leaves it
+# UNBOUND when that customapi.xml carries no plugintypeid. Get-OrCreate would
+# then report "exists" and skip, leaving an API that executes nothing. Always
+# assert the binding rather than trusting existence.
+$bound = Invoke-Dv -Method Get -Path "customapis($customApiId)`?`$select=_plugintypeid_value"
+if ($bound._plugintypeid_value -ne $pluginTypeId) {
+    Invoke-Dv -Method Patch -Path "customapis($customApiId)" -Body @{ 'PluginTypeId@odata.bind' = "/plugintypes($pluginTypeId)" } | Out-Null
+    Write-Host "  bound to plug-in type: $typeName"
+}
+else {
+    Write-Host "  binding already correct"
+}
+
+Write-Host '4. Creating request parameters...'
+foreach ($p in $contract.requestParameters) {
+    $body = [ordered]@{
+        uniquename                = $p.uniquename
+        name                      = $p.name
+        displayname               = $p.displayname
+        description               = $p.description
+        type                      = $p.type
+        isoptional                = $p.isoptional
+        'CustomAPIId@odata.bind'  = "/customapis($customApiId)"
+    }
+    Get-OrCreate -Set 'customapirequestparameters' -IdField 'customapirequestparameterid' -Filter "uniquename eq '$($p.uniquename)' and _customapiid_value eq $customApiId" -Body $body | Out-Null
+}
+
+Write-Host '5. Creating response properties...'
+foreach ($p in $contract.responseProperties) {
+    $body = [ordered]@{
+        uniquename                = $p.uniquename
+        name                      = $p.name
+        displayname               = $p.displayname
+        description               = $p.description
+        type                      = $p.type
+        'CustomAPIId@odata.bind'  = "/customapis($customApiId)"
+    }
+    Get-OrCreate -Set 'customapiresponseproperties' -IdField 'customapiresponsepropertyid' -Filter "uniquename eq '$($p.uniquename)' and _customapiid_value eq $customApiId" -Body $body | Out-Null
+}
+
+Write-Host "Done. al_SubmitReview is deployed to solution '$SolutionUniqueName'." -ForegroundColor Green

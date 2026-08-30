@@ -24,8 +24,11 @@ interface RoleOption {
 }
 
 export function SecurityConfigPage() {
-  const { can } = usePermissions();
-  const canManage = can('permission.manage', 'Manage');
+  const { can, ready } = usePermissions();
+  // `ready` gates this as well as the level: the provider stands a permissive set in
+  // while it resolves, so without it the privileged controls would be offered to
+  // everyone for the length of that read (AD-041 keeps the server the real gate).
+  const canManage = ready && can('permission.manage', 'Manage');
   const [reloadKey, setReloadKey] = useState(0);
   const state = useSecurityConfig(reloadKey);
   const [rolesReloadKey, setRolesReloadKey] = useState(0);
@@ -183,16 +186,18 @@ export function SecurityConfigPage() {
         <section className="security__panel" aria-labelledby="assign-heading">
           <div className="security__panel-bar">
             <h2 id="assign-heading">Assign a role</h2>
-            <button
-              type="button"
-              className="security__btn"
-              onClick={() => {
-                setAssignNotice(null);
-                setAssignOpen(true);
-              }}
-            >
-              Assign a role
-            </button>
+            {canManage ? (
+              <button
+                type="button"
+                className="security__btn"
+                onClick={() => {
+                  setAssignNotice(null);
+                  setAssignOpen(true);
+                }}
+              >
+                Assign a role
+              </button>
+            ) : null}
           </div>
           <p className="security__hint">Map a person&rsquo;s work email to an application role.</p>
           {assignNotice && !assignOpen ? (
@@ -205,16 +210,18 @@ export function SecurityConfigPage() {
         <section className="security__panel" aria-labelledby="perm-heading">
           <div className="security__panel-bar">
             <h2 id="perm-heading">Page and capability permissions</h2>
-            <button
-              type="button"
-              className="security__btn"
-              onClick={() => {
-                setPermNotice(null);
-                setPermOpen(true);
-              }}
-            >
-              Set a permission
-            </button>
+            {canManage ? (
+              <button
+                type="button"
+                className="security__btn"
+                onClick={() => {
+                  setPermNotice(null);
+                  setPermOpen(true);
+                }}
+              >
+                Set a permission
+              </button>
+            ) : null}
           </div>
           <p className="security__hint">Grant a role an access level on a page or capability.</p>
           {permNotice && !permOpen ? (

@@ -1,0 +1,26 @@
+{% comment %}
+  Status badge. Include with:  (% include 'OT Status Badge' status: row.al_casestatus.label %)
+
+  Colour never carries the meaning on its own — the label is always rendered
+  as text inside the badge (NFR-ACC-01).
+{% endcomment %}
+{% assign s = status | default: '' | downcase %}
+{% if s == '' %}
+  <span class="ot-badge ot-badge--none">Not set</span>
+{% elsif s contains 'potential harm' %}
+  <span class="ot-badge ot-badge--harm">{{ status | escape }}</span>
+{% elsif s contains 'insufficient' %}
+  <span class="ot-badge ot-badge--insufficient">{{ status | escape }}</span>
+{% elsif s contains 'issues' %}
+  <span class="ot-badge ot-badge--issues">{{ status | escape }}</span>
+{% elsif s contains 'pass' %}
+  <span class="ot-badge ot-badge--pass">{{ status | escape }}</span>
+{% elsif s contains 'closed' or s contains 'no check required' %}
+  <span class="ot-badge ot-badge--closed">{{ status | escape }}</span>
+{% elsif s contains 'failed' or s contains 'blocked' or s contains 'overdue' %}
+  <span class="ot-badge ot-badge--blocked">{{ status | escape }}</span>
+{% elsif s contains 'progress' or s contains 'assigned' or s contains 'submitted' %}
+  <span class="ot-badge ot-badge--active">{{ status | escape }}</span>
+{% else %}
+  <span class="ot-badge ot-badge--waiting">{{ status | escape }}</span>
+{% endif %}

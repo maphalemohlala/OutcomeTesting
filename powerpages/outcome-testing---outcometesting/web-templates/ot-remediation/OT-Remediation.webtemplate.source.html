@@ -1,0 +1,103 @@
+{% extends 'OT Layout' %}
+{% block content %}
+{% comment %}
+  Remediation worklist (PP-12).
+
+  Ageing is shown as elapsed calendar days and labelled as such. The
+  10-working-day threshold needs the business calendar confirmed under
+  OD-018, so no working-day figure is displayed rather than a wrong one.
+{% endcomment %}
+
+{% assign page_size = 25 %}
+{% assign page_number = request.params['page'] | default: 1 | times: 1 %}
+{% if page_number < 1 %}{% assign page_number = 1 %}{% endif %}
+
+{% fetchxml actions %}
+<fetch count="{{ page_size }}" page="{{ page_number }}" returntotalrecordcount="true">
+  <entity name="al_remediationaction">
+    <attribute name="al_remediationactionid" />
+    <attribute name="al_name" />
+    <attribute name="al_description" />
+    <attribute name="al_actionstatus" />
+    <attribute name="al_duedate" />
+    <attribute name="al_completedon" />
+    <attribute name="createdon" />
+    <order attribute="al_duedate" descending="false" />
+    <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
+      <attribute name="al_outcomecaseid" />
+      <attribute name="al_casereference" />
+      <attribute name="al_advisername" />
+    </link-entity>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign rows = actions.results.entities %}
+
+<div class="ot-notice" role="status">
+  <strong>Shell stage.</strong> All remediation actions are listed. Filtering to your own
+  actions, adviser response and T&amp;C attestation arrive in Phase&nbsp;6. Ageing is shown in
+  calendar dates only. Working-day ageing against the 10-day threshold is pending the business calendar (OD-018).
+</div>
+
+<section class="ot-card" aria-labelledby="ot-remediation-heading">
+  <h2 class="ot-card__title" id="ot-remediation-heading">Remediation actions</h2>
+
+  {% if rows.size > 0 %}
+    <div class="ot-table-wrap">
+      <table class="ot-table">
+        <caption>
+          Showing {{ rows.size }} of {{ actions.results.total_record_count }} actions,
+          page {{ page_number }}.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Case reference</th>
+            <th scope="col">Adviser</th>
+            <th scope="col">Action</th>
+            <th scope="col">Description</th>
+            <th scope="col">Status</th>
+            <th scope="col">Opened</th>
+            <th scope="col">Due</th>
+            <th scope="col">Completed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in rows %}
+            <tr>
+              <td>
+                {% assign cid = a['case.al_outcomecaseid'] %}
+                {% if cid %}
+                  <a href="/case-details?id={{ cid }}">
+                    {{ a['case.al_casereference'] | default: 'Untitled case' | escape }}
+                  </a>
+                {% else %}
+                  {{ a['case.al_casereference'] | default: '—' | escape }}
+                {% endif %}
+              </td>
+              <td>{{ a['case.al_advisername'] | escape }}</td>
+              <td>{{ a.al_name | escape }}</td>
+              <td>{{ a.al_description | escape }}</td>
+              <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
+              <td>{{ a.createdon | date: 'dd MMM yyyy' | default: '—' }}</td>
+              <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+              <td>{{ a.al_completedon | date: 'dd MMM yyyy' | default: '—' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <nav aria-label="Pagination" style="margin-top: 1rem;">
+      {% if page_number > 1 %}
+        <a href="?page={{ page_number | minus: 1 }}">&laquo; Previous</a>
+      {% endif %}
+      {% if rows.size == page_size %}
+        <a href="?page={{ page_number | plus: 1 }}" style="margin-left: 1rem;">Next &raquo;</a>
+      {% endif %}
+    </nav>
+  {% else %}
+    {% include 'OT Empty State' title: 'No remediation actions' message: 'A pass outcome requires no remediation. Actions appear here for any non-pass outcome.' %}
+  {% endif %}
+</section>
+{% endblock %}
