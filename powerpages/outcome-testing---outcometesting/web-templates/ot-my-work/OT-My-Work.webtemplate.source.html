@@ -49,6 +49,29 @@
 </fetch>
 {% endfetchxml %}
 
+{% comment %}
+  An aggregate fetch returns no result set at all when the caller cannot read the
+  table — an anonymous visitor, or a signed-in user whose web role grants nothing
+  on it. Indexing entities[0] straight away then fails with "Index was outside the
+  bounds of the array", and the tile renders that message as its label. A `default`
+  filter cannot save it: the index is evaluated before any filter runs, so the guard
+  has to come first. Same .size > 0 test the case table below already uses.
+{% endcomment %}
+{% assign total_cases = 0 %}
+{% if case_count.results and case_count.results.entities.size > 0 %}
+  {% assign total_cases = case_count.results.entities[0].total %}
+{% endif %}
+
+{% assign total_reviews = 0 %}
+{% if review_count.results and review_count.results.entities.size > 0 %}
+  {% assign total_reviews = review_count.results.entities[0].total %}
+{% endif %}
+
+{% assign total_remediations = 0 %}
+{% if remediation_count.results and remediation_count.results.entities.size > 0 %}
+  {% assign total_remediations = remediation_count.results.entities[0].total %}
+{% endif %}
+
 <div class="ot-notice" role="status">
   <strong>Shell stage.</strong> These figures cover all cases in the environment, not
   only work assigned to you. Assignment filtering and role-based access arrive with
@@ -58,19 +81,19 @@
 <ul class="ot-tiles">
   <li>
     <a class="ot-tile" href="/cases">
-      <span class="ot-tile__count">{{ case_count.results.entities[0].total | default: 0 }}</span>
+      <span class="ot-tile__count">{{ total_cases }}</span>
       <span class="ot-tile__label">Cases</span>
     </a>
   </li>
   <li>
     <a class="ot-tile" href="/tax-reviews">
-      <span class="ot-tile__count">{{ review_count.results.entities[0].total | default: 0 }}</span>
+      <span class="ot-tile__count">{{ total_reviews }}</span>
       <span class="ot-tile__label">Review instances</span>
     </a>
   </li>
   <li>
     <a class="ot-tile ot-tile--alert" href="/remediation">
-      <span class="ot-tile__count">{{ remediation_count.results.entities[0].total | default: 0 }}</span>
+      <span class="ot-tile__count">{{ total_remediations }}</span>
       <span class="ot-tile__label">Remediation actions</span>
     </a>
   </li>
