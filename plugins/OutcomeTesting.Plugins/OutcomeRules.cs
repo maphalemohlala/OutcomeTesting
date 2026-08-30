@@ -64,6 +64,28 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// Whether a Q-TAX-02 result sends the case to remediation, refusing any value
+        /// outside the AD-055 PassFailInsufficient scale. The non-Try predicate cannot
+        /// distinguish "passed" from "not a tax result at all", and treating an unscaled
+        /// value as a pass closes the case terminally — the same failure TryGradeFromAnswer
+        /// refuses on the AQS side.
+        /// </summary>
+        public static bool TryTaxResultRequiresRemediation(int answerChoice, out bool requiresRemediation)
+        {
+            requiresRemediation = false;
+
+            if (answerChoice != ResponseRules.ChoicePass
+                && answerChoice != ResponseRules.ChoiceFail
+                && answerChoice != ResponseRules.ChoiceInsufficient)
+            {
+                return false;
+            }
+
+            requiresRemediation = TaxResultRequiresRemediation(answerChoice);
+            return true;
+        }
+
+        /// <summary>
         /// The al_section.al_ownerrole a review of this discipline is answerable for
         /// (AD-020). Returns false for a review type the model does not define, so the
         /// caller refuses rather than submitting against an empty mandatory set.

@@ -61,6 +61,29 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Theory]
+        [InlineData(ResponseRules.ChoicePass, false)]
+        [InlineData(ResponseRules.ChoiceFail, true)]
+        [InlineData(ResponseRules.ChoiceInsufficient, true)]
+        public void Accepts_every_value_on_the_tax_scale(int answer, bool expected)
+        {
+            bool requiresRemediation;
+            Assert.True(OutcomeRules.TryTaxResultRequiresRemediation(answer, out requiresRemediation));
+            Assert.Equal(expected, requiresRemediation);
+        }
+
+        [Theory]
+        [InlineData(ResponseRules.ChoicePassWithIssues)]
+        [InlineData(ResponseRules.ChoiceYes)]
+        [InlineData(999)]
+        public void Refuses_a_tax_result_the_AD_055_scale_does_not_contain(int answer)
+        {
+            // Never treats an unscaled value as a pass: that closes the case terminally,
+            // which is the same failure TryGradeFromAnswer refuses on the AQS side.
+            bool requiresRemediation;
+            Assert.False(OutcomeRules.TryTaxResultRequiresRemediation(answer, out requiresRemediation));
+        }
+
+        [Theory]
         [InlineData(ResponseRules.ReviewTypeTax, ResponseRules.OwnerRoleTaxTeam)]
         [InlineData(ResponseRules.ReviewTypeAqs, ResponseRules.OwnerRoleAqsChecker)]
         public void Maps_a_review_discipline_to_the_sections_it_owns(int reviewType, int expected)
