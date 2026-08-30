@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { odataEscape } from '../../services/odata';
 import {
   APP_ROLES,
   APP_ROLE_BY_VALUE,
@@ -12,7 +13,11 @@ import {
   type PermissionSet,
   type ResourceKey,
 } from '../../types/permissions';
-import { Al_pagepermissionsService, Al_userrolemappingsService } from '../../generated';
+import {
+  Al_pagepermissionsService,
+  Al_userrolemappingsService,
+  Al_usersService,
+} from '../../generated';
 import { useCurrentUser } from '../../services/auth/useCurrentUser';
 import { PermissionContext, type PermissionContextValue } from './permissionContext';
 
@@ -29,13 +34,23 @@ interface Resolved {
  * server-side by the Custom API commands.
  */
 async function loadPermissions(email: string): Promise<Resolved> {
-  const [mapResult, permResult] = await Promise.all([
+  const [mapResult, permResult, userResult] = await Promise.all([
     Al_userrolemappingsService.getAll({ filter: 'statecode eq 0', top: 5000 }),
     Al_pagepermissionsService.getAll({ filter: 'statecode eq 0', top: 5000 }),
+    Al_usersService.getAll({ filter: `al_workemail eq '${odataEscape(email.trim().toLowerCase())}'`, top: 1 }),
   ]);
 
   const mappings = mapResult.success ? mapResult.data : null;
   const perms = permResult.success ? permResult.data : [];
+
+  // Deactivation (OD-010) withdraws access, so a deactivated registry row resolves to no
+  // roles here as well as server-side. Mirrored rather than relied on: the server is the
+  // gate, and this only stops the UI offering a leaver work it would then refuse.
+  const registered = userResult.success ? userResult.data : [];
+  const deactivated = registered.length > 0 && registered[0].al_isactive === false;
+  if (deactivated) {
+    return { roles: [], permissions: resolvePermissions([]) };
+  }
 
   // Bootstrap / fail-open: before any mapping exists (or if the table is unreadable),
   // grant every role so the first administrator can configure access. Server commands
@@ -61,6 +76,7 @@ async function loadPermissions(email: string): Promise<Resolved> {
     .filter((rule): rule is PermissionRule => Boolean(rule));
 
   const rules = overlayRules(DEFAULT_PERMISSIONS, dataRules);
+
   return { roles, permissions: resolvePermissions(roles, rules) };
 }
 
@@ -86,7 +102,9 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   }, [email, userState.status]);
 
   const value = useMemo<PermissionContextValue>(() => {
-    // While resolving, stay permissive so no screen flashes locked; not yet authoritative.
+    // While resolving, the permissive set stands in so nothing computes against an empty
+    // one — but `ready` is false, and the gates render their pending state rather than
+    // this set, so it is never what decides whether a screen is shown.
     const roles = resolved ? resolved.roles : [...APP_ROLES];
     const permissions = resolved ? resolved.permissions : resolvePermissions(APP_ROLES);
     return {

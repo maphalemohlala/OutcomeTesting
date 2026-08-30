@@ -26,7 +26,14 @@ namespace OutcomeTesting.Plugins
         private const string RecordEntity = "al_exportrecord";
         private const string CaseEntity = "al_outcomecase";
         private const string OutcomeEntity = "al_outcome";
+        private const string ResponseEntity = "al_response";
+        private const string ReviewEntity = "al_reviewinstance";
+        private const string QuestionVersionEntity = "al_questionversion";
+        private const string QuestionEntity = "al_question";
+        private const string AnswerChoiceAttr = "al_answerchoice";
+        private const string FileQualityQuestionCode = "Q-FQ-01";
         private const int CaseStatusClosed = 120910591;
+        private const int BatchStatusDraft = 120910770;
         private const int BatchStatusGenerated = 120910771;
         private const int CommandGenerateExport = 120910775;
 
@@ -51,7 +58,7 @@ namespace OutcomeTesting.Plugins
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "export.generate", PermissionHelpers.AccessEdit);
 
-            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey);
+            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandGenerateExport);
             if (existingAudit != null)
             {
                 var priorCount = existingAudit.GetAttributeValue<string>("al_details");
@@ -59,9 +66,23 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            var batch = userService.Retrieve(BatchEntity, batchId, new ColumnSet("al_exportbatchcode"));
+            var batch = userService.Retrieve(BatchEntity, batchId, new ColumnSet("al_exportbatchcode", "al_batchstatus"));
             var batchCode = batch.GetAttributeValue<string>("al_exportbatchcode");
             var batchRef = new EntityReference(BatchEntity, batchId);
+
+            // An export batch is a snapshot of what was produced, and the records are
+            // upserted in place. Re-generating one that has already been produced would
+            // rewrite those rows with today's values and revert a Delivered batch to
+            // Generated, destroying the record of what was actually sent (AD-042). A
+            // re-run is a new batch, not a second pass over this one. Retries of the same
+            // intent are already handled by the idempotency replay above.
+            var currentStatus = batch.GetAttributeValue<OptionSetValue>("al_batchstatus");
+            if (currentStatus != null && currentStatus.Value != BatchStatusDraft)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "This export batch has already been generated. Create a new batch to produce a fresh export.");
+            }
 
             var cases = new QueryExpression(CaseEntity)
             {
@@ -73,11 +94,15 @@ namespace OutcomeTesting.Plugins
             cases.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
             cases.Criteria.AddCondition("al_casestatus", ConditionOperator.Equal, CaseStatusClosed);
 
+            // Paged: a bare RetrieveMultiple stops at 5000 and the batch would then stamp
+            // that truncated figure as its complete row count (AD-042), leaving no way to
+            // detect the shortfall during reconciliation.
             var rows = 0;
-            foreach (var outcomeCase in userService.RetrieveMultiple(cases).Entities)
+            foreach (var outcomeCase in CommandHelpers.RetrieveAll(userService, cases))
             {
                 var caseRef = outcomeCase.GetAttributeValue<string>("al_casereference") ?? outcomeCase.Id.ToString("D");
                 var adviceGrade = ResolveAdviceGrade(userService, outcomeCase.Id);
+                var fileQualityGrade = ResolveFileQualityGrade(userService, outcomeCase.Id);
                 var code = "EXR-" + batchCode + "-" + caseRef;
 
                 var record = new Entity(RecordEntity)
@@ -95,6 +120,7 @@ namespace OutcomeTesting.Plugins
                     ["al_clientname"] = outcomeCase.GetAttributeValue<string>("al_clientname"),
                     ["al_preorpostcheck"] = Formatted(outcomeCase, "al_preorpostcheck"),
                     ["al_advicequalitygrade"] = adviceGrade,
+                    ["al_filequalitygrade"] = fileQualityGrade,
                     ["al_separator"] = string.Empty,
                     ["statecode"] = new OptionSetValue(0),
                     ["statuscode"] = new OptionSetValue(1),
@@ -152,6 +178,41 @@ namespace OutcomeTesting.Plugins
                 return outcome.FormattedValues["al_finaloutcome"];
             }
             return outcome.FormattedValues.ContainsKey("al_initialoutcome") ? outcome.FormattedValues["al_initialoutcome"] : null;
+        }
+
+        // AD-039 col 10 File Quality grade = the answer to Q-FQ-01 "File quality outcome",
+        // the one PassFail question in Checker Checklist V8 (knowledge/checklist-v8.md,
+        // section S-FQOUT). It is held as a Response on the case's review, not on
+        // al_Outcome, which carries only the BR-005 advice quality scale.
+        //
+        // Matched on the question's business code rather than its GUID so the export does
+        // not break when the question is retired and succeeded (BR-013, AD-004): a
+        // successor version keeps the code and stays the same question.
+        private static string ResolveFileQualityGrade(IOrganizationService service, Guid caseId)
+        {
+            var query = new QueryExpression(ResponseEntity)
+            {
+                ColumnSet = new ColumnSet(AnswerChoiceAttr),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+
+            var review = query.AddLink(ReviewEntity, "al_reviewinstanceid", "al_reviewinstanceid");
+            review.LinkCriteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+
+            var version = query.AddLink(QuestionVersionEntity, "al_questionversionid", "al_questionversionid");
+            var question = version.AddLink(QuestionEntity, "al_questionid", "al_questionid");
+            question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.Equal, FileQualityQuestionCode);
+
+            var found = service.RetrieveMultiple(query).Entities;
+            if (found.Count == 0)
+            {
+                return null;
+            }
+
+            return found[0].FormattedValues.ContainsKey(AnswerChoiceAttr)
+                ? found[0].FormattedValues[AnswerChoiceAttr]
+                : null;
         }
 
         private static void SetResponse(IPluginExecutionContext context, string batchId, string rowCount, string status, Guid auditId, bool conflict)

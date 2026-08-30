@@ -23,4 +23,7 @@ plugins/**/obj/
 .auth/
 .temp/
 
+# Playwright MCP session artefacts (console logs, page snapshots) — scratch, not source
+.playwright-mcp/
+
 # NOTE: powerpages/ metadata IS version controlled. Do not ignore it.

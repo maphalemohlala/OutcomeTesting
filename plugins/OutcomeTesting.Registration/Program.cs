@@ -17,11 +17,18 @@ using System.Text.Json;
 //   Contract-driven: upserts the assembly once, then every command found in
 //   plugins/customapi/*.customapi.json (plug-in type + Custom API + parameters). Idempotent.
 //
-// Verify:   dotnet run -- verify <orgUrl>            (CompleteRemediation)
-//           dotnet run -- verifysignoff <orgUrl>     (SignOffRemediation)
-//           dotnet run -- verifyregrade <orgUrl>     (RegradeCase)
+// Verify:   dotnet run -- verify <orgUrl> <caseId> --confirm <orgUrl>        (CompleteRemediation)
+//           dotnet run -- verifysignoff <orgUrl> <caseId> --confirm <orgUrl>  (SignOffRemediation)
+//           dotnet run -- verifyregrade <orgUrl> <caseId> --confirm <orgUrl>  (RegradeCase)
 //   Seeds temporary records, invokes the command, and asserts the state transition, the
 //   audit event and idempotency. Prints PASS/FAIL evidence and cleans up.
+//
+//   These modes CREATE AND MUTATE REAL BUSINESS RECORDS on the case you name, and the
+//   Audit Events the commands write are immutable — cleanup deletes the seeded rows but
+//   cannot remove the audit trail they leave behind (NFR-AUD-01). Run them against a
+//   development environment and a case seeded for the purpose, never a live client case.
+//   That is why the case is named explicitly rather than picked, and why the org URL has
+//   to be repeated after --confirm: neither can happen by muscle memory.
 //
 // Add to solution: dotnet run -- addtosolution <orgUrl> [<solutionUniqueName>]
 //   Adds the plug-in assembly (and its plug-in type) to the target solution for clean ALM
@@ -53,7 +60,8 @@ ServiceClient Connect(string orgUrl)
 
 if (args.Length >= 2 && args[0].Equals("verify", StringComparison.OrdinalIgnoreCase))
 {
-    return Verify(args[1]);
+    var target = VerificationTarget(args);
+    return target == null ? 1 : Verify(args[1], target.Value);
 }
 
 if (args.Length >= 2 && args[0].Equals("registerall", StringComparison.OrdinalIgnoreCase))
@@ -63,12 +71,14 @@ if (args.Length >= 2 && args[0].Equals("registerall", StringComparison.OrdinalIg
 
 if (args.Length >= 2 && args[0].Equals("verifysignoff", StringComparison.OrdinalIgnoreCase))
 {
-    return VerifySignOff(args[1]);
+    var target = VerificationTarget(args);
+    return target == null ? 1 : VerifySignOff(args[1], target.Value);
 }
 
 if (args.Length >= 2 && args[0].Equals("verifyregrade", StringComparison.OrdinalIgnoreCase))
 {
-    return VerifyRegrade(args[1]);
+    var target = VerificationTarget(args);
+    return target == null ? 1 : VerifyRegrade(args[1], target.Value);
 }
 
 if (args.Length >= 2 && args[0].Equals("addtosolution", StringComparison.OrdinalIgnoreCase))
@@ -192,7 +202,7 @@ int Register(string[] a)
     return 0;
 }
 
-int Verify(string orgUrl)
+int Verify(string orgUrl, Guid caseId)
 {
     using var svc = Connect(orgUrl);
     var pass = true;
@@ -202,14 +212,9 @@ int Verify(string orgUrl)
         pass &= ok;
     }
 
-    var caseRef = svc.RetrieveMultiple(new QueryExpression("al_outcomecase")
-    {
-        ColumnSet = new ColumnSet("al_name"),
-        TopCount = 1,
-    }).Entities.FirstOrDefault();
+    var caseRef = NamedCase(svc, caseId);
     if (caseRef == null)
     {
-        Console.Error.WriteLine("No al_outcomecase found to attach a verification action to.");
         return 1;
     }
 
@@ -223,6 +228,12 @@ int Verify(string orgUrl)
         ["al_outcomecaseid"] = caseRef.ToEntityReference(),
     });
     Console.WriteLine($"Seeded remediation action {actionId} on case '{caseRef["al_name"]}'.");
+
+    // From here the seeded action must be removed whatever happens. Without this, a
+    // failure part-way strands a fake Open remediation action on the case, which then
+    // blocks its sign-off (BR-008).
+    try
+    {
 
     var seeded = svc.Retrieve("al_remediationaction", actionId, new ColumnSet("al_actionstatus"));
     var key = Guid.NewGuid().ToString();
@@ -266,8 +277,12 @@ int Verify(string orgUrl)
     }).Entities.Count;
     Check("idempotent replay (no duplicate audit)", afterReplay == 1, $"count={afterReplay}");
 
-    svc.Delete("al_remediationaction", actionId);
-    Console.WriteLine($"Cleaned up verification action {actionId}.");
+    }
+    finally
+    {
+        TryDelete(svc, "al_remediationaction", actionId);
+        Console.WriteLine($"Cleaned up verification action {actionId}.");
+    }
     Console.WriteLine(pass ? "VERIFY: PASS" : "VERIFY: FAIL");
     return pass ? 0 : 2;
 }
@@ -425,7 +440,7 @@ int RegisterAll(string orgUrl, string? dllPathArg)
     return 0;
 }
 
-int VerifySignOff(string orgUrl)
+int VerifySignOff(string orgUrl, Guid caseId)
 {
     using var svc = Connect(orgUrl);
     var pass = true;
@@ -435,10 +450,9 @@ int VerifySignOff(string orgUrl)
         pass &= ok;
     }
 
-    var caseRef = FirstEntity(svc, "al_outcomecase");
+    var caseRef = NamedCase(svc, caseId);
     if (caseRef == null)
     {
-        Console.Error.WriteLine("No al_outcomecase found to attach a verification action to.");
         return 1;
     }
 
@@ -519,7 +533,7 @@ int VerifySignOff(string orgUrl)
     return pass ? 0 : 2;
 }
 
-int VerifyRegrade(string orgUrl)
+int VerifyRegrade(string orgUrl, Guid caseId)
 {
     using var svc = Connect(orgUrl);
     var pass = true;
@@ -529,11 +543,15 @@ int VerifyRegrade(string orgUrl)
         pass &= ok;
     }
 
-    var caseRef = FirstEntity(svc, "al_outcomecase");
+    var caseRef = NamedCase(svc, caseId);
     var version = FirstEntity(svc, "al_checklistversion");
-    if (caseRef == null || version == null)
+    if (caseRef == null)
     {
-        Console.Error.WriteLine("Need an al_outcomecase and an al_checklistversion to seed a verification outcome.");
+        return 1;
+    }
+    if (version == null)
+    {
+        Console.Error.WriteLine("Need an al_checklistversion to seed a verification outcome.");
         return 1;
     }
 
@@ -609,6 +627,60 @@ static Guid SeedCompletedAction(ServiceClient svc, EntityReference caseRef, stri
         ["al_actionstatus"] = new OptionSetValue(120910602), // Completed
         ["al_outcomecaseid"] = caseRef,
     });
+}
+
+/// <summary>
+/// Parses and confirms the target of a verify run, or explains what is missing and
+/// returns null.
+///
+/// The verify modes create and mutate real business records and leave immutable Audit
+/// Events behind. Previously they took the FIRST al_outcomecase in the org with no filter
+/// and no environment guard, so running one against production wrote a permanent audit
+/// trail onto a real client case describing work that never happened — falsifying exactly
+/// the record AD-031 exists to protect. Naming the case, and repeating the org URL, makes
+/// both choices deliberate.
+/// </summary>
+static Guid? VerificationTarget(string[] args)
+{
+    var orgUrl = args[1];
+
+    if (args.Length < 3 || !Guid.TryParse(args[2], out var caseId))
+    {
+        Console.Error.WriteLine($"Usage: dotnet run -- {args[0]} <orgUrl> <caseId> --confirm <orgUrl>");
+        Console.Error.WriteLine("  <caseId> is the al_outcomecase to seed against. Use a case created for testing:");
+        Console.Error.WriteLine("  this run writes real records and leaves immutable audit events on that case.");
+        return null;
+    }
+
+    var confirmIndex = Array.FindIndex(args, a => a.Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+    var confirmed = confirmIndex >= 0
+        && confirmIndex + 1 < args.Length
+        && args[confirmIndex + 1].TrimEnd('/').Equals(orgUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+
+    if (!confirmed)
+    {
+        Console.Error.WriteLine($"Refusing to run: this writes real records to {orgUrl} and leaves immutable audit events.");
+        Console.Error.WriteLine($"Re-run with --confirm {orgUrl} if that environment is a development environment.");
+        return null;
+    }
+
+    return caseId;
+}
+
+/// <summary>The case named on the command line, or null with an explanation.</summary>
+static Entity? NamedCase(ServiceClient svc, Guid caseId)
+{
+    try
+    {
+        var found = svc.Retrieve("al_outcomecase", caseId, new ColumnSet("al_name"));
+        Console.WriteLine($"Verifying against case '{found.GetAttributeValue<string>("al_name")}' ({caseId}).");
+        return found;
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"No al_outcomecase {caseId} could be read: {ex.Message}");
+        return null;
+    }
 }
 
 static Entity? FirstEntity(ServiceClient svc, string table)

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { odataEscape } from '../../services/odata';
+import { logTechnical } from '../../services/errors';
 import {
   Al_importbatchesService,
   Al_importexceptionsService,
@@ -28,10 +30,6 @@ export type UploadState =
   | { phase: 'processing'; message: string }
   | { phase: 'done'; result: UploadResult }
   | { phase: 'error'; message: string };
-
-function odataEscape(value: string): string {
-  return value.replace(/'/g, "''");
-}
 
 async function referenceExists(reference: string): Promise<boolean> {
   const result = await Al_outcomecasesService.getAll({
@@ -213,11 +211,26 @@ export function useCaseUpload(onUploaded: () => void) {
     }
 
     const exceptionCount = total - imported;
-    await Al_importbatchesService.update(batchId, {
+    const completed = await Al_importbatchesService.update(batchId, {
       al_batchstatus: BATCH_STATUS_COMPLETED,
       al_importedcount: imported,
       al_exceptioncount: exceptionCount,
     });
+
+    // The rows are already in Dataverse; only the batch header failed to close. Say so
+    // rather than reporting success, so the batch is not left silently at Validating
+    // with counts that never caught up.
+    if (!completed.success) {
+      logTechnical('import batch completion', completed.error);
+      setState({
+        phase: 'error',
+        message:
+          `${imported} of ${total} cases were imported, but the batch could not be marked ` +
+          `complete. Ask an administrator to check batch ${batchCode} before re-running it.`,
+      });
+      onUploaded();
+      return;
+    }
 
     setState({
       phase: 'done',

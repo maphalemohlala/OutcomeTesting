@@ -59,7 +59,7 @@ namespace OutcomeTesting.Plugins
             var expectedRowVersion = CommandHelpers.GetOptionalString(context, InExpectedRowVersion);
 
             // Idempotency: a replay with the same key returns the original regrade (NFR-REL-01).
-            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey);
+            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandRegradeCase);
             if (existingAudit != null)
             {
                 var priorLabel = existingAudit.GetAttributeValue<string>("al_details");
@@ -68,7 +68,18 @@ namespace OutcomeTesting.Plugins
             }
 
             // Confirm the outcome exists (and the caller can read it) before writing.
-            userService.Retrieve(OutcomeEntity, targetId, new ColumnSet(InitialOutcomeAttr));
+            var outcome = userService.Retrieve(OutcomeEntity, targetId, new ColumnSet(InitialOutcomeAttr));
+
+            // A regrade overrides a grade that was already given, so there has to BE one.
+            // Without this, a final outcome can be written against an ungraded record: BR-007
+            // is broken from the other side (a final with no initial to preserve against) and
+            // the Audit Event claims an override that never happened.
+            if (outcome.GetAttributeValue<OptionSetValue>(InitialOutcomeAttr) == null)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "This case has no initial outcome to regrade. Record the original outcome before overriding it.");
+            }
 
             // Preserve the initial outcome (BR-007): only the final columns are written.
             var update = new Entity(OutcomeEntity, targetId)

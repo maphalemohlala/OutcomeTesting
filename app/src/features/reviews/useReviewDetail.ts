@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReviewType } from '../../types/domain';
+import { isRecordId } from '../../services/odata';
 import {
   Al_reviewinstancesService,
   Al_responsesService,
@@ -160,7 +161,10 @@ export function useReviewDetail(
   }
 
   useEffect(() => {
-    if (!reviewId) return;
+    // The id comes from the route, so it is untrusted until it parses as a record id;
+    // an id that is not one never reaches a filter. The unavailable state for that case
+    // is derived below rather than set here.
+    if (!isRecordId(reviewId)) return;
     let cancelled = false;
 
     Promise.all([
@@ -218,6 +222,13 @@ export function useReviewDetail(
 
   if (!reviewId) {
     return { status: 'unavailable', reason: 'No review was requested.' };
+  }
+
+  if (!isRecordId(reviewId)) {
+    return {
+      status: 'unavailable',
+      reason: 'This review could not be loaded. It may not exist, or you may not have access to it.',
+    };
   }
 
   return state;

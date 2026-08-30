@@ -69,7 +69,7 @@ namespace OutcomeTesting.Plugins
             var fields = ParseFields(context);
 
             // Idempotency: a replay with the same key returns the original result (NFR-REL-01).
-            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey);
+            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandUpdateCaseDetails);
             if (existingAudit != null)
             {
                 SetResponse(context, targetId.ToString("D"), existingAudit.Id, false);
@@ -113,6 +113,11 @@ namespace OutcomeTesting.Plugins
 
             // General editable case fields, addressed by logical name via the Fields payload.
             ApplyFields(fields, before, update, changes);
+
+            // One lifecycle check for both status paths — the legacy Status parameter and
+            // the Fields payload both land on the same attribute, so validating after they
+            // have been applied is what stops either route writing an impossible status.
+            EnsureLifecycleTransition(before, update);
 
             if (changes.Count == 0)
             {
@@ -315,6 +320,39 @@ namespace OutcomeTesting.Plugins
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.ValidationPrefix + "The Fields payload is not valid JSON: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Refuses a status change the lifecycle does not describe (FR-010 range).
+        ///
+        /// al_casestatus was previously written straight from caller input, so a case could
+        /// jump from Imported to Closed — skipping validation, allocation, review and
+        /// remediation — and then be collected by the export, which filters on Closed, and
+        /// delivered with no review instance and a blank grade.
+        /// </summary>
+        private static void EnsureLifecycleTransition(Entity before, Entity update)
+        {
+            if (!update.Contains(StatusAttr))
+            {
+                return;
+            }
+
+            var target = update[StatusAttr] as OptionSetValue;
+            if (target == null)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.ValidationPrefix +
+                    "A case must have a status. Move it to the next status in the lifecycle rather than clearing it.");
+            }
+
+            var current = before.GetAttributeValue<OptionSetValue>(StatusAttr);
+            int? from = current != null ? current.Value : (int?)null;
+
+            if (!CaseLifecycle.IsAllowed(from, target.Value))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + CaseLifecycle.DescribeRefusal(from, target.Value));
             }
         }
 
