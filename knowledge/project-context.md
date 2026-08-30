@@ -18,6 +18,12 @@ Build a Dataverse-centred outcome testing and file-checking platform that replac
 ## Actors and access
 Administrators, Outcome Testing Managers, Checkers/AQS Reviewers, Tax Reviewers, Advisers/Remediation Users, T&C Managers/Supervisors, Regional Leads and Report Users. Users are managed through Entra groups and Power Platform/Dataverse teams. Multi-role membership is allowed.
 
+Portal web roles are a narrower set than the actor list above, settled 2026-08-30:
+- **Adviser and Planner are two separate web roles** (OD-019). Only `AL Portal - Adviser Remediation` exists today, so a Planner role is still to be added and remediation routing split between them.
+- **T&C Manager and Supervisor are one role and one person** (OD-020), which the single `AL Portal - T&C Supervisor` role already matches. FR-023 and BR-008 sign-off routes to it.
+- **Regional Manager/Lead receives notifications only and is not a portal user** (OD-021). The existing `AL Portal - Regional Manager` web role over-grants and is to be removed; PP-15 recipients come from the BR-009 notification list, not from portal role membership.
+- Tax and AQS Reviewers additionally hold Global read on cases, reviews and responses, with write scoped to their own reviews (AD-056).
+
 ## Data principles
 - Dataverse is the system of record.
 - Use relational tables, stable alternate keys and explicit status/state models.
