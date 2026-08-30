@@ -145,12 +145,14 @@ namespace OutcomeTesting.Plugins
         /// their final state; a Tax handoff with AQS still to come goes straight to the
         /// queue, because the case is not submitted — only its Tax review is. A case still
         /// at Assigned is opened first, since a review may be submitted from Assigned and
-        /// nothing moves the case automatically.
+        /// nothing moves the case automatically. A case whose status was never set is not
+        /// Assigned and so is not opened — the Submitted hop is left to refuse it against
+        /// AD-057, rather than inventing a state it was never in.
         ///
         /// Pure so the chain can be asserted against CaseLifecycle.IsAllowed without a
         /// Dataverse service; SubmitReviewPlugin performs the hops this returns.
         /// </summary>
-        public static int[] HopsFor(int currentStatus, int finalStatus)
+        public static int[] HopsFor(int? currentStatus, int finalStatus)
         {
             var hops = new List<int>();
 

@@ -104,7 +104,7 @@ namespace OutcomeTesting.Plugins
                 var outcomeRow = ResolveOutcome(userService, outcomeCase.Id);
                 var adviceGrade = outcomeRow == null
                     ? null
-                    : (Formatted(outcomeRow, "al_finaloutcome") ?? Formatted(outcomeRow, "al_initialoutcome"));
+                    : Outcomes.EffectiveOutcomeLabel(outcomeRow);
                 var fileQualityGrade = ResolveFileQualityGrade(userService, outcomeCase.Id);
                 var code = "EXR-" + batchCode + "-" + caseRef;
 
@@ -114,15 +114,14 @@ namespace OutcomeTesting.Plugins
                 // of a delivered Trail Light file (AD-039, OD-024).
                 if (outcomeRow != null)
                 {
-                    var effective = outcomeRow.GetAttributeValue<OptionSetValue>("al_finaloutcome")
-                        ?? outcomeRow.GetAttributeValue<OptionSetValue>("al_initialoutcome");
+                    var effective = Outcomes.EffectiveOutcome(outcomeRow);
                     var anyAccountability =
                         (outcomeRow.GetAttributeValue<bool?>("al_fqadviseraccountable") ?? false)
                         || (outcomeRow.GetAttributeValue<bool?>("al_fqparaplanneraccountable") ?? false)
                         || (outcomeRow.GetAttributeValue<bool?>("al_aqadviseraccountable") ?? false)
                         || (outcomeRow.GetAttributeValue<bool?>("al_aqparaplanneraccountable") ?? false);
 
-                    if (effective != null && OutcomeRules.RequiresRemediation(effective.Value) && !anyAccountability)
+                    if (effective.HasValue && OutcomeRules.RequiresRemediation(effective.Value) && !anyAccountability)
                     {
                         throw new InvalidPluginExecutionException(
                             CommandHelpers.PreconditionPrefix
@@ -206,6 +205,13 @@ namespace OutcomeTesting.Plugins
                 Criteria = new FilterExpression(),
             };
             query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+
+            // One Outcome per case is the intent, but nothing in the schema enforces it and
+            // a re-review can leave a second. This row decides the exported grade and the
+            // accountability gate, so picking whichever row Dataverse happened to return
+            // first would make the export non-deterministic. Newest wins.
+            query.AddOrder("createdon", OrderType.Descending);
+
             var found = service.RetrieveMultiple(query).Entities;
             return found.Count == 0 ? null : found[0];
         }
@@ -248,6 +254,12 @@ namespace OutcomeTesting.Plugins
             var version = query.AddLink(QuestionVersionEntity, "al_questionversionid", "al_questionversionid");
             var question = version.AddLink(QuestionEntity, "al_questionid", "al_questionid");
             question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.Equal, FileQualityQuestionCode);
+
+            // The case may hold several reviews, and a succeeded question (BR-013, AD-004)
+            // several versions, so this can match more than one response. The latest is the
+            // grade in force; without an order the exported File Quality grade would be
+            // whichever row came back first.
+            query.AddOrder("modifiedon", OrderType.Descending);
 
             var found = service.RetrieveMultiple(query).Entities;
             if (found.Count == 0)

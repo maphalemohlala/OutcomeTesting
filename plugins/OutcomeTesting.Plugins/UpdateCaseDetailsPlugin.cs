@@ -349,11 +349,7 @@ namespace OutcomeTesting.Plugins
             var current = before.GetAttributeValue<OptionSetValue>(StatusAttr);
             int? from = current != null ? current.Value : (int?)null;
 
-            if (!CaseLifecycle.IsAllowed(from, target.Value))
-            {
-                throw new InvalidPluginExecutionException(
-                    CommandHelpers.PreconditionPrefix + CaseLifecycle.DescribeRefusal(from, target.Value));
-            }
+            CaseTransitions.EnsureAllowed(from, target.Value);
         }
 
         private static void ApplyFields(
