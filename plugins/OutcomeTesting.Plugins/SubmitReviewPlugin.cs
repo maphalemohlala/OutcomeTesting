@@ -34,6 +34,7 @@ namespace OutcomeTesting.Plugins
         private const string ReviewSubmittedOn = "al_submittedon";
         private const string ReviewChecklistVersion = "al_checklistversionid";
         private const string ReviewType = "al_reviewtype";
+        private const string ReviewOutcomeCase = "al_outcomecaseid";
         private const int StatusAssigned = 120910210;
         private const int StatusInProgress = 120910211;
         private const int StatusSubmitted = 120910212;
@@ -81,7 +82,7 @@ namespace OutcomeTesting.Plugins
             var review = service.Retrieve(
                 ReviewEntity,
                 targetId,
-                new ColumnSet(ReviewStatus, ReviewChecklistVersion, ReviewType, "ownerid"));
+                new ColumnSet(ReviewStatus, ReviewChecklistVersion, ReviewType, ReviewOutcomeCase, "ownerid"));
 
             EnsureCaller(service, context, review);
 
@@ -105,6 +106,7 @@ namespace OutcomeTesting.Plugins
             }
 
             EnsureMandatoryQuestionsAnswered(service, targetId, review);
+            EnsureTaxPrecedesAqs(service, review);
 
             var update = new Entity(ReviewEntity, targetId)
             {
@@ -243,6 +245,47 @@ namespace OutcomeTesting.Plugins
                 throw new InvalidPluginExecutionException(
                     PreconditionPrefix + "Complete all questions marked Required before submitting. "
                     + missing + " of " + mandatory.Entities.Count + " required questions are unanswered.");
+            }
+        }
+
+        /// <summary>
+        /// Tax and AQS run sequentially when both are required (BR-004). Without this an
+        /// AQS review could be graded and its case closed while the Tax check was still
+        /// open, producing an Outcome for a case whose Tax check never happened.
+        ///
+        /// Sibling instances are read from the case rather than trusted from al_sequence,
+        /// because sequence is data a caller can set and the invariant has to hold anyway.
+        /// A Tax submit is never refused here: Tax is always first.
+        /// </summary>
+        private static void EnsureTaxPrecedesAqs(IOrganizationService service, Entity review)
+        {
+            var reviewType = review.GetAttributeValue<OptionSetValue>(ReviewType);
+            if (reviewType == null || reviewType.Value != ResponseRules.ReviewTypeAqs)
+            {
+                return;
+            }
+
+            var caseRef = review.GetAttributeValue<EntityReference>(ReviewOutcomeCase);
+            if (caseRef == null)
+            {
+                return;
+            }
+
+            var query = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition(ReviewOutcomeCase, ConditionOperator.Equal, caseRef.Id);
+            query.Criteria.AddCondition(ReviewType, ConditionOperator.Equal, ResponseRules.ReviewTypeTax);
+            query.Criteria.AddCondition(ReviewStatus, ConditionOperator.NotEqual, StatusSubmitted);
+
+            if (service.RetrieveMultiple(query).Entities.Count > 0)
+            {
+                throw new InvalidPluginExecutionException(
+                    PreconditionPrefix + "The Tax check on this case has not been submitted yet. Tax must be completed before the AQS review (BR-004).");
             }
         }
 
