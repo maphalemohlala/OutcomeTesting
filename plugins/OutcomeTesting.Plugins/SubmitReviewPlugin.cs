@@ -41,6 +41,7 @@ namespace OutcomeTesting.Plugins
 
         // al_outcomecase and its route.
         private const string CaseEntity = "al_outcomecase";
+        private const string CaseStatus = "al_casestatus";
         private const string RouteEntity = "al_reviewroute";
         private const string CaseReviewRoute = "al_reviewrouteid";
         private const string RouteRequiresTax = "al_requirestaxreview";
@@ -464,7 +465,7 @@ namespace OutcomeTesting.Plugins
                 // Through Submitted, then on: the lifecycle has no edge from Review In
                 // Progress straight to Awaiting Remediation or Closed, and it should not —
                 // the case really is submitted before it is triaged (AD-057).
-                MoveCaseThrough(service, caseRef.Id, CaseLifecycle.Submitted);
+                MoveCaseToSubmitted(service, caseRef.Id);
                 nextStatus = OutcomeRules.NextCaseStatusForAqs(outcomeValue);
             }
             else
@@ -483,7 +484,7 @@ namespace OutcomeTesting.Plugins
                 // only its Tax review is. A Tax-only case is submitted, then triaged.
                 if (!aqsStillToCome)
                 {
-                    MoveCaseThrough(service, caseRef.Id, CaseLifecycle.Submitted);
+                    MoveCaseToSubmitted(service, caseRef.Id);
                 }
             }
 
@@ -525,8 +526,8 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         private static void MoveCaseThrough(IOrganizationService service, Guid caseId, int nextStatus)
         {
-            var outcomeCase = service.Retrieve(CaseEntity, caseId, new ColumnSet("al_casestatus"));
-            var current = outcomeCase.GetAttributeValue<OptionSetValue>("al_casestatus");
+            var outcomeCase = service.Retrieve(CaseEntity, caseId, new ColumnSet(CaseStatus));
+            var current = outcomeCase.GetAttributeValue<OptionSetValue>(CaseStatus);
             int? from = current != null ? current.Value : (int?)null;
 
             if (from.HasValue && from.Value == nextStatus)
@@ -542,8 +543,29 @@ namespace OutcomeTesting.Plugins
 
             service.Update(new Entity(CaseEntity, caseId)
             {
-                ["al_casestatus"] = new OptionSetValue(nextStatus),
+                [CaseStatus] = new OptionSetValue(nextStatus),
             });
+        }
+
+        /// <summary>
+        /// Moves the case to Submitted, opening it first if it was never opened. A review
+        /// may legitimately be submitted from Assigned — see the status guard in
+        /// ExecuteDataversePlugin — and nothing moves the CASE to Review In Progress
+        /// automatically, so without this hop a perfectly good submit is refused over a
+        /// case status its reviewer does not control. Each hop is still checked (AD-057):
+        /// this opens the case, it does not skip a state.
+        /// </summary>
+        private static void MoveCaseToSubmitted(IOrganizationService service, Guid caseId)
+        {
+            var outcomeCase = service.Retrieve(CaseEntity, caseId, new ColumnSet(CaseStatus));
+            var current = outcomeCase.GetAttributeValue<OptionSetValue>(CaseStatus);
+
+            if (current != null && current.Value == CaseLifecycle.Assigned)
+            {
+                MoveCaseThrough(service, caseId, CaseLifecycle.ReviewInProgress);
+            }
+
+            MoveCaseThrough(service, caseId, CaseLifecycle.Submitted);
         }
 
         /// <summary>True when the response holds a value in any typed answer column.</summary>
