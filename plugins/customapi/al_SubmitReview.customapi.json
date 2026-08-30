@@ -1,0 +1,65 @@
+{
+  "$comment": "Contract for the SubmitReview server-side command (AD-003, command-concurrency skill). Deployed by plugins/deploy/Register-SubmitReview.ps1. Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_SubmitReview",
+    "name": "al_SubmitReview",
+    "displayname": "Submit Review",
+    "description": "Checker submits their own Tax or AQS review instance (FR-010..FR-017). Enforces caller, transition, mandatory questions, optimistic concurrency and idempotency, writes an immutable Audit Event, and locks the review.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.SubmitReviewPlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "TargetId",
+      "name": "TargetId",
+      "displayname": "Target id",
+      "description": "Id of the al_reviewinstance to submit.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "ExpectedRowVersion",
+      "name": "ExpectedRowVersion",
+      "displayname": "Expected row version",
+      "description": "Row version the client read, for optimistic concurrency. Omit to skip the check.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay upserts the same Audit Event.",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "Status",
+      "name": "Status",
+      "displayname": "Status",
+      "description": "The review status after the command (Submitted).",
+      "type": 10
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written for this command.",
+      "type": 10
+    },
+    {
+      "uniquename": "Conflict",
+      "name": "Conflict",
+      "displayname": "Conflict",
+      "description": "True when the command was rejected for an optimistic-concurrency conflict.",
+      "type": 0
+    }
+  ]
+}

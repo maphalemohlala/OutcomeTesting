@@ -16,7 +16,8 @@
     so the definition lives in one place.
 
 .PARAMETER OrgUrl
-    e.g. https://org0b075da8.crm11.dynamics.com
+    The Dataverse environment URL to deploy to, e.g. https://<your-org>.crm<n>.dynamics.com
+    Pass the environment you intend to target; no environment is assumed or defaulted.
 
 .PARAMETER AccessToken
     A bearer token for the Dataverse Web API of OrgUrl. Obtain one however your
@@ -58,24 +59,36 @@ function Invoke-Dv {
     return Invoke-RestMethod -Method $Method -Uri $uri -Headers $headers -Body $json
 }
 
+# $IdField is passed in rather than derived from $Set. The primary-key column comes from
+# the entity's LOGICAL name, not its entity-set name, and the two differ by more than a
+# trailing 's' (customapiresponseproperties -> customapiresponsepropertyid), so deriving
+# it produces column names Dataverse rejects with HTTP 400.
 function Get-OrCreate {
-    param([string]$Set, [string]$Filter, [object]$Body)
-    $existing = Invoke-Dv -Method Get -Path "$Set`?`$filter=$Filter&`$select=$($Set)id"
+    param([string]$Set, [string]$IdField, [string]$Filter, [object]$Body)
+    $existing = Invoke-Dv -Method Get -Path "$Set`?`$filter=$Filter&`$select=$IdField"
     if ($existing.value.Count -gt 0) {
         Write-Host "  exists: $Filter"
-        return $existing.value[0]."$($Set)id"
+        return $existing.value[0].$IdField
     }
     $resp = Invoke-RestMethod -Method Post -Uri "$api/$Set" -Headers ($headers + @{ Prefer = 'return=representation' }) -Body ($Body | ConvertTo-Json -Depth 6)
     Write-Host "  created: $Filter"
-    return $resp."$($Set)id"
+    return $resp.$IdField
 }
 
 Write-Host '1. Pushing plug-in assembly (pac plugin push)...'
+$settingsFile = Join-Path $pluginProject 'spkl.json'
+if (-not (Test-Path -LiteralPath $settingsFile)) {
+    # Fail here rather than at step 2. Without this file the push cannot run, and the
+    # only symptom downstream is "Plug-in type not found", which points at the wrong cause.
+    throw "Plug-in push settings file not found: $settingsFile. Create it, or push the assembly manually with 'pac plugin push' from $pluginProject and re-run this script (the Web API steps are idempotent)."
+}
 Push-Location $pluginProject
 try {
-    pac plugin push --settingsFile (Join-Path $pluginProject 'spkl.json') 2>$null
+    # stderr is NOT discarded: when the push fails, its own message is the only thing that
+    # explains why, and step 2 can only report the symptom.
+    pac plugin push --settingsFile $settingsFile
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning 'pac plugin push returned non-zero. Run it manually from the plugin project, then re-run this script; the Web API steps below are idempotent.'
+        throw "pac plugin push failed with exit code $LASTEXITCODE (see its output above). Fix the push, then re-run this script; the Web API steps below are idempotent."
     }
 }
 finally { Pop-Location }
@@ -99,7 +112,7 @@ $apiBody = [ordered]@{
     allowedcustomprocessingsteptype  = $c.allowedcustomprocessingsteptype
     'PluginTypeId@odata.bind'        = "/plugintypes($pluginTypeId)"
 }
-$customApiId = Get-OrCreate -Set 'customapis' -Filter "uniquename eq '$($c.uniquename)'" -Body $apiBody
+$customApiId = Get-OrCreate -Set 'customapis' -IdField 'customapiid' -Filter "uniquename eq '$($c.uniquename)'" -Body $apiBody
 
 Write-Host '4. Creating request parameters...'
 foreach ($p in $contract.requestParameters) {
@@ -112,7 +125,7 @@ foreach ($p in $contract.requestParameters) {
         isoptional                = $p.isoptional
         'CustomAPIId@odata.bind'  = "/customapis($customApiId)"
     }
-    Get-OrCreate -Set 'customapirequestparameters' -Filter "uniquename eq '$($p.uniquename)' and _customapiid_value eq $customApiId" -Body $body | Out-Null
+    Get-OrCreate -Set 'customapirequestparameters' -IdField 'customapirequestparameterid' -Filter "uniquename eq '$($p.uniquename)' and _customapiid_value eq $customApiId" -Body $body | Out-Null
 }
 
 Write-Host '5. Creating response properties...'
@@ -125,7 +138,7 @@ foreach ($p in $contract.responseProperties) {
         type                      = $p.type
         'CustomAPIId@odata.bind'  = "/customapis($customApiId)"
     }
-    Get-OrCreate -Set 'customapiresponseproperties' -Filter "uniquename eq '$($p.uniquename)' and _customapiid_value eq $customApiId" -Body $body | Out-Null
+    Get-OrCreate -Set 'customapiresponseproperties' -IdField 'customapiresponsepropertyid' -Filter "uniquename eq '$($p.uniquename)' and _customapiid_value eq $customApiId" -Body $body | Out-Null
 }
 
 Write-Host "Done. al_CompleteRemediation is deployed to solution '$SolutionUniqueName'." -ForegroundColor Green

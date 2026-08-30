@@ -21,6 +21,8 @@
   <EntityRelationship Name="al_reviewinstance_response" />
   <EntityRelationship Name="al_reviewroute_outcomecase" />
   <EntityRelationship Name="al_section_question" />
+  <EntityRelationship Name="contact_al_remediationaction" />
+  <EntityRelationship Name="contact_al_reviewinstance" />
   <EntityRelationship Name="business_unit_al_auditevent" />
   <EntityRelationship Name="business_unit_al_caseassignment" />
   <EntityRelationship Name="business_unit_al_exportbatch" />

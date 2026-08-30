@@ -8,6 +8,7 @@ Authoritative wording lives in the build package documents `01-Solution-Vision` 
 | BR-nnn | Business requirement | 02-Business-Requirements |
 | FR-nnn | Functional requirement | 03-Functional-Requirements |
 | NFR-xxx-nn | Non-functional requirement | 04-Non-Functional-Requirements |
+| PP-nn | Power Pages portal requirement | Power Pages requirements pack (`OPP-41186` signed scope + build guide) |
 | OD-nnn | Open decision | 20-Open-Decisions, tracked in `decision-log.md` |
 | E-n | Delivery epic | 14-Development-Backlog |
 
@@ -38,6 +39,29 @@ Authoritative wording lives in the build package documents `01-Solution-Vision` 
 
 ## Non-functional requirements
 NFR-SEC-01, NFR-SEC-02, NFR-AUD-01, NFR-PERF-01, NFR-PERF-02, NFR-REL-01, NFR-REL-02, NFR-ALM-01, NFR-OPS-01, NFR-ACC-01 (WCAG 2.2 AA), NFR-DATA-01, NFR-OBS-01.
+
+## Power Pages portal requirements
+Approved 2026-08-29 by the signed scope `OPP-41186` item 13. The portal serves Tax checkers, AQS checkers, advisers and T&C Managers; the Code App serves managers and administrators (AD-044). Design: `docs/superpowers/specs/2026-08-29-power-pages-portal-design.md`.
+
+| ID | Summary | Traces to | Status |
+|---|---|---|---|
+| PP-01 | Entra ID authentication; anonymous access disabled; Contact provisioning; non-disclosing access-denied page | BR-012, NFR-SEC-01, NFR-SEC-02 | Confirmed |
+| PP-02 | Role-aware navigation enforced by page and table permissions, never UI hiding | BR-012, NFR-SEC-01 | Confirmed |
+| PP-03 | My Work dashboard: assigned, pending Tax, pending AQS, drafts, returned, open and overdue remediation | BR-003, FR-004 | Confirmed |
+| PP-04 | Case search and worklist with server-side filtering and pagination; no unbounded client retrieval | FR-004 to FR-006, NFR-PERF-01 | Confirmed |
+| PP-05 | Case detail in business sections; no administrative, integration, GUID or audit-payload fields exposed | FR-010 range | Confirmed |
+| PP-06 | Route display and transitions for Tax-only, AQS-only and Tax-then-AQS; return with reason | BR-004, FR-014, FR-015, FR-002, FR-003 | Confirmed |
+| PP-07 | Tax review: versioned questionnaire, draft save, mandatory enforcement, atomic submit, Tax grade held separately | FR-016, FR-010 to FR-013 | Confirmed |
+| PP-08 | AQS review: versioned questionnaire, conditional reasons, no cross-discipline overwrite | BR-005, FR-010 to FR-013 | Confirmed |
+| PP-09 | Questions administered outside the portal; published versions immutable; portal reads only the assigned version | BR-013, FR-030, FR-031 | Confirmed |
+| PP-10 | Four AQS outcomes; initial and final outcomes stored separately; Tax Pass/Fail separate from AQS scale | BR-005, BR-007 | Confirmed |
+| PP-11 | Submission lock across forms, Web API and manipulated URLs; reopen and correction require a reason and full before/after audit | BR-012, FR-017, NFR-AUD-01, AD-031 | Confirmed |
+| PP-12 | Remediation workspace: adviser response and T&C Manager attestation, both in the portal | BR-006, BR-008, FR-020 to FR-023, AD-045 | Confirmed |
+| PP-13 | Remediation SLA: clock start and stop, outstanding age, 10-working-day threshold on a business calendar | BR-010 | Blocked by OD-018 |
+| PP-14 | Evidence referenced from Intelligent Office; no portal upload or storage | AD-046 | Confirmed, reduced scope |
+| PP-15 | Nine notification events emitted to Power Automate via an outbox; email only | BR-009, FR-021, AD-035 | Confirmed |
+| PP-16 | User-friendly errors; technical detail and correlation ID logged separately, never surfaced | NFR-OBS-01 | Confirmed |
+| PP-17 | Reporting drill-down from outcome cards to filtered lists; full MI and export remain back-office | BR-010, FR-032 | Confirmed |
 
 ## Traceability matrix columns
 Every implemented story records: requirement ID, source document, actor, workflow step, priority, Given/When/Then acceptance criteria, data entities, screens/routes, commands, flows, security roles affected, tests, and release version.

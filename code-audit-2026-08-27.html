@@ -1,0 +1,946 @@
+<title>Outcome Testing Code Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+  :root {
+    --ground:      #F6F7F9;
+    --surface:     #FFFFFF;
+    --surface-alt: #EFF1F5;
+    --ink:         #151A21;
+    --ink-soft:    #4A5462;
+    --ink-faint:   #78828F;
+    --rule:        #DDE1E8;
+    --rule-strong: #C3C9D4;
+    --accent:      #33517E;
+    --accent-soft: #E7ECF5;
+    --crit:        #973029;
+    --crit-soft:   #F8EAE8;
+    --imp:         #8A5A15;
+    --imp-soft:    #F9F0E2;
+    --ok:          #2A6350;
+    --ok-soft:     #E6F0EC;
+    --shadow:      0 1px 2px rgba(21, 26, 33, .05), 0 8px 24px -16px rgba(21, 26, 33, .28);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #12161C;
+      --surface:     #191E26;
+      --surface-alt: #212832;
+      --ink:         #E6E9EE;
+      --ink-soft:    #A7B0BD;
+      --ink-faint:   #7C8695;
+      --rule:        #2B323D;
+      --rule-strong: #3C4553;
+      --accent:      #94AFDA;
+      --accent-soft: #1F2836;
+      --crit:        #E9938B;
+      --crit-soft:   #2E1E1D;
+      --imp:         #DDB273;
+      --imp-soft:    #2C2418;
+      --ok:          #86C4AC;
+      --ok-soft:     #17281F;
+      --shadow:      0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .7);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #12161C;
+    --surface:     #191E26;
+    --surface-alt: #212832;
+    --ink:         #E6E9EE;
+    --ink-soft:    #A7B0BD;
+    --ink-faint:   #7C8695;
+    --rule:        #2B323D;
+    --rule-strong: #3C4553;
+    --accent:      #94AFDA;
+    --accent-soft: #1F2836;
+    --crit:        #E9938B;
+    --crit-soft:   #2E1E1D;
+    --imp:         #DDB273;
+    --imp-soft:    #2C2418;
+    --ok:          #86C4AC;
+    --ok-soft:     #17281F;
+    --shadow:      0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 1.5rem 6rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 54rem; margin: 0 auto; }
+
+  code, .mono {
+    font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: .84em;
+    font-variant-ligatures: none;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    padding: 4.5rem 0 2rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .eyebrow {
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 1.25rem;
+  }
+
+  h1 {
+    font-family: "Newsreader", Georgia, serif;
+    font-size: clamp(2.5rem, 6vw, 3.9rem);
+    font-weight: 500;
+    line-height: 1.04;
+    letter-spacing: -.018em;
+    text-wrap: balance;
+    margin: 0 0 1.1rem;
+  }
+
+  .standfirst {
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 1.24rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 40rem;
+    margin: 0 0 2rem;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 2.25rem;
+    font-size: .82rem;
+    color: var(--ink-faint);
+    padding-bottom: .5rem;
+  }
+  .meta b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ---------- tally ---------- */
+
+  .tally {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin: 2.5rem 0 0;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .tally-cell {
+    background: var(--surface);
+    padding: 1.15rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+  }
+
+  .tally-n {
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 2.4rem;
+    font-weight: 500;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .tally-cell.is-crit .tally-n { color: var(--crit); }
+  .tally-cell.is-imp  .tally-n { color: var(--imp); }
+  .tally-cell.is-ok   .tally-n { color: var(--ok); }
+
+  .tally-l {
+    font-size: .74rem;
+    font-weight: 600;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* ---------- sections ---------- */
+
+  section { margin-top: 4rem; }
+
+  h2 {
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 1.95rem;
+    font-weight: 500;
+    letter-spacing: -.012em;
+    line-height: 1.2;
+    text-wrap: balance;
+    margin: 0 0 .5rem;
+    padding-bottom: .7rem;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+
+  .section-note {
+    color: var(--ink-soft);
+    font-size: .95rem;
+    margin: .9rem 0 2rem;
+    max-width: 42rem;
+  }
+
+  h3 {
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 1.2rem;
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  p { margin: 0 0 .9rem; }
+  p:last-child { margin-bottom: 0; }
+
+  /* ---------- evidence band ---------- */
+
+  .evidence {
+    display: grid;
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .ev-row {
+    background: var(--surface);
+    display: grid;
+    grid-template-columns: minmax(7rem, 12rem) 1fr;
+    gap: .35rem 1.5rem;
+    padding: .95rem 1.25rem;
+    align-items: baseline;
+  }
+
+  .ev-cmd {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: .8rem;
+    font-weight: 500;
+    color: var(--accent);
+  }
+  .ev-result { font-size: .92rem; color: var(--ink-soft); }
+  .ev-result b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 34rem) {
+    .ev-row { grid-template-columns: 1fr; }
+  }
+
+  /* ---------- findings ---------- */
+
+  .findings { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule-strong);
+    border-radius: 3px;
+    padding: 1.35rem 1.5rem;
+    box-shadow: var(--shadow);
+  }
+  .finding.is-crit { border-left-color: var(--crit); }
+  .finding.is-imp  { border-left-color: var(--imp); }
+
+  .f-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: .55rem .8rem;
+    margin-bottom: .85rem;
+  }
+
+  .f-id {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: .74rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    padding: .18rem .45rem;
+    border-radius: 2px;
+  }
+  .is-crit .f-id { background: var(--crit-soft); color: var(--crit); }
+  .is-imp  .f-id { background: var(--imp-soft);  color: var(--imp); }
+
+  .f-title { flex: 1 1 18rem; }
+
+  .chip {
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: .2rem .5rem;
+    border-radius: 2px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .chip-verified { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+  .chip-reported { background: var(--surface-alt); color: var(--ink-faint); border-color: var(--rule-strong); }
+
+  .f-body { font-size: .95rem; }
+  .f-body p { margin-bottom: .7rem; }
+
+  .f-loc {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: .78rem;
+    color: var(--ink-faint);
+    margin-bottom: .8rem;
+    word-break: break-word;
+  }
+
+  .f-break {
+    background: var(--surface-alt);
+    border-radius: 3px;
+    padding: .75rem .9rem;
+    font-size: .9rem;
+    color: var(--ink-soft);
+    margin-top: .9rem;
+  }
+  .f-break b {
+    display: block;
+    font-family: "Public Sans", sans-serif;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: .25rem;
+  }
+
+  pre {
+    background: var(--surface-alt);
+    border-radius: 3px;
+    padding: .8rem .9rem;
+    overflow-x: auto;
+    margin: .8rem 0;
+    font-size: .8rem;
+    line-height: 1.55;
+  }
+  pre code { font-size: 1em; }
+
+  /* ---------- systemic ---------- */
+
+  .systemic {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    padding: 1.5rem 1.6rem;
+  }
+  .systemic h3 { margin-bottom: .7rem; }
+  .systemic ul { margin: .8rem 0 0; padding-left: 1.15rem; }
+  .systemic li { margin-bottom: .4rem; font-size: .93rem; color: var(--ink-soft); }
+  .systemic li b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- cleared list ---------- */
+
+  .cleared {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .cl-item {
+    background: var(--surface);
+    padding: 1rem 1.15rem;
+  }
+  .cl-item h4 {
+    font-size: .87rem;
+    font-weight: 700;
+    margin: 0 0 .3rem;
+    color: var(--ok);
+  }
+  .cl-item p { font-size: .87rem; color: var(--ink-soft); margin: 0; }
+
+  /* ---------- caveat ---------- */
+
+  .caveat {
+    border: 1px dashed var(--rule-strong);
+    border-radius: 3px;
+    padding: 1.35rem 1.5rem;
+    background: var(--surface);
+  }
+  .caveat h3 { margin-bottom: .6rem; }
+  .caveat p { font-size: .93rem; color: var(--ink-soft); }
+
+  ul.plain { margin: .8rem 0 0; padding-left: 1.15rem; }
+  ul.plain li { margin-bottom: .45rem; font-size: .93rem; color: var(--ink-soft); }
+  ul.plain li b { color: var(--ink); font-weight: 600; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  footer {
+    margin-top: 4.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    font-size: .82rem;
+    color: var(--ink-faint);
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Ascot Lloyd · Outcome Testing · Code audit</p>
+    <h1>Guards written, never wired</h1>
+    <p class="standfirst">A review of the Outcome Testing solution found eight critical defects. The recurring shape is not missing logic — it is correct logic that nothing calls, and permission gates that open when their data is absent.</p>
+    <div class="meta">
+      <span><b>Branch</b> main @ be52b4a</span>
+      <span><b>Reviewed</b> app/ · plugins/ · src/ · data/</span>
+      <span><b>Method</b> 4 scoped reviewers, findings verified against source</span>
+    </div>
+  </header>
+
+  <div class="tally">
+    <div class="tally-cell is-crit"><span class="tally-n">8</span><span class="tally-l">Critical</span></div>
+    <div class="tally-cell is-imp"><span class="tally-n">16</span><span class="tally-l">Important</span></div>
+    <div class="tally-cell is-ok"><span class="tally-n">12</span><span class="tally-l">Verified correct</span></div>
+    <div class="tally-cell"><span class="tally-n">0</span><span class="tally-l">Build errors, both stacks</span></div>
+  </div>
+
+  <section>
+    <h2>What the toolchain says</h2>
+    <p class="section-note">The build is clean. Every defect below is a logic or design fault that compiles and passes its tests — which is precisely why they need reading rather than running.</p>
+    <div class="evidence">
+      <div class="ev-row">
+        <span class="ev-cmd">tsc -b</span>
+        <span class="ev-result"><b>Clean.</b> No type errors across 99 TypeScript files.</span>
+      </div>
+      <div class="ev-row">
+        <span class="ev-cmd">vitest run</span>
+        <span class="ev-result"><b>12 / 12 passing</b> — but the only test file is <code>permissions.test.ts</code>. The business-rule module and every plugin are untested.</span>
+      </div>
+      <div class="ev-row">
+        <span class="ev-cmd">eslint .</span>
+        <span class="ev-result"><b>0 errors, 9 warnings</b> — all one <code>useMemo</code> perf pattern. Not correctness.</span>
+      </div>
+      <div class="ev-row">
+        <span class="ev-cmd">dotnet build</span>
+        <span class="ev-result"><b>Both projects succeed — 0 warnings, 0 errors</b> (SDK 10.0.400, Release). Every C# defect below is in code that compiles cleanly.</span>
+      </div>
+      <div class="ev-row">
+        <span class="ev-cmd">assembly diff</span>
+        <span class="ev-result">Fresh build <b>49,152 bytes / 13 plugin types</b>. Shipped solution assembly <b>47,104 bytes / 11 types</b>. The solution ships a stale build.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Two root causes behind most of it</h2>
+    <p class="section-note">Fixing these two patterns closes roughly two thirds of the findings. Treating them as separate tickets means fixing the same bug a dozen times.</p>
+
+    <div class="findings">
+      <div class="systemic">
+        <h3>1. Nothing paginates — in either tier</h3>
+        <p><code>PageInfo</code>, <code>PagingCookie</code> and <code>MoreRecords</code> appear <b>nowhere</b> in the plugin assembly, and every client read is a bare <code>top:</code> cap. Dataverse returns 5,000 rows and stops.</p>
+        <ul>
+          <li><b>The regulatory export truncates silently.</b> <code>GenerateExportPlugin</code> writes 5,000 rows, then stamps <code>al_rowcount</code> with the truncated figure — so reconciliation cannot detect the loss.</li>
+          <li><b>The case worklist caps at 200, oldest-first.</b> Past 200 cases, new work stops appearing in the primary queue entirely.</li>
+          <li><b>Dashboard, MI reports and permission rules</b> all aggregate over one unpaged page with no truncation indicator.</li>
+        </ul>
+      </div>
+
+      <div class="systemic">
+        <h3>2. Permission gates fail open when their table is empty</h3>
+        <p>Both the client and the server treat "no role data" as "allow everything". Each is deliberate and commented as a bootstrap path — but neither is limited to bootstrap. A deactivated mapping table or a failed read re-opens the gate at any time in the system's life.</p>
+        <ul>
+          <li><b>Server:</b> zero <em>active</em> role mappings means every guarded command accepts every caller.</li>
+          <li><b>Client:</b> an empty or unreadable mapping table grants all six roles to everyone.</li>
+          <li><b>The guard that would fix the client half already exists</b> — a <code>ready</code> flag, computed and never read.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Critical</h2>
+    <p class="section-note">All eight verified against source. These block a production promotion.</p>
+
+    <div class="findings">
+
+      <article class="finding is-crit">
+        <div class="f-head">
+          <span class="f-id">C1</span>
+          <h3 class="f-title">The solution ships a stale assembly, so two commands call code that isn't deployed</h3>
+          <span class="chip chip-verified">Verified by build</span>
+        </div>
+        <p class="f-loc">app/src/services/commands/users.ts:61, :84 — src/customapis/ — src/PluginAssemblies/</p>
+        <div class="f-body">
+          <p>The admin screen calls <code>al_UpdateUser</code> and <code>al_SetUserActive</code>. Building the plugin project settles the root cause: the source compiles fine and produces <b>13</b> plugin types, but the assembly committed into the solution has only <b>11</b>.</p>
+          <pre><code>                          FRESH BUILD   SHIPPED SOLUTION
+bytes                          49,152             47,104
+SetUserActivePlugin                 1                  0
+UpdateUserPlugin                    1                  0
+(the other 11 types)                1                  1</code></pre>
+          <p>Someone added the two plugins and never re-packed the solution. The matching Custom API definitions were never created either — <code>src/customapis/</code> holds 11 folders, and the registration tool names neither message.</p>
+          <div class="f-break">
+            <b>What breaks</b>
+            Renaming a user and deactivating a leaver — the sanctioned OD-010 retention path — both fail at runtime behind a generic "service unavailable" message. Revoking a departed reviewer's access is impossible through the app.
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-crit">
+        <div class="f-head">
+          <span class="f-id">C2</span>
+          <h3 class="f-title">Server permission gate allows everyone when no active role mapping exists</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">plugins/OutcomeTesting.Plugins/PermissionHelpers.cs:39-51</p>
+        <div class="f-body">
+          <p><code>EnsureAppPermission</code> returns — meaning <em>allowed</em> — whenever <code>al_userrolemapping</code> holds zero rows with <code>statecode = 0</code>. This is the only application-level authorisation on every guarded command.</p>
+          <p>The inline comment argues that Dataverse create privilege on the mapping table still gates who reaches here. That holds for role assignment, but not for the commands that write to <em>other</em> tables — case edits, exports, question retirement.</p>
+          <div class="f-break">
+            <b>What breaks</b>
+            An administrator deactivates the last role mapping, or a migration lands mappings as inactive. Every RBAC-gated command now accepts any authenticated caller — including <code>al_AssignUserRole</code>, so a user can grant themselves Administrator.
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-crit">
+        <div class="f-head">
+          <span class="f-id">C3</span>
+          <h3 class="f-title">The plugin signing private key is committed to the repository</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">plugins/OutcomeTesting.Plugins/OutcomeTesting.Plugins.snk (1,172 bytes, git-tracked)</p>
+        <div class="f-body">
+          <p>The file header confirms a full private key blob, not a public-key-only file:</p>
+          <pre><code>07 02 00 00 00 24 00 00 52 53 41 32
+^^ PRIVATEKEYBLOB              "RSA2" = private</code></pre>
+          <p>Building with the committed key closes the loop — it reproduces exactly the identity the registration tool hardcodes:</p>
+          <pre><code>built from the committed .snk → PublicKeyToken=86b764d5a2430b1f
+Program.cs:133, :359          → "86b764d5a2430b1f"   ← match</code></pre>
+          <p>So anyone with repository read access can build an assembly Dataverse accepts as an in-place update of the registered one, at the same version and public key token.</p>
+          <div class="f-break">
+            <b>Judgement</b>
+            Strong-naming is not a .NET trust boundary, and exploiting this still requires Dataverse deployment privileges on the org — so this is a defence-in-depth failure, not an open door. But the plugins are the <em>only</em> enforcement point for regrade, sign-off and role assignment, and they run with system privileges. Rotate the key, remove it from history, and inject it at build time.
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-crit">
+        <div class="f-head">
+          <span class="f-id">C4</span>
+          <h3 class="f-title">The Trail Light export silently truncates at 5,000 cases</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">plugins/OutcomeTesting.Plugins/GenerateExportPlugin.cs:77</p>
+        <div class="f-body">
+          <p>The Closed-case query is a single <code>RetrieveMultiple</code> with no paging loop, so Dataverse returns at most 5,000 rows. The batch is then stamped <code>al_batchstatus = Generated</code> and <code>al_rowcount = &lt;truncated count&gt;</code>.</p>
+          <div class="f-break">
+            <b>What breaks</b>
+            With 7,400 closed cases, 5,000 export and the batch reports 5,000 as its complete row count. The regulatory file is 2,400 cases short and the record of it claims to be whole — reconciliation cannot detect the gap. Re-running reproduces the same truncation.
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-crit">
+        <div class="f-head">
+          <span class="f-id">C5</span>
+          <h3 class="f-title">CompleteRemediation runs as the system user with a bypassable owner check</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">plugins/OutcomeTesting.Plugins/CompleteRemediationPlugin.cs:56, :154</p>
+        <div class="f-body">
+          <p>Every read and write uses <code>PluginUserService</code> (system), there is no <code>EnsureAppPermission</code> call, and the sole authorisation short-circuits when the owner is not a <code>systemuser</code>:</p>
+          <pre><code>if (owner != null &amp;&amp; owner.LogicalName == "systemuser"
+    &amp;&amp; owner.Id != context.InitiatingUserId)</code></pre>
+          <p><code>al_RemediationAction</code> is user-owned, so <code>ownerid</code> can legitimately hold a team reference.</p>
+          <div class="f-break">
+            <b>What breaks</b>
+            For any team-owned remediation action, the check passes for everyone. Any authenticated caller can drive it to Completed, executing as the system user so their own lack of write privilege never applies. The action becomes eligible for sign-off with no adviser having done the work.
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-crit">
+        <div class="f-head">
+          <span class="f-id">C6</span>
+          <h3 class="f-title">Custom roles are inert server-side — the UI and the server disagree</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">PermissionHelpers.cs:103, :112, :136 vs AssignUserRolePlugin.cs:76</p>
+        <div class="f-body">
+          <p>The assign and permission paths write custom roles to <code>al_rolecode</code>, leaving <code>al_approle</code> null. The resolver reads <em>only</em> <code>al_approle</code> and filters page permissions on it alone. Four of the ten seeded roles have no <code>al_approle</code> value at all.</p>
+          <div class="f-break">
+            <b>What breaks</b>
+            An admin grants "Senior Checker" Edit on cases. The client resolves it from <code>al_rolecode</code> and enables the edit buttons. The user clicks Save and the server replies <em>"You have no application role assigned"</em> — immediately after one was assigned.
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-crit">
+        <div class="f-head">
+          <span class="f-id">C7</span>
+          <h3 class="f-title">The documented deploy script cannot succeed</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">plugins/deploy/Register-CompleteRemediation.ps1:63, :66, :102</p>
+        <div class="f-body">
+          <p><code>Get-OrCreate</code> derives the primary-id column from the entity <em>set</em> name rather than the logical name, producing properties that do not exist — <code>customapisid</code> instead of <code>customapiid</code>.</p>
+          <pre><code>Get-OrCreate -Set 'customapis' …
+  → $select=customapisid
+  → HTTP 400  "Could not find a property named 'customapisid'"</code></pre>
+          <p>With <code>$ErrorActionPreference = 'Stop'</code>, the script aborts before creating the Custom API.</p>
+          <div class="f-break">
+            <b>What breaks</b>
+            The documented deployment path fails on every run, on a fresh org or an existing one. Step 1 also points at an <code>spkl.json</code> that exists nowhere in the repo, and discards the resulting error with <code>2&gt;$null</code>.
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-crit">
+        <div class="f-head">
+          <span class="f-id">C8</span>
+          <h3 class="f-title">A seed data package ships a single-plugin assembly that would overwrite the live one</h3>
+          <span class="chip chip-verified">Verified by decode</span>
+        </div>
+        <p class="f-loc">data/plugin-register/data.xml:11</p>
+        <div class="f-body">
+          <p>Decoding the base64 <code>content</code> blob confirms it:</p>
+          <pre><code>decoded bytes: 15,360
+plugin types : CompleteRemediationPlugin, ExecuteDataversePlugin, IPlugin</code></pre>
+          <p>One command plugin, against 11 in the shipped solution assembly and 13 in a fresh build. Because the package upserts <code>pluginassembly</code> matched on name — at an unchanged version and public key token — Dataverse accepts it as an in-place replacement.</p>
+          <div class="f-break">
+            <b>What breaks</b>
+            Running <code>pac data import</code> on this package after registration leaves 10 of 11 commands pointing at plugin types absent from the assembly — every regrade, sign-off, role assignment and case edit failing at runtime, with no schema change to explain it. The blob also embeds a developer's absolute path.
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Important</h2>
+    <p class="section-note">Real defects that do not block a promotion on their own. Grouped by theme; the chip marks what I re-verified against source myself versus what I am passing on from a reviewer.</p>
+
+    <div class="findings">
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I1</span>
+          <h3 class="f-title">Unvalidated route parameter interpolated into OData filters</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">app/src/features/cases/useCaseReviews.ts:71 · useCaseOutcome.ts:73</p>
+        <div class="f-body">
+          <pre><code>filter: `_al_outcomecaseid_value eq ${caseId}`  // caseId from useParams, raw</code></pre>
+          <p>A crafted URL segment such as <code>&lt;guid&gt; or al_name ne null</code> breaks out of the filter and returns rows across other cases; a malformed id produces a 400 and an "unavailable" screen. Dataverse row-level security still bounds what comes back, which is why this is Important rather than Critical.</p>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I2</span>
+          <h3 class="f-title">The client-side business-rule module is dead code</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">app/src/types/domain.ts</p>
+        <div class="f-body">
+          <p>Nine of fourteen exports have zero callers anywhere in <code>app/src</code>:</p>
+          <pre><code>requiresRemediation          PRIVILEGED_OUTCOME_ACTIONS
+canCorrectOutcome            OUTCOME_CORRECTION_ROLE
+isValidCorrectionReason      OUTCOME_CORRECTION_ESCALATION_ROLES
+guardRegradeCase             SIGNOFF_DECISIONS
+guardSignOffRemediation      REVIEW_TYPES</code></pre>
+          <p>These encode core rules — non-pass creates remediation (BR-007), privileged correction with a mandatory reason (AD-031), the Approved/Rejected vocabulary. Written, covered by no test, wired to nothing. The status control meanwhile offers all 13 lifecycle values plus a blank option on a mandatory field.</p>
+          <div class="f-break">
+            <b>Worth noting</b>
+            The edit itself is <em>correctly</em> routed through the server-enforced <code>al_UpdateCaseDetails</code> command — this is not a bypass. The defect is that no transition validation exists on either side (see I8).
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I3</span>
+          <h3 class="f-title">Import batch completion is written without checking the result</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">app/src/features/imports/useCaseUpload.ts:216-220</p>
+        <div class="f-body">
+          <p>The closing <code>update</code> that marks the batch Completed and persists its counts is awaited but its <code>.success</code> is never inspected — unlike every other write in the same file.</p>
+          <div class="f-break">
+            <b>What breaks</b>
+            On failure the user sees a success summary while the batch stays at <em>Validating</em> with stale counts, contradicting the "imports are logged and recoverable" invariant.
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I4</span>
+          <h3 class="f-title">Deactivating a user does not revoke their access</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">SetUserActivePlugin.cs:64-68 vs PermissionHelpers.cs:99-107</p>
+        <div class="f-body">
+          <p>Deactivation flips only <code>al_user.al_isactive</code>. The resolver looks up <code>al_userrolemapping</code> by work email and never consults <code>al_isactive</code>, so the mappings stay active.</p>
+          <div class="f-break">
+            <b>What breaks</b>
+            A leaver deactivated through the sanctioned path keeps every application permission for as long as their Dataverse account exists — including a T&amp;C Manager's ability to overwrite a final outcome. (Compounded by C1: the deactivate command does not even reach the server.)
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I5</span>
+          <h3 class="f-title">Two privileged admin controls skip the gate their siblings use</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">app/src/features/admin/SecurityConfigPage.tsx:188, :210</p>
+        <div class="f-body">
+          <p><code>canManage</code> wraps the buttons at lines 230 and 256, but "Assign a role" and "Set a permission" — which open equivalent privileged-write modals — render unconditionally. Cosmetic given server enforcement, but inconsistent within one page.</p>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I6</span>
+          <h3 class="f-title">A Review Instance can exist with no owning case</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">src/Entities/al_ReviewInstance/Entity.xml:99</p>
+        <div class="f-body">
+          <p><code>al_outcomecaseid</code> is <code>RequiredLevel=none</code>, while the same lookup on Outcome, RemediationAction, CaseAssignment, Signoff and ExportRecord is <code>required</code>. The domain notes record this link as "not built yet" from when Outcome Case did not exist; it was added without tightening the level.</p>
+          <div class="f-break">
+            <b>What breaks</b>
+            A review and its whole answer set can be orphaned from any case — invisible to the worklist, to the Tax-then-AQS sequencing check that reads sibling instances, and to the export.
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I7</span>
+          <h3 class="f-title">The verification harness mutates live records and leaves immutable audit events</h3>
+          <span class="chip chip-reported">Reported</span>
+        </div>
+        <p class="f-loc">plugins/OutcomeTesting.Registration/Program.cs:205-224, :438-447, :520-599</p>
+        <div class="f-body">
+          <p>All three verify modes select the <em>first</em> record in <code>al_outcomecase</code> with no filter and no environment guard, then create and mutate real business records against it. The <code>finally</code> deletes the seeded outcome and review instance — but the audit events the commands wrote are immutable and stay attached.</p>
+          <div class="f-break">
+            <b>What breaks</b>
+            Running <code>verifyregrade</code> against production leaves permanent audit events on a real client case recording a regrade from Insufficient evidence to Pass that never happened. The audit trail AD-031 exists to protect is falsified, and MI cannot distinguish it. The CompleteRemediation path has no <code>finally</code> at all, so a failure strands a fake open remediation action that blocks sign-off.
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I8</span>
+          <h3 class="f-title">No lifecycle transition guard exists on either tier</h3>
+          <span class="chip chip-reported">Reported</span>
+        </div>
+        <p class="f-loc">plugins/OutcomeTesting.Plugins/UpdateCaseDetailsPlugin.cs:92, :283</p>
+        <div class="f-body">
+          <p><code>al_casestatus</code> is written straight from caller input with no source-to-target validation, and the review route is freely settable mid-review.</p>
+          <div class="f-break">
+            <b>What breaks</b>
+            A case can jump from Imported directly to Closed, skipping validation, allocation, review and remediation — then be picked up by the export (which filters on Closed) and delivered with no review instance and a blank grade.
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I9</span>
+          <h3 class="f-title">Sign-off is unlimited and reversible</h3>
+          <span class="chip chip-reported">Reported</span>
+        </div>
+        <p class="f-loc">plugins/OutcomeTesting.Plugins/SignOffRemediationPlugin.cs:88</p>
+        <div class="f-body">
+          <p>The only precondition is that the action is Completed, and an Approved sign-off leaves it Completed — so nothing stops a second sign-off. A later Rejected one reopens an already-approved action, leaving two contradictory sign-offs with nothing marking which is authoritative.</p>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I10</span>
+          <h3 class="f-title">Nine of the twenty contracted export columns are never populated</h3>
+          <span class="chip chip-reported">Reported</span>
+        </div>
+        <p class="f-loc">plugins/OutcomeTesting.Plugins/GenerateExportPlugin.cs:83-101</p>
+        <div class="f-body">
+          <p>Only 11 of the AD-039 columns are written. <code>al_filequalitygrade</code> and all eight fail-accountability name/code pairs are declared on <code>al_ExportRecord</code> but never set — so every delivered row breaches the fixed column contract and no failure can be attributed.</p>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I11</span>
+          <h3 class="f-title">The idempotency key is not scoped to a command or a target record</h3>
+          <span class="chip chip-reported">Reported</span>
+        </div>
+        <p class="f-loc">plugins/OutcomeTesting.Plugins/CommandHelpers.cs:73</p>
+        <div class="f-body">
+          <p><code>FindAuditByKey</code> matches on <code>al_idempotencykey</code> alone across the whole audit table, and the key column carries a unique alternate key — so the key space is global. Callers then build a success response from the <em>requested</em> target rather than the audit's recorded one.</p>
+          <div class="f-break">
+            <b>What breaks</b>
+            Replaying a key already used by a different command returns a fully successful-looking response for an operation that never ran. The keys are caller-supplied on unbound, non-private APIs.
+          </div>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I12</span>
+          <h3 class="f-title">Creating a user resurrects a deactivated leaver</h3>
+          <span class="chip chip-reported">Reported</span>
+        </div>
+        <p class="f-loc">plugins/OutcomeTesting.Plugins/CreateUserPlugin.cs:65-70</p>
+        <div class="f-body">
+          <p><code>CreateUser</code> upserts on work email with a payload that always sets <code>al_isactive = true</code> and <code>statecode = 0</code>. Re-adding someone with a leaver's email reactivates the old record under a new display name, restoring their still-active role mappings — audited only as "Created".</p>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I13</span>
+          <h3 class="f-title">Regrade does not require an initial outcome to exist</h3>
+          <span class="chip chip-reported">Reported</span>
+        </div>
+        <p class="f-loc">plugins/OutcomeTesting.Plugins/RegradeCasePlugin.cs:71</p>
+        <div class="f-body">
+          <p>The outcome is retrieved and the result discarded — nothing checks it was ever graded. A final outcome can be written with no initial to compare against, breaking BR-007 from the other side and producing an audit event claiming an override that never happened.</p>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I14</span>
+          <h3 class="f-title">Export is re-runnable over a delivered batch</h3>
+          <span class="chip chip-reported">Reported</span>
+        </div>
+        <p class="f-loc">plugins/OutcomeTesting.Plugins/GenerateExportPlugin.cs:109</p>
+        <div class="f-body">
+          <p>No guard on <code>al_batchstatus</code>, and records are upserted in place. Re-running after a delivery rewrites the delivered rows with current values, restamps <code>al_generatedon</code> and reverts Delivered to Generated — destroying the record of what was actually sent.</p>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I15</span>
+          <h3 class="f-title">Build output is committed to source control</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">plugins/OutcomeTesting.Registration/bin/** and obj/** — 181 tracked files</p>
+        <div class="f-body">
+          <p>The root <code>.gitignore</code> uses <code>/bin</code> and <code>/obj</code>, which are anchored to the repository root and never match the nested project. Third-party DLLs and the compiled executable are tracked.</p>
+          <pre><code>-/bin      →  bin/
+-/obj      →  obj/</code></pre>
+          <p>Then <code>git rm -r --cached</code> the tracked artifacts.</p>
+        </div>
+      </article>
+
+      <article class="finding is-imp">
+        <div class="f-head">
+          <span class="f-id">I16</span>
+          <h3 class="f-title">Client permission resolution has an unused readiness guard</h3>
+          <span class="chip chip-verified">Verified</span>
+        </div>
+        <p class="f-loc">app/src/app/permissions/permissionContext.ts:6 · PermissionProvider.tsx:44, :81, :93</p>
+        <div class="f-body">
+          <p><code>ready</code> is declared and computed but consumed nowhere. While unresolved — and whenever the mapping read fails — the provider hands out the union of all six roles, so route gates pass.</p>
+          <div class="f-break">
+            <b>Judgement</b>
+            The fail-open is deliberate and documented, and AD-041 makes UI gating explicitly advisory. The genuine issues are that the exposure is not limited to bootstrap, and that the guard designed to close the window was never wired up.
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Checked and found correct</h2>
+    <p class="section-note">Worth recording — these were audited against the domain rules and hold up. Several are the kind of thing that is usually wrong.</p>
+    <div class="cleared">
+      <div class="cl-item">
+        <h4>Checklist cascade behaviour</h4>
+        <p>All configuration relationships are <code>Restrict</code> at every level, as AD-016/AD-017 require.</p>
+      </div>
+      <div class="cl-item">
+        <h4>Fail Reason cardinality</h4>
+        <p>A true many-to-many with Response, not a lookup — matching AD-025 and FR-013.</p>
+      </div>
+      <div class="cl-item">
+        <h4>Initial vs final outcome</h4>
+        <p>Both columns exist alongside the regrade reason and timestamps. BR-007 is representable.</p>
+      </div>
+      <div class="cl-item">
+        <h4>Alternate keys</h4>
+        <p>All 23 entities declare one, and every underlying column is required — idempotent upsert is not undermined.</p>
+      </div>
+      <div class="cl-item">
+        <h4>Ownership model</h4>
+        <p>Configuration tables organisation-owned, operational tables user-owned, per AD-024.</p>
+      </div>
+      <div class="cl-item">
+        <h4>Auditing</h4>
+        <p>Enabled on all 23 tables, including every sensitive and lifecycle table named in the rules.</p>
+      </div>
+      <div class="cl-item">
+        <h4>V8 seed data</h4>
+        <p>Counted, not assumed: 1 / 1 / 11 / 42 / 42 / 20 — exactly AD-027. Response types, mandatory flags and fail-reason categories all match the transcript.</p>
+      </div>
+      <div class="cl-item">
+        <h4>Seed data hygiene</h4>
+        <p>Ten fictional users on <code>@example.com</code>. No personal data, no tenant or environment GUIDs.</p>
+      </div>
+      <div class="cl-item">
+        <h4>Custom API contracts</h4>
+        <p>All 11 match their JSON contracts on binding, privacy and parameter optionality. Mandatory reasons are mandatory.</p>
+      </div>
+      <div class="cl-item">
+        <h4>Access-level comparison</h4>
+        <p><code>accessMeets</code> uses a correct ordered rank comparison; multi-role resolution takes the highest level per resource.</p>
+      </div>
+      <div class="cl-item">
+        <h4>Case edit path</h4>
+        <p>Routed through the server-enforced <code>al_UpdateCaseDetails</code> command with concurrency and audit — not a client record write.</p>
+      </div>
+      <div class="cl-item">
+        <h4>Hardcoded environment IDs</h4>
+        <p>The <code>appId</code> and <code>environmentId</code> in <code>power.config.json</code> are a documented, correctly scoped AD-007 exception — not a violation.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Limits of this review</h2>
+    <div class="caveat">
+      <h3>What is proven, and what is not</h3>
+      <ul class="plain">
+        <li><b>All eight Criticals are verified.</b> Three now carry build-level proof rather than source reading: the stale shipped assembly (C1), the key-to-token match (C3), and the decoded seed blob (C8).</li>
+        <li><b>The C# compiles, but was never executed.</b> Both projects build with 0 errors, so every plugin defect is in working, shipping code — but no plugin was run against a Dataverse org. The logic findings (C2, C5, C6 and the plugin Importants) are static analysis against quoted source: high confidence, no runtime trace.</li>
+        <li><b>Chips mark provenance on the Important findings</b> — which I re-verified against source myself, and which I am relaying from a reviewer after confirming it was internally consistent and quoted real code.</li>
+        <li><b>Runtime privilege behaviour is out of reach from source.</b> Several findings are bounded in practice by Dataverse table privileges and row-level security, which cannot be read from this repository. Where that changes severity, I have said so in the finding.</li>
+        <li><b>Building created untracked output</b> under <code>plugins/*/bin</code> and <code>obj</code> — which the root <code>.gitignore</code> does not match, per I15. Worth clearing before committing.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    Reviewed against the domain rules in <code>knowledge/project-context.md</code> and the decision log. Findings cite <code>file:line</code> at branch <code>main @ be52b4a</code>.
+  </footer>
+
+</div>

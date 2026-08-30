@@ -1,0 +1,176 @@
+{% extends 'OT Layout' %}
+{% block content %}
+{% comment %}
+  Case worklist and search (PP-04).
+
+  Filtering and paging both happen server-side in FetchXML. Nothing is
+  filtered in the browser and no unbounded set is retrieved (NFR-PERF-01).
+  Filter values are escaped before they reach the query.
+
+  Option-set values come from src/Entities/al_OutcomeCase/Entity.xml:
+  al_casestatus 120910580-120910592, al_priority 120910780-120910783,
+  al_casetype 120910510-120910513. These are schema values, not display
+  strings, so referencing them directly is safe.
+
+  Filtering to your own assigned work still needs al_assignedcontactid,
+  which arrives with the Phase 2 schema delta (AD-047).
+{% endcomment %}
+
+{% assign f_ref      = request.params['ref']      | default: '' %}
+{% assign f_client   = request.params['client']   | default: '' %}
+{% assign f_adviser  = request.params['adviser']  | default: '' %}
+{% assign f_status   = request.params['status']   | default: '' %}
+{% assign f_priority = request.params['priority'] | default: '' %}
+{% assign f_type     = request.params['type']     | default: '' %}
+{% assign f_from     = request.params['from']     | default: '' %}
+{% assign f_to       = request.params['to']       | default: '' %}
+
+{% assign has_filter = false %}
+{% if f_ref != '' or f_client != '' or f_adviser != '' or f_status != '' or f_priority != '' or f_type != '' or f_from != '' or f_to != '' %}{% assign has_filter = true %}{% endif %}
+
+{% assign page_size = 25 %}
+{% assign page_number = request.params['page'] | default: 1 | times: 1 %}
+{% if page_number < 1 %}{% assign page_number = 1 %}{% endif %}
+
+{% capture qs %}ref={{ f_ref | url_escape }}&client={{ f_client | url_escape }}&adviser={{ f_adviser | url_escape }}&status={{ f_status | url_escape }}&priority={{ f_priority | url_escape }}&type={{ f_type | url_escape }}&from={{ f_from | url_escape }}&to={{ f_to | url_escape }}{% endcapture %}
+
+<form class="ot-filters" method="get" action="/cases" role="search" aria-label="Filter cases">
+  <div class="ot-filters__grid">
+    <div class="ot-field">
+      <label for="f-ref">Case reference</label>
+      <input type="search" id="f-ref" name="ref" value="{{ f_ref | escape }}" placeholder="Contains">
+    </div>
+    <div class="ot-field">
+      <label for="f-client">Client</label>
+      <input type="search" id="f-client" name="client" value="{{ f_client | escape }}" placeholder="Contains">
+    </div>
+    <div class="ot-field">
+      <label for="f-adviser">Adviser</label>
+      <input type="search" id="f-adviser" name="adviser" value="{{ f_adviser | escape }}" placeholder="Contains">
+    </div>
+    <div class="ot-field">
+      <label for="f-status">Status</label>
+      <select id="f-status" name="status">
+        <option value="">Any status</option>
+        <option value="120910580" {% if f_status == '120910580' %}selected{% endif %}>Imported</option>
+        <option value="120910581" {% if f_status == '120910581' %}selected{% endif %}>Validation Failed</option>
+        <option value="120910582" {% if f_status == '120910582' %}selected{% endif %}>Ready for Allocation</option>
+        <option value="120910583" {% if f_status == '120910583' %}selected{% endif %}>Queued</option>
+        <option value="120910584" {% if f_status == '120910584' %}selected{% endif %}>Assigned</option>
+        <option value="120910585" {% if f_status == '120910585' %}selected{% endif %}>Review In Progress</option>
+        <option value="120910586" {% if f_status == '120910586' %}selected{% endif %}>Submitted</option>
+        <option value="120910587" {% if f_status == '120910587' %}selected{% endif %}>Awaiting Remediation</option>
+        <option value="120910588" {% if f_status == '120910588' %}selected{% endif %}>Remediation In Progress</option>
+        <option value="120910589" {% if f_status == '120910589' %}selected{% endif %}>Awaiting Sign-off</option>
+        <option value="120910590" {% if f_status == '120910590' %}selected{% endif %}>Awaiting Recheck</option>
+        <option value="120910591" {% if f_status == '120910591' %}selected{% endif %}>Closed</option>
+        <option value="120910592" {% if f_status == '120910592' %}selected{% endif %}>No Check Required</option>
+      </select>
+    </div>
+    <div class="ot-field">
+      <label for="f-priority">Priority</label>
+      <select id="f-priority" name="priority">
+        <option value="">Any priority</option>
+        <option value="120910780" {% if f_priority == '120910780' %}selected{% endif %}>Low</option>
+        <option value="120910781" {% if f_priority == '120910781' %}selected{% endif %}>Normal</option>
+        <option value="120910782" {% if f_priority == '120910782' %}selected{% endif %}>High</option>
+        <option value="120910783" {% if f_priority == '120910783' %}selected{% endif %}>Urgent</option>
+      </select>
+    </div>
+    <div class="ot-field">
+      <label for="f-type">Case type</label>
+      <select id="f-type" name="type">
+        <option value="">Any type</option>
+        <option value="120910510" {% if f_type == '120910510' %}selected{% endif %}>New advice</option>
+        <option value="120910511" {% if f_type == '120910511' %}selected{% endif %}>Ongoing</option>
+        <option value="120910512" {% if f_type == '120910512' %}selected{% endif %}>Review</option>
+        <option value="120910513" {% if f_type == '120910513' %}selected{% endif %}>Switch/Transfer</option>
+      </select>
+    </div>
+    <div class="ot-field">
+      <label for="f-from">Advice date from</label>
+      <input type="date" id="f-from" name="from" value="{{ f_from | escape }}">
+    </div>
+    <div class="ot-field">
+      <label for="f-to">Advice date to</label>
+      <input type="date" id="f-to" name="to" value="{{ f_to | escape }}">
+    </div>
+  </div>
+  <div class="ot-filters__actions">
+    <button type="submit" class="ot-btn ot-btn--primary">Apply filters</button>
+    {% if has_filter %}<a class="ot-btn" href="/cases">Clear filters</a>{% endif %}
+  </div>
+</form>
+
+{% fetchxml cases %}
+<fetch count="{{ page_size }}" page="{{ page_number }}" returntotalrecordcount="true">
+  <entity name="al_outcomecase">
+    <attribute name="al_outcomecaseid" />
+    <attribute name="al_casereference" />
+    <attribute name="al_clientname" />
+    <attribute name="al_advisername" />
+    <attribute name="al_casetype" />
+    <attribute name="al_casestatus" />
+    <attribute name="al_priority" />
+    <attribute name="al_advicedate" />
+    <attribute name="al_duedate" />
+    {% if has_filter %}<filter type="and">{% if f_ref != '' %}<condition attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" />{% endif %}{% if f_client != '' %}<condition attribute="al_clientname" operator="like" value="%{{ f_client | xml_escape }}%" />{% endif %}{% if f_adviser != '' %}<condition attribute="al_advisername" operator="like" value="%{{ f_adviser | xml_escape }}%" />{% endif %}{% if f_status != '' %}<condition attribute="al_casestatus" operator="eq" value="{{ f_status | xml_escape }}" />{% endif %}{% if f_priority != '' %}<condition attribute="al_priority" operator="eq" value="{{ f_priority | xml_escape }}" />{% endif %}{% if f_type != '' %}<condition attribute="al_casetype" operator="eq" value="{{ f_type | xml_escape }}" />{% endif %}{% if f_from != '' %}<condition attribute="al_advicedate" operator="on-or-after" value="{{ f_from | xml_escape }}" />{% endif %}{% if f_to != '' %}<condition attribute="al_advicedate" operator="on-or-before" value="{{ f_to | xml_escape }}" />{% endif %}</filter>{% endif %}
+    <order attribute="al_casereference" descending="false" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign rows = cases.results.entities %}
+{% assign total = cases.results.total_record_count %}
+
+<section class="ot-card" aria-labelledby="ot-cases-heading">
+  <h2 class="ot-card__title" id="ot-cases-heading">
+    {% if has_filter %}Filtered cases{% else %}All cases{% endif %}
+    <span class="ot-count">{{ total }}</span>
+  </h2>
+
+  {% if rows.size > 0 %}
+    <div class="ot-table-wrap">
+      <table class="ot-table">
+        <caption>Showing {{ rows.size }} of {{ total }} cases, page {{ page_number }}.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Case reference</th>
+            <th scope="col">Client</th>
+            <th scope="col">Adviser</th>
+            <th scope="col">Case type</th>
+            <th scope="col">Status</th>
+            <th scope="col">Priority</th>
+            <th scope="col">Advice date</th>
+            <th scope="col">Due</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in rows %}
+            <tr>
+              <td><a href="/case-details?id={{ c.al_outcomecaseid }}">{{ c.al_casereference | default: 'Untitled case' | escape }}</a></td>
+              <td>{{ c.al_clientname | escape }}</td>
+              <td>{{ c.al_advisername | escape }}</td>
+              <td>{{ c.al_casetype.label | escape }}</td>
+              <td>{% include 'OT Status Badge' status: c.al_casestatus.label %}</td>
+              <td>{{ c.al_priority.label | escape }}</td>
+              <td>{{ c.al_advicedate | date: 'dd MMM yyyy' }}</td>
+              <td>{{ c.al_duedate | date: 'dd MMM yyyy' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="ot-pager" aria-label="Pagination">
+      {% if page_number > 1 %}<a class="ot-btn" href="?{{ qs }}&page={{ page_number | minus: 1 }}">Previous</a>{% endif %}
+      <span class="ot-pager__pos">Page {{ page_number }}</span>
+      {% if rows.size == page_size %}<a class="ot-btn" href="?{{ qs }}&page={{ page_number | plus: 1 }}">Next</a>{% endif %}
+    </nav>
+  {% elsif has_filter %}
+    {% include 'OT Empty State' title: 'No cases match these filters' message: 'Widen or clear the filters to see more cases.' %}
+  {% else %}
+    {% include 'OT Empty State' title: 'No cases found' message: 'Cases appear here once an Intelligent Office extract has been imported and validated.' %}
+  {% endif %}
+</section>
+{% endblock %}

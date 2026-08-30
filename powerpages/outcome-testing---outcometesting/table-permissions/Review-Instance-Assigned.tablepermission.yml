@@ -1,0 +1,14 @@
+adx_append: false
+adx_appendto: false
+adx_contactrelationship: contact_al_reviewinstance
+adx_create: false
+adx_delete: false
+adx_entitylogicalname: al_reviewinstance
+adx_entityname: Review Instance - assigned to me (write scope)
+adx_entitypermission_webrole:
+- c53b2908-1fc1-4470-89cd-6f5b95c17ffe
+- e24b50c5-1443-4725-84c9-70355724547f
+adx_entitypermissionid: a1000000-0000-4000-8000-000000000071
+adx_read: true
+adx_scope: 756150001
+adx_write: false
