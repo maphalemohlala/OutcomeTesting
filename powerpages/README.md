@@ -45,6 +45,20 @@ pac pages download `
   --overwrite
 ```
 
+Before uploading, check that no two components claim the same record id:
+
+```powershell
+powershell -NoProfile -File .\powerpages\Check-ComponentIds.ps1
+```
+
+Record ids here are hand-minted and banded by component type (AD-059). Every
+component — web template, page template, web page, table permission, web link —
+is a row in the single `powerpagecomponent` table, so two components sharing an
+id are one row and the upload silently replaces one with the other. Nothing
+reports the loss; the component simply stops existing and every record pointing
+at it resolves to the wrong type, which the portal answers with a generic error
+page. This has already taken out `/cases` once and the primary navigation once.
+
 Upload the **site folder**, not this directory:
 
 ```powershell
