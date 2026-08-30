@@ -118,20 +118,24 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Where a Tax submit leaves the case. When AQS is still to come the case returns
-        /// to the shared queue for manual allocation (BR-003, AD-040) whatever the Tax
-        /// result — the Tax outcome does not finalise a case that has not had its advice
-        /// quality check. Otherwise the Tax result finalises it.
+        /// Where a Tax submit leaves the case. A Tax non-pass enters remediation whatever
+        /// the route (BR-006, OD-027) — only a passed Tax check hands off to AQS. When the
+        /// Tax check passed and AQS is still to come, the case returns to the shared queue
+        /// for manual allocation (BR-003, AD-040). Otherwise the Tax result finalises it.
         /// </summary>
         public static int NextCaseStatusForTax(int answerChoice, bool aqsStillToCome)
         {
-            if (aqsStillToCome)
+            // OD-027: a Tax non-pass enters remediation whatever the route (BR-006). Only a
+            // passed Tax check hands off to AQS — a case whose Tax check failed must not
+            // proceed to an advice quality review with the failure unaddressed, and a later
+            // AQS pass would otherwise close the case with the Tax fail unremediated.
+            if (TaxResultRequiresRemediation(answerChoice))
             {
-                return CaseLifecycle.Queued;
+                return CaseLifecycle.AwaitingRemediation;
             }
 
-            return TaxResultRequiresRemediation(answerChoice)
-                ? CaseLifecycle.AwaitingRemediation
+            return aqsStillToCome
+                ? CaseLifecycle.Queued
                 : CaseLifecycle.Closed;
         }
 

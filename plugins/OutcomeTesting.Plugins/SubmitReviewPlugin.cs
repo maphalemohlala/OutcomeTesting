@@ -329,6 +329,34 @@ namespace OutcomeTesting.Plugins
                         PreconditionPrefix + "This case requires a Tax check and none has been created yet. Tax must be completed before the AQS review (BR-004).");
                 }
             }
+
+            // OD-027: only a passed Tax check may proceed to AQS. A failed Tax check sends
+            // the case to remediation, so an AQS review on that case would grade advice
+            // whose tax position is still unresolved. No submitted Tax review, or one with
+            // no answer recorded, is not refused here — the checks above already cover the
+            // cases that matter, and refusing on absent data would break AQS-only and
+            // legacy routes.
+            var submittedTax = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            submittedTax.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            submittedTax.Criteria.AddCondition(ReviewOutcomeCase, ConditionOperator.Equal, caseRef.Id);
+            submittedTax.Criteria.AddCondition(ReviewType, ConditionOperator.Equal, ResponseRules.ReviewTypeTax);
+            submittedTax.Criteria.AddCondition(ReviewStatus, ConditionOperator.Equal, StatusSubmitted);
+
+            var submittedTaxEntities = service.RetrieveMultiple(submittedTax).Entities;
+            if (submittedTaxEntities.Count > 0)
+            {
+                var taxAnswer = AnswerChoiceFor(service, submittedTaxEntities[0].Id, TaxOutcomeQuestionCode);
+                if (taxAnswer.HasValue && OutcomeRules.TaxResultRequiresRemediation(taxAnswer.Value))
+                {
+                    throw new InvalidPluginExecutionException(
+                        PreconditionPrefix + "The tax check on this case did not pass, so the case is in remediation and cannot proceed to an AQS review (OD-027).");
+                }
+            }
         }
 
         /// <summary>
@@ -487,9 +515,9 @@ namespace OutcomeTesting.Plugins
                 var aqsStillToCome = AqsStillToCome(service, caseRef.Id);
                 nextStatus = OutcomeRules.NextCaseStatusForTax(answer.Value, aqsStillToCome);
 
-                // A Tax handoff goes straight to the queue — the case is not submitted,
-                // only its Tax review is. A Tax-only case is submitted, then triaged.
-                if (!aqsStillToCome)
+                // Only the handoff to the queue skips Submitted — the case is not submitted,
+                // only its Tax review is. Every finalising destination goes through it.
+                if (nextStatus != CaseLifecycle.Queued)
                 {
                     MoveCaseToSubmitted(service, caseRef.Id);
                 }

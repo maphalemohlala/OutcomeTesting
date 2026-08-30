@@ -117,15 +117,27 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal(CaseLifecycle.AwaitingRemediation, OutcomeRules.NextCaseStatusForAqs(outcome));
         }
 
-        [Theory]
-        [InlineData(ResponseRules.ChoicePass)]
-        [InlineData(ResponseRules.ChoiceFail)]
-        [InlineData(ResponseRules.ChoiceInsufficient)]
-        public void Queues_a_case_for_aqs_allocation_whatever_the_tax_result(int answer)
+        [Fact]
+        public void Queues_a_passed_tax_check_for_aqs_allocation()
         {
             // BR-003, AD-040: allocation is manual, so the handoff is real work to
             // allocate rather than a case parked with nobody working it.
-            Assert.Equal(CaseLifecycle.Queued, OutcomeRules.NextCaseStatusForTax(answer, true));
+            Assert.Equal(
+                CaseLifecycle.Queued,
+                OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, true));
+        }
+
+        [Theory]
+        [InlineData(ResponseRules.ChoiceFail)]
+        [InlineData(ResponseRules.ChoiceInsufficient)]
+        public void Sends_a_failed_tax_check_to_remediation_even_when_aqs_is_still_to_come(int answer)
+        {
+            // OD-027: only a passed Tax check hands off to AQS. A non-pass enters
+            // remediation whatever the route, so an AQS pass cannot later close the case
+            // with the Tax failure unaddressed (BR-006).
+            Assert.Equal(
+                CaseLifecycle.AwaitingRemediation,
+                OutcomeRules.NextCaseStatusForTax(answer, true));
         }
 
         [Fact]
