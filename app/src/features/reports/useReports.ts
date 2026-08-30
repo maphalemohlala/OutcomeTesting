@@ -15,6 +15,10 @@ import {
   type Al_remediationactions,
 } from '../../generated/models/Al_remediationactionsModel';
 import {
+  REMEDIATION_THRESHOLD_WORKING_DAYS,
+  workingDayAge,
+} from '../../lib/workingDays';
+import {
   Al_signoffsal_signoffdecision,
   type Al_signoffs,
 } from '../../generated/models/Al_signoffsModel';
@@ -49,19 +53,14 @@ export type ReportState =
   | { status: 'loading' }
   | { status: 'ready'; data: ReportData };
 
+// Working-day bands, not calendar (OD-018). The second band ends on the BR-010
+// ten-working-day threshold, so anything below the fold has breached it.
 const AGEING_BANDS: { label: string; min: number; max: number }[] = [
-  { label: '0–7 days', min: 0, max: 7 },
-  { label: '8–14 days', min: 8, max: 14 },
-  { label: '15–30 days', min: 15, max: 30 },
-  { label: 'Over 30 days', min: 31, max: Infinity },
+  { label: '1–5 working days', min: 1, max: 5 },
+  { label: `6–${REMEDIATION_THRESHOLD_WORKING_DAYS} working days`, min: 6, max: REMEDIATION_THRESHOLD_WORKING_DAYS },
+  { label: '11–20 working days', min: 11, max: 20 },
+  { label: 'Over 20 working days', min: 21, max: Infinity },
 ];
-
-function ageInDays(value: string | undefined): number {
-  if (!value) return 0;
-  const then = new Date(value).getTime();
-  if (Number.isNaN(then)) return 0;
-  return Math.max(0, Math.floor((Date.now() - then) / 86_400_000));
-}
 
 function isOverdue(dueDate: string | undefined): boolean {
   if (!dueDate) return false;
@@ -106,7 +105,9 @@ function aggregate(
     openRemediation += 1;
     if (isOverdue(record.al_duedate)) overdueRemediation += 1;
 
-    const age = ageInDays(record.createdon);
+    // The BR-010 clock is working days (OD-018). Calendar days were provisional and are
+    // no longer used for remediation.
+    const age = workingDayAge(record.createdon);
     const bandIndex = AGEING_BANDS.findIndex((band) => age >= band.min && age <= band.max);
     if (bandIndex >= 0) bands[bandIndex].count += 1;
   }
