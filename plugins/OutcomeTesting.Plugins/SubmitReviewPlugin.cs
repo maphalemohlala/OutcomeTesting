@@ -39,6 +39,12 @@ namespace OutcomeTesting.Plugins
         private const int StatusInProgress = 120910211;
         private const int StatusSubmitted = 120910212;
 
+        // al_outcomecase and its route.
+        private const string CaseEntity = "al_outcomecase";
+        private const string RouteEntity = "al_reviewroute";
+        private const string CaseReviewRoute = "al_reviewrouteid";
+        private const string RouteRequiresTax = "al_requirestaxreview";
+
         // Checklist chain and responses.
         private const string QuestionVersionEntity = "al_questionversion";
         private const string ResponseEntity = "al_response";
@@ -287,6 +293,56 @@ namespace OutcomeTesting.Plugins
                 throw new InvalidPluginExecutionException(
                     PreconditionPrefix + "The Tax check on this case has not been submitted yet. Tax must be completed before the AQS review (BR-004).");
             }
+
+            // No unsubmitted Tax instance. That is either "Tax has been submitted" or
+            // "Tax was never created", and only the route tells them apart. The
+            // difference matters: a route that requires Tax with no Tax instance at all
+            // means the check never happened, which is precisely what BR-004 exists to
+            // prevent. Where the case carries no route — every case created before the
+            // route seed existed — fall back to the instances rather than refusing on
+            // absent data, so an AQS-only case still submits.
+            bool taxRequired;
+            if (TryRouteRequires(service, caseRef.Id, RouteRequiresTax, out taxRequired) && taxRequired)
+            {
+                var anyTax = new QueryExpression(ReviewEntity)
+                {
+                    ColumnSet = new ColumnSet(false),
+                    TopCount = 1,
+                    Criteria = new FilterExpression(),
+                };
+                anyTax.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+                anyTax.Criteria.AddCondition(ReviewOutcomeCase, ConditionOperator.Equal, caseRef.Id);
+                anyTax.Criteria.AddCondition(ReviewType, ConditionOperator.Equal, ResponseRules.ReviewTypeTax);
+
+                if (service.RetrieveMultiple(anyTax).Entities.Count == 0)
+                {
+                    throw new InvalidPluginExecutionException(
+                        PreconditionPrefix + "This case requires a Tax check and none has been created yet. Tax must be completed before the AQS review (BR-004).");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Whether the case's route demands a discipline. Returns false when the case
+        /// carries no route at all — every case created before the route seed existed —
+        /// so the caller falls back to the review instances that actually exist rather
+        /// than refusing on absent data.
+        /// </summary>
+        private static bool TryRouteRequires(
+            IOrganizationService service, Guid caseId, string routeAttribute, out bool required)
+        {
+            required = false;
+
+            var outcomeCase = service.Retrieve(CaseEntity, caseId, new ColumnSet(CaseReviewRoute));
+            var routeRef = outcomeCase.GetAttributeValue<EntityReference>(CaseReviewRoute);
+            if (routeRef == null)
+            {
+                return false;
+            }
+
+            var route = service.Retrieve(RouteEntity, routeRef.Id, new ColumnSet(routeAttribute));
+            required = route.GetAttributeValue<bool?>(routeAttribute) ?? false;
+            return true;
         }
 
         /// <summary>True when the response holds a value in any typed answer column.</summary>
