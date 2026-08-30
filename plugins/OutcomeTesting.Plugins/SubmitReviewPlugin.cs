@@ -33,6 +33,7 @@ namespace OutcomeTesting.Plugins
         private const string ReviewStatus = "al_reviewstatus";
         private const string ReviewSubmittedOn = "al_submittedon";
         private const string ReviewChecklistVersion = "al_checklistversionid";
+        private const string ReviewType = "al_reviewtype";
         private const int StatusAssigned = 120910210;
         private const int StatusInProgress = 120910211;
         private const int StatusSubmitted = 120910212;
@@ -80,7 +81,7 @@ namespace OutcomeTesting.Plugins
             var review = service.Retrieve(
                 ReviewEntity,
                 targetId,
-                new ColumnSet(ReviewStatus, ReviewChecklistVersion, "ownerid"));
+                new ColumnSet(ReviewStatus, ReviewChecklistVersion, ReviewType, "ownerid"));
 
             EnsureCaller(service, context, review);
 
@@ -164,6 +165,19 @@ namespace OutcomeTesting.Plugins
                     PreconditionPrefix + "This review has no checklist version issued, so it cannot be submitted.");
             }
 
+            // Mandatory questions are scoped to the sections this discipline owns
+            // (AD-020). Without this the gate demands all 42 mandatory answers whatever
+            // the review type, so a Tax review is held by AQS questions its reviewer
+            // cannot see, and an AQS review is held by the two Tax questions. The portal
+            // already filters sections by owner role (AD-056); this is the server half.
+            var reviewType = review.GetAttributeValue<OptionSetValue>(ReviewType);
+            int ownerRole;
+            if (reviewType == null || !OutcomeRules.TryOwnerRoleForReviewType(reviewType.Value, out ownerRole))
+            {
+                throw new InvalidPluginExecutionException(
+                    PreconditionPrefix + "This review has no recognised discipline, so the questions it must answer cannot be determined.");
+            }
+
             // Mandatory question versions belonging to this checklist version, reached
             // through Question -> Section, which is the single-parent chain in the model.
             var mandatoryQuery = new QueryExpression(QuestionVersionEntity)
@@ -179,6 +193,8 @@ namespace OutcomeTesting.Plugins
             sectionLink.EntityAlias = "s";
             sectionLink.LinkCriteria.AddCondition(
                 "al_checklistversionid", ConditionOperator.Equal, checklistVersion.Id);
+            sectionLink.LinkCriteria.AddCondition(
+                "al_ownerrole", ConditionOperator.Equal, ownerRole);
 
             var mandatory = service.RetrieveMultiple(mandatoryQuery);
             if (mandatory.Entities.Count == 0)
