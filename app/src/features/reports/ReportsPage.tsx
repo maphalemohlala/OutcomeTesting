@@ -74,7 +74,10 @@ export function ReportsPage() {
 
             <section className="reports__panel" aria-labelledby="reports-ageing">
               <h2 id="reports-ageing">Remediation ageing</h2>
-              <p className="reports__note">Actions not yet completed, by time since they were raised.</p>
+              <p className="reports__note">
+                Actions not yet completed, by working days since they were raised (BR-010). Bank
+                holidays are not excluded, so a span over one reads a day older than it is.
+              </p>
               <ul className="reports__list">
                 {state.data.remediationAgeing.map((band) => (
                   <li key={band.label}>
