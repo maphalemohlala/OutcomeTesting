@@ -101,9 +101,35 @@ namespace OutcomeTesting.Plugins
             foreach (var outcomeCase in CommandHelpers.RetrieveAll(userService, cases))
             {
                 var caseRef = outcomeCase.GetAttributeValue<string>("al_casereference") ?? outcomeCase.Id.ToString("D");
-                var adviceGrade = ResolveAdviceGrade(userService, outcomeCase.Id);
+                var outcomeRow = ResolveOutcome(userService, outcomeCase.Id);
+                var adviceGrade = outcomeRow == null
+                    ? null
+                    : (Formatted(outcomeRow, "al_finaloutcome") ?? Formatted(outcomeRow, "al_initialoutcome"));
                 var fileQualityGrade = ResolveFileQualityGrade(userService, outcomeCase.Id);
                 var code = "EXR-" + batchCode + "-" + caseRef;
+
+                // A non-pass with no accountability recorded would export four blank
+                // accountability pairs, which reads as "nobody is responsible" rather
+                // than "nobody has said yet". Refusing here keeps an incomplete row out
+                // of a delivered Trail Light file (AD-039, OD-024).
+                if (outcomeRow != null)
+                {
+                    var effective = outcomeRow.GetAttributeValue<OptionSetValue>("al_finaloutcome")
+                        ?? outcomeRow.GetAttributeValue<OptionSetValue>("al_initialoutcome");
+                    var anyAccountability =
+                        (outcomeRow.GetAttributeValue<bool?>("al_fqadviseraccountable") ?? false)
+                        || (outcomeRow.GetAttributeValue<bool?>("al_fqparaplanneraccountable") ?? false)
+                        || (outcomeRow.GetAttributeValue<bool?>("al_aqadviseraccountable") ?? false)
+                        || (outcomeRow.GetAttributeValue<bool?>("al_aqparaplanneraccountable") ?? false);
+
+                    if (effective != null && OutcomeRules.RequiresRemediation(effective.Value) && !anyAccountability)
+                    {
+                        throw new InvalidPluginExecutionException(
+                            CommandHelpers.PreconditionPrefix
+                            + "Case " + caseRef + " has a non-pass outcome with no fail accountability recorded. "
+                            + "Record accountability before generating the export.");
+                    }
+                }
 
                 var record = new Entity(RecordEntity)
                 {
@@ -121,6 +147,14 @@ namespace OutcomeTesting.Plugins
                     ["al_preorpostcheck"] = Formatted(outcomeCase, "al_preorpostcheck"),
                     ["al_advicequalitygrade"] = adviceGrade,
                     ["al_filequalitygrade"] = fileQualityGrade,
+                    ["al_fqfailadvisername"] = FlaggedText(outcomeRow, "al_fqadviseraccountable", outcomeCase, "al_advisername"),
+                    ["al_fqfailadvisercode"] = FlaggedText(outcomeRow, "al_fqadviseraccountable", outcomeCase, "al_advisercode"),
+                    ["al_fqfailparaplannername"] = FlaggedText(outcomeRow, "al_fqparaplanneraccountable", outcomeCase, "al_paraplanner"),
+                    ["al_fqfailparaplannercode"] = FlaggedText(outcomeRow, "al_fqparaplanneraccountable", outcomeCase, "al_paraplannercode"),
+                    ["al_aqfailadvisername"] = FlaggedText(outcomeRow, "al_aqadviseraccountable", outcomeCase, "al_advisername"),
+                    ["al_aqfailadvisercode"] = FlaggedText(outcomeRow, "al_aqadviseraccountable", outcomeCase, "al_advisercode"),
+                    ["al_aqfailparaplannername"] = FlaggedText(outcomeRow, "al_aqparaplanneraccountable", outcomeCase, "al_paraplanner"),
+                    ["al_aqfailparaplannercode"] = FlaggedText(outcomeRow, "al_aqparaplanneraccountable", outcomeCase, "al_paraplannercode"),
                     ["al_separator"] = string.Empty,
                     ["statecode"] = new OptionSetValue(0),
                     ["statuscode"] = new OptionSetValue(1),
@@ -156,28 +190,39 @@ namespace OutcomeTesting.Plugins
             return entity.FormattedValues.ContainsKey(attribute) ? entity.FormattedValues[attribute] : null;
         }
 
-        // AD-039 col 15 Advice Quality grade = final outcome, or initial when not yet finalised (BR-007).
-        private static string ResolveAdviceGrade(IOrganizationService service, Guid caseId)
+        // AD-039 col 15 Advice Quality grade = final outcome, or initial when not yet
+        // finalised (BR-007). Also returns the raw outcome value and the four OD-024
+        // accountability flags (Task 2), so the caller has both the grade and the
+        // accountability judgement without a second read.
+        private static Entity ResolveOutcome(IOrganizationService service, Guid caseId)
         {
             var query = new QueryExpression(OutcomeEntity)
             {
-                ColumnSet = new ColumnSet("al_finaloutcome", "al_initialoutcome"),
+                ColumnSet = new ColumnSet(
+                    "al_finaloutcome", "al_initialoutcome",
+                    "al_fqadviseraccountable", "al_fqparaplanneraccountable",
+                    "al_aqadviseraccountable", "al_aqparaplanneraccountable"),
                 TopCount = 1,
                 Criteria = new FilterExpression(),
             };
             query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
             var found = service.RetrieveMultiple(query).Entities;
-            if (found.Count == 0)
+            return found.Count == 0 ? null : found[0];
+        }
+
+        /// <summary>
+        /// The case value when the Outcome flags that person accountable, otherwise empty.
+        /// AD-039 attributes a fail to the adviser and/or the paraplanner, so a pair whose
+        /// flag is false is written empty rather than filled in.
+        /// </summary>
+        private static string FlaggedText(Entity outcomeRow, string flag, Entity outcomeCase, string caseAttribute)
+        {
+            if (outcomeRow == null || !(outcomeRow.GetAttributeValue<bool?>(flag) ?? false))
             {
-                return null;
+                return string.Empty;
             }
 
-            var outcome = found[0];
-            if (outcome.FormattedValues.ContainsKey("al_finaloutcome"))
-            {
-                return outcome.FormattedValues["al_finaloutcome"];
-            }
-            return outcome.FormattedValues.ContainsKey("al_initialoutcome") ? outcome.FormattedValues["al_initialoutcome"] : null;
+            return outcomeCase.GetAttributeValue<string>(caseAttribute) ?? string.Empty;
         }
 
         // AD-039 col 10 File Quality grade = the answer to Q-FQ-01 "File quality outcome",
