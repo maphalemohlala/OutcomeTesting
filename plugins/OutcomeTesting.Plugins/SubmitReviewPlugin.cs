@@ -477,6 +477,13 @@ namespace OutcomeTesting.Plugins
                         PreconditionPrefix + "The tax check outcome has not been recorded, so this review cannot be submitted.");
                 }
 
+                bool taxRequiresRemediation;
+                if (!OutcomeRules.TryTaxResultRequiresRemediation(answer.Value, out taxRequiresRemediation))
+                {
+                    throw new InvalidPluginExecutionException(
+                        PreconditionPrefix + "The tax check outcome holds a value this solution does not recognise (" + answer.Value + ").");
+                }
+
                 var aqsStillToCome = AqsStillToCome(service, caseRef.Id);
                 nextStatus = OutcomeRules.NextCaseStatusForTax(answer.Value, aqsStillToCome);
 
