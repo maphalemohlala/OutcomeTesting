@@ -1,0 +1,12 @@
+<entities>
+  <entity name="al_reviewroute" displayname="Review Route" primaryidfield="al_reviewrouteid" primarynamefield="al_name" disableplugins="false">
+    <fields>
+      <field displayname="Route name" name="al_name" type="string" customfield="true" />
+      <field displayname="Route code" name="al_routecode" type="string" customfield="true" primaryKey="true" />
+      <field displayname="Requires tax review" name="al_requirestaxreview" type="bool" customfield="true" />
+      <field displayname="Requires AQS review" name="al_requiresaqsreview" type="bool" customfield="true" />
+      <field displayname="Display order" name="al_displayorder" type="number" customfield="true" />
+    </fields>
+    <relationships />
+  </entity>
+</entities>
