@@ -44,6 +44,51 @@ export function stageTone(status: CaseStatus): StageTone {
   return STAGE_TONES[status];
 }
 
+/**
+ * The canonical lifecycle, as the set of statuses each status may become. Mirrors the
+ * server-side table in plugins/OutcomeTesting.Plugins/CaseLifecycle.cs, which is the
+ * authoritative gate (AD-003); this exists so the status control offers only what the
+ * command would accept, instead of all thirteen values on a mandatory field.
+ *
+ * Sources, per state: the spine is the canonical lifecycle above. Validation Failed
+ * returns to allocation once intake data is corrected, or closes where work must restart
+ * and the case is resubmitted as a new one (BR-002, AD-029). Awaiting Sign-off returns to
+ * Awaiting Remediation when the T&C Manager rejects it "with notes" (BR-008). No Check
+ * Required is the AD-036 bypass for cases that must not receive a grading outcome, so it
+ * is reachable only while no grade exists. Closed and No Check Required are terminal:
+ * reopening a closed outcome is the privileged AD-031 correction, not a details edit.
+ */
+export const CASE_STATUS_TRANSITIONS: Record<CaseStatus, readonly CaseStatus[]> = {
+  Imported: ['Validation Failed', 'Ready for Allocation', 'No Check Required'],
+  'Validation Failed': ['Ready for Allocation', 'Closed', 'No Check Required'],
+  'Ready for Allocation': ['Queued', 'No Check Required'],
+  Queued: ['Assigned', 'No Check Required'],
+  Assigned: ['Review In Progress', 'No Check Required'],
+  'Review In Progress': ['Submitted', 'No Check Required'],
+  Submitted: ['Awaiting Remediation', 'Closed'],
+  'Awaiting Remediation': ['Remediation In Progress'],
+  'Remediation In Progress': ['Awaiting Sign-off'],
+  'Awaiting Sign-off': ['Awaiting Recheck', 'Awaiting Remediation'],
+  'Awaiting Recheck': ['Closed'],
+  Closed: [],
+  'No Check Required': [],
+};
+
+/**
+ * The statuses a case may be moved to, including the one it already has — re-stating the
+ * current status is not a transition. A case with no status recorded is not part-way
+ * through the lifecycle, so every status is offered rather than none.
+ */
+export function nextStatuses(from: CaseStatus | null | undefined): readonly CaseStatus[] {
+  if (!from) return CASE_STATUSES;
+  return [from, ...CASE_STATUS_TRANSITIONS[from]];
+}
+
+/** Whether the lifecycle permits this move (BR-002, BR-008, AD-031, AD-036). */
+export function canTransition(from: CaseStatus | null | undefined, to: CaseStatus): boolean {
+  return nextStatuses(from).includes(to);
+}
+
 /** BR-005. The only four outcomes the solution may record. */
 export const OUTCOMES = [
   'Pass',

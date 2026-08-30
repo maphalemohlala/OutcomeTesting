@@ -49,7 +49,7 @@ namespace OutcomeTesting.Plugins
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "permission.manage", PermissionHelpers.AccessManage);
 
-            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey);
+            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandAssignUserRole);
             if (existingAudit != null)
             {
                 SetResponse(context, existingAudit.GetAttributeValue<string>("al_targetid"), "Assigned", existingAudit.Id, false);

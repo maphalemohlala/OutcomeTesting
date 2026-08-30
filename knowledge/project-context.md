@@ -57,6 +57,8 @@ The Intake tables now exist in DEV (AD-033): `al_ImportBatch` tracks one uploade
 
 `No Check Required` is a terminal bypass state for cases that must not be graded (AD-036). Tax wrong-route is a manager-controlled reassignment between Tax and AQS with a mandatory reason, retaining prior assignment history, not a status.
 
+This sequence is enforced, not just documented (AD-057). `CaseLifecycle` in the plug-in assembly gates every `al_casestatus` write in `al_UpdateCaseDetails`, and `CASE_STATUS_TRANSITIONS` in the Code App offers the manager only the statuses the command would accept. `Closed` and `No Check Required` are terminal: reopening or regrading a closed outcome is the privileged T&C Manager correction (OD-007, AD-031), not a details edit.
+
 ## Front ends
 Two front ends run over one Dataverse dataset, split by persona rather than by feature (AD-044, supersedes AD-002).
 

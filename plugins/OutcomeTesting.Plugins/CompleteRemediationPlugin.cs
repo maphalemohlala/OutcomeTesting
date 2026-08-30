@@ -72,7 +72,7 @@ namespace OutcomeTesting.Plugins
                 targetId,
                 new ColumnSet(ActionStatus, "ownerid"));
 
-            EnsureCaller(context, action);
+            EnsureCaller(service, context, action);
 
             var status = action.GetAttributeValue<OptionSetValue>(ActionStatus);
             var currentStatus = status != null ? status.Value : -1;
@@ -145,17 +145,62 @@ namespace OutcomeTesting.Plugins
                 || message.IndexOf("concurrency", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private static void EnsureCaller(IPluginExecutionContext context, Entity action)
+        private static void EnsureCaller(IOrganizationService service, IPluginExecutionContext context, Entity action)
         {
             var owner = action.GetAttributeValue<EntityReference>("ownerid");
 
             // The adviser completes their own action. Dataverse security is the primary
             // gate; this rejects a caller acting on an action owned by someone else.
-            if (owner != null && owner.LogicalName == "systemuser" && owner.Id != context.InitiatingUserId)
+            //
+            // al_remediationaction is user-owned, so ownerid may be a systemuser OR a team.
+            // Only the systemuser case can be settled by comparing ids: for a team-owned
+            // action the caller qualifies if they are a member of that team. Anything else
+            // — including an action with no owner at all — is refused rather than allowed,
+            // because this runs as the system user and so no Dataverse write privilege of
+            // the caller's would catch a wrong answer here.
+            if (owner == null)
             {
                 throw new InvalidPluginExecutionException(
-                    UnauthorizedPrefix + "Only the adviser who owns this remediation action can complete it.");
+                    UnauthorizedPrefix + "This remediation action has no owner, so it cannot be completed.");
             }
+
+            if (owner.LogicalName == "systemuser")
+            {
+                if (owner.Id != context.InitiatingUserId)
+                {
+                    throw new InvalidPluginExecutionException(
+                        UnauthorizedPrefix + "Only the adviser who owns this remediation action can complete it.");
+                }
+                return;
+            }
+
+            if (owner.LogicalName == "team")
+            {
+                if (!IsTeamMember(service, owner.Id, context.InitiatingUserId))
+                {
+                    throw new InvalidPluginExecutionException(
+                        UnauthorizedPrefix + "Only a member of the team that owns this remediation action can complete it.");
+                }
+                return;
+            }
+
+            throw new InvalidPluginExecutionException(
+                UnauthorizedPrefix + "This remediation action has an owner type that cannot be verified.");
+        }
+
+        /// <summary>True when <paramref name="userId"/> belongs to the given team.</summary>
+        private static bool IsTeamMember(IOrganizationService service, Guid teamId, Guid userId)
+        {
+            var query = new QueryExpression("teammembership")
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("teamid", ConditionOperator.Equal, teamId);
+            query.Criteria.AddCondition("systemuserid", ConditionOperator.Equal, userId);
+
+            return service.RetrieveMultiple(query).Entities.Count > 0;
         }
 
         private static Entity FindAuditByKey(IOrganizationService service, string idempotencyKey)
@@ -167,6 +212,10 @@ namespace OutcomeTesting.Plugins
                 Criteria = new FilterExpression(),
             };
             query.Criteria.AddCondition("al_idempotencykey", ConditionOperator.Equal, idempotencyKey);
+            // Scoped to this command: an idempotency key is caller-supplied and unique across
+            // the whole audit table, so matching the key alone would replay a key first used
+            // by a different command as if this one had already run.
+            query.Criteria.AddCondition("al_command", ConditionOperator.Equal, CommandCompleteRemediation);
 
             var result = service.RetrieveMultiple(query);
             return result.Entities.Count > 0 ? result.Entities[0] : null;
