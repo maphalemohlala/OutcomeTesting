@@ -347,6 +347,14 @@ namespace OutcomeTesting.Plugins
             submittedTax.Criteria.AddCondition(ReviewType, ConditionOperator.Equal, ResponseRules.ReviewTypeTax);
             submittedTax.Criteria.AddCondition(ReviewStatus, ConditionOperator.Equal, StatusSubmitted);
 
+            // A case can carry more than one submitted Tax review — a recheck or a regrade
+            // adds another. With TopCount 1 and no order Dataverse may return any of them,
+            // so which tax result gates the AQS submit would be arbitrary. The latest
+            // submission is the one in force; modifiedon breaks a tie and covers rows
+            // predating al_submittedon.
+            submittedTax.AddOrder(ReviewSubmittedOn, OrderType.Descending);
+            submittedTax.AddOrder("modifiedon", OrderType.Descending);
+
             var submittedTaxEntities = service.RetrieveMultiple(submittedTax).Entities;
             if (submittedTaxEntities.Count > 0)
             {
@@ -399,6 +407,12 @@ namespace OutcomeTesting.Plugins
             var version = query.AddLink(QuestionVersionEntity, "al_questionversionid", "al_questionversionid");
             var question = version.AddLink("al_question", "al_questionid", "al_questionid");
             question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.Equal, questionCode);
+
+            // Matched on question CODE, so a question retired and succeeded under BR-013 /
+            // AD-004 can leave this review holding an answer against more than one version
+            // of the same question. The latest answer is the one that grades the review;
+            // without an order Dataverse could return the superseded one.
+            query.AddOrder("modifiedon", OrderType.Descending);
 
             var found = service.RetrieveMultiple(query).Entities;
             if (found.Count == 0)
@@ -490,10 +504,6 @@ namespace OutcomeTesting.Plugins
                 }
 
                 CreateOutcome(service, review, targetId, caseRef, outcomeValue);
-                // Through Submitted, then on: the lifecycle has no edge from Review In
-                // Progress straight to Awaiting Remediation or Closed, and it should not —
-                // the case really is submitted before it is triaged (AD-057).
-                MoveCaseToSubmitted(service, caseRef.Id);
                 nextStatus = OutcomeRules.NextCaseStatusForAqs(outcomeValue);
             }
             else
@@ -514,16 +524,18 @@ namespace OutcomeTesting.Plugins
 
                 var aqsStillToCome = AqsStillToCome(service, caseRef.Id);
                 nextStatus = OutcomeRules.NextCaseStatusForTax(answer.Value, aqsStillToCome);
-
-                // Only the handoff to the queue skips Submitted — the case is not submitted,
-                // only its Tax review is. Every finalising destination goes through it.
-                if (nextStatus != CaseLifecycle.Queued)
-                {
-                    MoveCaseToSubmitted(service, caseRef.Id);
-                }
             }
 
-            MoveCaseThrough(service, caseRef.Id, nextStatus);
+            // OutcomeRules.HopsFor is the single description of the route a submit takes:
+            // open the case if it was never opened, through Submitted unless this is the Tax
+            // handoff to the queue, then on to the destination. It was previously a tested
+            // pure function that nothing called, with the plug-in walking the same route by
+            // hand — two descriptions that agreed only for as long as both were edited
+            // together. CaseTransitions checks each hop against AD-057 in turn.
+            CaseTransitions.MoveThrough(
+                service,
+                caseRef.Id,
+                OutcomeRules.HopsFor(CaseTransitions.CurrentStatus(service, caseRef.Id), nextStatus));
         }
 
         /// <summary>
@@ -554,57 +566,17 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Moves the case one hop, refusing any transition the lifecycle does not describe
-        /// (AD-057). Called once per hop rather than jumping, because the lifecycle is a
-        /// sequence and skipping a state is exactly what AD-057 exists to prevent. A hop
-        /// that is already satisfied is a no-op, so a re-run is harmless.
+        /// True when the response holds a value in any typed answer column (AD-023).
+        ///
+        /// al_answerchoices is a multi-select choice column, so it comes back as an
+        /// OptionSetValueCollection. Reading it as a string threw
+        /// InvalidCastException before any business rule ran, which made every review
+        /// carrying an answered multi-select question impossible to submit — in the V8
+        /// checklist that is every Tax review, because Q-TAX-01 is mandatory and
+        /// multi-select. ResponseGuardPlugin always read the column at its real type;
+        /// this is the same read.
         /// </summary>
-        private static void MoveCaseThrough(IOrganizationService service, Guid caseId, int nextStatus)
-        {
-            var outcomeCase = service.Retrieve(CaseEntity, caseId, new ColumnSet(CaseStatus));
-            var current = outcomeCase.GetAttributeValue<OptionSetValue>(CaseStatus);
-            int? from = current != null ? current.Value : (int?)null;
-
-            if (from.HasValue && from.Value == nextStatus)
-            {
-                return;
-            }
-
-            if (!CaseLifecycle.IsAllowed(from, nextStatus))
-            {
-                throw new InvalidPluginExecutionException(
-                    PreconditionPrefix + CaseLifecycle.DescribeRefusal(from, nextStatus));
-            }
-
-            service.Update(new Entity(CaseEntity, caseId)
-            {
-                [CaseStatus] = new OptionSetValue(nextStatus),
-            });
-        }
-
-        /// <summary>
-        /// Moves the case to Submitted, opening it first if it was never opened. A review
-        /// may legitimately be submitted from Assigned — see the status guard in
-        /// ExecuteDataversePlugin — and nothing moves the CASE to Review In Progress
-        /// automatically, so without this hop a perfectly good submit is refused over a
-        /// case status its reviewer does not control. Each hop is still checked (AD-057):
-        /// this opens the case, it does not skip a state.
-        /// </summary>
-        private static void MoveCaseToSubmitted(IOrganizationService service, Guid caseId)
-        {
-            var outcomeCase = service.Retrieve(CaseEntity, caseId, new ColumnSet(CaseStatus));
-            var current = outcomeCase.GetAttributeValue<OptionSetValue>(CaseStatus);
-
-            if (current != null && current.Value == CaseLifecycle.Assigned)
-            {
-                MoveCaseThrough(service, caseId, CaseLifecycle.ReviewInProgress);
-            }
-
-            MoveCaseThrough(service, caseId, CaseLifecycle.Submitted);
-        }
-
-        /// <summary>True when the response holds a value in any typed answer column.</summary>
-        private static bool HasAnswer(Entity response)
+        public static bool HasAnswer(Entity response)
         {
             var text = response.GetAttributeValue<string>("al_answertext");
             if (!string.IsNullOrWhiteSpace(text))
@@ -612,8 +584,8 @@ namespace OutcomeTesting.Plugins
                 return true;
             }
 
-            var choices = response.GetAttributeValue<string>("al_answerchoices");
-            if (!string.IsNullOrWhiteSpace(choices))
+            var choices = response.GetAttributeValue<OptionSetValueCollection>("al_answerchoices");
+            if (choices != null && choices.Count > 0)
             {
                 return true;
             }
