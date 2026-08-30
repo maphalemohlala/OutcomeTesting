@@ -135,6 +135,117 @@
             <Description description="Whether the paraplanner is accountable for an Advice Quality fail on this outcome. Set by the SetFailAccountability command (OD-024); read by the AD-039 export." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_FinalisedOn">
+          <Type>datetime</Type>
+          <Name>al_finalisedon</Name>
+          <LogicalName>al_finalisedon</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>inactive</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>1</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>datetime</Format>
+          <CanChangeDateTimeBehavior>0</CanChangeDateTimeBehavior>
+          <Behavior>1</Behavior>
+          <displaynames>
+            <displayname description="Finalised on" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="When the final outcome was set. Empty until the case outcome is finalised. Feeds remediation ageing MI under BR-010." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_FinalOutcome">
+          <Type>picklist</Type>
+          <Name>al_finaloutcome</Name>
+          <LogicalName>al_finaloutcome</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>1</IsSearchable>
+          <IsFilterable>1</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <AppDefaultValue>-1</AppDefaultValue>
+          <optionset Name="al_outcome_finaloutcome">
+            <OptionSetType>picklist</OptionSetType>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Final outcome" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="The outcome after remediation, recheck or regrade (BR-005). Empty until finalised. Held separately from the initial outcome so both survive under BR-007. A value that differs from the initial outcome is a regrade owned by the T&amp;C Manager (OD-007, AD-031)." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="120910710" IsHidden="0">
+                <labels>
+                  <label description="Pass" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910711" IsHidden="0">
+                <labels>
+                  <label description="Pass with issues" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910712" IsHidden="0">
+                <labels>
+                  <label description="Insufficient evidence" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910713" IsHidden="0">
+                <labels>
+                  <label description="Potential harm" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Final outcome" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The outcome after remediation, recheck or regrade (BR-005), preserved separately from the initial outcome under BR-007." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_Fqadviseraccountable">
           <Type>bit</Type>
           <Name>al_fqadviseraccountable</Name>
@@ -255,116 +366,6 @@
           </displaynames>
           <Descriptions>
             <Description description="Whether the paraplanner is accountable for a File Quality fail on this outcome. Set by the SetFailAccountability command (OD-024); read by the AD-039 export." languagecode="1033" />
-          </Descriptions>
-        </attribute>
-        <attribute PhysicalName="al_FinalisedOn">
-          <Type>datetime</Type>
-          <Name>al_finalisedon</Name>
-          <LogicalName>al_finalisedon</LogicalName>
-          <RequiredLevel>none</RequiredLevel>
-          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
-          <ImeMode>inactive</ImeMode>
-          <ValidForUpdateApi>1</ValidForUpdateApi>
-          <ValidForReadApi>1</ValidForReadApi>
-          <ValidForCreateApi>1</ValidForCreateApi>
-          <IsCustomField>1</IsCustomField>
-          <IsAuditEnabled>1</IsAuditEnabled>
-          <IsSecured>0</IsSecured>
-          <IntroducedVersion>1.0.0.0</IntroducedVersion>
-          <IsCustomizable>1</IsCustomizable>
-          <IsRenameable>1</IsRenameable>
-          <CanModifySearchSettings>1</CanModifySearchSettings>
-          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
-          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
-          <SourceType>0</SourceType>
-          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
-          <IsSortableEnabled>0</IsSortableEnabled>
-          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
-          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
-          <IsDataSourceSecret>0</IsDataSourceSecret>
-          <AutoNumberFormat></AutoNumberFormat>
-          <IsSearchable>0</IsSearchable>
-          <IsFilterable>1</IsFilterable>
-          <IsRetrievable>1</IsRetrievable>
-          <IsLocalizable>0</IsLocalizable>
-          <Format>datetime</Format>
-          <CanChangeDateTimeBehavior>0</CanChangeDateTimeBehavior>
-          <Behavior>1</Behavior>
-          <displaynames>
-            <displayname description="Finalised on" languagecode="1033" />
-          </displaynames>
-          <Descriptions>
-            <Description description="When the final outcome was set. Empty until the case outcome is finalised. Feeds remediation ageing MI under BR-010." languagecode="1033" />
-          </Descriptions>
-        </attribute>
-        <attribute PhysicalName="al_FinalOutcome">
-          <Type>picklist</Type>
-          <Name>al_finaloutcome</Name>
-          <LogicalName>al_finaloutcome</LogicalName>
-          <RequiredLevel>none</RequiredLevel>
-          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
-          <ImeMode>auto</ImeMode>
-          <ValidForUpdateApi>1</ValidForUpdateApi>
-          <ValidForReadApi>1</ValidForReadApi>
-          <ValidForCreateApi>1</ValidForCreateApi>
-          <IsCustomField>1</IsCustomField>
-          <IsAuditEnabled>1</IsAuditEnabled>
-          <IsSecured>0</IsSecured>
-          <IntroducedVersion>1.0.0.0</IntroducedVersion>
-          <IsCustomizable>1</IsCustomizable>
-          <IsRenameable>1</IsRenameable>
-          <CanModifySearchSettings>1</CanModifySearchSettings>
-          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
-          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
-          <SourceType>0</SourceType>
-          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
-          <IsSortableEnabled>0</IsSortableEnabled>
-          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
-          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
-          <IsDataSourceSecret>0</IsDataSourceSecret>
-          <AutoNumberFormat></AutoNumberFormat>
-          <IsSearchable>1</IsSearchable>
-          <IsFilterable>1</IsFilterable>
-          <IsRetrievable>1</IsRetrievable>
-          <IsLocalizable>0</IsLocalizable>
-          <optionset Name="al_outcome_finaloutcome">
-            <OptionSetType>picklist</OptionSetType>
-            <IntroducedVersion>1.0.0.0</IntroducedVersion>
-            <IsCustomizable>1</IsCustomizable>
-            <displaynames>
-              <displayname description="Final outcome" languagecode="1033" />
-            </displaynames>
-            <Descriptions>
-              <Description description="The outcome after remediation, recheck or regrade (BR-005). Empty until finalised. Held separately from the initial outcome so both survive under BR-007. A value that differs from the initial outcome is a regrade owned by the T&amp;C Manager (OD-007, AD-031)." languagecode="1033" />
-            </Descriptions>
-            <options>
-              <option value="120910710" IsHidden="0">
-                <labels>
-                  <label description="Pass" languagecode="1033" />
-                </labels>
-              </option>
-              <option value="120910711" IsHidden="0">
-                <labels>
-                  <label description="Pass with issues" languagecode="1033" />
-                </labels>
-              </option>
-              <option value="120910712" IsHidden="0">
-                <labels>
-                  <label description="Insufficient evidence" languagecode="1033" />
-                </labels>
-              </option>
-              <option value="120910713" IsHidden="0">
-                <labels>
-                  <label description="Potential harm" languagecode="1033" />
-                </labels>
-              </option>
-            </options>
-          </optionset>
-          <displaynames>
-            <displayname description="Final outcome" languagecode="1033" />
-          </displaynames>
-          <Descriptions>
-            <Description description="The outcome after remediation, recheck or regrade (BR-005), preserved separately from the initial outcome under BR-007." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_InitialOutcome">

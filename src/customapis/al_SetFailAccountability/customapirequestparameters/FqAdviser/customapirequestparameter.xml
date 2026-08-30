@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="FqAdviser">
+  <description default="True when the adviser is accountable for the File Quality fail.">
+    <label description="True when the adviser is accountable for the File Quality fail." languagecode="1033" />
+  </description>
+  <displayname default="FQ adviser accountable">
+    <label description="FQ adviser accountable" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>FqAdviser</name>
+  <type>0</type>
+</customapirequestparameter>

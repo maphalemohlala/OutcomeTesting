@@ -1,0 +1,18 @@
+<customapi uniquename="al_SetFailAccountability">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Records who is accountable for a File Quality or Advice Quality fail on an Outcome (OD-024), the judgement AD-039's export columns 11-14 and 17-20 report. Refuses a pass Outcome or a case with no outcome recorded. Enforces the page.cases Edit permission and writes an immutable Audit Event (BR-012).">
+    <label description="Records who is accountable for a File Quality or Advice Quality fail on an Outcome (OD-024), the judgement AD-039's export columns 11-14 and 17-20 report. Refuses a pass Outcome or a case with no outcome recorded. Enforces the page.cases Edit permission and writes an immutable Audit Event (BR-012)." languagecode="1033" />
+  </description>
+  <displayname default="Set Fail Accountability">
+    <label description="Set Fail Accountability" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_SetFailAccountability</name>
+  <plugintypeid>
+    <plugintypeexportkey>11aa9608-7fa4-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

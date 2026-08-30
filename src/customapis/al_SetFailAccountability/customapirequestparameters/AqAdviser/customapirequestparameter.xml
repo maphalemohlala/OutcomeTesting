@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="AqAdviser">
+  <description default="True when the adviser is accountable for the Advice Quality fail.">
+    <label description="True when the adviser is accountable for the Advice Quality fail." languagecode="1033" />
+  </description>
+  <displayname default="AQ adviser accountable">
+    <label description="AQ adviser accountable" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>AqAdviser</name>
+  <type>0</type>
+</customapirequestparameter>

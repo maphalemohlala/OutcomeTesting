@@ -26,17 +26,35 @@
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.RegradeCasePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="4b61d8ba-07a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.RegradeCasePlugin">
       <FriendlyName>OutcomeTesting.Plugins.RegradeCasePlugin</FriendlyName>
     </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.ResponseGuardPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="0dd9d5b9-c0a3-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.ResponseGuardPlugin">
+      <FriendlyName>ResponseGuardPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.ResponseProgressPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="0ed9d5b9-c0a3-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.ResponseProgressPlugin">
+      <FriendlyName>ResponseProgressPlugin</FriendlyName>
+    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.RetireAndSucceedQuestionPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="1ddeb4bb-20a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.RetireAndSucceedQuestionPlugin">
       <FriendlyName>OutcomeTesting.Plugins.RetireAndSucceedQuestionPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.SetFailAccountabilityPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="11aa9608-7fa4-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.SetFailAccountabilityPlugin">
+      <FriendlyName>SetFailAccountabilityPlugin</FriendlyName>
     </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.SetPagePermissionPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="0512aec1-20a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.SetPagePermissionPlugin">
       <FriendlyName>OutcomeTesting.Plugins.SetPagePermissionPlugin</FriendlyName>
     </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.SetUserActivePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="fc908a8b-5ca2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.SetUserActivePlugin">
+      <FriendlyName>OutcomeTesting.Plugins.SetUserActivePlugin</FriendlyName>
+    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.SignOffRemediationPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="6ca40cc1-07a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.SignOffRemediationPlugin">
       <FriendlyName>OutcomeTesting.Plugins.SignOffRemediationPlugin</FriendlyName>
     </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.SubmitReviewPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="0663d6eb-aea3-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.SubmitReviewPlugin">
+      <FriendlyName>SubmitReviewPlugin</FriendlyName>
+    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.UpdateCaseDetailsPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="8cf2e849-2fa2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.UpdateCaseDetailsPlugin">
       <FriendlyName>OutcomeTesting.Plugins.UpdateCaseDetailsPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.UpdateUserPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="be8b7270-5da2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.UpdateUserPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.UpdateUserPlugin</FriendlyName>
     </PluginType>
   </PluginTypes>
 </PluginAssembly>
