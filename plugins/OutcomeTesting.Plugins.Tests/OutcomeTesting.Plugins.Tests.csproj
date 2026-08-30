@@ -3,15 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
     <IsPackable>false</IsPackable>
-    <!--
-      Signed with the same key as OutcomeTesting.Plugins so that project's
-      InternalsVisibleTo (a strong-named assembly can only grant friend access to another
-      strong-named assembly named by its exact public key) resolves to this assembly,
-      giving these tests access to internal members such as
-      GenerateExportPlugin.FlaggedText.
-    -->
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>..\OutcomeTesting.Plugins\OutcomeTesting.Plugins.snk</AssemblyOriginatorKeyFile>
+    <SignAssembly>false</SignAssembly>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 

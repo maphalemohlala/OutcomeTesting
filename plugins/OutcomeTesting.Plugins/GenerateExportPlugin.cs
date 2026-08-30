@@ -215,7 +215,7 @@ namespace OutcomeTesting.Plugins
         /// AD-039 attributes a fail to the adviser and/or the paraplanner, so a pair whose
         /// flag is false is written empty rather than filled in.
         /// </summary>
-        internal static string FlaggedText(Entity outcomeRow, string flag, Entity outcomeCase, string caseAttribute)
+        public static string FlaggedText(Entity outcomeRow, string flag, Entity outcomeCase, string caseAttribute)
         {
             if (outcomeRow == null || !(outcomeRow.GetAttributeValue<bool?>(flag) ?? false))
             {
