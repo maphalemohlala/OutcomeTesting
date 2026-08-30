@@ -44,10 +44,16 @@ namespace OutcomeTesting.Plugins
         private const string RouteEntity = "al_reviewroute";
         private const string CaseReviewRoute = "al_reviewrouteid";
         private const string RouteRequiresTax = "al_requirestaxreview";
+        private const string RouteRequiresAqs = "al_requiresaqsreview";
 
         // Checklist chain and responses.
         private const string QuestionVersionEntity = "al_questionversion";
         private const string ResponseEntity = "al_response";
+
+        // al_outcome and the questions that drive it.
+        private const string OutcomeEntity = "al_outcome";
+        private const string GradeQuestionCode = "Q-GR-01";
+        private const string TaxOutcomeQuestionCode = "Q-TAX-02";
 
         // al_auditevent.
         private const string AuditEntity = "al_auditevent";
@@ -88,7 +94,7 @@ namespace OutcomeTesting.Plugins
             var review = service.Retrieve(
                 ReviewEntity,
                 targetId,
-                new ColumnSet(ReviewStatus, ReviewChecklistVersion, ReviewType, ReviewOutcomeCase, "ownerid"));
+                new ColumnSet(ReviewStatus, ReviewChecklistVersion, ReviewType, ReviewOutcomeCase, "ownerid", "al_sequence"));
 
             EnsureCaller(service, context, review);
 
@@ -149,6 +155,8 @@ namespace OutcomeTesting.Plugins
             {
                 service.Update(update);
             }
+
+            FinaliseReview(service, review, targetId);
 
             var auditId = WriteAuditEvent(service, targetId, idempotencyKey, context);
             SetResponse(context, StatusName(StatusSubmitted), auditId, false);
@@ -343,6 +351,199 @@ namespace OutcomeTesting.Plugins
             var route = service.Retrieve(RouteEntity, routeRef.Id, new ColumnSet(routeAttribute));
             required = route.GetAttributeValue<bool?>(routeAttribute) ?? false;
             return true;
+        }
+
+        /// <summary>
+        /// The al_answerchoice this review recorded for a question, by business code.
+        /// Returns null when the question was not answered.
+        /// </summary>
+        private static int? AnswerChoiceFor(IOrganizationService service, Guid reviewId, string questionCode)
+        {
+            var query = new QueryExpression(ResponseEntity)
+            {
+                ColumnSet = new ColumnSet("al_answerchoice"),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
+
+            var version = query.AddLink(QuestionVersionEntity, "al_questionversionid", "al_questionversionid");
+            var question = version.AddLink("al_question", "al_questionid", "al_questionid");
+            question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.Equal, questionCode);
+
+            var found = service.RetrieveMultiple(query).Entities;
+            if (found.Count == 0)
+            {
+                return null;
+            }
+
+            var choice = found[0].GetAttributeValue<OptionSetValue>("al_answerchoice");
+            return choice == null ? (int?)null : choice.Value;
+        }
+
+        /// <summary>
+        /// Whether an AQS review is still owed on this case. The route decides when it is
+        /// set; where it is null — which is every case created before the route seed
+        /// existed — fall back to the review instances that actually exist, so a Tax
+        /// submit on a case with no AQS instance finalises as Tax-only rather than
+        /// stalling in the queue forever.
+        /// </summary>
+        private static bool AqsStillToCome(IOrganizationService service, Guid caseId)
+        {
+            bool aqsRequired;
+            var hasRoute = TryRouteRequires(service, caseId, RouteRequiresAqs, out aqsRequired);
+
+            // A route that explicitly does not require AQS settles it: this is Tax-only.
+            if (hasRoute && !aqsRequired)
+            {
+                return false;
+            }
+
+            // Either the route requires AQS, or there is no route to ask. Both are
+            // answered the same way: is there an AQS instance that has not been submitted?
+            var query = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition(ReviewOutcomeCase, ConditionOperator.Equal, caseId);
+            query.Criteria.AddCondition(ReviewType, ConditionOperator.Equal, ResponseRules.ReviewTypeAqs);
+            query.Criteria.AddCondition(ReviewStatus, ConditionOperator.NotEqual, StatusSubmitted);
+
+            if (service.RetrieveMultiple(query).Entities.Count > 0)
+            {
+                return true;
+            }
+
+            // No unsubmitted AQS instance. If the route demanded one it has not been
+            // created yet, so it is still to come; with no route, this is Tax-only.
+            return hasRoute;
+        }
+
+        /// <summary>
+        /// Records what the submission produced: for AQS the initial Outcome (BR-005,
+        /// BR-007), and for both disciplines the case's next status (AD-057). Runs inside
+        /// the submit transaction, so a review can never be Submitted without its Outcome.
+        ///
+        /// A Tax review creates no Outcome: al_Outcome.al_initialoutcome carries only the
+        /// BR-005 four-value AQS scale, and the Tax result is the three-value
+        /// PassFailInsufficient scale of Q-TAX-02 (AD-055). The Tax grade stays on its
+        /// response, and AD-039's export contract has no Tax column.
+        /// </summary>
+        private static void FinaliseReview(IOrganizationService service, Entity review, Guid targetId)
+        {
+            var caseRef = review.GetAttributeValue<EntityReference>(ReviewOutcomeCase);
+            if (caseRef == null)
+            {
+                throw new InvalidPluginExecutionException(
+                    PreconditionPrefix + "This review is not linked to a case, so its outcome cannot be recorded.");
+            }
+
+            var reviewType = review.GetAttributeValue<OptionSetValue>(ReviewType).Value;
+            int nextStatus;
+
+            if (reviewType == ResponseRules.ReviewTypeAqs)
+            {
+                var answer = AnswerChoiceFor(service, targetId, GradeQuestionCode);
+                if (!answer.HasValue)
+                {
+                    throw new InvalidPluginExecutionException(
+                        PreconditionPrefix + "The advice quality grade has not been recorded, so this review cannot be submitted.");
+                }
+
+                int outcomeValue;
+                if (!OutcomeRules.TryGradeFromAnswer(answer.Value, out outcomeValue))
+                {
+                    throw new InvalidPluginExecutionException(
+                        PreconditionPrefix + "The advice quality grade holds a value this solution does not recognise (" + answer.Value + ").");
+                }
+
+                CreateOutcome(service, review, targetId, caseRef, outcomeValue);
+                // Through Submitted, then on: the lifecycle has no edge from Review In
+                // Progress straight to Awaiting Remediation or Closed, and it should not —
+                // the case really is submitted before it is triaged (AD-057).
+                MoveCaseThrough(service, caseRef.Id, CaseLifecycle.Submitted);
+                nextStatus = OutcomeRules.NextCaseStatusForAqs(outcomeValue);
+            }
+            else
+            {
+                var answer = AnswerChoiceFor(service, targetId, TaxOutcomeQuestionCode);
+                if (!answer.HasValue)
+                {
+                    throw new InvalidPluginExecutionException(
+                        PreconditionPrefix + "The tax check outcome has not been recorded, so this review cannot be submitted.");
+                }
+
+                var aqsStillToCome = AqsStillToCome(service, caseRef.Id);
+                nextStatus = OutcomeRules.NextCaseStatusForTax(answer.Value, aqsStillToCome);
+
+                // A Tax handoff goes straight to the queue — the case is not submitted,
+                // only its Tax review is. A Tax-only case is submitted, then triaged.
+                if (!aqsStillToCome)
+                {
+                    MoveCaseThrough(service, caseRef.Id, CaseLifecycle.Submitted);
+                }
+            }
+
+            MoveCaseThrough(service, caseRef.Id, nextStatus);
+        }
+
+        /// <summary>
+        /// Writes the initial Outcome. The code is derived from the case reference and the
+        /// review sequence, so a replay upserts the same row on the al_outcomecode
+        /// alternate key rather than creating a second Outcome (NFR-REL-01).
+        /// Only the initial columns are written: the final outcome is the regrade path's
+        /// to set, and BR-007 requires both to be preserved separately.
+        /// </summary>
+        private static void CreateOutcome(
+            IOrganizationService service, Entity review, Guid reviewId, EntityReference caseRef, int outcomeValue)
+        {
+            var outcomeCase = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet("al_casereference"));
+            var caseReference = outcomeCase.GetAttributeValue<string>("al_casereference") ?? caseRef.Id.ToString("D");
+            var sequence = review.GetAttributeValue<int?>("al_sequence") ?? 1;
+            var code = "OUT-" + caseReference + "-" + sequence;
+
+            var outcome = new Entity(OutcomeEntity)
+            {
+                ["al_name"] = "Outcome " + caseReference,
+                ["al_outcomecode"] = code,
+                ["al_outcomecaseid"] = caseRef,
+                ["al_reviewinstanceid"] = new EntityReference(ReviewEntity, reviewId),
+                ["al_initialoutcome"] = new OptionSetValue(outcomeValue),
+            };
+
+            AssignUserRolePlugin.Upsert(service, OutcomeEntity, "al_outcomecode", code, outcome);
+        }
+
+        /// <summary>
+        /// Moves the case one hop, refusing any transition the lifecycle does not describe
+        /// (AD-057). Called once per hop rather than jumping, because the lifecycle is a
+        /// sequence and skipping a state is exactly what AD-057 exists to prevent. A hop
+        /// that is already satisfied is a no-op, so a re-run is harmless.
+        /// </summary>
+        private static void MoveCaseThrough(IOrganizationService service, Guid caseId, int nextStatus)
+        {
+            var outcomeCase = service.Retrieve(CaseEntity, caseId, new ColumnSet("al_casestatus"));
+            var current = outcomeCase.GetAttributeValue<OptionSetValue>("al_casestatus");
+            int? from = current != null ? current.Value : (int?)null;
+
+            if (from.HasValue && from.Value == nextStatus)
+            {
+                return;
+            }
+
+            if (!CaseLifecycle.IsAllowed(from, nextStatus))
+            {
+                throw new InvalidPluginExecutionException(
+                    PreconditionPrefix + CaseLifecycle.DescribeRefusal(from, nextStatus));
+            }
+
+            service.Update(new Entity(CaseEntity, caseId)
+            {
+                ["al_casestatus"] = new OptionSetValue(nextStatus),
+            });
         }
 
         /// <summary>True when the response holds a value in any typed answer column.</summary>
