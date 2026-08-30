@@ -104,7 +104,6 @@ namespace OutcomeTesting.Plugins.Tests
 
         [Theory]
         [InlineData(CaseLifecycle.Submitted, CaseLifecycle.ReviewInProgress)]
-        [InlineData(CaseLifecycle.Assigned, CaseLifecycle.Queued)]
         [InlineData(CaseLifecycle.AwaitingRecheck, CaseLifecycle.AwaitingRemediation)]
         public void Refuses_walking_the_lifecycle_backwards(int from, int to)
         {
@@ -134,6 +133,18 @@ namespace OutcomeTesting.Plugins.Tests
             // unstatused case uneditable rather than correctable.
             Assert.True(CaseLifecycle.IsAllowed(null, CaseLifecycle.ReadyForAllocation));
             Assert.True(CaseLifecycle.IsAllowed(null, CaseLifecycle.Closed));
+        }
+
+        [Theory]
+        [InlineData(CaseLifecycle.Assigned)]
+        [InlineData(CaseLifecycle.ReviewInProgress)]
+        public void Returns_a_case_to_the_queue_when_another_discipline_is_still_required(int from)
+        {
+            // BR-004: Tax and AQS run sequentially. When Tax submits on a Tax-then-AQS
+            // route the case goes back to the shared queue for the AQS checker to be
+            // assigned (BR-003, AD-040), so this is not a backwards move — it is the
+            // handoff between two disciplines on one case.
+            Assert.True(CaseLifecycle.IsAllowed(from, CaseLifecycle.Queued));
         }
 
         [Fact]
