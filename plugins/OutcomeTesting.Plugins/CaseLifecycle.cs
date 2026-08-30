@@ -80,6 +80,12 @@ namespace OutcomeTesting.Plugins
         /// closed outcome is a privileged T&C Manager correction requiring a mandatory
         /// reason on an immutable Audit Event (OD-007, AD-031) — al_RegradeCase, not an
         /// ordinary details edit.
+        ///
+        /// A case returns to Queued from Assigned or Review In Progress when one
+        /// discipline has finished and another is still required — the Tax-then-AQS
+        /// handoff (BR-004). Allocation is manual (BR-003, AD-040), so the case goes back
+        /// to the shared queue for a manager to assign the AQS checker rather than moving
+        /// straight to a named person. This is a handoff, not a backwards step.
         /// </summary>
         private static readonly Dictionary<int, int[]> Allowed = new Dictionary<int, int[]>
         {
@@ -87,8 +93,8 @@ namespace OutcomeTesting.Plugins
             { ValidationFailed, new[] { ReadyForAllocation, Closed, NoCheckRequired } },
             { ReadyForAllocation, new[] { Queued, NoCheckRequired } },
             { Queued, new[] { Assigned, NoCheckRequired } },
-            { Assigned, new[] { ReviewInProgress, NoCheckRequired } },
-            { ReviewInProgress, new[] { Submitted, NoCheckRequired } },
+            { Assigned, new[] { ReviewInProgress, Queued, NoCheckRequired } },
+            { ReviewInProgress, new[] { Submitted, Queued, NoCheckRequired } },
             { Submitted, new[] { AwaitingRemediation, Closed } },
             { AwaitingRemediation, new[] { RemediationInProgress } },
             { RemediationInProgress, new[] { AwaitingSignoff } },
