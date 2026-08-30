@@ -208,6 +208,28 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void Opens_a_case_that_is_still_assigned_before_submitting_it()
+        {
+            // A review may be submitted from Assigned and nothing moves the CASE to Review
+            // In Progress automatically, so the submit opens it rather than being refused
+            // over a status its reviewer does not control.
+            Assert.Equal(
+                new[] { CaseLifecycle.ReviewInProgress, CaseLifecycle.Submitted, CaseLifecycle.Closed },
+                OutcomeRules.HopsFor(CaseLifecycle.Assigned, CaseLifecycle.Closed));
+        }
+
+        [Fact]
+        public void Does_not_open_a_case_whose_status_was_never_set()
+        {
+            // A null status is not Assigned. Treating it as Assigned would invent a
+            // Review In Progress hop from a state the case was never in; the Submitted hop
+            // is left to refuse it against AD-057 instead.
+            Assert.Equal(
+                new[] { CaseLifecycle.Submitted, CaseLifecycle.Closed },
+                OutcomeRules.HopsFor(null, CaseLifecycle.Closed));
+        }
+
+        [Fact]
         public void Sends_a_tax_handoff_straight_to_the_queue_without_submitting_the_case()
         {
             // The case is not submitted when only its Tax review is (BR-004).

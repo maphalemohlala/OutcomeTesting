@@ -61,13 +61,13 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            var outcome = userService.Retrieve(OutcomeEntity, targetId, new ColumnSet("al_initialoutcome", "al_finaloutcome"));
+            var outcome = userService.Retrieve(
+                OutcomeEntity, targetId, new ColumnSet(Outcomes.InitialOutcomeAttr, Outcomes.FinalOutcomeAttr));
 
             // Accountability describes a fail. Recording it against a Pass would put a
             // name in a Trail Light column that AD-039 only ever fills for a fail.
-            var effective = outcome.GetAttributeValue<OptionSetValue>("al_finaloutcome")
-                ?? outcome.GetAttributeValue<OptionSetValue>("al_initialoutcome");
-            if (effective == null)
+            var effective = Outcomes.EffectiveOutcome(outcome);
+            if (!effective.HasValue)
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix + "This case has no outcome recorded, so there is no fail to attribute.");
