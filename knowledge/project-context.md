@@ -22,7 +22,8 @@ Portal web roles are a narrower set than the actor list above, settled 2026-08-3
 - **Adviser and Planner are two separate web roles** (OD-019). Only `AL Portal - Adviser Remediation` exists today, so a Planner role is still to be added and remediation routing split between them.
 - **T&C Manager and Supervisor are one role and one person** (OD-020), which the single `AL Portal - T&C Supervisor` role already matches. FR-023 and BR-008 sign-off routes to it.
 - **Regional Manager/Lead receives notifications only and is not a portal user** (OD-021). The existing `AL Portal - Regional Manager` web role over-grants and is to be removed; PP-15 recipients come from the BR-009 notification list, not from portal role membership.
-- Tax and AQS Reviewers additionally hold Global read on cases, reviews and responses, with write scoped to their own reviews (AD-056).
+- **Every authenticated portal user holds Global read on cases** and can action only what is assigned to them (OD-022, 2026-08-31). This extends AD-056 from the two reviewer roles to all signed-in users; the ability to act is carried by the review assignment, not the case, so write reaches responses only through the Contact-anchored review chain.
+- Permissions are in practice bound to the built-in **Administrators** and **Authenticated Users** roles; the `AL Portal - *` roles above carry none and are inert (AD-067). Adding or removing one of those named roles therefore changes nothing until permissions are bound to it.
 
 ## Data principles
 - Dataverse is the system of record.
