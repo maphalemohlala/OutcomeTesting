@@ -184,8 +184,21 @@ Every child rule's role set is a subset of the `…0b0` set, as the platform req
 own and inherit `…0b0` — every portal role may read them, which is what OD-022 asks
 for.
 
-`Access Denied`, `Page Not Found` and `Default Offline Page` get no rule and stay
-public. They must render before authentication, and they disclose nothing.
+`Access Denied`, `Page Not Found` and `Default Offline Page` get no rule of their own.
+They are children of Home, so they **inherit `…0b0` and are not public** — an earlier
+draft of this section claimed they stayed public, which was simply wrong about how
+inheritance works. The consequence is deliberate and is the safer direction: an
+anonymous user who guesses a URL is redirected to sign-in rather than being shown a
+custom 404, which discloses less, not more.
+
+One consequence of that is not settled and must not be guessed at. An authenticated
+contact holding **no** portal web role is denied Home, and the Access Denied page they
+would be sent to is itself behind the same rule. Whether Power Pages serves its error
+pages outside the web-page permission path or redirects in a loop is platform behaviour,
+and only DEV can answer it. The role matrix in 10.3 already exercises exactly this case;
+it now names the loop as a possible outcome. **If a loop appears, the remedy is to clear
+`adx_parentpageid` on those three pages** so they leave Home's inheritance chain
+entirely, rather than weakening the Home rule.
 
 ### 6.2 Why the Home rule excludes child web files
 
