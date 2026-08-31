@@ -27,3 +27,6 @@ plugins/**/obj/
 .playwright-mcp/
 
 # NOTE: powerpages/ metadata IS version controlled. Do not ignore it.
+
+# Claude Code personal settings (machine-specific paths)
+.claude/settings.local.json
