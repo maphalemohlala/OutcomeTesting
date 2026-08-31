@@ -5,8 +5,8 @@ adx_delete: false
 adx_entitylogicalname: al_response
 adx_entityname: Response - on a review assigned to me
 adx_entitypermission_webrole:
-- c53b2908-1fc1-4470-89cd-6f5b95c17ffe
-- e24b50c5-1443-4725-84c9-70355724547f
+- a1000000-0000-4000-8000-000000000090
+- a1000000-0000-4000-8000-000000000091
 adx_entitypermissionid: a1000000-0000-4000-8000-000000000072
 adx_parententitypermission: a1000000-0000-4000-8000-000000000071
 adx_parentrelationship: al_reviewinstance_response
