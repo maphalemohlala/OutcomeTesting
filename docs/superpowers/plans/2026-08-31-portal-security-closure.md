@@ -365,7 +365,7 @@ foreach ($page in $pages) {
 $mustBeFalse = @(
     'Authentication/Registration/Enabled',
     'Authentication/Registration/OpenRegistrationEnabled',
-    'Authentication/Registration/ExternalLoginEnabled'
+    'Authentication/Registration/LocalLoginEnabled'
 )
 foreach ($name in $mustBeFalse) {
     if (-not $settingByName.ContainsKey($name)) {
@@ -685,7 +685,7 @@ In `sitesetting.yml`, set `adx_value` to `false` on each of these three, leaving
 |---|---|---|
 | `Authentication/Registration/Enabled` | `true` | `false` |
 | `Authentication/Registration/OpenRegistrationEnabled` | `true` | `false` |
-| `Authentication/Registration/ExternalLoginEnabled` | `true` | `false` |
+| `Authentication/Registration/ExternalLoginEnabled` | `true` | **`true` — leave it ON** |
 
 `Authentication/Registration/LocalLoginEnabled` is already `false` and is left alone. Entra ID OpenIdConnect becomes the only route in, which is what AD-047's Entra-group-sync provisioning already assumes.
 
