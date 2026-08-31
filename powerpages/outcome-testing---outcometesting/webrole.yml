@@ -16,16 +16,16 @@
   adx_webroleid: a1000000-0000-4000-8000-000000000093
 - adx_anonymoususersrole: false
   adx_authenticatedusersrole: false
-  adx_name: AL Portal - Regional Manager
-  adx_webroleid: a1000000-0000-4000-8000-000000000094
-- adx_anonymoususersrole: false
-  adx_authenticatedusersrole: false
   adx_name: AL Portal - Outcome Testing Manager
   adx_webroleid: a1000000-0000-4000-8000-000000000095
 - adx_anonymoususersrole: false
   adx_authenticatedusersrole: false
   adx_name: AL Portal - Portal Administrator
   adx_webroleid: a1000000-0000-4000-8000-000000000096
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: AL Portal - Planner
+  adx_webroleid: a1000000-0000-4000-8000-000000000097
 - adx_anonymoususersrole: false
   adx_authenticatedusersrole: false
   adx_name: Administrators
