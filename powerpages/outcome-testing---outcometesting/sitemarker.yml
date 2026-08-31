@@ -12,8 +12,6 @@
 - adx_name: Profile
   adx_pageid: 6b7c4888-877a-41ec-8a9c-2245601999f7
   adx_sitemarkerid: 71985bdb-5fbd-4696-81da-d4431dd6425b
-- adx_name: Search
-  adx_sitemarkerid: b52f7317-d7aa-4f78-8901-334a5f9088c1
 - adx_name: Knowledge Base Search Results
   adx_sitemarkerid: ee3333f7-ad9c-434c-a4ee-33747387408b
 - adx_name: Access Denied
