@@ -64,14 +64,31 @@ $identityKeys = @{
 
 $claims = [System.Collections.Generic.List[object]]::new()
 
-foreach ($file in Get-ChildItem -LiteralPath $SitePath -Recurse -File -Filter '*.yml') {
-    $suffix = $identityKeys.Keys | Where-Object { $file.Name.EndsWith($_, [StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
-    if (-not $suffix) { continue }
+# Web roles and page access control rules are not per-component files with a
+# suffix; each is one top-level list file. Match those by exact name, so the
+# two component types this repository edits most are no longer unchecked.
+$fileKeys = @{
+    'webrole.yml'     = 'adx_webroleid'
+    'webpagerule.yml' = 'adx_webpageaccesscontrolruleid'
+}
 
-    $key = $identityKeys[$suffix]
+foreach ($file in Get-ChildItem -LiteralPath $SitePath -Recurse -File -Filter '*.yml') {
+    $key = $null
+    $kind = $null
+
+    if ($fileKeys.ContainsKey($file.Name)) {
+        $key = $fileKeys[$file.Name]
+        $kind = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
+    }
+    else {
+        $suffix = $identityKeys.Keys | Where-Object { $file.Name.EndsWith($_, [StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+        if (-not $suffix) { continue }
+        $key = $identityKeys[$suffix]
+        $kind = $suffix.Trim('.').Replace('.yml', '')
+    }
+
     $lines = Get-Content -LiteralPath $file.FullName
     $relative = $file.FullName.Substring($SitePath.Length).TrimStart([char]92, [char]47)
-    $kind = $suffix.Trim('.').Replace('.yml', '')
 
     # A yml may hold ONE component (a web template) or a LIST of them (every link in
     # a weblink set). Walking every line rather than taking the first match is what
