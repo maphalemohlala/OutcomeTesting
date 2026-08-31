@@ -119,10 +119,10 @@ yesterday now cannot — do this, in order:
 
 1. **Stop. Do not proceed to step 5, 6 or 7.** Step 6's deletions are irreversible;
    nothing there should run until sign-in is confirmed working again.
-2. **Check `Authentication/Registration/ExternalLoginEnabled` first** — see step 4 for
-   why this is the prime suspect. If it is the cause, set it back to `true` in the Portal
-   Management app (Site Settings) and re-test sign-in immediately. This is a single
-   setting edit, not a redeploy.
+2. **Check the two registration settings first** — see step 4. `ExternalLoginEnabled`
+   must be `true` (the branch ships it that way; a stale `false` in DEV would lock
+   everyone out) and, if only first-time sign-ins fail, `Registration/Enabled` is the
+   suspect. Both are single setting edits in the Portal Management app, not a redeploy.
 3. **If sign-in is still broken**, re-upload the pre-branch state of `powerpages/` from
    the last known-good commit (`git log -- powerpages/`) with the same `pac pages upload`
    command. Upload overwrites existing rows, so re-applying a prior commit's metadata
@@ -138,20 +138,54 @@ yesterday now cannot — do this, in order:
 reach the portal at all, and one setting changed in this branch makes that not obviously
 true.
 
-`Authentication/Registration/ExternalLoginEnabled` was set to `false` in this branch (see
-section 7 of the design), on the reasoning that Entra ID OpenID Connect is the only
-sign-in route once self-registration and local login are also off. **It is not
-established from source whether Power Pages treats OIDC sign-in as an "external login"
-for the purpose of this flag.** This step does not assert which behaviour is correct —
-only that it must be verified before anything else here proceeds.
+**This was a real defect and it has been fixed in the branch — read this before assuming
+the risk is theoretical.** `Authentication/Registration/ExternalLoginEnabled` was briefly
+set to `false` in this work, on the mistaken reading that "external login" meant external
+self-service accounts. It does not: it is the site-wide switch for **external identity
+providers**, and Entra ID OIDC is one. Microsoft Learn's Entra setup page says so plainly
+— if no identity providers appear, External login must be On
+(`power-pages/security/authentication/openid-settings`) — and this site's own
+`AzureADLoginEnabled` description calls Azure AD "an external identity provider". With
+local login and registration both off, `false` would have left no route into the portal
+at all.
 
-In an InPrivate session immediately after the upload, sign in as an existing
-Entra-provisioned contact — not a new registration, since self-registration is off.
+The setting is back to `true`, and `Check-PortalSecurity.ps1` assertion 7 now **fails the
+build if it is ever false again**. Confirm the shipped value before uploading:
+
+```powershell
+Select-String -Path .\powerpages\outcome-testing---outcometesting\sitesetting.yml -Pattern 'ExternalLoginEnabled' -Context 0,2
+```
+
+Expected: `adx_value: true`.
+
+One thing genuinely remains unverified, and this step is where it surfaces:
+`Authentication/Registration/Enabled` is `false`. Sign-in is not registration, and
+contacts are provisioned by Entra group sync (AD-047), so an existing contact should sign
+in unaffected. What is not established from source is whether a contact signing in for
+the **first time** — one with no `adx_externalidentity` record yet — is routed through a
+registration step to associate their external identity. If it is, that association is
+blocked while registration is off.
+
+In an InPrivate session immediately after the upload, sign in twice — the second test is
+the one that matters and is easy to skip:
+
+1. **A contact who has signed in to this portal before.** Proves the upload did not break
+   working authentication.
+2. **A contact who has never signed in before** — an Entra-provisioned contact with no
+   external identity association yet. This is the case `Registration/Enabled: false` may
+   block, and it is how every new joiner will arrive.
 
 - **If sign-in succeeds:** record the result below and continue to step 5.
-- **If sign-in fails:** this is the lockout scenario. Follow the Rollback paragraph under
-  step 3 — the immediate remedy is to set `Authentication/Registration/ExternalLoginEnabled`
-  back to `true` in the Portal Management app and re-test, not to guess at some other cause.
+- **If the returning contact fails:** this is the lockout scenario. Follow the Rollback
+  paragraph under step 3. Check `ExternalLoginEnabled` is `true` in the environment first
+  — the branch ships `true`, but a stale value in DEV from an earlier upload would
+  reproduce the fault.
+- **If only the first-time contact fails:** the cause is almost certainly
+  `Authentication/Registration/Enabled: false` blocking external-identity association.
+  Remedy: set it back to `true` in the Portal Management app, leaving
+  `OpenRegistrationEnabled` and `LocalLoginEnabled` `false` — that still permits no
+  self-service sign-up, which is what PP-01 actually requires. Record the outcome, because
+  it settles a question this document could not.
 
 **Result:** _(not run)_
 

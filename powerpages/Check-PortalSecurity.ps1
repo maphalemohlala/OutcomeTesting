@@ -18,7 +18,9 @@
       5. At most one Restrict Read rule per page. Power Pages raises a
          conflicting-rules error on more.
       6. No page rule binds the Anonymous Users role.
-      7. Self-registration and external login are off.
+      7. Registration, open registration and local login are off, and external
+         login is ON. Entra ID OIDC is an external identity provider, so turning
+         external login off removes the only way into the site.
       8. Every web role referenced by a permission, or by a page rule, still
          exists.
       9. A Global-scope table permission never carries write, create or
@@ -344,7 +346,7 @@ foreach ($page in $pages) {
 $mustBeFalse = @(
     'Authentication/Registration/Enabled',
     'Authentication/Registration/OpenRegistrationEnabled',
-    'Authentication/Registration/ExternalLoginEnabled'
+    'Authentication/Registration/LocalLoginEnabled'
 )
 foreach ($name in $mustBeFalse) {
     if (-not $settingByName.ContainsKey($name)) {
@@ -354,6 +356,26 @@ foreach ($name in $mustBeFalse) {
     $value = ($settingByName[$name] -replace "^'|'$", '').Trim()
     if ($value -notmatch '^(?i)false$') {
         Add-Failure '7 registration' "Site setting '$name' is '$value', not false."
+    }
+}
+
+# ExternalLoginEnabled is asserted TRUE, which looks backwards in a hardening gate
+# and is not. It is the site-wide switch for external identity providers, and Entra
+# ID OIDC is one: Microsoft Learn's Entra setup page tells makers that if no identity
+# providers appear, External login must be On, and this site's own
+# AzureADLoginEnabled description calls Azure AD "an external identity provider".
+# With local login and registration both off, turning this off leaves no route into
+# the portal at all. It was set to false earlier in this work and would have locked
+# every user out of DEV on the next upload; the assertion exists so that cannot
+# happen again by looking like the tidy thing to do.
+$name = 'Authentication/Registration/ExternalLoginEnabled'
+if (-not $settingByName.ContainsKey($name)) {
+    Add-Failure '7 registration' "Site setting '$name' is absent. Entra ID sign-in depends on it; set it explicitly to true."
+}
+else {
+    $value = ($settingByName[$name] -replace "^'|'$", '').Trim()
+    if ($value -notmatch '^(?i)true$') {
+        Add-Failure '7 registration' "Site setting '$name' is '$value', not true. Entra ID OIDC is an external identity provider, so this disables the only way in."
     }
 }
 

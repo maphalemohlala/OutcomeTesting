@@ -24,7 +24,7 @@
   adx_value: false
 - adx_name: Authentication/Registration/ExternalLoginEnabled
   adx_sitesettingid: 1d757839-8cb0-4da9-a240-9f0aef3ce99e
-  adx_value: false
+  adx_value: true
 - adx_name: Search/IndexQueryName
   adx_sitesettingid: 2745eff0-9945-4597-949b-9e26675ae84b
   adx_value: Portal Search

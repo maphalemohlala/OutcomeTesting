@@ -232,12 +232,32 @@ of section 8, so the file holds only rules that do something.
 |---|---|---|
 | `Authentication/Registration/OpenRegistrationEnabled` | `true` | `false` |
 | `Authentication/Registration/Enabled` | `true` | `false` |
-| `Authentication/Registration/ExternalLoginEnabled` | `true` | `false` |
+| `Authentication/Registration/ExternalLoginEnabled` | `true` | **`true` — unchanged, see below** |
 | `Authentication/Registration/LocalLoginEnabled` | `false` | `false` (unchanged) |
 
 Entra ID OpenIdConnect becomes the only route in, which is what PP-01 requires and what
 the AD-047 Entra-group-sync provisioning model already assumes. Contacts are provisioned
 by sync; nobody self-registers.
+
+### 7.1 ExternalLoginEnabled must stay ON, and an earlier draft of this section had it wrong
+
+This design originally listed `ExternalLoginEnabled` among the settings to turn off, on
+the reading that "external login" meant external self-service accounts. It does not. It
+is the site-wide switch for **external identity providers**, and Entra ID OIDC is one of
+them. Microsoft Learn's Entra setup page states it directly: if no identity providers
+appear in the maker UI, *External login* must be On
+(`power-pages/security/authentication/openid-settings`). This site's own
+`AzureADLoginEnabled` description agrees, calling Azure AD "an external identity
+provider".
+
+With `LocalLoginEnabled` and `Registration/Enabled` both off, turning external login off
+leaves **no route into the portal at all**. The value was briefly set to `false` in this
+work and would have locked every user out of DEV on the next upload.
+
+`Check-PortalSecurity.ps1` assertion 7 now asserts this setting is **`true`**, alongside
+the three it asserts are false. An assertion that a hardening gate requires something to
+be *enabled* looks wrong at a glance, which is exactly why it carries its reasoning
+inline: the next person to "tidy" it will read why first.
 
 Site setting ids are unchanged — only values change.
 
@@ -322,8 +342,8 @@ Assertions:
    set.
 5. At most one active Restrict Read rule per page.
 6. No page rule binds the Anonymous Users role.
-7. `Registration/Enabled`, `OpenRegistrationEnabled` and `ExternalLoginEnabled` are all
-   `false`.
+7. `Registration/Enabled`, `OpenRegistrationEnabled` and `LocalLoginEnabled` are all
+   `false`, and `ExternalLoginEnabled` is `true` (see 7.1).
 8. Every `adx_entitypermission_webrole` references a role that exists in `webrole.yml`
    — the check that would have caught a binding to the deleted Regional Manager role.
 
