@@ -21,10 +21,10 @@
   adx_value: False
 - adx_name: Authentication/Registration/Enabled
   adx_sitesettingid: 1718a762-9c61-40a3-b9dc-01772bee07f3
-  adx_value: true
+  adx_value: false
 - adx_name: Authentication/Registration/ExternalLoginEnabled
   adx_sitesettingid: 1d757839-8cb0-4da9-a240-9f0aef3ce99e
-  adx_value: true
+  adx_value: false
 - adx_name: Search/IndexQueryName
   adx_sitesettingid: 2745eff0-9945-4597-949b-9e26675ae84b
   adx_value: Portal Search
@@ -65,7 +65,7 @@
   adx_value: 00:05:00
 - adx_name: Authentication/Registration/OpenRegistrationEnabled
   adx_sitesettingid: 7f49cad0-5886-4c5d-9b5d-55e10b5c821d
-  adx_value: true
+  adx_value: false
 - adx_description: Denies use of the portal to minors. By default, it is set to false.
   adx_name: Authentication/Registration/DenyMinors
   adx_sitesettingid: 809d499f-e845-493f-8d57-3a9ade675127
