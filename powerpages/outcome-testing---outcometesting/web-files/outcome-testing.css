@@ -96,7 +96,7 @@
   --portalThemeColor2: #b0ed70;   /* was yellow - accent          */
   --portalThemeColor3: #0a3535;   /* was blue                     */
   --portalThemeColor4: #b0ed70;   /* was orange - hover/active    */
-  --portalThemeColor5: #0a3535;   /* was tan    - footer          */
+  --portalThemeColor5: #eaeeee;   /* was tan    - footer, light so the logo reads */
   --portalThemeColor6: #ccfdf3;   /* was sage                     */
   --portalThemeColor7: #ffffff;
   --portalThemeColor8: #0a3535;
@@ -179,16 +179,6 @@ html body .navbar-header a:focus-visible {
   width: auto !important;
 }
 
-html body .navbar .siteTitle,
-html body .navbar .custom-sitetitle {
-  font-family: var(--font-heading);
-  font-size: var(--text-xl);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--colour-text) !important;
-  margin: 0;
-}
-
 /* Navigation. The hovered item is marked by a filled mint chip, not by a
    rule under the text: the theme already draws its own underline, so a
    border here produced the double line. Underlines are suppressed on both
@@ -241,36 +231,59 @@ html body .navbar a:focus-visible {
 
 .navbar .divider-vertical { display: none; }
 
+/* The footer band is light so the Ascot Lloyd logo can sit in it unaltered.
+   The supplied mark is Teal #2b5257 and Highlight Green #b0ed70; against the
+   previous Dark Teal band that is 1.55:1, well under the 3:1 that WCAG 2.2 AA
+   1.4.11 requires of meaningful non-text content, and "teal on dark teal" is
+   not a pairing the brand contrast sheet offers. Rather than recolour a brand
+   asset, the band moved to the 10% teal tint: the logo reads at 7.3:1 and the
+   sheet's approved "teal on light" and "dark teal on light" pairings apply. */
 footer,
 footer.footer,
 footer[data-component-theme],
 .footer .footer-bottom {
-  background-color: var(--brand-teal-dark) !important;
+  background-color: var(--teal-tint-10) !important;
   background-image: none !important;
-  color: var(--colour-text-inverse) !important;
+  color: var(--colour-text) !important;
   font-size: var(--text-sm);
 }
 
-footer.footer { padding: var(--space-4) 0; }
+footer.footer {
+  padding: var(--space-4) 0;
+  border-top: var(--edge) solid var(--colour-border);
+}
 
 /* The footer content comes from an editable snippet, so its markup can carry
-   its own colours. Force white on every descendant, then restore the link
-   colour, so the text always reads against the dark teal band. */
+   its own colours. Force the body text colour onto every descendant, then
+   restore the link colour, so the text always reads against the light band. */
 footer, footer *,
 .footer, .footer * {
-  color: var(--colour-text-inverse) !important;
+  color: var(--colour-text) !important;
 }
 
 footer a, .footer a,
 footer a:hover, .footer a:hover,
 footer a:focus, .footer a:focus {
-  color: var(--brand-teal-light) !important;
+  color: var(--colour-action) !important;
   text-decoration: underline;
 }
 
+/* Dark teal, not Highlight Green. On the light band the green ring is 1.4:1,
+   which would fail the same 1.4.11 rule the band change exists to satisfy. */
 footer a:focus-visible, .footer a:focus-visible {
-  outline: 2px solid var(--brand-green-highlight);
+  outline: 2px solid var(--colour-focus);
   outline-offset: 2px;
+}
+
+/* 34px matches the height the header mark actually renders at: the snippet's
+   inline style says 32px, but `.navbar .navbar-brand img` overrides it with
+   !important. Matching the rendered value keeps the two lockups the same size.
+   width:auto preserves the 173.876 x 55.969 aspect ratio of the supplied SVG. */
+.ot-footer__logo {
+  display: block;
+  height: 34px;
+  width: auto;
+  margin-bottom: var(--space-3);
 }
 
 /* ------------------------------------------------------------------

@@ -1,3 +1,12 @@
-<p class="smallText">Copyright © </p>
-<p class="smallText">{{ now | date: 'yyyy' }}</p>
-<p class="smallText">. All rights reserved.</p>
+{% comment %}
+  The logo URL is read from the same 'Logo URL' snippet the header uses, so the
+  address is defined in one place and a brand change reaches both marks.
+
+  alt is deliberately empty and the mark is not a link: the header logo already
+  announces Ascot Lloyd and already links home, so repeating either here would
+  give screen reader and keyboard users a duplicate they have to step past.
+{% endcomment %}
+{% if snippets['Logo URL'] %}
+  <img class="ot-footer__logo" src="{{ snippets['Logo URL'] }}" alt="" aria-hidden="true">
+{% endif %}
+<p class="smallText">Copyright © {{ now | date: 'yyyy' }}. All rights reserved.</p>
