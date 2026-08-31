@@ -25,6 +25,8 @@ Portal web roles are a narrower set than the actor list above, settled 2026-08-3
 - **Every authenticated portal user holds Global read on cases** and can action only what is assigned to them (OD-022, 2026-08-31). This extends AD-056 from the two reviewer roles to all signed-in users; the ability to act is carried by the review assignment, not the case, so write reaches responses only through the Contact-anchored review chain.
 - Permissions are in practice bound to the built-in **Administrators** and **Authenticated Users** roles; the `AL Portal - *` roles above carry none and are inert (AD-067). Adding or removing one of those named roles therefore changes nothing until permissions are bound to it.
 
+Case allocation is manual and done in the PowerApps code app by **team leads and managers**; each review team (AQS and Tax) has a team lead (BR-003, AD-040). The capability is **not built yet** — `al_CaseAssignment` has no assigned-user lookup, there is no assign command and no allocation screen, so a case on the Tax-then-AQS route parks at `Queued` with no supported way forward (OD-029).
+
 ## Data principles
 - Dataverse is the system of record.
 - Use relational tables, stable alternate keys and explicit status/state models.
