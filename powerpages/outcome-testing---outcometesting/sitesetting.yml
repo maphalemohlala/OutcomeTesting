@@ -86,7 +86,7 @@
   adx_value: true
 - adx_name: Search/Enabled
   adx_sitesettingid: 8fc477ba-08f6-400c-8a3c-a5312bc46a26
-  adx_value: true
+  adx_value: false
 - adx_name: Site/BootstrapV5Enabled
   adx_sitesettingid: 91bd94f8-0456-4a06-a108-4915af19af86
   adx_value: true
