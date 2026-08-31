@@ -6,7 +6,7 @@
     The companion to Check-ComponentIds.ps1. That script asks whether the site
     will deploy intact; this one asks whether it is safe to deploy at all.
 
-    Eight assertions, each traceable to the design at
+    Ten assertions, each traceable to the design at
     docs/superpowers/specs/2026-08-31-portal-security-closure-design.md:
 
       1. No table permission grants an anonymous role anything.
@@ -19,7 +19,15 @@
          conflicting-rules error on more.
       6. No page rule binds the Anonymous Users role.
       7. Self-registration and external login are off.
-      8. Every web role referenced by a permission still exists.
+      8. Every web role referenced by a permission, or by a page rule, still
+         exists.
+      9. A Global-scope table permission never carries write, create or
+         delete. Scope alone must never be relied on to contain a right.
+     10. A Grant Change page rule may bind only the Administrators role. Grant
+         Change overrides every Restrict Read rule for whoever holds it.
+
+    Two guards refuse to treat a broken scan as a clean one: an empty page
+    scan, and a webrole.yml where no role can be identified as anonymous.
 
     Run before every `pac pages upload`, alongside Check-ComponentIds.ps1.
 
@@ -45,7 +53,18 @@ if (-not (Test-Path -LiteralPath $SitePath)) { throw "Site folder not found: $Si
 # Pages that may be reached without signing in. Sign-in itself is a system page
 # outside the web page tree; these three must render before authentication and
 # disclose nothing.
-$publicPages = @('Access Denied', 'Page Not Found', 'Default Offline Page')
+#
+# Keyed on adx_webpageid, not adx_name (I4): a name match lets anyone rename an
+# arbitrary page "Page Not Found" and have it silently exempted from assertion 3.
+# These ids were read out of web-pages/*/*.webpage.yml on 2026-08-31, not guessed:
+#   2c479bb8-b2ec-42ca-8659-5436357fb008  Access Denied         (web-pages/access-denied)
+#   8787d0d8-73e7-46a5-a53b-034bca05c819  Page Not Found        (web-pages/page-not-found)
+#   e3ab9f5e-60b9-47df-a196-022777161753  Default Offline Page  (web-pages/default-offline-page)
+$publicPageIds = @(
+    '2c479bb8-b2ec-42ca-8659-5436357fb008',
+    '8787d0d8-73e7-46a5-a53b-034bca05c819',
+    'e3ab9f5e-60b9-47df-a196-022777161753'
+)
 
 $failures = [System.Collections.Generic.List[string]]::new()
 function Add-Failure { param([string]$Rule, [string]$Detail) $failures.Add("[$Rule] $Detail") }
@@ -69,7 +88,11 @@ function Read-YamlDoc {
             else { $listKey = $null; $doc[$key] = $val }
             continue
         }
-        if ($listKey -and $line -match '^-\s+(.+)$') {
+        # Optional leading whitespace: a 2-space-indented list item under its key is
+        # valid YAML and is the shape pac itself emits elsewhere in this site (I1). A
+        # column-0-only pattern here silently parses such a file as roleless, which
+        # disarms assertions 1 and 8 without any failure being reported.
+        if ($listKey -and $line -match '^\s*-\s+(.+)$') {
             $doc[$listKey] += $Matches[1].Trim()
         }
     }
@@ -115,7 +138,24 @@ $rules = if (Test-Path -LiteralPath $rulesPath) { Read-YamlList $rulesPath } els
 
 $roleById = @{}
 foreach ($r in $roles) { $roleById[$r.adx_webroleid] = $r }
-$anonRoleIds = @($roles | Where-Object { $_.adx_anonymoususersrole -eq 'true' } | ForEach-Object { $_.adx_webroleid })
+
+# Values on disk are inconsistently quoted, same as the site setting values assertion 7
+# normalises below (C2) — strip surrounding quotes and compare case-insensitively rather
+# than trusting exact text. An exact 'true' match lets a role quoted as 'true' in
+# webrole.yml pass through as though it were not the anonymous role at all.
+$anonRoleIds = @($roles | Where-Object {
+    $flag = ($_.adx_anonymoususersrole -replace "^'|'$", '').Trim()
+    $flag -match '^(?i)true$'
+} | ForEach-Object { $_.adx_webroleid })
+
+# A site where no role can be identified as anonymous is not a clean site — it is a
+# broken scan (the flag renamed, quoted unrecognisably, or the row deleted outright),
+# and every assertion below that keys off $anonRoleIds would simply have nothing to
+# compare against, passing green over an unscanned anonymous-access hole (C2). Modelled
+# on the empty-page-scan guard below.
+if ($anonRoleIds.Count -eq 0) {
+    Add-Failure 'guard anonymous-role-missing' "No web role in webrole.yml carries adx_anonymoususersrole: true. The anonymous role cannot be identified; refusing to treat that as a clean scan."
+}
 
 $permissions = @()
 foreach ($f in Get-ChildItem -LiteralPath (Join-Path $SitePath 'table-permissions') -File -Filter '*.tablepermission.yml') {
@@ -149,7 +189,7 @@ $settings = Read-YamlList (Join-Path $SitePath 'sitesetting.yml')
 $settingByName = @{}
 foreach ($s in $settings) { $settingByName[$s.adx_name] = $s.adx_value }
 
-# ---------------------------------------------------------------- 1, 2, 8
+# ---------------------------------------------------------------- 1, 2, 8, 9
 foreach ($p in $permissions) {
     $bound = @($p.adx_entitypermission_webrole)
 
@@ -168,10 +208,29 @@ foreach ($p in $permissions) {
     if ($p.adx_entityname -match 'PROVISIONAL') {
         Add-Failure '2 provisional' "$($p._file) is still named '$($p.adx_entityname)'."
     }
+
+    # Assertion 9 (C1): Global scope (756150000) is site-wide by definition, so nothing
+    # ties it to any particular role — a Global permission with write, create or delete
+    # set is a right handed to whichever role the file names, with no further mechanism
+    # to contain it. adx_append/adx_appendto are deliberately excluded: Fail Reason -
+    # read (…073) is Global scope and legitimately carries adx_appendto for the
+    # al_al_failreason_al_response N:N association, so including it would fail the gate
+    # against the correct current site.
+    if ($p.adx_scope -eq '756150000') {
+        foreach ($right in @('adx_write', 'adx_create', 'adx_delete')) {
+            $value = ($p[$right] -replace "^'|'$", '').Trim()
+            if ($value -match '^(?i)true$') {
+                Add-Failure '9 global-scope-rights' "$($p._file) is Global scope and sets $right to true. Global scope must never carry write, create or delete."
+            }
+        }
+    }
 }
 
-# ---------------------------------------------------------------- 5, 6
+# ---------------------------------------------------------------- 5, 6, 8, 10
 $restrictRules = @($rules | Where-Object { $_.adx_right -eq '2' })
+
+# Id of the Administrators role, referenced by assertion 10 below.
+$adminRoleId = 'c53b2908-1fc1-4470-89cd-6f5b95c17ffe'
 
 # Assertion 6 scans EVERY rule, not just Restrict Read ones: the anonymous role
 # must never be bound to a page rule of any right, and a Grant Change rule is
@@ -179,10 +238,36 @@ $restrictRules = @($rules | Where-Object { $_.adx_right -eq '2' })
 # $restrictRules would let an anonymous Grant Change rule pass silently.
 foreach ($rule in $rules) {
     # A rule with no adx_webpageaccesscontrolrule_webrole key yields @($null);
-    # filter it out rather than let the anonymous-role check compare against it.
-    foreach ($id in (@($rule.adx_webpageaccesscontrolrule_webrole) | Where-Object { $_ })) {
+    # filter it out rather than let the anonymous-role and dangling-role checks
+    # compare against it.
+    $boundRoles = @($rule.adx_webpageaccesscontrolrule_webrole) | Where-Object { $_ }
+
+    foreach ($id in $boundRoles) {
         if ($anonRoleIds -contains $id) {
             Add-Failure '6 anonymous-page-rule' "Rule '$($rule.adx_name)' binds an anonymous web role."
+        }
+        # Assertion 8 (I2): page rules are now the main place a role id is referenced,
+        # so the dangling-role check above for table permissions is extended here too.
+        # This is also one of the two ways C2's fragile-anon-lookup bypass is closed:
+        # binding the (renamed-away) anonymous role to a page rule via an id that no
+        # longer resolves to any role in webrole.yml would otherwise pass unnoticed.
+        if (-not $roleById.ContainsKey($id)) {
+            Add-Failure '8 dangling-role' "Rule '$($rule.adx_name)' references web role $id, which does not exist in webrole.yml."
+        }
+    }
+
+    # Assertion 10 (I3): a Grant Change rule overrides every Restrict Read rule
+    # site-wide for whoever it binds (see the design's section 6.3 and 6, "Grant Change
+    # is permissive and overrides Restrict Read"). Left unconstrained, a Grant Change
+    # rule bound to Authenticated Users on Home defeats every Restrict Read rule in the
+    # site while every other assertion here still reports green. The one legitimate
+    # rule, "Grant Change to Administrators", binds only the Administrators role and
+    # satisfies this by construction.
+    if ($rule.adx_right -eq '1') {
+        $nonAdmin = @($boundRoles | Where-Object { $_ -ne $adminRoleId })
+        if ($nonAdmin.Count -gt 0) {
+            $names = ($nonAdmin | ForEach-Object { if ($roleById.ContainsKey($_)) { $roleById[$_].adx_name } else { $_ } }) -join ', '
+            Add-Failure '10 grant-change-not-admin' "Grant Change rule '$($rule.adx_name)' binds role(s) other than Administrators: $names. A Grant Change rule overrides every Restrict Read rule for whoever holds it, so only Administrators may hold one."
         }
     }
 }
@@ -225,7 +310,7 @@ function Get-EffectiveRule {
 }
 
 foreach ($page in $pages) {
-    if ($publicPages -contains $page.adx_name) { continue }
+    if ($publicPageIds -contains $page.adx_webpageid) { continue }
 
     $effective = Get-EffectiveRule -Page $page -RuleByPage $ruleByPage -PageById $pageById
     if (-not $effective) {
