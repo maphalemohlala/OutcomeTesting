@@ -832,7 +832,7 @@ In the design studio, sync configuration. Then, in an InPrivate session per role
 | Adviser opens `/remediation` | Renders |
 | Tax Reviewer opens another checker's review | Renders read-only; save is refused |
 | Any authenticated portal role opens `/cases` | Renders (OD-022) |
-| A contact with no portal web role opens `/` | Access denied — fail closed |
+| A contact with no portal web role opens `/` | Access denied — fail closed. **Watch for a redirect loop:** the Access Denied page inherits Home's rule, so a role-less contact may be denied the page they are being sent to. If that happens, clear `adx_parentpageid` on `Access Denied`, `Page Not Found` and `Default Offline Page` so they leave Home's inheritance chain, and re-run. Do not weaken the Home rule to fix it. |
 | Self-registration URL | Unavailable |
 
 Do **not** assert that an Administrator is denied any page. `Grant Change to Administrators` sits on Home with All content scope and overrides Restrict Read site-wide, so that test could only ever fail.
