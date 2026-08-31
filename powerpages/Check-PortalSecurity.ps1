@@ -126,12 +126,24 @@ foreach ($f in Get-ChildItem -LiteralPath (Join-Path $SitePath 'table-permission
 
 $pages = @()
 foreach ($f in Get-ChildItem -LiteralPath (Join-Path $SitePath 'web-pages') -Recurse -File -Filter '*.webpage.yml') {
-    if ($f.FullName -match 'content-pages') { continue }   # language variants, not the root page
+    # Language variants live in a content-pages subfolder; skip only THAT folder.
+    # Matching on $f.FullName (the full path) instead of the immediate parent
+    # would also match if the repo itself ever sat under a directory named
+    # "content-pages" — silently dropping every page in the scan.
+    if ($f.Directory.Name -eq 'content-pages') { continue }
     $doc = Read-YamlDoc $f.FullName
     if ($doc.adx_webpageid) { $pages += ,$doc }
 }
 $pageById = @{}
 foreach ($p in $pages) { $pageById[$p.adx_webpageid] = $p }
+
+# A scan that finds zero pages is not proof the site is clean — it's proof page
+# discovery broke (wrong -SitePath, a moved web-pages folder, an over-eager
+# content-pages filter). Left unguarded, assertions 3 and 4 would simply have
+# nothing to iterate and the gate would report a pass over a site nobody checked.
+if ($pages.Count -eq 0) {
+    Add-Failure 'guard empty-page-scan' "No web pages found under '$(Join-Path $SitePath 'web-pages')'. Page discovery is broken; refusing to treat that as a clean site."
+}
 
 $settings = Read-YamlList (Join-Path $SitePath 'sitesetting.yml')
 $settingByName = @{}
@@ -141,7 +153,10 @@ foreach ($s in $settings) { $settingByName[$s.adx_name] = $s.adx_value }
 foreach ($p in $permissions) {
     $bound = @($p.adx_entitypermission_webrole)
 
-    foreach ($id in $bound) {
+    # A permission with no adx_entitypermission_webrole key at all yields @($null),
+    # a one-element array whose element is $null — filter it out before the
+    # ContainsKey calls below, which throw on a null key rather than returning false.
+    foreach ($id in ($bound | Where-Object { $_ })) {
         if ($anonRoleIds -contains $id) {
             Add-Failure '1 anonymous-permission' "$($p._file) grants '$($p.adx_entityname)' to an anonymous web role."
         }
@@ -158,8 +173,14 @@ foreach ($p in $permissions) {
 # ---------------------------------------------------------------- 5, 6
 $restrictRules = @($rules | Where-Object { $_.adx_right -eq '2' })
 
-foreach ($rule in $restrictRules) {
-    foreach ($id in @($rule.adx_webpageaccesscontrolrule_webrole)) {
+# Assertion 6 scans EVERY rule, not just Restrict Read ones: the anonymous role
+# must never be bound to a page rule of any right, and a Grant Change rule is
+# exactly the shape someone copies when adding a new one. Scoping this to
+# $restrictRules would let an anonymous Grant Change rule pass silently.
+foreach ($rule in $rules) {
+    # A rule with no adx_webpageaccesscontrolrule_webrole key yields @($null);
+    # filter it out rather than let the anonymous-role check compare against it.
+    foreach ($id in (@($rule.adx_webpageaccesscontrolrule_webrole) | Where-Object { $_ })) {
         if ($anonRoleIds -contains $id) {
             Add-Failure '6 anonymous-page-rule' "Rule '$($rule.adx_name)' binds an anonymous web role."
         }
@@ -173,7 +194,15 @@ foreach ($group in $restrictRules | Group-Object { $_.adx_webpageid } | Where-Ob
 
 # ---------------------------------------------------------------- 3, 4
 $ruleByPage = @{}
-foreach ($rule in $restrictRules) { $ruleByPage[$rule.adx_webpageid] = $rule }
+foreach ($rule in $restrictRules) {
+    # A site-scoped rule (adx_scope not 'page') carries no adx_webpageid at all —
+    # "Grant Change to Content" is exactly this shape today, at adx_right 1, but
+    # nothing stops a future Restrict Read rule from being scoped the same way.
+    # Indexing a hashtable with a null key throws, so skip rather than crash;
+    # such a rule can't be attributed to any one page for assertions 3-5 anyway.
+    if (-not $rule.adx_webpageid) { continue }
+    $ruleByPage[$rule.adx_webpageid] = $rule
+}
 
 # Walks a page up its parent chain and returns the nearest Restrict Read rule,
 # which is the one Power Pages actually applies through inheritance.
@@ -208,8 +237,12 @@ foreach ($page in $pages) {
     if ($ruleByPage.ContainsKey($page.adx_webpageid)) {
         $ancestor = Get-EffectiveRule -Page $page -RuleByPage $ruleByPage -PageById $pageById -Inherited
         if ($ancestor) {
-            $own = @($effective.adx_webpageaccesscontrolrule_webrole)
-            $parent = @($ancestor.adx_webpageaccesscontrolrule_webrole)
+            # Filter out $null here: a rule with no adx_webpageaccesscontrolrule_webrole
+            # key yields @($null), which would otherwise (a) manufacture a spurious
+            # "extra role" that is really just "no roles bound", and (b) crash the
+            # ContainsKey lookup below, which throws on a null key.
+            $own = @($effective.adx_webpageaccesscontrolrule_webrole) | Where-Object { $_ }
+            $parent = @($ancestor.adx_webpageaccesscontrolrule_webrole) | Where-Object { $_ }
             $extra = @($own | Where-Object { $parent -notcontains $_ })
             if ($extra.Count -gt 0) {
                 $names = ($extra | ForEach-Object { if ($roleById.ContainsKey($_)) { $roleById[$_].adx_name } else { $_ } }) -join ', '
