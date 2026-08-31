@@ -97,7 +97,32 @@ least one contact holds each of:
 If any role shows zero members, stop and raise it before continuing — do not upload a
 permission model nobody can exercise.
 
-**Result:** _(not run)_
+**Result: RUN 2026-08-31 — FAILED. Stopped here; the upload was not performed.**
+
+Queried with `pac org fetch` against `Env_AQ_Dev` (logical names in this environment are
+`mspp_*`, not `adx_*`):
+
+- **`contact` row count: 1.** That single contact is Active but has no `fullname`, no
+  `firstname`/`lastname` and no `emailaddress1`.
+- **`al_user` row count: 10.** The application side has ten identities; the portal side
+  has none that can be used.
+- Every `AL Portal - *` web role therefore has **zero usable members**.
+
+The ten web roles that exist in DEV are the pre-branch set — `AL Portal - Regional
+Manager` (`…094`) is still present and `AL Portal - Planner` (`…097`) is absent, which is
+expected, since this branch has not been uploaded.
+
+**What this means.** AD-047 provisions portal contacts by Entra group sync, joined to the
+application identity on work email. That sync has evidently never run against DEV: there
+is no contact carrying an email to join on. Uploading this branch in that state would
+apply the Restrict Read rule on Home to a site where nobody holds a portal role, so every
+authenticated user would be denied every page. Administrators would still reach
+everything through the `Grant Change to Administrators` rule, so DEV would not be bricked
+— but steps 4 and 7 could not be performed at all, because there is no contact to sign in
+as, and step 6's irreversible deletions would then run against an environment whose
+sign-in path was never verified.
+
+**This is the gate doing its job.** Resolve portal identity before re-running from step 3.
 
 ## 3. Upload
 
