@@ -818,6 +818,26 @@ diff --strip-trailing-cr powerpages/outcome-testing---outcometesting/webpagerule
 
 Expected: no differences. This is the step that proves `pac pages upload` carries `adx_webpageaccesscontrolrule`; download was already observed to serialise it, but upload was inferred rather than seen. If the five new rules are absent from the re-download, stop: the rules must then be created through the Portal Management app, and that fact must be recorded before anything else proceeds.
 
+- [ ] **Step 4b: Verify the deletions actually happened, because upload does not delete**
+
+`pac pages upload` is **additive**. Removing a YAML file from the site folder does not remove the corresponding row from the target environment. Left unchecked, this branch uploads cleanly and the portal still carries the anonymous-create `Feedback` permission — the single most important thing this sub-project set out to remove.
+
+Confirm each of these is genuinely gone from DEV, using the re-downloaded scratch folder from step 4 and the Portal Management app:
+
+| Deleted in | Component | Id |
+|---|---|---|
+| Task 4 | `Feedback` table permission (**Anonymous Users, create**) | `73e2df0d-fb6c-4d88-94cc-eeec79eaca3e` |
+| Task 4 | `PROVISIONAL DEV ONLY - Outcome` | `a1000000-0000-4000-8000-000000000064` |
+| Task 4 | `PROVISIONAL DEV ONLY - ChecklistVersion` | `a1000000-0000-4000-8000-000000000065` |
+| Task 4 | `PROVISIONAL DEV ONLY - Checklist` | `a1000000-0000-4000-8000-00000000006a` |
+| Task 3 | `AL Portal - Regional Manager` web role | `a1000000-0000-4000-8000-000000000094` |
+| Task 5 | `Grant Change to Content` page rule | `7f9846c2-9af9-4dae-a52d-4b106ec11302` |
+| Task 7 | `contact-us`, `search`, `pages`, `subpage-1`, `subpage-2` web pages | see Task 7 |
+
+If the re-download still lists any of them, delete it **environment-side** in the Portal Management app, then re-download and confirm again. Do not proceed to step 5 until the scratch download is free of all of them: a role matrix run against a site that still holds the old permissions tests the wrong site.
+
+Deleting rows in a shared environment is destructive and irreversible. Confirm the target is DEV before each deletion, and record what was deleted in the deployment document.
+
 - [ ] **Step 5: Clear the site cache and run the role matrix**
 
 In the design studio, sync configuration. Then, in an InPrivate session per role:
