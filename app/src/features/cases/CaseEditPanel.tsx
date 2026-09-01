@@ -19,6 +19,7 @@ import {
   Al_outcomecasesal_taxteamdisposition,
   Al_outcomecasesal_vulnerableclient,
 } from '../../generated/models/Al_outcomecasesModel';
+import { nextStatuses, type CaseStatus } from '../../types/domain';
 import type { CaseDetail, CaseEditValues } from './useCaseDetail';
 import './CaseEditPanel.css';
 
@@ -122,8 +123,21 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
         }
       }
     }
+
+    // Status is the one choice that is not a free list: offering all thirteen values lets
+    // a manager pick a move the al_UpdateCaseDetails command will refuse, and previously
+    // let a case jump straight to Closed. The command is still the authoritative gate
+    // (AD-003); this only stops the UI proposing what it would reject.
+    const reachable = nextStatuses(detail.status);
+    lists.set(
+      'al_casestatus',
+      toOptions(Al_outcomecasesal_casestatus).filter((option) =>
+        reachable.includes(option.label as CaseStatus),
+      ),
+    );
+
     return lists;
-  }, []);
+  }, [detail.status]);
 
   if (!can('page.cases', 'Edit')) {
     return null;
@@ -238,7 +252,11 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
                             value={value == null ? '' : String(value)}
                             onChange={(e) => setField(field.attr, field.kind, e.target.value)}
                           >
-                            <option value="">Not set</option>
+                            {/* Status is mandatory and always set, so "Not set" is not one
+                                of its choices; the server refuses a cleared status too. */}
+                            {field.attr === 'al_casestatus' ? null : (
+                              <option value="">Not set</option>
+                            )}
                             {(optionLists.get(field.attr) ?? []).map((option) => (
                               <option key={option.value} value={String(option.value)}>
                                 {option.label}

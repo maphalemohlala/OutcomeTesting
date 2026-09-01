@@ -1,0 +1,786 @@
+{% extends 'OT Layout' %}
+{% block content %}
+{% comment %}
+  Review detail: renders the questionnaire version issued to this review
+  (PP-07, PP-08, PP-09).
+
+  The chain is Checklist Version -> Section -> Question -> Question Version.
+  Questions are read from the version stamped on the review instance, never
+  from the current editable question record, so a historic review always
+  renders the wording, order and response type that applied when it was
+  answered (BR-013, FR-030, FR-031).
+
+  Answerable by the assigned checker (AD-053). Answers are written straight to
+  al_response over the portal Web API, which supports create and update; only
+  actions are unsupported, which is why submission still goes through a cloud
+  flow and answering does not. Every rule that matters - the submission lock,
+  the AD-023 column match, the option subset and AD-020 section ownership - is
+  enforced by ResponseGuardPlugin, so nothing here is a security boundary
+  (NFR-SEC-01).
+{% endcomment %}
+
+{% assign review_id = request.params['id'] %}
+
+{% if review_id == null or review_id == empty %}
+  {% include 'OT Empty State' title: 'No review selected' message: 'Open a review from a worklist to see its questionnaire.' %}
+{% else %}
+
+  {% fetchxml review %}
+  <fetch top="1">
+    <entity name="al_reviewinstance">
+      <attribute name="al_reviewinstanceid" />
+      <attribute name="al_name" />
+      <attribute name="al_reviewtype" />
+      <attribute name="al_reviewstatus" />
+      <attribute name="al_sequence" />
+      <attribute name="al_startedon" />
+      <attribute name="al_submittedon" />
+      <attribute name="al_checklistversionid" />
+      <attribute name="al_assignedcontactid" />
+      <filter type="and">
+        <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | xml_escape }}" />
+      </filter>
+      <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
+        <attribute name="al_outcomecaseid" />
+        <attribute name="al_casereference" />
+        <attribute name="al_clientname" />
+        <attribute name="al_advisername" />
+      </link-entity>
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+
+  {% assign rv = review.results.entities[0] %}
+
+  {% if rv == null %}
+    {% include 'OT Empty State' title: 'Review not available' message: 'This review does not exist, or you do not have permission to view it.' %}
+  {% else %}
+
+    {% assign cv_id = rv.al_checklistversionid.id %}
+
+    {% comment %}
+      AD-020 section ownership, keyed by the review's discipline. Filtering in the query
+      rather than in the loop is what makes the Tax/AQS split structural: a Tax checker's
+      page never receives an AQS section's questions at all, which is what PP-08's
+      "no cross-discipline overwrite" needs. The same rule is enforced again server-side
+      by ResponseGuardPlugin, because a filter in a page is not a security boundary
+      (NFR-SEC-01).
+    {% endcomment %}
+    {% if rv.al_reviewtype.value == 120910200 %}
+      {% assign owner_role = 120910100 %}
+    {% else %}
+      {% assign owner_role = 120910101 %}
+    {% endif %}
+
+    {% comment %}
+      A submitted review is read-only (PP-11). The questionnaire renders for a submitted
+      review too, so every control is disabled and the autosave script is not emitted at
+      all. ResponseGuardPlugin refuses the write regardless; disabling the control is what
+      stops a checker typing into a field that can never save.
+    {% endcomment %}
+    {% if rv.al_submittedon %}
+      {% assign locked = true %}
+    {% else %}
+      {% assign locked = false %}
+    {% endif %}
+
+    {% comment %}
+      AD-056: a reviewer reads every review but changes only their own. Because reading
+      another reviewer's review is now intended, the page must say so and disable its
+      controls - otherwise a checker types into fields that the table permissions will
+      refuse on save. The permission chain is the actual boundary; this is what stops the
+      user discovering it the hard way.
+    {% endcomment %}
+    {% if rv.al_assignedcontactid.id and rv.al_assignedcontactid.id == user.id %}
+      {% assign mine = true %}
+    {% else %}
+      {% assign mine = false %}
+    {% endif %}
+
+    {% if locked or mine == false %}
+      {% assign editable = false %}
+    {% else %}
+      {% assign editable = true %}
+    {% endif %}
+
+    <section class="ot-card" aria-labelledby="ot-review-summary">
+      <h2 class="ot-card__title" id="ot-review-summary">
+        {{ rv.al_reviewtype.label | escape }} review
+        {% include 'OT Status Badge' status: rv.al_reviewstatus.label %}
+      </h2>
+      <dl class="ot-dl">
+        <div>
+          <dt>Case</dt>
+          <dd>
+            {% assign cid = rv['case.al_outcomecaseid'] %}
+            {% if cid %}
+              <a href="/case-details?id={{ cid }}">{{ rv['case.al_casereference'] | default: 'Untitled case' | escape }}</a>
+            {% else %}
+              {{ rv['case.al_casereference'] | default: '—' | escape }}
+            {% endif %}
+          </dd>
+        </div>
+        <div><dt>Client</dt><dd>{{ rv['case.al_clientname'] | default: '—' | escape }}</dd></div>
+        <div><dt>Adviser</dt><dd>{{ rv['case.al_advisername'] | default: '—' | escape }}</dd></div>
+        <div><dt>Checklist version</dt><dd>{{ rv.al_checklistversionid.name | default: '—' | escape }}</dd></div>
+        <div><dt>Sequence</dt><dd>{{ rv.al_sequence | default: '—' }}</dd></div>
+        <div><dt>Started</dt><dd>{{ rv.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
+        <div><dt>Submitted</dt><dd>{{ rv.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
+      </dl>
+    </section>
+
+    {% if rv.al_submittedon %}
+      <div class="ot-notice" role="status">
+        <strong>Submitted {{ rv.al_submittedon | date: 'dd MMM yyyy' }}.</strong>
+        This review is locked. Reopening or regrading is a T&amp;C Manager action and
+        requires a recorded reason (AD-031).
+      </div>
+    {% elsif mine == false %}
+      {% comment %}
+        Reading another reviewer's work is intended under AD-056; changing it is not.
+        Saying so plainly is better than presenting controls that fail on save.
+      {% endcomment %}
+      <div class="ot-notice" role="status">
+        <strong>This review is assigned to someone else.</strong>
+        You can read it, but only the assigned reviewer can record or change answers on it.
+      </div>
+    {% else %}
+      {% comment %}
+        Submit panel. The button is only an affordance: al_SubmitReview re-checks
+        the caller, the status transition and every mandatory question server-side,
+        so hiding or showing it changes nothing about what is permitted
+        (NFR-SEC-01). The flow trigger id comes from a site setting so it differs
+        per environment and never appears in source.
+      {% endcomment %}
+      <section class="ot-card ot-submit"
+               data-ot-submit
+               data-review-id="{{ rv.al_reviewinstanceid }}"
+               data-flow-id="{{ settings['OutcomeTesting/Flow/SubmitReview'] | default: '' }}"
+               aria-labelledby="ot-submit-heading">
+        <h2 class="ot-card__title" id="ot-submit-heading">Submit this review</h2>
+        <p>
+          Submitting locks the review. Every question marked Required must be answered
+          first; the check runs server-side, so a missing answer is refused rather than
+          silently accepted.
+        </p>
+        <p>
+          <button type="button" class="ot-btn ot-btn--primary" data-ot-submit-button>
+            Submit review
+          </button>
+        </p>
+        <p class="ot-submit__status" data-ot-submit-status aria-live="polite"></p>
+        {% unless settings['OutcomeTesting/Flow/SubmitReview'] %}
+          <p class="ot-submit__status ot-submit__status--error" role="status">
+            Submitting is not configured in this environment yet. The
+            <code>OutcomeTesting/Flow/SubmitReview</code> site setting has no value.
+          </p>
+        {% endunless %}
+      </section>
+      <script>
+        /*
+         * Submit Review (PP-07, PP-08, PP-11).
+         *
+         * Path: portal page -> secured cloud flow -> al_SubmitReview custom API -> Dataverse.
+         *
+         * The hop through Power Automate is not a preference. The portals Web API
+         * explicitly does not support calling actions or functions, so a Custom API
+         * cannot be invoked from a page directly; a cloud flow with the "When Power
+         * Pages calls a flow" trigger is the supported route.
+         *
+         * This script is progressive enhancement only. Every rule that matters -
+         * caller, transition, mandatory questions, concurrency, idempotency, and the
+         * submission lock - is enforced in the plug-in. Disabling the button here is a
+         * courtesy to the user, never an access control (NFR-SEC-01).
+         */
+        (function () {
+          'use strict';
+
+          var root = document.querySelector('[data-ot-submit]');
+          if (!root) { return; }
+
+          var button = root.querySelector('[data-ot-submit-button]');
+          var status = root.querySelector('[data-ot-submit-status]');
+          var reviewId = root.getAttribute('data-review-id');
+          var flowId = root.getAttribute('data-flow-id');
+          var rowVersion = root.getAttribute('data-row-version') || '';
+
+          if (!button || !reviewId) { return; }
+
+          /*
+           * One idempotency key per review per browser session. A retry after a
+           * network failure replays the same key, so the command recognises it as the
+           * same intent and returns the original Audit Event instead of writing a
+           * second one (NFR-REL-01). A fresh page load starts a new attempt.
+           */
+          function idempotencyKey() {
+            var storageKey = 'ot.submit.' + reviewId;
+            var existing = null;
+            try { existing = window.sessionStorage.getItem(storageKey); } catch (e) { /* private mode */ }
+            if (existing) { return existing; }
+
+            var key;
+            if (window.crypto && window.crypto.randomUUID) {
+              key = window.crypto.randomUUID();
+            } else {
+              key = 'ot-' + reviewId + '-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+            }
+            try { window.sessionStorage.setItem(storageKey, key); } catch (e) { /* ignore */ }
+            return key;
+          }
+
+          function show(message, kind) {
+            if (!status) { return; }
+            status.textContent = message;
+            status.className = 'ot-submit__status ot-submit__status--' + (kind || 'info');
+            status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+          }
+
+          /*
+           * The plug-in prefixes its failures so the client can branch without parsing
+           * prose. Messages here say what happened, what is still safe, and what to do
+           * next, and never expose a table name, query, id or stack trace (PP-16).
+           */
+          function friendlyError(raw) {
+            var text = String(raw || '');
+            if (text.indexOf('CONFLICT:') !== -1) {
+              return 'This review changed since you opened it. Reload the page and try again - your answers are still saved.';
+            }
+            if (text.indexOf('UNAUTHORIZED:') !== -1) {
+              return 'You do not have permission to submit this review.';
+            }
+            if (text.indexOf('PRECONDITION:') !== -1) {
+              // Carries the actionable detail, e.g. how many required questions remain.
+              var idx = text.indexOf('PRECONDITION:');
+              return text.substring(idx + 'PRECONDITION:'.length).trim();
+            }
+            return 'We could not submit this review. Nothing has been changed. Please try again, and contact support if it keeps happening.';
+          }
+
+          function setBusy(busy) {
+            button.disabled = busy;
+            button.setAttribute('aria-busy', busy ? 'true' : 'false');
+            button.textContent = busy ? 'Submitting...' : 'Submit review';
+          }
+
+          button.addEventListener('click', function () {
+            if (button.disabled) { return; }
+
+            if (!flowId) {
+              show('Submitting is not configured for this environment yet. Contact your administrator.', 'error');
+              return;
+            }
+
+            if (!window.shell || typeof window.shell.ajaxSafePost !== 'function') {
+              show('This page did not load completely. Refresh and try again.', 'error');
+              return;
+            }
+
+            setBusy(true);
+            show('Submitting your review...', 'info');
+
+            var payload = {
+              TargetId: reviewId,
+              IdempotencyKey: idempotencyKey(),
+              ExpectedRowVersion: rowVersion
+            };
+
+            window.shell.ajaxSafePost({
+              type: 'POST',
+              url: '/_api/cloudflow/v1.0/trigger/' + flowId,
+              contentType: 'application/json',
+              data: { eventData: JSON.stringify(payload) }
+            })
+              .done(function (response) {
+                var body = response;
+                if (typeof body === 'string') {
+                  try { body = JSON.parse(body); } catch (e) { body = {}; }
+                }
+                body = body || {};
+
+                // The flow surfaces the plug-in's failure rather than throwing, so a
+                // 200 does not by itself mean the command succeeded.
+                if (body.Error || body.error) {
+                  show(friendlyError(body.Error || body.error), 'error');
+                  setBusy(false);
+                  return;
+                }
+
+                show('Review submitted. Reloading...', 'success');
+                try { window.sessionStorage.removeItem('ot.submit.' + reviewId); } catch (e) { /* ignore */ }
+                window.setTimeout(function () { window.location.reload(); }, 800);
+              })
+              .fail(function (xhr) {
+                var raw = '';
+                if (xhr) {
+                  raw = xhr.responseText || (xhr.statusText || '');
+                }
+                show(friendlyError(raw), 'error');
+                setBusy(false);
+              });
+          });
+        })();
+
+      </script>
+    {% endif %}
+
+    {% if cv_id == null %}
+      {% include 'OT Empty State' title: 'No checklist version issued' message: 'This review has no checklist version, so no questions can be rendered.' %}
+    {% else %}
+
+      {% fetchxml questions %}
+      <fetch>
+        <entity name="al_questionversion">
+          <attribute name="al_questionversionid" />
+          <attribute name="al_questiontext" />
+          <attribute name="al_responsetype" />
+          <attribute name="al_ismandatory" />
+          <attribute name="al_versionnumber" />
+          <attribute name="al_displayorder" />
+          <link-entity name="al_question" from="al_questionid" to="al_questionid" alias="q">
+            <attribute name="al_displayorder" />
+            <link-entity name="al_section" from="al_sectionid" to="al_sectionid" alias="s">
+              <attribute name="al_sectionid" />
+              <attribute name="al_name" />
+              <attribute name="al_displayorder" />
+              <attribute name="al_helptext" />
+              <attribute name="al_ownerrole" />
+              <filter type="and">
+                <condition attribute="al_checklistversionid" operator="eq" value="{{ cv_id }}" />
+                <condition attribute="al_ownerrole" operator="eq" value="{{ owner_role }}" />
+              </filter>
+            </link-entity>
+          </link-entity>
+          <order entityname="s" attribute="al_displayorder" />
+          <order entityname="q" attribute="al_displayorder" />
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+
+      {% fetchxml responses %}
+      <fetch>
+        <entity name="al_response">
+          <attribute name="al_responseid" />
+          <attribute name="al_questionversionid" />
+          <attribute name="al_answertext" />
+          <attribute name="al_answerchoice" />
+          <attribute name="al_answerchoices" />
+          <attribute name="al_answerdate" />
+          <filter type="and">
+            <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | xml_escape }}" />
+          </filter>
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+
+      {% comment %}
+        Fail reasons (FR-013, AD-054). Reference data, fetched once and reused by every
+        answer rather than per question. The picker is revealed by the client only for a
+        non-pass selection.
+      {% endcomment %}
+      {% fetchxml failreasons %}
+      <fetch>
+        <entity name="al_failreason">
+          <attribute name="al_failreasonid" />
+          <attribute name="al_name" />
+          <attribute name="al_category" />
+          <attribute name="al_displayorder" />
+          <order attribute="al_displayorder" />
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+
+      {% fetchxml selectedreasons %}
+      <fetch>
+        <entity name="al_failreason">
+          <attribute name="al_failreasonid" />
+          <link-entity name="al_al_failreason_al_response" from="al_failreasonid" to="al_failreasonid" intersect="true">
+            <link-entity name="al_response" from="al_responseid" to="al_responseid" alias="r">
+              <attribute name="al_responseid" />
+              <filter type="and">
+                <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | xml_escape }}" />
+              </filter>
+            </link-entity>
+          </link-entity>
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+
+      {% comment %}
+        Flattened to a delimited key list so the per-checkbox test is a string match
+        rather than a nested loop over every pair for all 42 questions.
+      {% endcomment %}
+      {% capture selected_reason_pairs %}{% for s in selectedreasons.results.entities %}|{{ s['r.al_responseid'] }}~{{ s.al_failreasonid }}{% endfor %}|{% endcapture %}
+
+      {% assign qrows = questions.results.entities %}
+      {% assign arows = responses.results.entities %}
+
+      {% if qrows.size == 0 %}
+        {% include 'OT Empty State' title: 'No questions in this version' message: 'The checklist version issued to this review has no sections or questions.' %}
+      {% else %}
+
+        {% comment %}
+          The questionnaire. Each question renders the control matching its response
+          type and writes the AD-023 typed column. The wrapper carries the review id so
+          the autosave script does not have to re-parse the query string.
+        {% endcomment %}
+        <div data-ot-questionnaire data-review-id="{{ rv.al_reviewinstanceid }}">
+        {% assign current_section = '' %}
+        {% for qv in qrows %}
+          {% assign sid = qv['s.al_sectionid'] %}
+
+          {% if sid != current_section %}
+            {% unless forloop.first %}
+              </div>
+            </section>
+            {% endunless %}
+            {% assign current_section = sid %}
+
+            <section class="ot-card" aria-labelledby="sec-{{ sid }}">
+              <h2 class="ot-card__title" id="sec-{{ sid }}">
+                {{ qv['s.al_name'] | escape }}
+                {% assign owner = qv['s.al_ownerrole'] %}
+                {% if owner and owner.label %}
+                  <span class="ot-badge ot-badge--waiting">{{ owner.label | escape }}</span>
+                {% endif %}
+              </h2>
+              {% if qv['s.al_helptext'] %}
+                <p class="ot-section-help">{{ qv['s.al_helptext'] | escape }}</p>
+              {% endif %}
+              <div class="ot-answers">
+          {% endif %}
+
+          {% assign qv_id = qv.al_questionversionid %}
+          {% assign rt = qv.al_responsetype.value %}
+
+          {% assign existing = null %}
+          {% for a in arows %}
+            {% if a.al_questionversionid.id == qv_id %}{% assign existing = a %}{% endif %}
+          {% endfor %}
+
+          {% if rt == 120910000 or rt == 120910001 %}{% assign column = 'text' %}
+          {% elsif rt == 120910002 %}{% assign column = 'date' %}
+          {% elsif rt == 120910004 %}{% assign column = 'choices' %}
+          {% else %}{% assign column = 'choice' %}
+          {% endif %}
+
+          <div class="ot-answer"
+               data-ot-answer
+               data-question-version="{{ qv_id }}"
+               data-response-id="{{ existing.al_responseid }}"
+               data-response-type="{{ rt }}"
+               data-column="{{ column }}">
+
+            <fieldset class="ot-answer__field">
+              <legend class="ot-answer__legend">
+                {{ qv.al_questiontext | escape }}
+                {% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}
+              </legend>
+
+              {% if column == 'text' %}
+                {% if rt == 120910001 %}
+                  <textarea class="ot-answer__input" rows="4"
+                            data-ot-input{% unless editable %} disabled{% endunless %}
+                            aria-label="{{ qv.al_questiontext | escape }}">{{ existing.al_answertext | escape }}</textarea>
+                {% else %}
+                  <input type="text" class="ot-answer__input"
+                         data-ot-input{% unless editable %} disabled{% endunless %}
+                         value="{{ existing.al_answertext | escape }}"
+                         aria-label="{{ qv.al_questiontext | escape }}" />
+                {% endif %}
+
+              {% elsif column == 'date' %}
+                <input type="date" class="ot-answer__input"
+                       data-ot-input{% unless editable %} disabled{% endunless %}
+                       value="{{ existing.al_answerdate | date: 'yyyy-MM-dd' }}"
+                       aria-label="{{ qv.al_questiontext | escape }}" />
+
+              {% elsif column == 'choices' %}
+                {% comment %}
+                  Tax check reason (Q-TAX-01), the only multi-select in V8. FetchXML returns
+                  a multi-select picklist as its comma-separated labels, so the checked test
+                  is a label match. None of the five labels is a substring of another.
+                {% endcomment %}
+                {% assign mvalues = '120910340,120910341,120910342,120910343,120910344' | split: ',' %}
+                {% assign mlabels = 'LSA/LSDBA/TTFAC,Trust,IHT,Tax calculation,Other' | split: ',' %}
+                <div class="ot-answer__options">
+                  {% for opt in mvalues %}
+                    <label class="ot-answer__option">
+                      <input type="checkbox" data-ot-input value="{{ opt }}"{% unless editable %} disabled{% endunless %}
+                             {% if existing.al_answerchoices contains mlabels[forloop.index0] %}checked{% endif %} />
+                      <span>{{ mlabels[forloop.index0] }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+
+              {% else %}
+                {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id editable: editable %}
+              {% endif %}
+
+              {% comment %}
+                al_answertext doubles as the evidence note held with a structured answer,
+                which is how the Code App already reads the record
+                (app/src/features/reviews/useReviewDetail.ts, noteOf). The client reveals it
+                only for a non-pass selection; it stays optional under AD-019.
+              {% endcomment %}
+              {% if column == 'choice' or column == 'choices' %}
+                <div class="ot-answer__reasons" data-ot-reasons hidden>
+                  <p class="ot-answer__note-label">Fail reasons — select all that apply</p>
+                  {% for fr in failreasons.results.entities %}
+                    <label class="ot-answer__option">
+                      {% capture pairkey %}|{{ existing.al_responseid }}~{{ fr.al_failreasonid }}{% endcapture %}<input type="checkbox" data-ot-reason value="{{ fr.al_failreasonid }}"{% unless editable %} disabled{% endunless %}{% if existing.al_responseid and selected_reason_pairs contains pairkey %} checked{% endif %} />
+                      <span>{{ fr.al_category.label | escape }} — {{ fr.al_name | escape }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+                <div class="ot-answer__note" data-ot-note hidden>
+                  <label class="ot-answer__note-label" for="note-{{ qv_id }}">
+                    Evidence or observation (optional)
+                  </label>
+                  <textarea id="note-{{ qv_id }}" class="ot-answer__input" rows="3"
+                            data-ot-note-input{% unless editable %} disabled{% endunless %}>{{ existing.al_answertext | escape }}</textarea>
+                </div>
+              {% endif %}
+            </fieldset>
+
+            <p class="ot-answer__status" data-ot-status aria-live="polite"></p>
+          </div>
+
+          {% if forloop.last %}
+              </div>
+            </section>
+          {% endif %}
+        {% endfor %}
+        </div>
+        {% if editable %}
+        <script>
+          /*
+           * Answer autosave and fail reasons (PP-07, PP-08, FR-013, AD-053, AD-054).
+           *
+           * Path: page -> Portals Web API -> al_response -> ResponseGuardPlugin.
+           *
+           * Unlike submission, this needs no cloud flow. The Portals Web API supports
+           * create, update and associate; only actions are unsupported, which is why
+           * al_SubmitReview goes through Power Automate and answering does not. It also
+           * keeps a debounced edit from spending a flow run.
+           *
+           * Every rule that matters - the submission lock, the AD-023 column match, the
+           * option subset and AD-020 section ownership - is enforced in the plug-in. This
+           * script is convenience, never access control (NFR-SEC-01).
+           */
+          (function () {
+            'use strict';
+
+            var DEBOUNCE_MS = 800;
+            var NON_PASS = [120910301, 120910302, 120910304];
+
+            var shell = document.querySelector('[data-ot-questionnaire]');
+            if (!shell) { return; }
+            var REVIEW_ID = shell.getAttribute('data-review-id');
+            if (!REVIEW_ID) { return; }
+
+            function api(method, path, body, onDone, onFail) {
+              var xhr = new XMLHttpRequest();
+              xhr.open(method, '/_api/' + path, true);
+              xhr.setRequestHeader('Content-Type', 'application/json');
+              xhr.setRequestHeader('Accept', 'application/json');
+              xhr.setRequestHeader('OData-MaxVersion', '4.0');
+              xhr.setRequestHeader('OData-Version', '4.0');
+
+              // Power Pages requires the request verification token on every write.
+              var token = document.querySelector('[name="__RequestVerificationToken"]');
+              if (token) { xhr.setRequestHeader('__RequestVerificationToken', token.value); }
+
+              xhr.onload = function () {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  onDone(xhr);
+                } else {
+                  onFail(xhr.responseText || xhr.statusText);
+                }
+              };
+              xhr.onerror = function () { onFail(''); };
+              xhr.send(body ? JSON.stringify(body) : null);
+            }
+
+            /*
+             * The plug-in prefixes its failures so the client can branch without parsing
+             * prose. Messages say what happened, what is still safe and what to do next,
+             * and never expose a table name, query, id or stack trace (PP-16).
+             */
+            function friendlyError(raw) {
+              var text = String(raw || '');
+              if (text.indexOf('CONFLICT:') !== -1) {
+                return 'This review has been submitted and can no longer be changed. Reload the page.';
+              }
+              if (text.indexOf('UNAUTHORIZED:') !== -1) {
+                return 'You do not have permission to change this answer.';
+              }
+              if (text.indexOf('PRECONDITION:') !== -1) {
+                var idx = text.indexOf('PRECONDITION:');
+                return text.substring(idx + 'PRECONDITION:'.length).trim();
+              }
+              return 'Not saved - retry. Your other answers are unaffected.';
+            }
+
+            function idFromHeader(xhr) {
+              // Create returns the new row's URI in OData-EntityId.
+              var header = xhr.getResponseHeader('OData-EntityId') || '';
+              var match = header.match(/\(([0-9a-f-]{36})\)/i);
+              return match ? match[1] : null;
+            }
+
+            function two(n) { return (n < 10 ? '0' : '') + n; }
+
+            function bind(root) {
+              var questionVersion = root.getAttribute('data-question-version');
+              var column = root.getAttribute('data-column');
+              var status = root.querySelector('[data-ot-status]');
+              var note = root.querySelector('[data-ot-note]');
+              var noteInput = root.querySelector('[data-ot-note-input]');
+              var reasons = root.querySelector('[data-ot-reasons]');
+              var inputs = root.querySelectorAll('[data-ot-input]');
+              var timer = null;
+
+              function show(message, kind) {
+                if (!status) { return; }
+                status.textContent = message;
+                status.className = 'ot-answer__status ot-answer__status--' + kind;
+              }
+
+              function chosenChoice() {
+                for (var i = 0; i < inputs.length; i++) {
+                  if (inputs[i].checked) { return parseInt(inputs[i].value, 10); }
+                }
+                return null;
+              }
+
+              function currentPayload() {
+                var body = {};
+                var i;
+
+                if (column === 'text') {
+                  body.al_answertext = inputs[0].value || null;
+                } else if (column === 'date') {
+                  body.al_answerdate = inputs[0].value || null;
+                } else if (column === 'choice') {
+                  body.al_answerchoice = chosenChoice();
+                  body.al_answertext = noteInput && noteInput.value ? noteInput.value : null;
+                } else {
+                  var picked = [];
+                  for (i = 0; i < inputs.length; i++) {
+                    if (inputs[i].checked) { picked.push(inputs[i].value); }
+                  }
+                  // A multi-select choice column is sent as a comma-separated value list.
+                  body.al_answerchoices = picked.length ? picked.join(',') : null;
+                  body.al_answertext = noteInput && noteInput.value ? noteInput.value : null;
+                }
+
+                return body;
+              }
+
+              /*
+               * BR-006: a non-pass outcome requires remediation, so it is the point at
+               * which an evidence note and a fail reason become useful. Both stay optional
+               * under AD-019.
+               */
+              function revealConditional() {
+                var chosen = null;
+                for (var i = 0; i < inputs.length; i++) {
+                  if (inputs[i].checked) { chosen = parseInt(inputs[i].value, 10); }
+                }
+                var isNonPass = NON_PASS.indexOf(chosen) !== -1;
+                if (note) { note.hidden = !isNonPass; }
+                if (reasons) { reasons.hidden = !isNonPass; }
+              }
+
+              function save() {
+                var responseId = root.getAttribute('data-response-id');
+                var body = currentPayload();
+                show('Saving...', 'saving');
+
+                function done() {
+                  var now = new Date();
+                  show('Saved ' + two(now.getHours()) + ':' + two(now.getMinutes()), 'saved');
+                }
+
+                function fail(raw) { show(friendlyError(raw), 'error'); }
+
+                if (responseId) {
+                  api('PATCH', 'al_responses(' + responseId + ')', body, done, fail);
+                  return;
+                }
+
+                // The two lookups are set only on create. They are not on the Web API
+                // field allowlist, so they travel as bind properties rather than columns.
+                body['al_reviewinstanceid@odata.bind'] = '/al_reviewinstances(' + REVIEW_ID + ')';
+                body['al_questionversionid@odata.bind'] = '/al_questionversions(' + questionVersion + ')';
+
+                api('POST', 'al_responses', body, function (xhr) {
+                  var created = idFromHeader(xhr);
+                  if (created) { root.setAttribute('data-response-id', created); }
+                  done();
+                }, fail);
+              }
+
+              function queue() {
+                revealConditional();
+                if (timer) { window.clearTimeout(timer); }
+                timer = window.setTimeout(save, DEBOUNCE_MS);
+              }
+
+              /*
+               * FR-013 permits several reasons on one answer, so this is an N:N
+               * association rather than a column. A reason can only attach once the
+               * answer row exists, which is why it waits on data-response-id.
+               */
+              function toggleReason(box) {
+                var responseId = root.getAttribute('data-response-id');
+                if (!responseId) {
+                  show('Choose an answer first, then add its reasons.', 'error');
+                  box.checked = !box.checked;
+                  return;
+                }
+
+                if (box.checked) {
+                  api('POST',
+                    'al_responses(' + responseId + ')/al_failreason_response/$ref',
+                    { '@odata.id': '/_api/al_failreasons(' + box.value + ')' },
+                    function () { show('Saved', 'saved'); },
+                    function (raw) { box.checked = false; show(friendlyError(raw), 'error'); });
+                } else {
+                  api('DELETE',
+                    'al_responses(' + responseId + ')/al_failreason_response/$ref?$id=/_api/al_failreasons(' + box.value + ')',
+                    null,
+                    function () { show('Saved', 'saved'); },
+                    function (raw) { box.checked = true; show(friendlyError(raw), 'error'); });
+                }
+              }
+
+              for (var i = 0; i < inputs.length; i++) {
+                inputs[i].addEventListener('change', queue);
+                if (inputs[i].tagName === 'TEXTAREA' || inputs[i].type === 'text') {
+                  inputs[i].addEventListener('input', queue);
+                }
+              }
+              if (noteInput) { noteInput.addEventListener('input', queue); }
+
+              var reasonBoxes = root.querySelectorAll('[data-ot-reason]');
+              for (var r = 0; r < reasonBoxes.length; r++) {
+                reasonBoxes[r].addEventListener('change', (function (box) {
+                  return function () { toggleReason(box); };
+                })(reasonBoxes[r]));
+              }
+
+              revealConditional();
+            }
+
+            var answers = document.querySelectorAll('[data-ot-answer]');
+            for (var i = 0; i < answers.length; i++) { bind(answers[i]); }
+          })();
+        </script>
+        {% endif %}
+
+      {% endif %}
+    {% endif %}
+  {% endif %}
+{% endif %}
+{% endblock %}

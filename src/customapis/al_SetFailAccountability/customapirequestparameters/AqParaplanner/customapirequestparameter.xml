@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="AqParaplanner">
+  <description default="True when the paraplanner is accountable for the Advice Quality fail.">
+    <label description="True when the paraplanner is accountable for the Advice Quality fail." languagecode="1033" />
+  </description>
+  <displayname default="AQ paraplanner accountable">
+    <label description="AQ paraplanner accountable" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>AqParaplanner</name>
+  <type>0</type>
+</customapirequestparameter>

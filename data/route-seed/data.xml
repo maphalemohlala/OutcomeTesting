@@ -1,0 +1,27 @@
+<entities>
+  <entity name="al_reviewroute" displayname="Review Route">
+    <records>
+      <record id="cccc0000-0000-4c00-8000-000000000001">
+        <field name="al_name" value="Tax only" />
+        <field name="al_routecode" value="ROUTE-TAX" />
+        <field name="al_requirestaxreview" value="True" />
+        <field name="al_requiresaqsreview" value="False" />
+        <field name="al_displayorder" value="1" />
+      </record>
+      <record id="cccc0000-0000-4c00-8000-000000000002">
+        <field name="al_name" value="AQS only" />
+        <field name="al_routecode" value="ROUTE-AQS" />
+        <field name="al_requirestaxreview" value="False" />
+        <field name="al_requiresaqsreview" value="True" />
+        <field name="al_displayorder" value="2" />
+      </record>
+      <record id="cccc0000-0000-4c00-8000-000000000003">
+        <field name="al_name" value="Tax then AQS" />
+        <field name="al_routecode" value="ROUTE-TAX-AQS" />
+        <field name="al_requirestaxreview" value="True" />
+        <field name="al_requiresaqsreview" value="True" />
+        <field name="al_displayorder" value="3" />
+      </record>
+    </records>
+  </entity>
+</entities>

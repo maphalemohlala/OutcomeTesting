@@ -1,0 +1,59 @@
+- adx_name: Grant Change to Administrators
+  adx_right: 1
+  adx_scope: 1
+  adx_webpageaccesscontrolrule_webrole:
+  - c53b2908-1fc1-4470-89cd-6f5b95c17ffe
+  adx_webpageaccesscontrolruleid: 563ee258-2962-4440-a6e8-d25296ac40bb
+  adx_webpageid: 52570e2a-4d91-41f8-95c9-d0017a937039
+- adx_name: Restrict read - portal roles
+  adx_right: 2
+  adx_scope: 2
+  adx_webpageaccesscontrolrule_webrole:
+  - a1000000-0000-4000-8000-000000000090
+  - a1000000-0000-4000-8000-000000000091
+  - a1000000-0000-4000-8000-000000000092
+  - a1000000-0000-4000-8000-000000000093
+  - a1000000-0000-4000-8000-000000000095
+  - a1000000-0000-4000-8000-000000000096
+  - a1000000-0000-4000-8000-000000000097
+  adx_webpageaccesscontrolruleid: a1000000-0000-4000-8000-0000000000b0
+  adx_webpageid: 52570e2a-4d91-41f8-95c9-d0017a937039
+- adx_name: Restrict read - Tax reviews
+  adx_right: 2
+  adx_scope: 1
+  adx_webpageaccesscontrolrule_webrole:
+  - a1000000-0000-4000-8000-000000000090
+  - a1000000-0000-4000-8000-000000000095
+  - a1000000-0000-4000-8000-000000000096
+  adx_webpageaccesscontrolruleid: a1000000-0000-4000-8000-0000000000b1
+  adx_webpageid: a1000000-0000-4000-8000-000000000033
+- adx_name: Restrict read - AQS reviews
+  adx_right: 2
+  adx_scope: 1
+  adx_webpageaccesscontrolrule_webrole:
+  - a1000000-0000-4000-8000-000000000091
+  - a1000000-0000-4000-8000-000000000095
+  - a1000000-0000-4000-8000-000000000096
+  adx_webpageaccesscontrolruleid: a1000000-0000-4000-8000-0000000000b2
+  adx_webpageid: a1000000-0000-4000-8000-000000000034
+- adx_name: Restrict read - Review
+  adx_right: 2
+  adx_scope: 1
+  adx_webpageaccesscontrolrule_webrole:
+  - a1000000-0000-4000-8000-000000000090
+  - a1000000-0000-4000-8000-000000000091
+  - a1000000-0000-4000-8000-000000000095
+  - a1000000-0000-4000-8000-000000000096
+  adx_webpageaccesscontrolruleid: a1000000-0000-4000-8000-0000000000b3
+  adx_webpageid: a1000000-0000-4000-8000-000000000036
+- adx_name: Restrict read - Remediation
+  adx_right: 2
+  adx_scope: 1
+  adx_webpageaccesscontrolrule_webrole:
+  - a1000000-0000-4000-8000-000000000092
+  - a1000000-0000-4000-8000-000000000093
+  - a1000000-0000-4000-8000-000000000095
+  - a1000000-0000-4000-8000-000000000096
+  - a1000000-0000-4000-8000-000000000097
+  adx_webpageaccesscontrolruleid: a1000000-0000-4000-8000-0000000000b4
+  adx_webpageid: a1000000-0000-4000-8000-000000000035

@@ -394,7 +394,7 @@
         <field name="al_displayorder" value="2" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910003" />
+        <field name="al_responsetype" value="120910006" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000002" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000003">

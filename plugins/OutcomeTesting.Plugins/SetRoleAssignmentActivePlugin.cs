@@ -51,7 +51,7 @@ namespace OutcomeTesting.Plugins
             var active = CommandHelpers.GetRequiredBool(context, InActive);
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
 
-            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey);
+            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandSetRoleAssignmentActive);
             if (existingAudit != null)
             {
                 SetResponse(context, mappingId.ToString("D"), active, existingAudit.Id);

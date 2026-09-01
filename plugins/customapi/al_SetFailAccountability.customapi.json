@@ -1,0 +1,82 @@
+{
+  "$comment": "Contract for the SetFailAccountability server-side command (AD-003, AD-039, OD-024). Deployed via the registration console (plugins/OutcomeTesting.Registration) and added to the OutcomeTesting solution via a solution-file import (src/customapis/al_SetFailAccountability). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_SetFailAccountability",
+    "name": "al_SetFailAccountability",
+    "displayname": "Set Fail Accountability",
+    "description": "Records who is accountable for a File Quality or Advice Quality fail on an Outcome (OD-024), the judgement AD-039's export columns 11-14 and 17-20 report. Refuses a pass Outcome or a case with no outcome recorded. Enforces the page.cases Edit permission and writes an immutable Audit Event (BR-012).",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.SetFailAccountabilityPlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "TargetId",
+      "name": "TargetId",
+      "displayname": "Target id",
+      "description": "Id of the al_outcome record to record accountability against.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "FqAdviser",
+      "name": "FqAdviser",
+      "displayname": "FQ adviser accountable",
+      "description": "True when the adviser is accountable for the File Quality fail.",
+      "type": 0,
+      "isoptional": false
+    },
+    {
+      "uniquename": "FqParaplanner",
+      "name": "FqParaplanner",
+      "displayname": "FQ paraplanner accountable",
+      "description": "True when the paraplanner is accountable for the File Quality fail.",
+      "type": 0,
+      "isoptional": false
+    },
+    {
+      "uniquename": "AqAdviser",
+      "name": "AqAdviser",
+      "displayname": "AQ adviser accountable",
+      "description": "True when the adviser is accountable for the Advice Quality fail.",
+      "type": 0,
+      "isoptional": false
+    },
+    {
+      "uniquename": "AqParaplanner",
+      "name": "AqParaplanner",
+      "displayname": "AQ paraplanner accountable",
+      "description": "True when the paraplanner is accountable for the Advice Quality fail.",
+      "type": 0,
+      "isoptional": false
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay returns the same result.",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "Status",
+      "name": "Status",
+      "displayname": "Status",
+      "description": "Result status.",
+      "type": 10
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written for this command.",
+      "type": 10
+    }
+  ]
+}

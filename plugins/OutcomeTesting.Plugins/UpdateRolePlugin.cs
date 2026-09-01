@@ -71,7 +71,7 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.ValidationPrefix + "Change the role name, description or active state.");
             }
 
-            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey);
+            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandUpdateRole);
             if (existingAudit != null)
             {
                 SetResponse(context, roleId.ToString("D"), existingAudit.Id, false);

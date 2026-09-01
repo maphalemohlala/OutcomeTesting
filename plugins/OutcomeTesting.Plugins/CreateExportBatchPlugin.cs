@@ -45,7 +45,7 @@ namespace OutcomeTesting.Plugins
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "export.generate", PermissionHelpers.AccessEdit);
 
-            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey);
+            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandCreateExportBatch);
             if (existingAudit != null)
             {
                 SetResponse(context, existingAudit.GetAttributeValue<string>("al_targetid"), "Draft", existingAudit.Id, false);

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isRecordId } from '../../services/odata';
 import { Al_outcomesService } from '../../generated';
 import {
   Al_outcomesal_finaloutcome,
@@ -66,7 +67,10 @@ export function useCaseOutcome(caseId: string | undefined): CaseOutcomeState {
   }
 
   useEffect(() => {
-    if (!caseId) return;
+    // The id comes from the route, so it is untrusted until it parses as a record id;
+    // an id that is not one never reaches a filter. The unavailable state for that case
+    // is derived below rather than set here.
+    if (!isRecordId(caseId)) return;
     let cancelled = false;
 
     Al_outcomesService.getAll({
@@ -90,6 +94,10 @@ export function useCaseOutcome(caseId: string | undefined): CaseOutcomeState {
       cancelled = true;
     };
   }, [caseId]);
+
+  if (caseId && !isRecordId(caseId)) {
+    return { status: 'unavailable' };
+  }
 
   return state;
 }

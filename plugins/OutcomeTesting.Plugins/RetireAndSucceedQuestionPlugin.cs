@@ -52,7 +52,7 @@ namespace OutcomeTesting.Plugins
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "question.retire", PermissionHelpers.AccessEdit);
 
-            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey);
+            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandRetireAndSucceed);
             if (existingAudit != null)
             {
                 SetResponse(context, existingAudit.GetAttributeValue<string>("al_targetid"), existingAudit.GetAttributeValue<string>("al_details"), existingAudit.Id, false);
