@@ -1,8 +1,8 @@
 <entities>
   <entity name="al_role" displayname="Role" primaryidfield="al_roleid" primarynamefield="al_name" disableplugins="false">
     <fields>
-      <field displayname="Role name" name="al_name" type="string" customfield="true" primaryKey="true" />
-      <field displayname="Role code" name="al_rolecode" type="string" customfield="true" />
+      <field displayname="Role name" name="al_name" type="string" customfield="true" />
+      <field displayname="Role code" name="al_rolecode" type="string" customfield="true" primaryKey="true" />
       <field displayname="Description" name="al_description" type="string" customfield="true" />
     </fields>
     <relationships />
