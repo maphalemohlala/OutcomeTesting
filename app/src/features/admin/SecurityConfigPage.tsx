@@ -1,16 +1,18 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { Modal } from '../../components/feedback/Modal';
+import { Tabs } from '../../components/navigation/Tabs';
 import { usePermissions } from '../../app/permissions/permissionContext';
-import { useSecurityConfig } from './useSecurityConfig';
-import { useRoles } from './useRoles';
-import { useUsers } from './useUsers';
-import { createRole, newRoleIntentKey } from '../../services/commands/roles';
-import { createUser, newUserIntentKey } from '../../services/commands/users';
+import { useIntentKeys } from '../../hooks/useIntentKey';
+import { useSecurityConfig, type PagePermissionRow, type RoleMappingRow } from './useSecurityConfig';
+import { useRoles, type RoleRow } from './useRoles';
+import { createRole, updateRole } from '../../services/commands/roles';
 import {
   assignUserRole,
-  newPermissionIntentKey,
   setPagePermission,
+  setPermissionRuleActive,
+  setRoleAssignmentActive,
 } from '../../services/commands/permissions';
 import { ACCESS_LEVELS, APP_ROLES, RESOURCE_KEYS, type AppRole } from '../../types/permissions';
 import './SecurityConfigPage.css';
@@ -23,6 +25,14 @@ interface RoleOption {
   custom: boolean;
 }
 
+/** Splits the `builtin:Label` / `custom:CODE` select value into the two command arguments. */
+function roleArgs(selected: string): { appRole?: string; roleCode?: string; label: string } {
+  const value = selected.slice(selected.indexOf(':') + 1);
+  return selected.startsWith('custom:')
+    ? { roleCode: value, label: value }
+    : { appRole: value, label: value };
+}
+
 export function SecurityConfigPage() {
   const { can } = usePermissions();
   const canManage = can('permission.manage', 'Manage');
@@ -30,26 +40,22 @@ export function SecurityConfigPage() {
   const state = useSecurityConfig(reloadKey);
   const [rolesReloadKey, setRolesReloadKey] = useState(0);
   const roles = useRoles(rolesReloadKey);
-  const [usersReloadKey, setUsersReloadKey] = useState(0);
-  const users = useUsers(usersReloadKey);
-
-  const [userName, setUserName] = useState('');
-  const [userEmail, setUserEmail] = useState('');
-  const [userBusy, setUserBusy] = useState(false);
-  const [userNotice, setUserNotice] = useState<Notice>(null);
-  const [userOpen, setUserOpen] = useState(false);
+  const intent = useIntentKeys();
 
   const [roleName, setRoleName] = useState('');
   const [roleDesc, setRoleDesc] = useState('');
   const [roleBusy, setRoleBusy] = useState(false);
   const [roleNotice, setRoleNotice] = useState<Notice>(null);
   const [roleOpen, setRoleOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<RoleRow | null>(null);
 
   const [email, setEmail] = useState('');
   const [assignRole, setAssignRole] = useState<string>(`builtin:${APP_ROLES[0]}`);
   const [assignBusy, setAssignBusy] = useState(false);
   const [assignNotice, setAssignNotice] = useState<Notice>(null);
   const [assignOpen, setAssignOpen] = useState(false);
+  /** Set when the assign form is changing an existing assignment, so the old one is withdrawn. */
+  const [replacing, setReplacing] = useState<RoleMappingRow | null>(null);
 
   const [permRole, setPermRole] = useState<string>(`builtin:${APP_ROLES[0]}`);
   const [resource, setResource] = useState<string>(RESOURCE_KEYS[0]);
@@ -57,6 +63,9 @@ export function SecurityConfigPage() {
   const [permBusy, setPermBusy] = useState(false);
   const [permNotice, setPermNotice] = useState<Notice>(null);
   const [permOpen, setPermOpen] = useState(false);
+
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [rowNotice, setRowNotice] = useState<Notice>(null);
 
   // Built-in roles use the al_approle picklist; custom roles (AD-044) enforce by al_role code.
   const roleOptions: RoleOption[] = [
@@ -68,6 +77,17 @@ export function SecurityConfigPage() {
       : []),
   ];
 
+  function reloadConfig() {
+    setReloadKey((k) => k + 1);
+  }
+
+  function openAssign(existing: RoleMappingRow | null) {
+    setReplacing(existing);
+    setEmail(existing ? existing.email : '');
+    setAssignNotice(null);
+    setAssignOpen(true);
+  }
+
   async function onAssign(event: React.FormEvent) {
     event.preventDefault();
     if (!email.trim()) {
@@ -76,78 +96,94 @@ export function SecurityConfigPage() {
     }
     setAssignBusy(true);
     setAssignNotice(null);
-    const custom = assignRole.startsWith('custom:');
-    const roleValue = assignRole.slice(assignRole.indexOf(':') + 1);
+
+    const { appRole, roleCode, label } = roleArgs(assignRole);
+    const token = `assign:${email.trim().toLowerCase()}:${label}`;
     const result = await assignUserRole({
       userEmail: email.trim(),
-      appRole: custom ? undefined : roleValue,
-      roleCode: custom ? roleValue : undefined,
-      idempotencyKey: newPermissionIntentKey(),
+      appRole,
+      roleCode,
+      idempotencyKey: intent.keyFor(token),
     });
-    setAssignBusy(false);
-    if (result.ok) {
-      setAssignNotice({ tone: 'ok', message: `${roleValue} assigned to ${email.trim()}.` });
-      setEmail('');
-      setAssignOpen(false);
-      setReloadKey((k) => k + 1);
-    } else {
+
+    if (!result.ok) {
+      setAssignBusy(false);
       setAssignNotice({ tone: 'error', message: result.message });
+      return;
     }
+    intent.release(token);
+
+    // Grant first, then withdraw: a failure here leaves the person with both roles rather
+    // than none. The mapping's business code embeds the role, so a change is two writes.
+    let message = `${label} assigned to ${email.trim()}.`;
+    if (replacing && replacing.id !== result.data.MappingId) {
+      const withdrawToken = `withdraw:${replacing.id}`;
+      const withdrawn = await setRoleAssignmentActive({
+        id: replacing.id,
+        active: false,
+        idempotencyKey: intent.keyFor(withdrawToken),
+      });
+      if (withdrawn.ok) {
+        intent.release(withdrawToken);
+        message = `${email.trim()} changed from ${replacing.role} to ${label}.`;
+      } else {
+        message = `${label} assigned, but the previous ${replacing.role} assignment could not be withdrawn: ${withdrawn.message}`;
+      }
+    }
+
+    setAssignBusy(false);
+    setAssignNotice({ tone: 'ok', message });
+    setEmail('');
+    setReplacing(null);
+    setAssignOpen(false);
+    reloadConfig();
+  }
+
+  function openPermission(existing: PagePermissionRow | null) {
+    if (existing) {
+      const known = APP_ROLES.includes(existing.role as AppRole);
+      setPermRole(known ? `builtin:${existing.role}` : `custom:${existing.role}`);
+      setResource(existing.resource);
+      setLevel(existing.level);
+    }
+    setPermNotice(null);
+    setPermOpen(true);
   }
 
   async function onSetPermission(event: React.FormEvent) {
     event.preventDefault();
     setPermBusy(true);
     setPermNotice(null);
-    const custom = permRole.startsWith('custom:');
-    const roleValue = permRole.slice(permRole.indexOf(':') + 1);
+
+    const { appRole, roleCode, label } = roleArgs(permRole);
+    const token = `perm:${label}:${resource}:${level}`;
     const result = await setPagePermission({
-      appRole: custom ? undefined : roleValue,
-      roleCode: custom ? roleValue : undefined,
+      appRole,
+      roleCode,
       resourceKey: resource,
       accessLevel: level,
-      idempotencyKey: newPermissionIntentKey(),
+      idempotencyKey: intent.keyFor(token),
     });
     setPermBusy(false);
     if (result.ok) {
-      setPermNotice({ tone: 'ok', message: `${roleValue} now has ${level} on ${resource}.` });
+      intent.release(token);
+      setPermNotice({ tone: 'ok', message: `${label} now has ${level} on ${resource}.` });
       setPermOpen(false);
-      setReloadKey((k) => k + 1);
+      reloadConfig();
     } else {
       setPermNotice({ tone: 'error', message: result.message });
     }
   }
 
-  async function onCreateUser(event: React.FormEvent) {
-    event.preventDefault();
-    if (!userName.trim()) {
-      setUserNotice({ tone: 'error', message: 'Enter the person’s full name.' });
-      return;
-    }
-    if (!userEmail.trim()) {
-      setUserNotice({ tone: 'error', message: 'Enter a work email.' });
-      return;
-    }
-    setUserBusy(true);
-    setUserNotice(null);
-    const result = await createUser({
-      fullName: userName.trim(),
-      workEmail: userEmail.trim(),
-      idempotencyKey: newUserIntentKey(),
-    });
-    setUserBusy(false);
-    if (result.ok) {
-      setUserNotice({ tone: 'ok', message: `${userName.trim()} added to the user registry.` });
-      setUserName('');
-      setUserEmail('');
-      setUserOpen(false);
-      setUsersReloadKey((k) => k + 1);
-    } else {
-      setUserNotice({ tone: 'error', message: result.message });
-    }
+  function openRoleForm(role: RoleRow | null) {
+    setEditingRole(role);
+    setRoleName(role ? role.name : '');
+    setRoleDesc(role ? role.description ?? '' : '');
+    setRoleNotice(null);
+    setRoleOpen(true);
   }
 
-  async function onCreateRole(event: React.FormEvent) {
+  async function onSubmitRole(event: React.FormEvent) {
     event.preventDefault();
     if (!roleName.trim()) {
       setRoleNotice({ tone: 'error', message: 'Enter a role name.' });
@@ -155,20 +191,113 @@ export function SecurityConfigPage() {
     }
     setRoleBusy(true);
     setRoleNotice(null);
-    const result = await createRole({
-      roleName: roleName.trim(),
-      description: roleDesc.trim() || null,
-      idempotencyKey: newRoleIntentKey(),
-    });
+
+    const editing = editingRole;
+    const token = editing ? `role:${editing.id}` : `role:new:${roleName.trim()}`;
+    const result = editing
+      ? await updateRole({
+          roleId: editing.id,
+          roleName: roleName.trim(),
+          description: roleDesc.trim(),
+          expectedRowVersion: editing.rowVersion,
+          idempotencyKey: intent.keyFor(token),
+        })
+      : await createRole({
+          roleName: roleName.trim(),
+          description: roleDesc.trim() || null,
+          idempotencyKey: intent.keyFor(token),
+        });
+
     setRoleBusy(false);
     if (result.ok) {
-      setRoleNotice({ tone: 'ok', message: `Role “${roleName.trim()}” created.` });
+      intent.release(token);
+      setRoleNotice({
+        tone: 'ok',
+        message: editing ? `Role “${roleName.trim()}” updated.` : `Role “${roleName.trim()}” created.`,
+      });
       setRoleName('');
       setRoleDesc('');
       setRoleOpen(false);
+      setEditingRole(null);
       setRolesReloadKey((k) => k + 1);
+      reloadConfig();
     } else {
       setRoleNotice({ tone: 'error', message: result.message });
+    }
+  }
+
+  async function onSetAssignmentActive(row: RoleMappingRow) {
+    if (rowBusy) return;
+    setRowBusy(row.id);
+    setRowNotice(null);
+    const token = `assignment-active:${row.id}:${!row.active}`;
+    const result = await setRoleAssignmentActive({
+      id: row.id,
+      active: !row.active,
+      idempotencyKey: intent.keyFor(token),
+    });
+    setRowBusy(null);
+    if (result.ok) {
+      intent.release(token);
+      setRowNotice({
+        tone: 'ok',
+        message: `${row.role} ${row.active ? 'withdrawn from' : 'restored for'} ${row.email}.`,
+      });
+      reloadConfig();
+    } else {
+      setRowNotice({ tone: 'error', message: result.message });
+    }
+  }
+
+  async function onSetRuleActive(row: PagePermissionRow) {
+    if (rowBusy) return;
+    setRowBusy(row.id);
+    setRowNotice(null);
+    const token = `rule-active:${row.id}:${!row.active}`;
+    const result = await setPermissionRuleActive({
+      id: row.id,
+      active: !row.active,
+      idempotencyKey: intent.keyFor(token),
+    });
+    setRowBusy(null);
+    if (result.ok) {
+      intent.release(token);
+      setRowNotice({
+        tone: 'ok',
+        message: row.active
+          ? `Override withdrawn; ${row.role} falls back to the default for ${row.resource}.`
+          : `Override restored for ${row.role} on ${row.resource}.`,
+      });
+      reloadConfig();
+    } else {
+      setRowNotice({ tone: 'error', message: result.message });
+    }
+  }
+
+  async function onSetRoleActive(row: RoleRow) {
+    if (rowBusy) return;
+    setRowBusy(row.id);
+    setRowNotice(null);
+    const token = `role-active:${row.id}:${!row.active}`;
+    const result = await updateRole({
+      roleId: row.id,
+      active: !row.active,
+      expectedRowVersion: row.rowVersion,
+      idempotencyKey: intent.keyFor(token),
+    });
+    setRowBusy(null);
+    if (result.ok) {
+      intent.release(token);
+      setRowNotice({
+        tone: 'ok',
+        message: row.active
+          ? `${row.name} retired. Its assignments and permission rules were withdrawn with it.`
+          : `${row.name} restored. Re-assign it to the people who need it.`,
+      });
+      setRolesReloadKey((k) => k + 1);
+      reloadConfig();
+    } else {
+      setRowNotice({ tone: 'error', message: result.message });
     }
   }
 
@@ -183,18 +312,14 @@ export function SecurityConfigPage() {
         <section className="security__panel" aria-labelledby="assign-heading">
           <div className="security__panel-bar">
             <h2 id="assign-heading">Assign a role</h2>
-            <button
-              type="button"
-              className="security__btn"
-              onClick={() => {
-                setAssignNotice(null);
-                setAssignOpen(true);
-              }}
-            >
+            <button type="button" className="security__btn" onClick={() => openAssign(null)}>
               Assign a role
             </button>
           </div>
-          <p className="security__hint">Map a person&rsquo;s work email to an application role.</p>
+          <p className="security__hint">
+            Map a person&rsquo;s work email to an application role. People are registered on the{' '}
+            <Link to="/admin/users">Users</Link> page.
+          </p>
           {assignNotice && !assignOpen ? (
             <p className={`security__notice security__notice--${assignNotice.tone}`} role="status">
               {assignNotice.message}
@@ -205,14 +330,7 @@ export function SecurityConfigPage() {
         <section className="security__panel" aria-labelledby="perm-heading">
           <div className="security__panel-bar">
             <h2 id="perm-heading">Page and capability permissions</h2>
-            <button
-              type="button"
-              className="security__btn"
-              onClick={() => {
-                setPermNotice(null);
-                setPermOpen(true);
-              }}
-            >
+            <button type="button" className="security__btn" onClick={() => openPermission(null)}>
               Set a permission
             </button>
           </div>
@@ -228,20 +346,13 @@ export function SecurityConfigPage() {
           <div className="security__panel-bar">
             <h2 id="roles-heading">Roles</h2>
             {canManage ? (
-              <button
-                type="button"
-                className="security__btn"
-                onClick={() => {
-                  setRoleNotice(null);
-                  setRoleOpen(true);
-                }}
-              >
+              <button type="button" className="security__btn" onClick={() => openRoleForm(null)}>
                 Create role
               </button>
             ) : null}
           </div>
           <p className="security__hint">
-            The roles that can be assigned. Administrators can add new ones.
+            The roles that can be assigned. Administrators can add, rename and retire them.
           </p>
           {roleNotice && !roleOpen ? (
             <p className={`security__notice security__notice--${roleNotice.tone}`} role="status">
@@ -249,36 +360,16 @@ export function SecurityConfigPage() {
             </p>
           ) : null}
         </section>
-
-        <section className="security__panel" aria-labelledby="users-heading">
-          <div className="security__panel-bar">
-            <h2 id="users-heading">People</h2>
-            {canManage ? (
-              <button
-                type="button"
-                className="security__btn"
-                onClick={() => {
-                  setUserNotice(null);
-                  setUserOpen(true);
-                }}
-              >
-                Register user
-              </button>
-            ) : null}
-          </div>
-          <p className="security__hint">
-            The people known to the application, keyed on work email. Administrators can add new ones.
-          </p>
-          {userNotice && !userOpen ? (
-            <p className={`security__notice security__notice--${userNotice.tone}`} role="status">
-              {userNotice.message}
-            </p>
-          ) : null}
-        </section>
       </div>
 
       {assignOpen ? (
-        <Modal title="Assign a role" onClose={() => setAssignOpen(false)}>
+        <Modal
+          title={replacing ? `Change role for ${replacing.email}` : 'Assign a role'}
+          onClose={() => {
+            setAssignOpen(false);
+            setReplacing(null);
+          }}
+        >
           {assignNotice ? (
             <p className={`security__notice security__notice--${assignNotice.tone}`} role="status">
               {assignNotice.message}
@@ -293,6 +384,7 @@ export function SecurityConfigPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="person@ascotlloyd.co.uk"
                 autoComplete="off"
+                readOnly={replacing !== null}
               />
             </label>
             <label className="security__field">
@@ -305,17 +397,26 @@ export function SecurityConfigPage() {
                 ))}
               </select>
             </label>
+            {replacing ? (
+              <p className="security__hint">
+                The {replacing.role} assignment is withdrawn once the new role is granted. The
+                withdrawn record is kept for the audit trail.
+              </p>
+            ) : null}
             <div className="security__form-actions">
               <button
                 type="button"
                 className="security__btn security__btn--ghost"
-                onClick={() => setAssignOpen(false)}
+                onClick={() => {
+                  setAssignOpen(false);
+                  setReplacing(null);
+                }}
                 disabled={assignBusy}
               >
                 Cancel
               </button>
               <button type="submit" className="security__btn" disabled={assignBusy}>
-                {assignBusy ? 'Assigning…' : 'Assign role'}
+                {assignBusy ? 'Saving…' : replacing ? 'Change role' : 'Assign role'}
               </button>
             </div>
           </form>
@@ -360,6 +461,9 @@ export function SecurityConfigPage() {
                 ))}
               </select>
             </label>
+            <p className="security__hint">
+              Setting a level for a role and resource replaces any existing rule for that pair.
+            </p>
             <div className="security__form-actions">
               <button
                 type="button"
@@ -378,13 +482,19 @@ export function SecurityConfigPage() {
       ) : null}
 
       {roleOpen ? (
-        <Modal title="Create a role" onClose={() => setRoleOpen(false)}>
+        <Modal
+          title={editingRole ? `Edit ${editingRole.name}` : 'Create a role'}
+          onClose={() => {
+            setRoleOpen(false);
+            setEditingRole(null);
+          }}
+        >
           {roleNotice ? (
             <p className={`security__notice security__notice--${roleNotice.tone}`} role="status">
               {roleNotice.message}
             </p>
           ) : null}
-          <form className="security__form" onSubmit={onCreateRole}>
+          <form className="security__form" onSubmit={onSubmitRole}>
             <label className="security__field">
               <span>Role name</span>
               <input
@@ -404,62 +514,26 @@ export function SecurityConfigPage() {
                 placeholder="What the role is for"
               />
             </label>
+            {editingRole ? (
+              <p className="security__hint">
+                The role code <strong>{editingRole.code}</strong> stays the same, so existing
+                assignments and permission rules keep working.
+              </p>
+            ) : null}
             <div className="security__form-actions">
               <button
                 type="button"
                 className="security__btn security__btn--ghost"
-                onClick={() => setRoleOpen(false)}
+                onClick={() => {
+                  setRoleOpen(false);
+                  setEditingRole(null);
+                }}
                 disabled={roleBusy}
               >
                 Cancel
               </button>
               <button type="submit" className="security__btn" disabled={roleBusy}>
-                {roleBusy ? 'Creating…' : 'Create role'}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      ) : null}
-
-      {userOpen ? (
-        <Modal title="Register a user" onClose={() => setUserOpen(false)}>
-          {userNotice ? (
-            <p className={`security__notice security__notice--${userNotice.tone}`} role="status">
-              {userNotice.message}
-            </p>
-          ) : null}
-          <form className="security__form" onSubmit={onCreateUser}>
-            <label className="security__field">
-              <span>Full name</span>
-              <input
-                type="text"
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                placeholder="e.g. Jordan Taylor"
-                autoComplete="off"
-              />
-            </label>
-            <label className="security__field">
-              <span>Work email</span>
-              <input
-                type="email"
-                value={userEmail}
-                onChange={(e) => setUserEmail(e.target.value)}
-                placeholder="person@ascotlloyd.co.uk"
-                autoComplete="off"
-              />
-            </label>
-            <div className="security__form-actions">
-              <button
-                type="button"
-                className="security__btn security__btn--ghost"
-                onClick={() => setUserOpen(false)}
-                disabled={userBusy}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="security__btn" disabled={userBusy}>
-                {userBusy ? 'Registering…' : 'Register user'}
+                {roleBusy ? 'Saving…' : editingRole ? 'Save changes' : 'Create role'}
               </button>
             </div>
           </form>
@@ -475,123 +549,190 @@ export function SecurityConfigPage() {
         </section>
       ) : null}
 
-      {state.status === 'ready' ? (
-        <div className="security__tables">
-          <section aria-labelledby="mappings-heading">
-            <h2 id="mappings-heading">Role assignments</h2>
-            {state.mappings.length === 0 ? (
-              <p>No roles assigned yet. Everyone has full access until the first role is assigned.</p>
-            ) : (
-              <table className="security__table">
-                <thead>
-                  <tr>
-                    <th scope="col">Work email</th>
-                    <th scope="col">Role</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {state.mappings.map((m) => (
-                    <tr key={m.id}>
-                      <td>{m.email}</td>
-                      <td>{m.role}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-
-          <section aria-labelledby="perms-heading">
-            <h2 id="perms-heading">Permission rules</h2>
-            {state.permissions.length === 0 ? (
-              <p>No overrides set. The built-in role defaults apply.</p>
-            ) : (
-              <table className="security__table">
-                <thead>
-                  <tr>
-                    <th scope="col">Resource</th>
-                    <th scope="col">Role</th>
-                    <th scope="col">Access</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {state.permissions.map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.resource}</td>
-                      <td>{p.role}</td>
-                      <td>{p.level}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-        </div>
+      {rowNotice ? (
+        <p className={`security__notice security__notice--${rowNotice.tone}`} role="status">
+          {rowNotice.message}
+        </p>
       ) : null}
 
-      <div className="security__tables">
-        <section aria-labelledby="roles-list-heading">
-          <h2 id="roles-list-heading">Role registry</h2>
-          {roles.status === 'loading' ? <p role="status">Loading roles…</p> : null}
-          {roles.status === 'unavailable' ? <p>{roles.reason}</p> : null}
-          {roles.status === 'ready' ? (
-            roles.roles.length === 0 ? (
-              <p>No roles have been created yet.</p>
-            ) : (
-              <table className="security__table">
-                <thead>
-                  <tr>
-                    <th scope="col">Role</th>
-                    <th scope="col">Code</th>
-                    <th scope="col">Description</th>
-                    <th scope="col">Active</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {roles.roles.map((r) => (
-                    <tr key={r.id}>
-                      <td>{r.name}</td>
-                      <td>{r.code}</td>
-                      <td>{r.description ?? '—'}</td>
-                      <td>{r.active ? 'Yes' : 'No'}</td>
+      <Tabs
+        label="Security configuration"
+        items={[
+          {
+            id: 'assignments',
+            label: 'Role assignments',
+            count: state.status === 'ready' ? state.mappings.length : undefined,
+            render: () =>
+              state.status !== 'ready' ? (
+                <p role="status">
+                  {state.status === 'loading'
+                    ? 'Loading role assignments…'
+                    : 'Role assignments cannot be shown.'}
+                </p>
+              ) : state.mappings.length === 0 ? (
+                <p>
+                  No roles assigned yet. Everyone has full access until the first role is assigned.
+                </p>
+              ) : (
+                <table className="security__table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Work email</th>
+                      <th scope="col">Role</th>
+                      <th scope="col">Status</th>
+                      {canManage ? <th scope="col">Actions</th> : null}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )
-          ) : null}
-        </section>
-
-        <section aria-labelledby="users-list-heading">
-          <h2 id="users-list-heading">User registry</h2>
-          {users.status === 'loading' ? <p role="status">Loading users…</p> : null}
-          {users.status === 'unavailable' ? <p>{users.reason}</p> : null}
-          {users.status === 'ready' ? (
-            users.users.length === 0 ? (
-              <p>No users have been registered yet.</p>
-            ) : (
-              <table className="security__table">
-                <thead>
-                  <tr>
-                    <th scope="col">Name</th>
-                    <th scope="col">Work email</th>
-                    <th scope="col">Active</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.users.map((u) => (
-                    <tr key={u.id}>
-                      <td>{u.name}</td>
-                      <td>{u.email}</td>
-                      <td>{u.active ? 'Yes' : 'No'}</td>
+                  </thead>
+                  <tbody>
+                    {state.mappings.map((m) => (
+                      <tr key={m.id} data-inactive={m.active ? undefined : 'true'}>
+                        <td>{m.email}</td>
+                        <td>{m.role}</td>
+                        <td>{m.active ? 'Active' : 'Withdrawn'}</td>
+                        {canManage ? (
+                          <td className="security__row-actions">
+                            {m.active ? (
+                              <button
+                                type="button"
+                                className="security__link-btn"
+                                onClick={() => openAssign(m)}
+                                disabled={rowBusy !== null}
+                              >
+                                Change role
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="security__link-btn"
+                              onClick={() => onSetAssignmentActive(m)}
+                              disabled={rowBusy !== null}
+                            >
+                              {rowBusy === m.id ? 'Working…' : m.active ? 'Withdraw' : 'Restore'}
+                            </button>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ),
+          },
+          {
+            id: 'permissions',
+            label: 'Permission rules',
+            count: state.status === 'ready' ? state.permissions.length : undefined,
+            render: () =>
+              state.status !== 'ready' ? (
+                <p role="status">
+                  {state.status === 'loading'
+                    ? 'Loading permission rules…'
+                    : 'Permission rules cannot be shown.'}
+                </p>
+              ) : state.permissions.length === 0 ? (
+                <p>No overrides set. The built-in role defaults apply.</p>
+              ) : (
+                <table className="security__table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Resource</th>
+                      <th scope="col">Role</th>
+                      <th scope="col">Access</th>
+                      <th scope="col">Status</th>
+                      {canManage ? <th scope="col">Actions</th> : null}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )
-          ) : null}
-        </section>
-      </div>
+                  </thead>
+                  <tbody>
+                    {state.permissions.map((p) => (
+                      <tr key={p.id} data-inactive={p.active ? undefined : 'true'}>
+                        <td>{p.resource}</td>
+                        <td>{p.role}</td>
+                        <td>{p.level}</td>
+                        <td>{p.active ? 'Active' : 'Withdrawn'}</td>
+                        {canManage ? (
+                          <td className="security__row-actions">
+                            {p.active ? (
+                              <button
+                                type="button"
+                                className="security__link-btn"
+                                onClick={() => openPermission(p)}
+                                disabled={rowBusy !== null}
+                              >
+                                Change level
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="security__link-btn"
+                              onClick={() => onSetRuleActive(p)}
+                              disabled={rowBusy !== null}
+                            >
+                              {rowBusy === p.id ? 'Working…' : p.active ? 'Withdraw' : 'Restore'}
+                            </button>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ),
+          },
+          {
+            id: 'roles',
+            label: 'Role registry',
+            count: roles.status === 'ready' ? roles.roles.length : undefined,
+            render: () =>
+              roles.status === 'loading' ? (
+                <p role="status">Loading roles…</p>
+              ) : roles.status === 'unavailable' ? (
+                <p>{roles.reason}</p>
+              ) : roles.roles.length === 0 ? (
+                <p>No roles have been created yet.</p>
+              ) : (
+                <table className="security__table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Role</th>
+                      <th scope="col">Code</th>
+                      <th scope="col">Description</th>
+                      <th scope="col">Active</th>
+                      {canManage ? <th scope="col">Actions</th> : null}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roles.roles.map((r) => (
+                      <tr key={r.id} data-inactive={r.active ? undefined : 'true'}>
+                        <td>{r.name}</td>
+                        <td>{r.code}</td>
+                        <td>{r.description ?? '—'}</td>
+                        <td>{r.active ? 'Yes' : 'No'}</td>
+                        {canManage ? (
+                          <td className="security__row-actions">
+                            <button
+                              type="button"
+                              className="security__link-btn"
+                              onClick={() => openRoleForm(r)}
+                              disabled={rowBusy !== null}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="security__link-btn"
+                              onClick={() => onSetRoleActive(r)}
+                              disabled={rowBusy !== null}
+                            >
+                              {rowBusy === r.id ? 'Working…' : r.active ? 'Retire' : 'Restore'}
+                            </button>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ),
+          },
+        ]}
+      />
     </>
   );
 }

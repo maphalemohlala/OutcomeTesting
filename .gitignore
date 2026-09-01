@@ -13,3 +13,6 @@ plugins/**/obj/
 
 # MSBuild Binary and Structured Log
 *.binlog
+
+# vendored obra/superpowers skills - installed locally, not committed
+/.github/skills/

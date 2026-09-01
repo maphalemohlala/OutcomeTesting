@@ -6,10 +6,8 @@ import {
   type LibraryQuestion,
 } from './useQuestionLibrary';
 import { usePermissions } from '../../app/permissions/permissionContext';
-import {
-  newQuestionIntentKey,
-  retireAndSucceedQuestion,
-} from '../../services/commands/questions';
+import { useIntentKeys } from '../../hooks/useIntentKey';
+import { retireAndSucceedQuestion } from '../../services/commands/questions';
 import './QuestionLibraryPage.css';
 
 function QuestionRow({
@@ -27,6 +25,7 @@ function QuestionRow({
   const [draftMandatory, setDraftMandatory] = useState(question.mandatory);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const intent = useIntentKeys();
 
   async function onSave() {
     if (!draft.trim()) {
@@ -40,10 +39,11 @@ function QuestionRow({
       newWording: draft.trim(),
       responseType: draftResponseType,
       mandatory: draftMandatory,
-      idempotencyKey: newQuestionIntentKey(),
+      idempotencyKey: intent.keyFor(question.id),
     });
     setBusy(false);
     if (result.ok) {
+      intent.release(question.id);
       setEditing(false);
       onSaved();
     } else {

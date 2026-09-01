@@ -1,4 +1,4 @@
-import { executeCommand, newCorrelationKey, type CommandResult } from './commandClient';
+import { executeCommand, type CommandResult } from './commandClient';
 
 /**
  * Application RBAC write commands (AD-003, AD-041). Each runs as a Dataverse Custom
@@ -35,10 +35,6 @@ export interface SetPagePermissionOutput {
   Conflict: boolean;
 }
 
-export function newPermissionIntentKey(): string {
-  return newCorrelationKey();
-}
-
 export function assignUserRole(input: AssignUserRoleInput): Promise<CommandResult<AssignUserRoleOutput>> {
   const body: Record<string, unknown> = {
     UserEmail: input.userEmail,
@@ -60,4 +56,43 @@ export function setPagePermission(
   if (input.roleCode) body.RoleCode = input.roleCode;
   else if (input.appRole) body.AppRole = input.appRole;
   return executeCommand<SetPagePermissionOutput>('al_SetPagePermission', body);
+}
+
+export interface SetActiveInput {
+  id: string;
+  active: boolean;
+  idempotencyKey: string;
+}
+
+export interface SetActiveOutput {
+  Active: boolean;
+  AuditEventId: string;
+}
+
+/**
+ * Withdraws or restores a role assignment. Changing someone's role is a withdraw plus a
+ * fresh assignUserRole, because the mapping's business code embeds the role.
+ */
+export function setRoleAssignmentActive(
+  input: SetActiveInput,
+): Promise<CommandResult<SetActiveOutput>> {
+  return executeCommand<SetActiveOutput>('al_SetRoleAssignmentActive', {
+    MappingId: input.id,
+    Active: input.active,
+    IdempotencyKey: input.idempotencyKey,
+  });
+}
+
+/**
+ * Withdraws or restores a permission override rule. Withdrawing drops the override so the
+ * role falls back to the code default; to deny explicitly, set the rule level to None.
+ */
+export function setPermissionRuleActive(
+  input: SetActiveInput,
+): Promise<CommandResult<SetActiveOutput>> {
+  return executeCommand<SetActiveOutput>('al_SetPermissionRuleActive', {
+    PermissionId: input.id,
+    Active: input.active,
+    IdempotencyKey: input.idempotencyKey,
+  });
 }

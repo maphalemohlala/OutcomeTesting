@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="MappingId">
+  <description default="Id of the al_userrolemapping record.">
+    <label description="Id of the al_userrolemapping record." languagecode="1033" />
+  </description>
+  <displayname default="Mapping id">
+    <label description="Mapping id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_SetRoleAssignmentActive.MappingId</name>
+  <type>10</type>
+</customapiresponseproperty>

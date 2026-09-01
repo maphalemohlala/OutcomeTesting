@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="RoleName">
+  <description default="New display name. Omit to leave unchanged. The role code never changes.">
+    <label description="New display name. Omit to leave unchanged. The role code never changes." languagecode="1033" />
+  </description>
+  <displayname default="Role name">
+    <label description="Role name" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>al_UpdateRole.RoleName</name>
+  <type>10</type>
+</customapirequestparameter>

@@ -1,4 +1,4 @@
-import { executeCommand, newCorrelationKey, type CommandResult } from './commandClient';
+import { executeCommand, type CommandResult } from './commandClient';
 
 /**
  * RetireAndSucceedQuestion command (AD-003, AD-004, FR-030/FR-031). Published checklist
@@ -20,10 +20,6 @@ export interface RetireAndSucceedQuestionOutput {
   VersionNumber: string;
   AuditEventId: string;
   Conflict: boolean;
-}
-
-export function newQuestionIntentKey(): string {
-  return newCorrelationKey();
 }
 
 export function retireAndSucceedQuestion(
