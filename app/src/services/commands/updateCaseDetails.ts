@@ -1,4 +1,4 @@
-import { executeCommand, newCorrelationKey, type CommandResult } from './commandClient';
+import { executeCommand, type CommandResult } from './commandClient';
 
 /**
  * UpdateCaseDetails command (AD-003, AD-036, AD-041). A manager amends the editable
@@ -37,10 +37,6 @@ export interface UpdateCaseDetailsOutput {
   Conflict: boolean;
 }
 
-export function newCaseEditIntentKey(): string {
-  return newCorrelationKey();
-}
-
 export function updateCaseDetails(
   input: UpdateCaseDetailsInput,
 ): Promise<CommandResult<UpdateCaseDetailsOutput>> {
@@ -65,5 +61,5 @@ export function updateCaseDetails(
     if (Object.keys(payload).length > 0) body.Fields = JSON.stringify(payload);
   }
 
-  return executeCommand<UpdateCaseDetailsOutput>('al_UpdateCaseDetails', body, 'al_outcomecases');
+  return executeCommand<UpdateCaseDetailsOutput>('al_UpdateCaseDetails', body);
 }

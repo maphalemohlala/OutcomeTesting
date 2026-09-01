@@ -1,4 +1,4 @@
-import { executeCommand, newCorrelationKey, type CommandResult } from './commandClient';
+import { executeCommand, type CommandResult } from './commandClient';
 
 /**
  * CompleteRemediation command (BR-006, BR-008, FR-020..FR-023). An adviser drives
@@ -20,10 +20,6 @@ export interface CompleteRemediationOutput {
   Status: string;
   AuditEventId: string;
   Conflict: boolean;
-}
-
-export function newRemediationIntentKey(): string {
-  return newCorrelationKey();
 }
 
 export function completeRemediation(

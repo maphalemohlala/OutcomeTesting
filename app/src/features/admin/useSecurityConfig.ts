@@ -6,6 +6,8 @@ export interface RoleMappingRow {
   id: string;
   email: string;
   role: string;
+  /** False once the assignment has been withdrawn; the row is kept for the audit trail. */
+  active: boolean;
 }
 
 export interface PagePermissionRow {
@@ -13,6 +15,7 @@ export interface PagePermissionRow {
   role: string;
   resource: string;
   level: string;
+  active: boolean;
 }
 
 export type SecurityConfigState =
@@ -26,9 +29,10 @@ export function useSecurityConfig(reloadKey: number): SecurityConfigState {
   useEffect(() => {
     let cancelled = false;
 
+    // Withdrawn rows are kept and shown as inactive, so an administrator can restore them.
     Promise.all([
-      Al_userrolemappingsService.getAll({ filter: 'statecode eq 0', top: 5000 }),
-      Al_pagepermissionsService.getAll({ filter: 'statecode eq 0', top: 5000 }),
+      Al_userrolemappingsService.getAll({ top: 5000 }),
+      Al_pagepermissionsService.getAll({ top: 5000 }),
     ])
       .then(([mapResult, permResult]) => {
         if (cancelled) return;
@@ -49,6 +53,7 @@ export function useSecurityConfig(reloadKey: number): SecurityConfigState {
               m.al_approlename ||
               APP_ROLE_BY_VALUE[Number(m.al_approle)] ||
               String(m.al_approle),
+            active: Number(m.statecode) === 0,
           }))
           .sort((a, b) => a.email.localeCompare(b.email));
 
@@ -62,6 +67,7 @@ export function useSecurityConfig(reloadKey: number): SecurityConfigState {
               String(p.al_approle),
             resource: p.al_resourcekey ?? '',
             level: p.al_accesslevelname ?? ACCESS_LEVEL_BY_VALUE[Number(p.al_accesslevel)] ?? String(p.al_accesslevel),
+            active: Number(p.statecode) === 0,
           }))
           .sort((a, b) => a.resource.localeCompare(b.resource) || a.role.localeCompare(b.role));
 

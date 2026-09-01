@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Active">
+  <description default="True to restore the assignment, false to withdraw it.">
+    <label description="True to restore the assignment, false to withdraw it." languagecode="1033" />
+  </description>
+  <displayname default="Active">
+    <label description="Active" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_SetRoleAssignmentActive.Active</name>
+  <type>0</type>
+</customapirequestparameter>

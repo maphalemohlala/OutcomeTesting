@@ -1,0 +1,75 @@
+{
+  "name": "al_RetireAndSucceedQuestion",
+  "title": "al_RetireAndSucceedQuestion",
+  "type": "Microsoft.PowerApps/dataverseOperation",
+  "properties": {
+    "displayName": "al_RetireAndSucceedQuestion",
+    "swagger": {
+      "swagger": "2.0",
+      "info": {
+        "title": "al_RetireAndSucceedQuestion",
+        "version": "1.0"
+      },
+      "basePath": "/api/data/v9.2",
+      "paths": {
+        "/al_RetireAndSucceedQuestion": {
+          "post": {
+            "operationId": "al_RetireAndSucceedQuestion",
+            "parameters": [
+              {
+                "name": "QuestionId",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "NewWording",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "IdempotencyKey",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "ResponseType",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "Mandatory",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              }
+            ],
+            "responses": {
+              "200": {
+                "description": "Success",
+                "schema": {
+                  "type": "object",
+                  "x-ms-dataverse-type": "LookupType",
+                  "x-ms-csdl-type": "mscrm.al_RetireAndSucceedQuestionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

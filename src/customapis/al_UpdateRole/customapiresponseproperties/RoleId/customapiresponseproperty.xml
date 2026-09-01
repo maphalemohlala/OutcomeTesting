@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="RoleId">
+  <description default="Id of the al_role record.">
+    <label description="Id of the al_role record." languagecode="1033" />
+  </description>
+  <displayname default="Role id">
+    <label description="Role id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_UpdateRole.RoleId</name>
+  <type>10</type>
+</customapiresponseproperty>

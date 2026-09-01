@@ -1,0 +1,65 @@
+{
+  "$comment": "Contract for the SetPermissionRuleActive server-side command (AD-003, AD-041, AD-037/OD-010). Deployed via the registration console (plugins/OutcomeTesting.Registration) and added to the OutcomeTesting solution via a solution-file import (src/customapis/al_SetPermissionRuleActive). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_SetPermissionRuleActive",
+    "name": "al_SetPermissionRuleActive",
+    "displayname": "Set Permission Rule Active",
+    "description": "Withdraws or restores an al_pagepermission override rule. Withdrawing drops the override so the role falls back to the code default; to deny explicitly, set the rule level to None instead. Enforces permission.manage Manage and writes an immutable Audit Event (BR-012).",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.SetPermissionRuleActivePlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "PermissionId",
+      "name": "PermissionId",
+      "displayname": "Permission id",
+      "description": "Id of the al_pagepermission record to withdraw or restore.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "Active",
+      "name": "Active",
+      "displayname": "Active",
+      "description": "True to restore the rule, false to withdraw it.",
+      "type": 0,
+      "isoptional": false
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay returns the same result.",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "PermissionId",
+      "name": "PermissionId",
+      "displayname": "Permission id",
+      "description": "Id of the al_pagepermission record.",
+      "type": 10
+    },
+    {
+      "uniquename": "Active",
+      "name": "Active",
+      "displayname": "Active",
+      "description": "The resulting active state.",
+      "type": 0
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written for this command.",
+      "type": 10
+    }
+  ]
+}

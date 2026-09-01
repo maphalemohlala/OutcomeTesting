@@ -1,6 +1,6 @@
 <customapirequestparameter uniquename="Fields">
-  <description default="JSON object of editable al_outcomecase fields keyed by logical name. Choice fields take the numeric option value, dates yyyy-MM-dd. Only allowlisted fields are accepted; each change is audited. Omit to change nothing here.">
-    <label description="JSON object of editable al_outcomecase fields keyed by logical name. Choice fields take the numeric option value, dates yyyy-MM-dd. Only allowlisted fields are accepted; each change is audited. Omit to change nothing here." languagecode="1033" />
+  <description default="JSON object of editable al_outcomecase fields keyed by logical name (e.g. {&quot;al_clientname&quot;:&quot;A. Client&quot;,&quot;al_casetype&quot;:&quot;120910510&quot;}). Choice fields take the numeric option value, dates yyyy-MM-dd. Only allowlisted fields are accepted; each change is audited. Omit to change nothing here.">
+    <label description="JSON object of editable al_outcomecase fields keyed by logical name (e.g. {&quot;al_clientname&quot;:&quot;A. Client&quot;,&quot;al_casetype&quot;:&quot;120910510&quot;}). Choice fields take the numeric option value, dates yyyy-MM-dd. Only allowlisted fields are accepted; each change is audited. Omit to change nothing here." languagecode="1033" />
   </description>
   <displayname default="Fields">
     <label description="Fields" languagecode="1033" />

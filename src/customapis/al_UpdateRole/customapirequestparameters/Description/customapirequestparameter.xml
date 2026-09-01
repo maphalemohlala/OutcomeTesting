@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Description">
+  <description default="New description. Omit to leave unchanged; send an empty string to clear it.">
+    <label description="New description. Omit to leave unchanged; send an empty string to clear it." languagecode="1033" />
+  </description>
+  <displayname default="Description">
+    <label description="Description" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>al_UpdateRole.Description</name>
+  <type>10</type>
+</customapirequestparameter>

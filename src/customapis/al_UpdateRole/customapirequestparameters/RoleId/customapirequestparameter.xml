@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="RoleId">
+  <description default="Id of the al_role record to amend.">
+    <label description="Id of the al_role record to amend." languagecode="1033" />
+  </description>
+  <displayname default="Role id">
+    <label description="Role id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_UpdateRole.RoleId</name>
+  <type>10</type>
+</customapirequestparameter>

@@ -8,6 +8,7 @@ export interface RoleRow {
   code: string;
   description: string | null;
   active: boolean;
+  rowVersion: string | null;
 }
 
 export type RolesState =
@@ -38,6 +39,7 @@ export function useRoles(reloadKey = 0): RolesState {
             code: r.al_rolecode,
             description: r.al_description ?? null,
             active: r.al_isactive !== false,
+            rowVersion: r.versionnumber != null ? String(r.versionnumber) : null,
           })),
         });
       })
