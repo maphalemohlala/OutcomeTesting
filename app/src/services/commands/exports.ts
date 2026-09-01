@@ -1,4 +1,4 @@
-import { executeCommand, newCorrelationKey, type CommandResult } from './commandClient';
+import { executeCommand, type CommandResult } from './commandClient';
 
 /**
  * Trail Light export commands (AD-003, AD-039, AD-034 manual only). CreateExportBatch
@@ -30,10 +30,6 @@ export interface GenerateExportOutput {
   Status: string;
   AuditEventId: string;
   Conflict: boolean;
-}
-
-export function newExportIntentKey(): string {
-  return newCorrelationKey();
 }
 
 export function createExportBatch(

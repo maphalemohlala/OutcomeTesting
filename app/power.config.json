@@ -98,6 +98,16 @@
           "entitySetName": "al_users",
           "logicalName": "al_user",
           "isHidden": false
+        },
+        "environment_39a902ba": {
+          "entitySetName": "Environment",
+          "logicalName": "environment_39a902ba",
+          "isHidden": false
+        },
+        "auditevents": {
+          "entitySetName": "al_auditevents",
+          "logicalName": "al_auditevent",
+          "isHidden": false
         }
       },
       "environmentVariableName": ""

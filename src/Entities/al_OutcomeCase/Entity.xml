@@ -53,117 +53,6 @@
             <Description description="Date the advice was given." languagecode="1033" />
           </Descriptions>
         </attribute>
-        <attribute PhysicalName="al_DueDate">
-          <Type>datetime</Type>
-          <Name>al_duedate</Name>
-          <LogicalName>al_duedate</LogicalName>
-          <RequiredLevel>none</RequiredLevel>
-          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
-          <ImeMode>inactive</ImeMode>
-          <ValidForUpdateApi>1</ValidForUpdateApi>
-          <ValidForReadApi>1</ValidForReadApi>
-          <ValidForCreateApi>1</ValidForCreateApi>
-          <IsCustomField>1</IsCustomField>
-          <IsAuditEnabled>1</IsAuditEnabled>
-          <IsSecured>0</IsSecured>
-          <IntroducedVersion>1.0.0.0</IntroducedVersion>
-          <IsCustomizable>1</IsCustomizable>
-          <IsRenameable>1</IsRenameable>
-          <CanModifySearchSettings>1</CanModifySearchSettings>
-          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
-          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
-          <SourceType>0</SourceType>
-          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
-          <IsSortableEnabled>0</IsSortableEnabled>
-          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
-          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
-          <IsDataSourceSecret>0</IsDataSourceSecret>
-          <AutoNumberFormat></AutoNumberFormat>
-          <IsSearchable>0</IsSearchable>
-          <IsFilterable>1</IsFilterable>
-          <IsRetrievable>1</IsRetrievable>
-          <IsLocalizable>0</IsLocalizable>
-          <Format>date</Format>
-          <CanChangeDateTimeBehavior>0</CanChangeDateTimeBehavior>
-          <Behavior>2</Behavior>
-          <displaynames>
-            <displayname description="Due date" languagecode="1033" />
-          </displaynames>
-          <Descriptions>
-            <Description description="Target date for the case to be completed. Set and amended by a manager as an administrative update; changes are audited (BR-012)." languagecode="1033" />
-          </Descriptions>
-        </attribute>
-        <attribute PhysicalName="al_Priority">
-          <Type>picklist</Type>
-          <Name>al_priority</Name>
-          <LogicalName>al_priority</LogicalName>
-          <RequiredLevel>none</RequiredLevel>
-          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
-          <ImeMode>auto</ImeMode>
-          <ValidForUpdateApi>1</ValidForUpdateApi>
-          <ValidForReadApi>1</ValidForReadApi>
-          <ValidForCreateApi>1</ValidForCreateApi>
-          <IsCustomField>1</IsCustomField>
-          <IsAuditEnabled>1</IsAuditEnabled>
-          <IsSecured>0</IsSecured>
-          <IntroducedVersion>1.0.0.0</IntroducedVersion>
-          <IsCustomizable>1</IsCustomizable>
-          <IsRenameable>1</IsRenameable>
-          <CanModifySearchSettings>1</CanModifySearchSettings>
-          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
-          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
-          <SourceType>0</SourceType>
-          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
-          <IsSortableEnabled>0</IsSortableEnabled>
-          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
-          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
-          <IsDataSourceSecret>0</IsDataSourceSecret>
-          <AutoNumberFormat></AutoNumberFormat>
-          <IsSearchable>1</IsSearchable>
-          <IsFilterable>1</IsFilterable>
-          <IsRetrievable>1</IsRetrievable>
-          <IsLocalizable>0</IsLocalizable>
-          <AppDefaultValue>-1</AppDefaultValue>
-          <optionset Name="al_outcomecase_priority">
-            <OptionSetType>picklist</OptionSetType>
-            <IntroducedVersion>1.0.0.0</IntroducedVersion>
-            <IsCustomizable>1</IsCustomizable>
-            <displaynames>
-              <displayname description="Priority" languagecode="1033" />
-            </displaynames>
-            <Descriptions>
-              <Description description="Work priority for the case, set by a manager." languagecode="1033" />
-            </Descriptions>
-            <options>
-              <option value="120910780" IsHidden="0">
-                <labels>
-                  <label description="Low" languagecode="1033" />
-                </labels>
-              </option>
-              <option value="120910781" IsHidden="0">
-                <labels>
-                  <label description="Normal" languagecode="1033" />
-                </labels>
-              </option>
-              <option value="120910782" IsHidden="0">
-                <labels>
-                  <label description="High" languagecode="1033" />
-                </labels>
-              </option>
-              <option value="120910783" IsHidden="0">
-                <labels>
-                  <label description="Urgent" languagecode="1033" />
-                </labels>
-              </option>
-            </options>
-          </optionset>
-          <displaynames>
-            <displayname description="Priority" languagecode="1033" />
-          </displaynames>
-          <Descriptions>
-            <Description description="Work priority for the case: Low, Normal, High or Urgent. Set by a manager as an administrative update; changes are audited (BR-012)." languagecode="1033" />
-          </Descriptions>
-        </attribute>
         <attribute PhysicalName="al_AdviserCode">
           <Type>nvarchar</Type>
           <Name>al_advisercode</Name>
@@ -662,6 +551,46 @@
             <Description description="Client name or initials for the case. Personal data retained indefinitely; erasure is by anonymisation in place, never deletion (AD-037)." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_DueDate">
+          <Type>datetime</Type>
+          <Name>al_duedate</Name>
+          <LogicalName>al_duedate</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>inactive</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>1</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>date</Format>
+          <CanChangeDateTimeBehavior>0</CanChangeDateTimeBehavior>
+          <Behavior>2</Behavior>
+          <displaynames>
+            <displayname description="Due date" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Target date for the case to be completed. Set and amended by a manager as an administrative update; changes are audited (BR-012)." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_Name">
           <Type>nvarchar</Type>
           <Name>al_name</Name>
@@ -886,6 +815,7 @@
           <LogicalName>al_previouscaseid</LogicalName>
           <RequiredLevel>none</RequiredLevel>
           <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
           <ValidForUpdateApi>1</ValidForUpdateApi>
           <ValidForReadApi>1</ValidForReadApi>
           <ValidForCreateApi>1</ValidForCreateApi>
@@ -916,6 +846,77 @@
           </displaynames>
           <Descriptions>
             <Description description="Links a case to the case it replaces. The reverse navigation is the replacement case. NoCascade delete is deliberate: removing one case must never delete the case it replaced or was replaced by, so history survives." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_Priority">
+          <Type>picklist</Type>
+          <Name>al_priority</Name>
+          <LogicalName>al_priority</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>1</IsSearchable>
+          <IsFilterable>1</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <AppDefaultValue>-1</AppDefaultValue>
+          <optionset Name="al_outcomecase_priority">
+            <OptionSetType>picklist</OptionSetType>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Priority" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="Work priority for the case, set by a manager." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="120910780" IsHidden="0">
+                <labels>
+                  <label description="Low" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910781" IsHidden="0">
+                <labels>
+                  <label description="Normal" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910782" IsHidden="0">
+                <labels>
+                  <label description="High" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910783" IsHidden="0">
+                <labels>
+                  <label description="Urgent" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Priority" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Work priority for the case: Low, Normal, High or Urgent. Set by a manager as an administrative update; changes are audited (BR-012)." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_Products">
@@ -1040,6 +1041,7 @@
           <LogicalName>al_reviewrouteid</LogicalName>
           <RequiredLevel>none</RequiredLevel>
           <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
           <ValidForUpdateApi>1</ValidForUpdateApi>
           <ValidForReadApi>1</ValidForReadApi>
           <ValidForCreateApi>1</ValidForCreateApi>

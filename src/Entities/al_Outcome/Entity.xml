@@ -83,6 +83,7 @@
           <IsFilterable>1</IsFilterable>
           <IsRetrievable>1</IsRetrievable>
           <IsLocalizable>0</IsLocalizable>
+          <AppDefaultValue>-1</AppDefaultValue>
           <optionset Name="al_outcome_finaloutcome">
             <OptionSetType>picklist</OptionSetType>
             <IntroducedVersion>1.0.0.0</IntroducedVersion>

@@ -1,0 +1,59 @@
+{
+  "name": "al_SetPermissionRuleActive",
+  "title": "al_SetPermissionRuleActive",
+  "type": "Microsoft.PowerApps/dataverseOperation",
+  "properties": {
+    "displayName": "al_SetPermissionRuleActive",
+    "swagger": {
+      "swagger": "2.0",
+      "info": {
+        "title": "al_SetPermissionRuleActive",
+        "version": "1.0"
+      },
+      "basePath": "/api/data/v9.2",
+      "paths": {
+        "/al_SetPermissionRuleActive": {
+          "post": {
+            "operationId": "al_SetPermissionRuleActive",
+            "parameters": [
+              {
+                "name": "PermissionId",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "Active",
+                "in": "body",
+                "required": true,
+                "type": "boolean",
+                "x-ms-dataverse-type": "BooleanType",
+                "x-ms-csdl-type": "Edm.Boolean"
+              },
+              {
+                "name": "IdempotencyKey",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              }
+            ],
+            "responses": {
+              "200": {
+                "description": "Success",
+                "schema": {
+                  "type": "object",
+                  "x-ms-dataverse-type": "LookupType",
+                  "x-ms-csdl-type": "mscrm.al_SetPermissionRuleActiveResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

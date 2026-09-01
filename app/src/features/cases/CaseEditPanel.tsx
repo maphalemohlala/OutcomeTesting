@@ -5,10 +5,8 @@ import { Modal } from '../../components/feedback/Modal';
 import { ValidationSummary } from '../../components/feedback/ValidationSummary';
 import { messageForFailure } from '../../services/errors';
 import { UserPicker } from '../../components/form/UserPicker';
-import {
-  updateCaseDetails,
-  newCaseEditIntentKey,
-} from '../../services/commands/updateCaseDetails';
+import { useIntentKeys } from '../../hooks/useIntentKey';
+import { updateCaseDetails } from '../../services/commands/updateCaseDetails';
 import {
   Al_outcomecasesal_adviserstatus,
   Al_outcomecasesal_casestatus,
@@ -113,6 +111,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
   const [panelNotice, setPanelNotice] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const intent = useIntentKeys();
 
   const optionLists = useMemo(() => {
     const lists = new Map<keyof CaseEditValues, { value: number; label: string }[]>();
@@ -172,11 +171,12 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
       fields: changed,
       reason: reason.trim(),
       expectedRowVersion: detail.rowVersion,
-      idempotencyKey: newCaseEditIntentKey(),
+      idempotencyKey: intent.keyFor(detail.id),
     })
       .then((result) => {
         setSaving(false);
         if (result.ok) {
+          intent.release(detail.id);
           setPanelNotice('Case details updated.');
           setReason('');
           setErrors([]);

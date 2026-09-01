@@ -1,0 +1,107 @@
+{
+  "name": "al_UpdateCaseDetails",
+  "title": "al_UpdateCaseDetails",
+  "type": "Microsoft.PowerApps/dataverseOperation",
+  "properties": {
+    "displayName": "al_UpdateCaseDetails",
+    "swagger": {
+      "swagger": "2.0",
+      "info": {
+        "title": "al_UpdateCaseDetails",
+        "version": "1.0"
+      },
+      "basePath": "/api/data/v9.2",
+      "paths": {
+        "/al_UpdateCaseDetails": {
+          "post": {
+            "operationId": "al_UpdateCaseDetails",
+            "parameters": [
+              {
+                "name": "TargetId",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "Status",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "RouteId",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "Priority",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "DueDate",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "Reason",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "ExpectedRowVersion",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "IdempotencyKey",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "Fields",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              }
+            ],
+            "responses": {
+              "200": {
+                "description": "Success",
+                "schema": {
+                  "type": "object",
+                  "x-ms-dataverse-type": "LookupType",
+                  "x-ms-csdl-type": "mscrm.al_UpdateCaseDetailsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

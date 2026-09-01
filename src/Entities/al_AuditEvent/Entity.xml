@@ -267,6 +267,21 @@
                   <label description="SetUserActive" languagecode="1033" />
                 </labels>
               </option>
+              <option value="120910788" IsHidden="0">
+                <labels>
+                  <label description="SetRoleAssignmentActive" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910789" IsHidden="0">
+                <labels>
+                  <label description="SetPermissionRuleActive" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910790" IsHidden="0">
+                <labels>
+                  <label description="UpdateRole" languagecode="1033" />
+                </labels>
+              </option>
             </options>
           </optionset>
           <displaynames>

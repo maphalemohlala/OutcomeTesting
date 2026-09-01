@@ -140,6 +140,7 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   // Outcome Testing Manager runs intake, allocation, reporting and exports.
   { role: 'Outcome Testing Manager', resource: 'page.cases', level: 'Edit' },
   { role: 'Outcome Testing Manager', resource: 'page.imports', level: 'Edit' },
+  { role: 'Outcome Testing Manager', resource: 'page.remediation', level: 'View' },
   { role: 'Outcome Testing Manager', resource: 'page.reports', level: 'View' },
   { role: 'Outcome Testing Manager', resource: 'page.exports', level: 'Manage' },
   { role: 'Outcome Testing Manager', resource: 'command.assign', level: 'Edit' },
@@ -148,6 +149,7 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   // Administrator manages configuration and the permission model itself.
   { role: 'Administrator', resource: 'page.cases', level: 'View' },
   { role: 'Administrator', resource: 'page.imports', level: 'Edit' },
+  { role: 'Administrator', resource: 'page.remediation', level: 'View' },
   { role: 'Administrator', resource: 'page.reports', level: 'View' },
   { role: 'Administrator', resource: 'page.exports', level: 'Manage' },
   { role: 'Administrator', resource: 'page.admin.questions', level: 'Manage' },

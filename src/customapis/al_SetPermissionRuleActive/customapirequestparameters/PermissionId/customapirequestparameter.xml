@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="PermissionId">
+  <description default="Id of the al_pagepermission record to withdraw or restore.">
+    <label description="Id of the al_pagepermission record to withdraw or restore." languagecode="1033" />
+  </description>
+  <displayname default="Permission id">
+    <label description="Permission id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_SetPermissionRuleActive.PermissionId</name>
+  <type>10</type>
+</customapirequestparameter>

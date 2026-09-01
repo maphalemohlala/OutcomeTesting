@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="MappingId">
+  <description default="Id of the al_userrolemapping record to withdraw or restore.">
+    <label description="Id of the al_userrolemapping record to withdraw or restore." languagecode="1033" />
+  </description>
+  <displayname default="Mapping id">
+    <label description="Mapping id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_SetRoleAssignmentActive.MappingId</name>
+  <type>10</type>
+</customapirequestparameter>

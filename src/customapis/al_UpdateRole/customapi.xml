@@ -1,0 +1,18 @@
+<customapi uniquename="al_UpdateRole">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Renames, re-describes or retires an al_role. The role code is the stable key assignments and rules reference and never changes. Retiring cascades to them. Enforces permission.manage Manage and writes an immutable Audit Event (BR-012).">
+    <label description="Renames, re-describes or retires an al_role. The role code is the stable key assignments and rules reference and never changes. Retiring cascades to them. Enforces permission.manage Manage and writes an immutable Audit Event (BR-012)." languagecode="1033" />
+  </description>
+  <displayname default="Update Role">
+    <label description="Update Role" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_UpdateRole</name>
+  <plugintypeid>
+    <plugintypeexportkey>36d7c83c-c1a2-f111-b8dc-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

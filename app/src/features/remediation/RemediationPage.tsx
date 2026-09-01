@@ -9,10 +9,8 @@ import {
   type RemediationActionRow,
   type SignoffRow,
 } from './useRemediation';
-import {
-  completeRemediation,
-  newRemediationIntentKey,
-} from '../../services/commands/completeRemediation';
+import { useIntentKeys } from '../../hooks/useIntentKey';
+import { completeRemediation } from '../../services/commands/completeRemediation';
 import { messageForFailure } from '../../services/errors';
 import './RemediationPage.css';
 
@@ -165,6 +163,7 @@ export function RemediationPage() {
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [actionStatus, setActionStatus] = useState('');
   const state = useRemediation(caseId, reloadKey);
+  const intent = useIntentKeys();
 
   const allActions = state.status === 'ready' ? state.actions : [];
   const actionStatuses = useMemo(
@@ -180,15 +179,15 @@ export function RemediationPage() {
     if (busyId !== null) return;
     setBusyId(action.id);
     setNotice(null);
-
     completeRemediation({
       actionId: action.id,
       expectedRowVersion: action.rowVersion,
-      idempotencyKey: newRemediationIntentKey(),
+      idempotencyKey: intent.keyFor(action.id),
     })
       .then((result) => {
         setBusyId(null);
         if (result.ok) {
+          intent.release(action.id);
           setNotice({ tone: 'success', message: `${action.reference} marked complete.` });
           setReloadKey((key) => key + 1);
         } else {

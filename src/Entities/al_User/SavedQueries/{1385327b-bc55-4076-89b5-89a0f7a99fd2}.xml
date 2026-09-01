@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<savedqueries xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <savedquery>
+    <IsCustomizable>1</IsCustomizable>
+    <CanBeDeleted>0</CanBeDeleted>
+    <isquickfindquery>0</isquickfindquery>
+    <isprivate>0</isprivate>
+    <isdefault>0</isdefault>
+    <savedqueryid>{1385327b-bc55-4076-89b5-89a0f7a99fd2}</savedqueryid>
+    <layoutxml>
+      <grid name="resultset" jump="al_name" select="1" icon="1" preview="1">
+        <row name="result" id="al_userid">
+          <cell name="al_name" width="300" />
+          <cell name="createdon" width="125" />
+        </row>
+      </grid>
+    </layoutxml>
+    <querytype>0</querytype>
+    <fetchxml>
+      <fetch version="1.0" mapping="logical">
+        <entity name="al_user">
+          <attribute name="al_userid" />
+          <attribute name="al_name" />
+          <attribute name="createdon" />
+          <order attribute="al_name" descending="false" />
+          <filter type="and">
+            <condition attribute="statecode" operator="eq" value="1" />
+          </filter>
+        </entity>
+      </fetch>
+    </fetchxml>
+    <IntroducedVersion>1.0.0.0</IntroducedVersion>
+    <LocalizedNames>
+      <LocalizedName description="Inactive Users" languagecode="1033" />
+    </LocalizedNames>
+  </savedquery>
+</savedqueries>
