@@ -1,0 +1,18 @@
+<customapi uniquename="al_SetPermissionRuleActive">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Withdraws or restores an al_pagepermission override rule. Withdrawing drops the override so the role falls back to the code default; to deny explicitly, set the rule level to None instead. Enforces permission.manage Manage and writes an immutable Audit Event (BR-012).">
+    <label description="Withdraws or restores an al_pagepermission override rule. Withdrawing drops the override so the role falls back to the code default; to deny explicitly, set the rule level to None instead. Enforces permission.manage Manage and writes an immutable Audit Event (BR-012)." languagecode="1033" />
+  </description>
+  <displayname default="Set Permission Rule Active">
+    <label description="Set Permission Rule Active" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_SetPermissionRuleActive</name>
+  <plugintypeid>
+    <plugintypeexportkey>819dab2c-c1a2-f111-b8dc-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

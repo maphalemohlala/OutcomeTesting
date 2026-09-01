@@ -30,3 +30,6 @@ plugins/**/obj/
 
 # Claude Code personal settings (machine-specific paths)
 .claude/settings.local.json
+
+# vendored obra/superpowers skills - installed locally, not committed
+/.github/skills/

@@ -1,6 +1,6 @@
 <customapirequestparameter uniquename="FullName">
-  <description default="The person&apos;s new full name.">
-    <label description="The person&apos;s new full name." languagecode="1033" />
+  <description default="The person's new full name.">
+    <label description="The person's new full name." languagecode="1033" />
   </description>
   <displayname default="Full name">
     <label description="Full name" languagecode="1033" />

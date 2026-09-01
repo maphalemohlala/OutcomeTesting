@@ -1,0 +1,59 @@
+{
+  "name": "al_SetRoleAssignmentActive",
+  "title": "al_SetRoleAssignmentActive",
+  "type": "Microsoft.PowerApps/dataverseOperation",
+  "properties": {
+    "displayName": "al_SetRoleAssignmentActive",
+    "swagger": {
+      "swagger": "2.0",
+      "info": {
+        "title": "al_SetRoleAssignmentActive",
+        "version": "1.0"
+      },
+      "basePath": "/api/data/v9.2",
+      "paths": {
+        "/al_SetRoleAssignmentActive": {
+          "post": {
+            "operationId": "al_SetRoleAssignmentActive",
+            "parameters": [
+              {
+                "name": "MappingId",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "Active",
+                "in": "body",
+                "required": true,
+                "type": "boolean",
+                "x-ms-dataverse-type": "BooleanType",
+                "x-ms-csdl-type": "Edm.Boolean"
+              },
+              {
+                "name": "IdempotencyKey",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              }
+            ],
+            "responses": {
+              "200": {
+                "description": "Success",
+                "schema": {
+                  "type": "object",
+                  "x-ms-dataverse-type": "LookupType",
+                  "x-ms-csdl-type": "mscrm.al_SetRoleAssignmentActiveResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

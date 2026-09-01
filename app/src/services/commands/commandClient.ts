@@ -1,6 +1,9 @@
 import { getClient } from '@microsoft/power-apps/data';
 import { dataSourcesInfo } from '../../../.power/schemas/appschemas/dataSourcesInfo';
 import { DEFAULT_FAILURE_MESSAGES, logTechnical } from '../errors';
+import { dataSourceForCommand, type CommandOperation } from './operations';
+
+export { newCorrelationKey } from './intentKey';
 
 /**
  * Client-side entry point for the server-side lifecycle commands (AD-003). Every
@@ -40,11 +43,6 @@ export interface CommandFailure {
 }
 
 export type CommandResult<T> = CommandSuccess<T> | CommandFailure;
-
-/** A fresh idempotency key for one user intent. Reuse it across retries of that intent. */
-export function newCorrelationKey(): string {
-  return crypto.randomUUID();
-}
 
 /**
  * Pulls a human-readable message out of whatever the platform throws. The Power Apps
@@ -101,15 +99,14 @@ function classify(error: unknown): CommandFailure {
 }
 
 /**
- * Invokes an unbound Dataverse Custom API and normalises the result. `anchorTable`
- * is a registered data source; it only resolves the environment to call. It must be the
- * entity-set name used as a key in dataSourcesInfo (plural, e.g. al_remediationactions),
- * not the singular logical name, or the player cannot resolve the data source.
+ * Invokes an unbound Dataverse Custom API and normalises the result. The Power Apps client
+ * resolves the call as `dataSourcesInfo[tableName].apis[operationName]`, and the generator
+ * registers each custom API as its own data source, so `tableName` is the API's own key --
+ * not the table the command happens to write to.
  */
 export async function executeCommand<TResult>(
-  operationName: string,
+  operationName: CommandOperation,
   body: Record<string, unknown>,
-  anchorTable = 'al_remediationactions',
 ): Promise<CommandResult<TResult>> {
   try {
     const result = await client.executeAsync<never, TResult>({
@@ -117,7 +114,7 @@ export async function executeCommand<TResult>(
         action: 'customapi',
         parameters: {
           operationName,
-          tableName: anchorTable,
+          tableName: dataSourceForCommand(operationName),
           body,
         },
       },

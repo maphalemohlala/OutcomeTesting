@@ -8,6 +8,7 @@ export interface DirectoryUser {
   email: string;
   active: boolean;
   createdOn: string | null;
+  rowVersion: string | null;
 }
 
 export type UserDirectoryState =
@@ -42,6 +43,7 @@ export function useUserDirectory(reloadKey = 0): UserDirectoryState {
             email: u.al_workemail,
             active: u.al_isactive !== false,
             createdOn: u.createdon ?? null,
+            rowVersion: u.versionnumber != null ? String(u.versionnumber) : null,
           })),
         });
       })

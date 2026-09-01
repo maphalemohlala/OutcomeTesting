@@ -104,6 +104,48 @@ namespace OutcomeTesting.Plugins
             return null;
         }
 
+        public static bool GetRequiredBool(IPluginExecutionContext context, string name)
+        {
+            var value = GetOptionalBool(context, name);
+            if (!value.HasValue)
+            {
+                throw new InvalidPluginExecutionException(PreconditionPrefix + name + " is required.");
+            }
+
+            return value.Value;
+        }
+
+        public static bool? GetOptionalBool(IPluginExecutionContext context, string name)
+        {
+            object value;
+            if (context.InputParameters.TryGetValue(name, out value) && value is bool)
+            {
+                return (bool)value;
+            }
+
+            return null;
+        }
+
+        /// <summary>True when the row is in the Active state (statecode 0).</summary>
+        public static bool IsActive(Entity record)
+        {
+            var state = record.GetAttributeValue<OptionSetValue>("statecode");
+            return state == null || state.Value == 0;
+        }
+
+        /// <summary>
+        /// Activates or deactivates a row. Deactivation is the sanctioned alternative to
+        /// deletion for retained data (AD-037/OD-010), so the row and its history survive.
+        /// </summary>
+        public static void SetState(IOrganizationService service, string entity, Guid id, bool active)
+        {
+            service.Update(new Entity(entity, id)
+            {
+                ["statecode"] = new OptionSetValue(active ? 0 : 1),
+                ["statuscode"] = new OptionSetValue(active ? 1 : 2),
+            });
+        }
+
         public static bool IsConcurrencyFault(FaultException<OrganizationServiceFault> fault)
         {
             // ConcurrencyVersionMismatch (0x80060892); fall back to message text in case

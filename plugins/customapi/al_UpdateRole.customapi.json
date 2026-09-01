@@ -1,0 +1,89 @@
+{
+  "$comment": "Contract for the UpdateRole server-side command (AD-003, AD-041, AD-044). Deployed via the registration console (plugins/OutcomeTesting.Registration) and added to the OutcomeTesting solution via a solution-file import (src/customapis/al_UpdateRole). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_UpdateRole",
+    "name": "al_UpdateRole",
+    "displayname": "Update Role",
+    "description": "Renames, re-describes or retires an al_role. The role code is the stable key assignments and rules reference and never changes. Retiring cascades to them. Enforces permission.manage Manage and writes an immutable Audit Event (BR-012).",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.UpdateRolePlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "RoleId",
+      "name": "RoleId",
+      "displayname": "Role id",
+      "description": "Id of the al_role record to amend.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "RoleName",
+      "name": "RoleName",
+      "displayname": "Role name",
+      "description": "New display name. Omit to leave unchanged. The role code never changes.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "Description",
+      "name": "Description",
+      "displayname": "Description",
+      "description": "New description. Omit to leave unchanged; send an empty string to clear it.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "Active",
+      "name": "Active",
+      "displayname": "Active",
+      "description": "True to restore the role, false to retire it and cascade to its assignments and rules. Omit to leave unchanged.",
+      "type": 0,
+      "isoptional": true
+    },
+    {
+      "uniquename": "ExpectedRowVersion",
+      "name": "ExpectedRowVersion",
+      "displayname": "Expected row version",
+      "description": "Row version for optimistic concurrency. Omit to skip the check.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay returns the same result.",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "RoleId",
+      "name": "RoleId",
+      "displayname": "Role id",
+      "description": "Id of the al_role record.",
+      "type": 10
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written for this command.",
+      "type": 10
+    },
+    {
+      "uniquename": "Conflict",
+      "name": "Conflict",
+      "displayname": "Conflict",
+      "description": "True when the row version did not match and nothing was written.",
+      "type": 0
+    }
+  ]
+}

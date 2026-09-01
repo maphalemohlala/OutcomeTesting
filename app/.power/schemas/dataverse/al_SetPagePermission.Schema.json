@@ -1,0 +1,75 @@
+{
+  "name": "al_SetPagePermission",
+  "title": "al_SetPagePermission",
+  "type": "Microsoft.PowerApps/dataverseOperation",
+  "properties": {
+    "displayName": "al_SetPagePermission",
+    "swagger": {
+      "swagger": "2.0",
+      "info": {
+        "title": "al_SetPagePermission",
+        "version": "1.0"
+      },
+      "basePath": "/api/data/v9.2",
+      "paths": {
+        "/al_SetPagePermission": {
+          "post": {
+            "operationId": "al_SetPagePermission",
+            "parameters": [
+              {
+                "name": "AppRole",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "ResourceKey",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "AccessLevel",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "IdempotencyKey",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "RoleCode",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              }
+            ],
+            "responses": {
+              "200": {
+                "description": "Success",
+                "schema": {
+                  "type": "object",
+                  "x-ms-dataverse-type": "LookupType",
+                  "x-ms-csdl-type": "mscrm.al_SetPagePermissionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

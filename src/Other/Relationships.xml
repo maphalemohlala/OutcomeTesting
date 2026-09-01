@@ -35,7 +35,9 @@
   <EntityRelationship Name="business_unit_al_remediationaction" />
   <EntityRelationship Name="business_unit_al_response" />
   <EntityRelationship Name="business_unit_al_reviewinstance" />
+  <EntityRelationship Name="business_unit_al_role" />
   <EntityRelationship Name="business_unit_al_signoff" />
+  <EntityRelationship Name="business_unit_al_user" />
   <EntityRelationship Name="business_unit_al_userrolemapping" />
   <EntityRelationship Name="lk_al_auditevent_createdby" />
   <EntityRelationship Name="lk_al_auditevent_modifiedby" />
@@ -73,10 +75,14 @@
   <EntityRelationship Name="lk_al_reviewinstance_modifiedby" />
   <EntityRelationship Name="lk_al_reviewroute_createdby" />
   <EntityRelationship Name="lk_al_reviewroute_modifiedby" />
+  <EntityRelationship Name="lk_al_role_createdby" />
+  <EntityRelationship Name="lk_al_role_modifiedby" />
   <EntityRelationship Name="lk_al_section_createdby" />
   <EntityRelationship Name="lk_al_section_modifiedby" />
   <EntityRelationship Name="lk_al_signoff_createdby" />
   <EntityRelationship Name="lk_al_signoff_modifiedby" />
+  <EntityRelationship Name="lk_al_user_createdby" />
+  <EntityRelationship Name="lk_al_user_modifiedby" />
   <EntityRelationship Name="lk_al_userrolemapping_createdby" />
   <EntityRelationship Name="lk_al_userrolemapping_modifiedby" />
   <EntityRelationship Name="organization_al_checklist" />
@@ -98,7 +104,9 @@
   <EntityRelationship Name="owner_al_remediationaction" />
   <EntityRelationship Name="owner_al_response" />
   <EntityRelationship Name="owner_al_reviewinstance" />
+  <EntityRelationship Name="owner_al_role" />
   <EntityRelationship Name="owner_al_signoff" />
+  <EntityRelationship Name="owner_al_user" />
   <EntityRelationship Name="owner_al_userrolemapping" />
   <EntityRelationship Name="team_al_auditevent" />
   <EntityRelationship Name="team_al_caseassignment" />
@@ -112,7 +120,9 @@
   <EntityRelationship Name="team_al_remediationaction" />
   <EntityRelationship Name="team_al_response" />
   <EntityRelationship Name="team_al_reviewinstance" />
+  <EntityRelationship Name="team_al_role" />
   <EntityRelationship Name="team_al_signoff" />
+  <EntityRelationship Name="team_al_user" />
   <EntityRelationship Name="team_al_userrolemapping" />
   <EntityRelationship Name="user_al_auditevent" />
   <EntityRelationship Name="user_al_caseassignment" />
@@ -126,6 +136,8 @@
   <EntityRelationship Name="user_al_remediationaction" />
   <EntityRelationship Name="user_al_response" />
   <EntityRelationship Name="user_al_reviewinstance" />
+  <EntityRelationship Name="user_al_role" />
   <EntityRelationship Name="user_al_signoff" />
+  <EntityRelationship Name="user_al_user" />
   <EntityRelationship Name="user_al_userrolemapping" />
 </EntityRelationships>

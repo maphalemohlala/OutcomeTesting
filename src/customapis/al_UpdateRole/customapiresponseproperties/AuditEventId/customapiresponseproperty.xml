@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="AuditEventId">
+  <description default="Id of the Audit Event written for this command.">
+    <label description="Id of the Audit Event written for this command." languagecode="1033" />
+  </description>
+  <displayname default="Audit event id">
+    <label description="Audit event id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_UpdateRole.AuditEventId</name>
+  <type>10</type>
+</customapiresponseproperty>

@@ -2,11 +2,8 @@ import { useMemo, useState } from 'react';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import { useExports } from './useExports';
-import {
-  createExportBatch,
-  generateExport,
-  newExportIntentKey,
-} from '../../services/commands/exports';
+import { useIntentKeys } from '../../hooks/useIntentKey';
+import { createExportBatch, generateExport } from '../../services/commands/exports';
 import './ExportsPage.css';
 
 type Notice = { tone: 'ok' | 'error'; message: string } | null;
@@ -31,6 +28,7 @@ export function ExportsPage() {
   const state = useExports(reloadKey);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const intent = useIntentKeys();
 
   const [batchStatus, setBatchStatus] = useState('');
   const [batchFrom, setBatchFrom] = useState('');
@@ -75,9 +73,10 @@ export function ExportsPage() {
   async function onCreateBatch() {
     setBusy(true);
     setNotice(null);
-    const result = await createExportBatch({ idempotencyKey: newExportIntentKey() });
+    const result = await createExportBatch({ idempotencyKey: intent.keyFor('create-batch') });
     setBusy(false);
     if (result.ok) {
+      intent.release('create-batch');
       setNotice({ tone: 'ok', message: 'New draft export batch created.' });
       setReloadKey((k) => k + 1);
     } else {
@@ -88,9 +87,10 @@ export function ExportsPage() {
   async function onGenerate(batchId: string) {
     setBusy(true);
     setNotice(null);
-    const result = await generateExport({ batchId, idempotencyKey: newExportIntentKey() });
+    const result = await generateExport({ batchId, idempotencyKey: intent.keyFor(batchId) });
     setBusy(false);
     if (result.ok) {
+      intent.release(batchId);
       setNotice({ tone: 'ok', message: `Generated ${result.data.RowCount} export record(s).` });
       setReloadKey((k) => k + 1);
     } else {

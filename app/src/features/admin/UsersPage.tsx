@@ -5,13 +5,9 @@ import { Notice } from '../../components/feedback/Notice';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import { useUserDirectory, type DirectoryUser } from '../../hooks/useUserDirectory';
+import { useIntentKeys } from '../../hooks/useIntentKey';
 import { messageForFailure } from '../../services/errors';
-import {
-  createUser,
-  updateUser,
-  setUserActive,
-  newUserIntentKey,
-} from '../../services/commands/users';
+import { createUser, updateUser, setUserActive } from '../../services/commands/users';
 import './UsersPage.css';
 
 type Banner = { tone: 'success' | 'error'; message: string } | null;
@@ -36,6 +32,7 @@ export function UsersPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<DirectoryUser | null>(null);
+  const intent = useIntentKeys();
 
   const users = directory.status === 'ready' ? directory.users : [];
 
@@ -57,12 +54,14 @@ export function UsersPage() {
 
   async function onToggleActive(user: DirectoryUser) {
     setBanner(null);
+    const token = `active:${user.id}`;
     const result = await setUserActive({
       userId: user.id,
       active: !user.active,
-      idempotencyKey: newUserIntentKey(),
+      idempotencyKey: intent.keyFor(token),
     });
     if (result.ok) {
+      intent.release(token);
       setBanner({
         tone: 'success',
         message: `${user.name} ${user.active ? 'deactivated' : 'reactivated'}.`,
@@ -237,6 +236,7 @@ function CreateUserModal({
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const intent = useIntentKeys();
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -253,10 +253,11 @@ function CreateUserModal({
     const result = await createUser({
       fullName: name.trim(),
       workEmail: email.trim(),
-      idempotencyKey: newUserIntentKey(),
+      idempotencyKey: intent.keyFor('create'),
     });
     setBusy(false);
     if (result.ok) {
+      intent.release('create');
       onDone(`${name.trim()} added to the user registry.`);
     } else {
       setError(messageForFailure(result));
@@ -311,6 +312,7 @@ function EditUserModal({
   const [name, setName] = useState(user.name);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const intent = useIntentKeys();
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -323,10 +325,12 @@ function EditUserModal({
     const result = await updateUser({
       userId: user.id,
       fullName: name.trim(),
-      idempotencyKey: newUserIntentKey(),
+      expectedRowVersion: user.rowVersion,
+      idempotencyKey: intent.keyFor(user.id),
     });
     setBusy(false);
     if (result.ok) {
+      intent.release(user.id);
       onDone(`${name.trim()} updated.`);
     } else {
       setError(messageForFailure(result));

@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { NotBuiltYet } from '../components/feedback/NotBuiltYet';
 import { RequirePermission } from './permissions/PermissionGate';
@@ -35,7 +35,14 @@ export function AppRoutes() {
             />
           }
         />
-        <Route path="/cases/:caseId/remediation" element={<RemediationPage />} />
+        <Route
+          path="/cases/:caseId/remediation"
+          element={
+            <RequirePermission resource="page.remediation">
+              <RemediationPage />
+            </RequirePermission>
+          }
+        />
         <Route
           path="/cases/:caseId/recheck"
           element={
@@ -48,13 +55,7 @@ export function AppRoutes() {
         />
         <Route
           path="/cases/:caseId/audit"
-          element={
-            <NotBuiltYet
-              title="Audit history"
-              purpose="Trace who changed what, and when, for a single case (FR-033)."
-              blockedBy={['Audit Event table']}
-            />
-          }
+          element={<Navigate to=".." relative="path" replace />}
         />
         <Route path="/reviews/:reviewId/tax" element={<RequirePermission resource="page.reviews"><ReviewDetailPage reviewType="Tax" /></RequirePermission>} />
         <Route path="/reviews/:reviewId/aqs" element={<RequirePermission resource="page.reviews"><ReviewDetailPage reviewType="AQS" /></RequirePermission>} />

@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Active">
+  <description default="True to restore the role, false to retire it and cascade to its assignments and rules. Omit to leave unchanged.">
+    <label description="True to restore the role, false to retire it and cascade to its assignments and rules. Omit to leave unchanged." languagecode="1033" />
+  </description>
+  <displayname default="Active">
+    <label description="Active" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>al_UpdateRole.Active</name>
+  <type>0</type>
+</customapirequestparameter>

@@ -41,6 +41,12 @@
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.SetPagePermissionPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="0512aec1-20a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.SetPagePermissionPlugin">
       <FriendlyName>OutcomeTesting.Plugins.SetPagePermissionPlugin</FriendlyName>
     </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.SetPermissionRuleActivePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="819dab2c-c1a2-f111-b8dc-e4fade069307" Name="OutcomeTesting.Plugins.SetPermissionRuleActivePlugin">
+      <FriendlyName>OutcomeTesting.Plugins.SetPermissionRuleActivePlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.SetRoleAssignmentActivePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="b69dab2c-c1a2-f111-b8dc-e4fade069307" Name="OutcomeTesting.Plugins.SetRoleAssignmentActivePlugin">
+      <FriendlyName>OutcomeTesting.Plugins.SetRoleAssignmentActivePlugin</FriendlyName>
+    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.SetUserActivePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="fc908a8b-5ca2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.SetUserActivePlugin">
       <FriendlyName>OutcomeTesting.Plugins.SetUserActivePlugin</FriendlyName>
     </PluginType>
@@ -52,6 +58,9 @@
     </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.UpdateCaseDetailsPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="8cf2e849-2fa2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.UpdateCaseDetailsPlugin">
       <FriendlyName>OutcomeTesting.Plugins.UpdateCaseDetailsPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.UpdateRolePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="36d7c83c-c1a2-f111-b8dc-e4fade069307" Name="OutcomeTesting.Plugins.UpdateRolePlugin">
+      <FriendlyName>OutcomeTesting.Plugins.UpdateRolePlugin</FriendlyName>
     </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.UpdateUserPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="be8b7270-5da2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.UpdateUserPlugin">
       <FriendlyName>OutcomeTesting.Plugins.UpdateUserPlugin</FriendlyName>

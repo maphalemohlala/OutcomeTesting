@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Active">
+  <description default="The resulting active state.">
+    <label description="The resulting active state." languagecode="1033" />
+  </description>
+  <displayname default="Active">
+    <label description="Active" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_SetRoleAssignmentActive.Active</name>
+  <type>0</type>
+</customapiresponseproperty>

@@ -1,4 +1,4 @@
-import { executeCommand, newCorrelationKey, type CommandResult } from './commandClient';
+import { executeCommand, type CommandResult } from './commandClient';
 
 /**
  * CreateUser command (AD-003, AD-041, AD-044). An administrator adds a person to the
@@ -18,10 +18,6 @@ export interface CreateUserOutput {
   Status: string;
   AuditEventId: string;
   Conflict: boolean;
-}
-
-export function newUserIntentKey(): string {
-  return newCorrelationKey();
 }
 
 export function createUser(input: CreateUserInput): Promise<CommandResult<CreateUserOutput>> {
@@ -58,7 +54,7 @@ export function updateUser(input: UpdateUserInput): Promise<CommandResult<Update
     IdempotencyKey: input.idempotencyKey,
   };
   if (input.expectedRowVersion) body.ExpectedRowVersion = input.expectedRowVersion;
-  return executeCommand<UpdateUserOutput>('al_UpdateUser', body, 'al_users');
+  return executeCommand<UpdateUserOutput>('al_UpdateUser', body);
 }
 
 /**
@@ -80,13 +76,9 @@ export interface SetUserActiveOutput {
 }
 
 export function setUserActive(input: SetUserActiveInput): Promise<CommandResult<SetUserActiveOutput>> {
-  return executeCommand<SetUserActiveOutput>(
-    'al_SetUserActive',
-    {
-      UserId: input.userId,
-      Active: input.active,
-      IdempotencyKey: input.idempotencyKey,
-    },
-    'al_users',
-  );
+  return executeCommand<SetUserActiveOutput>('al_SetUserActive', {
+    UserId: input.userId,
+    Active: input.active,
+    IdempotencyKey: input.idempotencyKey,
+  });
 }

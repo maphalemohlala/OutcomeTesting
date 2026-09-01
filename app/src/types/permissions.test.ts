@@ -91,4 +91,20 @@ describe('DEFAULT_PERMISSIONS integrity', () => {
     expect(managers.every((r) => r.role === 'Administrator')).toBe(true);
     expect(managers.length).toBeGreaterThan(0);
   });
+
+  // The remediation route is gated on page.remediation; without these the oversight roles
+  // would silently lose the access they had while the route was ungated.
+  it('lets the oversight roles view remediation without being able to complete it', () => {
+    for (const role of ['Outcome Testing Manager', 'Administrator'] as AppRole[]) {
+      const set = resolvePermissions([role]);
+      expect(can(set, 'page.remediation')).toBe(true);
+      expect(can(set, 'remediation.complete', 'Edit')).toBe(false);
+    }
+  });
+
+  it('lets the Adviser and T&C Manager work remediation', () => {
+    for (const role of ['Adviser', 'T&C Manager'] as AppRole[]) {
+      expect(can(resolvePermissions([role]), 'page.remediation', 'Edit')).toBe(true);
+    }
+  });
 });
