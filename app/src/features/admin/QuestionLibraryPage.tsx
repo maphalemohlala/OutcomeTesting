@@ -141,8 +141,8 @@ function QuestionRow({
 export function QuestionLibraryPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const state = useQuestionLibrary(reloadKey);
-  const { can } = usePermissions();
-  const canEdit = can('question.retire', 'Edit');
+  const { can, ready } = usePermissions();
+  const canEdit = ready && can('question.retire', 'Edit');
 
   return (
     <>

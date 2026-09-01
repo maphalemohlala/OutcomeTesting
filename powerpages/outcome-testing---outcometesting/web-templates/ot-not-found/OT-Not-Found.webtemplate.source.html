@@ -1,0 +1,21 @@
+{% extends 'OT Layout' %}
+{% block content %}
+{% comment %}
+  Page not found (PP-16).
+
+  Says what happened, what is still safe, and what to do next, without
+  exposing a stack trace, query, table name or id.
+{% endcomment %}
+
+<section class="ot-card" aria-labelledby="ot-notfound">
+  <h2 class="ot-card__title" id="ot-notfound">We could not find that page</h2>
+  <p>
+    The address may be mistyped, or the page may have moved. Nothing you were working
+    on has been lost.
+  </p>
+  <p>
+    <a class="ot-btn ot-btn--primary" href="/">Back to My Work</a>
+    <a class="ot-btn" href="/cases">Case search</a>
+  </p>
+</section>
+{% endblock %}

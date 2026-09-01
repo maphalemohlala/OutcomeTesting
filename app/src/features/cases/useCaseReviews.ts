@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReviewType } from '../../types/domain';
+import { isRecordId } from '../../services/odata';
 import { Al_reviewinstancesService } from '../../generated';
 import {
   Al_reviewinstancesal_reviewstatus,
@@ -64,7 +65,10 @@ export function useCaseReviews(caseId: string | undefined): CaseReviewsState {
   }
 
   useEffect(() => {
-    if (!caseId) return;
+    // The id comes from the route, so it is untrusted until it parses as a record id;
+    // an id that is not one never reaches a filter. The unavailable state for that case
+    // is derived below rather than set here.
+    if (!isRecordId(caseId)) return;
     let cancelled = false;
 
     Al_reviewinstancesService.getAll({
@@ -89,6 +93,10 @@ export function useCaseReviews(caseId: string | undefined): CaseReviewsState {
       cancelled = true;
     };
   }, [caseId]);
+
+  if (caseId && !isRecordId(caseId)) {
+    return { status: 'unavailable' };
+  }
 
   return state;
 }

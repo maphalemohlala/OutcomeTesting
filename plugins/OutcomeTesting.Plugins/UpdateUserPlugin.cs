@@ -49,7 +49,7 @@ namespace OutcomeTesting.Plugins
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
             var expectedRowVersion = CommandHelpers.GetOptionalString(context, InExpectedRowVersion);
 
-            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey);
+            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandUpdateUser);
             if (existingAudit != null)
             {
                 SetResponse(context, userId.ToString("D"), existingAudit.Id, false);

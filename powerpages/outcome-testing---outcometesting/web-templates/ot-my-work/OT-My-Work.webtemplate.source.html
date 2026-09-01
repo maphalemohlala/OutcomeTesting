@@ -1,0 +1,141 @@
+{% extends 'OT Layout' %}
+{% block content %}
+{% comment %}
+  My Work dashboard (PP-03).
+
+  SHELL STAGE: counts and rows are unfiltered. Per-user filtering needs
+  al_assignedcontactid, which arrives with the Phase 2 schema delta (AD-047),
+  and status/route filters need the option-set values. Both are deliberately
+  absent here rather than faked, so nothing on this page implies an
+  assignment filter that is not yet enforced.
+{% endcomment %}
+
+{% fetchxml case_count %}
+<fetch aggregate="true">
+  <entity name="al_outcomecase">
+    <attribute name="al_outcomecaseid" alias="total" aggregate="count" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml review_count %}
+<fetch aggregate="true">
+  <entity name="al_reviewinstance">
+    <attribute name="al_reviewinstanceid" alias="total" aggregate="count" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml remediation_count %}
+<fetch aggregate="true">
+  <entity name="al_remediationaction">
+    <attribute name="al_remediationactionid" alias="total" aggregate="count" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml recent_cases %}
+<fetch top="10">
+  <entity name="al_outcomecase">
+    <attribute name="al_outcomecaseid" />
+    <attribute name="al_casereference" />
+    <attribute name="al_clientname" />
+    <attribute name="al_advisername" />
+    <attribute name="al_casestatus" />
+    <attribute name="al_priority" />
+    <attribute name="al_duedate" />
+    <order attribute="al_duedate" descending="false" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}
+  An aggregate fetch returns no result set at all when the caller cannot read the
+  table — an anonymous visitor, or a signed-in user whose web role grants nothing
+  on it. Indexing entities[0] straight away then fails with "Index was outside the
+  bounds of the array", and the tile renders that message as its label. A `default`
+  filter cannot save it: the index is evaluated before any filter runs, so the guard
+  has to come first. Same .size > 0 test the case table below already uses.
+{% endcomment %}
+{% assign total_cases = 0 %}
+{% if case_count.results and case_count.results.entities.size > 0 %}
+  {% assign total_cases = case_count.results.entities[0].total %}
+{% endif %}
+
+{% assign total_reviews = 0 %}
+{% if review_count.results and review_count.results.entities.size > 0 %}
+  {% assign total_reviews = review_count.results.entities[0].total %}
+{% endif %}
+
+{% assign total_remediations = 0 %}
+{% if remediation_count.results and remediation_count.results.entities.size > 0 %}
+  {% assign total_remediations = remediation_count.results.entities[0].total %}
+{% endif %}
+
+<div class="ot-notice" role="status">
+  <strong>Shell stage.</strong> These figures cover all cases in the environment, not
+  only work assigned to you. Assignment filtering and role-based access arrive with
+  the Phase&nbsp;2 security build.
+</div>
+
+<ul class="ot-tiles">
+  <li>
+    <a class="ot-tile" href="/cases">
+      <span class="ot-tile__count">{{ total_cases }}</span>
+      <span class="ot-tile__label">Cases</span>
+    </a>
+  </li>
+  <li>
+    <a class="ot-tile" href="/tax-reviews">
+      <span class="ot-tile__count">{{ total_reviews }}</span>
+      <span class="ot-tile__label">Review instances</span>
+    </a>
+  </li>
+  <li>
+    <a class="ot-tile ot-tile--alert" href="/remediation">
+      <span class="ot-tile__count">{{ total_remediations }}</span>
+      <span class="ot-tile__label">Remediation actions</span>
+    </a>
+  </li>
+</ul>
+
+<section class="ot-card" aria-labelledby="ot-recent-heading">
+  <h2 class="ot-card__title" id="ot-recent-heading">Cases by due date</h2>
+
+  {% if recent_cases.results.entities.size > 0 %}
+    <div class="ot-table-wrap">
+      <table class="ot-table">
+        <caption>The ten cases with the earliest due dates.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Case reference</th>
+            <th scope="col">Client</th>
+            <th scope="col">Adviser</th>
+            <th scope="col">Status</th>
+            <th scope="col">Priority</th>
+            <th scope="col">Due</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in recent_cases.results.entities %}
+            <tr>
+              <td>
+                <a href="/case-details?id={{ c.al_outcomecaseid }}">
+                  {{ c.al_casereference | default: 'Untitled case' | escape }}
+                </a>
+              </td>
+              <td>{{ c.al_clientname | escape }}</td>
+              <td>{{ c.al_advisername | escape }}</td>
+              <td>{% include 'OT Status Badge' status: c.al_casestatus.label %}</td>
+              <td>{{ c.al_priority.label | escape }}</td>
+              <td>{{ c.al_duedate | date: 'dd MMM yyyy' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    {% include 'OT Empty State' title: 'No cases yet' message: 'Cases appear here once an Intelligent Office extract has been imported.' %}
+  {% endif %}
+</section>
+{% endblock %}

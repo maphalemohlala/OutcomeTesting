@@ -1,0 +1,37 @@
+{% extends 'OT Layout' %}
+{% block content %}
+{% comment %}
+  Access denied (PP-01, PP-16).
+
+  The wording is deliberately identical whether the record exists, does not
+  exist, or exists and is not yours. Saying "this case is not assigned to
+  you" would confirm the case exists, which is disclosure by another route.
+
+  No technical detail is shown. The correlation id is rendered only so a
+  user can quote it to support; the underlying error is logged separately.
+{% endcomment %}
+
+<section class="ot-card" aria-labelledby="ot-denied">
+  <h2 class="ot-card__title" id="ot-denied">You do not have access to this page</h2>
+  <p>
+    This may be because the page is restricted to a different role, or because the
+    record is not one you work on. If you think you should have access, contact your
+    Outcome Testing manager.
+  </p>
+  <p>
+    {% if user %}
+      You are signed in as {{ user.fullname | escape }}.
+    {% else %}
+      You are not signed in. <a href="{{ website.sign_in_url_substitution }}">Sign in</a> and try again.
+    {% endif %}
+  </p>
+  <p class="ot-support">
+    Reference: <code>{{ request.params['id'] | default: 'none' | escape | truncate: 12 }}</code>
+    &middot; quote this if you contact support.
+  </p>
+  <p>
+    <a class="ot-btn ot-btn--primary" href="/">Back to My Work</a>
+    <a class="ot-btn" href="/cases">Case search</a>
+  </p>
+</section>
+{% endblock %}

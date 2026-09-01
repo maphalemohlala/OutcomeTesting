@@ -1,0 +1,57 @@
+{% extends 'OT Layout' %}
+{% block content %}
+{% comment %}
+  Portal landing page.
+
+  Deliberately a router, not a second dashboard: the counts and worklists
+  live on My Work (PP-03). This page exists so the site root is useful and
+  so each role can see, in one glance, the areas open to it.
+{% endcomment %}
+
+<div class="ot-notice" role="status">
+  <strong>Shell stage.</strong> Every area below lists all records in the environment.
+  Role-based navigation and assignment filtering arrive with the Phase&nbsp;2 security build.
+</div>
+
+<ul class="ot-tiles">
+  <li>
+    <a class="ot-tile" href="/my-work">
+      <span class="ot-tile__label">Start here</span>
+      <span class="ot-tile__count" style="font-size: 1.25rem;">My Work</span>
+    </a>
+  </li>
+  <li>
+    <a class="ot-tile" href="/cases">
+      <span class="ot-tile__label">Search and open</span>
+      <span class="ot-tile__count" style="font-size: 1.25rem;">Cases</span>
+    </a>
+  </li>
+  <li>
+    <a class="ot-tile" href="/tax-reviews">
+      <span class="ot-tile__label">File quality</span>
+      <span class="ot-tile__count" style="font-size: 1.25rem;">Tax reviews</span>
+    </a>
+  </li>
+  <li>
+    <a class="ot-tile" href="/aqs-reviews">
+      <span class="ot-tile__label">Advice quality</span>
+      <span class="ot-tile__count" style="font-size: 1.25rem;">AQS reviews</span>
+    </a>
+  </li>
+  <li>
+    <a class="ot-tile ot-tile--alert" href="/remediation">
+      <span class="ot-tile__label">Actions and ageing</span>
+      <span class="ot-tile__count" style="font-size: 1.25rem;">Remediation</span>
+    </a>
+  </li>
+</ul>
+
+<section class="ot-card" aria-labelledby="ot-home-about">
+  <h2 class="ot-card__title" id="ot-home-about">Outcome Testing</h2>
+  <p>
+    Tax and AQS checks, outcomes and remediation for Ascot Lloyd. Tax runs before AQS
+    when a case requires both. Case import, allocation, question administration and
+    reporting are handled by managers in the Outcome Testing app.
+  </p>
+</section>
+{% endblock %}

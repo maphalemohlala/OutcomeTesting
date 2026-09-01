@@ -49,7 +49,7 @@ namespace OutcomeTesting.Plugins
             var active = CommandHelpers.GetRequiredBool(context, InActive);
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
 
-            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey);
+            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandSetPermissionRuleActive);
             if (existingAudit != null)
             {
                 SetResponse(context, permissionId.ToString("D"), active, existingAudit.Id);

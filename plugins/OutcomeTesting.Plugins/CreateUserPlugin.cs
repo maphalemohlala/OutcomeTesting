@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
 
 namespace OutcomeTesting.Plugins
 {
@@ -22,6 +23,7 @@ namespace OutcomeTesting.Plugins
         private const string OutConflict = "Conflict";
 
         private const string UserEntity = "al_user";
+        private const string ActiveAttr = "al_isactive";
         private const int CommandCreateUser = 120910785;
 
         public CreateUserPlugin(string unsecureConfiguration, string secureConfiguration)
@@ -51,29 +53,65 @@ namespace OutcomeTesting.Plugins
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "permission.manage", PermissionHelpers.AccessManage);
 
-            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey);
+            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandCreateUser);
             if (existingAudit != null)
             {
                 SetResponse(context, existingAudit.GetAttributeValue<string>("al_targetid"), "Created", existingAudit.Id, false);
                 return;
             }
 
-            var user = new Entity(UserEntity)
+            // Registering someone must never be a way to bring a leaver back. The upsert is
+            // keyed on work email, so re-adding a deactivated person's address would rewrite
+            // their row active again under a new display name — restoring the role mappings
+            // that deactivation withdrew (OD-010), audited only as "Created". Reactivation
+            // is its own command, al_SetUserActive, and its own Audit Event.
+            var existing = FindByWorkEmail(userService, workEmail);
+            if (existing != null && !(existing.GetAttributeValue<bool?>(ActiveAttr) ?? true))
             {
-                ["al_name"] = fullName,
-                ["al_workemail"] = workEmail,
-                ["al_isactive"] = true,
-                ["statecode"] = new OptionSetValue(0),
-                ["statuscode"] = new OptionSetValue(1),
-            };
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "A deactivated account already exists for this work email. Reactivate it instead of registering it again.");
+            }
 
-            var userId = AssignUserRolePlugin.Upsert(userService, UserEntity, "al_workemail", workEmail, user);
+            Guid userId;
+            if (existing != null)
+            {
+                // Already registered and active: this is the idempotent re-run. Only the
+                // display name is refreshed — the active state is not this command's to set.
+                userId = existing.Id;
+                userService.Update(new Entity(UserEntity, userId) { ["al_name"] = fullName });
+            }
+            else
+            {
+                userId = userService.Create(new Entity(UserEntity)
+                {
+                    ["al_name"] = fullName,
+                    ["al_workemail"] = workEmail,
+                    [ActiveAttr] = true,
+                });
+            }
 
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandCreateUser, "CreateUser " + workEmail, UserEntity, userId,
                 fullName, workEmail, idempotencyKey, context);
 
             SetResponse(context, userId.ToString("D"), "Created", auditId, false);
+        }
+
+        /// <summary>The al_user registry row for a work email, or null. Read as the caller,
+        /// so a row they cannot see is not silently overwritten on their behalf.</summary>
+        private static Entity FindByWorkEmail(IOrganizationService service, string workEmail)
+        {
+            var query = new QueryExpression(UserEntity)
+            {
+                ColumnSet = new ColumnSet(ActiveAttr),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_workemail", ConditionOperator.Equal, workEmail);
+
+            var found = service.RetrieveMultiple(query).Entities;
+            return found.Count > 0 ? found[0] : null;
         }
 
         private static void SetResponse(IPluginExecutionContext context, string userId, string status, Guid auditId, bool conflict)

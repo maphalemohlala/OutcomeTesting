@@ -26,7 +26,14 @@ namespace OutcomeTesting.Plugins
         private const string RecordEntity = "al_exportrecord";
         private const string CaseEntity = "al_outcomecase";
         private const string OutcomeEntity = "al_outcome";
+        private const string ResponseEntity = "al_response";
+        private const string ReviewEntity = "al_reviewinstance";
+        private const string QuestionVersionEntity = "al_questionversion";
+        private const string QuestionEntity = "al_question";
+        private const string AnswerChoiceAttr = "al_answerchoice";
+        private const string FileQualityQuestionCode = "Q-FQ-01";
         private const int CaseStatusClosed = 120910591;
+        private const int BatchStatusDraft = 120910770;
         private const int BatchStatusGenerated = 120910771;
         private const int CommandGenerateExport = 120910775;
 
@@ -51,7 +58,7 @@ namespace OutcomeTesting.Plugins
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "export.generate", PermissionHelpers.AccessEdit);
 
-            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey);
+            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandGenerateExport);
             if (existingAudit != null)
             {
                 var priorCount = existingAudit.GetAttributeValue<string>("al_details");
@@ -59,9 +66,23 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            var batch = userService.Retrieve(BatchEntity, batchId, new ColumnSet("al_exportbatchcode"));
+            var batch = userService.Retrieve(BatchEntity, batchId, new ColumnSet("al_exportbatchcode", "al_batchstatus"));
             var batchCode = batch.GetAttributeValue<string>("al_exportbatchcode");
             var batchRef = new EntityReference(BatchEntity, batchId);
+
+            // An export batch is a snapshot of what was produced, and the records are
+            // upserted in place. Re-generating one that has already been produced would
+            // rewrite those rows with today's values and revert a Delivered batch to
+            // Generated, destroying the record of what was actually sent (AD-042). A
+            // re-run is a new batch, not a second pass over this one. Retries of the same
+            // intent are already handled by the idempotency replay above.
+            var currentStatus = batch.GetAttributeValue<OptionSetValue>("al_batchstatus");
+            if (currentStatus != null && currentStatus.Value != BatchStatusDraft)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "This export batch has already been generated. Create a new batch to produce a fresh export.");
+            }
 
             var cases = new QueryExpression(CaseEntity)
             {
@@ -73,12 +94,41 @@ namespace OutcomeTesting.Plugins
             cases.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
             cases.Criteria.AddCondition("al_casestatus", ConditionOperator.Equal, CaseStatusClosed);
 
+            // Paged: a bare RetrieveMultiple stops at 5000 and the batch would then stamp
+            // that truncated figure as its complete row count (AD-042), leaving no way to
+            // detect the shortfall during reconciliation.
             var rows = 0;
-            foreach (var outcomeCase in userService.RetrieveMultiple(cases).Entities)
+            foreach (var outcomeCase in CommandHelpers.RetrieveAll(userService, cases))
             {
                 var caseRef = outcomeCase.GetAttributeValue<string>("al_casereference") ?? outcomeCase.Id.ToString("D");
-                var adviceGrade = ResolveAdviceGrade(userService, outcomeCase.Id);
+                var outcomeRow = ResolveOutcome(userService, outcomeCase.Id);
+                var adviceGrade = outcomeRow == null
+                    ? null
+                    : Outcomes.EffectiveOutcomeLabel(outcomeRow);
+                var fileQualityGrade = ResolveFileQualityGrade(userService, outcomeCase.Id);
                 var code = "EXR-" + batchCode + "-" + caseRef;
+
+                // A non-pass with no accountability recorded would export four blank
+                // accountability pairs, which reads as "nobody is responsible" rather
+                // than "nobody has said yet". Refusing here keeps an incomplete row out
+                // of a delivered Trail Light file (AD-039, OD-024).
+                if (outcomeRow != null)
+                {
+                    var effective = Outcomes.EffectiveOutcome(outcomeRow);
+                    var anyAccountability =
+                        (outcomeRow.GetAttributeValue<bool?>("al_fqadviseraccountable") ?? false)
+                        || (outcomeRow.GetAttributeValue<bool?>("al_fqparaplanneraccountable") ?? false)
+                        || (outcomeRow.GetAttributeValue<bool?>("al_aqadviseraccountable") ?? false)
+                        || (outcomeRow.GetAttributeValue<bool?>("al_aqparaplanneraccountable") ?? false);
+
+                    if (effective.HasValue && OutcomeRules.RequiresRemediation(effective.Value) && !anyAccountability)
+                    {
+                        throw new InvalidPluginExecutionException(
+                            CommandHelpers.PreconditionPrefix
+                            + "Case " + caseRef + " has a non-pass outcome with no fail accountability recorded. "
+                            + "Record accountability before generating the export.");
+                    }
+                }
 
                 var record = new Entity(RecordEntity)
                 {
@@ -95,6 +145,15 @@ namespace OutcomeTesting.Plugins
                     ["al_clientname"] = outcomeCase.GetAttributeValue<string>("al_clientname"),
                     ["al_preorpostcheck"] = Formatted(outcomeCase, "al_preorpostcheck"),
                     ["al_advicequalitygrade"] = adviceGrade,
+                    ["al_filequalitygrade"] = fileQualityGrade,
+                    ["al_fqfailadvisername"] = FlaggedText(outcomeRow, "al_fqadviseraccountable", outcomeCase, "al_advisername"),
+                    ["al_fqfailadvisercode"] = FlaggedText(outcomeRow, "al_fqadviseraccountable", outcomeCase, "al_advisercode"),
+                    ["al_fqfailparaplannername"] = FlaggedText(outcomeRow, "al_fqparaplanneraccountable", outcomeCase, "al_paraplanner"),
+                    ["al_fqfailparaplannercode"] = FlaggedText(outcomeRow, "al_fqparaplanneraccountable", outcomeCase, "al_paraplannercode"),
+                    ["al_aqfailadvisername"] = FlaggedText(outcomeRow, "al_aqadviseraccountable", outcomeCase, "al_advisername"),
+                    ["al_aqfailadvisercode"] = FlaggedText(outcomeRow, "al_aqadviseraccountable", outcomeCase, "al_advisercode"),
+                    ["al_aqfailparaplannername"] = FlaggedText(outcomeRow, "al_aqparaplanneraccountable", outcomeCase, "al_paraplanner"),
+                    ["al_aqfailparaplannercode"] = FlaggedText(outcomeRow, "al_aqparaplanneraccountable", outcomeCase, "al_paraplannercode"),
                     ["al_separator"] = string.Empty,
                     ["statecode"] = new OptionSetValue(0),
                     ["statuscode"] = new OptionSetValue(1),
@@ -130,28 +189,87 @@ namespace OutcomeTesting.Plugins
             return entity.FormattedValues.ContainsKey(attribute) ? entity.FormattedValues[attribute] : null;
         }
 
-        // AD-039 col 15 Advice Quality grade = final outcome, or initial when not yet finalised (BR-007).
-        private static string ResolveAdviceGrade(IOrganizationService service, Guid caseId)
+        // AD-039 col 15 Advice Quality grade = final outcome, or initial when not yet
+        // finalised (BR-007). Also returns the raw outcome value and the four OD-024
+        // accountability flags (Task 2), so the caller has both the grade and the
+        // accountability judgement without a second read.
+        private static Entity ResolveOutcome(IOrganizationService service, Guid caseId)
         {
             var query = new QueryExpression(OutcomeEntity)
             {
-                ColumnSet = new ColumnSet("al_finaloutcome", "al_initialoutcome"),
+                ColumnSet = new ColumnSet(
+                    "al_finaloutcome", "al_initialoutcome",
+                    "al_fqadviseraccountable", "al_fqparaplanneraccountable",
+                    "al_aqadviseraccountable", "al_aqparaplanneraccountable"),
                 TopCount = 1,
                 Criteria = new FilterExpression(),
             };
             query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+
+            // One Outcome per case is the intent, but nothing in the schema enforces it and
+            // a re-review can leave a second. This row decides the exported grade and the
+            // accountability gate, so picking whichever row Dataverse happened to return
+            // first would make the export non-deterministic. Newest wins.
+            query.AddOrder("createdon", OrderType.Descending);
+
+            var found = service.RetrieveMultiple(query).Entities;
+            return found.Count == 0 ? null : found[0];
+        }
+
+        /// <summary>
+        /// The case value when the Outcome flags that person accountable, otherwise empty.
+        /// AD-039 attributes a fail to the adviser and/or the paraplanner, so a pair whose
+        /// flag is false is written empty rather than filled in.
+        /// </summary>
+        public static string FlaggedText(Entity outcomeRow, string flag, Entity outcomeCase, string caseAttribute)
+        {
+            if (outcomeRow == null || !(outcomeRow.GetAttributeValue<bool?>(flag) ?? false))
+            {
+                return string.Empty;
+            }
+
+            return outcomeCase.GetAttributeValue<string>(caseAttribute) ?? string.Empty;
+        }
+
+        // AD-039 col 10 File Quality grade = the answer to Q-FQ-01 "File quality outcome",
+        // the one PassFail question in Checker Checklist V8 (knowledge/checklist-v8.md,
+        // section S-FQOUT). It is held as a Response on the case's review, not on
+        // al_Outcome, which carries only the BR-005 advice quality scale.
+        //
+        // Matched on the question's business code rather than its GUID so the export does
+        // not break when the question is retired and succeeded (BR-013, AD-004): a
+        // successor version keeps the code and stays the same question.
+        private static string ResolveFileQualityGrade(IOrganizationService service, Guid caseId)
+        {
+            var query = new QueryExpression(ResponseEntity)
+            {
+                ColumnSet = new ColumnSet(AnswerChoiceAttr),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+
+            var review = query.AddLink(ReviewEntity, "al_reviewinstanceid", "al_reviewinstanceid");
+            review.LinkCriteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+
+            var version = query.AddLink(QuestionVersionEntity, "al_questionversionid", "al_questionversionid");
+            var question = version.AddLink(QuestionEntity, "al_questionid", "al_questionid");
+            question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.Equal, FileQualityQuestionCode);
+
+            // The case may hold several reviews, and a succeeded question (BR-013, AD-004)
+            // several versions, so this can match more than one response. The latest is the
+            // grade in force; without an order the exported File Quality grade would be
+            // whichever row came back first.
+            query.AddOrder("modifiedon", OrderType.Descending);
+
             var found = service.RetrieveMultiple(query).Entities;
             if (found.Count == 0)
             {
                 return null;
             }
 
-            var outcome = found[0];
-            if (outcome.FormattedValues.ContainsKey("al_finaloutcome"))
-            {
-                return outcome.FormattedValues["al_finaloutcome"];
-            }
-            return outcome.FormattedValues.ContainsKey("al_initialoutcome") ? outcome.FormattedValues["al_initialoutcome"] : null;
+            return found[0].FormattedValues.ContainsKey(AnswerChoiceAttr)
+                ? found[0].FormattedValues[AnswerChoiceAttr]
+                : null;
         }
 
         private static void SetResponse(IPluginExecutionContext context, string batchId, string rowCount, string status, Guid auditId, bool conflict)

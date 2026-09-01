@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ServiceModel;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -21,6 +22,53 @@ namespace OutcomeTesting.Plugins
         public const string NotFoundPrefix = "NOTFOUND: ";
 
         public const string AuditEntity = "al_auditevent";
+
+        /// <summary>
+        /// Retrieves every row matching <paramref name="query"/>, following Dataverse's
+        /// paging cookie rather than stopping at the first page.
+        ///
+        /// A bare RetrieveMultiple returns at most 5000 rows and simply stops — no error,
+        /// no signal. Any command that counts, exports or reconciles has to page, or it
+        /// silently reports a truncated figure as a complete one. Callers that genuinely
+        /// want one row should set TopCount and call RetrieveMultiple directly instead.
+        /// </summary>
+        public static List<Entity> RetrieveAll(IOrganizationService service, QueryExpression query)
+        {
+            if (service == null) throw new ArgumentNullException("service");
+            if (query == null) throw new ArgumentNullException("query");
+
+            // TopCount and PageInfo are mutually exclusive in Dataverse; a caller that set a
+            // cap means it, so honour it rather than silently paging past it.
+            if (query.TopCount.HasValue)
+            {
+                return new List<Entity>(service.RetrieveMultiple(query).Entities);
+            }
+
+            var all = new List<Entity>();
+            query.PageInfo = new PagingInfo
+            {
+                Count = PageSize,
+                PageNumber = 1,
+                PagingCookie = null,
+            };
+
+            while (true)
+            {
+                var page = service.RetrieveMultiple(query);
+                all.AddRange(page.Entities);
+
+                if (!page.MoreRecords)
+                {
+                    return all;
+                }
+
+                query.PageInfo.PageNumber++;
+                query.PageInfo.PagingCookie = page.PagingCookie;
+            }
+        }
+
+        /// <summary>Rows fetched per page when following a paging cookie.</summary>
+        private const int PageSize = 5000;
 
         public static Guid ParseRequiredGuid(IPluginExecutionContext context, string name)
         {
@@ -112,7 +160,19 @@ namespace OutcomeTesting.Plugins
                 || message.IndexOf("concurrency", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        public static Entity FindAuditByKey(IOrganizationService service, string idempotencyKey)
+        /// <summary>
+        /// Finds this command's own prior audit event for an idempotency key, so a retry
+        /// replays its original result instead of acting twice.
+        ///
+        /// The key alone is not enough to identify a replay. Keys are supplied by the
+        /// caller on unbound APIs and the key column is globally unique across the audit
+        /// table, so matching on the key by itself lets a key first used by one command be
+        /// replayed against another — returning a successful-looking response, built from
+        /// the requested target and the other command's details, for work that never ran.
+        /// Scoping to <paramref name="command"/> means a replay can only ever return the
+        /// result of the same command that recorded it.
+        /// </summary>
+        public static Entity FindAuditByKey(IOrganizationService service, string idempotencyKey, int command)
         {
             var query = new QueryExpression(AuditEntity)
             {
@@ -121,6 +181,7 @@ namespace OutcomeTesting.Plugins
                 Criteria = new FilterExpression(),
             };
             query.Criteria.AddCondition("al_idempotencykey", ConditionOperator.Equal, idempotencyKey);
+            query.Criteria.AddCondition("al_command", ConditionOperator.Equal, command);
 
             var result = service.RetrieveMultiple(query);
             return result.Entities.Count > 0 ? result.Entities[0] : null;

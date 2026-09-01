@@ -18,6 +18,15 @@ Build a Dataverse-centred outcome testing and file-checking platform that replac
 ## Actors and access
 Administrators, Outcome Testing Managers, Checkers/AQS Reviewers, Tax Reviewers, Advisers/Remediation Users, T&C Managers/Supervisors, Regional Leads and Report Users. Users are managed through Entra groups and Power Platform/Dataverse teams. Multi-role membership is allowed.
 
+Portal web roles are a narrower set than the actor list above, settled 2026-08-30:
+- **Adviser and Planner are two separate web roles** (OD-019). Only `AL Portal - Adviser Remediation` exists today, so a Planner role is still to be added and remediation routing split between them.
+- **T&C Manager and Supervisor are one role and one person** (OD-020), which the single `AL Portal - T&C Supervisor` role already matches. FR-023 and BR-008 sign-off routes to it.
+- **Regional Manager/Lead receives notifications only and is not a portal user** (OD-021). The existing `AL Portal - Regional Manager` web role over-grants and is to be removed; PP-15 recipients come from the BR-009 notification list, not from portal role membership.
+- **Every authenticated portal user holds Global read on cases** and can action only what is assigned to them (OD-022, 2026-08-31). This extends AD-056 from the two reviewer roles to all signed-in users; the ability to act is carried by the review assignment, not the case, so write reaches responses only through the Contact-anchored review chain.
+- Permissions are in practice bound to the built-in **Administrators** and **Authenticated Users** roles; the `AL Portal - *` roles above carry none and are inert (AD-067). Adding or removing one of those named roles therefore changes nothing until permissions are bound to it.
+
+Case allocation is manual and done in the PowerApps code app by **team leads and managers**; each review team (AQS and Tax) has a team lead (BR-003, AD-040). The capability is **not built yet** — `al_CaseAssignment` has no assigned-user lookup, there is no assign command and no allocation screen, so a case on the Tax-then-AQS route parks at `Queued` with no supported way forward (OD-029).
+
 ## Data principles
 - Dataverse is the system of record.
 - Use relational tables, stable alternate keys and explicit status/state models.
@@ -57,9 +66,22 @@ The Intake tables now exist in DEV (AD-033): `al_ImportBatch` tracks one uploade
 
 `No Check Required` is a terminal bypass state for cases that must not be graded (AD-036). Tax wrong-route is a manager-controlled reassignment between Tax and AQS with a mandatory reason, retaining prior assignment history, not a status.
 
+This sequence is enforced, not just documented (AD-057). `CaseLifecycle` in the plug-in assembly gates every `al_casestatus` write in `al_UpdateCaseDetails`, and `CASE_STATUS_TRANSITIONS` in the Code App offers the manager only the statuses the command would accept. `Closed` and `No Check Required` are terminal: reopening or regrading a closed outcome is the privileged T&C Manager correction (OD-007, AD-031), not a details edit.
+
+## Front ends
+Two front ends run over one Dataverse dataset, split by persona rather than by feature (AD-044, supersedes AD-002).
+
+| Audience | Front end | Surface |
+|---|---|---|
+| Managers and administrators | Power Apps Code App (`app/`) | Oversight, allocation and reassignment, imports, question administration, security administration, audit investigation, MI and export |
+| Tax checkers, AQS checkers, advisers, T&C Managers | Power Pages portal (`powerpages/`) | Where checks and remediation are performed |
+
+Code App screens for cases, dashboard and reviews are management oversight views, not the checker's working surface. Business logic lives in shared server-side commands (AD-003) and is never duplicated per front end. Portal identity is the Entra-synced `Contact`, joined to the application identity on work email; `systemuser` remains the record owner (AD-047). The whole remediation loop — adviser response and T&C attestation — runs in the portal (AD-045).
+
 ## Repository layout
 - `src/` is the unpacked Dataverse solution root and is packaged in full. Flows unpack to `src/Workflows/`.
 - `app/` holds the Power Apps Code App. It must stay outside `src/`.
+- `powerpages/` holds the Power Pages site metadata. It must stay outside `src/` and outside `app/`; the two front ends never share a directory (AD-048).
 - `brand/` holds the authoritative Ascot Lloyd visual resources. It must stay outside `src/` so brand assets are not packaged into the solution.
 - `knowledge/` holds domain context, the requirements index and the decision log.
 - `skills/` holds the phase skills; `.github/` holds Copilot instructions and prompts.

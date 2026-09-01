@@ -20,8 +20,8 @@ function formatDate(iso: string | null): string {
 }
 
 export function UsersPage() {
-  const { can } = usePermissions();
-  const canManage = can('permission.manage', 'Manage');
+  const { can, ready } = usePermissions();
+  const canManage = ready && can('permission.manage', 'Manage');
 
   const [reloadKey, setReloadKey] = useState(0);
   const directory = useUserDirectory(reloadKey);

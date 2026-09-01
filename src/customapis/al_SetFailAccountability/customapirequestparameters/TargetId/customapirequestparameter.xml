@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="TargetId">
+  <description default="Id of the al_outcome record to record accountability against.">
+    <label description="Id of the al_outcome record to record accountability against." languagecode="1033" />
+  </description>
+  <displayname default="Target id">
+    <label description="Target id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>TargetId</name>
+  <type>10</type>
+</customapirequestparameter>

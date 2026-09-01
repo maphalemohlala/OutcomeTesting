@@ -71,7 +71,7 @@ namespace OutcomeTesting.Plugins
             }
 
             // Idempotency: a replay with the same key returns the original sign-off (NFR-REL-01).
-            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey);
+            var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandSignOffRemediation);
             if (existingAudit != null)
             {
                 var priorSignoff = existingAudit.GetAttributeValue<string>("al_details");
@@ -89,6 +89,17 @@ namespace OutcomeTesting.Plugins
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix + "Only a completed remediation action can be signed off.");
+            }
+
+            // Sign-off happens once. An Approved sign-off leaves the action Completed, so
+            // without this the same action can be signed off repeatedly — and a later
+            // Rejected one would reopen an already-approved action (BR-008), leaving two
+            // contradictory sign-offs with nothing recording which is authoritative.
+            if (HasExistingSignoff(systemService, targetId))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "This remediation action has already been signed off. Reopening a completed sign-off is a privileged correction (AD-031).");
             }
 
             var caseRef = action.GetAttributeValue<EntityReference>("al_outcomecaseid");
@@ -133,6 +144,25 @@ namespace OutcomeTesting.Plugins
                 context);
 
             SetResponse(context, signoffId.ToString("D"), decision, auditId, false);
+        }
+
+        /// <summary>
+        /// True when this remediation action already carries a sign-off. Read with the
+        /// system service so the answer does not depend on the caller's own read privileges:
+        /// a sign-off they cannot see is still a sign-off.
+        /// </summary>
+        private static bool HasExistingSignoff(IOrganizationService systemService, Guid targetId)
+        {
+            var query = new QueryExpression(SignoffEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition("al_remediationactionid", ConditionOperator.Equal, targetId);
+
+            return systemService.RetrieveMultiple(query).Entities.Count > 0;
         }
 
         private static void ReopenAction(IOrganizationService service, Guid targetId, string expectedRowVersion)
