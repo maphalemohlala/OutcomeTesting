@@ -14,6 +14,7 @@ import {
   type Al_outcomecases,
 } from '../../generated/models/Al_outcomecasesModel';
 import { choiceLabel as choice } from './choiceLabel';
+import { lookupLabel } from './lookupLabel';
 
 /**
  * Pure record-to-view mapping, kept free of the generated services so it stays unit
@@ -73,7 +74,7 @@ export interface CaseDetail {
   edit: CaseEditValues;
 }
 
-function toRoute(name: string | undefined): ReviewRoute | null {
+function toRoute(name: string | null): ReviewRoute | null {
   return REVIEW_ROUTES.find((route) => route === name) ?? null;
 }
 
@@ -124,13 +125,13 @@ export function toDetail(record: Al_outcomecases): CaseDetail {
     caseReference: record.al_casereference,
     status: Al_outcomecasesal_casestatus[record.al_casestatus] as CaseStatus,
     statusValue: record.al_casestatus,
-    route: toRoute(record.al_reviewrouteidname),
-    owner: text(record.owneridname),
+    route: toRoute(lookupLabel(record, 'al_reviewrouteid', record.al_reviewrouteidname)),
+    owner: lookupLabel(record, 'ownerid', record.owneridname),
     ageInDays: ageInDays(record.createdon),
     priority: choice(Al_outcomecasesal_priority, extra.al_priority, extra.al_priorityname),
     dueDate: date(extra.al_duedate),
     rowVersion: record.versionnumber != null ? String(record.versionnumber) : null,
-    previousCase: text(record.al_previouscaseidname),
+    previousCase: lookupLabel(record, 'al_previouscaseid', record.al_previouscaseidname),
     client: [
       { label: 'Client', value: text(record.al_clientname) },
       {

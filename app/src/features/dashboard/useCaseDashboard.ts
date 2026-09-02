@@ -61,7 +61,7 @@ function aggregate(records: Al_outcomecases[]): DashboardData {
     if (status === 'Closed') continue;
 
     totalOpen += 1;
-    if (!record.al_reviewrouteidname) unrouted += 1;
+    if (!record._al_reviewrouteid_value) unrouted += 1;
 
     const age = ageInDays(record.createdon);
     if (age > oldestOpenDays) oldestOpenDays = age;

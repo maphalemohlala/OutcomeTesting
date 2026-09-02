@@ -6,6 +6,7 @@ import {
   type Al_outcomecases,
 } from '../../generated/models/Al_outcomecasesModel';
 import { choiceLabel } from './choiceLabel';
+import { lookupLabel } from './lookupLabel';
 
 /**
  * Pure record-to-row mapping, kept free of the generated services so it stays unit
@@ -42,7 +43,7 @@ const NEXT_ACTION: Record<CaseStatus, string> = {
   'No Check Required': 'No action — bypassed, not graded',
 };
 
-function toRoute(name: string | undefined): ReviewRoute | null {
+function toRoute(name: string | null): ReviewRoute | null {
   return REVIEW_ROUTES.find((route) => route === name) ?? null;
 }
 
@@ -58,9 +59,9 @@ export function toSummary(record: Al_outcomecases): CaseSummary {
   return {
     id: record.al_outcomecaseid,
     caseReference: record.al_casereference,
-    route: toRoute(record.al_reviewrouteidname),
+    route: toRoute(lookupLabel(record, 'al_reviewrouteid', record.al_reviewrouteidname)),
     status,
-    owner: record.owneridname ?? null,
+    owner: lookupLabel(record, 'ownerid', record.owneridname),
     priority: choiceLabel(Al_outcomecasesal_priority, record.al_priority, record.al_priorityname),
     createdOn: record.createdon ?? null,
     ageInDays: ageInDays(record.createdon),
