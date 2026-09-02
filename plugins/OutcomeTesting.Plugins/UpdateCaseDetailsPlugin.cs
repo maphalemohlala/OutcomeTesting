@@ -38,6 +38,13 @@ namespace OutcomeTesting.Plugins
         private const string RouteAttr = "al_reviewrouteid";
         private const string PriorityAttr = "al_priority";
         private const string DueDateAttr = "al_duedate";
+        private const string TaxRequiredAttr = "al_taxcheckrequired";
+        private const string RouteCodeAttr = "al_routecode";
+
+        private const int TaxCheckRequiredYes = 120910560;
+        private const int TaxCheckRequiredNo = 120910561;
+        private const string RouteCodeTaxThenAqs = "ROUTE-TAX-AQS";
+        private const string RouteCodeAqsOnly = "ROUTE-AQS";
 
         private const int CommandUpdateCaseDetails = 120910778;
 
@@ -123,6 +130,13 @@ namespace OutcomeTesting.Plugins
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.ValidationPrefix + "Provide at least one detail to change.");
+            }
+
+            // BR-004: an explicit RouteId is the AD-036/OD-008 reassignment and always wins;
+            // otherwise the route follows the Tax check required answer.
+            if (!routeId.HasValue)
+            {
+                DeriveRoute(systemService, before, update, changes);
             }
 
             if (string.IsNullOrEmpty(expectedRowVersion))
@@ -218,6 +232,77 @@ namespace OutcomeTesting.Plugins
             }
 
             return value.Date;
+        }
+
+        /// <summary>
+        /// BR-004 route derivation: Tax check required Yes routes the case Tax then AQS, No
+        /// routes it AQS only. Tax team disposition is not an input - it advances or ends the
+        /// route rather than choosing it, and Tax only is only reachable through the AD-036
+        /// wrong-route reassignment (an explicit RouteId). The route is recalculated only when
+        /// the tax answer changes or the case has no route yet, so a deliberate reassignment
+        /// is never silently reverted by an unrelated edit.
+        ///
+        /// Route codes are matched against <c>data/route-seed</c>, so the route rows must be
+        /// seeded before this command can set a route.
+        /// </summary>
+        public static void DeriveRoute(IOrganizationService service, Entity before, Entity update, List<string> changes)
+        {
+            var beforeTax = before.GetAttributeValue<OptionSetValue>(TaxRequiredAttr);
+            var afterTax = update.Contains(TaxRequiredAttr)
+                ? update.GetAttributeValue<OptionSetValue>(TaxRequiredAttr)
+                : beforeTax;
+            if (afterTax == null)
+            {
+                return;
+            }
+
+            var currentRoute = before.GetAttributeValue<EntityReference>(RouteAttr);
+            var taxChanged = beforeTax == null || beforeTax.Value != afterTax.Value;
+            if (!taxChanged && currentRoute != null)
+            {
+                return;
+            }
+
+            string code;
+            switch (afterTax.Value)
+            {
+                case TaxCheckRequiredYes:
+                    code = RouteCodeTaxThenAqs;
+                    break;
+                case TaxCheckRequiredNo:
+                    code = RouteCodeAqsOnly;
+                    break;
+                default:
+                    return;
+            }
+
+            var routeId = FindRouteByCode(service, code);
+            if (!routeId.HasValue)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + "Review route '" + code + "' is not configured.");
+            }
+
+            if (currentRoute != null && currentRoute.Id == routeId.Value)
+            {
+                return;
+            }
+
+            update[RouteAttr] = new EntityReference(RouteEntity, routeId.Value);
+            changes.Add("Route " + Describe(currentRoute) + " -> " + routeId.Value.ToString("D") + " (" + code + ", derived BR-004)");
+        }
+
+        private static Guid? FindRouteByCode(IOrganizationService service, string code)
+        {
+            var query = new QueryExpression(RouteEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+            };
+            query.Criteria.AddCondition(RouteCodeAttr, ConditionOperator.Equal, code);
+
+            var result = service.RetrieveMultiple(query);
+            return result.Entities.Count > 0 ? result.Entities[0].Id : (Guid?)null;
         }
 
         private static string Describe(OptionSetValue value)
