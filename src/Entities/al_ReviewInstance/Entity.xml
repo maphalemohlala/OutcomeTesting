@@ -454,6 +454,67 @@
             <Description description="When the reviewer first opened the instance for editing. Feeds turnaround MI under BR-010." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_submitrequested">
+          <Type>bit</Type>
+          <Name>al_submitrequested</Name>
+          <LogicalName>al_submitrequested</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>1</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <AppDefaultValue>0</AppDefaultValue>
+          <optionset Name="al_reviewinstance_submitrequested">
+            <OptionSetType>bit</OptionSetType>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Submit requested" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="Whether a submission has been requested for this review." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="0" IsHidden="0">
+                <labels>
+                  <label description="No" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="1" IsHidden="0">
+                <labels>
+                  <label description="Yes" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Submit requested" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The portal's submit trigger. The Portals Web API cannot call an action, so the review page sets this one boolean and SubmitRequestPlugin runs the submission (AD-053 pattern), removing the Power Automate dependency. It is the only column on this table the site allowlists for browser writes; everything that matters is decided server-side, so setting it is a request, not an instruction." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_SubmittedOn">
           <Type>datetime</Type>
           <Name>al_submittedon</Name>

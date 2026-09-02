@@ -7,6 +7,6 @@
   </displayname>
   <iscustomizable>1</iscustomizable>
   <isoptional>0</isoptional>
-  <name>al_RegradeCase.Reason</name>
+  <name>Reason</name>
   <type>10</type>
 </customapirequestparameter>

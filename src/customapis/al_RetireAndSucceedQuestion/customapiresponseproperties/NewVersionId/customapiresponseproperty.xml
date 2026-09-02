@@ -6,6 +6,6 @@
     <label description="New version id" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_RetireAndSucceedQuestion.NewVersionId</name>
+  <name>NewVersionId</name>
   <type>10</type>
 </customapiresponseproperty>

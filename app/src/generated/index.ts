@@ -4,6 +4,7 @@
  */
 
 // Models
+export * as Al_AssignCaseModel from './models/Al_AssignCaseModel';
 export * as Al_AssignUserRoleModel from './models/Al_AssignUserRoleModel';
 export * as Al_CompleteRemediationModel from './models/Al_CompleteRemediationModel';
 export * as Al_CreateExportBatchModel from './models/Al_CreateExportBatchModel';
@@ -39,6 +40,7 @@ export * as Al_usersModel from './models/Al_usersModel';
 export * as CommonModels from './models/CommonModels';
 
 // Services
+export * from './services/Al_AssignCaseService';
 export * from './services/Al_AssignUserRoleService';
 export * from './services/Al_CompleteRemediationService';
 export * from './services/Al_CreateExportBatchService';

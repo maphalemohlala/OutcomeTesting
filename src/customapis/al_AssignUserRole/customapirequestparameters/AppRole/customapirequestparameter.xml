@@ -7,6 +7,6 @@
   </displayname>
   <iscustomizable>1</iscustomizable>
   <isoptional>1</isoptional>
-  <name>al_AssignUserRole.AppRole</name>
+  <name>AppRole</name>
   <type>10</type>
 </customapirequestparameter>

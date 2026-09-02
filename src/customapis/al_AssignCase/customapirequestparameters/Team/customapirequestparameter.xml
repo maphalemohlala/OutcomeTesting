@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Team">
+  <description default="Name of the shared queue the case sits in, recorded on the assignment row. Free text; there is no team model (OD-029).">
+    <label description="Name of the shared queue the case sits in, recorded on the assignment row. Free text; there is no team model (OD-029)." languagecode="1033" />
+  </description>
+  <displayname default="Team">
+    <label description="Team" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>al_AssignCase.Team</name>
+  <type>10</type>
+</customapirequestparameter>

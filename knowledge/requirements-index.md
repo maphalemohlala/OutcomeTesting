@@ -56,9 +56,9 @@ Approved 2026-08-29 by the signed scope `OPP-41186` item 13. The portal serves T
 | PP-09 | Questions administered outside the portal; published versions immutable; portal reads only the assigned version | BR-013, FR-030, FR-031 | Confirmed |
 | PP-10 | Four AQS outcomes; initial and final outcomes stored separately; Tax Pass/Fail separate from AQS scale | BR-005, BR-007 | Confirmed |
 | PP-11 | Submission lock across forms, Web API and manipulated URLs; reopen and correction require a reason and full before/after audit | BR-012, FR-017, NFR-AUD-01, AD-031 | Confirmed |
-| PP-12 | Remediation workspace: adviser response and T&C Manager attestation, both in the portal | BR-006, BR-008, FR-020 to FR-023, AD-045 | Confirmed |
-| PP-13 | Remediation SLA: clock start and stop, outstanding age, 10-working-day threshold on a business calendar | BR-010 | Blocked by OD-018 |
-| PP-14 | Evidence referenced from Intelligent Office; no portal upload or storage | AD-046 | Confirmed, reduced scope |
+| PP-12 | Remediation workspace: adviser response and T&C Manager attestation, both in the portal | BR-006, BR-008, FR-020 to FR-023, AD-045 | Adviser half built 2026-09-02 — response, Intelligent Office reference and completion, inline on `/remediation`. T&C attestation not built |
+| PP-13 | Remediation SLA: clock start and stop, outstanding age, 10-working-day threshold on a business calendar | BR-010 | Confirmed. OD-018 resolved 2026-08-30; working-day ageing implemented in the Code App (`app/src/lib/workingDays.ts`) and on the portal remediation list. The reset-and-preserve behaviour on a rejected sign-off is not built — it needs each period stored on the action |
+| PP-14 | Evidence referenced from Intelligent Office; no portal upload or storage | AD-046 | Built 2026-09-02 — `al_RemediationAction.al_evidencereference`, captured on the adviser response form |
 | PP-15 | Nine notification events emitted to Power Automate via an outbox; email only | BR-009, FR-021, AD-035 | Confirmed |
 | PP-16 | User-friendly errors; technical detail and correlation ID logged separately, never surfaced | NFR-OBS-01 | Confirmed |
 | PP-17 | Reporting drill-down from outcome cards to filtered lists; full MI and export remain back-office | BR-010, FR-032 | Confirmed |

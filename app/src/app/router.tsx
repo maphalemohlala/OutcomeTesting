@@ -4,6 +4,7 @@ import { NotBuiltYet } from '../components/feedback/NotBuiltYet';
 import { RequirePermission } from './permissions/PermissionGate';
 import { CaseWorklistPage } from '../features/cases/CaseWorklistPage';
 import { CaseDetailPage } from '../features/cases/CaseDetailPage';
+import { AllocationPage } from '../features/cases/AllocationPage';
 import { CaseIntakePage } from '../features/imports/CaseIntakePage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { QuestionLibraryPage } from '../features/admin/QuestionLibraryPage';
@@ -28,11 +29,9 @@ export function AppRoutes() {
         <Route
           path="/cases/:caseId/allocation"
           element={
-            <NotBuiltYet
-              title="Allocation"
-              purpose="Route a case to the correct team or reviewer and record why (FR-005, FR-006)."
-              blockedBy={['Case Assignment writes (assign/reassign commands, AD-040)']}
-            />
+            <RequirePermission resource="page.cases">
+              <AllocationPage />
+            </RequirePermission>
           }
         />
         <Route
@@ -49,7 +48,7 @@ export function AppRoutes() {
             <NotBuiltYet
               title="Recheck and regrade"
               purpose="Record a recheck and set the final outcome while preserving the initial one (FR-024)."
-              blockedBy={['Recheck and Outcome tables', 'OD-007']}
+              blockedBy={['Nothing — the screen itself is the gap. OD-007 is resolved (AD-031), al_Outcome carries the final outcome (AD-032) and al_RegradeCase is registered']}
             />
           }
         />

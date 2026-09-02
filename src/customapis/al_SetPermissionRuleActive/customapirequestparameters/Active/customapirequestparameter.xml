@@ -7,6 +7,6 @@
   </displayname>
   <iscustomizable>1</iscustomizable>
   <isoptional>0</isoptional>
-  <name>al_SetPermissionRuleActive.Active</name>
+  <name>Active</name>
   <type>0</type>
 </customapirequestparameter>

@@ -6,6 +6,6 @@
     <label description="Conflict" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_UpdateRole.Conflict</name>
+  <name>Conflict</name>
   <type>0</type>
 </customapiresponseproperty>

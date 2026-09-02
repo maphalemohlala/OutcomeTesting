@@ -6,6 +6,6 @@
     <label description="Mapping id" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_AssignUserRole.MappingId</name>
+  <name>MappingId</name>
   <type>10</type>
 </customapiresponseproperty>

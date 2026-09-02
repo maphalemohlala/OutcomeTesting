@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="AssignmentId">
+  <description default="Id of the al_caseassignment row created for this allocation.">
+    <label description="Id of the al_caseassignment row created for this allocation." languagecode="1033" />
+  </description>
+  <displayname default="Assignment id">
+    <label description="Assignment id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_AssignCase.AssignmentId</name>
+  <type>10</type>
+</customapiresponseproperty>

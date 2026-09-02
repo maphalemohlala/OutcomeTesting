@@ -6,6 +6,6 @@
     <label description="Permission id" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_SetPermissionRuleActive.PermissionId</name>
+  <name>PermissionId</name>
   <type>10</type>
 </customapiresponseproperty>

@@ -7,6 +7,6 @@
   </displayname>
   <iscustomizable>1</iscustomizable>
   <isoptional>1</isoptional>
-  <name>al_UpdateCaseDetails.ExpectedRowVersion</name>
+  <name>ExpectedRowVersion</name>
   <type>10</type>
 </customapirequestparameter>

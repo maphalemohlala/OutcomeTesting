@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Status">
+  <description default="Assigned, or AlreadyAssigned when an idempotent replay returned the original result.">
+    <label description="Assigned, or AlreadyAssigned when an idempotent replay returned the original result." languagecode="1033" />
+  </description>
+  <displayname default="Status">
+    <label description="Status" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_AssignCase.Status</name>
+  <type>10</type>
+</customapiresponseproperty>

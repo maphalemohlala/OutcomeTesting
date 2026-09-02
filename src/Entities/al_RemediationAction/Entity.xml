@@ -79,6 +79,84 @@
             <Description description="Progress of the action: Open, In progress or Completed. The adviser drives it to Completed (BR-008); T&amp;C Manager validation and sign-off are recorded on al_Signoff (AD-031)." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_adviserresponse">
+          <Type>ntext</Type>
+          <Name>al_adviserresponse</Name>
+          <LogicalName>al_adviserresponse</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>text</Format>
+          <MaxLength>2000</MaxLength>
+          <displaynames>
+            <displayname description="Adviser response" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="What the adviser did about this action, in their own words (FR-020, FR-021). Written from the portal, which is where the whole remediation loop runs (AD-045). Recorded separately from al_description so the instruction and the answer to it are never confused." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_assignedcontactid">
+          <Type>lookup</Type>
+          <Name>al_assignedcontactid</Name>
+          <LogicalName>al_assignedcontactid</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <LookupStyle>single</LookupStyle>
+          <LookupTypes />
+          <displaynames>
+            <displayname description="Assigned contact" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Portal identity of the adviser responsible for this remediation action (AD-047). Set server-side at assignment from the work-email join (OD-003, AD-010). Contact-scoped Power Pages access binds to this; systemuser ownership is unchanged." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_CompletedOn">
           <Type>datetime</Type>
           <Name>al_completedon</Name>
@@ -117,6 +195,67 @@
           </displaynames>
           <Descriptions>
             <Description description="When the adviser marked the action complete. Empty until completion. Preserving this alongside the initial outcome supports BR-007." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_completerequested">
+          <Type>bit</Type>
+          <Name>al_completerequested</Name>
+          <LogicalName>al_completerequested</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>1</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <AppDefaultValue>0</AppDefaultValue>
+          <optionset Name="al_remediationaction_completerequested">
+            <OptionSetType>bit</OptionSetType>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Complete requested" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="Whether the adviser has asked for this action to be marked complete." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="0" IsHidden="0">
+                <labels>
+                  <label description="No" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="1" IsHidden="0">
+                <labels>
+                  <label description="Yes" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Complete requested" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The portal's completion trigger, mirroring al_reviewinstance.al_submitrequested (AD-073). A page cannot call the al_CompleteRemediation action, so the adviser sets this and CompleteRequestPlugin runs the command. Setting it is a request: the status transition, the mandatory response and the audit event are all decided server-side." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_Description">
@@ -199,6 +338,46 @@
             <Description description="Date the action is due. Feeds remediation ageing MI under BR-010." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_evidencereference">
+          <Type>nvarchar</Type>
+          <Name>al_evidencereference</Name>
+          <LogicalName>al_evidencereference</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>text</Format>
+          <MaxLength>400</MaxLength>
+          <Length>800</Length>
+          <displaynames>
+            <displayname description="Evidence reference" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Reference to the supporting document in Intelligent Office (PP-14, AD-046). A reference only: no evidence is uploaded to or stored by the portal, so this is the whole of PP-14." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_Name">
           <Type>nvarchar</Type>
           <Name>al_name</Name>
@@ -237,45 +416,6 @@
           </displaynames>
           <Descriptions>
             <Description description="Short label identifying the remediation action in lists." languagecode="1033" />
-          </Descriptions>
-        </attribute>
-        <attribute PhysicalName="al_assignedcontactid">
-          <Type>lookup</Type>
-          <Name>al_assignedcontactid</Name>
-          <LogicalName>al_assignedcontactid</LogicalName>
-          <RequiredLevel>none</RequiredLevel>
-          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
-          <ImeMode>auto</ImeMode>
-          <ValidForUpdateApi>1</ValidForUpdateApi>
-          <ValidForReadApi>1</ValidForReadApi>
-          <ValidForCreateApi>1</ValidForCreateApi>
-          <IsCustomField>1</IsCustomField>
-          <IsAuditEnabled>1</IsAuditEnabled>
-          <IsSecured>0</IsSecured>
-          <IntroducedVersion>1.0.0.0</IntroducedVersion>
-          <IsCustomizable>1</IsCustomizable>
-          <IsRenameable>1</IsRenameable>
-          <CanModifySearchSettings>1</CanModifySearchSettings>
-          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
-          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
-          <SourceType>0</SourceType>
-          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
-          <IsSortableEnabled>0</IsSortableEnabled>
-          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
-          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
-          <IsDataSourceSecret>0</IsDataSourceSecret>
-          <AutoNumberFormat></AutoNumberFormat>
-          <IsSearchable>0</IsSearchable>
-          <IsFilterable>0</IsFilterable>
-          <IsRetrievable>0</IsRetrievable>
-          <IsLocalizable>0</IsLocalizable>
-          <LookupStyle>single</LookupStyle>
-          <LookupTypes />
-          <displaynames>
-            <displayname description="Assigned contact" languagecode="1033" />
-          </displaynames>
-          <Descriptions>
-            <Description description="Portal identity of the adviser responsible for this remediation action (AD-047). Set server-side at assignment from the work-email join (OD-003, AD-010). Contact-scoped Power Pages access binds to this; systemuser ownership is unchanged." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_outcomecaseid">

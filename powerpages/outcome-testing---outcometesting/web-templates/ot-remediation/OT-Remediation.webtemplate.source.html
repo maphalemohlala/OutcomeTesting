@@ -1,11 +1,22 @@
 {% extends 'OT Layout' %}
 {% block content %}
 {% comment %}
-  Remediation worklist (PP-12).
+  Remediation worklist (PP-12, PP-13).
 
-  Ageing is shown as elapsed calendar days and labelled as such. The
-  10-working-day threshold needs the business calendar confirmed under
-  OD-018, so no working-day figure is displayed rather than a wrong one.
+  Working-day ageing against the BR-010 ten-day threshold, per OD-018 (resolved
+  2026-08-30): Monday to Friday, the day a case enters remediation counts as day 1,
+  and England's bank holidays are applied manually rather than encoded - so a period
+  spanning Christmas or Easter reads older here than it truly is and a breach near a
+  bank holiday wants a human look.
+
+  The count runs in the browser rather than in Liquid because Liquid has no date
+  arithmetic. It is fed calendar dates, not timestamps, which is what keeps it free of
+  the timezone question app/src/lib/workingDays.ts has to solve: the server has already
+  resolved which UK day each value falls on.
+
+  Not yet implemented (OD-018 names it): a rejected sign-off resets the clock while
+  preserving the previous period. That needs each period stored on the action, so a case
+  that goes round twice still shows one age here, not two.
 {% endcomment %}
 
 {% assign page_size = 25 %}
@@ -21,6 +32,9 @@
     <attribute name="al_actionstatus" />
     <attribute name="al_duedate" />
     <attribute name="al_completedon" />
+    <attribute name="al_adviserresponse" />
+    <attribute name="al_evidencereference" />
+    <attribute name="al_assignedcontactid" />
     <attribute name="createdon" />
     <order attribute="al_duedate" descending="false" />
     <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
@@ -35,9 +49,9 @@
 {% assign rows = actions.results.entities %}
 
 <div class="ot-notice" role="status">
-  <strong>Shell stage.</strong> All remediation actions are listed. Filtering to your own
-  actions, adviser response and T&amp;C attestation arrive in Phase&nbsp;6. Ageing is shown in
-  calendar dates only. Working-day ageing against the 10-day threshold is pending the business calendar (OD-018).
+  <strong>All remediation actions.</strong> You can record a response on the ones assigned
+  to you; the rest are read-only. Age counts working days, Monday to Friday, from the day
+  the action opened; bank holidays are not deducted, so an age spanning one reads a day high.
 </div>
 
 <section class="ot-card" aria-labelledby="ot-remediation-heading">
@@ -58,6 +72,7 @@
             <th scope="col">Description</th>
             <th scope="col">Status</th>
             <th scope="col">Opened</th>
+            <th scope="col">Age</th>
             <th scope="col">Due</th>
             <th scope="col">Completed</th>
           </tr>
@@ -80,9 +95,120 @@
               <td>{{ a.al_description | escape }}</td>
               <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
               <td>{{ a.createdon | date: 'dd MMM yyyy' | default: '—' }}</td>
+              <td>
+                <span class="ot-age"
+                      data-ot-age
+                      data-opened="{{ a.createdon | date: 'yyyy-MM-dd' }}"
+                      data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
+              </td>
               <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
               <td>{{ a.al_completedon | date: 'dd MMM yyyy' | default: '—' }}</td>
             </tr>
+            {% comment %}
+              The adviser's half of the BR-008 loop (PP-12, FR-020, FR-021), inline rather
+              than on a page of its own so the worklist and the response live together.
+
+              Rendered only for an action assigned to the signed-in contact and not yet
+              completed. That is presentation, not a boundary: the Contact-scoped table
+              permission is what actually decides whose action can be written (AD-069), and
+              CompleteRemediationPlugin re-checks the status and the response server-side.
+            {% endcomment %}
+            {% if user and a.al_assignedcontactid.id == user.id and a.al_completedon == null %}
+              <tr class="ot-response-row">
+                <td colspan="9">
+                  <details class="ot-response" data-ot-response data-action-id="{{ a.al_remediationactionid }}">
+                    <summary>Record your response</summary>
+
+                    <div class="ot-response__field">
+                      <label for="ot-response-{{ a.al_remediationactionid }}">What did you do?</label>
+                      <textarea id="ot-response-{{ a.al_remediationactionid }}"
+                                rows="4"
+                                data-ot-response-text>{{ a.al_adviserresponse | escape }}</textarea>
+                    </div>
+
+                    <div class="ot-response__field">
+                      <label for="ot-evidence-{{ a.al_remediationactionid }}">
+                        Intelligent Office reference
+                      </label>
+                      <input type="text"
+                             id="ot-evidence-{{ a.al_remediationactionid }}"
+                             value="{{ a.al_evidencereference | escape }}"
+                             data-ot-response-evidence />
+                      <p class="ot-response__hint">
+                        A reference to the document in Intelligent Office. Nothing is uploaded
+                        here and no file is stored by this site.
+                      </p>
+                    </div>
+
+                    <p class="ot-response__actions">
+                      <button type="button" class="ot-btn" data-ot-response-save>Save response</button>
+                      <button type="button" class="ot-btn ot-btn--primary" data-ot-response-complete>
+                        Save and mark complete
+                      </button>
+                    </p>
+                    <p class="ot-response__status" data-ot-response-status aria-live="polite"></p>
+                  </details>
+                </td>
+              </tr>
+            {% endif %}
+            {% comment %}
+              The T&C Manager's half of the loop (PP-12, FR-023, BR-008). Offered on a
+              completed action that has not been signed off yet.
+
+              Whether the signed-in user may actually attest is decided by the create
+              permission on al_signoff, which binds the T&C Supervisor role alone — this
+              renders the panel for anyone, and a user without the role is refused on save.
+              Showing it is a worse experience than hiding it, but hiding it by role in
+              Liquid would look like access control and enforce nothing (NFR-SEC-01).
+            {% endcomment %}
+            {% if a.al_completedon and a.al_actionstatus.value == 120910602 %}
+              <tr class="ot-response-row">
+                <td colspan="9">
+                  <details class="ot-response" data-ot-signoff data-action-id="{{ a.al_remediationactionid }}">
+                    <summary>Sign off this remediation</summary>
+
+                    {% if a.al_adviserresponse %}
+                      <div class="ot-response__field">
+                        <span class="ot-response__label">The adviser recorded</span>
+                        <p>{{ a.al_adviserresponse | escape | newline_to_br }}</p>
+                        {% if a.al_evidencereference %}
+                          <p class="ot-response__hint">
+                            Intelligent Office reference: {{ a.al_evidencereference | escape }}
+                          </p>
+                        {% endif %}
+                      </div>
+                    {% endif %}
+
+                    <div class="ot-response__field">
+                      <label for="ot-decision-{{ a.al_remediationactionid }}">Decision</label>
+                      <select id="ot-decision-{{ a.al_remediationactionid }}" data-ot-signoff-decision>
+                        <option value="">Choose…</option>
+                        <option value="120910720">Approved</option>
+                        <option value="120910721">Rejected</option>
+                      </select>
+                    </div>
+
+                    <div class="ot-response__field">
+                      <label for="ot-notes-{{ a.al_remediationactionid }}">Notes</label>
+                      <textarea id="ot-notes-{{ a.al_remediationactionid }}"
+                                rows="3"
+                                data-ot-signoff-notes></textarea>
+                      <p class="ot-response__hint">
+                        Required when rejecting: the adviser needs to know what to put right
+                        (BR-008). A rejection returns the action to them.
+                      </p>
+                    </div>
+
+                    <p class="ot-response__actions">
+                      <button type="button" class="ot-btn ot-btn--primary" data-ot-signoff-save>
+                        Record sign-off
+                      </button>
+                    </p>
+                    <p class="ot-response__status" data-ot-signoff-status aria-live="polite"></p>
+                  </details>
+                </td>
+              </tr>
+            {% endif %}
           {% endfor %}
         </tbody>
       </table>
@@ -100,4 +226,287 @@
     {% include 'OT Empty State' title: 'No remediation actions' message: 'A pass outcome requires no remediation. Actions appear here for any non-pass outcome.' %}
   {% endif %}
 </section>
+
+<script>
+  /*
+   * Working-day ageing for the BR-010 remediation clock (OD-018).
+   *
+   * Mirrors app/src/lib/workingDays.ts: Monday to Friday, the opening day counts as
+   * day 1, bank holidays are not deducted. An action that has completed is aged to its
+   * completion date, so a finished action stops ticking.
+   *
+   * Input is a yyyy-MM-dd calendar date the server already resolved, so nothing here
+   * converts a timezone. Each date is pinned to midday UTC before arithmetic, which is
+   * what stops a day slipping when the browser sits in another region.
+   */
+  (function () {
+    'use strict';
+
+    var THRESHOLD = 10;
+
+    function midday(text) {
+      if (!text) { return null; }
+      var parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+      if (!parts) { return null; }
+      return new Date(Date.UTC(+parts[1], +parts[2] - 1, +parts[3], 12, 0, 0));
+    }
+
+    function workingDaysBetween(from, to) {
+      if (to.getTime() < from.getTime()) { return 0; }
+      var count = 0;
+      var cursor = new Date(from.getTime());
+      while (cursor.getTime() <= to.getTime()) {
+        var day = cursor.getUTCDay();
+        if (day >= 1 && day <= 5) { count += 1; }
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+      return count;
+    }
+
+    var now = new Date();
+    var today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0));
+
+    var cells = document.querySelectorAll('[data-ot-age]');
+    for (var i = 0; i < cells.length; i += 1) {
+      var cell = cells[i];
+      var opened = midday(cell.getAttribute('data-opened'));
+      if (!opened) { continue; }
+
+      var completed = midday(cell.getAttribute('data-completed'));
+      var age = workingDaysBetween(opened, completed || today);
+
+      cell.textContent = age + (age === 1 ? ' working day' : ' working days');
+      if (!completed && age > THRESHOLD) {
+        cell.classList.add('ot-age--breached');
+        cell.setAttribute('title', 'Past the ten-working-day threshold (BR-010).');
+      }
+    }
+  })();
+</script>
+
+<script>
+  /*
+   * Adviser response and completion (PP-12, FR-020, FR-021, BR-008).
+   *
+   * Path: this page -> PATCH al_remediationaction -> CompleteRequestPlugin -> Dataverse.
+   *
+   * Same mechanic as the review submit (AD-073): the portals Web API cannot call an
+   * action, so the page writes allowlisted columns and a synchronous plug-in does the
+   * work. Saving writes the response alone; completing writes the response and the
+   * trigger in one request, so an adviser can never mark an action complete with a
+   * response that failed to save.
+   *
+   * Progressive enhancement only. The status transition, the mandatory response and the
+   * audit event are all enforced server-side (NFR-SEC-01).
+   */
+  (function () {
+    'use strict';
+
+    var panels = document.querySelectorAll('[data-ot-response]');
+    if (!panels.length) { return; }
+
+    function friendlyError(raw) {
+      var text = String(raw || '');
+      if (text.indexOf('CONFLICT:') !== -1) {
+        return 'This action changed since you opened it. Reload the page and try again.';
+      }
+      if (text.indexOf('UNAUTHORIZED:') !== -1) {
+        return 'You do not have permission to change this action.';
+      }
+      if (text.indexOf('PRECONDITION:') !== -1) {
+        var idx = text.indexOf('PRECONDITION:');
+        return text.substring(idx + 'PRECONDITION:'.length).trim();
+      }
+      return 'We could not save that. Nothing has been changed. Please try again.';
+    }
+
+    function wire(panel) {
+      var actionId = panel.getAttribute('data-action-id');
+      var response = panel.querySelector('[data-ot-response-text]');
+      var evidence = panel.querySelector('[data-ot-response-evidence]');
+      var save = panel.querySelector('[data-ot-response-save]');
+      var complete = panel.querySelector('[data-ot-response-complete]');
+      var status = panel.querySelector('[data-ot-response-status]');
+
+      function show(message, kind) {
+        status.textContent = message;
+        status.className = 'ot-response__status ot-response__status--' + (kind || 'info');
+        status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+      }
+
+      function busy(on) {
+        save.disabled = on;
+        complete.disabled = on;
+      }
+
+      function send(markComplete) {
+        if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
+          show('This page did not load completely. Refresh and try again.', 'error');
+          return;
+        }
+
+        // Checked here only so the user is told before a round trip; the plug-in refuses
+        // a completion with no response regardless.
+        if (markComplete && !response.value.trim()) {
+          show('Record what you did before marking this complete.', 'error');
+          return;
+        }
+
+        busy(true);
+        show(markComplete ? 'Completing...' : 'Saving...', 'info');
+
+        var payload = {
+          al_adviserresponse: response.value,
+          al_evidencereference: evidence.value
+        };
+        if (markComplete) { payload.al_completerequested = true; }
+
+        window.shell.getTokenDeferred().done(function (token) {
+          var request = new XMLHttpRequest();
+          request.open('PATCH', '/_api/al_remediationactions(' + actionId + ')', true);
+          request.setRequestHeader('Content-Type', 'application/json');
+          request.setRequestHeader('__RequestVerificationToken', token);
+
+          request.onreadystatechange = function () {
+            if (request.readyState !== 4) { return; }
+
+            if (request.status >= 200 && request.status < 300) {
+              if (markComplete) {
+                show('Completed. Reloading...', 'success');
+                window.setTimeout(function () { window.location.reload(); }, 800);
+                return;
+              }
+              show('Saved.', 'success');
+              busy(false);
+              return;
+            }
+
+            show(friendlyError(request.responseText), 'error');
+            busy(false);
+          };
+
+          request.send(JSON.stringify(payload));
+        }).fail(function () {
+          show('This page did not load completely. Refresh and try again.', 'error');
+          busy(false);
+        });
+      }
+
+      save.addEventListener('click', function () { send(false); });
+      complete.addEventListener('click', function () { send(true); });
+    }
+
+    for (var i = 0; i < panels.length; i += 1) {
+      wire(panels[i]);
+    }
+  })();
+</script>
+
+<script>
+  /*
+   * T&C attestation (PP-12, FR-023, BR-008).
+   *
+   * Path: this page -> POST al_signoff -> SignoffGuardPlugin / SignoffProgressPlugin.
+   *
+   * A create, not an update, so this needs no trigger column: the portals Web API supports
+   * create. The page sends the decision, the notes and the action; everything identifying
+   * is stamped server-side. Whether the signed-in user may do this at all is decided by
+   * the create permission on al_signoff, not by anything here (NFR-SEC-01).
+   */
+  (function () {
+    'use strict';
+
+    var panels = document.querySelectorAll('[data-ot-signoff]');
+    if (!panels.length) { return; }
+
+    var REJECTED = '120910721';
+
+    function friendlyError(raw) {
+      var text = String(raw || '');
+      if (text.indexOf('PRECONDITION:') !== -1) {
+        var idx = text.indexOf('PRECONDITION:');
+        return text.substring(idx + 'PRECONDITION:'.length).trim();
+      }
+      if (text.indexOf('VALIDATION:') !== -1) {
+        var v = text.indexOf('VALIDATION:');
+        return text.substring(v + 'VALIDATION:'.length).trim();
+      }
+      // A user without the T&C Supervisor role lands here: the platform refuses the
+      // create before any of our code runs, so there is no prefix to branch on.
+      return 'We could not record that sign-off. You may not have permission to sign off remediation.';
+    }
+
+    function wire(panel) {
+      var actionId = panel.getAttribute('data-action-id');
+      var decision = panel.querySelector('[data-ot-signoff-decision]');
+      var notes = panel.querySelector('[data-ot-signoff-notes]');
+      var save = panel.querySelector('[data-ot-signoff-save]');
+      var status = panel.querySelector('[data-ot-signoff-status]');
+
+      function show(message, kind) {
+        status.textContent = message;
+        status.className = 'ot-response__status ot-response__status--' + (kind || 'info');
+        status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+      }
+
+      save.addEventListener('click', function () {
+        if (save.disabled) { return; }
+
+        if (!decision.value) {
+          show('Choose whether this remediation is approved or rejected.', 'error');
+          return;
+        }
+
+        // Told before the round trip; SignoffGuardPlugin refuses it regardless.
+        if (decision.value === REJECTED && !notes.value.trim()) {
+          show('A rejection must say what the adviser needs to put right.', 'error');
+          return;
+        }
+
+        if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
+          show('This page did not load completely. Refresh and try again.', 'error');
+          return;
+        }
+
+        save.disabled = true;
+        show('Recording...', 'info');
+
+        var payload = {
+          al_signoffdecision: Number(decision.value),
+          al_notes: notes.value
+        };
+        payload['al_remediationactionid@odata.bind'] = '/al_remediationactions(' + actionId + ')';
+
+        window.shell.getTokenDeferred().done(function (token) {
+          var request = new XMLHttpRequest();
+          request.open('POST', '/_api/al_signoffs', true);
+          request.setRequestHeader('Content-Type', 'application/json');
+          request.setRequestHeader('__RequestVerificationToken', token);
+
+          request.onreadystatechange = function () {
+            if (request.readyState !== 4) { return; }
+
+            if (request.status >= 200 && request.status < 300) {
+              show('Sign-off recorded. Reloading...', 'success');
+              window.setTimeout(function () { window.location.reload(); }, 800);
+              return;
+            }
+
+            show(friendlyError(request.responseText), 'error');
+            save.disabled = false;
+          };
+
+          request.send(JSON.stringify(payload));
+        }).fail(function () {
+          show('This page did not load completely. Refresh and try again.', 'error');
+          save.disabled = false;
+        });
+      });
+    }
+
+    for (var i = 0; i < panels.length; i += 1) {
+      wire(panels[i]);
+    }
+  })();
+</script>
 {% endblock %}

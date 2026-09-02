@@ -1,5 +1,24 @@
 # Submit Review — cloud flow build steps
 
+> **SUPERSEDED 2026-09-02 by AD-073. Do not build this flow.**
+>
+> Submission no longer goes through Power Automate. The review page writes
+> `al_reviewinstance.al_submitrequested` over the Portals Web API and the synchronous
+> `SubmitRequestPlugin` runs the submission, which is the same mechanic AD-053 already
+> used for answers. There is nothing left to create in the maker portal.
+>
+> Worth knowing why, because it was not only about avoiding a licence: this design could
+> not have worked as written. `EnsureCaller` compares `InitiatingUserId` to the review's
+> `ownerid`, and a cloud flow runs under **its own connection identity** — the note at the
+> bottom of this file says so. Once allocation began setting `ownerid` to the assignee
+> (AD-072), every submit through the flow would have returned `UNAUTHORIZED:`. The
+> authorization model had to change whichever route was taken.
+>
+> Kept rather than deleted because the contract it describes — the failure prefixes, the
+> idempotency behaviour, the response shape — is still exactly what the plug-in enforces,
+> and because a reader who finds the empty `OutcomeTesting/Flow/SubmitReview` site setting
+> deserves to find out here why it is empty on purpose.
+
 The portal cannot call `al_SubmitReview` directly. Microsoft's Power Pages Web API
 documentation is explicit: *"Calling actions and functions by using the portals Web
 API isn't supported."* A Custom API is an action, so the only supported route from a

@@ -3,6 +3,7 @@
   <EntityRelationship Name="al_checklist_checklistversion" />
   <EntityRelationship Name="al_checklistversion_reviewinstance" />
   <EntityRelationship Name="al_checklistversion_section" />
+  <EntityRelationship Name="al_contact_al_outcomecase" />
   <EntityRelationship Name="al_exportbatch_exportrecord" />
   <EntityRelationship Name="al_failreason_response" />
   <EntityRelationship Name="al_importbatch_importexception" />
@@ -21,8 +22,7 @@
   <EntityRelationship Name="al_reviewinstance_response" />
   <EntityRelationship Name="al_reviewroute_outcomecase" />
   <EntityRelationship Name="al_section_question" />
-  <EntityRelationship Name="contact_al_remediationaction" />
-  <EntityRelationship Name="contact_al_reviewinstance" />
+  <EntityRelationship Name="al_systemuser_caseassignment" />
   <EntityRelationship Name="business_unit_al_auditevent" />
   <EntityRelationship Name="business_unit_al_caseassignment" />
   <EntityRelationship Name="business_unit_al_exportbatch" />
@@ -39,6 +39,9 @@
   <EntityRelationship Name="business_unit_al_signoff" />
   <EntityRelationship Name="business_unit_al_user" />
   <EntityRelationship Name="business_unit_al_userrolemapping" />
+  <EntityRelationship Name="contact_al_caseassignment" />
+  <EntityRelationship Name="contact_al_remediationaction" />
+  <EntityRelationship Name="contact_al_reviewinstance" />
   <EntityRelationship Name="lk_al_auditevent_createdby" />
   <EntityRelationship Name="lk_al_auditevent_modifiedby" />
   <EntityRelationship Name="lk_al_caseassignment_createdby" />

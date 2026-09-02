@@ -6,6 +6,6 @@
     <label description="Sign-off id" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_SignOffRemediation.SignoffId</name>
+  <name>SignoffId</name>
   <type>10</type>
 </customapiresponseproperty>

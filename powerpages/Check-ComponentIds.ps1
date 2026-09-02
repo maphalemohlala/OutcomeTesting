@@ -64,12 +64,13 @@ $identityKeys = @{
 
 $claims = [System.Collections.Generic.List[object]]::new()
 
-# Web roles and page access control rules are not per-component files with a
-# suffix; each is one top-level list file. Match those by exact name, so the
-# two component types this repository edits most are no longer unchecked.
+# Web roles, page access control rules and site settings are not per-component
+# files with a suffix; each is one top-level list file. Match those by exact name,
+# so the component types this repository edits most are no longer unchecked.
 $fileKeys = @{
     'webrole.yml'     = 'adx_webroleid'
     'webpagerule.yml' = 'adx_webpageaccesscontrolruleid'
+    'sitesetting.yml' = 'adx_sitesettingid'
 }
 
 foreach ($file in Get-ChildItem -LiteralPath $SitePath -Recurse -File -Filter '*.yml') {

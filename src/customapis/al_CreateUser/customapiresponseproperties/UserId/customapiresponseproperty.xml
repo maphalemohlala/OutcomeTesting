@@ -6,6 +6,6 @@
     <label description="User id" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_CreateUser.UserId</name>
+  <name>UserId</name>
   <type>10</type>
 </customapiresponseproperty>
