@@ -1,0 +1,14 @@
+adx_append: true
+adx_appendto: false
+adx_create: true
+adx_delete: false
+adx_entitylogicalname: al_signoff
+adx_entityname: Signoff - T&C attestation
+adx_entitypermission_webrole:
+- a1000000-0000-4000-8000-000000000093
+adx_entitypermissionid: a1000000-0000-4000-8000-00000000006c
+adx_parententitypermission: a1000000-0000-4000-8000-000000000062
+adx_parentrelationship: al_remediationaction_signoff
+adx_read: true
+adx_scope: 756150003
+adx_write: false

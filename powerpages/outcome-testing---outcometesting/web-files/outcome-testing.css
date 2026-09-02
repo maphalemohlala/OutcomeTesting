@@ -742,6 +742,82 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-notice strong { color: var(--colour-text); }
 
 /* ------------------------------------------------------------------
+   Remediation working-day age (BR-010, OD-018)
+   ------------------------------------------------------------------ */
+
+.ot-age { white-space: nowrap; }
+
+/* Colour is never the only signal: the cell also carries a title and the count itself. */
+.ot-age--breached {
+  color: var(--colour-outcome-harm);
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------
+   Adviser response (PP-12)
+   ------------------------------------------------------------------ */
+
+.ot-response-row td { background: var(--colour-surface); }
+
+.ot-response summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--colour-text);
+  padding: var(--space-2) 0;
+}
+
+.ot-response__field {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 44rem;
+  margin-bottom: var(--space-3);
+}
+
+.ot-response__field label { font-weight: 600; }
+
+.ot-response__label {
+  font-weight: 600;
+  color: var(--colour-text-muted);
+  font-size: var(--text-sm);
+}
+
+.ot-response__field select {
+  font: inherit;
+  padding: var(--space-2) var(--space-3);
+  color: var(--colour-text);
+  background: var(--colour-background);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.ot-response__field textarea,
+.ot-response__field input {
+  font: inherit;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  color: var(--colour-text);
+  background: var(--colour-background);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.ot-response__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.ot-response__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+}
+
+.ot-response__status { margin: 0; font-size: var(--text-sm); }
+.ot-response__status--success { color: var(--colour-outcome-pass); font-weight: 600; }
+.ot-response__status--error   { color: var(--colour-outcome-harm); font-weight: 600; }
+
+/* ------------------------------------------------------------------
    Accessibility
    ------------------------------------------------------------------ */
 

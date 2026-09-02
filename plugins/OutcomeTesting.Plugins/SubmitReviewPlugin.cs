@@ -84,12 +84,62 @@ namespace OutcomeTesting.Plugins
             var idempotencyKey = GetRequiredString(context, InIdempotencyKey);
             var expectedRowVersion = GetOptionalString(context, InExpectedRowVersion);
 
+            var result = Submit(
+                service,
+                targetId,
+                idempotencyKey,
+                expectedRowVersion,
+                context.InitiatingUserId,
+                context.CorrelationId,
+                requireCallerOwnsReview: true,
+                details: null);
+
+            SetResponse(context, result.Status, result.AuditEventId, result.Conflict);
+        }
+
+        /// <summary>The outcome of a submission, in the shape the Custom API responds with.</summary>
+        public sealed class SubmitResult
+        {
+            public string Status { get; set; }
+
+            public Guid AuditEventId { get; set; }
+
+            public bool Conflict { get; set; }
+        }
+
+        /// <summary>
+        /// The whole submission (FR-016, FR-017, PP-07, PP-08, PP-11), shared by the
+        /// <c>al_SubmitReview</c> Custom API and the portal's update-triggered path so the
+        /// two entry points cannot enforce different rules. Extracted for the same reason
+        /// <see cref="CaseTransitions"/> was: two callers writing the same state is two
+        /// places for it to be enforced differently.
+        ///
+        /// <paramref name="requireCallerOwnsReview"/> is false for the portal. Power Pages
+        /// Web API writes arrive under the site's application user, so the caller identity
+        /// is never the checker and an owner check there would look like security while
+        /// enforcing nothing (AD-053). The boundary for that path is the Contact-scoped
+        /// table permission, which is what let the write happen at all.
+        /// </summary>
+        public static SubmitResult Submit(
+            IOrganizationService service,
+            Guid targetId,
+            string idempotencyKey,
+            string expectedRowVersion,
+            Guid actorId,
+            Guid correlationId,
+            bool requireCallerOwnsReview,
+            string details)
+        {
             // Idempotency: a replay with the same key is a success no-op (NFR-REL-01).
             var existingAudit = FindAuditByKey(service, idempotencyKey);
             if (existingAudit != null)
             {
-                SetResponse(context, StatusName(StatusSubmitted), existingAudit.Id, false);
-                return;
+                return new SubmitResult
+                {
+                    Status = StatusName(StatusSubmitted),
+                    AuditEventId = existingAudit.Id,
+                    Conflict = false,
+                };
             }
 
             var review = service.Retrieve(
@@ -97,7 +147,10 @@ namespace OutcomeTesting.Plugins
                 targetId,
                 new ColumnSet(ReviewStatus, ReviewChecklistVersion, ReviewType, ReviewOutcomeCase, "ownerid", "al_sequence"));
 
-            EnsureCaller(service, context, review);
+            if (requireCallerOwnsReview)
+            {
+                EnsureCaller(service, actorId, review);
+            }
 
             var status = review.GetAttributeValue<OptionSetValue>(ReviewStatus);
             var currentStatus = status != null ? status.Value : -1;
@@ -107,9 +160,13 @@ namespace OutcomeTesting.Plugins
             // (BR-007, PP-11). Reopening is a privileged T&C Manager command (AD-031).
             if (currentStatus == StatusSubmitted)
             {
-                var replayAudit = WriteAuditEvent(service, targetId, idempotencyKey, context);
-                SetResponse(context, StatusName(StatusSubmitted), replayAudit, false);
-                return;
+                var replayAudit = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details);
+                return new SubmitResult
+                {
+                    Status = StatusName(StatusSubmitted),
+                    AuditEventId = replayAudit,
+                    Conflict = false,
+                };
             }
 
             if (currentStatus != StatusAssigned && currentStatus != StatusInProgress)
@@ -159,8 +216,14 @@ namespace OutcomeTesting.Plugins
 
             FinaliseReview(service, review, targetId);
 
-            var auditId = WriteAuditEvent(service, targetId, idempotencyKey, context);
-            SetResponse(context, StatusName(StatusSubmitted), auditId, false);
+            var auditId = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details);
+
+            return new SubmitResult
+            {
+                Status = StatusName(StatusSubmitted),
+                AuditEventId = auditId,
+                Conflict = false,
+            };
         }
 
         /// <summary>
@@ -613,7 +676,7 @@ namespace OutcomeTesting.Plugins
                 || message.IndexOf("concurrency", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private static void EnsureCaller(IOrganizationService service, IPluginExecutionContext context, Entity review)
+        private static void EnsureCaller(IOrganizationService service, Guid callerId, Entity review)
         {
             var owner = review.GetAttributeValue<EntityReference>("ownerid");
 
@@ -631,7 +694,7 @@ namespace OutcomeTesting.Plugins
 
             if (owner.LogicalName == "systemuser")
             {
-                if (owner.Id != context.InitiatingUserId)
+                if (owner.Id != callerId)
                 {
                     throw new InvalidPluginExecutionException(
                         UnauthorizedPrefix + "Only the checker assigned to this review can submit it.");
@@ -641,7 +704,7 @@ namespace OutcomeTesting.Plugins
 
             if (owner.LogicalName == "team")
             {
-                if (!IsTeamMember(service, owner.Id, context.InitiatingUserId))
+                if (!IsTeamMember(service, owner.Id, callerId))
                 {
                     throw new InvalidPluginExecutionException(
                         UnauthorizedPrefix + "Only a member of the team that owns this review can submit it.");
@@ -690,7 +753,9 @@ namespace OutcomeTesting.Plugins
             IOrganizationService service,
             Guid targetId,
             string idempotencyKey,
-            IPluginExecutionContext context)
+            Guid actorId,
+            Guid correlationId,
+            string details)
         {
             var audit = new Entity(AuditEntity)
             {
@@ -698,11 +763,16 @@ namespace OutcomeTesting.Plugins
                 ["al_command"] = new OptionSetValue(CommandSubmitReview),
                 ["al_targettable"] = ReviewEntity,
                 ["al_targetid"] = targetId.ToString("D"),
-                ["al_actorid"] = context.InitiatingUserId.ToString("D"),
+                ["al_actorid"] = actorId.ToString("D"),
                 ["al_idempotencykey"] = idempotencyKey,
-                ["al_correlationid"] = context.CorrelationId.ToString("D"),
+                ["al_correlationid"] = correlationId.ToString("D"),
                 ["al_occurredon"] = DateTime.UtcNow,
             };
+
+            if (!string.IsNullOrEmpty(details))
+            {
+                audit["al_details"] = details;
+            }
 
             return service.Create(audit);
         }

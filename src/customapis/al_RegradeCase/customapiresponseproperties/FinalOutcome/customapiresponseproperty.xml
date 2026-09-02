@@ -6,6 +6,6 @@
     <label description="Final outcome" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_RegradeCase.FinalOutcome</name>
+  <name>FinalOutcome</name>
   <type>10</type>
 </customapiresponseproperty>

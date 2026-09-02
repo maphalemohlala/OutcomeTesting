@@ -4,6 +4,7 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
+using System.Text;
 using System.Text.Json;
 
 // Registers OR verifies the CompleteRemediation server-side command (AD-003) using the
@@ -89,6 +90,30 @@ if (args.Length >= 2 && args[0].Equals("addtosolution", StringComparison.Ordinal
 if (args.Length >= 2 && args[0].Equals("grantsecurity", StringComparison.OrdinalIgnoreCase))
 {
     return GrantSecurity(args[1]);
+}
+
+if (args.Length >= 3 && args[0].Equals("registertype", StringComparison.OrdinalIgnoreCase))
+{
+    return RegisterType(args[1], args[2]);
+}
+
+if (args.Length >= 3 && args[0].Equals("restoretablepermissions", StringComparison.OrdinalIgnoreCase))
+{
+    return RestoreTablePermissions(args[1], args[2]);
+}
+
+if (args.Length >= 6 && args[0].Equals("registerstep", StringComparison.OrdinalIgnoreCase))
+{
+    // Stage before filtering attributes: an empty trailing argument is dropped by the
+    // shell, which silently shifted the stage into the attribute list when it was last.
+    int stageArg;
+    if (!int.TryParse(args[5], out stageArg) || (stageArg != 20 && stageArg != 40))
+    {
+        Console.Error.WriteLine("Stage must be 20 (pre-operation) or 40 (post-operation).");
+        return 1;
+    }
+
+    return RegisterStep(args[1], args[2], args[3], args[4], args.Length > 6 ? args[6] : string.Empty, stageArg);
 }
 
 if (args.Length >= 3 && args[0].Equals("seedadmin", StringComparison.OrdinalIgnoreCase))
@@ -403,6 +428,302 @@ int AddToSolution(string orgUrl, string solutionUniqueName)
     Console.WriteLine(
         $"Done. Add the Custom API via 'pac solution import' of src/customapis, then verify '{solutionUniqueName}' in the maker portal.");
     return 0;
+}
+
+// A plug-in registered against a table message has no Custom API, so registerall - which
+// iterates the contracts - never creates its type. This creates one by class name and
+// prints the id, which is what the SdkMessageProcessingStep solution file has to carry.
+int RegisterType(string orgUrl, string typeName)
+{
+    using var svc = Connect(orgUrl);
+
+    var assemblyId = FindId(svc, "pluginassembly", ("name", AssemblyName));
+    if (assemblyId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"Plug-in assembly '{AssemblyName}' is not registered. Push it first.");
+        return 1;
+    }
+
+    var values = new Entity("plugintype")
+    {
+        ["pluginassemblyid"] = new EntityReference("pluginassembly", assemblyId),
+        ["typename"] = typeName,
+        ["friendlyname"] = typeName,
+        ["name"] = typeName,
+    };
+
+    var existing = FindId(svc, "plugintype", ("typename", typeName));
+    Guid id;
+    if (existing == Guid.Empty)
+    {
+        id = svc.Create(values);
+        Console.WriteLine($"created plugintype: {id}");
+    }
+    else
+    {
+        values.Id = existing;
+        svc.Update(values);
+        id = existing;
+        Console.WriteLine($"updated plugintype: {id}");
+    }
+
+    Console.WriteLine($"PluginTypeId={id:D}");
+    return 0;
+}
+
+// Registers a plug-in against a table message. Hand-authoring the solution file instead
+// does not work: pack refuses a step whose plug-in type is absent from the assembly
+// manifest, and the manifest is only correct when it comes from an export (AD-013). So the
+// step is created here and brought back into src by the round trip.
+int RegisterStep(string orgUrl, string typeName, string messageName, string primaryEntity, string filteringAttributes, int stage)
+{
+    using var svc = Connect(orgUrl);
+
+    var pluginTypeId = FindId(svc, "plugintype", ("typename", typeName));
+    if (pluginTypeId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"Plug-in type '{typeName}' is not registered. Run 'registertype' first.");
+        return 1;
+    }
+
+    var messageId = FindId(svc, "sdkmessage", ("name", messageName));
+    if (messageId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"SDK message '{messageName}' was not found.");
+        return 1;
+    }
+
+    // The filter binds the message to one table; without it the step fires for every table
+    // that supports the message.
+    var filter = new QueryExpression("sdkmessagefilter")
+    {
+        ColumnSet = new ColumnSet("sdkmessagefilterid"),
+        TopCount = 1,
+        Criteria = new FilterExpression(),
+    };
+    filter.Criteria.AddCondition("sdkmessageid", ConditionOperator.Equal, messageId);
+    filter.Criteria.AddCondition("primaryobjecttypecode", ConditionOperator.Equal, primaryEntity);
+
+    var filterRows = svc.RetrieveMultiple(filter).Entities;
+    if (filterRows.Count == 0)
+    {
+        Console.Error.WriteLine($"No SDK message filter for {messageName} on {primaryEntity}.");
+        return 1;
+    }
+
+    var stepName = $"{typeName.Split('.').Last()}: {messageName} of {primaryEntity}";
+
+    var values = new Entity("sdkmessageprocessingstep")
+    {
+        ["name"] = stepName,
+        ["plugintypeid"] = new EntityReference("plugintype", pluginTypeId),
+        ["sdkmessageid"] = new EntityReference("sdkmessage", messageId),
+        ["sdkmessagefilterid"] = new EntityReference("sdkmessagefilter", filterRows[0].Id),
+        ["stage"] = new OptionSetValue(stage),
+        ["mode"] = new OptionSetValue(0),            // synchronous, so a refusal reaches the caller
+        ["rank"] = 1,
+        ["supporteddeployment"] = new OptionSetValue(0),
+        ["invocationsource"] = new OptionSetValue(0),
+        ["filteringattributes"] = filteringAttributes,
+    };
+
+    var existing = FindId(svc, "sdkmessageprocessingstep", ("name", stepName));
+    Guid stepId;
+    if (existing == Guid.Empty)
+    {
+        stepId = svc.Create(values);
+        Console.WriteLine($"created sdkmessageprocessingstep: {stepId}");
+    }
+    else
+    {
+        values.Id = existing;
+        svc.Update(values);
+        stepId = existing;
+        Console.WriteLine($"updated sdkmessageprocessingstep: {stepId}");
+    }
+
+    try
+    {
+        svc.Execute(new AddSolutionComponentRequest
+        {
+            ComponentId = stepId,
+            ComponentType = 92,
+            SolutionUniqueName = "OutcomeTesting",
+            AddRequiredComponents = false,
+        });
+        Console.WriteLine("  added to the OutcomeTesting solution.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"  solution membership: {ex.Message.Split('\n')[0].Trim()}");
+    }
+
+    Console.WriteLine($"SdkMessageProcessingStepId={stepId:D}");
+    return 0;
+}
+
+// Creates or updates portal table permissions directly, because `pac pages upload` 2.11.2
+// cannot write adx_entitypermission to an Enhanced data model site - it addresses the
+// legacy table and aborts the whole upload. In the Enhanced model a table permission is a
+// powerpagecomponent of type 18 whose settings live as JSON in `content`, so this writes
+// that row from the same YAML the CLI would have read. Idempotent: the id in the YAML is
+// the component id, so a re-run updates rather than duplicating (AD-059).
+int RestoreTablePermissions(string orgUrl, string sitePath)
+{
+    var folder = Path.Combine(Path.GetFullPath(sitePath), "table-permissions");
+    if (!Directory.Exists(folder))
+    {
+        Console.Error.WriteLine($"No table-permissions folder under {sitePath}.");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var site = new QueryExpression("powerpagesite") { ColumnSet = new ColumnSet("name"), TopCount = 2 };
+    var sites = svc.RetrieveMultiple(site).Entities;
+    if (sites.Count != 1)
+    {
+        Console.Error.WriteLine($"Expected exactly one Power Pages site, found {sites.Count}.");
+        return 1;
+    }
+
+    var siteId = sites[0].Id;
+    Console.WriteLine($"Site: {sites[0].GetAttributeValue<string>("name")} ({siteId:D})");
+
+    // Parents must exist before a child permission can point at one.
+    var files = Directory.GetFiles(folder, "*.tablepermission.yml")
+        .Select(f => new { Path = f, Yaml = ParseFlatYaml(File.ReadAllLines(f)) })
+        .OrderBy(f => f.Yaml.ContainsKey("adx_parententitypermission") ? 1 : 0)
+        .ToArray();
+
+    var written = 0;
+    foreach (var file in files)
+    {
+        var y = file.Yaml;
+        Guid id;
+        if (!y.TryGetValue("adx_entitypermissionid", out var rawId) || !Guid.TryParse(rawId.Scalar, out id))
+        {
+            Console.Error.WriteLine($"  skipped {Path.GetFileName(file.Path)}: no adx_entitypermissionid.");
+            continue;
+        }
+
+        var name = y.TryGetValue("adx_entityname", out var n) ? n.Scalar : Path.GetFileName(file.Path);
+
+        var row = new Entity("powerpagecomponent", id)
+        {
+            ["name"] = name,
+            ["powerpagecomponenttype"] = new OptionSetValue(18),
+            ["content"] = BuildPermissionJson(y),
+            ["powerpagesiteid"] = new EntityReference("powerpagesite", siteId),
+        };
+
+        var exists = svc.RetrieveMultiple(new QueryExpression("powerpagecomponent")
+        {
+            ColumnSet = new ColumnSet(false),
+            TopCount = 1,
+            Criteria =
+            {
+                Conditions = { new ConditionExpression("powerpagecomponentid", ConditionOperator.Equal, id) },
+            },
+        }).Entities.Count > 0;
+
+        if (exists)
+        {
+            svc.Update(row);
+            Console.WriteLine($"  updated {name} ({id:D})");
+        }
+        else
+        {
+            svc.Create(row);
+            Console.WriteLine($"  created {name} ({id:D})");
+        }
+
+        written++;
+    }
+
+    Console.WriteLine($"Done. {written} table permission(s) written.");
+    return 0;
+}
+
+/// <summary>
+/// The settings JSON Dataverse stores for a type-18 component: the YAML keys with the
+/// `adx_` prefix stripped, except the web-role list, which keeps its full name. Absent
+/// keys are omitted rather than emitted null, matching what an export produces.
+/// </summary>
+string BuildPermissionJson(Dictionary<string, YamlValue> y)
+{
+    var sb = new StringBuilder();
+    sb.AppendLine("{");
+
+    var parts = new List<string>();
+    foreach (var key in new[]
+             {
+                 "adx_append", "adx_appendto", "adx_contactrelationship", "adx_create", "adx_delete",
+                 "adx_entitylogicalname", "adx_entityname", "adx_parententitypermission",
+                 "adx_parentrelationship", "adx_read", "adx_scope", "adx_write",
+             })
+    {
+        if (!y.TryGetValue(key, out var value) || value.Scalar == null) continue;
+
+        var jsonKey = key.Substring("adx_".Length);
+        var raw = value.Scalar;
+
+        if (raw == "true" || raw == "false")
+        {
+            parts.Add($"  \"{jsonKey}\": {raw}");
+        }
+        else if (int.TryParse(raw, out var number))
+        {
+            parts.Add($"  \"{jsonKey}\": {number}");
+        }
+        else
+        {
+            parts.Add($"  \"{jsonKey}\": {System.Text.Json.JsonSerializer.Serialize(raw)}");
+        }
+    }
+
+    if (y.TryGetValue("adx_entitypermission_webrole", out var roles) && roles.Items.Count > 0)
+    {
+        var list = string.Join(",\n", roles.Items.Select(r => $"    \"{r}\""));
+        parts.Add("  \"adx_entitypermission_webrole\": [\n" + list + "\n  ]");
+    }
+
+    sb.AppendLine(string.Join(",\n", parts));
+    sb.Append('}');
+    return sb.ToString();
+}
+
+/// <summary>
+/// Enough YAML for these files: flat `key: value` pairs plus one `key:` followed by
+/// `- item` lines. Deliberately not a general parser - anything richer belongs in a real
+/// library, and these files are generated by the CLI in exactly this shape.
+/// </summary>
+Dictionary<string, YamlValue> ParseFlatYaml(string[] lines)
+{
+    var result = new Dictionary<string, YamlValue>(StringComparer.OrdinalIgnoreCase);
+    string listKey = null;
+
+    foreach (var line in lines)
+    {
+        if (string.IsNullOrWhiteSpace(line)) continue;
+
+        if (line.TrimStart().StartsWith("- ") && listKey != null)
+        {
+            result[listKey].Items.Add(line.TrimStart().Substring(2).Trim().Trim('"', '\''));
+            continue;
+        }
+
+        var colon = line.IndexOf(':');
+        if (colon < 0) continue;
+
+        var key = line.Substring(0, colon).Trim();
+        var value = line.Substring(colon + 1).Trim().Trim('"', '\'');
+
+        result[key] = new YamlValue { Scalar = value.Length == 0 ? null : value };
+        listKey = value.Length == 0 ? key : null;
+    }
+
+    return result;
 }
 
 int RegisterAll(string orgUrl, string? dllPathArg)
@@ -947,4 +1268,12 @@ static void GrantTable(
         svc.Execute(new AddPrivilegesRoleRequest { RoleId = roleId, Privileges = wanted.ToArray() });
         Console.WriteLine($"  granted {wanted.Count} privilege(s) on {table}");
     }
+}
+
+/// <summary>One YAML entry: either a scalar or a list of strings, never both.</summary>
+sealed class YamlValue
+{
+    public string Scalar { get; set; }
+
+    public List<string> Items { get; } = new List<string>();
 }

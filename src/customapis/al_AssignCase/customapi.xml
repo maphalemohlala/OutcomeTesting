@@ -1,0 +1,18 @@
+<customapi uniquename="al_AssignCase">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="A team lead or manager allocates a queued case to a named reviewer (BR-003, AD-040). Writes an assignment row, releases the prior one, stamps the review instance in both identity systems and moves the case to Assigned. Enforces command.assign Edit.">
+    <label description="A team lead or manager allocates a queued case to a named reviewer (BR-003, AD-040). Writes an assignment row, releases the prior one, stamps the review instance in both identity systems and moves the case to Assigned. Enforces command.assign Edit." languagecode="1033" />
+  </description>
+  <displayname default="Assign Case">
+    <label description="Assign Case" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_AssignCase</name>
+  <plugintypeid>
+    <plugintypeexportkey>81aadd88-aca6-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

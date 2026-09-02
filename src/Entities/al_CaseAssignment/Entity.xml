@@ -13,6 +13,45 @@
         <Description description="One allocation of a case to a team queue and a named individual, retained as history so reassignment never loses the record (BR-003, BR-012). Allocation is a shared queue with manual manager assignment (OD-002, AD-040)." languagecode="1033" />
       </Descriptions>
       <attributes>
+        <attribute PhysicalName="al_assignedcontactid">
+          <Type>lookup</Type>
+          <Name>al_assignedcontactid</Name>
+          <LogicalName>al_assignedcontactid</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <LookupStyle>single</LookupStyle>
+          <LookupTypes />
+          <displaynames>
+            <displayname description="Assigned contact" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Portal identity of the person this assignment allocated the case to (AD-047). Resolved server-side from the same work email as al_assigneduserid (OD-003, AD-010), so the assignment history records who was allocated in both identity systems without a later join." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_AssignedOn">
           <Type>datetime</Type>
           <Name>al_assignedon</Name>
@@ -91,6 +130,45 @@
           </displaynames>
           <Descriptions>
             <Description description="Name of the shared queue or team the case sits in. A manager then manually assigns the case to a named member (OD-002, AD-040); the assigned-user lookup is the assignment target." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_assigneduserid">
+          <Type>lookup</Type>
+          <Name>al_assigneduserid</Name>
+          <LogicalName>al_assigneduserid</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <LookupStyle>single</LookupStyle>
+          <LookupTypes />
+          <displaynames>
+            <displayname description="Assigned user" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The named individual a manager or team lead allocated this case to (AD-040). Deferred at Wave F under OD-002 and unblocked by the shared-queue decision; al_assignedteam stays as the queue name. A reassignment writes a new row rather than editing this one, so the allocation trail survives (BR-003, BR-012)." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_AssignmentReason">

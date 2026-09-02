@@ -41,39 +41,72 @@ The pushed build is the merged 20-type assembly, a superset of what DEV was runn
 no live type was withdrawn. It was built from the merged source and verified before the
 push: build clean, 142 plug-in tests pass.
 
-## 2. Create the three plug-in types and Custom APIs — NOT RUN, blocked
+## 2. Create the three plug-in types and Custom APIs — DONE 2026-09-02
 
 Re-querying `plugintype` after step 1 returned **17 types, unchanged**. This re-confirms
 AD-052: `pac plugin push` does not create plug-in type rows for classes the environment
 has not seen. The three new classes are in the assembly but have no type row, and without
 a type row there is nothing for a Custom API to bind to.
 
-The registration path is `plugins/deploy/Register-CustomApiFromContract.ps1`, which needs a
-Dataverse Web API bearer token. **This machine has neither the Azure CLI nor `MSAL.PS` /
-`Az.Accounts` installed**, so no token can be obtained from an automated session. The three
-contracts are already present in `plugins/customapi/`; nothing is missing but the token.
-
-To finish, run:
+`plugins/deploy/Register-CustomApiFromContract.ps1` (AD-063) needs a Dataverse Web API
+bearer token, and this machine still has no Azure CLI, `MSAL.PS` or `Az.Accounts` — checked
+again on 2026-09-02. **The blocker was the token, not the registration**, so the run used the
+other contract-driven path the repository already owns:
 
 ```powershell
-$org = 'https://org0b075da8.crm11.dynamics.com'
-$t = az account get-access-token --resource $org --query accessToken -o tsv
-foreach ($c in 'al_UpdateRole','al_SetRoleAssignmentActive','al_SetPermissionRuleActive') {
-    .\plugins\deploy\Register-CustomApiFromContract.ps1 -OrgUrl $org -AccessToken $t `
-        -ContractFile "$c.customapi.json"
-}
+dotnet bin\Debug\net8.0\OutcomeTesting.Registration.dll registerall https://org0b075da8.crm11.dynamics.com
 ```
 
-The script is idempotent, so a partial run is safe to repeat.
+`plugins/OutcomeTesting.Registration` connects with `ServiceClient` interactive OAuth and
+caches its token, so it needs no external token tool. It reads the same
+`plugins/customapi/*.customapi.json` contracts and is idempotent — the run reported
+`updated` for the fifteen commands that already existed and `created` for the three that
+did not:
 
-## 3. AD-013 export-and-replace round trip — NOT RUN, correctly deferred
+| Command | New plug-in type id |
+|---|---|
+| `al_SetPermissionRuleActive` | `7f3fbf12-a7a6-f111-aaac-e4fade069307` |
+| `al_SetRoleAssignmentActive` | `dc0ac518-a7a6-f111-aaac-e4fade069307` |
+| `al_UpdateRole` | `cff85832-a7a6-f111-aaac-e4fade069307` |
 
-This must run **after** step 2, not before. An export reflects what DEV holds; running it
-now would delete `src/customapis/al_UpdateRole/`, `al_SetRoleAssignmentActive/` and
-`al_SetPermissionRuleActive/` from source, silently reverting the merge.
+`registerall` also upserts the assembly, which step 1 had already pushed, so the same bits
+were re-uploaded rather than a different build landing. **Result: DEV holds 18 Custom APIs.**
 
-This round trip is the open half of OD-026 and the authoritative fix for the assembly
-manifest, which `992cdf8` had to resolve by hand — see AD-062.
+**A trap this run exposed.** `src/customapis/*/customapi.xml` carried `plugintypeexportkey`
+values from the environment where AD-045 was first deployed — the very ids AD-052 removed
+from DEV as orphans on 2026-08-29. Left alone, the solution import would have bound each
+Custom API to a plug-in type id that no longer exists. The three keys were corrected to the
+ids above before packing. **Anything that re-creates a plug-in type invalidates the
+committed export key**, and neither the pack nor the import says so.
+
+## 3. AD-013 export-and-replace round trip — DONE 2026-09-02
+
+`registerall` creates components in the **default** solution, so the three commands existed
+but were not solution members. A Custom-API-only package was packed from a staging folder
+holding just `customapis/al_UpdateRole`, `al_SetRoleAssignmentActive`,
+`al_SetPermissionRuleActive` plus `Other/` with `<RootComponents />` emptied and an empty
+`Relationships.xml`. An unmanaged import merges, so this added the three Custom APIs to
+`OutcomeTesting` and touched nothing else — the alternative, packing the whole of `src`,
+would have pushed every pending local change to DEV in the same operation.
+
+Then export, unpack, and copy back over `src` (`customapis`, `PluginAssemblies`, `Entities`,
+`Roles`, `Other/Solution.xml`, `Other/Customizations.xml`, `Other/Relationships*`,
+`SdkMessageProcessingSteps`). Never `CanvasApps` (AD-012).
+
+Verified from the export, not inferred:
+
+- `customapis/` holds **18** folders, the three new ones among them.
+- The plug-in assembly manifest declares **20** plug-in types, matching what the assembly
+  builds. This **closes the open half of OD-026** — the manifest no longer under-declares.
+- `pac solution pack --folder src` succeeds, warning only about `CanvasApps`, which AD-012
+  excludes on purpose.
+
+`SdkMessageProcessingSteps/` is new to `src` in this round trip. It is what DEV holds — the
+`al_response` steps behind AD-053 — and AD-013 says commit what Dataverse emits rather than
+deciding which components deserve to be in source.
+
+The staging step matters for the import, not the round trip: `src/PluginAssemblies/` still
+holds a committed DLL, so anything packing the whole of `src` must strip it first (AD-062).
 
 ## Tooling corrections found during this run
 
@@ -93,5 +126,5 @@ Both cost time and both contradict what the existing runbooks imply.
 | Step | Run by | Date | Outcome |
 |---|---|---|---|
 | 1. Push merged assembly | Delivery (automated) | 2026-09-01 | Pass |
-| 2. Register 3 types + 3 Custom APIs | _(unassigned)_ | | Blocked — needs a bearer token |
-| 3. AD-013 round trip | _(unassigned)_ | | Deferred until step 2 completes |
+| 2. Register 3 types + 3 Custom APIs | Delivery (automated) | 2026-09-02 | Pass — 18 Custom APIs in DEV |
+| 3. AD-013 round trip | Delivery (automated) | 2026-09-02 | Pass — 18 APIs and 20 plug-in types in the export; `src` packs clean |

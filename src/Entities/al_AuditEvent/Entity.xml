@@ -257,16 +257,6 @@
                   <label description="CreateUser" languagecode="1033" />
                 </labels>
               </option>
-              <option value="120910786" IsHidden="0">
-                <labels>
-                  <label description="UpdateUser" languagecode="1033" />
-                </labels>
-              </option>
-              <option value="120910787" IsHidden="0">
-                <labels>
-                  <label description="SetUserActive" languagecode="1033" />
-                </labels>
-              </option>
               <option value="120910788" IsHidden="0">
                 <labels>
                   <label description="SetRoleAssignmentActive" languagecode="1033" />
@@ -277,9 +267,19 @@
                   <label description="SetPermissionRuleActive" languagecode="1033" />
                 </labels>
               </option>
+              <option value="120910786" IsHidden="0">
+                <labels>
+                  <label description="UpdateUser" languagecode="1033" />
+                </labels>
+              </option>
               <option value="120910790" IsHidden="0">
                 <labels>
                   <label description="UpdateRole" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910787" IsHidden="0">
+                <labels>
+                  <label description="SetUserActive" languagecode="1033" />
                 </labels>
               </option>
             </options>

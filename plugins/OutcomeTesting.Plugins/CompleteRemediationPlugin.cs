@@ -27,6 +27,7 @@ namespace OutcomeTesting.Plugins
         private const string ActionEntity = "al_remediationaction";
         private const string ActionStatus = "al_actionstatus";
         private const string ActionCompletedOn = "al_completedon";
+        private const string ActionAdviserResponse = "al_adviserresponse";
         private const int StatusOpen = 120910600;
         private const int StatusInProgress = 120910601;
         private const int StatusCompleted = 120910602;
@@ -59,20 +60,74 @@ namespace OutcomeTesting.Plugins
             var idempotencyKey = GetRequiredString(context, InIdempotencyKey);
             var expectedRowVersion = GetOptionalString(context, InExpectedRowVersion);
 
+            var result = Complete(
+                service,
+                targetId,
+                idempotencyKey,
+                expectedRowVersion,
+                context.InitiatingUserId,
+                context.CorrelationId,
+                requireCallerOwnsAction: true,
+                details: null);
+
+            SetResponse(context, result.Status, result.AuditEventId, result.Conflict);
+        }
+
+        /// <summary>The outcome of a completion, in the shape the Custom API responds with.</summary>
+        public sealed class CompleteResult
+        {
+            public string Status { get; set; }
+
+            public Guid AuditEventId { get; set; }
+
+            public bool Conflict { get; set; }
+        }
+
+        /// <summary>
+        /// The whole completion (BR-006, BR-008, FR-020..FR-023), shared by the
+        /// <c>al_CompleteRemediation</c> Custom API and the portal's update-triggered path.
+        ///
+        /// <paramref name="requireCallerOwnsAction"/> is false for the portal, for the
+        /// reason AD-053 gives: Power Pages Web API writes arrive under the site's
+        /// application user, so the caller is never the adviser and an owner check there
+        /// would enforce nothing. The boundary for that path is the Contact-scoped
+        /// <c>Remediation Action - assigned to me</c> table permission (AD-069).
+        ///
+        /// BR-008 needs the adviser to say what they did, so a completion with no recorded
+        /// response is refused here rather than in the page — a blank response would reach
+        /// the T&amp;C Manager as an action to attest to with nothing to read.
+        /// </summary>
+        public static CompleteResult Complete(
+            IOrganizationService service,
+            Guid targetId,
+            string idempotencyKey,
+            string expectedRowVersion,
+            Guid actorId,
+            Guid correlationId,
+            bool requireCallerOwnsAction,
+            string details)
+        {
             // Idempotency: a replay with the same key is a success no-op (NFR-REL-01).
             var existingAudit = FindAuditByKey(service, idempotencyKey);
             if (existingAudit != null)
             {
-                SetResponse(context, StatusName(StatusCompleted), existingAudit.Id, false);
-                return;
+                return new CompleteResult
+                {
+                    Status = StatusName(StatusCompleted),
+                    AuditEventId = existingAudit.Id,
+                    Conflict = false,
+                };
             }
 
             var action = service.Retrieve(
                 ActionEntity,
                 targetId,
-                new ColumnSet(ActionStatus, "ownerid"));
+                new ColumnSet(ActionStatus, "ownerid", ActionAdviserResponse));
 
-            EnsureCaller(service, context, action);
+            if (requireCallerOwnsAction)
+            {
+                EnsureCaller(service, actorId, action);
+            }
 
             var status = action.GetAttributeValue<OptionSetValue>(ActionStatus);
             var currentStatus = status != null ? status.Value : -1;
@@ -80,15 +135,25 @@ namespace OutcomeTesting.Plugins
             // Already complete: idempotent success without a second write (BR-007 immutability).
             if (currentStatus == StatusCompleted)
             {
-                var replayAudit = WriteAuditEvent(service, targetId, idempotencyKey, context);
-                SetResponse(context, StatusName(StatusCompleted), replayAudit, false);
-                return;
+                var replayAudit = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details);
+                return new CompleteResult
+                {
+                    Status = StatusName(StatusCompleted),
+                    AuditEventId = replayAudit,
+                    Conflict = false,
+                };
             }
 
             if (currentStatus != StatusOpen && currentStatus != StatusInProgress)
             {
                 throw new InvalidPluginExecutionException(
                     PreconditionPrefix + "A remediation action can only be completed from Open or In progress.");
+            }
+
+            if (string.IsNullOrWhiteSpace(action.GetAttributeValue<string>(ActionAdviserResponse)))
+            {
+                throw new InvalidPluginExecutionException(
+                    PreconditionPrefix + "Record what you did about this action before marking it complete.");
             }
 
             var update = new Entity(ActionEntity, targetId)
@@ -127,8 +192,14 @@ namespace OutcomeTesting.Plugins
                 service.Update(update);
             }
 
-            var auditId = WriteAuditEvent(service, targetId, idempotencyKey, context);
-            SetResponse(context, StatusName(StatusCompleted), auditId, false);
+            var auditId = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details);
+
+            return new CompleteResult
+            {
+                Status = StatusName(StatusCompleted),
+                AuditEventId = auditId,
+                Conflict = false,
+            };
         }
 
         private static bool IsConcurrencyFault(System.ServiceModel.FaultException<OrganizationServiceFault> fault)
@@ -145,7 +216,7 @@ namespace OutcomeTesting.Plugins
                 || message.IndexOf("concurrency", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private static void EnsureCaller(IOrganizationService service, IPluginExecutionContext context, Entity action)
+        private static void EnsureCaller(IOrganizationService service, Guid callerId, Entity action)
         {
             var owner = action.GetAttributeValue<EntityReference>("ownerid");
 
@@ -166,7 +237,7 @@ namespace OutcomeTesting.Plugins
 
             if (owner.LogicalName == "systemuser")
             {
-                if (owner.Id != context.InitiatingUserId)
+                if (owner.Id != callerId)
                 {
                     throw new InvalidPluginExecutionException(
                         UnauthorizedPrefix + "Only the adviser who owns this remediation action can complete it.");
@@ -176,7 +247,7 @@ namespace OutcomeTesting.Plugins
 
             if (owner.LogicalName == "team")
             {
-                if (!IsTeamMember(service, owner.Id, context.InitiatingUserId))
+                if (!IsTeamMember(service, owner.Id, callerId))
                 {
                     throw new InvalidPluginExecutionException(
                         UnauthorizedPrefix + "Only a member of the team that owns this remediation action can complete it.");
@@ -225,7 +296,9 @@ namespace OutcomeTesting.Plugins
             IOrganizationService service,
             Guid targetId,
             string idempotencyKey,
-            IPluginExecutionContext context)
+            Guid actorId,
+            Guid correlationId,
+            string details)
         {
             var audit = new Entity(AuditEntity)
             {
@@ -233,11 +306,16 @@ namespace OutcomeTesting.Plugins
                 ["al_command"] = new OptionSetValue(CommandCompleteRemediation),
                 ["al_targettable"] = ActionEntity,
                 ["al_targetid"] = targetId.ToString("D"),
-                ["al_actorid"] = context.InitiatingUserId.ToString("D"),
+                ["al_actorid"] = actorId.ToString("D"),
                 ["al_idempotencykey"] = idempotencyKey,
-                ["al_correlationid"] = context.CorrelationId.ToString("D"),
+                ["al_correlationid"] = correlationId.ToString("D"),
                 ["al_occurredon"] = DateTime.UtcNow,
             };
+
+            if (!string.IsNullOrEmpty(details))
+            {
+                audit["al_details"] = details;
+            }
 
             return service.Create(audit);
         }

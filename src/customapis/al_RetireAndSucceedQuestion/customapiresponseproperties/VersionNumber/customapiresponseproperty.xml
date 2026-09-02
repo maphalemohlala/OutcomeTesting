@@ -6,6 +6,6 @@
     <label description="Version number" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_RetireAndSucceedQuestion.VersionNumber</name>
+  <name>VersionNumber</name>
   <type>10</type>
 </customapiresponseproperty>

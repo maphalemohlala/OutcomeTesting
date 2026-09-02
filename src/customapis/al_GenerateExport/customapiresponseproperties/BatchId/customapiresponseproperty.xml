@@ -6,6 +6,6 @@
     <label description="Batch id" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_GenerateExport.BatchId</name>
+  <name>BatchId</name>
   <type>10</type>
 </customapiresponseproperty>

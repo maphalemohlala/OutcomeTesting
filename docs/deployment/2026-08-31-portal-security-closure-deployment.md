@@ -134,7 +134,69 @@ $pac = Join-Path $env:USERPROFILE ".dotnet\tools\pac.exe"
 `--modelVersion` takes `Enhanced` or `Standard` on PAC CLI 2.11.2; the `--modelVersion 2`
 form in the build guide is not valid syntax.
 
-**Result:** _(not run)_
+**Result: RUN 2026-09-02 — succeeded on the third attempt, with a CLI defect worked around.**
+
+The site is uploaded. All 10 web roles, 11 table permissions, 6 page access control rules,
+56 site settings, 47 web templates and 24 web pages are in DEV, and both gates pass against
+the source that produced them.
+
+**The defect: `pac pages upload` 2.11.2 cannot write `adx_entitypermission` to an Enhanced
+data model site.** Partway through it abandons the `powerpagecomponent` path and addresses
+the legacy `adx_entitypermission` table, which does not exist here, and the whole upload
+aborts:
+
+> Upload failed for file 'adx_entitypermission' (record a1000000-…-000000000071): the
+> target entity was not found. … The entity with a name = 'adx_entitypermission' … was not
+> found in the MetadataCache.
+
+The message blames `--modelVersion`, which is a red herring — `Enhanced` is correct and
+every other component type wrote successfully as a `powerpagecomponent`. It failed on a
+different permission each run (`…072`, then `…071`), so it is not one bad record.
+
+**Why it matters more than it looks.** The abort happens *before* the web templates, so a
+run that reports failure has still silently changed site settings and permissions while
+leaving every page at its old content. The first attempt here did exactly that: the write
+permission and the two new Web API site settings landed, and the review page kept posting
+to a cloud flow that does not exist. **Check what actually landed before re-running; do not
+assume a failed upload changed nothing.**
+
+**Workaround, and why it is safe.** Move `table-permissions/` out of the site folder, run
+the upload, move it back — **and never with `--forceUploadAll`**. A plain
+`pac pages upload` is additive (see point 1 above), so files that are absent are not
+deleted from DEV. `--forceUploadAll` is **not** additive: it reconciles, and it deletes
+site components that are missing from the source folder. Combining the two on 2026-09-02
+wiped nine of the eleven table permissions from DEV, which presented as
+`Liquid error: Invalid cast from 'System.Int32' to 'System.Linq.Enumerable+...'` on every
+navigation page — templates querying tables the signed-in user could no longer read. It is
+fail-closed, so it is an outage rather than an exposure, but it takes the site down.
+
+**Deploy table permissions with the console, not the CLI.** `pac pages upload` cannot
+*create* a table permission on an Enhanced data model site at all — it addresses the legacy
+`adx_entitypermission` table and aborts the whole upload. Three separate attempts restored
+nothing. Use instead, from `plugins/OutcomeTesting.Registration`:
+
+```powershell
+dotnet bin\Debug\net8.0\OutcomeTesting.Registration.dll `
+    restoretablepermissions https://org0b075da8.crm11.dynamics.com `
+    ..\..\powerpages\outcome-testing---outcometesting
+```
+
+It reads the same `*.tablepermission.yml` and writes `powerpagecomponent` rows directly:
+type 18, settings as JSON in `content`, site resolved from the single `powerpagesite`, and
+the component id taken from `adx_entitypermissionid` so re-running updates rather than
+duplicating (AD-059). Parentless permissions are written before children. This is now the
+only reliable way to get table permissions into any environment, including TEST and PROD.
+
+Two non-fatal errors also appear and can be ignored; both name records that no longer
+exist and neither stops the upload:
+
+- `Could not delete powerpagecomponent record 'fc16bce0-…'` — concurrent delete conflict.
+- `Updating … record ID:5140384b-… FAILED … Does Not Exist`.
+
+**Verification is a `-Raw` string match, not `Select-String`.** The `content` column of a
+`powerpagecomponent` holds the whole template on one logical line, so a line-oriented
+`Select-String` reports 0 matches for text that is demonstrably present. Read the file with
+`-Raw` and use `.Contains()`.
 
 ### Rollback — if the upload leaves users locked out
 

@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="ReviewInstanceId">
+  <description default="Id of the review instance that was allocated.">
+    <label description="Id of the review instance that was allocated." languagecode="1033" />
+  </description>
+  <displayname default="Review instance id">
+    <label description="Review instance id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_AssignCase.ReviewInstanceId</name>
+  <type>10</type>
+</customapiresponseproperty>

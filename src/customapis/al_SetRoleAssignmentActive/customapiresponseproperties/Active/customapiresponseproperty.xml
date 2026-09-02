@@ -6,6 +6,6 @@
     <label description="Active" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_SetRoleAssignmentActive.Active</name>
+  <name>Active</name>
   <type>0</type>
 </customapiresponseproperty>

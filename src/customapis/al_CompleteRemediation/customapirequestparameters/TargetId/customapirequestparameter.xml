@@ -7,6 +7,6 @@
   </displayname>
   <iscustomizable>1</iscustomizable>
   <isoptional>0</isoptional>
-  <name>al_CompleteRemediation.TargetId</name>
+  <name>TargetId</name>
   <type>10</type>
 </customapirequestparameter>

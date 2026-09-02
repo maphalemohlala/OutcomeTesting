@@ -6,6 +6,6 @@
     <label description="Case id" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_UpdateCaseDetails.CaseId</name>
+  <name>CaseId</name>
   <type>10</type>
 </customapiresponseproperty>

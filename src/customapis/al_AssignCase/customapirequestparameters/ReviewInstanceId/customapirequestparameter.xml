@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="ReviewInstanceId">
+  <description default="Which check to allocate. Omit to take the earliest unsubmitted check by sequence, which is the Tax leg then the AQS leg on a Tax-then-AQS route (BR-004).">
+    <label description="Which check to allocate. Omit to take the earliest unsubmitted check by sequence, which is the Tax leg then the AQS leg on a Tax-then-AQS route (BR-004)." languagecode="1033" />
+  </description>
+  <displayname default="Review instance id">
+    <label description="Review instance id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>al_AssignCase.ReviewInstanceId</name>
+  <type>10</type>
+</customapirequestparameter>

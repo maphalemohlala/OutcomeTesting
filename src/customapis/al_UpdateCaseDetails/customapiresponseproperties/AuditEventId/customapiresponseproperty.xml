@@ -6,6 +6,6 @@
     <label description="Audit event id" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_UpdateCaseDetails.AuditEventId</name>
+  <name>AuditEventId</name>
   <type>10</type>
 </customapiresponseproperty>

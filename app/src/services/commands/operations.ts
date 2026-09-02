@@ -5,6 +5,7 @@
  * it and the command fails before it reaches Dataverse. operations.test.ts enforces this.
  */
 export const COMMAND_OPERATIONS = [
+  'al_AssignCase',
   'al_AssignUserRole',
   'al_CompleteRemediation',
   'al_CreateExportBatch',

@@ -180,6 +180,10 @@ export function CaseDetailPage() {
 
                     <CaseOutcomeSummary caseId={state.detail.id} />
 
+                    <section className="case-detail__related" aria-label="Allocation">
+                      <Link to={`/cases/${state.detail.id}/allocation`}>Allocation →</Link>
+                    </section>
+
                     <PermissionGate resource="page.remediation">
                       <section className="case-detail__related" aria-label="Related records">
                         <Link to={`/cases/${state.detail.id}/remediation`}>

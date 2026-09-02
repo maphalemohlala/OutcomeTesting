@@ -6,6 +6,6 @@
     <label description="Status" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_CreateUser.Status</name>
+  <name>Status</name>
   <type>10</type>
 </customapiresponseproperty>

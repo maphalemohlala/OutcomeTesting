@@ -7,6 +7,6 @@
   </displayname>
   <iscustomizable>1</iscustomizable>
   <isoptional>1</isoptional>
-  <name>al_UpdateCaseDetails.Priority</name>
+  <name>Priority</name>
   <type>10</type>
 </customapirequestparameter>

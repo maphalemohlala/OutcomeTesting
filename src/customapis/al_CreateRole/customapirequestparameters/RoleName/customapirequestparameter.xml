@@ -7,6 +7,6 @@
   </displayname>
   <iscustomizable>1</iscustomizable>
   <isoptional>0</isoptional>
-  <name>al_CreateRole.RoleName</name>
+  <name>RoleName</name>
   <type>10</type>
 </customapirequestparameter>

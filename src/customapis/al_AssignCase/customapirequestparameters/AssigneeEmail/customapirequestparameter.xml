@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="AssigneeEmail">
+  <description default="Work email of the reviewer (OD-003, AD-010). Resolves both the systemuser and the portal contact; the command refuses if either is missing.">
+    <label description="Work email of the reviewer (OD-003, AD-010). Resolves both the systemuser and the portal contact; the command refuses if either is missing." languagecode="1033" />
+  </description>
+  <displayname default="Assignee work email">
+    <label description="Assignee work email" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_AssignCase.AssigneeEmail</name>
+  <type>10</type>
+</customapirequestparameter>

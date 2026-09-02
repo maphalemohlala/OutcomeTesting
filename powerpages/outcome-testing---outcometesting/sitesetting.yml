@@ -105,7 +105,31 @@
   adx_name: Webapi/al_response/fields
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a2
   adx_value: al_answertext,al_answerchoice,al_answerchoices,al_answerdate
-- adx_description: "Trigger id of the \"Submit Review\" cloud flow for THIS environment, taken from the flow's Power Pages trigger URL (the guid after /trigger/). Environment specific: the flow must be registered against each site separately, so DEV, TEST and PROD each carry their own value. Leave empty until the flow exists; the review page then shows \"submitting is not configured\" rather than failing."
+- adx_description: "Exposes al_signoff to the portal Web API so a T&C Manager can attest to a completed remediation (PP-12, FR-023, BR-008). Sign-off is a create, which the Web API does support, so this needs no trigger column - and a separate table means create can be bound to the T&C Supervisor role alone."
+  adx_name: Webapi/al_signoff/enabled
+  adx_sitesettingid: a1000000-0000-4000-8000-0000000000a7
+  adx_value: 'true'
+- adx_description: "Allowlist of columns the browser may write on al_signoff. The decision, the notes and the action it relates to. The name, business code, case and timestamp are stamped by SignoffGuardPlugin, so the browser cannot choose a key or backdate a sign-off."
+  adx_name: Webapi/al_signoff/fields
+  adx_sitesettingid: a1000000-0000-4000-8000-0000000000a8
+  adx_value: al_signoffdecision,al_notes,al_remediationactionid
+- adx_description: "Exposes al_remediationaction to the portal Web API so an adviser can record their response and ask for the action to be completed (PP-12, AD-045). Paired with a three-column allowlist; CompleteRequestPlugin does the rest."
+  adx_name: Webapi/al_remediationaction/enabled
+  adx_sitesettingid: a1000000-0000-4000-8000-0000000000a5
+  adx_value: 'true'
+- adx_description: "Allowlist of columns the browser may write on al_remediationaction. The adviser's own words, the Intelligent Office reference (PP-14) and the completion trigger. Status and completed-on stay off the list so the plug-in remains the sole authority over the transition."
+  adx_name: Webapi/al_remediationaction/fields
+  adx_sitesettingid: a1000000-0000-4000-8000-0000000000a6
+  adx_value: al_adviserresponse,al_evidencereference,al_completerequested
+- adx_description: "Exposes al_reviewinstance to the portal Web API so the review page can request a submission. Paired with a one-column allowlist: the only writable column is al_submitrequested, which SubmitRequestPlugin reads. A Custom API cannot be called from a page and this replaces the cloud flow that used to bridge that gap."
+  adx_name: Webapi/al_reviewinstance/enabled
+  adx_sitesettingid: a1000000-0000-4000-8000-0000000000a3
+  adx_value: 'true'
+- adx_description: "Allowlist of columns the browser may write on al_reviewinstance. Deliberately the submit trigger alone: status, submitted-on and the assigned contact stay off the list so the plug-in remains the sole authority over what submission actually does."
+  adx_name: Webapi/al_reviewinstance/fields
+  adx_sitesettingid: a1000000-0000-4000-8000-0000000000a4
+  adx_value: al_submitrequested
+- adx_description: "Trigger id of the \"Submit Review\" cloud flow for THIS environment, taken from the flow's Power Pages trigger URL (the guid after /trigger/). SUPERSEDED: submission no longer goes through Power Automate. The review page writes al_submitrequested over the Web API and SubmitRequestPlugin does the work, so this setting is unused and stays empty. Kept rather than deleted because deleting a site setting is not what an upload does."
   adx_name: OutcomeTesting/Flow/SubmitReview
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a0
   adx_value: ''

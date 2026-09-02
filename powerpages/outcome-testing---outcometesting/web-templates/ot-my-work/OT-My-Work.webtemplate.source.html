@@ -3,17 +3,37 @@
 {% comment %}
   My Work dashboard (PP-03).
 
-  SHELL STAGE: counts and rows are unfiltered. Per-user filtering needs
-  al_assignedcontactid, which arrives with the Phase 2 schema delta (AD-047),
-  and status/route filters need the option-set values. Both are deliberately
-  absent here rather than faked, so nothing on this page implies an
-  assignment filter that is not yet enforced.
+  Scoped to the signed-in contact through al_ReviewInstance.al_assignedcontactid and
+  al_RemediationAction.al_assignedcontactid (AD-047, AD-050). Those lookups landed with
+  the Phase 2 schema delta, so the shell-stage note this page used to carry is gone.
+
+  Scoping here is presentation, never a boundary. Under OD-022 every authenticated user
+  may read every case, and the write boundary is the Contact-anchored table permission
+  chain (AD-056, AD-069) - not this filter. What the filter buys is a worklist that shows
+  the reviewer their own work instead of the whole environment.
 {% endcomment %}
+
+{% comment %}
+  user is null for an anonymous visitor. Home carries a Restrict Read rule (AD-068) so a
+  signed-out request should never reach this page, but an unguarded {{ user.id }} would
+  emit an empty condition value and silently count every row in the table - the exact
+  over-report this page exists to stop. Fail closed instead.
+{% endcomment %}
+{% if user == null %}
+  {% include 'OT Empty State' title: 'Sign in to see your work' message: 'This page shows the reviews and remediation actions assigned to you.' %}
+{% else %}
+
+{% assign me = user.id %}
 
 {% fetchxml case_count %}
 <fetch aggregate="true">
   <entity name="al_outcomecase">
-    <attribute name="al_outcomecaseid" alias="total" aggregate="count" />
+    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
+    <link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="rv">
+      <filter type="and">
+        <condition attribute="al_assignedcontactid" operator="eq" value="{{ me | xml_escape }}" />
+      </filter>
+    </link-entity>
   </entity>
 </fetch>
 {% endfetchxml %}
@@ -22,6 +42,10 @@
 <fetch aggregate="true">
   <entity name="al_reviewinstance">
     <attribute name="al_reviewinstanceid" alias="total" aggregate="count" />
+    <filter type="and">
+      <condition attribute="al_assignedcontactid" operator="eq" value="{{ me | xml_escape }}" />
+      <condition attribute="al_submittedon" operator="null" />
+    </filter>
   </entity>
 </fetch>
 {% endfetchxml %}
@@ -30,21 +54,38 @@
 <fetch aggregate="true">
   <entity name="al_remediationaction">
     <attribute name="al_remediationactionid" alias="total" aggregate="count" />
+    <filter type="and">
+      <condition attribute="al_assignedcontactid" operator="eq" value="{{ me | xml_escape }}" />
+      <condition attribute="al_actionstatus" operator="ne" value="120910602" />
+    </filter>
   </entity>
 </fetch>
 {% endfetchxml %}
 
-{% fetchxml recent_cases %}
+{% comment %}
+  The list is the reviews assigned to this contact and not yet submitted, ordered by the
+  case due date so the most pressing sits first. A submitted review is finished work and
+  belongs on the review list, not on a to-do.
+{% endcomment %}
+{% fetchxml my_reviews %}
 <fetch top="10">
-  <entity name="al_outcomecase">
-    <attribute name="al_outcomecaseid" />
-    <attribute name="al_casereference" />
-    <attribute name="al_clientname" />
-    <attribute name="al_advisername" />
-    <attribute name="al_casestatus" />
-    <attribute name="al_priority" />
-    <attribute name="al_duedate" />
-    <order attribute="al_duedate" descending="false" />
+  <entity name="al_reviewinstance">
+    <attribute name="al_reviewinstanceid" />
+    <attribute name="al_reviewtype" />
+    <attribute name="al_reviewstatus" />
+    <attribute name="al_startedon" />
+    <filter type="and">
+      <condition attribute="al_assignedcontactid" operator="eq" value="{{ me | xml_escape }}" />
+      <condition attribute="al_submittedon" operator="null" />
+    </filter>
+    <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="case">
+      <attribute name="al_outcomecaseid" />
+      <attribute name="al_casereference" />
+      <attribute name="al_clientname" />
+      <attribute name="al_advisername" />
+      <attribute name="al_duedate" />
+      <order attribute="al_duedate" descending="false" />
+    </link-entity>
   </entity>
 </fetch>
 {% endfetchxml %}
@@ -72,70 +113,65 @@
   {% assign total_remediations = remediation_count.results.entities[0].total %}
 {% endif %}
 
-<div class="ot-notice" role="status">
-  <strong>Shell stage.</strong> These figures cover all cases in the environment, not
-  only work assigned to you. Assignment filtering and role-based access arrive with
-  the Phase&nbsp;2 security build.
-</div>
-
 <ul class="ot-tiles">
   <li>
     <a class="ot-tile" href="/cases">
       <span class="ot-tile__count">{{ total_cases }}</span>
-      <span class="ot-tile__label">Cases</span>
+      <span class="ot-tile__label">My cases</span>
     </a>
   </li>
   <li>
     <a class="ot-tile" href="/tax-reviews">
       <span class="ot-tile__count">{{ total_reviews }}</span>
-      <span class="ot-tile__label">Review instances</span>
+      <span class="ot-tile__label">Reviews to complete</span>
     </a>
   </li>
   <li>
     <a class="ot-tile ot-tile--alert" href="/remediation">
       <span class="ot-tile__count">{{ total_remediations }}</span>
-      <span class="ot-tile__label">Remediation actions</span>
+      <span class="ot-tile__label">Open remediation actions</span>
     </a>
   </li>
 </ul>
 
 <section class="ot-card" aria-labelledby="ot-recent-heading">
-  <h2 class="ot-card__title" id="ot-recent-heading">Cases by due date</h2>
+  <h2 class="ot-card__title" id="ot-recent-heading">Reviews assigned to you</h2>
 
-  {% if recent_cases.results.entities.size > 0 %}
+  {% if my_reviews.results.entities.size > 0 %}
     <div class="ot-table-wrap">
       <table class="ot-table">
-        <caption>The ten cases with the earliest due dates.</caption>
+        <caption>Your ten most pressing open reviews, by case due date.</caption>
         <thead>
           <tr>
             <th scope="col">Case reference</th>
+            <th scope="col">Check</th>
             <th scope="col">Client</th>
             <th scope="col">Adviser</th>
             <th scope="col">Status</th>
-            <th scope="col">Priority</th>
             <th scope="col">Due</th>
           </tr>
         </thead>
         <tbody>
-          {% for c in recent_cases.results.entities %}
+          {% for r in my_reviews.results.entities %}
             <tr>
               <td>
-                <a href="/case-details?id={{ c.al_outcomecaseid }}">
-                  {{ c.al_casereference | default: 'Untitled case' | escape }}
+                <a href="/review?id={{ r.al_reviewinstanceid }}">
+                  {{ r['case.al_casereference'] | default: 'Untitled case' | escape }}
                 </a>
               </td>
-              <td>{{ c.al_clientname | escape }}</td>
-              <td>{{ c.al_advisername | escape }}</td>
-              <td>{% include 'OT Status Badge' status: c.al_casestatus.label %}</td>
-              <td>{{ c.al_priority.label | escape }}</td>
-              <td>{{ c.al_duedate | date: 'dd MMM yyyy' }}</td>
+              <td>{{ r.al_reviewtype.label | escape }}</td>
+              <td>{{ r['case.al_clientname'] | escape }}</td>
+              <td>{{ r['case.al_advisername'] | escape }}</td>
+              <td>{% include 'OT Status Badge' status: r.al_reviewstatus.label %}</td>
+              <td>{{ r['case.al_duedate'] | date: 'dd MMM yyyy' }}</td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   {% else %}
-    {% include 'OT Empty State' title: 'No cases yet' message: 'Cases appear here once an Intelligent Office extract has been imported.' %}
+    {% include 'OT Empty State' title: 'Nothing assigned to you' message: 'Reviews appear here once a team lead allocates one to you.' %}
   {% endif %}
 </section>
+{% endif %}
 {% endblock %}
