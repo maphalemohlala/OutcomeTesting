@@ -7,8 +7,13 @@
   Tax and AQS tables, so both pages share this template.
 {% endcomment %}
 
+{% comment %}
+  `integer` is the only safe coercion here. `times: 1` repeats a string rather than
+  converting it, so page_number became a string collection and the comparison below
+  threw. `default` cannot rescue that - it only substitutes null.
+{% endcomment %}
 {% assign page_size = 25 %}
-{% assign page_number = request.params['page'] | default: 1 | times: 1 %}
+{% assign page_number = request.params['page'] | integer | default: 1 %}
 {% if page_number < 1 %}{% assign page_number = 1 %}{% endif %}
 
 {% fetchxml reviews %}
