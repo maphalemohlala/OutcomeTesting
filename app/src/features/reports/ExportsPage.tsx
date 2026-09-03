@@ -1,9 +1,13 @@
 import { useMemo, useState } from 'react';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
-import { useExports } from './useExports';
+import { ExportMenu } from '../../components/export/ExportMenu';
+import { useExports, type ExportRecordRow } from './useExports';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { createExportBatch, generateExport } from '../../services/commands/exports';
+import { TRAIL_LIGHT_HEADERS, trailLightRow } from './trailLight';
+import { buildFullExtract, EXTRACT_ROW_LIMIT } from './fullExtract';
+import { downloadWorkbook, stampedFilename } from '../../lib/tabular';
 import './ExportsPage.css';
 
 type Notice = { tone: 'ok' | 'error'; message: string } | null;
@@ -70,6 +74,48 @@ export function ExportsPage() {
   const batchesFiltered = batchStatus !== '' || batchFrom !== '' || batchTo !== '';
   const recordsFiltered = recordSearch.trim() !== '' || recordGrade !== '';
 
+  const recordsByBatch = useMemo(() => {
+    const grouped = new Map<string, ExportRecordRow[]>();
+    for (const record of records) {
+      if (!record.batchId) continue;
+      grouped.set(record.batchId, [...(grouped.get(record.batchId) ?? []), record]);
+    }
+    return grouped;
+  }, [records]);
+
+  async function onFullExtract() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const extract = await buildFullExtract();
+      if (extract.sheets.length === 0) {
+        setNotice({ tone: 'error', message: 'No data in this system is readable by you.' });
+        return;
+      }
+      downloadWorkbook(stampedFilename('outcome-testing-full-extract', 'xlsx'), extract.sheets);
+
+      const caveats = [
+        extract.unavailable.length > 0
+          ? `not readable by you: ${extract.unavailable.join(', ')}`
+          : '',
+        extract.truncated.length > 0
+          ? `capped at ${EXTRACT_ROW_LIMIT} rows: ${extract.truncated.join(', ')}`
+          : '',
+      ].filter(Boolean);
+
+      setNotice({
+        tone: caveats.length > 0 ? 'error' : 'ok',
+        message:
+          `Downloaded ${extract.sheets.length} sheet(s).` +
+          (caveats.length > 0 ? ` Left out or shortened — ${caveats.join('; ')}.` : ''),
+      });
+    } catch {
+      setNotice({ tone: 'error', message: 'The full data extract could not be produced.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onCreateBatch() {
     setBusy(true);
     setNotice(null);
@@ -104,9 +150,14 @@ export function ExportsPage() {
         title="Exports"
         purpose="Produce the Trail Light export on demand. Each batch snapshots the closed cases into the 20-column contract for reconciliation (AD-039, AD-034 manual only)."
         actions={
-          <button type="button" className="exports__btn" onClick={onCreateBatch} disabled={busy}>
-            {busy ? 'Working…' : 'New export batch'}
-          </button>
+          <>
+            <button type="button" className="exports__btn exports__btn--ghost" onClick={onFullExtract} disabled={busy}>
+              {busy ? 'Working…' : 'Download all data'}
+            </button>
+            <button type="button" className="exports__btn" onClick={onCreateBatch} disabled={busy}>
+              New export batch
+            </button>
+          </>
         }
       />
 
@@ -193,24 +244,36 @@ export function ExportsPage() {
                         </td>
                       </tr>
                     ) : (
-                      filteredBatches.map((b) => (
-                        <tr key={b.id}>
-                          <td>{b.name}</td>
-                          <td>{b.status}</td>
-                          <td>{formatDate(b.generatedOn)}</td>
-                          <td>{b.rowCount}</td>
-                          <td>
-                            <button
-                              type="button"
-                              className="exports__btn exports__btn--ghost"
-                              onClick={() => onGenerate(b.id)}
-                              disabled={busy}
-                            >
-                              Generate
-                            </button>
-                          </td>
-                        </tr>
-                      ))
+                      filteredBatches.map((b) => {
+                        const batchRecords = recordsByBatch.get(b.id) ?? [];
+                        return (
+                          <tr key={b.id}>
+                            <td>{b.name}</td>
+                            <td>{b.status}</td>
+                            <td>{formatDate(b.generatedOn)}</td>
+                            <td>{b.rowCount}</td>
+                            <td className="exports__actions">
+                              <button
+                                type="button"
+                                className="exports__btn exports__btn--ghost"
+                                onClick={() => onGenerate(b.id)}
+                                disabled={busy}
+                              >
+                                Generate
+                              </button>
+                              <ExportMenu
+                                label="Download"
+                                stem={`trail-light-${b.code || b.name || 'batch'}`}
+                                sheetName="Trail Light"
+                                headers={TRAIL_LIGHT_HEADERS}
+                                rows={batchRecords.map((record) => trailLightRow(record.record))}
+                                caption={`${batchRecords.length} row(s) in the AD-039 20-column order`}
+                                disabled={busy}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -219,9 +282,21 @@ export function ExportsPage() {
           </section>
 
           <section aria-labelledby="records-heading">
-            <h2 id="records-heading" className="exports__heading">
-              Export records
-            </h2>
+            <div className="exports__section-head">
+              <h2 id="records-heading" className="exports__heading">
+                Export records
+              </h2>
+              {filteredRecords.length > 0 ? (
+                <ExportMenu
+                  label="Download filtered rows"
+                  stem="trail-light-filtered"
+                  sheetName="Trail Light"
+                  headers={TRAIL_LIGHT_HEADERS}
+                  rows={filteredRecords.map((record) => trailLightRow(record.record))}
+                  caption={`${filteredRecords.length} row(s) in the AD-039 20-column order`}
+                />
+              ) : null}
+            </div>
             {state.records.length === 0 ? (
               <p>No export records yet. Generate a batch to populate them.</p>
             ) : (

@@ -13,5 +13,8 @@
 }
 
 .page-intro__actions {
+  display: flex;
   flex: none;
+  align-items: center;
+  gap: var(--space-2);
 }

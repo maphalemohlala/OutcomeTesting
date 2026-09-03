@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
+import { CompletedCaseReport } from './CompletedCaseReport';
 import { useReports } from './useReports';
 import './ReportsPage.css';
 
@@ -103,6 +104,8 @@ export function ReportsPage() {
               </ul>
             </section>
           </div>
+
+          <CompletedCaseReport />
         </>
       ) : null}
     </>

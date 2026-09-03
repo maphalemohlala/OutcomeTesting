@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { Modal } from '../../components/feedback/Modal';
 import { Notice } from '../../components/feedback/Notice';
@@ -146,13 +147,14 @@ export function UsersPage() {
                   <th scope="col">Work email</th>
                   <th scope="col">Status</th>
                   <th scope="col">Added</th>
+                  <th scope="col">Cases</th>
                   {canManage ? <th scope="col">Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={canManage ? 5 : 4} className="users__empty">
+                    <td colSpan={canManage ? 6 : 5} className="users__empty">
                       No users match your current filters.
                     </td>
                   </tr>
@@ -169,6 +171,14 @@ export function UsersPage() {
                         </span>
                       </td>
                       <td>{formatDate(user.createdOn)}</td>
+                      <td>
+                        <Link
+                          className="users__link"
+                          to={`/cases?person=${encodeURIComponent(user.name)}`}
+                        >
+                          View cases
+                        </Link>
+                      </td>
                       {canManage ? (
                         <td className="users__actions">
                           <button
