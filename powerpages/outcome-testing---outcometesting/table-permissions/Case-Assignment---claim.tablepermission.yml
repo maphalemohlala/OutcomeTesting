@@ -1,0 +1,14 @@
+adx_append: false
+adx_appendto: false
+adx_contactrelationship: contact_al_caseassignment
+adx_create: true
+adx_delete: false
+adx_entitylogicalname: al_caseassignment
+adx_entityname: Case Assignment - claim from the queue
+adx_entitypermission_webrole:
+- a1000000-0000-4000-8000-000000000090
+- a1000000-0000-4000-8000-000000000091
+adx_entitypermissionid: a1000000-0000-4000-8000-000000000076
+adx_read: true
+adx_scope: 756150001
+adx_write: false

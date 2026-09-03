@@ -6,14 +6,14 @@ Build a Dataverse-centred outcome testing and file-checking platform that replac
 ## Confirmed core workflow
 1. Import or create a case from Intelligent Office/new-business data.
 2. Validate required data. Cases with invalid or missing intake data are returned with a reason and, where work must restart, closed as Returned/Cancelled and resubmitted as a new case linked through Previous Case/Replacement Case.
-3. Allocate to a shared team queue; a manager then manually assigns the case to a named team member. Tax and AQS use the same model, with no skills routing or auto-allocation (OD-002, AD-040).
+3. Allocate to a shared team queue; a manager then manually assigns the case to a named team member, or a checker picks a queued case up themselves from the portal (AD-076). Tax and AQS use the same model, with no skills routing or auto-allocation (OD-002, AD-040).
 4. Route as Tax only, AQS only, or Tax then AQS. Tax and AQS are sequential when both are required.
 5. Tax records its own Tax grade and evidence, then routes to AQS or returns/closes as appropriate. A completed Tax check with a non-pass result enters remediation; only wrong-route, no-check-required or invalid cases are returned or cancelled.
 6. AQS records Pass, Pass with issues, Insufficient evidence, or Potential harm.
 7. Non-pass outcomes create remediation. Preserve initial and final outcomes.
 8. Advisers complete remediation; T&C managers validate Insufficient evidence and Potential harm. Rejected remediation returns with notes.
 9. Final sign-off locks submitted sections and closes the case. Reopening, overriding or regrading a submitted or closed outcome is a privileged correction owned by the T&C Manager (Outcome Testing Manager/Administrator escalation) that requires a mandatory reason on an immutable Audit Event and preserves the initial outcome (OD-007, AD-031).
-10. Produce MI datasets and Trail Light-compatible exports. Export is a manual, on-demand production of a Trail Light-compatible file; automated SFTP and a Power BI build are out of MVP scope (AD-034). Notifications are delivered by email only (AD-035).
+10. Produce MI datasets and Trail Light-compatible exports. Export is a manual, on-demand production of a Trail Light-compatible file; automated SFTP and a Power BI build are out of MVP scope (AD-034). A closed Tax-only case is exported with the File Quality and Advice Quality columns blank, because both are sourced from the AQS review (AD-075). Notifications are delivered by email only (AD-035).
 
 ## Actors and access
 Administrators, Outcome Testing Managers, Checkers/AQS Reviewers, Tax Reviewers, Advisers/Remediation Users, T&C Managers/Supervisors, Regional Leads and Report Users. Users are managed through Entra groups and Power Platform/Dataverse teams. Multi-role membership is allowed.
@@ -25,7 +25,7 @@ Portal web roles are a narrower set than the actor list above, settled 2026-08-3
 - **Every authenticated portal user holds Global read on cases** and can action only what is assigned to them (OD-022, 2026-08-31). This extends AD-056 from the two reviewer roles to all signed-in users; the ability to act is carried by the review assignment, not the case, so write reaches responses only through the Contact-anchored review chain.
 - Permissions are in practice bound to the built-in **Administrators** and **Authenticated Users** roles; the `AL Portal - *` roles above carry none and are inert (AD-067). Adding or removing one of those named roles therefore changes nothing until permissions are bound to it.
 
-Case allocation is manual and done in the PowerApps code app by **team leads and managers**; each review team (AQS and Tax) has a team lead (BR-003, AD-040). The capability is **not built yet** — `al_CaseAssignment` has no assigned-user lookup, there is no assign command and no allocation screen, so a case on the Tax-then-AQS route parks at `Queued` with no supported way forward (OD-029).
+Case allocation is manual (BR-003, AD-040); each review team (AQS and Tax) has a team lead. Two supported routes out of `Queued`, both built: a team lead or manager allocates a case to a named member from the Code App's allocation screen (`al_AssignCase`, AD-072), or a checker picks a queued case up themselves from the portal's Tax or AQS review page, which assigns it to them and opens the check the route says is due (AD-076). There is no skills routing and no auto-allocation.
 
 ## Data principles
 - Dataverse is the system of record.
