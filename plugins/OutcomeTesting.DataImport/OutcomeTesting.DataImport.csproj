@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Configuration Migration data import, headless (OD-028).
+
+    `pac data` does not exist in the Power Platform CLI (verified against 2.11.2), and the
+    Configuration Migration Tool ships as a WPF application whose "/I" and "ImportData"
+    strings are control names, not command-line switches. So there is no supported way to
+    run a seed import from a script.
+
+    Rather than reimplement upsert-on-alternate-key by hand, this drives the tool's own
+    engine: Microsoft.Xrm.Tooling.Dmt.ImportProcessor, the same assembly the GUI calls.
+    The matching semantics OD-028 exists to prove are therefore the real ones, not a
+    lookalike.
+
+    net48 because the engine and CrmServiceClient are .NET Framework only, and the
+    Configuration Migration package ships net48 assemblies only — the .NET 8
+    ServiceClient used by OutcomeTesting.Registration cannot load them.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>OutcomeTesting.DataImport</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>OutcomeTesting.DataImport</AssemblyName>
+    <!-- The engine resolves its own dependencies from the output folder. -->
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CrmSdk.XrmTooling.ConfigurationMigration.Wpf" Version="9.1.0.365" />
+    <!-- CrmServiceClient's base types live here; without it the compiler cannot see them. -->
+    <PackageReference Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.*" />
+    <!--
+      CrmServiceClient binds ADAL at runtime, not compile time, so leaving this out builds
+      clean and then fails on the first connection with a FileNotFoundException. Pinned to
+      the version the connector asks for by name.
+    -->
+    <PackageReference Include="Microsoft.IdentityModel.Clients.ActiveDirectory" Version="3.19.8" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.*" PrivateAssets="All" />
+  </ItemGroup>
+
+  <!-- ImportCrmDataHandler exposes a WPF Dispatcher property, so the host needs WindowsBase. -->
+  <ItemGroup>
+    <Reference Include="WindowsBase" />
+  </ItemGroup>
+
+</Project>

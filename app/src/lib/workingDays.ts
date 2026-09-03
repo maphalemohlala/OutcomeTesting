@@ -121,3 +121,73 @@ export function hasBreachedRemediationThreshold(
   if (!value) return false;
   return workingDayAge(value, now) > REMEDIATION_THRESHOLD_WORKING_DAYS;
 }
+
+/** The clock as it stands on one remediation action (OD-018). */
+export interface RemediationClock {
+  /** Working days in the period now running. The BR-010 threshold measures this one. */
+  current: number;
+  /** Working days in the period a rejected sign-off ended, or null if never reset. */
+  previous: number | null;
+  /** Both periods added, for a "total time in remediation" reading. */
+  total: number;
+  /** True when a rejected sign-off has restarted the clock. */
+  wasReset: boolean;
+  /** Whether the current period has passed the ten-working-day threshold. */
+  breached: boolean;
+}
+
+/** The columns the clock is read from. Anything holding these can be measured. */
+export interface RemediationClockSource {
+  createdon?: string;
+  al_clockstartedon?: string;
+  al_completedon?: string;
+}
+
+/**
+ * The BR-010 remediation clock for one action (OD-018, resolved 2026-08-30).
+ *
+ * A rejected sign-off (BR-008) resets the clock, and the period it ended is preserved
+ * rather than merged: `createdon` keeps the original start and `al_clockstartedon` holds
+ * the current one, so a case that has been round twice reads as two timers instead of one
+ * long age. Merging them is the thing to avoid — a second round would show as breached
+ * before the adviser had had a day on it, and the ten-day threshold would be measuring
+ * time that was never theirs.
+ *
+ * The clock stops at completion (PP-13 is "clock start and stop"), so a completed action
+ * awaiting sign-off does not keep ageing while it sits with the T&C Manager.
+ *
+ * An action with no reset behaves exactly as before: one period from `createdon`.
+ *
+ * Only the most recent reset is on the action. A third round's earlier boundaries live on
+ * the al_signoff rows, which is where OD-018 puts the audit trail; this reports the two
+ * periods the columns can answer for and does not guess at the rest.
+ */
+export function remediationClock(
+  action: RemediationClockSource,
+  now: Date = new Date(),
+): RemediationClock {
+  const started = action.al_clockstartedon;
+  const created = action.createdon;
+  const stop = action.al_completedon ? new Date(action.al_completedon) : now;
+  const stopAt = Number.isNaN(stop.getTime()) ? now : stop;
+
+  const currentStart = started ?? created;
+  const current = currentStart ? workingDaysBetween(new Date(currentStart), stopAt) : 0;
+
+  let previous: number | null = null;
+  if (started && created) {
+    const from = new Date(created);
+    const to = new Date(started);
+    if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime()) && to.getTime() > from.getTime()) {
+      previous = workingDaysBetween(from, to);
+    }
+  }
+
+  return {
+    current,
+    previous,
+    total: current + (previous ?? 0),
+    wasReset: previous !== null,
+    breached: current > REMEDIATION_THRESHOLD_WORKING_DAYS,
+  };
+}

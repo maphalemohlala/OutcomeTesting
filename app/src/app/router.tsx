@@ -5,6 +5,7 @@ import { RequirePermission } from './permissions/PermissionGate';
 import { CaseWorklistPage } from '../features/cases/CaseWorklistPage';
 import { CaseDetailPage } from '../features/cases/CaseDetailPage';
 import { AllocationPage } from '../features/cases/AllocationPage';
+import { RecheckPage } from '../features/cases/RecheckPage';
 import { CaseIntakePage } from '../features/imports/CaseIntakePage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { PeoplePage } from '../features/people/PeoplePage';
@@ -44,14 +45,14 @@ export function AppRoutes() {
             </RequirePermission>
           }
         />
+        {/* Gated by page.cases like the other case sub-screens; the regrade action itself
+            is gated separately on command.regrade inside the page (AD-041). */}
         <Route
           path="/cases/:caseId/recheck"
           element={
-            <NotBuiltYet
-              title="Recheck and regrade"
-              purpose="Record a recheck and set the final outcome while preserving the initial one (FR-024)."
-              blockedBy={['Nothing — the screen itself is the gap. OD-007 is resolved (AD-031), al_Outcome carries the final outcome (AD-032) and al_RegradeCase is registered']}
-            />
+            <RequirePermission resource="page.cases">
+              <RecheckPage />
+            </RequirePermission>
           }
         />
         <Route

@@ -289,6 +289,8 @@ namespace OutcomeTesting.Plugins.Tests
                     return actual == null;
                 case ConditionOperator.NotNull:
                     return actual != null;
+                case ConditionOperator.In:
+                    return condition.Values.Any(v => Equals(actual, Scalar(v)));
                 default:
                     throw new NotSupportedException(
                         "ConditionOperator." + condition.Operator + " is not supported by this fake. "
@@ -331,9 +333,36 @@ namespace OutcomeTesting.Plugins.Tests
             return Scalar(row[attribute]) as IComparable;
         }
 
+        /// <summary>Every Execute the code under test issued, in order.</summary>
+        public List<OrganizationRequest> Requests { get; } = new List<OrganizationRequest>();
+
+        /// <summary>
+        /// Set to make Execute throw. This is how a mailbox that server-side email has not
+        /// approved is reproduced — the failure PP-15's drain exists to record rather than
+        /// swallow, and the one no unit test could reach while Execute was unsupported.
+        /// </summary>
+        public Exception ExecuteThrows { get; set; }
+
         public OrganizationResponse Execute(OrganizationRequest request)
         {
-            throw new NotSupportedException("Execute is not supported by this fake.");
+            Requests.Add(request);
+
+            if (ExecuteThrows != null)
+            {
+                throw ExecuteThrows;
+            }
+
+            // Named explicitly, keeping this fake's rule: support what the code under test
+            // actually issues and refuse the rest, rather than returning an empty response
+            // for any message and letting a wrong call look like it worked.
+            if (string.Equals(request.RequestName, NotificationDrain.SendEmailMessage, StringComparison.Ordinal))
+            {
+                return new OrganizationResponse();
+            }
+
+            throw new NotSupportedException(
+                "Message '" + request.RequestName + "' is not supported by this fake. "
+                + "Add it deliberately rather than letting a request silently succeed.");
         }
 
         public void Associate(

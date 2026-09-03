@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Failed">
+  <description default="Rows rejected by validation or refused by Dataverse.">
+    <label description="Rows rejected by validation or refused by Dataverse." languagecode="1033" />
+  </description>
+  <displayname default="Failed">
+    <label description="Failed" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_ImportCases.Failed</name>
+  <type>10</type>
+</customapiresponseproperty>

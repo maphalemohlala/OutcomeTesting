@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="ExceptionId">
+  <description default="Id of the al_importexception to close.">
+    <label description="Id of the al_importexception to close." languagecode="1033" />
+  </description>
+  <displayname default="Exception id">
+    <label description="Exception id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_ResolveImportException.ExceptionId</name>
+  <type>10</type>
+</customapirequestparameter>

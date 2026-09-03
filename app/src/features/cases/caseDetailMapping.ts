@@ -13,7 +13,7 @@ import {
   Al_outcomecasesal_vulnerableclient,
   type Al_outcomecases,
 } from '../../generated/models/Al_outcomecasesModel';
-import { choiceLabel as choice } from './choiceLabel';
+import { choiceLabel as choice } from '../../lib/choiceLabel';
 import { lookupLabel } from './lookupLabel';
 
 /**

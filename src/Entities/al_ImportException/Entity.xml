@@ -355,6 +355,46 @@
             <Description description="Why the row failed validation, shown to the intake team so they can correct and re-submit (BR-002)." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_ResolutionNote">
+          <Type>nvarchar</Type>
+          <Name>al_resolutionnote</Name>
+          <LogicalName>al_resolutionnote</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>1</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>textarea</Format>
+          <MaxLength>2000</MaxLength>
+          <Length>4000</Length>
+          <displaynames>
+            <displayname description="Resolution note" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="What was done about the row when the exception was closed - corrected and re-imported, or set aside as never a case (BR-002, FR-002/FR-003). Written only by al_ResolveImportException, and kept separate from al_reason so closing an exception never overwrites why it failed." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_ResolvedOn">
           <Type>datetime</Type>
           <Name>al_resolvedon</Name>

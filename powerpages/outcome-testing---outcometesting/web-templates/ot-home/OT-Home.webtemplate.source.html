@@ -3,15 +3,15 @@
 {% comment %}
   Portal landing page.
 
-  Deliberately a router, not a second dashboard: the counts and worklists
-  live on My Work (PP-03). This page exists so the site root is useful and
-  so each role can see, in one glance, the areas open to it.
-{% endcomment %}
+  Two jobs, in order. First a router to the areas open to the signed-in user; the personal
+  counts and worklists stay on My Work (PP-03). Then the PP-17 outcome cards, which are
+  reporting rather than routing: they count the whole book and drill into a filtered case
+  list. Full MI and export remain back-office, in the Outcome Testing app.
 
-<div class="ot-notice" role="status">
-  <strong>Shell stage.</strong> Every area below lists all records in the environment.
-  Role-based navigation and assignment filtering arrive with the Phase&nbsp;2 security build.
-</div>
+  The shell-stage notice this page used to carry is gone. It said role-based navigation and
+  assignment filtering were still to come; both landed with the Phase 2 security build
+  (AD-047, AD-056, AD-069), so it was telling users the opposite of what the site now does.
+{% endcomment %}
 
 <ul class="ot-tiles">
   <li>
@@ -45,6 +45,185 @@
     </a>
   </li>
 </ul>
+
+{% comment %}
+  Outcome cards and their drill-down (PP-17, BR-005, BR-010, FR-032).
+
+  A case's grade is on al_outcome, and BR-007 splits it across two columns so a regrade
+  preserves the original. The grade in force is therefore final where one has been recorded,
+  otherwise initial - the same precedence Outcomes.EffectiveOutcome applies server-side. In
+  FetchXML that is an OR whose second branch is an AND, once per grade.
+
+  Counted as distinct cases, not as outcome rows, because the card is answering "how many
+  cases" and the drill-down lands on a list of cases. Both halves have to count the same
+  thing or the number on the card will not match the number on the page it opens.
+
+  Six small aggregates rather than one grouped query. A single query grouped by both outcome
+  columns would be fewer round trips, but it would make the page depend on how an aliased
+  choice column renders in Liquid - and a card that silently shows "120910711" instead of a
+  grade is worse than a fifth aggregate. Every value below is a numeric literal from
+  src/Entities/al_Outcome/Entity.xml; nothing here reads an option set back.
+
+  Ungraded is total cases minus cases carrying an outcome row, taken as its own count rather
+  than as "everything the four cards did not match". A case whose outcome row somehow held
+  neither grade would otherwise be quietly added to Not yet graded, where nobody would look
+  for it.
+{% endcomment %}
+
+{% fetchxml count_pass %}
+<fetch aggregate="true">
+  <entity name="al_outcome">
+    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
+    <filter type="or">
+      <condition attribute="al_finaloutcome" operator="eq" value="120910710" />
+      <filter type="and">
+        <condition attribute="al_finaloutcome" operator="null" />
+        <condition attribute="al_initialoutcome" operator="eq" value="120910700" />
+      </filter>
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml count_issues %}
+<fetch aggregate="true">
+  <entity name="al_outcome">
+    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
+    <filter type="or">
+      <condition attribute="al_finaloutcome" operator="eq" value="120910711" />
+      <filter type="and">
+        <condition attribute="al_finaloutcome" operator="null" />
+        <condition attribute="al_initialoutcome" operator="eq" value="120910701" />
+      </filter>
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml count_insufficient %}
+<fetch aggregate="true">
+  <entity name="al_outcome">
+    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
+    <filter type="or">
+      <condition attribute="al_finaloutcome" operator="eq" value="120910712" />
+      <filter type="and">
+        <condition attribute="al_finaloutcome" operator="null" />
+        <condition attribute="al_initialoutcome" operator="eq" value="120910702" />
+      </filter>
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml count_harm %}
+<fetch aggregate="true">
+  <entity name="al_outcome">
+    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
+    <filter type="or">
+      <condition attribute="al_finaloutcome" operator="eq" value="120910713" />
+      <filter type="and">
+        <condition attribute="al_finaloutcome" operator="null" />
+        <condition attribute="al_initialoutcome" operator="eq" value="120910703" />
+      </filter>
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml count_cases %}
+<fetch aggregate="true">
+  <entity name="al_outcomecase">
+    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml count_graded %}
+<fetch aggregate="true">
+  <entity name="al_outcome">
+    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}
+  An aggregate fetch returns no result set at all when the caller cannot read the table, and
+  indexing entities[0] straight away then fails with "Index was outside the bounds of the
+  array" - which renders as the card's number. The same guard My Work carries, for the same
+  reason: a card must show a figure or nothing, never an error string.
+{% endcomment %}
+{% assign n_pass = 0 %}
+{% if count_pass.results and count_pass.results.entities.size > 0 %}{% assign n_pass = count_pass.results.entities[0].total %}{% endif %}
+
+{% assign n_issues = 0 %}
+{% if count_issues.results and count_issues.results.entities.size > 0 %}{% assign n_issues = count_issues.results.entities[0].total %}{% endif %}
+
+{% assign n_insufficient = 0 %}
+{% if count_insufficient.results and count_insufficient.results.entities.size > 0 %}{% assign n_insufficient = count_insufficient.results.entities[0].total %}{% endif %}
+
+{% assign n_harm = 0 %}
+{% if count_harm.results and count_harm.results.entities.size > 0 %}{% assign n_harm = count_harm.results.entities[0].total %}{% endif %}
+
+{% comment %}
+  These two are subtracted rather than only displayed, so they are coerced first. `integer`
+  is the same coercion the case list uses on its page parameter, and it is here for the same
+  reason: `minus` on a value Liquid is holding as anything but a number does not fail loudly,
+  it produces a wrong count.
+{% endcomment %}
+{% assign n_cases = 0 %}
+{% if count_cases.results and count_cases.results.entities.size > 0 %}{% assign n_cases = count_cases.results.entities[0].total | integer %}{% endif %}
+
+{% assign n_graded = 0 %}
+{% if count_graded.results and count_graded.results.entities.size > 0 %}{% assign n_graded = count_graded.results.entities[0].total | integer %}{% endif %}
+
+{% assign n_ungraded = n_cases | minus: n_graded %}
+{% if n_ungraded < 0 %}{% assign n_ungraded = 0 %}{% endif %}
+
+<section class="ot-card" aria-labelledby="ot-outcomes-heading">
+  <h2 class="ot-card__title" id="ot-outcomes-heading">
+    Outcomes
+    <span class="ot-count">{{ n_cases }}</span>
+  </h2>
+  <p>
+    The grade each case currently stands on &mdash; its final outcome, or the initial one
+    where no final grade has been recorded (BR-005, BR-007). Select a card to open the cases
+    behind it. Full management information and the Trail Light export stay in the Outcome
+    Testing app.
+  </p>
+
+  <ul class="ot-tiles">
+    <li>
+      <a class="ot-tile ot-tile--pass" href="/cases?outcome=pass">
+        <span class="ot-tile__count">{{ n_pass }}</span>
+        <span class="ot-tile__label">Pass</span>
+      </a>
+    </li>
+    <li>
+      <a class="ot-tile ot-tile--issues" href="/cases?outcome=issues">
+        <span class="ot-tile__count">{{ n_issues }}</span>
+        <span class="ot-tile__label">Pass with issues</span>
+      </a>
+    </li>
+    <li>
+      <a class="ot-tile ot-tile--insufficient" href="/cases?outcome=insufficient">
+        <span class="ot-tile__count">{{ n_insufficient }}</span>
+        <span class="ot-tile__label">Insufficient evidence</span>
+      </a>
+    </li>
+    <li>
+      <a class="ot-tile ot-tile--harm" href="/cases?outcome=harm">
+        <span class="ot-tile__count">{{ n_harm }}</span>
+        <span class="ot-tile__label">Potential harm</span>
+      </a>
+    </li>
+    <li>
+      <a class="ot-tile ot-tile--ungraded" href="/cases?outcome=none">
+        <span class="ot-tile__count">{{ n_ungraded }}</span>
+        <span class="ot-tile__label">Not yet graded</span>
+      </a>
+    </li>
+  </ul>
+</section>
 
 <section class="ot-card" aria-labelledby="ot-home-about">
   <h2 class="ot-card__title" id="ot-home-about">Outcome Testing</h2>

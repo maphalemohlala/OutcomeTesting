@@ -31,6 +31,18 @@ using System.Text.Json;
 //   That is why the case is named explicitly rather than picked, and why the org URL has
 //   to be repeated after --confirm: neither can happen by muscle memory.
 //
+// Register step: dotnet run -- registerstep <orgUrl> <typeName> <message> <table> <stage>
+//                              [<filteringAttributes>] [sync|async] [<runAsUpnOrId>]
+//   Stage is 20 (pre-operation) or 40 (post-operation). Mode defaults to sync. runAs sets
+//   the step's impersonating user, which is the account the plug-in executes as.
+//
+//   The PP-15 drain is the one asynchronous step, and it is registered last because
+//   registering it is what switches notification delivery on for an environment:
+//     registerstep <orgUrl> OutcomeTesting.Plugins.NotificationDrainPlugin Create \
+//                  al_notification 40 "" async <serviceAccountUpn>
+//   Do not register it until server-side email is approved and tested for that account's
+//   mailbox (OD-030). Until then rows rest at Pending, which is the honest state.
+//
 // Add to solution: dotnet run -- addtosolution <orgUrl> [<solutionUniqueName>]
 //   Adds the plug-in assembly (and its plug-in type) to the target solution for clean ALM
 //   promotion. Idempotent. The Custom API is added separately via a solution-file import
@@ -97,6 +109,11 @@ if (args.Length >= 3 && args[0].Equals("registertype", StringComparison.OrdinalI
     return RegisterType(args[1], args[2]);
 }
 
+if (args.Length >= 2 && args[0].Equals("createnotificationtable", StringComparison.OrdinalIgnoreCase))
+{
+    return CreateNotificationTable(args[1], args.Length > 2 ? args[2] : "OutcomeTesting");
+}
+
 if (args.Length >= 3 && args[0].Equals("restoretablepermissions", StringComparison.OrdinalIgnoreCase))
 {
     return RestoreTablePermissions(args[1], args[2]);
@@ -113,7 +130,20 @@ if (args.Length >= 6 && args[0].Equals("registerstep", StringComparison.OrdinalI
         return 1;
     }
 
-    return RegisterStep(args[1], args[2], args[3], args[4], args.Length > 6 ? args[6] : string.Empty, stageArg);
+    // Mode and run-as are optional and trail the existing arguments, so every registerstep
+    // command already in the deployment notes keeps working unchanged.
+    var modeArg = args.Length > 7 ? args[7] : "sync";
+    if (!modeArg.Equals("sync", StringComparison.OrdinalIgnoreCase)
+        && !modeArg.Equals("async", StringComparison.OrdinalIgnoreCase))
+    {
+        Console.Error.WriteLine("Mode must be 'sync' or 'async'.");
+        return 1;
+    }
+
+    return RegisterStep(
+        args[1], args[2], args[3], args[4], args.Length > 6 ? args[6] : string.Empty, stageArg,
+        modeArg.Equals("async", StringComparison.OrdinalIgnoreCase) ? 1 : 0,
+        args.Length > 8 ? args[8] : null);
 }
 
 if (args.Length >= 3 && args[0].Equals("seedadmin", StringComparison.OrdinalIgnoreCase))
@@ -475,7 +505,10 @@ int RegisterType(string orgUrl, string typeName)
 // does not work: pack refuses a step whose plug-in type is absent from the assembly
 // manifest, and the manifest is only correct when it comes from an export (AD-013). So the
 // step is created here and brought back into src by the round trip.
-int RegisterStep(string orgUrl, string typeName, string messageName, string primaryEntity, string filteringAttributes, int stage)
+// mode: 0 synchronous, 1 asynchronous. runAs names the systemuser the step executes as —
+// a domain name (UPN) or a record id — and is what makes the PP-15 drain send from the
+// service account's approved mailbox rather than from whoever's action queued the row.
+int RegisterStep(string orgUrl, string typeName, string messageName, string primaryEntity, string filteringAttributes, int stage, int mode = 0, string? runAs = null)
 {
     using var svc = Connect(orgUrl);
 
@@ -520,12 +553,35 @@ int RegisterStep(string orgUrl, string typeName, string messageName, string prim
         ["sdkmessageid"] = new EntityReference("sdkmessage", messageId),
         ["sdkmessagefilterid"] = new EntityReference("sdkmessagefilter", filterRows[0].Id),
         ["stage"] = new OptionSetValue(stage),
-        ["mode"] = new OptionSetValue(0),            // synchronous, so a refusal reaches the caller
+        // Synchronous by default, so a refusal reaches the caller. Asynchronous is for the
+        // one step that must NOT reach the caller: the PP-15 drain runs after the state
+        // change commits, so a mailbox refusal cannot roll back a submitted review.
+        ["mode"] = new OptionSetValue(mode),
         ["rank"] = 1,
         ["supporteddeployment"] = new OptionSetValue(0),
         ["invocationsource"] = new OptionSetValue(0),
         ["filteringattributes"] = filteringAttributes,
     };
+
+    if (mode == 1)
+    {
+        // Delete the system job once it succeeds. Without this an outbox that drains every
+        // notification leaves one AsyncOperation row per email behind for ever.
+        values["asyncautodelete"] = true;
+    }
+
+    if (!string.IsNullOrWhiteSpace(runAs))
+    {
+        var runAsId = ResolveSystemUser(svc, runAs);
+        if (runAsId == Guid.Empty)
+        {
+            Console.Error.WriteLine($"No enabled systemuser matches '{runAs}' (give a UPN or a record id).");
+            return 1;
+        }
+
+        values["impersonatinguserid"] = new EntityReference("systemuser", runAsId);
+        Console.WriteLine($"  runs as systemuser {runAsId}.");
+    }
 
     var existing = FindId(svc, "sdkmessageprocessingstep", ("name", stepName));
     Guid stepId;
@@ -1134,6 +1190,19 @@ static void TryDelete(ServiceClient svc, string table, Guid id)
     }
 }
 
+// Resolves the account a step runs as, by record id or UPN. Disabled users are excluded:
+// a step impersonating a disabled account fails at run time with an error that says nothing
+// about which account it is, so it is caught here where the name is still in hand.
+static Guid ResolveSystemUser(ServiceClient svc, string nameOrId)
+{
+    if (Guid.TryParse(nameOrId, out var id))
+    {
+        return FindId(svc, "systemuser", ("systemuserid", id), ("isdisabled", false));
+    }
+
+    return FindId(svc, "systemuser", ("domainname", nameOrId), ("isdisabled", false));
+}
+
 static Guid FindId(ServiceClient svc, string table, params (string attr, object value)[] conditions)
 {
     var query = new QueryExpression(table) { ColumnSet = new ColumnSet(false), TopCount = 1 };
@@ -1270,10 +1339,279 @@ static void GrantTable(
     }
 }
 
+/// <summary>
+/// Creates the al_Notification outbox table and its columns (PP-15). Idempotent: the
+/// entity and every column are created only when absent, so a re-run against a
+/// half-created table finishes the job rather than failing on the first existing column.
+///
+/// Components are created directly into <paramref name="solutionUniqueName"/>. registerall
+/// does not do that and the RBAC commands had to be added afterwards by a solution import
+/// (AD-062's note); naming the solution up front avoids repeating that.
+/// </summary>
+int CreateNotificationTable(string orgUrl, string solutionUniqueName)
+{
+    using var svc = Connect(orgUrl);
+
+    var exists = true;
+    try
+    {
+        svc.Execute(new RetrieveEntityRequest
+        {
+            LogicalName = NotificationTable.Logical,
+            EntityFilters = EntityFilters.Entity,
+        });
+    }
+    catch (Exception)
+    {
+        exists = false;
+    }
+
+    if (!exists)
+    {
+        Console.WriteLine($"Creating table {NotificationTable.Schema}…");
+        svc.Execute(new CreateEntityRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            Entity = new EntityMetadata
+            {
+                SchemaName = NotificationTable.Schema,
+                LogicalName = NotificationTable.Logical,
+                DisplayName = NotificationTable.Text("Notification"),
+                DisplayCollectionName = NotificationTable.Text("Notifications"),
+                Description = NotificationTable.Text(
+                    "Outbox for PP-15 notification events. A row is written in the same transaction as the "
+                    + "state change that caused it and drained separately by server-side email (AD-035, OD-030), "
+                    + "which is what makes retries safe and duplicate sends impossible."),
+                OwnershipType = OwnershipTypes.UserOwned,
+                IsActivity = false,
+                IsAuditEnabled = new BooleanManagedProperty(true),
+            },
+            PrimaryAttribute = new StringAttributeMetadata
+            {
+                SchemaName = "al_Name",
+                LogicalName = "al_name",
+                RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.ApplicationRequired),
+                MaxLength = 200,
+                FormatName = StringFormatName.Text,
+                DisplayName = NotificationTable.Text("Name"),
+                Description = NotificationTable.Text("Human-readable label for the notification."),
+            },
+        });
+        Console.WriteLine("  created.");
+    }
+    else
+    {
+        Console.WriteLine($"Table {NotificationTable.Schema} already exists; adding any missing columns.");
+    }
+
+    var present = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var current = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = NotificationTable.Logical,
+        EntityFilters = EntityFilters.Attributes,
+    });
+    foreach (var attribute in current.EntityMetadata.Attributes)
+    {
+        present.Add(attribute.LogicalName);
+    }
+
+    void Add(AttributeMetadata attribute)
+    {
+        if (present.Contains(attribute.LogicalName))
+        {
+            Console.WriteLine($"  {attribute.LogicalName}: already present");
+            return;
+        }
+
+        svc.Execute(new CreateAttributeRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            EntityName = NotificationTable.Logical,
+            Attribute = attribute,
+        });
+        Console.WriteLine($"  {attribute.LogicalName}: created");
+    }
+
+    StringAttributeMetadata Str(string schema, string logical, int length, string display, string description,
+        AttributeRequiredLevel level = AttributeRequiredLevel.None) =>
+        new StringAttributeMetadata
+        {
+            SchemaName = schema,
+            LogicalName = logical,
+            MaxLength = length,
+            FormatName = length > 2000 ? StringFormatName.TextArea : StringFormatName.Text,
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(level),
+            DisplayName = NotificationTable.Text(display),
+            Description = NotificationTable.Text(description),
+        };
+
+    Add(Str("al_NotificationCode", "al_notificationcode", 100, "Notification code",
+        "Deterministic per event and target, and the alternate key: a retry of the same state change collides here instead of queueing a second email.",
+        AttributeRequiredLevel.ApplicationRequired));
+
+    Add(new PicklistAttributeMetadata
+    {
+        SchemaName = "al_Event",
+        LogicalName = "al_event",
+        RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.ApplicationRequired),
+        DisplayName = NotificationTable.Text("Event"),
+        Description = NotificationTable.Text(
+            "Which business event this notifies. The five AD-035 names only; PP-15's other four are not enumerated in any requirement (OD-030 gap (a))."),
+        OptionSet = BuildOptionSet("al_notification_event", "Event", NotificationTable.Events),
+    });
+
+    Add(new PicklistAttributeMetadata
+    {
+        SchemaName = "al_Status",
+        LogicalName = "al_status",
+        RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.ApplicationRequired),
+        DisplayName = NotificationTable.Text("Status"),
+        Description = NotificationTable.Text("Where the row is in the outbox: Pending, Sent or Failed."),
+        OptionSet = BuildOptionSet("al_notification_status", "Status", NotificationTable.Statuses),
+    });
+
+    Add(Str("al_RecipientEmail", "al_recipientemail", 200, "Recipient email",
+        "Work email of the person to notify (AD-010, the canonical cross-system identifier)."));
+    Add(Str("al_Subject", "al_subject", 400, "Subject", "Subject line of the email to send."));
+    Add(Str("al_Body", "al_body", 4000, "Body", "Body of the email to send."));
+    Add(Str("al_FailureReason", "al_failurereason", 2000, "Failure reason",
+        "Why the send failed. Set only on Failed, so a stuck outbox says why rather than going quiet."));
+    Add(Str("al_TargetTable", "al_targettable", 100, "Target table",
+        "Logical name of the record the event happened to. A string pair rather than a lookup, matching al_auditevent, so the outbox does not constrain what it can point at."));
+    Add(Str("al_TargetId", "al_targetid", 100, "Target id", "Id of the record the event happened to."));
+    Add(Str("al_CorrelationId", "al_correlationid", 100, "Correlation id",
+        "Plug-in execution correlation id, so a notification can be tied to the command that raised it (NFR-OBS-01)."));
+
+    Add(new DateTimeAttributeMetadata
+    {
+        SchemaName = "al_QueuedOn",
+        LogicalName = "al_queuedon",
+        Format = DateTimeFormat.DateAndTime,
+        RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+        DisplayName = NotificationTable.Text("Queued on"),
+        Description = NotificationTable.Text("When the row was written, which is when the state change committed."),
+    });
+
+    Add(new DateTimeAttributeMetadata
+    {
+        SchemaName = "al_SentOn",
+        LogicalName = "al_senton",
+        Format = DateTimeFormat.DateAndTime,
+        RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+        DisplayName = NotificationTable.Text("Sent on"),
+        Description = NotificationTable.Text("When the send succeeded. Empty while Pending or Failed."),
+    });
+
+    // The alternate key is what actually enforces one notification per event per target:
+    // a duplicate insert fails on the key rather than being deduplicated after the fact.
+    var keys = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = NotificationTable.Logical,
+        EntityFilters = EntityFilters.Entity,
+    });
+    var hasKey = keys.EntityMetadata.Keys != null
+        && keys.EntityMetadata.Keys.Any(k => k.LogicalName == "al_notificationcodekey");
+    if (!hasKey)
+    {
+        svc.Execute(new CreateEntityKeyRequest
+        {
+            EntityName = NotificationTable.Logical,
+            SolutionUniqueName = solutionUniqueName,
+            EntityKey = new EntityKeyMetadata
+            {
+                SchemaName = "al_NotificationCodeKey",
+                LogicalName = "al_notificationcodekey",
+                DisplayName = NotificationTable.Text("Notification code"),
+                KeyAttributes = new[] { "al_notificationcode" },
+            },
+        });
+        Console.WriteLine("  al_notificationcodekey: created");
+    }
+    else
+    {
+        Console.WriteLine("  al_notificationcodekey: already present");
+    }
+
+    svc.Execute(new PublishAllXmlRequest());
+    Console.WriteLine($"Published. {NotificationTable.Schema} is in solution '{solutionUniqueName}'.");
+    return 0;
+}
+
+OptionSetMetadata BuildOptionSet(string name, string display, (int Value, string Name, string Description)[] options)
+{
+    var set = new OptionSetMetadata
+    {
+        IsGlobal = false,
+        OptionSetType = OptionSetType.Picklist,
+        Name = name,
+        DisplayName = NotificationTable.Text(display),
+    };
+
+    foreach (var option in options)
+    {
+        set.Options.Add(new OptionMetadata(NotificationTable.Text(option.Name), option.Value)
+        {
+            Description = NotificationTable.Text(option.Description),
+        });
+    }
+
+    return set;
+}
+
 /// <summary>One YAML entry: either a scalar or a list of strings, never both.</summary>
 sealed class YamlValue
 {
     public string Scalar { get; set; }
 
     public List<string> Items { get; } = new List<string>();
+}
+
+/// <summary>
+/// The al_Notification outbox (PP-15, AD-035, OD-030). A row is written in the same
+/// transaction as the state change that caused it and drained separately, which is what
+/// makes a retry safe and a duplicate send impossible.
+///
+/// Created through the metadata API rather than hand-authored solution XML so Dataverse
+/// generates the system columns, views and forms itself, and AD-013's "commit what
+/// Dataverse emits" stays true — the definition enters src/ on the next export round trip.
+///
+/// The event option set carries the FIVE events AD-035 names and no more. PP-15 says nine;
+/// the other four are not enumerated in any requirement (OD-030 gap (a)), and a nine-value
+/// option set would mean inventing four business events. Adding values later is additive
+/// and safe, so shipping five is not a decision that has to be unwound.
+/// </summary>
+static class NotificationTable
+{
+    public const string Logical = "al_notification";
+    public const string Schema = "al_Notification";
+
+    // Fresh option-value block: everything up to 120910791 is taken (al_auditevent's
+    // al_command reaches it), so 1209108xx starts clear of every existing set.
+    public const int EventAllocation = 120910800;
+    public const int EventReviewSubmitted = 120910801;
+    public const int EventRemediationAssigned = 120910802;
+    public const int EventSignoffApproved = 120910803;
+    public const int EventSignoffRejected = 120910804;
+
+    public const int StatusPending = 120910810;
+    public const int StatusSent = 120910811;
+    public const int StatusFailed = 120910812;
+
+    public static Label Text(string value) => new Label(value, 1033);
+
+    public static readonly (int Value, string Name, string Description)[] Events =
+    {
+        (EventAllocation, "Allocation", "A case was allocated to a checker (BR-003, AD-040/AD-076)."),
+        (EventReviewSubmitted, "Review submitted", "A checker submitted a review (FR-017)."),
+        (EventRemediationAssigned, "Remediation assigned", "A remediation action was raised against an adviser (BR-006, FR-020)."),
+        (EventSignoffApproved, "Sign-off approved", "A T&C Manager approved a remediation (BR-008, FR-023)."),
+        (EventSignoffRejected, "Sign-off rejected", "A T&C Manager rejected a remediation and sent it back (BR-008)."),
+    };
+
+    public static readonly (int Value, string Name, string Description)[] Statuses =
+    {
+        (StatusPending, "Pending", "Written and waiting to be drained. The safe resting state."),
+        (StatusSent, "Sent", "Handed to Dataverse server-side email successfully."),
+        (StatusFailed, "Failed", "The send failed; al_failurereason says why and the row can be retried."),
+    };
 }

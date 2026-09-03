@@ -1,0 +1,100 @@
+{
+  "$comment": "Contract for the ImportCases server-side command (AD-003, BR-001, BR-002, FR-002). Deployed via the registration console (plugins/OutcomeTesting.Registration) and added to the OutcomeTesting solution via a solution-file import (src/customapis/al_ImportCases). Custom API parameter Type codes: 0=Boolean, 10=String. Counts are returned as strings, matching al_GenerateExport's RowCount, so the whole command set shares one parameter shape.",
+  "customApi": {
+    "uniquename": "al_ImportCases",
+    "name": "al_ImportCases",
+    "displayname": "Import Cases",
+    "description": "Validates an Intelligent Office extract server-side and imports it (BR-001, BR-002). Logs an al_importbatch, creates a case per valid row, skips references already held so a re-upload is idempotent, and records each rejected row as an al_importexception with its reason (FR-002).",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.ImportCasesPlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "FileName",
+      "name": "FileName",
+      "displayname": "File name",
+      "description": "Name of the uploaded extract, recorded as the batch source.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "Csv",
+      "name": "Csv",
+      "displayname": "Extract",
+      "description": "The raw CSV extract. Sent as text rather than as parsed rows so BR-002 validation is applied server-side and cannot be bypassed.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay returns the same batch.",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "BatchId",
+      "name": "BatchId",
+      "displayname": "Batch id",
+      "description": "Id of the al_importbatch created.",
+      "type": 10
+    },
+    {
+      "uniquename": "BatchReference",
+      "name": "BatchReference",
+      "displayname": "Batch reference",
+      "description": "Business code of the batch, shown to the user and used to name the validation report.",
+      "type": 10
+    },
+    {
+      "uniquename": "Total",
+      "name": "Total",
+      "displayname": "Total",
+      "description": "Rows read from the extract, excluding the header and the guide row.",
+      "type": 10
+    },
+    {
+      "uniquename": "Imported",
+      "name": "Imported",
+      "displayname": "Imported",
+      "description": "Cases created.",
+      "type": 10
+    },
+    {
+      "uniquename": "Duplicates",
+      "name": "Duplicates",
+      "displayname": "Duplicates",
+      "description": "Rows skipped because the IO reference already exists (BR-001).",
+      "type": 10
+    },
+    {
+      "uniquename": "Failed",
+      "name": "Failed",
+      "displayname": "Failed",
+      "description": "Rows rejected by validation or refused by Dataverse.",
+      "type": 10
+    },
+    {
+      "uniquename": "Report",
+      "name": "Report",
+      "displayname": "Report",
+      "description": "JSON array of rejected and skipped rows for the validation report (FR-002). Empty on a replay.",
+      "type": 10
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written.",
+      "type": 10
+    }
+  ]
+}

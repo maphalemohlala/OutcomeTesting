@@ -1,0 +1,35 @@
+{% comment %}
+  The grade a case currently stands on, as words (BR-005, BR-007, PP-17).
+
+  Include with the two al_outcome columns, final first:
+    (% capture grade %)(% include 'OT Outcome Label' final: row['oc.al_finaloutcome'] initial: row['oc.al_initialoutcome'] %)(% endcapture %)
+    (% assign grade = grade | strip %)
+
+  BR-007 keeps the initial and final outcomes in separate columns so both survive a
+  regrade, so every reader has to answer the same question: final where one has been
+  recorded, otherwise initial. That precedence is written once, here, rather than at each
+  call site where getting it backwards would show a superseded grade. It is the same rule
+  the plug-ins apply in Outcomes.EffectiveOutcome and the Code App applies in
+  caseWorklistMapping.
+
+  Output is a label or nothing. Never an option-set number: an operational screen showing
+  "120910711" where a grade belongs is unreadable, and the reader has no way to look it up
+  (the design skill's rule against exposing Dataverse internals). A row this cannot resolve
+  yields empty, and the caller renders its own "not yet graded" state rather than a number.
+
+  .label is used where the platform supplies it. The numeric map is the fallback for the
+  reads where it does not come through - an aliased column from a link-entity does not
+  always carry its formatted value - and it is the reason this file exists as one include
+  instead of a repeated inline expression.
+{% endcomment %}
+{% assign grade = final | default: initial %}
+{% if grade %}{% assign text = grade.label %}{% if text and text != '' %}{{ text }}{% else %}{% assign raw = grade.value | default: grade | integer %}{% case raw %}
+{% when 120910700 %}Pass
+{% when 120910701 %}Pass with issues
+{% when 120910702 %}Insufficient evidence
+{% when 120910703 %}Potential harm
+{% when 120910710 %}Pass
+{% when 120910711 %}Pass with issues
+{% when 120910712 %}Insufficient evidence
+{% when 120910713 %}Potential harm
+{% endcase %}{% endif %}{% endif %}

@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Resolution">
+  <description default="Resolved or Ignored.">
+    <label description="Resolved or Ignored." languagecode="1033" />
+  </description>
+  <displayname default="Resolution">
+    <label description="Resolution" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_ResolveImportException.Resolution</name>
+  <type>10</type>
+</customapirequestparameter>

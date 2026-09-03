@@ -1,0 +1,24 @@
+{
+  "$comment": "Contract for the DrainNotifications server-side command (AD-003, PP-15, OD-030). Recovery path for outbox rows the asynchronous NotificationDrainPlugin step cannot reach — queued before the step was registered, failed against a mailbox since approved, or missing a recipient since resolved. Custom API parameter Type codes: 0=Boolean, 7=Integer, 10=String.",
+  "customApi": {
+    "uniquename": "al_DrainNotifications",
+    "name": "al_DrainNotifications",
+    "displayname": "Drain Notifications",
+    "description": "Re-drains a bounded batch of al_notification rows that are Pending or Failed, sending each through Dataverse server-side email from the account the command runs as (PP-15, AD-035, BR-009). Sent rows are never re-sent. Requires Manage on permission.manage.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.DrainNotificationsPlugin"
+  },
+  "requestParameters": [
+    { "uniquename": "MaxRows", "name": "MaxRows", "displayname": "Max rows", "description": "Most rows to attempt in this run. Omitted, zero or negative means 50; anything above 250 is clamped to 250, so one invocation can never send an unbounded number of emails. Re-run to work through a backlog.", "type": 7, "isoptional": true }
+  ],
+  "responseProperties": [
+    { "uniquename": "Processed", "name": "Processed", "displayname": "Processed", "description": "Rows the run attempted.", "type": 7 },
+    { "uniquename": "Sent", "name": "Sent", "displayname": "Sent", "description": "Rows handed to server-side email successfully and stamped Sent.", "type": 7 },
+    { "uniquename": "Failed", "name": "Failed", "displayname": "Failed", "description": "Rows that could not be sent. Each carries al_failurereason saying why, and stays retryable.", "type": 7 }
+  ]
+}

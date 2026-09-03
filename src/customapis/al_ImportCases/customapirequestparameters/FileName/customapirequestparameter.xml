@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="FileName">
+  <description default="Name of the uploaded extract, recorded as the batch source.">
+    <label description="Name of the uploaded extract, recorded as the batch source." languagecode="1033" />
+  </description>
+  <displayname default="File name">
+    <label description="File name" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_ImportCases.FileName</name>
+  <type>10</type>
+</customapirequestparameter>

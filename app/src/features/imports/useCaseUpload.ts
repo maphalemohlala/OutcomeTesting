@@ -1,19 +1,7 @@
 import { useState } from 'react';
-import { odataEscape } from '../../services/odata';
-import { logTechnical } from '../../services/errors';
-import {
-  Al_importbatchesService,
-  Al_importexceptionsService,
-  Al_outcomecasesService,
-} from '../../generated';
-import type { Al_importbatchesal_batchstatus } from '../../generated/models/Al_importbatchesModel';
-import type { Al_importexceptionsal_exceptionstatus } from '../../generated/models/Al_importexceptionsModel';
-import { parseCaseCsv, type ParsedCase, type RowError, type ValidationReportRow } from './caseUpload';
-
-const BATCH_STATUS_VALIDATING: Al_importbatchesal_batchstatus = 120910731;
-const BATCH_STATUS_COMPLETED: Al_importbatchesal_batchstatus = 120910732;
-const EXCEPTION_STATUS_OPEN: Al_importexceptionsal_exceptionstatus = 120910740;
-const EXCEPTION_STATUS_IGNORED: Al_importexceptionsal_exceptionstatus = 120910742;
+import { importCases, type ImportReportRow } from '../../services/commands/importCases';
+import { useIntentKeys } from '../../hooks/useIntentKey';
+import { parseCaseCsv, type ValidationReportRow } from './caseUpload';
 
 export interface UploadResult {
   batchReference: string;
@@ -31,44 +19,29 @@ export type UploadState =
   | { phase: 'done'; result: UploadResult }
   | { phase: 'error'; message: string };
 
-async function referenceExists(reference: string): Promise<boolean> {
-  const result = await Al_outcomecasesService.getAll({
-    filter: `al_casereference eq '${odataEscape(reference)}'`,
-    top: 1,
-  });
-  return result.success && result.data.length > 0;
-}
-
-async function recordException(
-  batchId: string,
-  batchCode: string,
-  rowNumber: number,
-  caseReference: string | null,
-  reason: string,
-  raw: string,
-  status: Al_importexceptionsal_exceptionstatus,
-): Promise<void> {
-  await Al_importexceptionsService.create({
-    al_name: `${batchCode}-R${rowNumber}`,
-    al_importexceptioncode: `${batchCode}-R${rowNumber}`,
-    al_exceptionstatus: status,
-    'al_importbatchid@odata.bind': `/al_importbatches(${batchId})`,
-    al_reason: reason.slice(0, 2000),
-    al_rownumber: rowNumber,
-    al_casereference: caseReference ?? undefined,
-    al_rawdata: raw,
-    statecode: 0,
-  });
+/** The command's report row and the downloadable report row are the same shape. */
+function toReportRows(rows: ImportReportRow[]): ValidationReportRow[] {
+  return rows.map((row) => ({
+    rowNumber: row.rowNumber,
+    caseReference: row.caseReference,
+    status: row.status,
+    reason: row.reason,
+    raw: row.raw,
+  }));
 }
 
 /**
- * Uploads an Intelligent Office extract: logs an Import Batch, creates one
- * Outcome Case per valid row (skipping references already in Dataverse so
- * re-uploads are idempotent, BR-001), and records every rejected row as an
- * Import Exception. Row visibility on read is still enforced by Dataverse.
+ * Uploads an Intelligent Office extract through the `al_ImportCases` command (AD-003).
+ *
+ * The whole import -- batch, cases, exceptions and audit event -- happens server-side in
+ * one transaction, so BR-002 validation cannot be bypassed by posting to the Web API and
+ * a failure part-way through leaves nothing half-written. This hook reads the file, does a
+ * local parse purely to catch a file that is unusable before sending it, and marshals the
+ * result.
  */
 export function useCaseUpload(onUploaded: () => void) {
   const [state, setState] = useState<UploadState>({ phase: 'idle' });
+  const intent = useIntentKeys();
 
   async function upload(file: File): Promise<void> {
     setState({ phase: 'processing', message: 'Reading file…' });
@@ -80,6 +53,9 @@ export function useCaseUpload(onUploaded: () => void) {
       return;
     }
 
+    // A local pre-check, not the rule. The server re-parses and re-validates; this only
+    // saves a round trip on a file that is obviously not an extract, and it is the same
+    // parser, so a file it accepts is a file the command accepts.
     const parsed = parseCaseCsv(text);
     if (parsed.fatal) {
       setState({ phase: 'error', message: parsed.fatal });
@@ -90,151 +66,42 @@ export function useCaseUpload(onUploaded: () => void) {
       return;
     }
 
-    const batchCode = `BATCH-${Date.now()}`;
-    const total = parsed.valid.length + parsed.invalid.length;
-    setState({ phase: 'processing', message: 'Creating import batch…' });
-
-    const batch = await Al_importbatchesService.create({
-      al_name: file.name,
-      al_importbatchcode: batchCode,
-      al_batchstatus: BATCH_STATUS_VALIDATING,
-      al_source: file.name.slice(0, 400),
-      al_importedon: new Date().toISOString(),
-      al_totalrows: total,
-      al_importedcount: 0,
-      al_exceptioncount: 0,
-      statecode: 0,
-    });
-    if (!batch.success || !batch.data) {
-      setState({ phase: 'error', message: 'The import batch could not be created in Dataverse.' });
-      return;
-    }
-    const batchId = batch.data.al_importbatchid;
-
-    let imported = 0;
-    let duplicates = 0;
-    let failed = 0;
-    const report: ValidationReportRow[] = [];
-
-    for (let i = 0; i < parsed.valid.length; i += 1) {
-      const row: ParsedCase = parsed.valid[i];
-      setState({ phase: 'processing', message: `Importing case ${i + 1} of ${parsed.valid.length}…` });
-      try {
-        if (await referenceExists(row.reference)) {
-          duplicates += 1;
-          const reason =
-            'IO reference already exists in Dataverse — skipped to avoid a duplicate case.';
-          report.push({
-            rowNumber: row.rowNumber,
-            caseReference: row.reference,
-            status: 'Duplicate (skipped)',
-            reason,
-            raw: row.raw,
-          });
-          await recordException(
-            batchId,
-            batchCode,
-            row.rowNumber,
-            row.reference,
-            reason,
-            row.raw,
-            EXCEPTION_STATUS_IGNORED,
-          );
-          continue;
-        }
-        const created = await Al_outcomecasesService.create(row.record);
-        if (created.success) {
-          imported += 1;
-        } else {
-          failed += 1;
-          const reason = 'Dataverse rejected this case. Check the values and try again.';
-          report.push({
-            rowNumber: row.rowNumber,
-            caseReference: row.reference,
-            status: 'Failed',
-            reason,
-            raw: row.raw,
-          });
-          await recordException(
-            batchId,
-            batchCode,
-            row.rowNumber,
-            row.reference,
-            reason,
-            row.raw,
-            EXCEPTION_STATUS_OPEN,
-          );
-        }
-      } catch {
-        failed += 1;
-        const reason = 'Dataverse rejected this case. Check the values and try again.';
-        report.push({
-          rowNumber: row.rowNumber,
-          caseReference: row.reference,
-          status: 'Failed',
-          reason,
-          raw: row.raw,
-        });
-        await recordException(
-          batchId,
-          batchCode,
-          row.rowNumber,
-          row.reference,
-          reason,
-          row.raw,
-          EXCEPTION_STATUS_OPEN,
-        );
-      }
-    }
-
-    for (const bad of parsed.invalid as RowError[]) {
-      report.push({
-        rowNumber: bad.rowNumber,
-        caseReference: bad.caseReference,
-        status: 'Invalid',
-        reason: bad.reason,
-        raw: bad.raw,
-      });
-      try {
-        await recordException(
-          batchId,
-          batchCode,
-          bad.rowNumber,
-          bad.caseReference,
-          bad.reason,
-          bad.raw,
-          EXCEPTION_STATUS_OPEN,
-        );
-      } catch {
-        failed += 1;
-      }
-    }
-
-    const exceptionCount = total - imported;
-    const completed = await Al_importbatchesService.update(batchId, {
-      al_batchstatus: BATCH_STATUS_COMPLETED,
-      al_importedcount: imported,
-      al_exceptioncount: exceptionCount,
+    setState({
+      phase: 'processing',
+      message: `Importing ${parsed.valid.length + parsed.invalid.length} rows…`,
     });
 
-    // The rows are already in Dataverse; only the batch header failed to close. Say so
-    // rather than reporting success, so the batch is not left silently at Validating
-    // with counts that never caught up.
-    if (!completed.success) {
-      logTechnical('import batch completion', completed.error);
-      setState({
-        phase: 'error',
-        message:
-          `${imported} of ${total} cases were imported, but the batch could not be marked ` +
-          `complete. Ask an administrator to check batch ${batchCode} before re-running it.`,
-      });
+    // One key per file, held until the import is confirmed (NFR-REL-01). Retrying the same
+    // file after a timeout replays the original batch rather than logging a second one;
+    // a genuinely different file — corrected and re-saved — carries a different token.
+    const token = `import:${file.name}:${file.size}:${file.lastModified}`;
+
+    const result = await importCases({
+      fileName: file.name,
+      csv: text,
+      idempotencyKey: intent.keyFor(token),
+    });
+
+    if (!result.ok) {
+      setState({ phase: 'error', message: result.message });
+      // The command may have written the batch before failing, and a failure that turns
+      // out to be a timed-out success leaves rows in place. Reload either way, so the
+      // screen shows what Dataverse actually holds rather than what the error implies.
       onUploaded();
       return;
     }
 
+    intent.release(token);
     setState({
       phase: 'done',
-      result: { batchReference: batchCode, total, imported, duplicates, failed, report },
+      result: {
+        batchReference: result.data.batchReference,
+        total: result.data.total,
+        imported: result.data.imported,
+        duplicates: result.data.duplicates,
+        failed: result.data.failed,
+        report: toReportRows(result.data.report),
+      },
     });
     onUploaded();
   }

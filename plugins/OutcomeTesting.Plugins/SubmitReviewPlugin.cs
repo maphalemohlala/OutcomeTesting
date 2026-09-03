@@ -218,12 +218,50 @@ namespace OutcomeTesting.Plugins
 
             var auditId = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details);
 
+            QueueSubmittedNotification(service, correlationId, review, targetId);
+
             return new SubmitResult
             {
                 Status = StatusName(StatusSubmitted),
                 AuditEventId = auditId,
                 Conflict = false,
             };
+        }
+
+        /// <summary>
+        /// Queues the PP-15 "Review submitted" event (AD-035), in the same transaction as
+        /// the submission so the two cannot disagree.
+        ///
+        /// The recipient is the para-planner named on the case (OD-030(ii), project owner
+        /// direction 2026-09-04). That is what BR-009 asks for: the para-planner who
+        /// supported the case hears that its check is finished, by email, without being
+        /// given a licence, a web role or any operational access to the case itself.
+        ///
+        /// The case names the para-planner but carries no address for them, so
+        /// <see cref="NotificationOutbox.ParaplannerEmail"/> resolves the name to a Contact
+        /// and returns null unless the match is unambiguous. A null recipient still queues
+        /// the row — the event happened and the outbox says so — and the drain then marks it
+        /// Failed with the reason, which puts an unresolvable para-planner in front of a
+        /// person instead of sending a client's advice outcome to a guessed address.
+        /// </summary>
+        private static void QueueSubmittedNotification(
+            IOrganizationService service,
+            Guid correlationId,
+            Entity review,
+            Guid reviewId)
+        {
+            var caseRef = review.GetAttributeValue<EntityReference>("al_outcomecaseid");
+            var reference = NotificationOutbox.CaseReference(service, caseRef) ?? "a case";
+
+            NotificationOutbox.Queue(
+                service,
+                correlationId,
+                NotificationOutbox.EventReviewSubmitted,
+                ReviewEntity,
+                reviewId,
+                NotificationOutbox.ParaplannerEmail(service, caseRef),
+                "Review submitted on case " + reference,
+                "The review on case " + reference + " has been submitted and is locked to further edits (FR-017).");
         }
 
         /// <summary>

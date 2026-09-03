@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Duplicates">
+  <description default="Rows skipped because the IO reference already exists (BR-001).">
+    <label description="Rows skipped because the IO reference already exists (BR-001)." languagecode="1033" />
+  </description>
+  <displayname default="Duplicates">
+    <label description="Duplicates" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_ImportCases.Duplicates</name>
+  <type>10</type>
+</customapiresponseproperty>

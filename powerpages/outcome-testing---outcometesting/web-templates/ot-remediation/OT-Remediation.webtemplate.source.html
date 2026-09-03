@@ -14,9 +14,12 @@
   the timezone question app/src/lib/workingDays.ts has to solve: the server has already
   resolved which UK day each value falls on.
 
-  Not yet implemented (OD-018 names it): a rejected sign-off resets the clock while
-  preserving the previous period. That needs each period stored on the action, so a case
-  that goes round twice still shows one age here, not two.
+  A rejected sign-off (BR-008) resets the clock, and the period it ended is preserved
+  rather than merged (OD-018). `al_clockstartedon` holds the start of the period now
+  running and `createdon` keeps the original start, so an action that has been round
+  twice shows both: the ten-day threshold measures the current period, and the earlier
+  one is shown beside it rather than added to it. Merging them would report a case as
+  breached on the adviser's second day of rework, for time that was never theirs.
 {% endcomment %}
 
 {% comment %}
@@ -40,6 +43,7 @@
     <attribute name="al_adviserresponse" />
     <attribute name="al_evidencereference" />
     <attribute name="al_assignedcontactid" />
+    <attribute name="al_clockstartedon" />
     <attribute name="createdon" />
     <order attribute="al_duedate" descending="false" />
     <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
@@ -101,9 +105,17 @@
               <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
               <td>{{ a.createdon | date: 'dd MMM yyyy' | default: '—' }}</td>
               <td>
+                {% comment %}
+                  data-opened is the start of the CURRENT period: al_clockstartedon once a
+                  rejected sign-off has reset it, and createdon until then. data-created is
+                  passed alongside so the script can show the period the reset ended
+                  (OD-018) instead of one merged age.
+                {% endcomment %}
+                {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
                 <span class="ot-age"
                       data-ot-age
-                      data-opened="{{ a.createdon | date: 'yyyy-MM-dd' }}"
+                      data-opened="{{ clock_start | date: 'yyyy-MM-dd' }}"
+                      data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
                       data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
               </td>
               <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
@@ -240,6 +252,12 @@
    * day 1, bank holidays are not deducted. An action that has completed is aged to its
    * completion date, so a finished action stops ticking.
    *
+   * data-opened is the start of the CURRENT period, which a rejected sign-off resets
+   * (OD-018). data-created is the original start, so where the two differ the period the
+   * rejection ended is shown beside the current one rather than added to it — an action
+   * back with the adviser is on a fresh ten days, and the earlier round is history, not
+   * a debt against the new one.
+   *
    * Input is a yyyy-MM-dd calendar date the server already resolved, so nothing here
    * converts a timezone. Each date is pinned to midday UTC before arithmetic, which is
    * what stops a day slipping when the browser sits in another region.
@@ -281,9 +299,27 @@
       var age = workingDaysBetween(opened, completed || today);
 
       cell.textContent = age + (age === 1 ? ' working day' : ' working days');
+
+      // A clock that has been reset carries an earlier period. Show it, because a case
+      // that has been round twice is not the same as one on its first ten days, and the
+      // adviser and the T&C Manager both need to see that it went back.
+      var created = midday(cell.getAttribute('data-created'));
+      if (created && created.getTime() < opened.getTime()) {
+        var previous = workingDaysBetween(created, opened);
+        var note = document.createElement('span');
+        note.className = 'ot-age__previous';
+        note.textContent = ' (reworked; previous period ' + previous +
+          (previous === 1 ? ' working day)' : ' working days)');
+        cell.appendChild(note);
+        cell.setAttribute('title',
+          'Sent back after sign-off. The ten-working-day threshold runs from the restart (OD-018).');
+      }
+
       if (!completed && age > THRESHOLD) {
         cell.classList.add('ot-age--breached');
-        cell.setAttribute('title', 'Past the ten-working-day threshold (BR-010).');
+        var existing = cell.getAttribute('title');
+        cell.setAttribute('title',
+          (existing ? existing + ' ' : '') + 'Past the ten-working-day threshold (BR-010).');
       }
     }
   })();

@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="ExceptionId">
+  <description default="Id of the al_importexception closed.">
+    <label description="Id of the al_importexception closed." languagecode="1033" />
+  </description>
+  <displayname default="Exception id">
+    <label description="Exception id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_ResolveImportException.ExceptionId</name>
+  <type>10</type>
+</customapiresponseproperty>

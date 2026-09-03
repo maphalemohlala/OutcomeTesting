@@ -30,6 +30,10 @@ export interface ExceptionSummary {
   reason: string;
   status: string;
   resolvedOn: string | null;
+  /** What was done about the row when it was closed. Empty while it is still open. */
+  resolutionNote: string | null;
+  /** Only an open exception can be closed (al_ResolveImportException refuses the rest). */
+  isOpen: boolean;
 }
 
 export type IntakeState =
@@ -64,14 +68,19 @@ function toBatch(record: Al_importbatches): BatchSummary {
 }
 
 function toException(record: Al_importexceptions): ExceptionSummary {
+  const status = Al_importexceptionsal_exceptionstatus[record.al_exceptionstatus] ?? 'Unknown';
   return {
     id: record.al_importexceptionid,
     batch: record.al_importbatchidname ?? null,
     rowNumber: record.al_rownumber ?? null,
     caseReference: record.al_casereference ?? null,
     reason: record.al_reason,
-    status: Al_importexceptionsal_exceptionstatus[record.al_exceptionstatus] ?? 'Unknown',
+    status,
     resolvedOn: formatDate(record.al_resolvedon),
+    resolutionNote: record.al_resolutionnote ?? null,
+    // Read from the label rather than the raw option value, so an unrecognised status
+    // reads as not-open and the screen offers no action it cannot complete.
+    isOpen: status === 'Open',
   };
 }
 

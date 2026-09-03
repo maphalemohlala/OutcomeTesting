@@ -1,0 +1,18 @@
+<customapi uniquename="al_ImportCases">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Validates an Intelligent Office extract server-side and imports it (BR-001, BR-002). Logs an al_importbatch, creates a case per valid row, skips references already held so a re-upload is idempotent, and records each rejected row as an al_importexception with its reason (FR-002).">
+    <label description="Validates an Intelligent Office extract server-side and imports it (BR-001, BR-002). Logs an al_importbatch, creates a case per valid row, skips references already held so a re-upload is idempotent, and records each rejected row as an al_importexception with its reason (FR-002)." languagecode="1033" />
+  </description>
+  <displayname default="Import Cases">
+    <label description="Import Cases" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_ImportCases</name>
+  <plugintypeid>
+    <plugintypeexportkey>aaeaca7d-c2a7-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

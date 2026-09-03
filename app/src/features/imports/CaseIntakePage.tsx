@@ -1,8 +1,10 @@
-import { useRef } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
+import { usePermissions } from '../../app/permissions/permissionContext';
 import { useCaseIntake } from './useCaseIntake';
 import { useCaseUpload } from './useCaseUpload';
+import { ResolveExceptionForm } from './ResolveExceptionForm';
 import { downloadTemplate, downloadValidationReport } from './caseUpload';
 import './CaseIntakePage.css';
 
@@ -10,6 +12,14 @@ export function CaseIntakePage() {
   const { state, reload } = useCaseIntake();
   const upload = useCaseUpload(reload);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { can } = usePermissions();
+
+  // Which exception is being closed, if any. One at a time: the form carries a mandatory
+  // note, and several open at once invites pasting the same note into all of them.
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [resolvedNotice, setResolvedNotice] = useState<string | null>(null);
+
+  const mayResolve = can('page.imports', 'Edit');
 
   const busy = upload.state.phase === 'processing';
 
@@ -176,6 +186,19 @@ export function CaseIntakePage() {
             <h2 id="intake-exceptions" className="intake__heading">
               Exceptions to resolve
             </h2>
+
+            {resolvedNotice ? (
+              <div className="intake__notice intake__notice--success" role="status">
+                <p>{resolvedNotice}</p>
+                <button
+                  type="button"
+                  className="intake__btn intake__btn--ghost"
+                  onClick={() => setResolvedNotice(null)}
+                >
+                  Dismiss
+                </button>
+              </div>
+            ) : null}
             <div className="intake__scroll">
               <table className="intake">
                 <caption className="visually-hidden">
@@ -191,25 +214,66 @@ export function CaseIntakePage() {
                     <th scope="col">Reason</th>
                     <th scope="col">Status</th>
                     <th scope="col">Resolved on</th>
+                    <th scope="col">Outcome</th>
                   </tr>
                 </thead>
                 <tbody>
                   {state.exceptions.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="intake__empty">
+                      <td colSpan={7} className="intake__empty">
                         No rows have failed validation.
                       </td>
                     </tr>
                   ) : (
                     state.exceptions.map((exception) => (
-                      <tr key={exception.id}>
-                        <td>{exception.batch ?? 'Unknown batch'}</td>
-                        <td className="intake__numeric">{exception.rowNumber ?? '—'}</td>
-                        <td>{exception.caseReference ?? 'Missing'}</td>
-                        <td className="intake__reason">{exception.reason}</td>
-                        <td>{exception.status}</td>
-                        <td>{exception.resolvedOn ?? 'Open'}</td>
-                      </tr>
+                      <Fragment key={exception.id}>
+                        <tr>
+                          <td>{exception.batch ?? 'Unknown batch'}</td>
+                          <td className="intake__numeric">{exception.rowNumber ?? '—'}</td>
+                          <td>{exception.caseReference ?? 'Missing'}</td>
+                          <td className="intake__reason">{exception.reason}</td>
+                          <td>{exception.status}</td>
+                          <td>{exception.resolvedOn ?? 'Open'}</td>
+                          <td>
+                            {exception.resolutionNote ? (
+                              <span className="intake__reason">{exception.resolutionNote}</span>
+                            ) : exception.isOpen && mayResolve ? (
+                              <button
+                                type="button"
+                                className="intake__btn intake__btn--ghost"
+                                onClick={() => {
+                                  setResolvedNotice(null);
+                                  setResolvingId(
+                                    resolvingId === exception.id ? null : exception.id,
+                                  );
+                                }}
+                                aria-expanded={resolvingId === exception.id}
+                              >
+                                {resolvingId === exception.id ? 'Cancel' : 'Close row'}
+                              </button>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                        </tr>
+                        {resolvingId === exception.id ? (
+                          <tr className="intake__resolve-row">
+                            <td colSpan={7}>
+                              <ResolveExceptionForm
+                                exception={exception}
+                                onResolved={() => {
+                                  setResolvingId(null);
+                                  setResolvedNotice(
+                                    `Row ${exception.rowNumber ?? ''} closed. The reason it failed is kept alongside the note.`,
+                                  );
+                                  reload();
+                                }}
+                                onCancel={() => setResolvingId(null)}
+                              />
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
                     ))
                   )}
                 </tbody>
