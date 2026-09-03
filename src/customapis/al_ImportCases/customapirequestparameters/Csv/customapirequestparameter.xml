@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Csv">
+  <description default="The raw CSV extract. Sent as text rather than as parsed rows so BR-002 validation is applied server-side and cannot be bypassed.">
+    <label description="The raw CSV extract. Sent as text rather than as parsed rows so BR-002 validation is applied server-side and cannot be bypassed." languagecode="1033" />
+  </description>
+  <displayname default="Extract">
+    <label description="Extract" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_ImportCases.Csv</name>
+  <type>10</type>
+</customapirequestparameter>

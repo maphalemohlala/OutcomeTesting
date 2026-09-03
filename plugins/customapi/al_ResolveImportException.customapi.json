@@ -1,0 +1,73 @@
+{
+  "$comment": "Contract for the ResolveImportException server-side command (AD-003, BR-002, FR-002/FR-003). Deployed via the registration console (plugins/OutcomeTesting.Registration) and added to the OutcomeTesting solution via a solution-file import (src/customapis/al_ResolveImportException). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_ResolveImportException",
+    "name": "al_ResolveImportException",
+    "displayname": "Resolve Import Exception",
+    "description": "Closes an import exception once the row has been dealt with (BR-002, FR-002/FR-003): Resolved when corrected and re-imported, Ignored when it was never a case. The mandatory note is kept separate from the validation reason. Writes an immutable Audit Event.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.ResolveImportExceptionPlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "ExceptionId",
+      "name": "ExceptionId",
+      "displayname": "Exception id",
+      "description": "Id of the al_importexception to close.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "Resolution",
+      "name": "Resolution",
+      "displayname": "Resolution",
+      "description": "Resolved or Ignored.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "Note",
+      "name": "Note",
+      "displayname": "Note",
+      "description": "Mandatory note recorded on the exception and the Audit Event (BR-012, NFR-AUD-01).",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay returns the same closure.",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "ExceptionId",
+      "name": "ExceptionId",
+      "displayname": "Exception id",
+      "description": "Id of the al_importexception closed.",
+      "type": 10
+    },
+    {
+      "uniquename": "Status",
+      "name": "Status",
+      "displayname": "Status",
+      "description": "The status recorded: Resolved or Ignored.",
+      "type": 10
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written.",
+      "type": 10
+    }
+  ]
+}

@@ -1,5 +1,11 @@
 # Delivery status — 2026-09-02
 
+> **Superseded by `docs/2026-09-03-delivery-status.md`.** This document was written at
+> commit `470fc61` and does not cover the four commits that followed it — the manager MI
+> drill-down and Excel exports, Tax-only export rows, the portal queue and self-claim. It
+> stays as the record of what was true on 2026-09-02; read the 2026-09-03 document for
+> current state.
+
 Where the solution stands after a day of work on the front-end gaps identified in
 `docs/2026-09-01-front-end-state-and-gaps.md`. That document is now substantially out of
 date; this one supersedes it.

@@ -137,10 +137,10 @@
   adx_name: Webapi/al_caseassignment/fields
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000aa
   adx_value: al_outcomecaseid,al_assignedcontactid
-- adx_description: "Switches on the \"Run checks\" button that lets a checker pick a queued case up (AD-076). Held OFF until ClaimCasePlugin is registered in the environment: without the plug-in the Web API create still succeeds, because the columns it stamps are only business required and Dataverse does not enforce that through the API, so the page would report success while the case stayed in the queue and left assignment rows that AD-037 forbids deleting. The queue list itself renders either way."
+- adx_description: "Switches on the \"Run checks\" button that lets a checker pick a queued case up (AD-076). Turned ON 2026-09-03, once ClaimCasePlugin was registered in DEV. It was held OFF until then because without the plug-in the Web API create still succeeds — the columns it stamps are only business required and Dataverse does not enforce that through the API — so the page would have reported success while the case stayed in the queue and left assignment rows that AD-037 forbids deleting. The queue list itself renders either way. Turning this on in a NEW environment requires the same two prerequisites in this order: the plug-in step registered, then the \"Case Assignment - claim from the queue\" permission uploaded."
   adx_name: OutcomeTesting/Claim/Enabled
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000ab
-  adx_value: 'false'
+  adx_value: 'true'
 - adx_description: "Trigger id of the \"Submit Review\" cloud flow for THIS environment, taken from the flow's Power Pages trigger URL (the guid after /trigger/). SUPERSEDED: submission no longer goes through Power Automate. The review page writes al_submitrequested over the Web API and SubmitRequestPlugin does the work, so this setting is unused and stays empty. Kept rather than deleted because deleting a site setting is not what an upload does."
   adx_name: OutcomeTesting/Flow/SubmitReview
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a0

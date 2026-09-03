@@ -21,6 +21,7 @@ export type Al_remediationactionsstatuscode = keyof typeof Al_remediationactions
 
 export interface Al_remediationactionsBase {
   al_actionstatus: Al_remediationactionsal_actionstatus;
+  al_clockstartedon?: string;
   al_completedon?: string;
   al_description: string;
   al_duedate?: string;

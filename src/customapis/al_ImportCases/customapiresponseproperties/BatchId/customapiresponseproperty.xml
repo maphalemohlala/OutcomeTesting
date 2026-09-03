@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="BatchId">
+  <description default="Id of the al_importbatch created.">
+    <label description="Id of the al_importbatch created." languagecode="1033" />
+  </description>
+  <displayname default="Batch id">
+    <label description="Batch id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_ImportCases.BatchId</name>
+  <type>10</type>
+</customapiresponseproperty>

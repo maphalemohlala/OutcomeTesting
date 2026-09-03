@@ -16,7 +16,7 @@ import {
 } from '../../generated/models/Al_remediationactionsModel';
 import {
   REMEDIATION_THRESHOLD_WORKING_DAYS,
-  workingDayAge,
+  remediationClock,
 } from '../../lib/workingDays';
 import {
   Al_signoffsal_signoffdecision,
@@ -106,8 +106,11 @@ function aggregate(
     if (isOverdue(record.al_duedate)) overdueRemediation += 1;
 
     // The BR-010 clock is working days (OD-018). Calendar days were provisional and are
-    // no longer used for remediation.
-    const age = workingDayAge(record.createdon);
+    // no longer used for remediation. The band is the period now running, because a
+    // rejected sign-off restarts the clock and the previous period is preserved rather
+    // than merged — banding on the merged age would put a freshly reworked action in the
+    // oldest band on the strength of a round that is already closed.
+    const age = remediationClock(record).current;
     const bandIndex = AGEING_BANDS.findIndex((band) => age >= band.min && age <= band.max);
     if (bandIndex >= 0) bands[bandIndex].count += 1;
   }

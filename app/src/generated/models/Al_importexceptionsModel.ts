@@ -28,6 +28,7 @@ export interface Al_importexceptionsBase {
   al_name: string;
   al_rawdata?: string;
   al_reason: string;
+  al_resolutionnote?: string;
   al_resolvedon?: string;
   al_rownumber?: number;
   importsequencenumber?: number;

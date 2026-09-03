@@ -22,6 +22,7 @@ namespace OutcomeTesting.Plugins
         private const string SignoffEntity = "al_signoff";
         private const string ActionEntity = "al_remediationaction";
         private const string ActionStatus = "al_actionstatus";
+        private const string ClockStartedOnAttr = "al_clockstartedon";
         private const string DecisionAttr = "al_signoffdecision";
         private const string NotesAttr = "al_notes";
         private const string ActionLookup = "al_remediationactionid";
@@ -77,10 +78,7 @@ namespace OutcomeTesting.Plugins
 
             if (decision.Value == DecisionRejectedValue)
             {
-                service.Update(new Entity(ActionEntity, actionRef.Id)
-                {
-                    [ActionStatus] = new OptionSetValue(StatusInProgress),
-                });
+                service.Update(ReopenedAction(actionRef.Id, DateTime.UtcNow));
             }
             else if (decision.Value == DecisionApprovedValue)
             {
@@ -97,6 +95,76 @@ namespace OutcomeTesting.Plugins
                 "Signed off from the portal: " + DescribeDecision(decision.Value) + ". Sign-off " + signoff.Id.ToString("D"),
                 idempotencyKey,
                 context);
+
+            QueueSignoffNotification(service, context, signoff, actionRef, decision.Value);
+        }
+
+        /// <summary>
+        /// Tells the adviser what happened to their remediation (PP-15, AD-035). Queued in
+        /// the same transaction as the decision, so a sign-off that rolls back takes its
+        /// notification with it and one that commits cannot be silently unannounced.
+        ///
+        /// Keyed on the sign-off rather than the action, because an action that goes round
+        /// twice is genuinely two decisions and the adviser needs to hear about both — key
+        /// it on the action and the second rejection would collide with the first and never
+        /// be sent.
+        /// </summary>
+        private static void QueueSignoffNotification(
+            IOrganizationService service,
+            IPluginExecutionContext context,
+            Entity signoff,
+            EntityReference actionRef,
+            int decision)
+        {
+            var approved = decision == DecisionApprovedValue;
+            var action = service.Retrieve(ActionEntity, actionRef.Id,
+                new ColumnSet("al_assignedcontactid", CaseLookup));
+
+            var caseRef = signoff.GetAttributeValue<EntityReference>(CaseLookup)
+                ?? action.GetAttributeValue<EntityReference>(CaseLookup);
+            var reference = NotificationOutbox.CaseReference(service, caseRef) ?? "a case";
+            var email = NotificationOutbox.ContactEmail(service, action.GetAttributeValue<EntityReference>("al_assignedcontactid"));
+            var notes = signoff.GetAttributeValue<string>(NotesAttr);
+
+            var body = approved
+                ? "Your remediation on case " + reference + " has been approved and the case has moved on to recheck."
+                : "Your remediation on case " + reference + " has been sent back for further work. "
+                    + "The ten-working-day clock has restarted from today (OD-018).";
+
+            if (!string.IsNullOrWhiteSpace(notes))
+            {
+                body += " Notes: " + notes;
+            }
+
+            NotificationOutbox.Queue(
+                service,
+                context,
+                approved ? NotificationOutbox.EventSignoffApproved : NotificationOutbox.EventSignoffRejected,
+                SignoffEntity,
+                signoff.Id,
+                email,
+                (approved ? "Remediation approved on case " : "Remediation sent back on case ") + reference,
+                body);
+        }
+
+        /// <summary>
+        /// The action as a rejection leaves it: back with the adviser, and on a fresh
+        /// BR-010 clock (OD-018). The reset is what makes the previous period a period
+        /// rather than part of one long age — <c>createdon</c> keeps the original start, so
+        /// createdon-to-clockStartedOn is the timer that just ended and clockStartedOn-to-now
+        /// is the one now running. A case that goes round twice therefore reads as two
+        /// timers, and the ten-working-day threshold applies to the current one.
+        ///
+        /// The status is set explicitly rather than left alone because a rejected action
+        /// has already been through Completed, and rework has to be visible as in progress.
+        /// </summary>
+        public static Entity ReopenedAction(Guid actionId, DateTime now)
+        {
+            return new Entity(ActionEntity, actionId)
+            {
+                [ActionStatus] = new OptionSetValue(StatusInProgress),
+                [ClockStartedOnAttr] = now,
+            };
         }
 
         /// <summary>

@@ -126,6 +126,17 @@ namespace OutcomeTesting.Plugins
             return null;
         }
 
+        public static int? GetOptionalInt(IPluginExecutionContext context, string name)
+        {
+            object value;
+            if (context.InputParameters.TryGetValue(name, out value) && value is int)
+            {
+                return (int)value;
+            }
+
+            return null;
+        }
+
         /// <summary>True when the row is in the Active state (statecode 0).</summary>
         public static bool IsActive(Entity record)
         {

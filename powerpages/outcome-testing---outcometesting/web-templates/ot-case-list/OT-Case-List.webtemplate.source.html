@@ -24,9 +24,35 @@
 {% assign f_type     = request.params['type']     | default: '' %}
 {% assign f_from     = request.params['from']     | default: '' %}
 {% assign f_to       = request.params['to']       | default: '' %}
+{% assign f_outcome  = request.params['outcome']  | default: '' %}
+
+{% comment %}
+  Outcome filter (PP-17). This is the list the outcome cards on Home drill into, so the
+  parameter is a slug rather than an option-set number: a shared link reads as
+  /cases?outcome=harm, and no Dataverse internal is exposed in a URL a person can see.
+
+  A case's grade lives on al_outcome, not on the case, and BR-007 splits it across two
+  columns so a regrade preserves both. "Effective grade is X" therefore means final = X,
+  OR final is empty AND initial = X - which is why each slug carries the pair of option
+  values and the filter below is an OR containing a nested AND. The values are the two
+  option sets in src/Entities/al_Outcome/Entity.xml.
+
+  An unrecognised slug is cleared rather than ignored. Ignoring it would drop the
+  condition and show every case under a "Filtered cases" heading - a wrong answer that
+  looks like a right one.
+{% endcomment %}
+{% assign o_final = '' %}
+{% assign o_initial = '' %}
+{% case f_outcome %}
+  {% when 'pass' %}{% assign o_final = '120910710' %}{% assign o_initial = '120910700' %}
+  {% when 'issues' %}{% assign o_final = '120910711' %}{% assign o_initial = '120910701' %}
+  {% when 'insufficient' %}{% assign o_final = '120910712' %}{% assign o_initial = '120910702' %}
+  {% when 'harm' %}{% assign o_final = '120910713' %}{% assign o_initial = '120910703' %}
+{% endcase %}
+{% if f_outcome != '' and f_outcome != 'none' and o_final == '' %}{% assign f_outcome = '' %}{% endif %}
 
 {% assign has_filter = false %}
-{% if f_ref != '' or f_client != '' or f_adviser != '' or f_status != '' or f_priority != '' or f_type != '' or f_from != '' or f_to != '' %}{% assign has_filter = true %}{% endif %}
+{% if f_ref != '' or f_client != '' or f_adviser != '' or f_status != '' or f_priority != '' or f_type != '' or f_from != '' or f_to != '' or f_outcome != '' %}{% assign has_filter = true %}{% endif %}
 
 {% comment %}
   `integer` is the only safe coercion here. `times: 1` repeats a string rather than
@@ -37,7 +63,7 @@
 {% assign page_number = request.params['page'] | integer | default: 1 %}
 {% if page_number < 1 %}{% assign page_number = 1 %}{% endif %}
 
-{% capture qs %}ref={{ f_ref | url_escape }}&client={{ f_client | url_escape }}&adviser={{ f_adviser | url_escape }}&status={{ f_status | url_escape }}&priority={{ f_priority | url_escape }}&type={{ f_type | url_escape }}&from={{ f_from | url_escape }}&to={{ f_to | url_escape }}{% endcapture %}
+{% capture qs %}ref={{ f_ref | url_escape }}&client={{ f_client | url_escape }}&adviser={{ f_adviser | url_escape }}&status={{ f_status | url_escape }}&priority={{ f_priority | url_escape }}&type={{ f_type | url_escape }}&from={{ f_from | url_escape }}&to={{ f_to | url_escape }}&outcome={{ f_outcome | url_escape }}{% endcapture %}
 
 <form class="ot-filters" method="get" action="/cases" role="search" aria-label="Filter cases">
   <div class="ot-filters__grid">
@@ -93,6 +119,17 @@
       </select>
     </div>
     <div class="ot-field">
+      <label for="f-outcome">Outcome</label>
+      <select id="f-outcome" name="outcome">
+        <option value="">Any outcome</option>
+        <option value="pass" {% if f_outcome == 'pass' %}selected{% endif %}>Pass</option>
+        <option value="issues" {% if f_outcome == 'issues' %}selected{% endif %}>Pass with issues</option>
+        <option value="insufficient" {% if f_outcome == 'insufficient' %}selected{% endif %}>Insufficient evidence</option>
+        <option value="harm" {% if f_outcome == 'harm' %}selected{% endif %}>Potential harm</option>
+        <option value="none" {% if f_outcome == 'none' %}selected{% endif %}>Not yet graded</option>
+      </select>
+    </div>
+    <div class="ot-field">
       <label for="f-from">Advice date from</label>
       <input type="date" id="f-from" name="from" value="{{ f_from | escape }}">
     </div>
@@ -119,8 +156,24 @@
     <attribute name="al_priority" />
     <attribute name="al_advicedate" />
     <attribute name="al_duedate" />
-    {% if has_filter %}<filter type="and">{% if f_ref != '' %}<condition attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" />{% endif %}{% if f_client != '' %}<condition attribute="al_clientname" operator="like" value="%{{ f_client | xml_escape }}%" />{% endif %}{% if f_adviser != '' %}<condition attribute="al_advisername" operator="like" value="%{{ f_adviser | xml_escape }}%" />{% endif %}{% if f_status != '' %}<condition attribute="al_casestatus" operator="eq" value="{{ f_status | xml_escape }}" />{% endif %}{% if f_priority != '' %}<condition attribute="al_priority" operator="eq" value="{{ f_priority | xml_escape }}" />{% endif %}{% if f_type != '' %}<condition attribute="al_casetype" operator="eq" value="{{ f_type | xml_escape }}" />{% endif %}{% if f_from != '' %}<condition attribute="al_advicedate" operator="on-or-after" value="{{ f_from | xml_escape }}" />{% endif %}{% if f_to != '' %}<condition attribute="al_advicedate" operator="on-or-before" value="{{ f_to | xml_escape }}" />{% endif %}</filter>{% endif %}
+    {% if has_filter %}<filter type="and">{% if f_ref != '' %}<condition attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" />{% endif %}{% if f_client != '' %}<condition attribute="al_clientname" operator="like" value="%{{ f_client | xml_escape }}%" />{% endif %}{% if f_adviser != '' %}<condition attribute="al_advisername" operator="like" value="%{{ f_adviser | xml_escape }}%" />{% endif %}{% if f_status != '' %}<condition attribute="al_casestatus" operator="eq" value="{{ f_status | xml_escape }}" />{% endif %}{% if f_priority != '' %}<condition attribute="al_priority" operator="eq" value="{{ f_priority | xml_escape }}" />{% endif %}{% if f_type != '' %}<condition attribute="al_casetype" operator="eq" value="{{ f_type | xml_escape }}" />{% endif %}{% if f_from != '' %}<condition attribute="al_advicedate" operator="on-or-after" value="{{ f_from | xml_escape }}" />{% endif %}{% if f_to != '' %}<condition attribute="al_advicedate" operator="on-or-before" value="{{ f_to | xml_escape }}" />{% endif %}{% if f_outcome == 'none' %}<condition entityname="oc" attribute="al_outcomeid" operator="null" />{% elsif f_outcome != '' %}<filter type="or"><condition entityname="oc" attribute="al_finaloutcome" operator="eq" value="{{ o_final }}" /><filter type="and"><condition entityname="oc" attribute="al_finaloutcome" operator="null" /><condition entityname="oc" attribute="al_initialoutcome" operator="eq" value="{{ o_initial }}" /></filter></filter>{% endif %}</filter>{% endif %}
     <order attribute="al_casereference" descending="false" />
+    {% comment %}
+      Outer, and joined on the case rather than the review: a case with no outcome yet must
+      still appear in an unfiltered list, and "Not yet graded" is a real drill-down target
+      from the Home cards. An inner join would silently drop every ungraded case from the
+      whole worklist.
+
+      One row per case, not several. al_outcome is written only by the AQS branch of
+      SubmitReviewPlugin, on a review instance whose code ClaimCasePlugin makes deterministic
+      per case and discipline; a regrade updates al_finaloutcome on that same row (BR-007)
+      rather than adding another. So this join cannot multiply a case across pages, and the
+      grade below is unambiguous.
+    {% endcomment %}
+    <link-entity name="al_outcome" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="oc">
+      <attribute name="al_initialoutcome" />
+      <attribute name="al_finaloutcome" />
+    </link-entity>
   </entity>
 </fetch>
 {% endfetchxml %}
@@ -145,6 +198,7 @@
             <th scope="col">Adviser</th>
             <th scope="col">Case type</th>
             <th scope="col">Status</th>
+            <th scope="col">Outcome</th>
             <th scope="col">Priority</th>
             <th scope="col">Advice date</th>
             <th scope="col">Due</th>
@@ -158,6 +212,7 @@
               <td>{{ c.al_advisername | escape }}</td>
               <td>{{ c.al_casetype.label | escape }}</td>
               <td>{% include 'OT Status Badge' status: c.al_casestatus.label %}</td>
+              <td>{% capture grade %}{% include 'OT Outcome Label' final: c['oc.al_finaloutcome'] initial: c['oc.al_initialoutcome'] %}{% endcapture %}{% assign grade = grade | strip %}{% if grade != '' %}{% include 'OT Status Badge' status: grade %}{% else %}<span class="ot-badge ot-badge--none">Not yet graded</span>{% endif %}</td>
               <td>{{ c.al_priority.label | escape }}</td>
               <td>{{ c.al_advicedate | date: 'dd MMM yyyy' }}</td>
               <td>{{ c.al_duedate | date: 'dd MMM yyyy' }}</td>

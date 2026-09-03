@@ -426,6 +426,21 @@ footer a:focus-visible, .footer a:focus-visible {
 
 .ot-tile--alert { border-left-color: var(--colour-outcome-issues); }
 
+/* PP-17 outcome cards. The edge repeats the grade hue already used by .ot-badge and by the
+   Code App's dashboard, so a grade reads the same colour wherever it appears. It is the
+   only decoration on the card and it carries no meaning on its own - the grade is written
+   out as the label beside it (NFR-ACC-01), which is also what keeps the set legible in
+   forced-colours mode, where the border collapses to the system colour. */
+.ot-tile--pass { border-left-color: var(--colour-outcome-pass); }
+.ot-tile--issues { border-left-color: var(--colour-outcome-issues); }
+.ot-tile--insufficient { border-left-color: var(--colour-outcome-insufficient); }
+.ot-tile--harm { border-left-color: var(--colour-outcome-harm); }
+.ot-tile--ungraded { border-left-color: var(--colour-outcome-none); }
+
+/* Tiles nested in a card sit flush inside its padding rather than adding a second gap
+   under the heading, and lose the standalone strip's bottom margin. */
+.ot-card .ot-tiles { margin-bottom: 0; }
+
 /* ------------------------------------------------------------------
    Filters. A working control strip, not a search hero: compact fields,
    every one labelled, and a clear-filters action that only appears when
@@ -751,6 +766,19 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-age--breached {
   color: var(--colour-outcome-harm);
   font-weight: 600;
+}
+
+/*
+ * The period a rejected sign-off ended (OD-018). Set below the current count in weight,
+ * because the current period is what the ten-day threshold measures — but it is plain
+ * text, not a colour cue, so it reads the same to anyone who cannot distinguish the two.
+ */
+.ot-age__previous {
+  display: block;
+  font-weight: 400;
+  font-size: 0.85em;
+  color: var(--colour-text-muted);
+  white-space: normal;
 }
 
 /* ------------------------------------------------------------------

@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Total">
+  <description default="Rows read from the extract, excluding the header and the guide row.">
+    <label description="Rows read from the extract, excluding the header and the guide row." languagecode="1033" />
+  </description>
+  <displayname default="Total">
+    <label description="Total" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_ImportCases.Total</name>
+  <type>10</type>
+</customapiresponseproperty>

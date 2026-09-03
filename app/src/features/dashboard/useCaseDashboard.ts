@@ -16,7 +16,7 @@ import {
 } from '../../generated/models/Al_remediationactionsModel';
 import type { Al_outcomes } from '../../generated/models/Al_outcomesModel';
 import { gradesByCase } from '../cases/caseWorklistMapping';
-import { REMEDIATION_THRESHOLD_WORKING_DAYS, workingDayAge } from '../../lib/workingDays';
+import { remediationClock } from '../../lib/workingDays';
 
 export interface StatusCount {
   status: CaseStatus;
@@ -130,7 +130,10 @@ function aggregate(
     }
     remediationOpen += 1;
     if (isOverdue(action.al_duedate)) remediationOverdue += 1;
-    if (workingDayAge(action.createdon) > REMEDIATION_THRESHOLD_WORKING_DAYS) {
+    // The current period, not the whole time in remediation: a rejected sign-off restarts
+    // the clock (OD-018), and counting from the original start would report a reworked
+    // action as breached before the adviser had had a day on it.
+    if (remediationClock(action).breached) {
       remediationBreached += 1;
     }
   }

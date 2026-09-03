@@ -1,6 +1,36 @@
 import { useEffect, useState } from 'react';
 import { Al_pagepermissionsService, Al_userrolemappingsService } from '../../generated';
 import { APP_ROLE_BY_VALUE, ACCESS_LEVEL_BY_VALUE } from '../../types/permissions';
+import { choiceLabel } from '../../lib/choiceLabel';
+
+/**
+ * What to show for an option value no map recognises.
+ *
+ * The previous fallback was String(value), which put a bare option number in the role and
+ * level columns — and rendered the literal text "undefined" when the column was empty,
+ * because String(undefined) is a string. Neither tells an administrator anything.
+ *
+ * The number is still shown, but labelled as unrecognised rather than presented as a role.
+ * This screen is explicitly administrative, so the raw value is the useful detail here: it
+ * is what someone needs in order to find the row that is wrong.
+ */
+function unrecognised(value: number | undefined): string {
+  return value == null ? 'Not set' : `Unrecognised (${value})`;
+}
+
+/**
+ * A custom role is identified by its stable al_role code (AD-044) and takes precedence;
+ * built-in roles come from the al_approle choice.
+ */
+function roleLabel(
+  roleCode: string | undefined,
+  formatted: string | undefined,
+  value: number | undefined,
+): string {
+  return (
+    roleCode?.trim() || choiceLabel(APP_ROLE_BY_VALUE, value, formatted) || unrecognised(value)
+  );
+}
 
 export interface RoleMappingRow {
   id: string;
@@ -48,11 +78,7 @@ export function useSecurityConfig(reloadKey: number): SecurityConfigState {
           .map((m) => ({
             id: m.al_userrolemappingid,
             email: m.al_useremail ?? '',
-            role:
-              m.al_rolecode?.trim() ||
-              m.al_approlename ||
-              APP_ROLE_BY_VALUE[Number(m.al_approle)] ||
-              String(m.al_approle),
+            role: roleLabel(m.al_rolecode, m.al_approlename, m.al_approle),
             active: Number(m.statecode) === 0,
           }))
           .sort((a, b) => a.email.localeCompare(b.email));
@@ -60,13 +86,11 @@ export function useSecurityConfig(reloadKey: number): SecurityConfigState {
         const permissions: PagePermissionRow[] = permResult.data
           .map((p) => ({
             id: p.al_pagepermissionid,
-            role:
-              p.al_rolecode?.trim() ||
-              p.al_approlename ||
-              APP_ROLE_BY_VALUE[Number(p.al_approle)] ||
-              String(p.al_approle),
+            role: roleLabel(p.al_rolecode, p.al_approlename, p.al_approle),
             resource: p.al_resourcekey ?? '',
-            level: p.al_accesslevelname ?? ACCESS_LEVEL_BY_VALUE[Number(p.al_accesslevel)] ?? String(p.al_accesslevel),
+            level:
+              choiceLabel(ACCESS_LEVEL_BY_VALUE, p.al_accesslevel, p.al_accesslevelname) ??
+              unrecognised(p.al_accesslevel),
             active: Number(p.statecode) === 0,
           }))
           .sort((a, b) => a.resource.localeCompare(b.resource) || a.role.localeCompare(b.role));

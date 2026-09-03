@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="BatchReference">
+  <description default="Business code of the batch, shown to the user and used to name the validation report.">
+    <label description="Business code of the batch, shown to the user and used to name the validation report." languagecode="1033" />
+  </description>
+  <displayname default="Batch reference">
+    <label description="Batch reference" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_ImportCases.BatchReference</name>
+  <type>10</type>
+</customapiresponseproperty>

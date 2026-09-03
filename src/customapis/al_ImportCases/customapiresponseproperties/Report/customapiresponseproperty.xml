@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Report">
+  <description default="JSON array of rejected and skipped rows for the validation report (FR-002). Empty on a replay.">
+    <label description="JSON array of rejected and skipped rows for the validation report (FR-002). Empty on a replay." languagecode="1033" />
+  </description>
+  <displayname default="Report">
+    <label description="Report" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>al_ImportCases.Report</name>
+  <type>10</type>
+</customapiresponseproperty>

@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Note">
+  <description default="Mandatory note recorded on the exception and the Audit Event (BR-012, NFR-AUD-01).">
+    <label description="Mandatory note recorded on the exception and the Audit Event (BR-012, NFR-AUD-01)." languagecode="1033" />
+  </description>
+  <displayname default="Note">
+    <label description="Note" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>al_ResolveImportException.Note</name>
+  <type>10</type>
+</customapirequestparameter>

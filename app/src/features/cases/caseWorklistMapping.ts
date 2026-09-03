@@ -13,7 +13,7 @@ import {
   Al_outcomesal_initialoutcome,
   type Al_outcomes,
 } from '../../generated/models/Al_outcomesModel';
-import { choiceLabel } from './choiceLabel';
+import { choiceLabel } from '../../lib/choiceLabel';
 import { lookupLabel } from './lookupLabel';
 
 /**

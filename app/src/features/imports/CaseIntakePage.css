@@ -131,3 +131,76 @@
 .intake__unavailable p + p {
   margin-top: var(--space-3);
 }
+
+/* ------------------------------------------------------------------
+   Closing an import exception (BR-002, FR-002/FR-003)
+
+   Rendered inline in the exceptions table rather than on a page of its
+   own, so the reason the row failed stays on screen while the note that
+   answers it is written.
+   ------------------------------------------------------------------ */
+
+.intake__resolve-row td {
+  background: var(--colour-surface-sunken);
+}
+
+.intake__resolve {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 60ch;
+  padding: var(--space-4);
+}
+
+.intake__resolve-heading {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.intake__resolve-choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.intake__resolve-choices legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.intake__resolve-choice {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+/* The meaning of each closure sits with the choice, not in a tooltip: picking the
+   wrong one cannot be undone, because AD-037 forbids deleting the row to put it back. */
+.intake__resolve-help {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.intake__resolve-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.intake__resolve-field textarea {
+  font: inherit;
+  padding: var(--space-2);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
+  background: var(--colour-surface);
+  color: var(--colour-text);
+  resize: vertical;
+}

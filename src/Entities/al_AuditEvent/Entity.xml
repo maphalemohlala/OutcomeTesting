@@ -267,6 +267,11 @@
                   <label description="SetPermissionRuleActive" languagecode="1033" />
                 </labels>
               </option>
+              <option value="120910791" IsHidden="0">
+                <labels>
+                  <label description="ResolveImportException" languagecode="1033" />
+                </labels>
+              </option>
               <option value="120910786" IsHidden="0">
                 <labels>
                   <label description="UpdateUser" languagecode="1033" />

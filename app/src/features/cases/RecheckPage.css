@@ -1,0 +1,81 @@
+.recheck__back {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.recheck__form {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 44rem;
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius);
+}
+
+.recheck__field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.recheck__field label {
+  font-weight: 600;
+  color: var(--colour-text);
+}
+
+.recheck__field select,
+.recheck__field textarea {
+  font: inherit;
+  padding: var(--space-2) var(--space-3);
+  color: var(--colour-text);
+  background: var(--colour-background);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.recheck__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.recheck__submit {
+  justify-self: start;
+  font: inherit;
+  font-weight: 600;
+  padding: var(--space-2) var(--space-4);
+  color: var(--colour-on-brand);
+  background: var(--colour-brand);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.recheck__submit[disabled] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.recheck__current h2 {
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-3);
+}
+
+.recheck__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.recheck__table th,
+.recheck__table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.recheck__table th {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}

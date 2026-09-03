@@ -4,6 +4,7 @@ import {
   addWorkingDays,
   hasBreachedRemediationThreshold,
   isWorkingDay,
+  remediationClock,
   workingDayAge,
   workingDaysBetween,
 } from './workingDays';
@@ -116,5 +117,99 @@ describe('hasBreachedRemediationThreshold', () => {
 
   it('does not breach on a missing date', () => {
     expect(hasBreachedRemediationThreshold(undefined)).toBe(false);
+  });
+});
+
+describe('remediationClock', () => {
+  // OD-018: a rejected sign-off resets the clock and the previous period is preserved,
+  // so a case that goes round twice shows both periods rather than one merged age.
+
+  it('measures one period from creation when the clock has never been reset', () => {
+    const clock = remediationClock({ createdon: '2026-08-24T09:00:00Z' }, at('2026-08-28'));
+
+    expect(clock.current).toBe(5);
+    expect(clock.previous).toBeNull();
+    expect(clock.wasReset).toBe(false);
+    expect(clock.total).toBe(5);
+  });
+
+  it('restarts the current period at the reset', () => {
+    const clock = remediationClock(
+      { createdon: '2026-08-10T09:00:00Z', al_clockstartedon: '2026-08-24T09:00:00Z' },
+      at('2026-08-28'),
+    );
+
+    expect(clock.current).toBe(5);
+  });
+
+  it('keeps the period the reset ended, rather than merging it in', () => {
+    const clock = remediationClock(
+      { createdon: '2026-08-10T09:00:00Z', al_clockstartedon: '2026-08-24T09:00:00Z' },
+      at('2026-08-28'),
+    );
+
+    expect(clock.previous).toBe(11);
+    expect(clock.wasReset).toBe(true);
+    expect(clock.total).toBe(16);
+  });
+
+  it('measures the threshold against the current period only', () => {
+    // The merged age here is 16 working days. Breaching on that would report a case as
+    // overdue on the adviser's second day of rework, for time that was never theirs.
+    const clock = remediationClock(
+      { createdon: '2026-08-10T09:00:00Z', al_clockstartedon: '2026-08-24T09:00:00Z' },
+      at('2026-08-28'),
+    );
+
+    expect(clock.total).toBeGreaterThan(REMEDIATION_THRESHOLD_WORKING_DAYS);
+    expect(clock.breached).toBe(false);
+  });
+
+  it('breaches once the current period passes ten working days', () => {
+    const clock = remediationClock(
+      { createdon: '2026-08-10T09:00:00Z', al_clockstartedon: '2026-08-24T09:00:00Z' },
+      at('2026-09-07'),
+    );
+
+    expect(clock.breached).toBe(true);
+  });
+
+  it('stops the clock at completion', () => {
+    // PP-13 is clock start and stop: an action completed and waiting on the T&C Manager
+    // must not keep ageing against the adviser.
+    const clock = remediationClock(
+      { createdon: '2026-08-24T09:00:00Z', al_completedon: '2026-08-28T17:00:00Z' },
+      at('2026-09-30'),
+    );
+
+    expect(clock.current).toBe(5);
+    expect(clock.breached).toBe(false);
+  });
+
+  it('ignores a reset stamped before creation rather than reporting a negative period', () => {
+    const clock = remediationClock(
+      { createdon: '2026-08-24T09:00:00Z', al_clockstartedon: '2026-08-10T09:00:00Z' },
+      at('2026-08-28'),
+    );
+
+    expect(clock.previous).toBeNull();
+    expect(clock.wasReset).toBe(false);
+  });
+
+  it('reads zero from an action carrying no dates at all', () => {
+    const clock = remediationClock({}, at('2026-08-28'));
+
+    expect(clock.current).toBe(0);
+    expect(clock.total).toBe(0);
+    expect(clock.breached).toBe(false);
+  });
+
+  it('falls back to now when the completion date is unreadable', () => {
+    const clock = remediationClock(
+      { createdon: '2026-08-24T09:00:00Z', al_completedon: 'not a date' },
+      at('2026-08-28'),
+    );
+
+    expect(clock.current).toBe(5);
   });
 });

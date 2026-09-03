@@ -1,0 +1,18 @@
+<customapi uniquename="al_ResolveImportException">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Closes an import exception once the row has been dealt with (BR-002, FR-002/FR-003): Resolved when corrected and re-imported, Ignored when it was never a case. The mandatory note is kept separate from the validation reason. Writes an immutable Audit Event.">
+    <label description="Closes an import exception once the row has been dealt with (BR-002, FR-002/FR-003): Resolved when corrected and re-imported, Ignored when it was never a case. The mandatory note is kept separate from the validation reason. Writes an immutable Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Resolve Import Exception">
+    <label description="Resolve Import Exception" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_ResolveImportException</name>
+  <plugintypeid>
+    <plugintypeexportkey>6e52c027-c3a7-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

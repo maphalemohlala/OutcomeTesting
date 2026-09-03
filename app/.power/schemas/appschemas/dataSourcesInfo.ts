@@ -310,6 +310,43 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "al_importcases": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_ImportCases": {
+        "path": "/api/data/v9.2/al_ImportCases",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "FileName",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Csv",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
   "al_importexceptions": {
     "tableId": "",
     "version": "",
@@ -351,6 +388,55 @@ export const dataSourcesInfo = {
     "primaryKey": "al_questionversionid",
     "dataSourceType": "Dataverse",
     "apis": {}
+  },
+  "al_regradecase": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_RegradeCase": {
+        "path": "/api/data/v9.2/al_RegradeCase",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "TargetId",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "FinalOutcome",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Reason",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "ExpectedRowVersion",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
   },
   "al_remediationactions": {
     "tableId": "",
@@ -404,6 +490,49 @@ export const dataSourcesInfo = {
             "name": "Mandatory",
             "in": "body",
             "required": false,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "al_resolveimportexception": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_ResolveImportException": {
+        "path": "/api/data/v9.2/al_ResolveImportException",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "ExceptionId",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Resolution",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Note",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
             "type": "string"
           }
         ],

@@ -240,22 +240,51 @@ function findChoice(map: Record<number, string>, label: string): number | null {
   return null;
 }
 
-/** Accepts dd/mm/yyyy (UK), yyyy-mm-dd, or any Date-parseable value; returns yyyy-mm-dd. */
+/**
+ * Accepts dd/mm/yyyy (UK) or yyyy-mm-dd, and written-out forms like "31 Jan 2026";
+ * returns yyyy-mm-dd. Kept deliberately in step with `ImportRules.ParseDate` in the
+ * plug-in, which is the rule this only previews — a value the two disagree about would
+ * show as importable here and then be rejected by the command.
+ *
+ * A numeric date that matches neither accepted order is rejected rather than handed to
+ * `new Date`, which reads month-first: 01/13/2026 would come back as 13 January, and an
+ * extract that named a thirteenth month is a data error, not a January date.
+ */
 function parseDate(value: string): string | null {
   const trimmed = value.trim();
+
   const uk = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(trimmed);
   if (uk) {
     const [, d, m, y] = uk;
-    const day = Number(d);
-    const month = Number(m);
-    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    return isoIfReal(Number(y), Number(m), Number(d));
   }
-  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(trimmed);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/.exec(trimmed);
+  if (iso) {
+    return isoIfReal(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+  }
+
+  if (/^[\d./-]+$/.test(trimmed)) return null;
+
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toISOString().slice(0, 10);
+  // Read back the local components, not the UTC ones. `new Date('31 Jan 2026')` is local
+  // midnight, and `toISOString()` on that lands on the 30th anywhere east of UTC — an
+  // advice date silently a day early, which no later check would catch.
+  return isoIfReal(parsed.getFullYear(), parsed.getMonth() + 1, parsed.getDate());
+}
+
+/** Formats a date, rejecting one that does not exist (31 February and the like). */
+function isoIfReal(year: number, month: number, day: number): string | null {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 function isGuideRow(fields: string[]): boolean {

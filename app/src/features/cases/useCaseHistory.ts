@@ -8,7 +8,7 @@ import {
 } from '../../generated';
 import { Al_auditeventsal_command } from '../../generated/models/Al_auditeventsModel';
 import { logTechnical } from '../../services/errors';
-import { choiceLabel } from './choiceLabel';
+import { choiceLabel } from '../../lib/choiceLabel';
 
 export interface HistoryEntry {
   id: string;

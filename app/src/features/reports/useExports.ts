@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Al_exportbatchesService, Al_exportrecordsService } from '../../generated';
+import { Al_exportbatchesal_batchstatus } from '../../generated/models/Al_exportbatchesModel';
 import type { Al_exportrecords } from '../../generated/models/Al_exportrecordsModel';
+import { choiceLabel } from '../../lib/choiceLabel';
 
 export interface ExportBatchRow {
   id: string;
@@ -49,7 +51,11 @@ export function useExports(reloadKey: number): ExportsState {
           id: b.al_exportbatchid,
           name: b.al_name ?? '',
           code: b.al_exportbatchcode ?? '',
-          status: b.al_batchstatusname ?? String(b.al_batchstatus ?? ''),
+          // getAll does not return the *name formatted value, so this read fell through to
+          // String(al_batchstatus) and put the raw option number on the screen — both in the
+          // status column and, worse, in the status filter, whose options are built from
+          // these values. The generated map is what the numbers mean.
+          status: choiceLabel(Al_exportbatchesal_batchstatus, b.al_batchstatus, b.al_batchstatusname) ?? 'Unknown',
           generatedOn: b.al_generatedon ?? null,
           rowCount: Number(b.al_rowcount ?? 0),
         }));

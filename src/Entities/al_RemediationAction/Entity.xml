@@ -197,6 +197,46 @@
             <Description description="When the adviser marked the action complete. Empty until completion. Preserving this alongside the initial outcome supports BR-007." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_ClockStartedOn">
+          <Type>datetime</Type>
+          <Name>al_clockstartedon</Name>
+          <LogicalName>al_clockstartedon</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>inactive</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>1</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>datetime</Format>
+          <CanChangeDateTimeBehavior>0</CanChangeDateTimeBehavior>
+          <Behavior>1</Behavior>
+          <displaynames>
+            <displayname description="Clock started on" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Start of the CURRENT remediation period for the BR-010 ten-working-day clock (OD-018). Empty until the clock has been reset, in which case the period runs from createdon. A rejected sign-off (BR-008) resets it, and the earlier period is preserved rather than merged: createdon to this value is the previous timer, and the sign-off rows carry every boundary before that." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_completerequested">
           <Type>bit</Type>
           <Name>al_completerequested</Name>
