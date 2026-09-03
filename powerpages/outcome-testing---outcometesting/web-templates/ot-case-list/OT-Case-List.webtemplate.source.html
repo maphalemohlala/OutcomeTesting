@@ -28,8 +28,13 @@
 {% assign has_filter = false %}
 {% if f_ref != '' or f_client != '' or f_adviser != '' or f_status != '' or f_priority != '' or f_type != '' or f_from != '' or f_to != '' %}{% assign has_filter = true %}{% endif %}
 
+{% comment %}
+  `integer` is the only safe coercion here. `times: 1` repeats a string rather than
+  converting it, so page_number became a string collection and the comparison below
+  threw. `default` cannot rescue that - it only substitutes null.
+{% endcomment %}
 {% assign page_size = 25 %}
-{% assign page_number = request.params['page'] | default: 1 | times: 1 %}
+{% assign page_number = request.params['page'] | integer | default: 1 %}
 {% if page_number < 1 %}{% assign page_number = 1 %}{% endif %}
 
 {% capture qs %}ref={{ f_ref | url_escape }}&client={{ f_client | url_escape }}&adviser={{ f_adviser | url_escape }}&status={{ f_status | url_escape }}&priority={{ f_priority | url_escape }}&type={{ f_type | url_escape }}&from={{ f_from | url_escape }}&to={{ f_to | url_escape }}{% endcapture %}
