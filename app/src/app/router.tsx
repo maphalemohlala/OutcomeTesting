@@ -7,6 +7,8 @@ import { CaseDetailPage } from '../features/cases/CaseDetailPage';
 import { AllocationPage } from '../features/cases/AllocationPage';
 import { CaseIntakePage } from '../features/imports/CaseIntakePage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
+import { PeoplePage } from '../features/people/PeoplePage';
+import { PersonCasesPage } from '../features/people/PersonCasesPage';
 import { QuestionLibraryPage } from '../features/admin/QuestionLibraryPage';
 import { SecurityConfigPage } from '../features/admin/SecurityConfigPage';
 import { UsersPage } from '../features/admin/UsersPage';
@@ -55,6 +57,23 @@ export function AppRoutes() {
         <Route
           path="/cases/:caseId/audit"
           element={<Navigate to=".." relative="path" replace />}
+        />
+        {/* People is a view over case data, so it is gated by the same resource (AD-041). */}
+        <Route
+          path="/people"
+          element={
+            <RequirePermission resource="page.cases">
+              <PeoplePage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/people/:role/:name"
+          element={
+            <RequirePermission resource="page.cases">
+              <PersonCasesPage />
+            </RequirePermission>
+          }
         />
         <Route path="/reviews/:reviewId/tax" element={<RequirePermission resource="page.reviews"><ReviewDetailPage reviewType="Tax" /></RequirePermission>} />
         <Route path="/reviews/:reviewId/aqs" element={<RequirePermission resource="page.reviews"><ReviewDetailPage reviewType="AQS" /></RequirePermission>} />

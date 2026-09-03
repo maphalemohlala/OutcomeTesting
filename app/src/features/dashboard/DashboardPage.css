@@ -24,6 +24,13 @@
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
   border-left: 3px solid var(--colour-stage-active);
+  color: inherit;
+  text-decoration: none;
+}
+
+a.dashboard__stat:hover,
+a.dashboard__outcome:hover {
+  background: var(--colour-surface-sunken);
 }
 
 .dashboard__stat[data-tone='blocked'] {
@@ -32,6 +39,58 @@
 
 .dashboard__stat[data-tone='waiting'] {
   border-left-color: var(--colour-stage-waiting);
+}
+
+.dashboard__section-heading {
+  margin-bottom: var(--space-1);
+  font-size: var(--text-lg);
+}
+
+.dashboard__section-note {
+  max-width: 80ch;
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.dashboard__outcomes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.dashboard__outcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-left: 3px solid var(--colour-outcome-none);
+  color: inherit;
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+
+.dashboard__outcome[data-variant='pass'] {
+  border-left-color: var(--colour-outcome-pass);
+}
+
+.dashboard__outcome[data-variant='issues'] {
+  border-left-color: var(--colour-outcome-issues);
+}
+
+.dashboard__outcome[data-variant='insufficient'] {
+  border-left-color: var(--colour-outcome-insufficient);
+}
+
+.dashboard__outcome[data-variant='harm'] {
+  border-left-color: var(--colour-outcome-harm);
+}
+
+.dashboard__outcome-label {
+  color: var(--colour-text-muted);
 }
 
 .dashboard__stat-value {
@@ -87,6 +146,15 @@
 .dashboard__status-list li:last-child,
 .dashboard__ageing li:last-child {
   border-bottom: none;
+}
+
+.dashboard__status-list a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.dashboard__status-list a:hover {
+  text-decoration: underline;
 }
 
 .dashboard__count {

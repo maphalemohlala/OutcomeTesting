@@ -1,30 +1,24 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { OutcomeIndicator } from '../../components/status/OutcomeIndicator';
 import { StageLabel } from '../../components/status/StageLabel';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
-import { CASE_STATUSES, REVIEW_ROUTES } from '../../types/domain';
+import { ExportMenu } from '../../components/export/ExportMenu';
+import { CASE_STATUSES, OUTCOMES, REVIEW_ROUTES } from '../../types/domain';
+import { CASE_EXPORT_HEADERS, caseExportRow } from './caseExport';
 import { useCaseWorklist, type CaseSummary } from './useCaseWorklist';
 import './CaseWorklistPage.css';
 
-interface Filters {
-  search: string;
-  status: string;
-  route: string;
-  priority: string;
-  from: string;
-  to: string;
-}
+/**
+ * Filters live in the URL so a dashboard card or a person view can link straight to the
+ * list it counted, and so the view a manager exports is the view they can share back.
+ */
+const FILTER_KEYS = ['q', 'status', 'route', 'priority', 'outcome', 'person', 'from', 'to'] as const;
 
-const EMPTY_FILTERS: Filters = {
-  search: '',
-  status: '',
-  route: '',
-  priority: '',
-  from: '',
-  to: '',
-};
+type FilterKey = (typeof FILTER_KEYS)[number];
+
+type Filters = Record<FilterKey, string>;
 
 function withinRange(createdOn: string | null, from: string, to: string): boolean {
   if (!from && !to) return true;
@@ -35,15 +29,28 @@ function withinRange(createdOn: string | null, from: string, to: string): boolea
   return true;
 }
 
+function matchesPerson(item: CaseSummary, person: string): boolean {
+  const name = person.toLowerCase();
+  return [item.adviser, item.paraplanner, item.checker, item.owner].some(
+    (value) => (value ?? '').toLowerCase() === name,
+  );
+}
+
 function applyFilters(cases: CaseSummary[], filters: Filters): CaseSummary[] {
-  const search = filters.search.trim().toLowerCase();
+  const search = filters.q.trim().toLowerCase();
   return cases.filter((item) => {
     if (filters.status && item.status !== filters.status) return false;
     if (filters.route && item.route !== filters.route) return false;
     if (filters.priority && (item.priority ?? '') !== filters.priority) return false;
+    if (filters.outcome === 'none' && item.latestOutcome) return false;
+    if (filters.outcome && filters.outcome !== 'none' && item.latestOutcome !== filters.outcome) {
+      return false;
+    }
+    if (filters.person && !matchesPerson(item, filters.person)) return false;
     if (!withinRange(item.createdOn, filters.from, filters.to)) return false;
     if (search) {
-      const haystack = `${item.caseReference} ${item.owner ?? ''}`.toLowerCase();
+      const haystack =
+        `${item.caseReference} ${item.owner ?? ''} ${item.client ?? ''} ${item.adviser ?? ''}`.toLowerCase();
       if (!haystack.includes(search)) return false;
     }
     return true;
@@ -52,7 +59,12 @@ function applyFilters(cases: CaseSummary[], filters: Filters): CaseSummary[] {
 
 export function CaseWorklistPage() {
   const state = useCaseWorklist();
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [params, setParams] = useSearchParams();
+
+  const filters = useMemo(
+    () => Object.fromEntries(FILTER_KEYS.map((key) => [key, params.get(key) ?? ''])) as Filters,
+    [params],
+  );
 
   const allCases = state.status === 'ready' ? state.cases : [];
 
@@ -63,13 +75,13 @@ export function CaseWorklistPage() {
   );
 
   const filtered = useMemo(() => applyFilters(allCases, filters), [allCases, filters]);
-  const isFiltered = useMemo(
-    () => JSON.stringify(filters) !== JSON.stringify(EMPTY_FILTERS),
-    [filters],
-  );
+  const isFiltered = FILTER_KEYS.some((key) => filters[key] !== '');
 
-  function set<K extends keyof Filters>(key: K, value: Filters[K]) {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+  function set(key: FilterKey, value: string) {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next, { replace: true });
   }
 
   return (
@@ -77,6 +89,18 @@ export function CaseWorklistPage() {
       <PageIntro
         title="Case worklist"
         purpose="Find the cases you own and decide what to pick up next."
+        actions={
+          state.status === 'ready' && filtered.length > 0 ? (
+            <ExportMenu
+              label="Export cases"
+              stem={isFiltered ? 'outcome-cases-filtered' : 'outcome-cases'}
+              sheetName="Cases"
+              headers={CASE_EXPORT_HEADERS}
+              rows={filtered.map(caseExportRow)}
+              caption={`Exports the ${filtered.length} case${filtered.length === 1 ? '' : 's'} currently listed`}
+            />
+          ) : null
+        }
       />
 
       {state.status === 'loading' ? <p role="status">Loading cases…</p> : null}
@@ -96,16 +120,16 @@ export function CaseWorklistPage() {
         <>
           <FilterBar
             summary={`${filtered.length} of ${allCases.length} cases`}
-            onClear={() => setFilters(EMPTY_FILTERS)}
+            onClear={() => setParams(new URLSearchParams(), { replace: true })}
             clearDisabled={!isFiltered}
           >
             <FilterField label="Search" htmlFor="worklist-search">
               <input
                 id="worklist-search"
                 type="search"
-                value={filters.search}
-                onChange={(e) => set('search', e.target.value)}
-                placeholder="Case ref or owner"
+                value={filters.q}
+                onChange={(e) => set('q', e.target.value)}
+                placeholder="Case ref, client, adviser or owner"
               />
             </FilterField>
             <FilterField label="Status" htmlFor="worklist-status">
@@ -120,6 +144,21 @@ export function CaseWorklistPage() {
                     {status}
                   </option>
                 ))}
+              </select>
+            </FilterField>
+            <FilterField label="Outcome" htmlFor="worklist-outcome">
+              <select
+                id="worklist-outcome"
+                value={filters.outcome}
+                onChange={(e) => set('outcome', e.target.value)}
+              >
+                <option value="">All outcomes</option>
+                {OUTCOMES.map((outcome) => (
+                  <option key={outcome} value={outcome}>
+                    {outcome}
+                  </option>
+                ))}
+                <option value="none">Not yet graded</option>
               </select>
             </FilterField>
             <FilterField label="Route" htmlFor="worklist-route">
@@ -170,6 +209,19 @@ export function CaseWorklistPage() {
             </FilterField>
           </FilterBar>
 
+          {filters.person ? (
+            <p className="worklist__scope" role="status">
+              Showing cases involving <strong>{filters.person}</strong>.{' '}
+              <button
+                type="button"
+                className="worklist__scope-clear"
+                onClick={() => set('person', '')}
+              >
+                Show everyone
+              </button>
+            </p>
+          ) : null}
+
           <div className="worklist__scroll">
             <table className="worklist">
               <caption className="visually-hidden">
@@ -178,6 +230,8 @@ export function CaseWorklistPage() {
               <thead>
                 <tr>
                   <th scope="col">Case</th>
+                  <th scope="col">Client</th>
+                  <th scope="col">Adviser</th>
                   <th scope="col">Route</th>
                   <th scope="col">Status</th>
                   <th scope="col">Owner</th>
@@ -192,7 +246,7 @@ export function CaseWorklistPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="worklist__empty">
+                    <td colSpan={10} className="worklist__empty">
                       No cases match your current filters.
                     </td>
                   </tr>
@@ -202,6 +256,16 @@ export function CaseWorklistPage() {
                       <th scope="row">
                         <Link to={`/cases/${item.id}`}>{item.caseReference}</Link>
                       </th>
+                      <td>{item.client ?? '—'}</td>
+                      <td>
+                        {item.adviser ? (
+                          <Link to={`/people/Adviser/${encodeURIComponent(item.adviser)}`}>
+                            {item.adviser}
+                          </Link>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                       <td>{item.route ?? 'Not routed'}</td>
                       <td>
                         <StageLabel status={item.status} />

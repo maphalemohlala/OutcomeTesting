@@ -19,6 +19,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/', label: 'Dashboard', resource: 'page.dashboard' },
       { to: '/cases', label: 'Case worklist', resource: 'page.cases' },
+      { to: '/people', label: 'People', resource: 'page.cases' },
     ],
   },
   {
