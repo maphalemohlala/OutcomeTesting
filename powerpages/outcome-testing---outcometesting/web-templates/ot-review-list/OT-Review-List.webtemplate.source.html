@@ -59,6 +59,17 @@
 {% assign is_tax_queue = false %}
 {% if reviewtype == 120910200 %}{% assign is_tax_queue = true %}{% endif %}
 
+{% comment %}
+  The queue is readable before it is actionable. Picking a case up depends on
+  ClaimCasePlugin being registered; without it the Web API create still succeeds, because
+  al_name, al_caseassignmentcode, al_assignedon and al_isactive are only *business*
+  required and Dataverse does not enforce that through the API. The page would report
+  success while the case stayed in the queue, leaving assignment rows that AD-037 forbids
+  deleting. So the button is switched on by a site setting, not by deployment.
+{% endcomment %}
+{% assign claim_enabled = false %}
+{% if settings['OutcomeTesting/Claim/Enabled'] == 'true' %}{% assign claim_enabled = true %}{% endif %}
+
 {% fetchxml available %}
 <fetch count="25">
   <entity name="al_outcomecase">
@@ -98,7 +109,7 @@
         <table class="ot-table">
           <caption>
             {{ unassigned.size }} case{% if unassigned.size != 1 %}s{% endif %} in the queue with no
-            checker. Running checks assigns the case to you.
+            checker.{% if claim_enabled %} Running checks assigns the case to you.{% endif %}
           </caption>
           <thead>
             <tr>
@@ -107,7 +118,7 @@
               <th scope="col">Adviser</th>
               <th scope="col">Due</th>
               <th scope="col">Checker</th>
-              <th scope="col"><span class="ot-visually-hidden">Action</span></th>
+              {% if claim_enabled %}<th scope="col"><span class="ot-visually-hidden">Action</span></th>{% endif %}
             </tr>
           </thead>
           <tbody>
@@ -122,26 +133,29 @@
                 <td>{{ c.al_advisername | escape }}</td>
                 <td>{{ c.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
                 <td>{{ c.al_checkername | default: 'Unassigned' | escape }}</td>
-                <td>
-                  <button type="button"
-                          class="ot-btn ot-btn--primary"
-                          data-ot-claim
-                          data-case-id="{{ c.al_outcomecaseid }}"
-                          data-case-reference="{{ c.al_casereference | default: 'this case' | escape }}">
-                    Run checks
-                  </button>
-                </td>
+                {% if claim_enabled %}
+                  <td>
+                    <button type="button"
+                            class="ot-btn ot-btn--primary"
+                            data-ot-claim
+                            data-case-id="{{ c.al_outcomecaseid }}"
+                            data-case-reference="{{ c.al_casereference | default: 'this case' | escape }}">
+                      Run checks
+                    </button>
+                  </td>
+                {% endif %}
               </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
-      <p class="ot-response__status" data-ot-claim-status aria-live="polite"></p>
+      {% if claim_enabled %}<p class="ot-response__status" data-ot-claim-status aria-live="polite"></p>{% endif %}
     {% else %}
       {% include 'OT Empty State' title: 'Nothing waiting' message: 'Every queued case in this discipline already has a checker.' %}
     {% endif %}
   </section>
 
+  {% if claim_enabled %}
   <dialog class="ot-dialog" data-ot-claim-dialog aria-labelledby="ot-claim-dialog-title">
     <h2 class="ot-dialog__title" id="ot-claim-dialog-title">Start checks on this case?</h2>
     <p>
@@ -153,6 +167,7 @@
       <button type="button" class="ot-btn ot-btn--primary" data-ot-claim-continue>Continue</button>
     </p>
   </dialog>
+  {% endif %}
 {% endif %}
 
 <div class="ot-notice" role="status">
@@ -221,7 +236,7 @@
   {% endif %}
 </section>
 
-{% if user %}
+{% if user and claim_enabled %}
 <script>
   /*
    * Picking a case up out of the shared queue (AD-076).
