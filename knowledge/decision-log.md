@@ -3,6 +3,8 @@
 Single register for open decisions and resolved architecture decisions. Agents must read this before implementing anything that depends on an open item, and must not invent a resolution. Record a resolution only when a named owner has confirmed it, with the date and the evidence source.
 
 ## Open decisions
+
+> Prioritised register of everything outstanding, with owners, evidence and a definition of done for each: `docs/2026-09-04-outstanding-work.md`. It covers the open decisions below alongside the engineering and tooling items that are tasks rather than decisions, so neither set gets read in isolation.
 | ID | Decision required | Owner | Build impact | Status | Resolution and date |
 |---|---|---|---|---|---|
 | OD-001 | Confirm exact V8 sections, questions, response types, mandatory flags and role ownership | Advice Quality Manager | Blocks checklist seed data and UAT | Resolved | 2026-08-26: `Checker Checklist - V8.docx` transcribed to `knowledge/checklist-v8.md`. Sections, wording and response types taken from the document; mandatory rule, select cardinality and section ownership confirmed from the process mapping session 2 workshop. See AD-019, AD-020, AD-021. |
