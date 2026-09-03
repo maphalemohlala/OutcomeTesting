@@ -42,6 +42,119 @@
 
 {% assign rows = reviews.results.entities %}
 
+{% comment %}
+  The shared queue (AD-076, extending AD-040, BR-003). Cases sitting at Queued that
+  nobody has picked up, so a checker can take one themselves rather than waiting to be
+  allocated.
+
+  The route decides which queue a case belongs in, not the page: a Tax-then-AQS case owes
+  its Tax check first (BR-004), so it is offered on the Tax page only and disappears from
+  here once someone takes it. The AQS queue is therefore AQS-required and Tax-not-required.
+
+  Nothing here is a permission boundary. What a checker may actually do is decided by the
+  create permission on al_caseassignment and by ClaimCasePlugin, which re-reads the status
+  and the route server-side (NFR-SEC-01).
+{% endcomment %}
+{% assign queued_status = 120910583 %}
+{% assign is_tax_queue = false %}
+{% if reviewtype == 120910200 %}{% assign is_tax_queue = true %}{% endif %}
+
+{% fetchxml available %}
+<fetch count="25">
+  <entity name="al_outcomecase">
+    <attribute name="al_outcomecaseid" />
+    <attribute name="al_casereference" />
+    <attribute name="al_clientname" />
+    <attribute name="al_advisername" />
+    <attribute name="al_duedate" />
+    <attribute name="al_checkername" />
+    <filter type="and">
+      <condition attribute="statecode" operator="eq" value="0" />
+      <condition attribute="al_casestatus" operator="eq" value="{{ queued_status }}" />
+    </filter>
+    <link-entity name="al_reviewroute" from="al_reviewrouteid" to="al_reviewrouteid" link-type="inner" alias="route">
+      <filter type="and">
+        {% if is_tax_queue %}
+          <condition attribute="al_requirestaxreview" operator="eq" value="1" />
+        {% else %}
+          <condition attribute="al_requiresaqsreview" operator="eq" value="1" />
+          <condition attribute="al_requirestaxreview" operator="ne" value="1" />
+        {% endif %}
+      </filter>
+    </link-entity>
+    <order attribute="al_duedate" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign unassigned = available.results.entities %}
+
+{% if user %}
+  <section class="ot-card" aria-labelledby="ot-queue-heading">
+    <h2 class="ot-card__title" id="ot-queue-heading">Available cases</h2>
+
+    {% if unassigned.size > 0 %}
+      <div class="ot-table-wrap">
+        <table class="ot-table">
+          <caption>
+            {{ unassigned.size }} case{% if unassigned.size != 1 %}s{% endif %} in the queue with no
+            checker. Running checks assigns the case to you.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Case reference</th>
+              <th scope="col">Client</th>
+              <th scope="col">Adviser</th>
+              <th scope="col">Due</th>
+              <th scope="col">Checker</th>
+              <th scope="col"><span class="ot-visually-hidden">Action</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in unassigned %}
+              <tr>
+                <td>
+                  <a href="/case-details?id={{ c.al_outcomecaseid }}">
+                    {{ c.al_casereference | default: 'Untitled case' | escape }}
+                  </a>
+                </td>
+                <td>{{ c.al_clientname | escape }}</td>
+                <td>{{ c.al_advisername | escape }}</td>
+                <td>{{ c.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+                <td>{{ c.al_checkername | default: 'Unassigned' | escape }}</td>
+                <td>
+                  <button type="button"
+                          class="ot-btn ot-btn--primary"
+                          data-ot-claim
+                          data-case-id="{{ c.al_outcomecaseid }}"
+                          data-case-reference="{{ c.al_casereference | default: 'this case' | escape }}">
+                    Run checks
+                  </button>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="ot-response__status" data-ot-claim-status aria-live="polite"></p>
+    {% else %}
+      {% include 'OT Empty State' title: 'Nothing waiting' message: 'Every queued case in this discipline already has a checker.' %}
+    {% endif %}
+  </section>
+
+  <dialog class="ot-dialog" data-ot-claim-dialog aria-labelledby="ot-claim-dialog-title">
+    <h2 class="ot-dialog__title" id="ot-claim-dialog-title">Start checks on this case?</h2>
+    <p>
+      You are about to start checks on <strong data-ot-claim-dialog-case></strong>. The case will be
+      assigned to you and will no longer be available for anyone else to pick up.
+    </p>
+    <p class="ot-dialog__actions">
+      <button type="button" class="ot-btn" data-ot-claim-cancel>Cancel</button>
+      <button type="button" class="ot-btn ot-btn--primary" data-ot-claim-continue>Continue</button>
+    </p>
+  </dialog>
+{% endif %}
+
 <div class="ot-notice" role="status">
   <strong>Shell stage.</strong> This list shows every {{ heading | downcase }} instance in the
   environment. Filtering to your own assigned work arrives with the Phase&nbsp;2 security build.
@@ -107,3 +220,132 @@
     {% include 'OT Empty State' title: 'No review instances' message: 'A review instance is created when a case is routed to this team.' %}
   {% endif %}
 </section>
+
+{% if user %}
+<script>
+  /*
+   * Picking a case up out of the shared queue (AD-076).
+   *
+   * Path: this page -> POST al_caseassignment -> ClaimCasePlugin -> Dataverse.
+   *
+   * A create, like the AD-074 sign-off, so it needs no trigger column and — more to the
+   * point — it can carry its own table permission. That permission is Contact-scoped
+   * through contact_al_caseassignment, so the row the browser posts has to point at the
+   * signed-in contact. This matters because authorization here cannot be a caller check:
+   * a Power Pages write reaches Dataverse as the site's application user, not as the
+   * checker (AD-053).
+   *
+   * The browser sends the case and the contact and nothing else. The business code, the
+   * Dataverse user, the review instance, the case status and the checker name on the case
+   * header are all resolved server-side, and the plug-in refuses a case that is not in the
+   * queue or that another checker has already taken.
+   */
+  (function () {
+    'use strict';
+
+    var buttons = document.querySelectorAll('[data-ot-claim]');
+    if (!buttons.length) { return; }
+
+    var contactId = '{{ user.id }}';
+    var dialog = document.querySelector('[data-ot-claim-dialog]');
+    var dialogCase = document.querySelector('[data-ot-claim-dialog-case]');
+    var cancel = document.querySelector('[data-ot-claim-cancel]');
+    var proceed = document.querySelector('[data-ot-claim-continue]');
+    var status = document.querySelector('[data-ot-claim-status]');
+    var pending = null;
+
+    function show(message, kind) {
+      if (!status) { return; }
+      status.textContent = message;
+      status.className = 'ot-response__status ot-response__status--' + (kind || 'info');
+      status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    }
+
+    function friendlyError(raw) {
+      var text = String(raw || '');
+      var markers = ['PRECONDITION:', 'VALIDATION:', 'CONFLICT:'];
+      for (var i = 0; i < markers.length; i += 1) {
+        var at = text.indexOf(markers[i]);
+        if (at !== -1) {
+          return text.substring(at + markers[i].length).trim();
+        }
+      }
+      // A user whose role carries no create permission lands here: the platform refuses
+      // before any of our code runs, so there is no prefix to branch on.
+      return 'We could not pick that case up. You may not have permission to run checks.';
+    }
+
+    function close() {
+      if (dialog.open) { dialog.close(); }
+      pending = null;
+    }
+
+    function claim(button) {
+      if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
+        show('This page did not load completely. Refresh and try again.', 'error');
+        return;
+      }
+
+      button.disabled = true;
+      show('Assigning the case to you...', 'info');
+
+      var payload = {};
+      payload['al_outcomecaseid@odata.bind'] = '/al_outcomecases(' + button.getAttribute('data-case-id') + ')';
+      payload['al_assignedcontactid@odata.bind'] = '/contacts(' + contactId + ')';
+
+      window.shell.getTokenDeferred().done(function (token) {
+        var request = new XMLHttpRequest();
+        request.open('POST', '/_api/al_caseassignments', true);
+        request.setRequestHeader('Content-Type', 'application/json');
+        request.setRequestHeader('__RequestVerificationToken', token);
+
+        request.onreadystatechange = function () {
+          if (request.readyState !== 4) { return; }
+
+          if (request.status >= 200 && request.status < 300) {
+            show('Assigned to you. Reloading...', 'success');
+            window.setTimeout(function () { window.location.reload(); }, 800);
+            return;
+          }
+
+          show(friendlyError(request.responseText), 'error');
+          button.disabled = false;
+        };
+
+        request.send(JSON.stringify(payload));
+      }).fail(function () {
+        show('This page did not load completely. Refresh and try again.', 'error');
+        button.disabled = false;
+      });
+    }
+
+    for (var i = 0; i < buttons.length; i += 1) {
+      buttons[i].addEventListener('click', function (event) {
+        pending = event.currentTarget;
+        dialogCase.textContent = pending.getAttribute('data-case-reference');
+
+        // showModal gives the focus trap, the Escape key and the backdrop; where it is
+        // unavailable the confirmation still has to happen, so fall back rather than
+        // assigning the case with no warning at all.
+        if (typeof dialog.showModal === 'function') {
+          dialog.showModal();
+          return;
+        }
+
+        if (window.confirm('You are about to start checks on ' + pending.getAttribute('data-case-reference')
+            + '. The case will be assigned to you.')) {
+          claim(pending);
+        }
+        pending = null;
+      });
+    }
+
+    cancel.addEventListener('click', close);
+    proceed.addEventListener('click', function () {
+      var button = pending;
+      close();
+      if (button) { claim(button); }
+    });
+  })();
+</script>
+{% endif %}

@@ -267,7 +267,7 @@ namespace OutcomeTesting.Plugins
         /// what preserves the allocation trail (BR-003, BR-012); a reassignment therefore
         /// leaves two rows, one released and one active.
         /// </summary>
-        private static void ReleasePriorAssignments(IOrganizationService service, Guid caseId)
+        public static void ReleasePriorAssignments(IOrganizationService service, Guid caseId)
         {
             var query = new QueryExpression(AssignmentEntity)
             {

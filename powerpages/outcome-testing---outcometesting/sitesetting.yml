@@ -129,6 +129,14 @@
   adx_name: Webapi/al_reviewinstance/fields
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a4
   adx_value: al_submitrequested
+- adx_description: "Exposes al_caseassignment to the portal Web API so a checker can pick a case up out of the shared queue (AD-076). A create, like the sign-off, so it needs no trigger column and can carry its own Contact-scoped permission - which is what ties the claim to the signed-in contact, since a portal write reaches Dataverse as the site's application user and cannot be attributed to a caller (AD-053)."
+  adx_name: Webapi/al_caseassignment/enabled
+  adx_sitesettingid: a1000000-0000-4000-8000-0000000000a9
+  adx_value: 'true'
+- adx_description: "Allowlist of columns the browser may write on al_caseassignment. The case and the checker only. The business code, the assigned Dataverse user, the timestamp and the active flag are stamped by ClaimCasePlugin, so a claim cannot be backdated or given a forged key."
+  adx_name: Webapi/al_caseassignment/fields
+  adx_sitesettingid: a1000000-0000-4000-8000-0000000000aa
+  adx_value: al_outcomecaseid,al_assignedcontactid
 - adx_description: "Trigger id of the \"Submit Review\" cloud flow for THIS environment, taken from the flow's Power Pages trigger URL (the guid after /trigger/). SUPERSEDED: submission no longer goes through Power Automate. The review page writes al_submitrequested over the Web API and SubmitRequestPlugin does the work, so this setting is unused and stays empty. Kept rather than deleted because deleting a site setting is not what an upload does."
   adx_name: OutcomeTesting/Flow/SubmitReview
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a0

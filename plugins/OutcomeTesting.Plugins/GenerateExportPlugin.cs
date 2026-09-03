@@ -30,6 +30,9 @@ namespace OutcomeTesting.Plugins
         private const string ReviewEntity = "al_reviewinstance";
         private const string QuestionVersionEntity = "al_questionversion";
         private const string QuestionEntity = "al_question";
+        private const string RouteEntity = "al_reviewroute";
+        private const string CaseReviewRouteAttr = "al_reviewrouteid";
+        private const string RouteRequiresAqsAttr = "al_requiresaqsreview";
         private const string AnswerChoiceAttr = "al_answerchoice";
         private const string FileQualityQuestionCode = "Q-FQ-01";
         private const int CaseStatusClosed = 120910591;
@@ -88,7 +91,8 @@ namespace OutcomeTesting.Plugins
             {
                 ColumnSet = new ColumnSet(
                     "al_casereference", "al_advisername", "al_advisercode", "al_paraplanner", "al_paraplannercode",
-                    "al_casetype", "al_productsolutiontype", "al_checkdate", "al_clientname", "al_preorpostcheck"),
+                    "al_casetype", "al_productsolutiontype", "al_checkdate", "al_clientname", "al_preorpostcheck",
+                    CaseReviewRouteAttr),
                 Criteria = new FilterExpression(),
             };
             cases.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
@@ -108,26 +112,11 @@ namespace OutcomeTesting.Plugins
                 var fileQualityGrade = ResolveFileQualityGrade(userService, outcomeCase.Id);
                 var code = "EXR-" + batchCode + "-" + caseRef;
 
-                // A non-pass with no accountability recorded would export four blank
-                // accountability pairs, which reads as "nobody is responsible" rather
-                // than "nobody has said yet". Refusing here keeps an incomplete row out
-                // of a delivered Trail Light file (AD-039, OD-024).
-                if (outcomeRow != null)
+                var incomplete = DescribeIncompleteRow(outcomeRow, fileQualityGrade, AqsExpected(userService, outcomeCase));
+                if (incomplete != null)
                 {
-                    var effective = Outcomes.EffectiveOutcome(outcomeRow);
-                    var anyAccountability =
-                        (outcomeRow.GetAttributeValue<bool?>("al_fqadviseraccountable") ?? false)
-                        || (outcomeRow.GetAttributeValue<bool?>("al_fqparaplanneraccountable") ?? false)
-                        || (outcomeRow.GetAttributeValue<bool?>("al_aqadviseraccountable") ?? false)
-                        || (outcomeRow.GetAttributeValue<bool?>("al_aqparaplanneraccountable") ?? false);
-
-                    if (effective.HasValue && OutcomeRules.RequiresRemediation(effective.Value) && !anyAccountability)
-                    {
-                        throw new InvalidPluginExecutionException(
-                            CommandHelpers.PreconditionPrefix
-                            + "Case " + caseRef + " has a non-pass outcome with no fail accountability recorded. "
-                            + "Record accountability before generating the export.");
-                    }
+                    throw new InvalidPluginExecutionException(
+                        CommandHelpers.PreconditionPrefix + "Case " + caseRef + " " + incomplete);
                 }
 
                 var record = new Entity(RecordEntity)
@@ -214,6 +203,108 @@ namespace OutcomeTesting.Plugins
 
             var found = service.RetrieveMultiple(query).Entities;
             return found.Count == 0 ? null : found[0];
+        }
+
+        /// <summary>
+        /// Why this case cannot be exported, phrased to follow "Case {reference} ", or null
+        /// when the row is complete.
+        ///
+        /// AD-039 is a fixed-position contract, so a blank in a graded column does not read
+        /// downstream as "not assessed" — it reads as an assessment that came back empty.
+        /// An incomplete row therefore refuses the batch and names the case, which is how
+        /// the OD-024 accountability check already behaved.
+        ///
+        /// <paramref name="aqsExpected"/> is what separates incomplete from finished.
+        /// Both graded columns are sourced from the AQS review — column 10 from Q-FQ-01,
+        /// column 15 from the Outcome that <c>SubmitReviewPlugin.CreateOutcome</c> writes on
+        /// the AQS submit — so on a Tax-only case neither has a source and never will.
+        /// AD-075 settles OD-031 in favour of exporting those cases with the two columns
+        /// blank, so the missing-value rules are asked only where an AQS review was due.
+        /// The accountability rule still applies whenever an outcome exists, because an
+        /// outcome on a case with no AQS review is a fact about the case either way.
+        ///
+        /// Pure and Entity-only so the decision is unit-testable without a fake
+        /// organisation service, matching <see cref="FlaggedText"/>.
+        /// </summary>
+        public static string DescribeIncompleteRow(Entity outcomeRow, string fileQualityGrade, bool aqsExpected)
+        {
+            // The old gate sat inside `if (outcomeRow != null)`, so a case closed without an
+            // Outcome escaped every check and exported blanks. Reachable by a manager moving
+            // a case Submitted -> Closed, which AD-057 permits; the submit path itself always
+            // writes the Outcome (SubmitReviewPlugin.CreateOutcome).
+            if (outcomeRow == null)
+            {
+                return aqsExpected
+                    ? "is closed with no outcome recorded, so the Advice Quality grade would be blank. "
+                        + "Record the outcome, or reopen the case if it was closed in error."
+                    : null;
+            }
+
+            var effective = Outcomes.EffectiveOutcome(outcomeRow);
+            if (!effective.HasValue)
+            {
+                return aqsExpected
+                    ? "has an outcome carrying neither an initial nor a final grade, so the "
+                        + "Advice Quality grade would be blank (BR-007)."
+                    : null;
+            }
+
+            // A non-pass with no accountability recorded would export four blank
+            // accountability pairs, which reads as "nobody is responsible" rather
+            // than "nobody has said yet" (AD-039, OD-024).
+            if (OutcomeRules.RequiresRemediation(effective.Value) && !AnyAccountability(outcomeRow))
+            {
+                return "has a non-pass outcome with no fail accountability recorded. "
+                    + "Record accountability before generating the export.";
+            }
+
+            if (aqsExpected && string.IsNullOrWhiteSpace(fileQualityGrade))
+            {
+                return "has no answer to Q-FQ-01 File quality outcome, so the File Quality "
+                    + "grade would be blank. Record the file quality outcome before generating the export.";
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Whether an AQS review was due on this case, which is what decides between "these
+        /// columns are blank because nobody graded them" and "this case has no advice
+        /// quality assessment to report" (AD-075, OD-031).
+        ///
+        /// The route answers it where one is set. Where it is null — every case created
+        /// before the route seed existed — fall back to whether an AQS instance exists, the
+        /// same fallback <c>SubmitReviewPlugin.AqsStillToCome</c> uses, so a legacy case is
+        /// not silently reclassified as Tax-only.
+        /// </summary>
+        private static bool AqsExpected(IOrganizationService service, Entity outcomeCase)
+        {
+            var routeRef = outcomeCase.GetAttributeValue<EntityReference>(CaseReviewRouteAttr);
+            if (routeRef != null)
+            {
+                var route = service.Retrieve(RouteEntity, routeRef.Id, new ColumnSet(RouteRequiresAqsAttr));
+                return route.GetAttributeValue<bool?>(RouteRequiresAqsAttr) ?? false;
+            }
+
+            var query = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, outcomeCase.Id);
+            query.Criteria.AddCondition("al_reviewtype", ConditionOperator.Equal, ResponseRules.ReviewTypeAqs);
+
+            return service.RetrieveMultiple(query).Entities.Count > 0;
+        }
+
+        private static bool AnyAccountability(Entity outcomeRow)
+        {
+            return (outcomeRow.GetAttributeValue<bool?>("al_fqadviseraccountable") ?? false)
+                || (outcomeRow.GetAttributeValue<bool?>("al_fqparaplanneraccountable") ?? false)
+                || (outcomeRow.GetAttributeValue<bool?>("al_aqadviseraccountable") ?? false)
+                || (outcomeRow.GetAttributeValue<bool?>("al_aqparaplanneraccountable") ?? false);
         }
 
         /// <summary>
