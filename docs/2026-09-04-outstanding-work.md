@@ -15,6 +15,12 @@ Ordered by what it costs to leave alone, not by effort.
 
 **Owner:** O365 / tenant admin. **Effort:** minutes. **Blocks:** PP-15, BR-009.
 
+> **Done later the same day.** The mailbox was approved *and* Test & Enable was run;
+> the query below now returns `Yes` / `Success` with a real
+> `testmailboxaccesscompletedon`. See `docs/2026-09-04-delivery-status.md`. What
+> remains of this item is registering the drain step and working the `Pending`
+> backlog — the rest of this section is kept for the procedure and the reasoning.
+
 The single highest-value action open. PP-15 and BR-009 are built, tested, deployed and
 switched off, waiting on one administrative approval.
 
