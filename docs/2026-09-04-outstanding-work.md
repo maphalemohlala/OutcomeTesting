@@ -39,9 +39,16 @@ Repair command: `repointwebpage <orgUrl> case-details "OT Case Detail Page"`.
 **OD-034 is why OD-035 is stuck.** `pac pages upload` aborts at ~44 % on a single
 `adx_entitypermission` record (`a1000000-…-072`) that is **already correct** in DEV — the site
 is on the enhanced data model, `adx_entitypermission` does not exist in the environment, and
-`pac` routes that one record down the Standard path regardless of `-mv Enhanced`. The abort
-lands **before web pages are processed**, so no web page change can be deployed by CLI at all.
-Three attempts on 2026-09-04, delta twice and `--forceUploadAll` once.
+`pac` routes that one record down the Standard path regardless of `-mv Enhanced`. Four
+attempts now — three on 2026-09-04 (delta twice, `--forceUploadAll` once) and one on
+2026-09-05 — all aborting on the same record.
+
+**Corrected 2026-09-05:** the 09-04 note said the abort lands *before web pages are
+processed*, so no web page change could deploy at all. That is wrong. The 09-05 run reached
+86.4 % (19 of 22 events) and **did** write the web pages — both `case-details` rows carry
+that run's timestamp. What never lands is the parent-scoped permission itself and whatever
+is ordered after it, and which components those are depends on what happens to be dirty.
+The damage is unpredictability, not a blanket block.
 
 `pac pages upload` has no scoping flag — only `--path`, `--deploymentProfile`,
 `--forceUploadAll`, `--modelVersion` — so the record cannot be skipped. Removing it from
