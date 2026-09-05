@@ -9,33 +9,19 @@ This is the register of what is left, not a status report. `docs/2026-09-03-deli
 cover what exists and how it got there. Every item names an owner, the evidence it rests on,
 and what "done" looks like, so nothing here needs re-deriving.
 
-**Ordered by what it costs to leave alone, not by effort.** The order changed on 2026-09-05:
-two live faults arrived and the item that had been first was unblocked.
+**Ordered by what it costs to leave alone, not by effort.** Re-ranked on 2026-09-05 after a
+verification pass: `/case-details` is broken for users and moved to the top, the drain step
+became fully unblocked, and OD-033 moved *down* — it was ranked first on the assumption
+that the authenticated-users flag conferred privilege, and the query evidence says it
+confers nothing.
 
 ---
 
-## 1. OD-033 — a live privilege over-grant on DEV
-
-**Owner:** Delivery. **Effort:** one field. **Status:** fix written, not yet applied.
-
-`Administrators` carries `mspp_authenticatedusersrole = Yes` in DEV. That flag auto-grants
-the role to **every authenticated portal user**, so every authenticated contact currently
-holds Administrators. `webrole.yml` declares `false`. Re-verified 2026-09-05 by query — still
-set, and two uploads since have left it set, so it needs a deliberate correction rather than
-another upload.
-
-Separately, a `Checker` web role exists in DEV (created 2026-09-03), appears in no source
-file, and is **also** flagged as an authenticated-users role. An upload will never remove it.
-
-**Done when:** the flag is cleared on `Administrators`, and `Checker` is either declared in
-source or deleted. The first half is mechanical; the second needs someone to say which it is.
-
-`registerstep`-style repair command now exists for the first half:
-`setwebroleauth <orgUrl> "Administrators" false`.
-
-## 2. OD-035 and OD-034 — `/case-details` is broken and cannot be deployed
+## 1. OD-035 and OD-034 — `/case-details` is broken and cannot be deployed
 
 **Owner:** Delivery. **Status:** OD-035 fix written, not yet applied. OD-034 unsolved.
+
+The only item on this list that users are hitting right now.
 
 **OD-035.** Both `case-details` web pages (`…032` root, `…042` content) carry a **null** page
 template in DEV, so the page returns the generic Power Pages error. The page template
@@ -60,53 +46,86 @@ source was considered and rejected: `pac` deletes components absent from source.
 deployment path exists that runs to completion, or the repair commands are accepted as the
 interim path with the risk written down.
 
-## 3. Register the PP-15 drain step
+## 2. Register the PP-15 drain step
 
-**Owner:** Delivery, after one confirmation. **Blocks:** PP-15, BR-009 actually delivering.
+**Owner:** Delivery. **Status:** fully unblocked as of 2026-09-05. **Delivers:** PP-15, BR-009.
 
-> **The mailbox blocker is closed.** Approved *and* Test & Enable run; re-verified 2026-09-05:
-> `isemailaddressapprovedbyo365admin = Yes`, `outgoingemailstatus = Success`,
-> `testmailboxaccesscompletedon = 9/4/2026 7:31 AM`. The AD-081 gate is met.
+> **Both preconditions are now closed.** The mailbox is approved *and* tested — re-verified
+> 2026-09-05: `isemailaddressapprovedbyo365admin = Yes`, `outgoingemailstatus = Success`,
+> `testmailboxaccesscompletedon = 9/4/2026 7:31 AM`. And the sending identity is settled by
+> project owner direction 2026-09-05: **DEV sends from the approved account**,
+> `svc.automate.aq@ascotlloyd.co.uk`. The `-dev` mailbox at `Pending Approval` is not used.
 
 Worth keeping, because it nearly went wrong: immediately after approval the mailbox read
 `Yes` / **`Not Run`**. Approval records permission, it does not test anything. Registering the
 step in that window would have stamped the whole `Pending` backlog `Failed`, which is the
 outcome the gate exists to prevent. The gate requires `Yes` **and** `Success`.
 
-**One thing to confirm first.** A second mailbox, `svc.automate.aq-dev@ascotlloyd.co.uk`,
-sits at `Pending Approval`. If DEV was meant to send from that identity, registering the step
-now means DEV email starts leaving under the production-named account. Settle which identity
-DEV sends from **before** registering, not after.
+**Done when:** the step is registered (command in the deployment doc) and the existing
+`Pending` backlog is worked with `al_DrainNotifications` starting at `MaxRows: 1`, reading
+`al_failurereason` on anything that lands at `Failed` before running a larger batch. The step
+fires on **Create**, so the backlog does not drain by itself.
 
-**Done when:** the sending identity is confirmed; the step is registered (command in the
-deployment doc); and the existing `Pending` backlog is worked with `al_DrainNotifications`
-starting at `MaxRows: 1`, reading `al_failurereason` on anything that lands at `Failed`
-before running a larger batch. The step fires on **Create**, so the backlog does not drain
-by itself.
+Note `al_DrainNotifications` is already live and callable (Manage on `permission.manage`), and
+now that the mailbox is good, invoking it sends real email.
 
-Note `al_DrainNotifications` is already live and callable (Manage on `permission.manage`).
-Invoking it before the identity question is settled sends real email.
+## 3. OD-033 — undeclared portal roles carrying the authenticated-users flag
+
+**Owner:** Delivery, plus whoever created `Checker`. **Effort:** one field, then one decision.
+
+**Corrected 2026-09-05 — this is drift, not a live over-grant.** It was previously ranked
+first here on the assumption that the flag conferred privilege. It does not, and the
+correction matters because it changes the urgency: verified by query, **both** roles have
+**zero table permissions and zero web page access control rules** bound to them, and
+`mspp_webrole` on this site carries no website-manager flag at all. Every authenticated
+contact does hold both roles — and holding them currently grants nothing.
+
+- **`Administrators`** has `mspp_authenticatedusersrole = Yes` in DEV; `webrole.yml` declares
+  `false`. Two uploads have left it set, so it needs a deliberate correction rather than
+  another upload. Repair command: `setwebroleauth <orgUrl> "Administrators" false`.
+- **`Checker`** (created 2026-09-03 07:19 by the service account) appears in **no source file
+  and in no pac manifest**. That second half is why an upload will never remove it: `pac`
+  deletes components it has tracked and is now missing from source, and it has never tracked
+  this one. It is invisible to the deployment pipeline in both directions.
+
+**Why it still matters while granting nothing:** both are auto-granted to every authenticated
+user, so the moment anyone attaches a table permission to either — in the maker portal, where
+`Checker` sits with an inviting name — every authenticated contact silently receives it. This
+is a loaded gun rather than a live wound, and it is cheap to unload now.
+
+**Done when:** the flag is cleared on `Administrators`, and `Checker` is either declared in
+source or deleted. The first is mechanical. The second needs intent from whoever created it
+on 2026-09-03 — the same day AD-076 self-claim was switched on, so it may be an abandoned
+step of that work.
 
 ## 4. OD-032 — `SetFailAccountability` has no `al_command` value of its own
 
 **Owner:** whoever owns the AD-039 accountability trail. **Effort:** small, additive.
 
-The most substantive open defect in the code, and it is not cosmetic. The command reuses
-`120910788`, which the option set labels `SetRoleAssignmentActive`. Two live consequences:
+`SetFailAccountabilityPlugin` writes `al_command = 120910788`, the value the option set
+labels `SetRoleAssignmentActive`. Two consequences, and 2026-09-05 evidence separates them:
 
-- Every Audit Event that command writes is **labelled as a different command**, so the
-  accountability trail reports a fail-accountability change as a role change.
-- `CommandHelpers.FindAuditByKey` scopes a replay lookup to `(idempotency key, command)`
-  precisely so one command's key cannot replay against another. With two commands sharing a
-  value **that protection is off between them**, and a key first used by one can return the
-  other's result for work that never ran.
+- **The mislabelling is real and already in the data.** DEV holds five audit rows on
+  `120910788`, all created 2026-08-30, and all five are genuinely `SetFailAccountability`
+  writes against `al_outcome`. Anything reading the accountability trail by its choice column
+  reports them as role changes. Under NFR-AUD-01 these rows are immutable, so the count only
+  grows while this stands.
+- **The replay-protection loss is latent, not live.** `CommandHelpers.FindAuditByKey` scopes
+  a lookup to `(idempotency key, command)` precisely so one command's key cannot replay
+  against another, and two commands sharing a value removes that between them. But a
+  collision needs the same key sent to both commands, and keys are `crypto.randomUUID()`
+  minted per intent (`intentKey.ts`) — and **nothing in the app calls `SetFailAccountability`
+  at all**. There is no path to it today. It is a removed safety net, which is worth
+  restoring before someone adds a caller, not an active defect.
 
-The fix is additive — mint a value, repoint `SetFailAccountabilityPlugin`, leave existing
-rows alone since they are immutable (NFR-AUD-01). It is open only because it changes what
-already-written audit rows mean, which is a decision rather than a silent correction.
+**The fix is easy; what needs deciding is the history.** Minting a value and repointing the
+plug-in is additive. What the five existing immutable rows then *mean* is the actual
+question — and the good news is that they are not ambiguous in practice: each carries
+`al_name = "SetFailAccountability"` and `al_targettable = "al_outcome"`, so they can be
+identified exactly. A documented cut-over date is enough; no data surgery is required.
 
-**Done when:** the trail owner has agreed how existing rows are to be read, a new value is
-minted, and the plug-in points at it.
+**Done when:** the trail owner has agreed how pre-fix rows are to be read, a new option value
+is minted, and `SetFailAccountabilityPlugin` points at it.
 
 ## 5. Close the gap between `src/` and DEV before anything is promoted
 
@@ -232,9 +251,17 @@ named owner and date, so it is flagged here rather than closed in passing.
 ## What is *not* outstanding
 
 Recorded so it is not re-investigated: PP-01 to PP-14, PP-16 and PP-17 are built; PP-15 is
-built for its five enumerated events and deployed, switched off pending item 3; OD-030 is
-resolved; and **the DEV mailbox is approved and tested** — item 3, not an unknown, and no
-longer a blocker.
+built for its five enumerated events and deployed, switched off pending item 2; OD-030 is
+resolved; **the DEV mailbox is approved and tested**; and **DEV sends from the approved
+account** `svc.automate.aq@ascotlloyd.co.uk` (project owner direction 2026-09-05), so the
+`-dev` mailbox at `Pending Approval` is not a question either.
+
+Also settled 2026-09-05, and the reason OD-033 was re-ranked: neither `Administrators` nor
+`Checker` has a single table permission or web page access control rule bound to it, and
+`mspp_webrole` on this site has no website-manager flag. The authenticated-users flag is
+therefore drift, not a privilege grant — do not re-raise it as a live over-grant. And
+`SetFailAccountability` has **no caller in the app at all**, with keys minted as random
+UUIDs per intent, so OD-032's replay-collision has no reachable path today.
 
 Also settled, from the 2026-09-04 diagnosis: the case detail page's own three FetchXML
 queries run clean against DEV and every web template it includes is present, so Liquid,
