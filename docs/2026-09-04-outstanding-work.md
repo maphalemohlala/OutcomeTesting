@@ -47,9 +47,21 @@ Three attempts on 2026-09-04, delta twice and `--forceUploadAll` once.
 `--forceUploadAll`, `--modelVersion` — so the record cannot be skipped. Removing it from
 source was considered and rejected: `pac` deletes components absent from source.
 
-**Done when:** OD-035's two rows are repointed and `/case-details` renders; and a portal
-deployment path exists that runs to completion, or the repair commands are accepted as the
-interim path with the risk written down.
+> **2026-09-05: root cause found, and the fix is proven on the export side.** `pac` routes
+> **parent-scoped** table permissions down the Standard-model path on an enhanced-data-model
+> site. Only two permissions are parent-scoped and the run aborts on the first. Upgrading pac
+> is not available (2.11.2 is the latest published version) and the upload has no scoping flag.
+>
+> The site and its **250 components** are now in the `OutcomeTesting` solution, and an export
+> carries all of them — including the parent-scoped permission that breaks the upload, intact
+> with its scope, parent and role links. `addsitetosolution` does this; `pac` cannot, because
+> 2.11.2 rejects the Power Pages component types by name *and* by number.
+
+**Done when:** the **import** side is proven — export from DEV, import into a second
+environment, and confirm the site reconstitutes. That is untested here because only DEV is
+authenticated. And a decision is taken on Microsoft documenting Power Pages solution
+awareness as a **preview feature**, "not meant for production use": that is a call for the
+platform owner before it becomes the PROD promotion path, not a tooling detail.
 
 ## 2. Register the PP-15 drain step
 

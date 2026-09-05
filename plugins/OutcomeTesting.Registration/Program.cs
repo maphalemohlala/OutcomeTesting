@@ -149,6 +149,11 @@ if (args.Length >= 6 && args[0].Equals("registerstep", StringComparison.OrdinalI
         args.Length > 8 ? args[8] : null);
 }
 
+if (args.Length >= 2 && args[0].Equals("addsitetosolution", StringComparison.OrdinalIgnoreCase))
+{
+    return AddSiteToSolution(args[1], args.Length > 2 ? args[2] : SolutionUniqueName);
+}
+
 if (args.Length >= 4 && args[0].Equals("repointwebpage", StringComparison.OrdinalIgnoreCase))
 {
     return RepointWebPage(args[1], args[2], args[3]);
@@ -1378,6 +1383,133 @@ int SetWebRoleAuth(string orgUrl, string roleName, string value)
 
     Console.WriteLine("Updated.");
     return 0;
+}
+
+// Adds a Power Pages site AND its site components to a solution (OD-034).
+//
+// Adding the site record alone is not enough and looks like it is: the solution then exports
+// an `Assets/powerpagesites.xml` of a few hundred bytes carrying the site header — default
+// language, header and footer template ids, domain — and not one web page, web template,
+// table permission or web role. That was verified by export on 2026-09-05, and it is the
+// trap this command exists to close.
+//
+// Why not `pac solution add-solution-component`: pac 2.11.2 (the latest published version)
+// resolves component types from its own table, which has no Power Pages entries. It rejects
+// the type *name* ("PowerPagesSite" silently falls back to Entity and fails) and it rejects
+// the numeric value outright — "Component Type Id (10434) is not known". The SDK's
+// AddSolutionComponentRequest takes the number directly, which is the whole reason this runs
+// here rather than through pac.
+//
+// The type values are resolved from `solutioncomponentdefinition` at run time rather than
+// hard-coded. Microsoft's own documentation gives two different numbers for the site in one
+// example (10463 in the command, 10319 in the prose immediately below it), so a literal
+// copied from the docs is not trustworthy; the environment is.
+int AddSiteToSolution(string orgUrl, string solutionUniqueName)
+{
+    using var svc = Connect(orgUrl);
+
+    var types = ComponentTypes(svc);
+    foreach (var required in new[] { "powerpagesite", "powerpagesitelanguage", "powerpagecomponent" })
+    {
+        if (!types.ContainsKey(required))
+        {
+            Console.Error.WriteLine($"This environment has no solution component definition for '{required}'. Nothing was changed.");
+            return 1;
+        }
+
+        Console.WriteLine($"  {required} = {types[required]}");
+    }
+
+    var sites = PortalRows(svc, "powerpagesite", "statecode", "0", "name");
+    if (sites.Count != 1)
+    {
+        Console.Error.WriteLine($"Expected exactly one active Power Pages site, found {sites.Count}. Nothing was changed.");
+        foreach (var s in sites)
+        {
+            Console.Error.WriteLine($"  {s.Id}  {s.GetAttributeValue<string>("name")}");
+        }
+
+        return 1;
+    }
+
+    var site = sites[0];
+    Console.WriteLine($"Site '{site.GetAttributeValue<string>("name")}' = {site.Id}");
+    Console.WriteLine($"Adding to solution '{solutionUniqueName}'…");
+
+    var added = 0;
+    var failed = 0;
+
+    // AddRequiredComponents is deliberately false throughout. The site does not declare its
+    // components as required — which is exactly why adding the site alone exported an empty
+    // shell — so relying on it would silently under-add. Every component is named instead.
+    void Add(Guid id, int type, string what)
+    {
+        try
+        {
+            svc.Execute(new AddSolutionComponentRequest
+            {
+                ComponentId = id,
+                ComponentType = type,
+                SolutionUniqueName = solutionUniqueName,
+                AddRequiredComponents = false,
+            });
+            added++;
+        }
+        catch (Exception error)
+        {
+            failed++;
+            if (failed <= 5)
+            {
+                Console.Error.WriteLine($"  {what} {id}: {error.Message}");
+            }
+        }
+    }
+
+    Add(site.Id, types["powerpagesite"], "site");
+
+    var languages = PortalRows(svc, "powerpagesitelanguage", "powerpagesiteid", site.Id.ToString("D"), "name");
+    foreach (var row in languages)
+    {
+        Add(row.Id, types["powerpagesitelanguage"], "language");
+    }
+
+    var components = PortalRows(svc, "powerpagecomponent", "powerpagesiteid", site.Id.ToString("D"), "name");
+    foreach (var row in components)
+    {
+        Add(row.Id, types["powerpagecomponent"], "component");
+    }
+
+    Console.WriteLine(
+        $"Done. site 1, languages {languages.Count}, components {components.Count} " +
+        $"-> {added} added, {failed} failed.");
+
+    // Export is the only thing that proves this worked: solution membership is not the same
+    // claim as "the components travel".
+    Console.WriteLine($"Verify with: pac solution export --name {solutionUniqueName} --path <zip> --overwrite");
+    return failed == 0 ? 0 : 1;
+}
+
+// Power Pages solution component type values, by definition name, read from the environment.
+static Dictionary<string, int> ComponentTypes(ServiceClient svc)
+{
+    const string fetch =
+        "<fetch><entity name='solutioncomponentdefinition'>" +
+        "<attribute name='name' /><attribute name='solutioncomponenttype' />" +
+        "<filter type='and'><condition attribute='name' operator='like' value='powerpage%' /></filter>" +
+        "</entity></fetch>";
+
+    var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    foreach (var row in svc.RetrieveMultiple(new FetchExpression(fetch)).Entities)
+    {
+        var name = row.GetAttributeValue<string>("name");
+        var type = row.GetAttributeValue<int?>("solutioncomponenttype");
+        if (!string.IsNullOrEmpty(name) && type.HasValue)
+        {
+            map[name] = type.Value;
+        }
+    }
+
+    return map;
 }
 
 // Reads Power Pages rows with FetchXML rather than QueryExpression.
