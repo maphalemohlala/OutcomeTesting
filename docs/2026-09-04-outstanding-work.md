@@ -1,7 +1,7 @@
 # Outstanding work
 
 Started 2026-09-04 at commit `77c1ab7`. **Last reviewed 2026-09-05**, after the case detail
-incident and the DEV verification pass — every environment claim below was re-queried that
+incident, the DEV verification pass and the repairs deployed that evening — every environment claim below was re-queried that
 day rather than carried forward.
 
 This is the register of what is left, not a status report. `docs/2026-09-03-delivery-status.md`,
@@ -17,11 +17,16 @@ confers nothing.
 
 ---
 
-## 1. OD-035 and OD-034 — `/case-details` is broken and cannot be deployed
+## 1. OD-034 — portal deployment has no working CLI path
 
-**Owner:** Delivery. **Status:** OD-035 fix written, not yet applied. OD-034 unsolved.
+**Owner:** Delivery. **Status:** OD-035 is CLOSED. OD-034 unsolved.
 
-The only item on this list that users are hitting right now.
+> **OD-035 closed 2026-09-05.** Both `case-details` web pages were repointed at `…002b` and
+> verified; the page renders. Correction to the diagnosis: the pages were **not** carrying a
+> null page template — both pointed at `…0022`, the colliding id, which is now the
+> `OT Outcome Label` web template. A lookup aimed at the wrong component type projects as
+> blank, which is what read as null. See
+> `docs/deployment/2026-09-05-portal-repairs-and-drain-enable.md`.
 
 **OD-035.** Both `case-details` web pages (`…032` root, `…042` content) carry a **null** page
 template in DEV, so the page returns the generic Power Pages error. The page template
@@ -48,7 +53,18 @@ interim path with the risk written down.
 
 ## 2. Register the PP-15 drain step
 
-**Owner:** Delivery. **Status:** fully unblocked as of 2026-09-05. **Delivers:** PP-15, BR-009.
+**Owner:** Delivery. **Status:** the step is REGISTERED as of 2026-09-05 — but unproven.
+
+> **Switched on, not proven.** The async drain step is registered, enabled and running as
+> the approved account. But `al_notification` holds **zero rows**: the emitters have never
+> produced a notification in DEV, so no message has travelled the full path (emitter → outbox
+> → async drain → server-side email). There is no backlog to work, and the `MaxRows: 1`
+> procedure below has nothing to run against.
+>
+> **What remains is proof.** Cause one qualifying event in DEV — an allocation is cheapest,
+> since the emitter fires on Create of `al_caseassignment` — and confirm the row appears,
+> reaches `Sent`, and the email arrives. That is a real business write, so it belongs to
+> whoever owns DEV data.
 
 > **Both preconditions are now closed.** The mailbox is approved *and* tested — re-verified
 > 2026-09-05: `isemailaddressapprovedbyo365admin = Yes`, `outgoingemailstatus = Success`,
@@ -71,7 +87,11 @@ now that the mailbox is good, invoking it sends real email.
 
 ## 3. OD-033 — undeclared portal roles carrying the authenticated-users flag
 
-**Owner:** Delivery, plus whoever created `Checker`. **Effort:** one field, then one decision.
+**Owner:** whoever created `Checker`. **Status:** half closed 2026-09-05.
+
+> **`Administrators` is fixed** — the flag was cleared and verified, and it now reads `No`,
+> matching `webrole.yml`. **`Checker` is untouched** and still auto-granted to every
+> authenticated user, because that half is a decision rather than a correction.
 
 **Corrected 2026-09-05 — this is drift, not a live over-grant.** It was previously ranked
 first here on the assumption that the flag conferred privilege. It does not, and the

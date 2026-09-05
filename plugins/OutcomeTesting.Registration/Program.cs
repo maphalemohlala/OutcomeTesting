@@ -1288,23 +1288,17 @@ int RepointWebPage(string orgUrl, string partialUrl, string pageTemplateName)
 {
     using var svc = Connect(orgUrl);
 
-    var templateId = FindId(svc, "mspp_pagetemplate", ("mspp_name", pageTemplateName));
+    var templateId = FindPortalId(svc, "mspp_pagetemplate", "mspp_name", pageTemplateName);
     if (templateId == Guid.Empty)
     {
-        Console.Error.WriteLine($"No page template named '{pageTemplateName}'. Nothing was changed.");
+        Console.Error.WriteLine($"No single page template named '{pageTemplateName}'. Nothing was changed.");
         return 1;
     }
 
     Console.WriteLine($"Page template '{pageTemplateName}' = {templateId}");
 
-    var query = new QueryExpression("mspp_webpage")
-    {
-        ColumnSet = new ColumnSet("mspp_name", "mspp_pagetemplateid", "mspp_partialurl", "mspp_isroot"),
-        Criteria = new FilterExpression(),
-    };
-    query.Criteria.AddCondition("mspp_partialurl", ConditionOperator.Equal, partialUrl);
-
-    var pages = svc.RetrieveMultiple(query).Entities;
+    var pages = PortalRows(svc, "mspp_webpage", "mspp_partialurl", partialUrl,
+        "mspp_name", "mspp_pagetemplateid", "mspp_partialurl", "mspp_isroot");
     if (pages.Count == 0)
     {
         Console.Error.WriteLine($"No web page has partial URL '{partialUrl}'. Nothing was changed.");
@@ -1351,14 +1345,8 @@ int SetWebRoleAuth(string orgUrl, string roleName, string value)
 
     using var svc = Connect(orgUrl);
 
-    var query = new QueryExpression("mspp_webrole")
-    {
-        ColumnSet = new ColumnSet("mspp_name", "mspp_authenticatedusersrole"),
-        Criteria = new FilterExpression(),
-    };
-    query.Criteria.AddCondition("mspp_name", ConditionOperator.Equal, roleName);
-
-    var roles = svc.RetrieveMultiple(query).Entities;
+    var roles = PortalRows(svc, "mspp_webrole", "mspp_name", roleName,
+        "mspp_name", "mspp_authenticatedusersrole");
     if (roles.Count == 0)
     {
         Console.Error.WriteLine($"No web role named '{roleName}'. Nothing was changed.");
@@ -1390,6 +1378,38 @@ int SetWebRoleAuth(string orgUrl, string roleName, string value)
 
     Console.WriteLine("Updated.");
     return 0;
+}
+
+// Reads Power Pages rows with FetchXML rather than QueryExpression.
+//
+// Not a style preference. `FindId`'s QueryExpression returns nothing at all against the
+// enhanced-data-model `mspp_*` tables on this site — `repointwebpage` reported "no page
+// template named 'OT Case Detail Page'" for a row that a FetchXML query with the identical
+// equality filter returns immediately. FetchXML is what demonstrably answers on these
+// tables, so the portal commands use it and the rest of this tool is left alone.
+//
+// Values are XML-escaped: a page template or web role name is operator-supplied, and an
+// apostrophe in one would otherwise break the query rather than fail to match.
+static List<Entity> PortalRows(
+    ServiceClient svc, string table, string filterAttr, string filterValue, params string[] columns)
+{
+    var attrs = string.Concat(columns.Select(c => $"<attribute name='{c}' />"));
+    var fetch =
+        $"<fetch><entity name='{table}'>{attrs}" +
+        $"<filter type='and'><condition attribute='{filterAttr}' operator='eq' " +
+        $"value='{System.Security.SecurityElement.Escape(filterValue)}' /></filter>" +
+        "</entity></fetch>";
+
+    return svc.RetrieveMultiple(new FetchExpression(fetch)).Entities.ToList();
+}
+
+// The id of the single row matching a name, or Guid.Empty when there is not exactly one.
+// Ambiguity is deliberately not resolved by taking the first: two components sharing a name
+// is the sort of drift these commands exist to repair, not something to pick a winner from.
+static Guid FindPortalId(ServiceClient svc, string table, string nameAttr, string name)
+{
+    var rows = PortalRows(svc, table, nameAttr, name, nameAttr);
+    return rows.Count == 1 ? rows[0].Id : Guid.Empty;
 }
 
 // Resolves the account a step runs as, by record id or UPN. Disabled users are excluded:
