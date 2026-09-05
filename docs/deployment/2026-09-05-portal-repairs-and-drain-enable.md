@@ -167,3 +167,53 @@ Intact, with its scope, its parent and its web-role links.
   path is a decision for the platform owner, not a tooling detail — and it should be taken
   alongside item 5 of the register, since `src/` still has to become the source of truth
   either way.
+
+---
+
+## 6. `pac pages upload` run again — fourth reproduction, and a correction
+
+Run deliberately to test the failure, after a pre-flight that checked what an upload would
+delete. That check matters and is worth repeating before any future run: `pac` deletes
+components present in the manifest and absent from source. Across all 24 component types the
+manifest tracks, **39 entries are absent from source and every one of them is already gone
+from DEV** — so the deletes are no-ops, and they are the "FAILED ... Does Not Exist" noise
+seen on every run. Nothing was at risk.
+
+Source and DEV were already identical (231 of 231 components present, 48 of 48 web templates
+byte-identical), so this was close to a no-op upload — which is what made it a clean test of
+the abort itself.
+
+It failed identically:
+
+```
+Found 93 records to process across 48 entities
+Uploading … 86,4% (Events: 19/22)
+Updating table powerpagecomponent with record ID:5140384b-… FAILED … Does Not Exist
+Error: Upload failed for file 'adx_entitypermission'
+       (record a1000000-0000-4000-8000-000000000072): the target entity was not found.
+```
+
+### The correction
+
+The 2026-09-04 record said the abort "happens **before web pages are processed**, so no web
+page change can be deployed by CLI". **That is wrong.** This run reached **86.4 % (19 of 22
+events)** and did write the web pages — both `case-details` rows carry its timestamp
+(`9/5/2026 8:27 PM`). The earlier ~44 % simply reflected more dirty records on the day, not a
+fixed point in the sequence.
+
+So the accurate characterisation of OD-034 is narrower and more awkward than "portal
+deployment is blocked":
+
+- the upload lands **most** components, including web pages;
+- it never lands the parent-scoped permission, nor anything ordered after it;
+- **which** components those are varies with what happens to be dirty on the day.
+
+That is an unpredictability problem, not an outage, and it is precisely why every upload has
+to be verified by query afterwards. A change can appear to deploy, and the run can still have
+dropped something without saying which.
+
+### Verified unchanged after the run
+
+- both `case-details` web pages still bound to `OT Case Detail Page` (`…002b`);
+- `Administrators` still `authenticatedusersrole = No`;
+- `Checker` still present and untouched — correctly not deleted, matching the pre-flight.
