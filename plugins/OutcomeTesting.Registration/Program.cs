@@ -43,6 +43,23 @@ using System.Text.Json;
 //   Do not register it until server-side email is approved and tested for that account's
 //   mailbox (OD-030). Until then rows rest at Pending, which is the honest state.
 //
+// Add a command value: dotnet run -- addcommandvalue <orgUrl> <value> <label>
+//   Mints one value on al_auditevent.al_command, the option set every command stamps on its
+//   audit row. Additive: rows already written keep the value they carry, which under
+//   NFR-AUD-01 is permanent, so a re-labelling is a documented cut-over date and not a
+//   migration. Idempotent, and it refuses a label another value already holds.
+//
+// Prove PP-15: dotnet run -- provepp15 <orgUrl> --confirm <orgUrl>
+//   Causes one allocation, then follows it emitter -> outbox -> async drain -> server-side
+//   email and reports each hop. Checks the emitter step, the drain step and the sending
+//   mailbox BEFORE writing anything, so a switched-off path is reported without leaving
+//   business rows behind to explain.
+//
+//   This CREATES REAL RECORDS AND SENDS REAL EMAIL. It holds the blast radius to rows it
+//   created — its own seeded case, allocated to the account the drain runs as, both deleted
+//   afterwards — but the al_notification row is left in place deliberately: it is the
+//   evidence. Same --confirm discipline as the verify modes, for the same reason.
+//
 // Add to solution: dotnet run -- addtosolution <orgUrl> [<solutionUniqueName>]
 //   Adds the plug-in assembly (and its plug-in type) to the target solution for clean ALM
 //   promotion. Idempotent. The Custom API is added separately via a solution-file import
@@ -57,6 +74,27 @@ const string ApiUniqueName = "al_CompleteRemediation";
 const int StatusOpen = 120910600;
 const int StatusCompleted = 120910602;
 const int CommandCompleteRemediation = 120910756;
+
+// al_auditevent.al_command is the option set every server-side command stamps on its audit
+// row, which is why `addcommandvalue` names one attribute rather than taking any option set:
+// minting a value here is a change to the accountability trail's vocabulary.
+const string AuditEntity = "al_auditevent";
+const string CommandAttribute = "al_command";
+
+// PP-15 proof-run constants, mirroring NotificationOutbox and CaseLifecycle in the plug-in
+// assembly. Duplicated rather than referenced because this tool targets net8.0 and the
+// assembly targets net462 (AD-062); every one of them is asserted against the environment on
+// each run, so drift shows up as a FAIL rather than a wrong answer.
+const int CaseStatusQueued = 120910583;
+const int EventAllocation = 120910800;
+const int StatusPending = 120910810;
+const int StatusSent = 120910811;
+const int StatusFailed = 120910812;
+
+// The drain is asynchronous, so the platform decides when the job runs. Two minutes is long
+// enough that a slow queue is not read as a failure, and short enough that a genuinely stuck
+// row is reported rather than waited on.
+const int DrainWaitSeconds = 120;
 
 ServiceClient Connect(string orgUrl)
 {
@@ -164,9 +202,35 @@ if (args.Length >= 4 && args[0].Equals("setwebroleauth", StringComparison.Ordina
     return SetWebRoleAuth(args[1], args[2], args[3]);
 }
 
+if (args.Length >= 3 && args[0].Equals("deletewebrole", StringComparison.OrdinalIgnoreCase))
+{
+    return DeleteWebRole(args);
+}
+
 if (args.Length >= 3 && args[0].Equals("seedadmin", StringComparison.OrdinalIgnoreCase))
 {
     return SeedAdmin(args[1], args[2]);
+}
+
+if (args.Length >= 4 && args[0].Equals("addcommandvalue", StringComparison.OrdinalIgnoreCase))
+{
+    if (!int.TryParse(args[2], out var commandValue))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- addcommandvalue <orgUrl> <value> <label>");
+        return 1;
+    }
+
+    return AddCommandValue(args[1], commandValue, args[3]);
+}
+
+if (args.Length >= 2 && args[0].Equals("provepp15", StringComparison.OrdinalIgnoreCase))
+{
+    return ProvePp15(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("pp15evidence", StringComparison.OrdinalIgnoreCase))
+{
+    return Pp15Evidence(args[1]);
 }
 
 if (args.Length < 1)
@@ -1385,6 +1449,100 @@ int SetWebRoleAuth(string orgUrl, string roleName, string value)
     return 0;
 }
 
+// Deletes a web role that exists only in the environment (OD-033, second half).
+//
+// `Checker` was created in DEV on 2026-09-03 and appears in no source file and in no pac
+// manifest, which is what made it unreachable from the pipeline in both directions: an
+// upload cannot remove a component it has never tracked. So the only way it leaves is a
+// deliberate delete, and the only way it could have left otherwise was to declare it in
+// source first — which would have meant keeping a role nobody has claimed.
+//
+// **It refuses to delete a role anything is bound to.** Web role bindings in the enhanced
+// data model live inside the `content` JSON of powerpagecomponent rows rather than in link
+// tables, so this scans every component on the site for the role's id. That check is the
+// point of the command: deleting an empty role is tidying, and deleting one that grants
+// something is a privilege change nobody asked for. The two are indistinguishable from the
+// role row alone, which is exactly how it would go wrong.
+int DeleteWebRole(string[] a)
+{
+    var orgUrl = a[1];
+    var roleName = a[2];
+    var confirmIndex = Array.FindIndex(a, x => x.Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+    if (confirmIndex < 0 || confirmIndex + 1 >= a.Length
+        || !a[confirmIndex + 1].TrimEnd('/').Equals(orgUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
+    {
+        Console.Error.WriteLine("This PERMANENTLY DELETES a portal security role.");
+        Console.Error.WriteLine("Usage: dotnet run -- deletewebrole <orgUrl> <roleName> --confirm <orgUrl>");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var roles = PortalRows(svc, "mspp_webrole", "mspp_name", roleName,
+        "mspp_name", "mspp_authenticatedusersrole", "mspp_anonymoususersrole");
+    if (roles.Count == 0)
+    {
+        Console.WriteLine($"No web role named '{roleName}'. Nothing to delete.");
+        return 0;
+    }
+
+    if (roles.Count > 1)
+    {
+        Console.Error.WriteLine($"{roles.Count} web roles are named '{roleName}'. Refusing to guess; nothing was deleted.");
+        return 1;
+    }
+
+    var role = roles[0];
+    Console.WriteLine($"Web role '{roleName}' ({role.Id:D}): "
+        + $"authenticatedusersrole={role.GetAttributeValue<bool?>("mspp_authenticatedusersrole")}, "
+        + $"anonymoususersrole={role.GetAttributeValue<bool?>("mspp_anonymoususersrole")}");
+
+    var referencedBy = ComponentsReferencing(svc, role.Id);
+    if (referencedBy.Count > 0)
+    {
+        Console.Error.WriteLine($"{referencedBy.Count} site component(s) reference this role. Refusing to delete:");
+        foreach (var component in referencedBy)
+        {
+            Console.Error.WriteLine($"  {component.GetAttributeValue<string>("name")} "
+                + $"(type {Formatted(component, "powerpagecomponenttype")}, {component.Id:D})");
+        }
+
+        return 1;
+    }
+
+    Console.WriteLine("  no site component references it - nothing is bound to this role.");
+    svc.Delete("mspp_webrole", role.Id);
+
+    // Verified by re-query, not by the delete returning. Every portal write in this tool is
+    // checked this way, because an upload's exit code has already been shown to say nothing
+    // about what landed (OD-034).
+    var after = PortalRows(svc, "mspp_webrole", "mspp_name", roleName, "mspp_name");
+    Console.WriteLine(after.Count == 0
+        ? $"Deleted. No web role named '{roleName}' remains."
+        : $"Delete returned success but {after.Count} row(s) named '{roleName}' remain.");
+    return after.Count == 0 ? 0 : 2;
+}
+
+/// <summary>
+/// Site components whose content mentions this id. Web role bindings live inside the
+/// `content` JSON of a powerpagecomponent in the enhanced data model, so a substring match
+/// on the id is what finds them — there is no link table to join.
+/// </summary>
+static List<Entity> ComponentsReferencing(ServiceClient svc, Guid roleId)
+{
+    var query = new QueryExpression("powerpagecomponent")
+    {
+        ColumnSet = new ColumnSet("name", "powerpagecomponenttype", "content"),
+    };
+
+    var needle = roleId.ToString("D");
+    return svc.RetrieveMultiple(query).Entities
+        .Where(c => c.Id != roleId)
+        .Where(c => (c.GetAttributeValue<string>("content") ?? string.Empty)
+            .IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0)
+        .ToList();
+}
+
 // Adds a Power Pages site AND its site components to a solution (OD-034).
 //
 // Adding the site record alone is not enough and looks like it is: the solution then exports
@@ -1910,6 +2068,419 @@ OptionSetMetadata BuildOptionSet(string name, string display, (int Value, string
     }
 
     return set;
+}
+
+// Adds one value to `al_auditevent.al_command`, the option set every server-side command
+// stamps on the audit row it writes.
+//
+// Minting a value is the whole of the OD-032 fix. `SetFailAccountability` shared
+// `SetRoleAssignmentActive`'s 120910788, so its audit rows were labelled as role changes and
+// `CommandHelpers.FindAuditByKey`, which scopes a replay lookup to (idempotency key,
+// command), had nothing to tell the two apart. Adding a value is additive by construction:
+// rows already written keep the value they carry, and NFR-AUD-01 makes that permanent, so
+// the cut-over is a documented date rather than a data migration.
+//
+// Read back from metadata afterwards, because InsertOptionValue reports success on the
+// definition it just changed and a caller that trusted it would never notice a failed
+// publish.
+int AddCommandValue(string orgUrl, int value, string label)
+{
+    using var svc = Connect(orgUrl);
+
+    var before = CommandOptions(svc);
+    if (before.TryGetValue(value, out var current))
+    {
+        Console.WriteLine($"al_command already carries {value} = '{current}'.");
+        return string.Equals(current, label, StringComparison.Ordinal) ? 0 : 2;
+    }
+
+    var clash = before.FirstOrDefault(o => string.Equals(o.Value, label, StringComparison.OrdinalIgnoreCase));
+    if (clash.Value != null)
+    {
+        Console.Error.WriteLine($"'{label}' is already {clash.Key}. Two values sharing a label is the fault this command exists to fix.");
+        return 1;
+    }
+
+    svc.Execute(new InsertOptionValueRequest
+    {
+        EntityLogicalName = AuditEntity,
+        AttributeLogicalName = CommandAttribute,
+        Value = value,
+        Label = new Label(label, 1033),
+    });
+
+    svc.Execute(new PublishXmlRequest
+    {
+        ParameterXml = $"<importexportxml><entities><entity>{AuditEntity}</entity></entities></importexportxml>",
+    });
+
+    var after = CommandOptions(svc);
+    var ok = after.TryGetValue(value, out var written) && written == label;
+    Console.WriteLine(ok
+        ? $"al_command {value} = '{label}' inserted and published ({after.Count} values)."
+        : $"Insert returned success, but metadata does not read back {value} = '{label}'.");
+    return ok ? 0 : 2;
+}
+
+/// <summary>`al_command` values by value, so a caller can assert rather than assume.</summary>
+static Dictionary<int, string> CommandOptions(ServiceClient svc)
+{
+    var response = (RetrieveAttributeResponse)svc.Execute(new RetrieveAttributeRequest
+    {
+        EntityLogicalName = AuditEntity,
+        LogicalName = CommandAttribute,
+        RetrieveAsIfPublished = false,
+    });
+
+    var options = ((PicklistAttributeMetadata)response.AttributeMetadata).OptionSet.Options;
+    return options
+        .Where(o => o.Value.HasValue)
+        .ToDictionary(o => o.Value!.Value, o => o.Label?.UserLocalizedLabel?.Label ?? string.Empty);
+}
+
+// Proves PP-15 end to end in one run: causes a qualifying event, watches the outbox row it
+// writes reach Sent, and names the email that carried it.
+//
+// Every piece of this path had been verified alone and never together. The emitters were
+// deployed 2026-09-03 and the drain step registered 2026-09-05, and on that date
+// `al_notification` held zero rows — an empty outbox, not a drained one. So nothing had ever
+// travelled emitter -> outbox row -> asynchronous drain -> server-side email, and PP-15 was
+// switched on rather than proven. This is the run that closes the difference.
+//
+// **It writes real business records and sends real email**, which is why it takes --confirm
+// with the org URL repeated. The blast radius is held to rows this command created:
+//
+// - it seeds its own `al_outcomecase` rather than allocating a case someone is working on;
+// - it allocates to the account the drain runs as, so the email arrives at the service
+//   mailbox rather than a colleague's inbox;
+// - it deletes the assignment and the case afterwards.
+//
+// What it deliberately does not delete is the `al_notification` row. That row is the
+// evidence — the first notification this environment has produced — and an outbox row whose
+// target is gone is exactly what a proof run should leave behind.
+int ProvePp15(string[] a)
+{
+    var orgUrl = a[1];
+    var confirmIndex = Array.FindIndex(a, x => x.Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+    if (confirmIndex < 0 || confirmIndex + 1 >= a.Length
+        || !a[confirmIndex + 1].TrimEnd('/').Equals(orgUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
+    {
+        Console.Error.WriteLine("This CREATES REAL RECORDS and SENDS REAL EMAIL from the service mailbox.");
+        Console.Error.WriteLine("Usage: dotnet run -- provepp15 <orgUrl> --confirm <orgUrl>");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+    var pass = true;
+    void Check(string name, bool ok, string detail)
+    {
+        Console.WriteLine($"  [{(ok ? "PASS" : "FAIL")}] {name}: {detail}");
+        pass &= ok;
+    }
+
+    // Preconditions. Read-only, and nothing is written unless every one of them holds: a
+    // proof run that seeded records and then found the emitter switched off would leave
+    // business rows behind to explain a fault it could have reported without writing at all.
+    var emitter = StepState(svc, "NotificationEmitterPlugin: Create of al_caseassignment");
+    Check("emitter step registered on Create of al_caseassignment",
+        emitter != null && emitter.Enabled, emitter == null ? "not registered" : emitter.Describe());
+
+    var drain = StepState(svc, "NotificationDrainPlugin: Create of al_notification");
+    Check("drain step registered, asynchronous, enabled",
+        drain != null && drain.Enabled && drain.Mode == 1, drain == null ? "not registered" : drain.Describe());
+
+    var sender = drain?.RunAs ?? Guid.Empty;
+    Check("drain runs as a named account", sender != Guid.Empty,
+        sender == Guid.Empty ? "no impersonating user - the drain has no mailbox to send from" : sender.ToString("D"));
+
+    var senderRow = sender == Guid.Empty
+        ? null
+        : svc.Retrieve("systemuser", sender, new ColumnSet("internalemailaddress", "fullname"));
+    var senderAddress = senderRow?.GetAttributeValue<string>("internalemailaddress");
+    Check("sending account has a work email", !string.IsNullOrWhiteSpace(senderAddress), senderAddress ?? "none");
+
+    if (sender != Guid.Empty)
+    {
+        var mailbox = Mailbox(svc, sender);
+        var approved = mailbox?.GetAttributeValue<bool?>("isemailaddressapprovedbyo365admin") == true;
+        var outgoing = mailbox == null ? "no mailbox row" : Formatted(mailbox, "outgoingemailstatus");
+        Check("mailbox approved by the O365 admin", approved, approved ? "Yes" : "No");
+
+        // Approved and tested are different facts, and the gap between them is the trap this
+        // project already walked up to: immediately after approval the mailbox read Yes and
+        // Not Run, and draining in that window would have stamped the backlog Failed.
+        Check("mailbox outgoing test succeeded", outgoing == "Success", outgoing);
+    }
+
+    if (!pass)
+    {
+        Console.Error.WriteLine("PROVE PP-15: preconditions failed. Nothing was written.");
+        return 2;
+    }
+
+    var stamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+    var reference = "PP15-PROOF-" + stamp;
+    var caseId = Guid.Empty;
+    var assignmentId = Guid.Empty;
+
+    try
+    {
+        caseId = svc.Create(new Entity("al_outcomecase")
+        {
+            ["al_name"] = "PP-15 proof " + stamp,
+            ["al_casereference"] = reference,
+            ["al_casestatus"] = new OptionSetValue(CaseStatusQueued),
+        });
+        Console.WriteLine($"  seeded al_outcomecase {caseId:D} ({reference}).");
+
+        assignmentId = svc.Create(new Entity("al_caseassignment")
+        {
+            ["al_name"] = "PP-15 proof allocation " + stamp,
+            ["al_caseassignmentcode"] = "PP15-" + stamp,
+            ["al_outcomecaseid"] = new EntityReference("al_outcomecase", caseId),
+            ["al_assigneduserid"] = new EntityReference("systemuser", sender),
+            ["al_assignedon"] = DateTime.UtcNow,
+            ["al_isactive"] = true,
+        });
+        Console.WriteLine($"  created al_caseassignment {assignmentId:D} - this is the qualifying event.");
+
+        // The emitter is synchronous, so the row exists by the time Create returns or it
+        // never will. Polling for it would only turn a missing emitter into a slow timeout.
+        var code = "ALLOCATION-" + assignmentId.ToString("N").ToUpperInvariant();
+        var row = NotificationByCode(svc, code);
+        Check("emitter wrote an outbox row", row != null, code);
+        if (row == null)
+        {
+            Console.Error.WriteLine("PROVE PP-15: FAIL - no notification was queued.");
+            return 2;
+        }
+
+        Console.WriteLine($"  al_notification {row.Id:D}");
+        Check("queued to the allocated person", row.GetAttributeValue<string>("al_recipientemail") == senderAddress,
+            row.GetAttributeValue<string>("al_recipientemail") ?? "(none)");
+        Check("event is Allocation", row.GetAttributeValue<OptionSetValue>("al_event")?.Value == EventAllocation,
+            Formatted(row, "al_event"));
+
+        // The drain is asynchronous, so the row stays Pending for as long as the platform
+        // takes to pick the job up. Waiting is the honest way to read that; a single read
+        // straight after the create would report Pending and prove nothing.
+        var deadline = DateTime.UtcNow.AddSeconds(DrainWaitSeconds);
+        while (row.GetAttributeValue<OptionSetValue>("al_status")?.Value == StatusPending && DateTime.UtcNow < deadline)
+        {
+            Thread.Sleep(5000);
+            row = NotificationByCode(svc, code) ?? row;
+            Console.WriteLine($"  waiting for the drain: {Formatted(row, "al_status")}");
+        }
+
+        var status = row.GetAttributeValue<OptionSetValue>("al_status")?.Value;
+        Check("outbox row reached Sent", status == StatusSent, Formatted(row, "al_status"));
+        if (status == StatusFailed)
+        {
+            Console.WriteLine($"  al_failurereason: {row.GetAttributeValue<string>("al_failurereason")}");
+        }
+
+        var sentOn = row.GetAttributeValue<DateTime?>("al_senton");
+        Check("send timestamped", sentOn.HasValue, sentOn?.ToString("u") ?? "not stamped");
+
+        // Named, not inferred. Sent on the outbox row means the drain handed the message to
+        // Dataverse; the email activity is where delivery itself is readable afterwards.
+        var queuedOn = row.GetAttributeValue<DateTime?>("al_queuedon") ?? DateTime.UtcNow.AddMinutes(-15);
+        var email = LatestEmail(svc, row.GetAttributeValue<string>("al_subject"), queuedOn);
+        Check("email activity created", email != null, email == null ? "none found" : $"{email.Id:D}");
+        if (email != null)
+        {
+            Console.WriteLine($"  email subject: {email.GetAttributeValue<string>("subject")}");
+            Console.WriteLine($"  email status: {Formatted(email, "statuscode")}, created {email.GetAttributeValue<DateTime?>("createdon"):u}");
+        }
+    }
+    finally
+    {
+        // Assignment first: it points at the case, and deleting the case would otherwise
+        // have to cascade to reach it.
+        if (assignmentId != Guid.Empty) { TryDelete(svc, "al_caseassignment", assignmentId); }
+        if (caseId != Guid.Empty) { TryDelete(svc, "al_outcomecase", caseId); }
+        Console.WriteLine("  seeded case and assignment deleted. The al_notification row is left as evidence.");
+    }
+
+    Console.WriteLine(pass ? "PROVE PP-15: PASS" : "PROVE PP-15: FAIL");
+    return pass ? 0 : 2;
+}
+
+// Read-only. Prints the whole outbox and, for each row, the email the drain produced.
+//
+// The distinction it exists to make: `Sent` on an al_notification row means the drain handed
+// the message to Dataverse, which is the last thing the drain can observe. Whether it left
+// the mailbox is on the email activity, and the two are hours apart when server-side email
+// is backed up. Reading only the outbox is how a queue that is quietly not sending looks
+// healthy — the failure OD-030 warned about, one layer further out.
+int Pp15Evidence(string orgUrl)
+{
+    using var svc = Connect(orgUrl);
+
+    var query = new QueryExpression("al_notification")
+    {
+        ColumnSet = new ColumnSet("al_notificationcode", "al_status", "al_event", "al_recipientemail", "al_subject", "al_queuedon", "al_senton", "al_failurereason"),
+    };
+    query.Orders.Add(new OrderExpression("al_queuedon", OrderType.Ascending));
+
+    var rows = svc.RetrieveMultiple(query).Entities;
+    Console.WriteLine($"al_notification: {rows.Count} row(s).");
+
+    foreach (var row in rows)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"  {row.GetAttributeValue<string>("al_notificationcode")}");
+        Console.WriteLine($"    {Formatted(row, "al_event")} -> {row.GetAttributeValue<string>("al_recipientemail") ?? "(no recipient)"}");
+        Console.WriteLine($"    status {Formatted(row, "al_status")}, queued {row.GetAttributeValue<DateTime?>("al_queuedon"):u}, sent {row.GetAttributeValue<DateTime?>("al_senton"):u}");
+
+        var reason = row.GetAttributeValue<string>("al_failurereason");
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            Console.WriteLine($"    failure: {reason}");
+        }
+
+        // Subject prefix, not equality: Dataverse appends a tracking token to the subject it
+        // stores ("… CRM:0249002"), so the email never carries the string the outbox recorded.
+        var subject = row.GetAttributeValue<string>("al_subject");
+        var emails = string.IsNullOrWhiteSpace(subject) ? new List<Entity>() : EmailsBySubjectPrefix(svc, subject);
+        if (emails.Count == 0)
+        {
+            Console.WriteLine("    email: none found");
+        }
+
+        // Both copies are printed, because they answer different questions. The outbound
+        // activity says the drain composed and issued a message; an inbound copy of the same
+        // subject says server-side email delivered it and synchronisation tracked it back —
+        // which is the only evidence here that anything actually arrived.
+        foreach (var email in emails)
+        {
+            Console.WriteLine(
+                $"    email {email.Id:D}: {Formatted(email, "directioncode")}, {Formatted(email, "statuscode")}, "
+                + $"created {email.GetAttributeValue<DateTime?>("createdon"):u}");
+        }
+    }
+
+    return 0;
+}
+
+/// <summary>
+/// Every email whose subject starts with what the outbox recorded, newest first.
+///
+/// Prefix, not equality: Dataverse appends a tracking token to the subject it stores
+/// ("… CRM:0249002"), so an exact match on the outbox's own subject finds nothing. That cost
+/// a FAIL on the first proof run and is the sort of thing that reads as "no email was sent".
+/// </summary>
+static List<Entity> EmailsBySubjectPrefix(ServiceClient svc, string subject)
+{
+    var query = new QueryExpression("email")
+    {
+        ColumnSet = new ColumnSet("subject", "statuscode", "directioncode", "createdon"),
+        Criteria = new FilterExpression(),
+    };
+    query.Criteria.AddCondition("subject", ConditionOperator.BeginsWith, subject);
+    query.Orders.Add(new OrderExpression("createdon", OrderType.Descending));
+    return svc.RetrieveMultiple(query).Entities.ToList();
+}
+
+/// <summary>The step registered under <paramref name="stepName"/>, or null when there is none.</summary>
+static StepFacts? StepState(ServiceClient svc, string stepName)
+{
+    var query = new QueryExpression("sdkmessageprocessingstep")
+    {
+        ColumnSet = new ColumnSet("statecode", "mode", "stage", "impersonatinguserid"),
+        TopCount = 1,
+        Criteria = new FilterExpression(),
+    };
+    query.Criteria.AddCondition("name", ConditionOperator.Equal, stepName);
+
+    var row = svc.RetrieveMultiple(query).Entities.FirstOrDefault();
+    return row == null
+        ? null
+        : new StepFacts(
+            row.GetAttributeValue<OptionSetValue>("statecode")?.Value == 0,
+            row.GetAttributeValue<OptionSetValue>("mode")?.Value ?? 0,
+            row.GetAttributeValue<OptionSetValue>("stage")?.Value ?? 0,
+            row.GetAttributeValue<EntityReference>("impersonatinguserid")?.Id ?? Guid.Empty);
+}
+
+/// <summary>The mailbox row for a user, which is where approval and the outgoing test live.</summary>
+static Entity? Mailbox(ServiceClient svc, Guid userId)
+{
+    var query = new QueryExpression("mailbox")
+    {
+        ColumnSet = new ColumnSet("isemailaddressapprovedbyo365admin", "outgoingemailstatus", "testmailboxaccesscompletedon"),
+        TopCount = 1,
+        Criteria = new FilterExpression(),
+    };
+    query.Criteria.AddCondition("regardingobjectid", ConditionOperator.Equal, userId);
+    return svc.RetrieveMultiple(query).Entities.FirstOrDefault();
+}
+
+/// <summary>One outbox row by its alternate key, with everything a proof run reports on.</summary>
+static Entity? NotificationByCode(ServiceClient svc, string code)
+{
+    var query = new QueryExpression("al_notification")
+    {
+        ColumnSet = new ColumnSet("al_status", "al_event", "al_recipientemail", "al_subject", "al_senton", "al_failurereason", "al_queuedon"),
+        TopCount = 1,
+        Criteria = new FilterExpression(),
+    };
+    query.Criteria.AddCondition("al_notificationcode", ConditionOperator.Equal, code);
+    return svc.RetrieveMultiple(query).Entities.FirstOrDefault();
+}
+
+/// <summary>
+/// The email the drain sent for this notification.
+///
+/// Matched on subject because the drain sets no regardingobjectid — deliberately, since a
+/// regarding object would need activities enabled on all five target tables in exchange for
+/// a link the body already spells out.
+///
+/// The fallback to "newest email since the row was queued" is not slack in the assertion. A
+/// subject that does not match is a real finding — it would mean the email carried something
+/// other than what the outbox recorded — and it is only findable if the search does not stop
+/// at the exact match. The caller prints the subject it found, so the two are compared by a
+/// person rather than collapsed into a pass.
+/// </summary>
+static Entity? LatestEmail(ServiceClient svc, string? subject, DateTime since)
+{
+    Entity? Newest(Action<FilterExpression> criteria)
+    {
+        var query = new QueryExpression("email")
+        {
+            ColumnSet = new ColumnSet("subject", "statuscode", "createdon"),
+            TopCount = 1,
+            Criteria = new FilterExpression(),
+        };
+        criteria(query.Criteria);
+        query.Orders.Add(new OrderExpression("createdon", OrderType.Descending));
+        return svc.RetrieveMultiple(query).Entities.FirstOrDefault();
+    }
+
+    if (!string.IsNullOrWhiteSpace(subject))
+    {
+        var exact = Newest(c => c.AddCondition("subject", ConditionOperator.Equal, subject));
+        if (exact != null)
+        {
+            return exact;
+        }
+    }
+
+    // A minute of slack before the queue time: the row and the email are stamped by
+    // different clocks, and a send that beat its own outbox row by a second is not a miss.
+    return Newest(c => c.AddCondition("createdon", ConditionOperator.OnOrAfter, since.AddMinutes(-1)));
+}
+
+/// <summary>An option set or status read as its label, so evidence reads the way a person would.</summary>
+static string Formatted(Entity row, string attribute) =>
+    row.FormattedValues.Contains(attribute) ? row.FormattedValues[attribute] : "(none)";
+
+/// <summary>What a registered step is set to do, so a check can report it rather than restate it.</summary>
+sealed record StepFacts(bool Enabled, int Mode, int Stage, Guid RunAs)
+{
+    public string Describe() =>
+        $"stage {Stage}, {(Mode == 1 ? "asynchronous" : "synchronous")}, {(Enabled ? "enabled" : "DISABLED")}"
+        + (RunAs == Guid.Empty ? string.Empty : $", runs as {RunAs:D}");
 }
 
 /// <summary>One YAML entry: either a scalar or a list of strings, never both.</summary>
