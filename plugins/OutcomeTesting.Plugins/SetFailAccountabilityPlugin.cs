@@ -27,7 +27,13 @@ namespace OutcomeTesting.Plugins
         private const string OutAuditEventId = "AuditEventId";
 
         private const string OutcomeEntity = "al_outcome";
-        private const int CommandSetFailAccountability = 120910788;
+        // Its own value since 2026-09-05 (OD-032). It previously reused 120910788, which the
+        // option set labels SetRoleAssignmentActive, so every row this command wrote was
+        // labelled as a role change and CommandHelpers.FindAuditByKey could not keep the two
+        // commands' idempotency keys apart. Rows written before the cut-over stay on
+        // 120910788 and are immutable (NFR-AUD-01); they are identified by
+        // al_name = "SetFailAccountability" with al_targettable = "al_outcome".
+        private const int CommandSetFailAccountability = 120910792;
 
         public SetFailAccountabilityPlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(SetFailAccountabilityPlugin))
