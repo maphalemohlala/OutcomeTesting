@@ -49,6 +49,9 @@ using System.Text.Json;
 //   (src/customapis/al_CompleteRemediation, pac solution import).
 
 const string AssemblyName = "OutcomeTesting.Plugins";
+
+// The shipping solution. Anything not a member of it does not promote to TEST or PROD.
+const string SolutionUniqueName = "OutcomeTesting";
 const string TypeName = "OutcomeTesting.Plugins.CompleteRemediationPlugin";
 const string ApiUniqueName = "al_CompleteRemediation";
 const int StatusOpen = 120910600;
@@ -144,6 +147,16 @@ if (args.Length >= 6 && args[0].Equals("registerstep", StringComparison.OrdinalI
         args[1], args[2], args[3], args[4], args.Length > 6 ? args[6] : string.Empty, stageArg,
         modeArg.Equals("async", StringComparison.OrdinalIgnoreCase) ? 1 : 0,
         args.Length > 8 ? args[8] : null);
+}
+
+if (args.Length >= 4 && args[0].Equals("repointwebpage", StringComparison.OrdinalIgnoreCase))
+{
+    return RepointWebPage(args[1], args[2], args[3]);
+}
+
+if (args.Length >= 4 && args[0].Equals("setwebroleauth", StringComparison.OrdinalIgnoreCase))
+{
+    return SetWebRoleAuth(args[1], args[2], args[3]);
 }
 
 if (args.Length >= 3 && args[0].Equals("seedadmin", StringComparison.OrdinalIgnoreCase))
@@ -833,6 +846,9 @@ int RegisterAll(string orgUrl, string? dllPathArg)
         ["content"] = Convert.ToBase64String(File.ReadAllBytes(dllPath)),
     }, ("name", AssemblyName));
 
+    // Every API this run touched, so solution membership can be checked once at the end.
+    var registered = new List<(string Name, Guid Id)>();
+
     foreach (var file in contracts)
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(file));
@@ -861,6 +877,8 @@ int RegisterAll(string orgUrl, string? dllPathArg)
             ["allowedcustomprocessingsteptype"] = new OptionSetValue(api.GetProperty("allowedcustomprocessingsteptype").GetInt32()),
             ["plugintypeid"] = new EntityReference("plugintype", pluginTypeId),
         }, ("uniquename", apiName));
+
+        registered.Add((apiName, customApiId));
 
         foreach (var p in doc.RootElement.GetProperty("requestParameters").EnumerateArray())
         {
@@ -893,7 +911,58 @@ int RegisterAll(string orgUrl, string? dllPathArg)
     }
 
     Console.WriteLine($"Done. Registered {contracts.Length} command(s) from {contractsDir}.");
+
+    ReportSolutionMembership(svc, registered);
     return 0;
+}
+
+// Names any Custom API that this run registered but that is not a member of the shipping
+// solution, and prints the exact command that fixes it.
+//
+// Registering an API creates it in the *Default* solution only. That is invisible until a
+// promotion to TEST or PROD quietly ships without it — `al_DrainNotifications` was caught on
+// 2026-09-04 only because someone thought to check by hand, which is not a control.
+//
+// This reports rather than adds. Adding requires a solution component type code, and pac
+// rejects both the code it maps from `371` and the documented `10088` while accepting the
+// *name* `CustomAPI` — so the numeric value this SDK call would need is exactly the thing
+// that is not pinned down. Printing a verified-working command is honest; guessing a code
+// against a live solution is not. Automating the add is a follow-up, once the code is
+// confirmed against an environment.
+static void ReportSolutionMembership(ServiceClient svc, List<(string Name, Guid Id)> apis)
+{
+    if (apis.Count == 0)
+    {
+        return;
+    }
+
+    var query = new QueryExpression("solutioncomponent")
+    {
+        ColumnSet = new ColumnSet("objectid"),
+        Criteria = new FilterExpression(),
+    };
+    query.Criteria.AddCondition("objectid", ConditionOperator.In, apis.Select(a => (object)a.Id).ToArray());
+    var link = query.AddLink("solution", "solutionid", "solutionid");
+    link.LinkCriteria.AddCondition("uniquename", ConditionOperator.Equal, SolutionUniqueName);
+
+    var members = new HashSet<Guid>(
+        svc.RetrieveMultiple(query).Entities.Select(e => e.GetAttributeValue<Guid>("objectid")));
+
+    var missing = apis.Where(a => !members.Contains(a.Id)).ToList();
+    if (missing.Count == 0)
+    {
+        Console.WriteLine($"All {apis.Count} Custom API(s) are members of '{SolutionUniqueName}'.");
+        return;
+    }
+
+    Console.WriteLine();
+    Console.WriteLine($"WARNING: {missing.Count} Custom API(s) are NOT in '{SolutionUniqueName}' and will not promote:");
+    foreach (var api in missing)
+    {
+        Console.WriteLine($"  {api.Name} ({api.Id})");
+        Console.WriteLine($"    pac solution add-solution-component --solutionUniqueName {SolutionUniqueName} \\");
+        Console.WriteLine($"        --component {api.Id} --componentType CustomAPI --AddRequiredComponents");
+    }
 }
 
 int VerifySignOff(string orgUrl, Guid caseId)
@@ -1188,6 +1257,139 @@ static void TryDelete(ServiceClient svc, string table, Guid id)
     {
         Console.WriteLine($"  cleanup: could not delete {table} {id}: {ex.Message.Split('\n')[0].Trim()}");
     }
+}
+
+// ---------------------------------------------------------------------------------------
+// Portal repair commands (OD-034).
+//
+// `pac pages upload` aborts partway through on this site — on a single table-permission
+// record that is already correct in the environment — and the abort lands *before* web pages
+// are processed, so no web page change can be deployed by CLI at all. These two commands
+// exist to apply the corrections that upload cannot, and only those.
+//
+// Deliberately narrow rather than a generic "set any field on any row" hatch. A generic
+// setter would be one typo away from silently rewriting business data, and it would not
+// know that a page template is a lookup while the authenticated-users flag is a bool. Each
+// command names the fault it repairs, resolves its target by business name rather than by a
+// hand-copied guid, and prints the value before and after so the change is evidenced in the
+// console rather than asserted. They are repair tools; `pac pages upload` remains the
+// deployment path once OD-034 is closed.
+// ---------------------------------------------------------------------------------------
+
+// Repoints every web page on a partial URL at a named page template (OD-035).
+//
+// A web page whose page template lookup is null cannot render at all — Power Pages returns
+// the generic error page — which is exactly what a component-id collision leaves behind when
+// the page template row is taken over by another component (AD-084).
+//
+// Both the root page and its language content page carry the lookup, so this matches on
+// partial URL and fixes every row it finds rather than taking the first.
+int RepointWebPage(string orgUrl, string partialUrl, string pageTemplateName)
+{
+    using var svc = Connect(orgUrl);
+
+    var templateId = FindId(svc, "mspp_pagetemplate", ("mspp_name", pageTemplateName));
+    if (templateId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No page template named '{pageTemplateName}'. Nothing was changed.");
+        return 1;
+    }
+
+    Console.WriteLine($"Page template '{pageTemplateName}' = {templateId}");
+
+    var query = new QueryExpression("mspp_webpage")
+    {
+        ColumnSet = new ColumnSet("mspp_name", "mspp_pagetemplateid", "mspp_partialurl", "mspp_isroot"),
+        Criteria = new FilterExpression(),
+    };
+    query.Criteria.AddCondition("mspp_partialurl", ConditionOperator.Equal, partialUrl);
+
+    var pages = svc.RetrieveMultiple(query).Entities;
+    if (pages.Count == 0)
+    {
+        Console.Error.WriteLine($"No web page has partial URL '{partialUrl}'. Nothing was changed.");
+        return 1;
+    }
+
+    var changed = 0;
+    foreach (var page in pages)
+    {
+        var before = page.GetAttributeValue<EntityReference>("mspp_pagetemplateid");
+        var root = page.GetAttributeValue<bool?>("mspp_isroot") == true ? "root" : "content";
+
+        if (before != null && before.Id == templateId)
+        {
+            Console.WriteLine($"  {page.Id} ({root}): already correct, left alone.");
+            continue;
+        }
+
+        Console.WriteLine($"  {page.Id} ({root}): {(before == null ? "<none>" : before.Id.ToString())} -> {templateId}");
+
+        svc.Update(new Entity("mspp_webpage", page.Id)
+        {
+            ["mspp_pagetemplateid"] = new EntityReference("mspp_pagetemplate", templateId),
+        });
+        changed++;
+    }
+
+    Console.WriteLine($"Done. {changed} of {pages.Count} web page(s) on '{partialUrl}' updated.");
+    return 0;
+}
+
+// Sets the authenticated-users flag on a named web role (OD-033).
+//
+// The flag auto-grants the role to every authenticated portal user, so a role carrying it by
+// accident is a live over-grant rather than a cosmetic drift — and an upload will not
+// necessarily clear it, which is why this is a deliberate correction and not another upload.
+int SetWebRoleAuth(string orgUrl, string roleName, string value)
+{
+    if (!bool.TryParse(value, out var flag))
+    {
+        Console.Error.WriteLine("Value must be 'true' or 'false'.");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var query = new QueryExpression("mspp_webrole")
+    {
+        ColumnSet = new ColumnSet("mspp_name", "mspp_authenticatedusersrole"),
+        Criteria = new FilterExpression(),
+    };
+    query.Criteria.AddCondition("mspp_name", ConditionOperator.Equal, roleName);
+
+    var roles = svc.RetrieveMultiple(query).Entities;
+    if (roles.Count == 0)
+    {
+        Console.Error.WriteLine($"No web role named '{roleName}'. Nothing was changed.");
+        return 1;
+    }
+
+    // More than one role sharing a name is itself a fault worth stopping on: picking one of
+    // them would leave the other granting whatever this was meant to revoke.
+    if (roles.Count > 1)
+    {
+        Console.Error.WriteLine($"{roles.Count} web roles are named '{roleName}'. Refusing to guess; nothing was changed.");
+        return 1;
+    }
+
+    var role = roles[0];
+    var before = role.GetAttributeValue<bool?>("mspp_authenticatedusersrole");
+    Console.WriteLine($"Web role '{roleName}' ({role.Id}): authenticatedusersrole {before} -> {flag}");
+
+    if (before == flag)
+    {
+        Console.WriteLine("Already correct, left alone.");
+        return 0;
+    }
+
+    svc.Update(new Entity("mspp_webrole", role.Id)
+    {
+        ["mspp_authenticatedusersrole"] = flag,
+    });
+
+    Console.WriteLine("Updated.");
+    return 0;
 }
 
 // Resolves the account a step runs as, by record id or UPN. Disabled users are excluded:

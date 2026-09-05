@@ -3,6 +3,15 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
+    <!--
+      This machine carries only the .NET 10 runtime, and without a roll-forward policy the
+      built exe refuses to start: "You must install or update .NET to run this application",
+      which reads like a missing SDK rather than a missing runtime *major* and cost real time
+      on 2026-09-04. Rolling forward keeps the tested target framework — the Dataverse client
+      is validated against net8.0 — while letting the tool run on whatever major is actually
+      installed. Prefer this over retargeting, which would change what the client is tested on.
+    -->
+    <RollForward>LatestMajor</RollForward>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>OutcomeTesting.Registration</RootNamespace>
