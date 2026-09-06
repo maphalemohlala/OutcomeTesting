@@ -1,4 +1,4 @@
-import type { CommandFailure, CommandFailureKind } from './commands/commandClient';
+import type { CommandFailure, CommandFailureKind } from './commands/failures';
 
 /**
  * Single place that turns a classified failure into user-facing copy and keeps the
