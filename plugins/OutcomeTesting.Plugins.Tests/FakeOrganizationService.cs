@@ -439,16 +439,32 @@ namespace OutcomeTesting.Plugins.Tests
             return new EntityCollection(results);
         }
 
+        /// <summary>Every Associate call, as (relationship, target, related).</summary>
+        public List<Tuple<string, EntityReference, EntityReference>> Associations { get; } =
+            new List<Tuple<string, EntityReference, EntityReference>>();
+
+        /// <summary>Every Disassociate call, as (relationship, target, related).</summary>
+        public List<Tuple<string, EntityReference, EntityReference>> Disassociations { get; } =
+            new List<Tuple<string, EntityReference, EntityReference>>();
+
         public void Associate(
             string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities)
         {
-            throw new NotSupportedException("Associate is not supported by this fake.");
+            foreach (var related in relatedEntities)
+            {
+                Associations.Add(Tuple.Create(
+                    relationship.SchemaName, new EntityReference(entityName, entityId), related));
+            }
         }
 
         public void Disassociate(
             string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities)
         {
-            throw new NotSupportedException("Disassociate is not supported by this fake.");
+            foreach (var related in relatedEntities)
+            {
+                Disassociations.Add(Tuple.Create(
+                    relationship.SchemaName, new EntityReference(entityName, entityId), related));
+            }
         }
     }
 }

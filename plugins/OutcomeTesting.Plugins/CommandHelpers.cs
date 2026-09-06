@@ -12,7 +12,7 @@ namespace OutcomeTesting.Plugins
     /// idempotency lookup and the immutable Audit Event write (BR-012, NFR-AUD-01) in one
     /// place so every command behaves identically.
     /// </summary>
-    internal static class CommandHelpers
+    public static class CommandHelpers
     {
         // Distinct failure prefixes so the client can branch (command-concurrency skill).
         public const string ConflictPrefix = "CONFLICT: ";
