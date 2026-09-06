@@ -108,6 +108,11 @@
           "entitySetName": "al_auditevents",
           "logicalName": "al_auditevent",
           "isHidden": false
+        },
+        "contacts": {
+          "entitySetName": "contacts",
+          "logicalName": "contact",
+          "isHidden": false
         }
       },
       "environmentVariableName": ""

@@ -445,6 +445,49 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "al_resolveimportexception": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_ResolveImportException": {
+        "path": "/api/data/v9.2/al_ResolveImportException",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "ExceptionId",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Resolution",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Note",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
   "al_responses": {
     "tableId": "",
     "version": "",
@@ -490,49 +533,6 @@ export const dataSourcesInfo = {
             "name": "Mandatory",
             "in": "body",
             "required": false,
-            "type": "string"
-          }
-        ],
-        "responseInfo": {
-          "200": {
-            "type": "object"
-          }
-        }
-      }
-    }
-  },
-  "al_resolveimportexception": {
-    "tableId": "",
-    "version": "",
-    "primaryKey": "",
-    "dataSourceType": "Dataverse",
-    "apis": {
-      "al_ResolveImportException": {
-        "path": "/api/data/v9.2/al_ResolveImportException",
-        "method": "POST",
-        "parameters": [
-          {
-            "name": "ExceptionId",
-            "in": "body",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "Resolution",
-            "in": "body",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "Note",
-            "in": "body",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "IdempotencyKey",
-            "in": "body",
-            "required": true,
             "type": "string"
           }
         ],
@@ -914,6 +914,13 @@ export const dataSourcesInfo = {
     "tableId": "",
     "version": "",
     "primaryKey": "al_userid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "contacts": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "contactid",
     "dataSourceType": "Dataverse",
     "apis": {}
   }
