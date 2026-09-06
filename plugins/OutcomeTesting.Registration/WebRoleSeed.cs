@@ -146,6 +146,9 @@ public static class WebRoleSeed
                 ["al_name"] = roleName + " - " + email,
                 ["al_useremail"] = email,
                 ["al_rolecode"] = roleName,
+                // Explicitly null: al_approle carries a schema default, so a mirror row
+                // written without it comes back carrying a picklist role nobody assigned.
+                ["al_approle"] = null,
                 ["al_userrolemappingcode"] = code,
                 ["statecode"] = new OptionSetValue(0),
                 ["statuscode"] = new OptionSetValue(1),

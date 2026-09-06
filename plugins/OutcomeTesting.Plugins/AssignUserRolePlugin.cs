@@ -80,6 +80,10 @@ namespace OutcomeTesting.Plugins
                     ["al_name"] = (normalizedCode + " - " + email),
                     ["al_useremail"] = email,
                     ["al_rolecode"] = normalizedCode,
+                    // Explicitly null: al_approle carries a schema default, so leaving it
+                    // out writes a picklist role nobody asked for onto a code-based
+                    // assignment, and anything reading the picklist would honour it.
+                    ["al_approle"] = null,
                     ["al_userrolemappingcode"] = code,
                     ["statecode"] = new OptionSetValue(0),
                     ["statuscode"] = new OptionSetValue(1),

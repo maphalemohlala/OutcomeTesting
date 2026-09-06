@@ -202,17 +202,23 @@ namespace OutcomeTesting.Plugins
             var roles = new CallerRoles();
             foreach (var entity in service.RetrieveMultiple(query).Entities)
             {
-                var role = entity.GetAttributeValue<OptionSetValue>("al_approle");
-                if (role != null)
-                {
-                    roles.AppRoles.Add(role.Value);
-                    continue;
-                }
-
+                // al_rolecode outranks al_approle (AD-044), which is also how the client
+                // reads a mapping. The order used to be reversed, and that was not
+                // harmless: al_approle carries a schema default, so every row written with
+                // only a role code came back ALSO carrying a picklist value, and the
+                // picklist won. Every web role assignment resolved as that default rather
+                // than as the role it named.
                 var code = entity.GetAttributeValue<string>("al_rolecode");
                 if (!string.IsNullOrWhiteSpace(code))
                 {
                     roles.RoleCodes.Add(code.Trim());
+                    continue;
+                }
+
+                var role = entity.GetAttributeValue<OptionSetValue>("al_approle");
+                if (role != null)
+                {
+                    roles.AppRoles.Add(role.Value);
                 }
             }
             return roles;
