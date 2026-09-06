@@ -154,15 +154,22 @@ public static class ContactsMigration
     /// as text from the intake extract), so leaving the fictional names would keep listing
     /// people the registry no longer holds. Adviser and paraplanner are offset so no case
     /// has the same person in both positions.
+    ///
+    /// The checker is taken from the case's live allocation, and cleared where there is
+    /// none. ClaimCasePlugin stamps it at allocation time, but a re-run skips cases already
+    /// allocated, so deriving it here is what keeps the header true on a second pass.
+    /// Clearing an unallocated case matters as much: the old value would otherwise keep a
+    /// checker in the People view who is not in the registry and holds no allocation.
     /// </summary>
     private static void RewriteCasePeople(IOrganizationService svc, List<Entity> cases, List<Person> people)
     {
-        Console.WriteLine("2. Rewriting the adviser and paraplanner on every case…");
+        Console.WriteLine("2. Rewriting the people recorded on every case…");
 
         for (var i = 0; i < cases.Count; i++)
         {
             var adviser = people[i % people.Count];
             var paraplanner = people[(i + 1) % people.Count];
+            var checker = AssigneeOf(svc, cases[i].Id, people);
 
             svc.Update(new Entity("al_outcomecase", cases[i].Id)
             {
@@ -170,6 +177,7 @@ public static class ContactsMigration
                 ["al_advisercode"] = Code("ADV", adviser),
                 ["al_paraplanner"] = paraplanner.Name,
                 ["al_paraplannercode"] = Code("PP", paraplanner),
+                ["al_checkername"] = checker?.Name,
             });
         }
 
@@ -206,6 +214,21 @@ public static class ContactsMigration
             var reference = outcomeCase.GetAttributeValue<string>("al_casereference") ?? outcomeCase.Id.ToString("D");
             var assignee = people[i % people.Count];
 
+            var status = outcomeCase.GetAttributeValue<OptionSetValue>("al_casestatus");
+            if (status != null && status.Value == CaseStatusClosed)
+            {
+                Console.WriteLine($"   {reference} is Closed — left alone.");
+                allocated.Add((outcomeCase, AssigneeOf(svc, outcomeCase.Id, people) ?? assignee));
+                continue;
+            }
+
+            if (HasActiveAssignment(svc, outcomeCase.Id))
+            {
+                Console.WriteLine($"   {reference} already allocated — left alone.");
+                allocated.Add((outcomeCase, AssigneeOf(svc, outcomeCase.Id, people) ?? assignee));
+                continue;
+            }
+
             try
             {
                 var update = new Entity("al_outcomecase", outcomeCase.Id)
@@ -238,6 +261,40 @@ public static class ContactsMigration
         Console.WriteLine($"   {allocated.Count} allocated, {left} left unassigned on purpose.");
         Console.WriteLine();
         return allocated;
+    }
+
+    /// <summary>Whether the case already holds a live allocation, so a re-run leaves it be.</summary>
+    private static bool HasActiveAssignment(IOrganizationService svc, Guid caseId)
+    {
+        var query = new QueryExpression("al_caseassignment")
+        {
+            ColumnSet = new ColumnSet(false),
+            Criteria = new FilterExpression(),
+            TopCount = 1,
+        };
+        query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+        query.Criteria.AddCondition("al_isactive", ConditionOperator.Equal, true);
+
+        return svc.RetrieveMultiple(query).Entities.Count > 0;
+    }
+
+    /// <summary>Who currently holds the case, so a re-run reports the real assignee.</summary>
+    private static Person? AssigneeOf(IOrganizationService svc, Guid caseId, List<Person> people)
+    {
+        var query = new QueryExpression("al_caseassignment")
+        {
+            ColumnSet = new ColumnSet("al_assignedcontactid"),
+            Criteria = new FilterExpression(),
+            TopCount = 1,
+        };
+        query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+        query.Criteria.AddCondition("al_isactive", ConditionOperator.Equal, true);
+
+        var found = svc.RetrieveMultiple(query).Entities;
+        if (found.Count == 0) return null;
+
+        var contact = found[0].GetAttributeValue<EntityReference>("al_assignedcontactid");
+        return contact == null ? null : people.FirstOrDefault(p => p.ContactId == contact.Id);
     }
 
     private static Guid AqsOnlyRoute(IOrganizationService svc)
@@ -285,6 +342,15 @@ public static class ContactsMigration
             var reference = outcomeCase.GetAttributeValue<string>("al_casereference") ?? outcomeCase.Id.ToString("D");
             try
             {
+                var current = svc.Retrieve("al_outcomecase", outcomeCase.Id, new ColumnSet("al_casestatus"))
+                    .GetAttributeValue<OptionSetValue>("al_casestatus");
+                if (current != null && current.Value == CaseStatusClosed)
+                {
+                    Console.WriteLine($"   {reference}: already Closed — left alone.");
+                    closed++;
+                    continue;
+                }
+
                 var review = OpenReview(svc, outcomeCase.Id);
                 if (review == null)
                 {
