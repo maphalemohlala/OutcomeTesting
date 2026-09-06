@@ -1,3 +1,4 @@
+using OutcomeTesting.Registration;
 using Microsoft.Crm.Sdk.Messages;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
@@ -256,6 +257,16 @@ if (args.Length >= 3 && args[0].Equals("fetch", StringComparison.OrdinalIgnoreCa
     return Fetch(args[1], args[2]);
 }
 
+if (args.Length >= 2 && args[0].Equals("migratetocontacts", StringComparison.OrdinalIgnoreCase))
+{
+    return MigrateToContacts(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("proveexport", StringComparison.OrdinalIgnoreCase))
+{
+    return ProveExport(args[1]);
+}
+
 if (args.Length < 1)
 {
     Console.Error.WriteLine("Usage: dotnet run -- <orgUrl> [<pluginDllPath>]   |   dotnet run -- verify <orgUrl>");
@@ -310,6 +321,97 @@ int Fetch(string orgUrl, string fetchXmlOrFile)
     Console.WriteLine(JsonSerializer.Serialize(
         new { count = rows.Count, moreRecords = results.MoreRecords, rows },
         new JsonSerializerOptions { WriteIndented = true }));
+    return 0;
+}
+
+// One-off DEV migration onto the contact registry. DELETES al_user rows, REWRITES the
+// adviser and paraplanner on every case, ALLOCATES cases and CLOSES some of them, and the
+// Audit Events those commands write are immutable (NFR-AUD-01). The org URL is repeated
+// after --confirm for the same reason the verify modes repeat it: this must not happen by
+// muscle memory.
+int MigrateToContacts(string[] a)
+{
+    var orgUrl = a[1];
+    var confirmed = a.Length >= 4
+        && a[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase)
+        && a[3].TrimEnd('/').Equals(orgUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+
+    if (!confirmed)
+    {
+        Console.Error.WriteLine(
+            "This rewrites business data. Re-run as: migratetocontacts <orgUrl> --confirm <orgUrl>");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var whoAmI = (WhoAmIResponse)svc.Execute(new WhoAmIRequest());
+    var caller = svc.Retrieve("systemuser", whoAmI.UserId, new ColumnSet("internalemailaddress"));
+    var callerEmail = (caller.GetAttributeValue<string>("internalemailaddress") ?? string.Empty).Trim();
+    Console.WriteLine($"Running as {callerEmail}.");
+    Console.WriteLine();
+
+    return ContactsMigration.Run(svc, callerEmail);
+}
+
+// Runs the Trail Light export the way the Exports page does — CreateExportBatch then
+// GenerateExport — and reports the row count and the records actually written. This is
+// the evidence that the Download control has something to download; the control disables
+// itself on an empty row set, so a batch of 0 was never a UI defect.
+int ProveExport(string orgUrl)
+{
+    using var svc = Connect(orgUrl);
+
+    var closed = new QueryExpression("al_outcomecase")
+    {
+        ColumnSet = new ColumnSet("al_casereference"),
+        Criteria = new FilterExpression(),
+    };
+    closed.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+    closed.Criteria.AddCondition("al_casestatus", ConditionOperator.Equal, 120910591);
+    var closedCases = svc.RetrieveMultiple(closed).Entities;
+    Console.WriteLine($"Closed cases available to the export: {closedCases.Count}");
+
+    var createKey = "PROVE-EXPORT-CREATE-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+    var created = svc.Execute(new OrganizationRequest("al_CreateExportBatch")
+    {
+        ["IdempotencyKey"] = createKey,
+    });
+    var batchId = (string)created["BatchId"];
+    Console.WriteLine($"Created draft batch {batchId}.");
+
+    var generated = svc.Execute(new OrganizationRequest("al_GenerateExport")
+    {
+        ["BatchId"] = batchId,
+        ["IdempotencyKey"] = "PROVE-EXPORT-GEN-" + batchId,
+    });
+    var rowCount = (string)generated["RowCount"];
+    Console.WriteLine($"Generated: RowCount={rowCount}, Status={generated["Status"]}");
+
+    var records = new QueryExpression("al_exportrecord")
+    {
+        ColumnSet = new ColumnSet("al_advisername", "al_advicequalitygrade", "al_filequalitygrade", "al_clientname"),
+        Criteria = new FilterExpression(),
+    };
+    records.Criteria.AddCondition("al_exportbatchid", ConditionOperator.Equal, new Guid(batchId));
+    var rows = svc.RetrieveMultiple(records).Entities;
+
+    Console.WriteLine($"Export records written: {rows.Count}");
+    foreach (var row in rows)
+    {
+        Console.WriteLine(
+            "  adviser=" + (row.GetAttributeValue<string>("al_advisername") ?? "(blank)")
+            + " adviceGrade=" + (row.GetAttributeValue<string>("al_advicequalitygrade") ?? "(blank)")
+            + " fileQuality=" + (row.GetAttributeValue<string>("al_filequalitygrade") ?? "(blank)"));
+    }
+
+    if (rows.Count == 0)
+    {
+        Console.Error.WriteLine("PROVE EXPORT: FAIL - the batch is empty, so Download stays disabled.");
+        return 2;
+    }
+
+    Console.WriteLine("PROVE EXPORT: PASS - the batch has rows, so Download is enabled.");
     return 0;
 }
 

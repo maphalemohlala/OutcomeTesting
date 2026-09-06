@@ -23,7 +23,7 @@ namespace OutcomeTesting.Plugins.Tests
         private static FakeOrganizationService Both()
         {
             var svc = new FakeOrganizationService();
-            svc.Seed("systemuser", UserId, "internalemailid", Email, "fullname", "Ada Checker", "isdisabled", false);
+            svc.Seed("systemuser", UserId, "internalemailaddress", Email, "fullname", "Ada Checker", "isdisabled", false);
             svc.Seed("contact", ContactId, "emailaddress1", Email, "fullname", "Ada Checker");
             return svc;
         }
@@ -39,7 +39,7 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Matches_a_user_on_domainname_when_internalemailid_is_unset()
+        public void Matches_a_user_on_domainname_when_internalemailaddress_is_unset()
         {
             var svc = new FakeOrganizationService();
             svc.Seed("systemuser", UserId, "domainname", Email, "fullname", "Ada Checker", "isdisabled", false);
@@ -65,7 +65,7 @@ namespace OutcomeTesting.Plugins.Tests
         public void Refuses_when_no_portal_contact_holds_the_email()
         {
             var svc = new FakeOrganizationService();
-            svc.Seed("systemuser", UserId, "internalemailid", Email, "isdisabled", false);
+            svc.Seed("systemuser", UserId, "internalemailaddress", Email, "isdisabled", false);
 
             var ex = Assert.Throws<InvalidPluginExecutionException>(
                 () => AssignCasePlugin.ResolveAssignee(svc, Email));
@@ -79,7 +79,7 @@ namespace OutcomeTesting.Plugins.Tests
         public void Refuses_a_disabled_user()
         {
             var svc = new FakeOrganizationService();
-            svc.Seed("systemuser", UserId, "internalemailid", Email, "isdisabled", true);
+            svc.Seed("systemuser", UserId, "internalemailaddress", Email, "isdisabled", true);
             svc.Seed("contact", ContactId, "emailaddress1", Email);
 
             var ex = Assert.Throws<InvalidPluginExecutionException>(
@@ -130,6 +130,35 @@ namespace OutcomeTesting.Plugins.Tests
             var name = AssignCasePlugin.BuildAssignmentName(new string('r', 90), new string('n', 90));
 
             Assert.True(name.Length <= 100, "name was " + name.Length + " characters");
+        }
+
+        /// <summary>
+        /// The work email column on systemuser is <c>internalemailaddress</c>. The filter
+        /// named <c>internalemailid</c>, which does not exist, so Dataverse rejected the
+        /// query outright and EVERY allocation failed — the al_AssignCase command and the
+        /// portal claim alike. It went unnoticed because no case had ever been allocated in
+        /// DEV, and because these tests seeded the same wrong name: the fake has no metadata
+        /// to contradict it, so the test agreed with the bug.
+        ///
+        /// This case seeds the real shape a Dataverse user has — a mailbox address and a
+        /// separate UPN — so resolution has to work off the mailbox column alone.
+        /// </summary>
+        [Fact]
+        public void Resolves_a_user_whose_mailbox_and_upn_differ()
+        {
+            var svc = new FakeOrganizationService();
+            svc.Seed(
+                "systemuser", UserId,
+                "internalemailaddress", Email,
+                "domainname", "ada.checker@tenant.onmicrosoft.com",
+                "fullname", "Ada Checker",
+                "isdisabled", false);
+            svc.Seed("contact", ContactId, "emailaddress1", Email, "fullname", "Ada Checker");
+
+            var assignee = AssignCasePlugin.ResolveAssignee(svc, Email);
+
+            Assert.Equal(UserId, assignee.UserId);
+            Assert.Equal(ContactId, assignee.ContactId);
         }
     }
 }

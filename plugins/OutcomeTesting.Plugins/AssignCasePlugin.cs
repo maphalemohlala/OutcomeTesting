@@ -180,7 +180,7 @@ namespace OutcomeTesting.Plugins
                 {
                     Conditions =
                     {
-                        new ConditionExpression("internalemailid", ConditionOperator.Equal, email),
+                        new ConditionExpression("internalemailaddress", ConditionOperator.Equal, email),
                         new ConditionExpression("domainname", ConditionOperator.Equal, email),
                     },
                 });
