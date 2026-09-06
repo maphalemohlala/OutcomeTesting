@@ -188,5 +188,9 @@ two roles as equal rather than pinning the under-granted shape.
 | `al_pagepermission` | 52 web role rules + 17 legacy picklist rules |
 | Cases | 13: 9 allocated, 3 closed, 4 queued |
 | Export | Proved end to end, 3 rows with both graded columns populated |
+| Code App | Pushed, `appversion` `2026-09-06T12:40:13Z` |
 
 Tests: **167** app, **316** plug-in. `tsc` and `eslint` clean (9 pre-existing warnings).
+
+Deployment record, including the two things that cost time:
+`docs/deployment/2026-09-06-contacts-webroles-deployment.md`.
