@@ -49,6 +49,14 @@ using System.Text.Json;
 //   NFR-AUD-01 is permanent, so a re-labelling is a documented cut-over date and not a
 //   migration. Idempotent, and it refuses a label another value already holds.
 //
+// Metadata membership: dotnet run -- metadatamembership <orgUrl>
+//   Read-only. Reports every al_ table's membership of the shipping solution AND its
+//   rootcomponentbehavior, which is the fact that decides whether an option minted after the
+//   table was added travels with an export. Prints the fix command for anything short.
+//
+// Add metadata: dotnet run -- addmetadatatosolution <orgUrl> <entity> [<attribute>]
+//   Adds a table with all its subcomponents, or one named attribute.
+//
 // Prove PP-15: dotnet run -- provepp15 <orgUrl> --confirm <orgUrl>
 //   Causes one allocation, then follows it emitter -> outbox -> async drain -> server-side
 //   email and reports each hop. Checks the emitter step, the drain step and the sending
@@ -231,6 +239,16 @@ if (args.Length >= 2 && args[0].Equals("provepp15", StringComparison.OrdinalIgno
 if (args.Length >= 2 && args[0].Equals("pp15evidence", StringComparison.OrdinalIgnoreCase))
 {
     return Pp15Evidence(args[1]);
+}
+
+if (args.Length >= 2 && args[0].Equals("metadatamembership", StringComparison.OrdinalIgnoreCase))
+{
+    return MetadataMembership(args[1]);
+}
+
+if (args.Length >= 3 && args[0].Equals("addmetadatatosolution", StringComparison.OrdinalIgnoreCase))
+{
+    return AddMetadataToSolution(args[1], args[2], args.Length >= 4 ? args[3] : null);
 }
 
 if (args.Length < 1)
@@ -2474,6 +2492,258 @@ static Entity? LatestEmail(ServiceClient svc, string? subject, DateTime since)
 /// <summary>An option set or status read as its label, so evidence reads the way a person would.</summary>
 static string Formatted(Entity row, string attribute) =>
     row.FormattedValues.Contains(attribute) ? row.FormattedValues[attribute] : "(none)";
+
+// Reports which `al_` tables are members of the shipping solution, and how.
+//
+// The distinction that matters is `rootcomponentbehavior`, not membership. A table added
+// with **Include subcomponents** carries every attribute, option value, form and view it
+// has, now and later — so an option minted afterwards through the metadata API travels with
+// it and nothing needs re-adding. A table added as a **shell**, or with named subcomponents
+// only, carries what was listed and silently drops the rest, which is the version of this
+// that fails at import rather than at export.
+//
+// Worth being explicit, because it is a common misreading: adding an option value without
+// naming a solution does not put the option "in the default solution" in a way that excludes
+// it from this one. Unmanaged customisations all land in the same Active layer. What decides
+// whether the shipping solution carries the option is whether the solution holds the
+// attribute — directly, or through a table that includes its subcomponents.
+int MetadataMembership(string orgUrl)
+{
+    using var svc = Connect(orgUrl);
+
+    var solutionId = FindId(svc, "solution", ("uniquename", SolutionUniqueName));
+    if (solutionId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No solution '{SolutionUniqueName}'.");
+        return 1;
+    }
+
+    var members = SolutionMembers(svc, solutionId);
+    Console.WriteLine($"{SolutionUniqueName} ({solutionId:D}): {members.Count} component(s).");
+
+    var all = ((RetrieveAllEntitiesResponse)svc.Execute(new RetrieveAllEntitiesRequest
+    {
+        EntityFilters = EntityFilters.Relationships,
+        RetrieveAsIfPublished = false,
+    })).EntityMetadata;
+
+    var entities = all
+        .Where(e => e.LogicalName != null && e.LogicalName.StartsWith("al_", StringComparison.Ordinal))
+        .OrderBy(e => e.LogicalName, StringComparer.Ordinal)
+        .ToList();
+
+    // Every many-to-many relationship in the environment, by the intersect table it uses.
+    // An intersect table is never a solution component in its own right — the relationship
+    // is (component type 10) — so checking it as a table reports a false gap, which is
+    // exactly what the first run of this report did.
+    var intersects = all
+        .SelectMany(e => e.ManyToManyRelationships ?? Array.Empty<ManyToManyRelationshipMetadata>())
+        .Where(r => r.IntersectEntityName != null)
+        .GroupBy(r => r.IntersectEntityName!, StringComparer.OrdinalIgnoreCase)
+        .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+    Console.WriteLine();
+    Console.WriteLine($"al_ tables in the environment: {entities.Count}");
+
+    var missing = new List<string>();
+    var shallow = new List<string>();
+
+    foreach (var entity in entities)
+    {
+        var name = entity.LogicalName!;
+        var id = entity.MetadataId ?? Guid.Empty;
+
+        if (entity.IsIntersect == true || intersects.ContainsKey(name))
+        {
+            // An intersect table is not a solution component, and neither, in this solution,
+            // is the relationship that owns it: **a many-to-many relationship travels as a
+            // subcomponent of the tables it joins**, so it has no `solutioncomponent` row of
+            // its own even when the export carries it in full. Looking for one reports a gap
+            // that is not there — this report did exactly that before it was checked against
+            // an actual export on 2026-09-06, which carried both relationships and all 149.
+            //
+            // The real test is therefore the participants: if both ends are members that
+            // include their subcomponents, the relationship promotes.
+            var relationship = intersects.TryGetValue(name, out var r) ? r : null;
+            // Either end, not both. Verified against the 2026-09-06 export: it carries
+            // `al_contact_al_outcomecase` in full even though `contact` is not a member,
+            // because `al_outcomecase` is — one participating table including its
+            // subcomponents is enough to bring the relationship with it.
+            var carried = relationship != null
+                && (Member(members, all, relationship.Entity1LogicalName)
+                    || Member(members, all, relationship.Entity2LogicalName));
+
+            Console.WriteLine($"  [{(carried ? "via an end" : "NEITHER END"),-16}] {name}"
+                + (relationship == null ? "  (intersect)" : $"  (intersect for {relationship.SchemaName})"));
+            if (!carried)
+            {
+                missing.Add(name);
+            }
+
+            continue;
+        }
+
+        if (!members.TryGetValue((1, id), out var behavior))
+        {
+            Console.WriteLine($"  [{"NOT A MEMBER",-16}] {name}");
+            missing.Add(name);
+            continue;
+        }
+
+        Console.WriteLine($"  [{BehaviorLabel(behavior),-16}] {name}");
+        if (behavior != 0)
+        {
+            shallow.Add(name);
+        }
+    }
+
+    // Attributes held as components in their own right. On a table that already includes its
+    // subcomponents these are redundant, and their absence proves nothing — which is exactly
+    // why they are reported separately rather than folded into the table's line.
+    var attributeMembers = members.Keys.Count(k => k.Type == 2);
+    Console.WriteLine();
+    Console.WriteLine($"Attributes held as components in their own right: {attributeMembers}");
+
+    Console.WriteLine();
+    if (missing.Count == 0 && shallow.Count == 0)
+    {
+        Console.WriteLine("Every al_ table is carried: real tables as members including their");
+        Console.WriteLine("subcomponents, intersect tables through their relationship. Options minted");
+        Console.WriteLine("after a table was added therefore travel with the export - no re-adding.");
+        return 0;
+    }
+
+    foreach (var name in missing)
+    {
+        Console.WriteLine($"  {name}: not carried - add it, or add the tables its relationship joins");
+    }
+
+    foreach (var name in shallow)
+    {
+        Console.WriteLine($"  addmetadatatosolution <orgUrl> {name}      # member, but not with subcomponents");
+    }
+
+    return 2;
+}
+
+/// <summary>True when a table is a solution member that includes its subcomponents.</summary>
+static bool Member(Dictionary<(int Type, Guid Id), int> members, IEnumerable<EntityMetadata> all, string? logicalName)
+{
+    var entity = all.FirstOrDefault(e => string.Equals(e.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase));
+    return entity?.MetadataId is Guid id && members.TryGetValue((1, id), out var behavior) && behavior == 0;
+}
+
+/// <summary>Solution components as (componenttype, objectid) -> rootcomponentbehavior.</summary>
+static Dictionary<(int Type, Guid Id), int> SolutionMembers(ServiceClient svc, Guid solutionId)
+{
+    var query = new QueryExpression("solutioncomponent")
+    {
+        ColumnSet = new ColumnSet("componenttype", "objectid", "rootcomponentbehavior"),
+        Criteria = new FilterExpression(),
+    };
+    query.Criteria.AddCondition("solutionid", ConditionOperator.Equal, solutionId);
+
+    var map = new Dictionary<(int, Guid), int>();
+    foreach (var row in RetrieveAll(svc, query))
+    {
+        var type = row.GetAttributeValue<OptionSetValue>("componenttype")?.Value;
+        var objectId = row.GetAttributeValue<Guid?>("objectid");
+        if (type.HasValue && objectId.HasValue)
+        {
+            map[(type.Value, objectId.Value)] = row.GetAttributeValue<OptionSetValue>("rootcomponentbehavior")?.Value ?? 0;
+        }
+    }
+
+    return map;
+}
+
+/// <summary>
+/// Every page of a query. The 5000-row default cap would silently truncate a solution this
+/// size, and a truncated membership list reads as "not a member" — the one wrong answer this
+/// report must not give.
+/// </summary>
+static List<Entity> RetrieveAll(ServiceClient svc, QueryExpression query)
+{
+    var results = new List<Entity>();
+    query.PageInfo = new PagingInfo { PageNumber = 1, Count = 500 };
+
+    while (true)
+    {
+        var page = svc.RetrieveMultiple(query);
+        results.AddRange(page.Entities);
+        if (!page.MoreRecords)
+        {
+            return results;
+        }
+
+        query.PageInfo.PageNumber++;
+        query.PageInfo.PagingCookie = page.PagingCookie;
+    }
+}
+
+static string BehaviorLabel(int behavior) => behavior switch
+{
+    0 => "subcomponents",
+    1 => "NO subcomponents",
+    2 => "SHELL ONLY",
+    _ => $"behavior {behavior}",
+};
+
+// Adds a table to the solution with all of its subcomponents, or one named attribute.
+//
+// `pac solution add-solution-component` can do the table; it is here because the whole point
+// is the *behaviour*, and adding a table that is already a shell member has to replace that
+// membership rather than report "already present" and leave the shell in place.
+int AddMetadataToSolution(string orgUrl, string entityName, string? attributeName)
+{
+    using var svc = Connect(orgUrl);
+
+    var entity = ((RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entityName,
+        EntityFilters = EntityFilters.Attributes,
+        RetrieveAsIfPublished = false,
+    })).EntityMetadata;
+
+    if (string.IsNullOrWhiteSpace(attributeName))
+    {
+        svc.Execute(new AddSolutionComponentRequest
+        {
+            ComponentId = entity.MetadataId ?? Guid.Empty,
+            ComponentType = 1,
+            SolutionUniqueName = SolutionUniqueName,
+            AddRequiredComponents = false,
+            DoNotIncludeSubcomponents = false,
+        });
+        Console.WriteLine($"Added table {entityName} to {SolutionUniqueName} with its subcomponents.");
+    }
+    else
+    {
+        var attribute = entity.Attributes.FirstOrDefault(a =>
+            string.Equals(a.LogicalName, attributeName, StringComparison.OrdinalIgnoreCase));
+        if (attribute == null)
+        {
+            Console.Error.WriteLine($"{entityName} has no attribute '{attributeName}'.");
+            return 1;
+        }
+
+        svc.Execute(new AddSolutionComponentRequest
+        {
+            ComponentId = attribute.MetadataId ?? Guid.Empty,
+            ComponentType = 2,
+            SolutionUniqueName = SolutionUniqueName,
+            AddRequiredComponents = false,
+        });
+        Console.WriteLine($"Added attribute {entityName}.{attributeName} to {SolutionUniqueName}.");
+    }
+
+    // Verified by re-query, like every other write in this tool.
+    var solutionId = FindId(svc, "solution", ("uniquename", SolutionUniqueName));
+    var members = SolutionMembers(svc, solutionId);
+    var behavior = members.TryGetValue((1, entity.MetadataId ?? Guid.Empty), out var b) ? BehaviorLabel(b) : "NOT A MEMBER";
+    Console.WriteLine($"  {entityName} now reads: {behavior}");
+    return 0;
+}
 
 /// <summary>What a registered step is set to do, so a check can report it rather than restate it.</summary>
 sealed record StepFacts(bool Enabled, int Mode, int Stage, Guid RunAs)
