@@ -31,6 +31,12 @@ namespace OutcomeTesting.Plugins.Tests
         /// <summary>Every Create the code under test issued, in order.</summary>
         public List<Entity> Creates { get; } = new List<Entity>();
 
+        /// <summary>Results handed back, in order, for each FetchExpression the code under test issues.</summary>
+        public Queue<EntityCollection> FetchResults { get; } = new Queue<EntityCollection>();
+
+        /// <summary>Every fetch issued, so a test can assert on what was asked for.</summary>
+        public List<string> FetchXml { get; } = new List<string>();
+
         public int RetrieveMultipleCount { get; private set; }
 
         /// <summary>Seeds a row directly, bypassing the Create log.</summary>
@@ -138,6 +144,23 @@ namespace OutcomeTesting.Plugins.Tests
         public EntityCollection RetrieveMultiple(QueryBase query)
         {
             RetrieveMultipleCount++;
+
+            var fetch = query as FetchExpression;
+            if (fetch != null)
+            {
+                FetchXml.Add(fetch.Query);
+
+                // If FetchResults are queued, use those (for explicit test setup).
+                // Otherwise, try to execute the FetchXML against seeded data.
+                if (FetchResults.Count > 0)
+                {
+                    return FetchResults.Dequeue();
+                }
+
+                // Simple FetchXML execution: parse and filter by name if it's a simple entity query.
+                // This handles WebRoleRegistry.FindByName's use case.
+                return ExecuteSimpleFetch(fetch.Query);
+            }
 
             var q = query as QueryExpression;
             if (q == null)
@@ -363,6 +386,47 @@ namespace OutcomeTesting.Plugins.Tests
             throw new NotSupportedException(
                 "Message '" + request.RequestName + "' is not supported by this fake. "
                 + "Add it deliberately rather than letting a request silently succeed.");
+        }
+
+        private EntityCollection ExecuteSimpleFetch(string fetchXml)
+        {
+            // Simple FetchXML parser for basic queries like WebRoleRegistry.FindByName.
+            // Looks for: <entity name='X'><attribute name='Y'/><filter><condition attribute='Z' operator='eq' value='V'/></filter>
+
+            // Extract entity name
+            var entityMatch = System.Text.RegularExpressions.Regex.Match(fetchXml, @"<entity\s+name='([^']+)'");
+            if (!entityMatch.Success)
+            {
+                return new EntityCollection();
+            }
+
+            var entityName = entityMatch.Groups[1].Value;
+            var table = Table(entityName);
+            var results = new List<Entity>(table.Values);
+
+            // Extract filter conditions (simple case: condition with operator='eq')
+            var conditionMatches = System.Text.RegularExpressions.Regex.Matches(
+                fetchXml, @"<condition\s+attribute='([^']+)'\s+operator='eq'\s+value='([^']*)'\s*/>");
+
+            foreach (System.Text.RegularExpressions.Match match in conditionMatches)
+            {
+                var attrName = match.Groups[1].Value;
+                var encodedValue = match.Groups[2].Value;
+
+                // Decode XML entities (SecurityElement.Escape escapes &, <, >)
+                var attrValue = encodedValue
+                    .Replace("&amp;", "&")
+                    .Replace("&lt;", "<")
+                    .Replace("&gt;", ">");
+
+                results = results.Where(r =>
+                {
+                    var val = r.GetAttributeValue<object>(attrName);
+                    return val != null && val.ToString() == attrValue;
+                }).ToList();
+            }
+
+            return new EntityCollection(results);
         }
 
         public void Associate(

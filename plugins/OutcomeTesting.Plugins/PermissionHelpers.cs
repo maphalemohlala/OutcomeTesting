@@ -179,6 +179,11 @@ namespace OutcomeTesting.Plugins
             {
                 foreach (var webRole in WebRoleRegistry.RolesForContact(service, contact.Id))
                 {
+                    if (WebRoleRegistry.ExcludedFromResolution(service, webRole))
+                    {
+                        continue;
+                    }
+
                     if (!roles.RoleCodes.Contains(webRole))
                     {
                         roles.RoleCodes.Add(webRole);

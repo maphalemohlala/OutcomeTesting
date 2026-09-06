@@ -47,6 +47,35 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// Whether a web role must be ignored when resolving what a caller may do (AD-090).
+        ///
+        /// Two reasons, and the second is the one that matters. `Anonymous Users` and
+        /// `Authenticated Users` are Power Pages plumbing and excluded by name. Beyond them, ANY
+        /// role carrying <c>mspp_authenticatedusersrole</c> is auto-granted to every signed-in
+        /// contact, so treating it as an application role grants that role to everyone —
+        /// which is exactly what OD-033 found `Administrators` doing in DEV.
+        ///
+        /// A role that cannot be looked up is NOT excluded. Absence of evidence that a role is
+        /// auto-granted is not evidence that it is, and excluding on a failed read would withdraw
+        /// access from everyone holding it.
+        /// </summary>
+        public static bool ExcludedFromResolution(IOrganizationService service, string roleName)
+        {
+            if (IsSystemRole(roleName))
+            {
+                return true;
+            }
+
+            var role = FindByName(service, (roleName ?? string.Empty).Trim());
+            if (role == null)
+            {
+                return false;
+            }
+
+            return role.GetAttributeValue<bool?>(AuthenticatedAttr) ?? false;
+        }
+
+        /// <summary>
         /// The web role names associated with a contact.
         ///
         /// FetchXML rather than QueryExpression: mspp_webrole does not answer a plain
@@ -108,6 +137,7 @@ namespace OutcomeTesting.Plugins
                 "<fetch>" +
                   "<entity name='" + RoleEntity + "'>" +
                     "<attribute name='" + NameAttr + "'/>" +
+                    "<attribute name='" + AuthenticatedAttr + "'/>" +
                     "<attribute name='" + WebsiteAttr + "'/>" +
                     "<filter><condition attribute='" + NameAttr + "' operator='eq' value='" +
                       System.Security.SecurityElement.Escape(roleName) + "'/></filter>" +
