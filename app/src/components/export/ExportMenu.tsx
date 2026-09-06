@@ -12,6 +12,11 @@ interface Props {
   /** One line describing exactly what will be written, so the file holds no surprises. */
   caption?: string;
   disabled?: boolean;
+  /**
+   * Why there is nothing to download, shown on the disabled trigger. Without it an
+   * empty table renders a dead control and the reason lives only in the caller's head.
+   */
+  emptyHint?: string;
 }
 
 /**
@@ -19,7 +24,7 @@ interface Props {
  * come from data Dataverse has already returned, a user can only ever export what they
  * are permitted to read (BR-012) — this control is not an access path of its own.
  */
-export function ExportMenu({ label, stem, sheetName, headers, rows, caption, disabled }: Props) {
+export function ExportMenu({ label, stem, sheetName, headers, rows, caption, disabled, emptyHint }: Props) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const empty = rows.length === 0;
@@ -52,6 +57,7 @@ export function ExportMenu({ label, stem, sheetName, headers, rows, caption, dis
         aria-expanded={open}
         aria-controls={menuId}
         disabled={disabled || empty}
+        title={empty ? (emptyHint ?? 'There is nothing to download yet.') : undefined}
         onClick={() => setOpen((current) => !current)}
       >
         {label}

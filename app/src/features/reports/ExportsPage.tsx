@@ -5,6 +5,7 @@ import { ExportMenu } from '../../components/export/ExportMenu';
 import { useExports, type ExportRecordRow } from './useExports';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { createExportBatch, generateExport } from '../../services/commands/exports';
+import { messageForFailure } from '../../services/errors';
 import { TRAIL_LIGHT_HEADERS, trailLightRow } from './trailLight';
 import { buildFullExtract, EXTRACT_ROW_LIMIT } from './fullExtract';
 import { downloadWorkbook, stampedFilename } from '../../lib/tabular';
@@ -126,7 +127,7 @@ export function ExportsPage() {
       setNotice({ tone: 'ok', message: 'New draft export batch created.' });
       setReloadKey((k) => k + 1);
     } else {
-      setNotice({ tone: 'error', message: result.message });
+      setNotice({ tone: 'error', message: messageForFailure(result) });
     }
   }
 
@@ -137,10 +138,23 @@ export function ExportsPage() {
     setBusy(false);
     if (result.ok) {
       intent.release(batchId);
-      setNotice({ tone: 'ok', message: `Generated ${result.data.RowCount} export record(s).` });
+      const rows = Number(result.data.RowCount ?? 0);
+      // A zero-row batch is a legitimate outcome, not a success worth celebrating: the
+      // export collects only cases at status Closed, so this means none are closed yet.
+      // Reporting it in the success tone and then disabling Download reads as a broken
+      // button, which is exactly how it was reported.
+      setNotice(
+        rows === 0
+          ? {
+              tone: 'error',
+              message:
+                'This batch generated 0 rows. The Trail Light export collects only cases at status Closed, and none are closed yet, so there is nothing to download.',
+            }
+          : { tone: 'ok', message: `Generated ${rows} export record(s).` },
+      );
       setReloadKey((k) => k + 1);
     } else {
-      setNotice({ tone: 'error', message: result.message });
+      setNotice({ tone: 'error', message: messageForFailure(result) });
     }
   }
 
@@ -246,6 +260,9 @@ export function ExportsPage() {
                     ) : (
                       filteredBatches.map((b) => {
                         const batchRecords = recordsByBatch.get(b.id) ?? [];
+                        // AD-042: only a Draft batch may be generated. Leaving the button
+                        // live made the plug-in's refusal the way users discovered that.
+                        const isDraft = b.status === 'Draft';
                         return (
                           <tr key={b.id}>
                             <td>{b.name}</td>
@@ -257,7 +274,12 @@ export function ExportsPage() {
                                 type="button"
                                 className="exports__btn exports__btn--ghost"
                                 onClick={() => onGenerate(b.id)}
-                                disabled={busy}
+                                disabled={busy || !isDraft}
+                                title={
+                                  isDraft
+                                    ? undefined
+                                    : `This batch is ${b.status}. Create a new batch to produce a fresh export.`
+                                }
                               >
                                 Generate
                               </button>
@@ -269,6 +291,11 @@ export function ExportsPage() {
                                 rows={batchRecords.map((record) => trailLightRow(record.record))}
                                 caption={`${batchRecords.length} row(s) in the AD-039 20-column order`}
                                 disabled={busy}
+                                emptyHint={
+                                  isDraft
+                                    ? 'This batch has not been generated yet.'
+                                    : 'This batch generated 0 rows, because no cases are at status Closed.'
+                                }
                               />
                             </td>
                           </tr>
