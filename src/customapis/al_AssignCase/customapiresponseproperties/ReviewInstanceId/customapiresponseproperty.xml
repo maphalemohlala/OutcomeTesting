@@ -6,6 +6,6 @@
     <label description="Review instance id" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_AssignCase.ReviewInstanceId</name>
+  <name>ReviewInstanceId</name>
   <type>10</type>
 </customapiresponseproperty>

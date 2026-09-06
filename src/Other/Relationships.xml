@@ -29,6 +29,7 @@
   <EntityRelationship Name="business_unit_al_exportrecord" />
   <EntityRelationship Name="business_unit_al_importbatch" />
   <EntityRelationship Name="business_unit_al_importexception" />
+  <EntityRelationship Name="business_unit_al_notification" />
   <EntityRelationship Name="business_unit_al_outcome" />
   <EntityRelationship Name="business_unit_al_outcomecase" />
   <EntityRelationship Name="business_unit_al_pagepermission" />
@@ -60,6 +61,8 @@
   <EntityRelationship Name="lk_al_importbatch_modifiedby" />
   <EntityRelationship Name="lk_al_importexception_createdby" />
   <EntityRelationship Name="lk_al_importexception_modifiedby" />
+  <EntityRelationship Name="lk_al_notification_createdby" />
+  <EntityRelationship Name="lk_al_notification_modifiedby" />
   <EntityRelationship Name="lk_al_outcome_createdby" />
   <EntityRelationship Name="lk_al_outcome_modifiedby" />
   <EntityRelationship Name="lk_al_outcomecase_createdby" />
@@ -101,6 +104,7 @@
   <EntityRelationship Name="owner_al_exportrecord" />
   <EntityRelationship Name="owner_al_importbatch" />
   <EntityRelationship Name="owner_al_importexception" />
+  <EntityRelationship Name="owner_al_notification" />
   <EntityRelationship Name="owner_al_outcome" />
   <EntityRelationship Name="owner_al_outcomecase" />
   <EntityRelationship Name="owner_al_pagepermission" />
@@ -117,6 +121,7 @@
   <EntityRelationship Name="team_al_exportrecord" />
   <EntityRelationship Name="team_al_importbatch" />
   <EntityRelationship Name="team_al_importexception" />
+  <EntityRelationship Name="team_al_notification" />
   <EntityRelationship Name="team_al_outcome" />
   <EntityRelationship Name="team_al_outcomecase" />
   <EntityRelationship Name="team_al_pagepermission" />
@@ -133,6 +138,7 @@
   <EntityRelationship Name="user_al_exportrecord" />
   <EntityRelationship Name="user_al_importbatch" />
   <EntityRelationship Name="user_al_importexception" />
+  <EntityRelationship Name="user_al_notification" />
   <EntityRelationship Name="user_al_outcome" />
   <EntityRelationship Name="user_al_outcomecase" />
   <EntityRelationship Name="user_al_pagepermission" />

@@ -6,6 +6,6 @@
     <label description="Failed" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_ImportCases.Failed</name>
+  <name>Failed</name>
   <type>10</type>
 </customapiresponseproperty>

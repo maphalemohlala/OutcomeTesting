@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Failed">
+  <description default="Rows that could not be sent. Each carries al_failurereason saying why, and stays retryable.">
+    <label description="Rows that could not be sent. Each carries al_failurereason saying why, and stays retryable." languagecode="1033" />
+  </description>
+  <displayname default="Failed">
+    <label description="Failed" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>Failed</name>
+  <type>7</type>
+</customapiresponseproperty>

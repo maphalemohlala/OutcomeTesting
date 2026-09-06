@@ -7,6 +7,6 @@
   </displayname>
   <iscustomizable>1</iscustomizable>
   <isoptional>0</isoptional>
-  <name>al_ResolveImportException.ExceptionId</name>
+  <name>ExceptionId</name>
   <type>10</type>
 </customapirequestparameter>

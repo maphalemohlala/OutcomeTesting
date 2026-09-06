@@ -1,0 +1,18 @@
+<customapi uniquename="al_DrainNotifications">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Re-drains a bounded batch of al_notification rows that are Pending or Failed, sending each through Dataverse server-side email from the account the command runs as (PP-15, AD-035, BR-009). Sent rows are never re-sent. Requires Manage on permission.manage.">
+    <label description="Re-drains a bounded batch of al_notification rows that are Pending or Failed, sending each through Dataverse server-side email from the account the command runs as (PP-15, AD-035, BR-009). Sent rows are never re-sent. Requires Manage on permission.manage." languagecode="1033" />
+  </description>
+  <displayname default="Drain Notifications">
+    <label description="Drain Notifications" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_DrainNotifications</name>
+  <plugintypeid>
+    <plugintypeexportkey>7e8395a5-e7a7-f111-aaac-002248c8d3e2</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

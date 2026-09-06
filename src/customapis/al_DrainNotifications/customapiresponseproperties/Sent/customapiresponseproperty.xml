@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Sent">
+  <description default="Rows handed to server-side email successfully and stamped Sent.">
+    <label description="Rows handed to server-side email successfully and stamped Sent." languagecode="1033" />
+  </description>
+  <displayname default="Sent">
+    <label description="Sent" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>Sent</name>
+  <type>7</type>
+</customapiresponseproperty>

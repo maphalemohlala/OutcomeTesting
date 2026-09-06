@@ -6,6 +6,6 @@
     <label description="Imported" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_ImportCases.Imported</name>
+  <name>Imported</name>
   <type>10</type>
 </customapiresponseproperty>

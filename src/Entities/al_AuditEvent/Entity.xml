@@ -182,6 +182,11 @@
                   <label description="AssignCase" languagecode="1033" />
                 </labels>
               </option>
+              <option value="120910792" IsHidden="0">
+                <labels>
+                  <label description="SetFailAccountability" languagecode="1033" />
+                </labels>
+              </option>
               <option value="120910752" IsHidden="0">
                 <labels>
                   <label description="ReturnCase" languagecode="1033" />
@@ -285,11 +290,6 @@
               <option value="120910787" IsHidden="0">
                 <labels>
                   <label description="SetUserActive" languagecode="1033" />
-                </labels>
-              </option>
-              <option value="120910792" IsHidden="0">
-                <labels>
-                  <label description="SetFailAccountability" languagecode="1033" />
                 </labels>
               </option>
             </options>

@@ -6,6 +6,6 @@
     <label description="Total" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_ImportCases.Total</name>
+  <name>Total</name>
   <type>10</type>
 </customapiresponseproperty>

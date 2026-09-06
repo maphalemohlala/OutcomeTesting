@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Processed">
+  <description default="Rows the run attempted.">
+    <label description="Rows the run attempted." languagecode="1033" />
+  </description>
+  <displayname default="Processed">
+    <label description="Processed" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>Processed</name>
+  <type>7</type>
+</customapiresponseproperty>

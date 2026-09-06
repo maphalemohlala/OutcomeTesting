@@ -10,11 +10,14 @@ is the current one; `docs/2026-09-03-delivery-status.md`, `docs/2026-09-04-deliv
 the deployment records under `docs/deployment/` cover what exists and how it got there. Every item names an owner, the evidence it rests on,
 and what "done" looks like, so nothing here needs re-deriving.
 
-**Ordered by what it costs to leave alone, not by effort.** Re-ranked on 2026-09-05 after the
-evening deployment closed four items. What is left is genuinely different in kind from what
-went: **nothing below is a defect in something already delivered.** One is a tooling gap
-(OD-034), one is an ALM debt that blocks promotion, and the rest are decisions and scheduled
-work owned outside Delivery. The register is shorter and slower-moving than it has been.
+**Ordered by what it costs to leave alone, not by effort.** Re-ranked 2026-09-06, after the
+AD-013 round trip closed the `src/`↔DEV gap. **Nothing below is a defect in something already
+delivered**, and only one item — OD-034 — is an engineering problem at all; the rest are
+decisions, scheduled security work and environment set-up owned outside Delivery.
+
+**Sequencing, by project owner direction 2026-09-06:** the other environments are set up once
+everything is tested and approved in DEV. So no item here is waiting on TEST or PROD, and
+promotion readiness is a state to be *ready for*, not a task in flight.
 
 ---
 
@@ -71,23 +74,7 @@ authenticated. And a decision is taken on Microsoft documenting Power Pages solu
 awareness as a **preview feature**, "not meant for production use": that is a call for the
 platform owner before it becomes the PROD promotion path, not a tooling detail.
 
-## 2. Close the gap between `src/` and DEV before anything is promoted
-
-**Owner:** Delivery. **Blocks:** every promotion to TEST and PROD.
-
-`al_Notification` has **no definition in `src/Entities/` at all** — it was created through the
-metadata API — plus the table changes made on 2026-09-03. Until the AD-013 export round trip
-runs, `src/` is not the source of truth and a managed promotion cannot be trusted to carry
-what DEV actually has.
-
-**Done when:** an export round trip has brought `al_Notification` and the 2026-09-03 changes
-into `src/`, and a pack of `src/` reproduces the DEV solution.
-
-Related and still only **partially resolved: OD-011** — Code Apps production readiness, tenant
-availability and per-persona licensing. It was deferred "until the app is ready to promote".
-It is close to being that, so it should stop being deferred by default.
-
-## 3. Name PP-15's other four events
+## 2. Name PP-15's other four events
 
 **Owner:** Product owner. **Effort:** additive once named.
 
@@ -99,7 +86,7 @@ written until someone names them.
 **Done when:** four events are named, with their recipients, and added to the option set and
 the emitters.
 
-## 4. OD-025 — the plug-in signing key is committed to the repository
+## 3. OD-025 — the plug-in signing key is committed to the repository
 
 **Owner:** Platform owner / IT security. **Aging, and the cost grows.**
 
@@ -118,7 +105,7 @@ This is defence-in-depth, not a live exploit: strong-naming is not a .NET trust 
 abusing it needs Dataverse deployment privilege. That is a reason to schedule it, not to keep
 deferring it.
 
-## 5. OD-023 — support model: hours of cover and response targets
+## 4. OD-023 — support model: hours of cover and response targets
 
 **Owner:** Platform owner.
 
@@ -128,7 +115,7 @@ when to expect a response. Still unstated: hours and response targets, split bet
 portal-down and a single user blocked; and who the hand-off goes to when something needs a
 configuration or platform change, since AQS and Tax do not hold Power Pages or Dataverse admin.
 
-## 6. Users and roles rework
+## 5. Users and roles rework
 
 **Owner:** Delivery, on project owner direction 2026-09-04. **Not started.**
 
@@ -149,6 +136,23 @@ Two points need resolving before design:
   Narrower than it was on 2026-09-04: `Administrators` no longer carries the flag and
   `Checker` no longer exists (OD-033), so `Authenticated Users` is the only case left — but
   it is the stock role, so the rule is still owed.
+
+## 6. OD-011 — Code Apps production readiness, tenant availability and licensing
+
+**Owner:** Platform owner. **Status:** partially resolved since 2026-08-26.
+
+Code app operations are enabled on `Env_AQ_Dev` and `pa app push` succeeds there. Still open:
+enabling TEST and PROD, and confirming licensing for **every persona**. It was deferred "until
+the app is ready to promote", and it previously rode along under the `src/` gap item — it now
+stands on its own, because that gap is closed and this is what is left between a working DEV
+and a second environment.
+
+Ranked last deliberately, and not because it is unimportant: **project owner direction
+2026-09-06 is that the other environments are set up once everything is tested and approved in
+DEV.** So this is sequenced behind DEV sign-off rather than blocked on anything technical.
+
+**Done when:** TEST and PROD have code app operations enabled and per-persona licensing is
+confirmed.
 
 ---
 
@@ -172,6 +176,20 @@ Two points need resolving before design:
 - **Senior Checker** needs `command.assign` granted as a Dataverse row.
 - **Optimistic concurrency is not sent on the portal submit path.**
 - **10 `react-hooks/exhaustive-deps` lint warnings**, all pre-existing, zero errors.
+
+## Closed on 2026-09-06
+
+- **`src/` is the source of truth again.** The AD-013 export-and-replace round trip ran
+  against DEV: `src/Entities/al_Notification/` now exists, `src/customapis/` holds 22 APIs
+  (adding `al_DrainNotifications`), `src/SdkMessageProcessingSteps/` holds 14 (adding the PP-15
+  drain step and three emitter steps), and the plug-in manifest declares **31 types, matching
+  the 31 the assembly builds**. `pac solution pack --folder src` succeeds with only the
+  expected `CanvasApps` warning (AD-012). See
+  `docs/deployment/2026-09-06-ad013-round-trip.md`.
+- **A quiet drift the round trip found and corrected:** 30 custom API parameter and response
+  files carried `<name>al_AssignCase.Reason</name>`-style qualified names where DEV holds the
+  bare name. `uniquename` was already right, so nothing was broken — but it is precisely the
+  hand-authored-versus-emitted divergence AD-013 exists to remove.
 
 ## Closed on 2026-09-05
 

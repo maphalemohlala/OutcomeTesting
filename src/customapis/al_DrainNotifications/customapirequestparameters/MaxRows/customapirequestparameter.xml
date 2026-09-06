@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="MaxRows">
+  <description default="Most rows to attempt in this run. Omitted, zero or negative means 50; anything above 250 is clamped to 250, so one invocation can never send an unbounded number of emails. Re-run to work through a backlog.">
+    <label description="Most rows to attempt in this run. Omitted, zero or negative means 50; anything above 250 is clamped to 250, so one invocation can never send an unbounded number of emails. Re-run to work through a backlog." languagecode="1033" />
+  </description>
+  <displayname default="Max rows">
+    <label description="Max rows" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>MaxRows</name>
+  <type>7</type>
+</customapirequestparameter>

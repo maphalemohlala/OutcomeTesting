@@ -11,6 +11,9 @@
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.AssignUserRolePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="be558da9-20a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.AssignUserRolePlugin">
       <FriendlyName>OutcomeTesting.Plugins.AssignUserRolePlugin</FriendlyName>
     </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.ClaimCasePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="7e4ffad2-b8a7-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.ClaimCasePlugin">
+      <FriendlyName>OutcomeTesting.Plugins.ClaimCasePlugin</FriendlyName>
+    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CompleteRemediationPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="7d51d0d1-f5a1-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.CompleteRemediationPlugin">
       <FriendlyName>OutcomeTesting.Plugins.CompleteRemediationPlugin</FriendlyName>
     </PluginType>
@@ -26,11 +29,26 @@
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CreateUserPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="032c932d-3ea2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.CreateUserPlugin">
       <FriendlyName>OutcomeTesting.Plugins.CreateUserPlugin</FriendlyName>
     </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.DrainNotificationsPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="7e8395a5-e7a7-f111-aaac-002248c8d3e2" Name="OutcomeTesting.Plugins.DrainNotificationsPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.DrainNotificationsPlugin</FriendlyName>
+    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.GenerateExportPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="a822aeb5-20a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.GenerateExportPlugin">
       <FriendlyName>OutcomeTesting.Plugins.GenerateExportPlugin</FriendlyName>
     </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.ImportCasesPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="aaeaca7d-c2a7-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.ImportCasesPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.ImportCasesPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.NotificationDrainPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="a5b05784-e7a7-f111-aaac-002248c8d3e2" Name="OutcomeTesting.Plugins.NotificationDrainPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.NotificationDrainPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.NotificationEmitterPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="efefcb20-e1a7-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.NotificationEmitterPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.NotificationEmitterPlugin</FriendlyName>
+    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.RegradeCasePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="4b61d8ba-07a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.RegradeCasePlugin">
       <FriendlyName>OutcomeTesting.Plugins.RegradeCasePlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.ResolveImportExceptionPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="6e52c027-c3a7-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.ResolveImportExceptionPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.ResolveImportExceptionPlugin</FriendlyName>
     </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.ResponseGuardPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="0dd9d5b9-c0a3-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.ResponseGuardPlugin">
       <FriendlyName>ResponseGuardPlugin</FriendlyName>

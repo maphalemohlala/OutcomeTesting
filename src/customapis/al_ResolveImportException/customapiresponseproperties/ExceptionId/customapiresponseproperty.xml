@@ -6,6 +6,6 @@
     <label description="Exception id" languagecode="1033" />
   </displayname>
   <iscustomizable>1</iscustomizable>
-  <name>al_ResolveImportException.ExceptionId</name>
+  <name>ExceptionId</name>
   <type>10</type>
 </customapiresponseproperty>
