@@ -168,14 +168,6 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// The caller's roles: their web roles, plus whatever the mapping table holds.
-        ///
-        /// A web role contributes its NAME as a role code, which is the same shape
-        /// al_pagepermission.al_rolecode matches on, so a rule written against a web role
-        /// and a rule written against an AD-044 custom role are indistinguishable to the
-        /// gate — as they should be.
-        /// </summary>
-        /// <summary>
         /// The role codes a person holds, as the gate resolves them (AD-089).
         ///
         /// Public so al_GetMyRoles can hand the client the SAME answer the server enforces
@@ -192,6 +184,14 @@ namespace OutcomeTesting.Plugins
             return GetActiveRoles(service, (email ?? string.Empty).Trim()).RoleCodes;
         }
 
+        /// <summary>
+        /// The caller's roles: their web roles, plus whatever the mapping table holds.
+        ///
+        /// A web role contributes its NAME as a role code, which is the same shape
+        /// al_pagepermission.al_rolecode matches on, so a rule written against a web role
+        /// and a rule written against an AD-044 custom role are indistinguishable to the
+        /// gate — as they should be.
+        /// </summary>
         private static CallerRoles GetActiveRoles(IOrganizationService service, string email)
         {
             var roles = GetMappedRoles(service, email);
