@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDirectory, casesForPerson, isPersonRole } from './peopleDirectory';
+import { buildDirectory, caseloadByName, casesForPerson, isPersonRole } from './peopleDirectory';
 import type { CaseSummary } from '../cases/caseWorklistMapping';
 
 function caseRow(overrides: Partial<CaseSummary>): CaseSummary {
@@ -118,5 +118,43 @@ describe('isPersonRole', () => {
     expect(isPersonRole('Adviser')).toBe(true);
     expect(isPersonRole('Administrator')).toBe(false);
     expect(isPersonRole(undefined)).toBe(false);
+  });
+});
+
+describe('caseloadByName', () => {
+  it('counts a case once for someone holding two positions on it', () => {
+    const loads = caseloadByName([
+      caseRow({ id: 'a', adviser: 'Jane Adviser', checker: 'Jane Adviser' }),
+    ]);
+
+    const jane = loads.get('jane adviser');
+    expect(jane?.totalCases).toBe(1);
+    expect(jane?.roles).toEqual(['Adviser', 'Checker']);
+  });
+
+  it('aggregates a person across separate cases and positions', () => {
+    const loads = caseloadByName([
+      caseRow({ id: 'a', adviser: 'Jane Adviser', status: 'Closed', latestOutcome: 'Pass' }),
+      caseRow({ id: 'b', paraplanner: 'Jane Adviser', status: 'Assigned' }),
+    ]);
+
+    const jane = loads.get('jane adviser');
+    expect(jane?.totalCases).toBe(2);
+    expect(jane?.closedCases).toBe(1);
+    expect(jane?.openCases).toBe(1);
+    expect(jane?.outcomes.Pass).toBe(1);
+    expect(jane?.notGraded).toBe(1);
+  });
+
+  it('matches on name case-insensitively so a directory join is not defeated by casing', () => {
+    const loads = caseloadByName([caseRow({ id: 'a', adviser: 'JANE ADVISER' })]);
+
+    expect(loads.get('jane adviser')?.name).toBe('JANE ADVISER');
+  });
+
+  it('ignores blank names rather than inventing an empty person', () => {
+    const loads = caseloadByName([caseRow({ id: 'a', adviser: '   ', checker: null })]);
+
+    expect(loads.size).toBe(0);
   });
 });

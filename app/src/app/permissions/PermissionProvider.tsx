@@ -16,7 +16,7 @@ import {
 import {
   Al_pagepermissionsService,
   Al_userrolemappingsService,
-  Al_usersService,
+  ContactsService,
 } from '../../generated';
 import { useCurrentUser } from '../../services/auth/useCurrentUser';
 import { PermissionContext, type PermissionContextValue } from './permissionContext';
@@ -37,7 +37,10 @@ async function loadPermissions(email: string): Promise<Resolved> {
   const [mapResult, permResult, userResult] = await Promise.all([
     Al_userrolemappingsService.getAll({ filter: 'statecode eq 0', top: 5000 }),
     Al_pagepermissionsService.getAll({ filter: 'statecode eq 0', top: 5000 }),
-    Al_usersService.getAll({ filter: `al_workemail eq '${odataEscape(email.trim().toLowerCase())}'`, top: 1 }),
+    ContactsService.getAll({
+      filter: `emailaddress1 eq '${odataEscape(email.trim().toLowerCase())}'`,
+      top: 1,
+    }),
   ]);
 
   const mappings = mapResult.success ? mapResult.data : null;
@@ -47,7 +50,7 @@ async function loadPermissions(email: string): Promise<Resolved> {
   // roles here as well as server-side. Mirrored rather than relied on: the server is the
   // gate, and this only stops the UI offering a leaver work it would then refuse.
   const registered = userResult.success ? userResult.data : [];
-  const deactivated = registered.length > 0 && registered[0].al_isactive === false;
+  const deactivated = registered.length > 0 && Number(registered[0].statecode) !== 0;
   if (deactivated) {
     return { roles: [], permissions: resolvePermissions([]) };
   }

@@ -12,7 +12,6 @@ import { PeoplePage } from '../features/people/PeoplePage';
 import { PersonCasesPage } from '../features/people/PersonCasesPage';
 import { QuestionLibraryPage } from '../features/admin/QuestionLibraryPage';
 import { SecurityConfigPage } from '../features/admin/SecurityConfigPage';
-import { UsersPage } from '../features/admin/UsersPage';
 import { ReviewDetailPage } from '../features/reviews/ReviewDetailPage';
 import { RemediationPage } from '../features/remediation/RemediationPage';
 import { ReportsPage } from '../features/reports/ReportsPage';
@@ -98,14 +97,12 @@ export function AppRoutes() {
           path="/admin/questions"
           element={<RequirePermission resource="page.admin.questions"><QuestionLibraryPage /></RequirePermission>}
         />
-        <Route
-          path="/admin/users"
-          element={
-            <RequirePermission resource="page.admin.users">
-              <UsersPage />
-            </RequirePermission>
-          }
-        />
+        {/*
+          The Users admin page merged into People: one directory, sourced from Contacts,
+          carrying both the caseload view and the registry admin actions. The route is kept
+          as a redirect so bookmarks and any link still in the wild keep working.
+        */}
+        <Route path="/admin/users" element={<Navigate to="/people" replace />} />
         <Route
           path="/admin/security"
           element={

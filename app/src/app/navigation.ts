@@ -37,7 +37,8 @@ export const NAV_GROUPS: NavGroup[] = [
     heading: 'Administration',
     items: [
       { to: '/admin/questions', label: 'Question library', resource: 'page.admin.questions' },
-      { to: '/admin/users', label: 'Users', resource: 'page.admin.users' },
+      // Users merged into People (My work): one directory rather than two lists of people
+      // that nothing joined. Its route redirects there.
       { to: '/admin/security', label: 'Security configuration', resource: 'page.admin.security' },
     ],
   },

@@ -12,7 +12,7 @@ interface Props {
 }
 
 /**
- * Person selector sourced from the application user registry (al_user). Replaces free text
+ * Person selector sourced from the application user registry (contact). Replaces free text
  * so a person field is chosen from known users rather than typed. The current value is kept
  * selectable even when it is not (yet) a registered user, so imported names are never lost
  * (AD-029: the user lookups on the case remain text). When the directory cannot load, this
@@ -48,7 +48,7 @@ export function UserPicker({ id, value, onChange, placeholder = 'Select a person
       onChange={(e) => onChange(e.target.value)}
     >
       <option value="">{placeholder}</option>
-      {hasUnlistedValue ? <option value={value}>{value} (not in user registry)</option> : null}
+      {hasUnlistedValue ? <option value={value}>{value} (not in the people directory)</option> : null}
       {active.map((user) => (
         <option key={user.id} value={user.name}>
           {user.name} — {user.email}

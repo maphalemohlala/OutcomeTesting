@@ -16,7 +16,7 @@ import {
   Al_sectionsService,
   Al_signoffsService,
   Al_userrolemappingsService,
-  Al_usersService,
+  ContactsService,
 } from '../../generated';
 import type { CellValue, Sheet } from '../../lib/tabular';
 
@@ -82,7 +82,7 @@ const SOURCES: { name: string; read: () => Promise<{ success: boolean; data?: un
   { name: 'Sections', read: () => Al_sectionsService.getAll({ top: EXTRACT_ROW_LIMIT }) },
   { name: 'Questions', read: () => Al_questionsService.getAll({ top: EXTRACT_ROW_LIMIT }) },
   { name: 'Question versions', read: () => Al_questionversionsService.getAll({ top: EXTRACT_ROW_LIMIT }) },
-  { name: 'Users', read: () => Al_usersService.getAll({ top: EXTRACT_ROW_LIMIT }) },
+  { name: 'People', read: () => ContactsService.getAll({ top: EXTRACT_ROW_LIMIT }) },
   { name: 'Roles', read: () => Al_rolesService.getAll({ top: EXTRACT_ROW_LIMIT }) },
   { name: 'Role assignments', read: () => Al_userrolemappingsService.getAll({ top: EXTRACT_ROW_LIMIT }) },
   { name: 'Permission rules', read: () => Al_pagepermissionsService.getAll({ top: EXTRACT_ROW_LIMIT }) },

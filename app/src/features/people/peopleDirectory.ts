@@ -109,3 +109,79 @@ export function casesForPerson(
 export function isPersonRole(value: string | undefined): value is PersonRole {
   return (PERSON_ROLES as readonly string[]).includes(value ?? '');
 }
+
+/**
+ * One person's whole caseload, across every position they hold.
+ *
+ * `buildDirectory` deliberately emits a row per person *per position*, because that is
+ * how a workload is read. Joining to the registry needs the opposite: one row per human,
+ * keyed on something the registry also has. Name is all the case carries (AD-029 keeps
+ * the person fields as text from the intake extract), so that is the key, lower-cased so
+ * a difference in casing does not split one person into two.
+ */
+export interface PersonCaseload {
+  /** As recorded on the case, for display. */
+  name: string;
+  roles: PersonRole[];
+  code: string | null;
+  totalCases: number;
+  openCases: number;
+  closedCases: number;
+  notGraded: number;
+  outcomes: Record<Outcome, number>;
+  oldestOpenDays: number;
+}
+
+export function caseloadByName(cases: CaseSummary[]): Map<string, PersonCaseload> {
+  const loads = new Map<string, PersonCaseload>();
+  // A person can hold two positions on one case — adviser and checker, say. Counting the
+  // case once per position would inflate their load, so each case is counted once per
+  // person and the positions are collected alongside.
+  const seen = new Map<string, Set<string>>();
+
+  for (const item of cases) {
+    for (const position of positions(item)) {
+      const name = position.name?.trim();
+      if (!name) continue;
+
+      const key = name.toLowerCase();
+      const load =
+        loads.get(key) ??
+        ({
+          name,
+          roles: [],
+          code: null,
+          totalCases: 0,
+          openCases: 0,
+          closedCases: 0,
+          notGraded: 0,
+          outcomes: emptyOutcomes(),
+          oldestOpenDays: 0,
+        } satisfies PersonCaseload);
+
+      if (!load.roles.includes(position.role)) load.roles.push(position.role);
+      load.code = load.code ?? position.code ?? null;
+
+      const counted = seen.get(key) ?? new Set<string>();
+      if (!counted.has(item.id)) {
+        counted.add(item.id);
+        seen.set(key, counted);
+
+        load.totalCases += 1;
+        if (CLOSED_STATUSES.has(item.status)) {
+          load.closedCases += 1;
+        } else {
+          load.openCases += 1;
+          if (item.ageInDays > load.oldestOpenDays) load.oldestOpenDays = item.ageInDays;
+        }
+
+        if (item.latestOutcome) load.outcomes[item.latestOutcome] += 1;
+        else load.notGraded += 1;
+      }
+
+      loads.set(key, load);
+    }
+  }
+
+  return loads;
+}
