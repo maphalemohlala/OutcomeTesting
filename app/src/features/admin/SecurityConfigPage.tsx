@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
-import { Modal } from '../../components/feedback/Modal';
 import { Tabs } from '../../components/navigation/Tabs';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import { useIntentKeys } from '../../hooks/useIntentKey';
@@ -15,15 +14,15 @@ import {
   setRoleAssignmentActive,
 } from '../../services/commands/permissions';
 import { ACCESS_LEVELS, RESOURCE_KEYS } from '../../types/permissions';
+import {
+  AssignRoleModal,
+  PermissionModal,
+  RoleFormModal,
+  type Notice,
+  type RoleOption,
+} from './SecurityModals';
+import { roleDetailPath } from './roleDetail';
 import './SecurityConfigPage.css';
-
-type Notice = { tone: 'ok' | 'error'; message: string } | null;
-
-interface RoleOption {
-  value: string;
-  label: string;
-  custom: boolean;
-}
 
 /** Splits the `builtin:Label` / `custom:CODE` select value into the two command arguments. */
 function roleArgs(selected: string): { appRole?: string; roleCode?: string; label: string } {
@@ -370,6 +369,7 @@ export function SecurityConfigPage() {
           </div>
           <p className="security__hint">
             The roles that can be assigned. Administrators can add, rename and retire them.
+            Select a role to see everything it grants and everyone who holds it.
           </p>
           {roleNotice && !roleOpen ? (
             <p className={`security__notice security__notice--${roleNotice.tone}`} role="status">
@@ -380,181 +380,57 @@ export function SecurityConfigPage() {
       </div>
 
       {assignOpen ? (
-        <Modal
+        <AssignRoleModal
           title={replacing ? `Change role for ${replacing.email}` : 'Assign a role'}
+          notice={assignNotice}
+          email={email}
+          onEmailChange={setEmail}
+          emailReadOnly={replacing !== null}
+          roleOptions={roleOptions}
+          selectedRole={selectedAssignRole}
+          onRoleChange={setAssignRole}
+          replacingRole={replacing ? replacing.role : null}
+          busy={assignBusy}
+          submitLabel={replacing ? 'Change role' : 'Assign role'}
+          onSubmit={onAssign}
           onClose={() => {
             setAssignOpen(false);
             setReplacing(null);
           }}
-        >
-          {assignNotice ? (
-            <p className={`security__notice security__notice--${assignNotice.tone}`} role="status">
-              {assignNotice.message}
-            </p>
-          ) : null}
-          <form className="security__form" onSubmit={onAssign}>
-            <label className="security__field">
-              <span>Work email</span>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="person@ascotlloyd.co.uk"
-                autoComplete="off"
-                readOnly={replacing !== null}
-              />
-            </label>
-            <label className="security__field">
-              <span>Role</span>
-              <select value={selectedAssignRole} onChange={(e) => setAssignRole(e.target.value)}>
-                {roleOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {replacing ? (
-              <p className="security__hint">
-                The {replacing.role} assignment is withdrawn once the new role is granted. The
-                withdrawn record is kept for the audit trail.
-              </p>
-            ) : null}
-            <div className="security__form-actions">
-              <button
-                type="button"
-                className="security__btn security__btn--ghost"
-                onClick={() => {
-                  setAssignOpen(false);
-                  setReplacing(null);
-                }}
-                disabled={assignBusy}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="security__btn" disabled={assignBusy}>
-                {assignBusy ? 'Saving…' : replacing ? 'Change role' : 'Assign role'}
-              </button>
-            </div>
-          </form>
-        </Modal>
+        />
       ) : null}
 
       {permOpen ? (
-        <Modal title="Set a page or capability permission" onClose={() => setPermOpen(false)}>
-          {permNotice ? (
-            <p className={`security__notice security__notice--${permNotice.tone}`} role="status">
-              {permNotice.message}
-            </p>
-          ) : null}
-          <form className="security__form" onSubmit={onSetPermission}>
-            <label className="security__field">
-              <span>Role</span>
-              <select value={selectedPermRole} onChange={(e) => setPermRole(e.target.value)}>
-                {roleOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="security__field">
-              <span>Resource</span>
-              <select value={resource} onChange={(e) => setResource(e.target.value)}>
-                {RESOURCE_KEYS.map((key) => (
-                  <option key={key} value={key}>
-                    {key}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="security__field">
-              <span>Access level</span>
-              <select value={level} onChange={(e) => setLevel(e.target.value)}>
-                {ACCESS_LEVELS.map((lvl) => (
-                  <option key={lvl} value={lvl}>
-                    {lvl}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="security__hint">
-              Setting a level for a role and resource replaces any existing rule for that pair.
-            </p>
-            <div className="security__form-actions">
-              <button
-                type="button"
-                className="security__btn security__btn--ghost"
-                onClick={() => setPermOpen(false)}
-                disabled={permBusy}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="security__btn" disabled={permBusy}>
-                {permBusy ? 'Saving…' : 'Set permission'}
-              </button>
-            </div>
-          </form>
-        </Modal>
+        <PermissionModal
+          notice={permNotice}
+          roleOptions={roleOptions}
+          selectedRole={selectedPermRole}
+          onRoleChange={setPermRole}
+          resource={resource}
+          onResourceChange={setResource}
+          level={level}
+          onLevelChange={setLevel}
+          busy={permBusy}
+          onSubmit={onSetPermission}
+          onClose={() => setPermOpen(false)}
+        />
       ) : null}
 
       {roleOpen ? (
-        <Modal
-          title={editingRole ? `Edit ${editingRole.name}` : 'Create a role'}
+        <RoleFormModal
+          editing={editingRole}
+          notice={roleNotice}
+          name={roleName}
+          onNameChange={setRoleName}
+          description={roleDesc}
+          onDescriptionChange={setRoleDesc}
+          busy={roleBusy}
+          onSubmit={onSubmitRole}
           onClose={() => {
             setRoleOpen(false);
             setEditingRole(null);
           }}
-        >
-          {roleNotice ? (
-            <p className={`security__notice security__notice--${roleNotice.tone}`} role="status">
-              {roleNotice.message}
-            </p>
-          ) : null}
-          <form className="security__form" onSubmit={onSubmitRole}>
-            <label className="security__field">
-              <span>Role name</span>
-              <input
-                type="text"
-                value={roleName}
-                onChange={(e) => setRoleName(e.target.value)}
-                placeholder="e.g. Senior Checker"
-                autoComplete="off"
-              />
-            </label>
-            <label className="security__field">
-              <span>Description</span>
-              <textarea
-                value={roleDesc}
-                onChange={(e) => setRoleDesc(e.target.value)}
-                rows={2}
-                placeholder="What the role is for"
-              />
-            </label>
-            {editingRole ? (
-              <p className="security__hint">
-                The role code <strong>{editingRole.code}</strong> stays the same, so existing
-                assignments and permission rules keep working.
-              </p>
-            ) : null}
-            <div className="security__form-actions">
-              <button
-                type="button"
-                className="security__btn security__btn--ghost"
-                onClick={() => {
-                  setRoleOpen(false);
-                  setEditingRole(null);
-                }}
-                disabled={roleBusy}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="security__btn" disabled={roleBusy}>
-                {roleBusy ? 'Saving…' : editingRole ? 'Save changes' : 'Create role'}
-              </button>
-            </div>
-          </form>
-        </Modal>
+        />
       ) : null}
 
       {state.status === 'loading' ? <p role="status">Loading security configuration…</p> : null}
@@ -718,7 +594,9 @@ export function SecurityConfigPage() {
                   <tbody>
                     {roles.roles.map((r) => (
                       <tr key={r.id} data-inactive={r.active ? undefined : 'true'}>
-                        <td>{r.name}</td>
+                        <td>
+                          <Link to={roleDetailPath(r.code)}>{r.name}</Link>
+                        </td>
                         <td>{r.code}</td>
                         <td>{r.description ?? '—'}</td>
                         <td>{r.active ? 'Yes' : 'No'}</td>

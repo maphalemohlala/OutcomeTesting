@@ -5,6 +5,11 @@
   margin-bottom: var(--space-6);
 }
 
+/* A drill-down screen stacks its panels: each carries a full-width table. */
+.security--stacked {
+  grid-template-columns: 1fr;
+}
+
 .security__panel {
   padding: var(--space-4);
   background: var(--colour-surface);
@@ -26,6 +31,10 @@
 
 .security__panel-bar h2 {
   margin: 0;
+}
+
+.security__panel .security__table {
+  margin-top: var(--space-3);
 }
 
 .security__hint {

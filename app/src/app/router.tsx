@@ -12,6 +12,7 @@ import { PeoplePage } from '../features/people/PeoplePage';
 import { PersonCasesPage } from '../features/people/PersonCasesPage';
 import { QuestionLibraryPage } from '../features/admin/QuestionLibraryPage';
 import { SecurityConfigPage } from '../features/admin/SecurityConfigPage';
+import { RoleDetailPage } from '../features/admin/RoleDetailPage';
 import { ReviewDetailPage } from '../features/reviews/ReviewDetailPage';
 import { RemediationPage } from '../features/remediation/RemediationPage';
 import { ReportsPage } from '../features/reports/ReportsPage';
@@ -108,6 +109,17 @@ export function AppRoutes() {
           element={
             <RequirePermission resource="page.admin.security">
               <SecurityConfigPage />
+            </RequirePermission>
+          }
+        />
+        {/* One role's grants and holders. Gated by the same resource as the screen it
+            drills down from; the manage actions on it are gated on permission.manage
+            inside the page, as they are on the parent (AD-041). */}
+        <Route
+          path="/admin/security/roles/:roleCode"
+          element={
+            <RequirePermission resource="page.admin.security">
+              <RoleDetailPage />
             </RequirePermission>
           }
         />
