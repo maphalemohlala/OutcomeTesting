@@ -923,5 +923,12 @@ export const dataSourcesInfo = {
     "primaryKey": "contactid",
     "dataSourceType": "Dataverse",
     "apis": {}
+  },
+  "mspp_webroles": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "mspp_webroleid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
   }
 };

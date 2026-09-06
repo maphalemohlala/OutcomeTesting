@@ -1,0 +1,264 @@
+{
+  "name": "mspp_webrole",
+  "title": "Web Roles",
+  "schema": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "x-ms-dataverse-entity": true,
+      "x-ms-dataverse-entityset": "mspp_webroles",
+      "x-ms-dataverse-primary-id": "mspp_webroleid",
+      "x-ms-dataverse-primary-name": "mspp_name",
+      "properties": {
+        "mspp_anonymoususersrole": {
+          "type": "string",
+          "title": "Anonymous Users Role",
+          "x-ms-dataverse-attribute": "mspp_anonymoususersrole",
+          "x-ms-dataverse-type": "BooleanType",
+          "x-ms-schema-name": "mspp_anonymoususersrole",
+          "enum": [
+            "No",
+            "Yes"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            "#0000ff",
+            "#0000ff"
+          ],
+          "x-ms-optionsetmetadataid": "358ea321-169e-f111-b8dd-e4fade065423",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Anonymous User's Role",
+          "x-ms-optionSetType": "Boolean"
+        },
+        "mspp_anonymoususersrolename": {
+          "type": "string",
+          "title": "mspp_anonymoususersrolename",
+          "x-ms-dataverse-attribute": "mspp_anonymoususersrolename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "mspp_anonymoususersroleName",
+          "x-ms-read-only": true
+        },
+        "mspp_authenticatedusersrole": {
+          "type": "string",
+          "title": "Authenticated Users Role",
+          "x-ms-dataverse-attribute": "mspp_authenticatedusersrole",
+          "x-ms-dataverse-type": "BooleanType",
+          "x-ms-schema-name": "mspp_authenticatedusersrole",
+          "enum": [
+            "No",
+            "Yes"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            "#0000ff",
+            "#0000ff"
+          ],
+          "x-ms-optionsetmetadataid": "3a8ea321-169e-f111-b8dd-e4fade065423",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Authenticated Users Role",
+          "x-ms-optionSetType": "Boolean"
+        },
+        "mspp_authenticatedusersrolename": {
+          "type": "string",
+          "title": "mspp_authenticatedusersrolename",
+          "x-ms-dataverse-attribute": "mspp_authenticatedusersrolename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "mspp_authenticatedusersroleName",
+          "x-ms-read-only": true
+        },
+        "mspp_createdby": {
+          "type": "string",
+          "title": "Created By",
+          "x-ms-dataverse-attribute": "mspp_createdby",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "mspp_createdby"
+        },
+        "mspp_createdbyname": {
+          "type": "string",
+          "title": "mspp_createdbyname",
+          "x-ms-dataverse-attribute": "mspp_createdbyname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "mspp_createdbyName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
+        "mspp_createdbyyominame": {
+          "type": "string",
+          "title": "mspp_createdbyyominame",
+          "x-ms-dataverse-attribute": "mspp_createdbyyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "mspp_createdbyYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
+        "mspp_createdon": {
+          "type": "string",
+          "title": "Created On",
+          "x-ms-dataverse-attribute": "mspp_createdon",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "mspp_createdon"
+        },
+        "mspp_description": {
+          "type": "string",
+          "title": "Description",
+          "x-ms-dataverse-attribute": "mspp_description",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "mspp_description",
+          "maxLength": 2000
+        },
+        "mspp_key": {
+          "type": "string",
+          "title": "Key",
+          "x-ms-dataverse-attribute": "mspp_key",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "mspp_key",
+          "maxLength": 100
+        },
+        "mspp_modifiedby": {
+          "type": "string",
+          "title": "Modified By",
+          "x-ms-dataverse-attribute": "mspp_modifiedby",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "mspp_modifiedby"
+        },
+        "mspp_modifiedbyname": {
+          "type": "string",
+          "title": "mspp_modifiedbyname",
+          "x-ms-dataverse-attribute": "mspp_modifiedbyname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "mspp_modifiedbyName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
+        "mspp_modifiedbyyominame": {
+          "type": "string",
+          "title": "mspp_modifiedbyyominame",
+          "x-ms-dataverse-attribute": "mspp_modifiedbyyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "mspp_modifiedbyYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
+        "mspp_modifiedon": {
+          "type": "string",
+          "title": "Modified On",
+          "x-ms-dataverse-attribute": "mspp_modifiedon",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "mspp_modifiedon"
+        },
+        "mspp_name": {
+          "type": "string",
+          "title": "Name",
+          "x-ms-dataverse-attribute": "mspp_name",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "mspp_name",
+          "x-ms-dataverse-primary-name": true,
+          "required": true,
+          "maxLength": 100
+        },
+        "mspp_webroleid": {
+          "type": "string",
+          "title": "Web Role",
+          "x-ms-dataverse-attribute": "mspp_webroleid",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "mspp_webroleId",
+          "x-ms-dataverse-primary-id": true,
+          "required": true,
+          "x-ms-keyType": "primary"
+        },
+        "mspp_websiteid": {
+          "type": "string",
+          "title": "Website",
+          "x-ms-dataverse-attribute": "mspp_websiteid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "mspp_websiteid",
+          "required": true
+        },
+        "mspp_websiteidname": {
+          "type": "string",
+          "title": "mspp_websiteidname",
+          "x-ms-dataverse-attribute": "mspp_websiteidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "mspp_websiteidName",
+          "x-ms-read-only": true,
+          "maxLength": 300
+        },
+        "statecode": {
+          "type": "string",
+          "title": "Status",
+          "x-ms-dataverse-attribute": "statecode",
+          "x-ms-dataverse-type": "StateType",
+          "x-ms-schema-name": "statecode",
+          "required": true,
+          "enum": [
+            "Active",
+            "Inactive"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "208ea321-169e-f111-b8dd-e4fade065423",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Status",
+          "x-ms-optionSetType": "State"
+        },
+        "statecodename": {
+          "type": "string",
+          "title": "statecodename",
+          "x-ms-dataverse-attribute": "statecodename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "statecodeName",
+          "x-ms-read-only": true
+        },
+        "statuscode": {
+          "type": "string",
+          "title": "Status Reason",
+          "x-ms-dataverse-attribute": "statuscode",
+          "x-ms-dataverse-type": "StatusType",
+          "x-ms-schema-name": "statuscode",
+          "enum": [
+            "Active",
+            "Inactive"
+          ],
+          "x-ms-enum-values": [
+            1,
+            2
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "2a8ea321-169e-f111-b8dd-e4fade065423",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Status Reason",
+          "x-ms-optionSetType": "Status"
+        },
+        "statuscodename": {
+          "type": "string",
+          "title": "statuscodename",
+          "x-ms-dataverse-attribute": "statuscodename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "statuscodeName",
+          "x-ms-read-only": true
+        }
+      },
+      "required": [
+        "mspp_name",
+        "mspp_webroleid",
+        "mspp_websiteid",
+        "statecode"
+      ]
+    }
+  }
+}

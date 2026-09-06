@@ -113,6 +113,11 @@
           "entitySetName": "contacts",
           "logicalName": "contact",
           "isHidden": false
+        },
+        "webroles": {
+          "entitySetName": "mspp_webroles",
+          "logicalName": "mspp_webrole",
+          "isHidden": false
         }
       },
       "environmentVariableName": ""

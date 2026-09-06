@@ -267,6 +267,16 @@ if (args.Length >= 2 && args[0].Equals("proveexport", StringComparison.OrdinalIg
     return ProveExport(args[1]);
 }
 
+if (args.Length >= 3 && args[0].Equals("relationships", StringComparison.OrdinalIgnoreCase))
+{
+    return Relationships(args[1], args[2]);
+}
+
+if (args.Length >= 2 && args[0].Equals("probewebrole", StringComparison.OrdinalIgnoreCase))
+{
+    return ProbeWebRole(args[1]);
+}
+
 if (args.Length < 1)
 {
     Console.Error.WriteLine("Usage: dotnet run -- <orgUrl> [<pluginDllPath>]   |   dotnet run -- verify <orgUrl>");
@@ -413,6 +423,115 @@ int ProveExport(string orgUrl)
 
     Console.WriteLine("PROVE EXPORT: PASS - the batch has rows, so Download is enabled.");
     return 0;
+}
+
+// Read-only. Prints a table's many-to-many relationships, which is the only reliable way
+// to learn an intersect entity's logical name — guessing at it costs a round trip per
+// guess and the name differs between the classic (adx_) and enhanced (mspp_) portal
+// data models.
+int Relationships(string orgUrl, string entity)
+{
+    using var svc = Connect(orgUrl);
+
+    var response = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Relationships,
+    });
+
+    Console.WriteLine($"{entity} many-to-many:");
+    foreach (var many in response.EntityMetadata.ManyToManyRelationships)
+    {
+        Console.WriteLine(
+            "  " + many.SchemaName
+            + "  intersect=" + many.IntersectEntityName
+            + "  " + many.Entity1LogicalName + "." + many.Entity1IntersectAttribute
+            + " <-> " + many.Entity2LogicalName + "." + many.Entity2IntersectAttribute);
+    }
+
+    return 0;
+}
+
+// Throwaway feasibility probe: can a web role be created, renamed, associated to a contact
+// and cleaned up through the SDK? mspp_webrole is a typed surface over powerpagecomponent
+// in the enhanced portal data model, and whether it accepts writes decides whether roles
+// can be managed from the app at all. Everything it creates, it deletes.
+int ProbeWebRole(string orgUrl)
+{
+    using var svc = Connect(orgUrl);
+
+    // The website table is not directly queryable in the enhanced model, so the reference
+    // is lifted off a web role that already exists rather than looked up by name.
+    // FetchXML, not QueryExpression: mspp_webrole is a virtual surface over
+    // powerpagecomponent and returns nothing to a plain QueryExpression here.
+    var sample = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch top='1'><entity name='mspp_webrole'><attribute name='mspp_websiteid'/></entity></fetch>"))
+        .Entities.FirstOrDefault();
+    Console.WriteLine(sample == null
+        ? "  (no sample mspp_webrole row came back)"
+        : "  sample attributes: " + string.Join(", ", sample.Attributes.Select(a => a.Key + "=" + (a.Value?.GetType().Name ?? "null"))));
+
+    var website = sample?.GetAttributeValue<EntityReference>("mspp_websiteid")
+        ?? new EntityReference("mspp_website", Guid.Parse("b4cfe195-fd15-42e8-94e5-f27bcceaf5fc"));
+    Console.WriteLine($"website: {website.Id:D} (logical name {website.LogicalName})");
+
+    var roleId = Guid.Empty;
+    try
+    {
+        roleId = svc.Create(new Entity("mspp_webrole")
+        {
+            ["mspp_name"] = "ZZ Probe Role (delete me)",
+            ["mspp_description"] = "Temporary feasibility probe.",
+            ["mspp_websiteid"] = website,
+            ["mspp_authenticatedusersrole"] = false,
+            ["mspp_anonymoususersrole"] = false,
+        });
+        Console.WriteLine($"CREATE mspp_webrole: OK {roleId:D}");
+
+        svc.Update(new Entity("mspp_webrole", roleId) { ["mspp_name"] = "ZZ Probe Role renamed" });
+        Console.WriteLine("UPDATE mspp_webrole: OK");
+
+        var contact = svc.RetrieveMultiple(new FetchExpression(
+            "<fetch top='1'><entity name='contact'><attribute name='fullname'/></entity></fetch>"))
+            .Entities.First();
+
+        svc.Associate(
+            "contact",
+            contact.Id,
+            new Relationship("powerpagecomponent_mspp_webrole_contact"),
+            new EntityReferenceCollection { new EntityReference("mspp_webrole", roleId) });
+        Console.WriteLine($"ASSOCIATE to {contact.GetAttributeValue<string>("fullname")}: OK");
+
+        svc.Disassociate(
+            "contact",
+            contact.Id,
+            new Relationship("powerpagecomponent_mspp_webrole_contact"),
+            new EntityReferenceCollection { new EntityReference("mspp_webrole", roleId) });
+        Console.WriteLine("DISASSOCIATE: OK");
+
+        Console.WriteLine("PROBE: PASS - web roles can be managed and assigned through the SDK.");
+        return 0;
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine("PROBE FAILED: " + ex.Message.Replace("\r", " ").Replace("\n", " "));
+        return 2;
+    }
+    finally
+    {
+        if (roleId != Guid.Empty)
+        {
+            try
+            {
+                svc.Delete("mspp_webrole", roleId);
+                Console.WriteLine("cleanup: probe role deleted.");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"cleanup FAILED, delete {roleId:D} by hand: {ex.Message}");
+            }
+        }
+    }
 }
 
 int Register(string[] a)

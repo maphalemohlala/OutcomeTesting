@@ -42,6 +42,7 @@ export * as Al_userrolemappingsModel from './models/Al_userrolemappingsModel';
 export * as Al_usersModel from './models/Al_usersModel';
 export * as CommonModels from './models/CommonModels';
 export * as ContactsModel from './models/ContactsModel';
+export * as Mspp_webrolesModel from './models/Mspp_webrolesModel';
 
 // Services
 export * from './services/Al_AssignCaseService';
@@ -81,3 +82,4 @@ export * from './services/Al_signoffsService';
 export * from './services/Al_userrolemappingsService';
 export * from './services/Al_usersService';
 export * from './services/ContactsService';
+export * from './services/Mspp_webrolesService';
