@@ -18,12 +18,25 @@ Build a Dataverse-centred outcome testing and file-checking platform that replac
 ## Actors and access
 Administrators, Outcome Testing Managers, Checkers/AQS Reviewers, Tax Reviewers, Advisers/Remediation Users, T&C Managers/Supervisors, Regional Leads and Report Users. Users are managed through Entra groups and Power Platform/Dataverse teams. Multi-role membership is allowed.
 
-Portal web roles are a narrower set than the actor list above, settled 2026-08-30:
-- **Adviser and Planner are two separate web roles** (OD-019). Only `AL Portal - Adviser Remediation` exists today, so a Planner role is still to be added and remediation routing split between them.
+**People are `contact` rows** (AD-085, 2026-09-06). The application user registry is the
+contact table, keyed on `emailaddress1` — the AD-010 work email — and one directory at
+`/people` carries both the caseload view and the admin actions (AD-086). The former `al_User`
+table is decommissioned and unread; whether it is deleted is OD-037.
+
+**Web roles are the application's role model** (AD-087, 2026-09-06). The app no longer keeps
+its own registry: the role list is read live from `mspp_webrole`, assignment associates the
+contact and mirrors into `al_UserRoleMapping`, and permission rules key on the web role name
+through `al_rolecode`. So the list below is now the whole role vocabulary, not just the
+portal's — a role added on the portal appears in the app with no code change. Ten web roles
+exist in DEV: the eight business roles, plus `Anonymous Users` and `Authenticated Users`,
+which are Power Pages plumbing and are excluded from the app's vocabulary.
+
+Portal web roles were settled 2026-08-30:
+- **Adviser and Planner are two separate web roles** (OD-019). Both now exist. `AL Portal - Planner` was added 2026-08-31 and is bound alongside `AL Portal - Adviser Remediation` on the same Contact-scoped remediation permission and page rule, so the two **share** remediation routing rather than the routing distinguishing between them. They carry the same application permissions for the same reason.
 - **T&C Manager and Supervisor are one role and one person** (OD-020), which the single `AL Portal - T&C Supervisor` role already matches. FR-023 and BR-008 sign-off routes to it.
-- **Regional Manager/Lead receives notifications only and is not a portal user** (OD-021). The existing `AL Portal - Regional Manager` web role over-grants and is to be removed; PP-15 recipients come from the BR-009 notification list, not from portal role membership.
+- **Regional Manager/Lead receives notifications only and is not a portal user** (OD-021). `AL Portal - Regional Manager` **has been removed** — verified absent from DEV 2026-09-06. PP-15 recipients come from the BR-009 notification list, not from portal role membership.
 - **Every authenticated portal user holds Global read on cases** and can action only what is assigned to them (OD-022, 2026-08-31). This extends AD-056 from the two reviewer roles to all signed-in users; the ability to act is carried by the review assignment, not the case, so write reaches responses only through the Contact-anchored review chain.
-- Permissions are in practice bound to the built-in **Administrators** and **Authenticated Users** roles; the `AL Portal - *` roles above carry none and are inert (AD-067). Adding or removing one of those named roles therefore changes nothing until permissions are bound to it.
+- **Portal** permissions are in practice bound to the built-in **Administrators** and **Authenticated Users** roles; the `AL Portal - *` roles carry few of their own and are largely inert on the portal (AD-067). That is a statement about Power Pages table and page permissions only. **In the application they are not inert**: since AD-087 each named role carries its own `al_pagepermission` rules, so adding or removing one now changes what a person can do in the Code App even where it changes nothing on the portal.
 
 Case allocation is manual (BR-003, AD-040); each review team (AQS and Tax) has a team lead. Two supported routes out of `Queued`, both built: a team lead or manager allocates a case to a named member from the Code App's allocation screen (`al_AssignCase`, AD-072), or a checker picks a queued case up themselves from the portal's Tax or AQS review page, which assigns it to them and opens the check the route says is due (AD-076). There is no skills routing and no auto-allocation.
 

@@ -107,13 +107,19 @@ describe('DEFAULT_PERMISSIONS integrity', () => {
     }
   });
 
-  it('gives the Planner sight of the work and no authority over it', () => {
-    // No requirement describes this role, so it deliberately holds View and nothing more.
-    const set = resolvePermissions(['AL Portal - Planner']);
-    expect(can(set, 'page.cases')).toBe(true);
-    expect(can(set, 'page.cases', 'Edit')).toBe(false);
-    expect(can(set, 'command.assign', 'Edit')).toBe(false);
-    expect(can(set, 'permission.manage', 'Manage')).toBe(false);
+  it('gives the Planner the same remediation authority as Adviser Remediation', () => {
+    // OD-019: the two are separate roles that share remediation routing, and the portal
+    // binds both to the same Contact-scoped permission and page rule.
+    const planner = resolvePermissions(['AL Portal - Planner']);
+    const adviser = resolvePermissions(['AL Portal - Adviser Remediation']);
+
+    expect(can(planner, 'page.remediation', 'Edit')).toBe(true);
+    expect(can(planner, 'remediation.complete', 'Edit')).toBe(true);
+    expect(levelFor(planner, 'page.remediation')).toBe(levelFor(adviser, 'page.remediation'));
+
+    // Sharing remediation is not sharing everything: neither allocates nor administers.
+    expect(can(planner, 'command.assign', 'Edit')).toBe(false);
+    expect(can(planner, 'permission.manage', 'Manage')).toBe(false);
   });
 
   it('excludes the Power Pages system roles from the vocabulary', () => {

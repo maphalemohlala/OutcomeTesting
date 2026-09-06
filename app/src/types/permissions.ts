@@ -174,10 +174,13 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   { role: 'AL Portal - Outcome Testing Manager', resource: 'command.assign', level: 'Edit' },
   { role: 'AL Portal - Outcome Testing Manager', resource: 'export.generate', level: 'Edit' },
 
-  // Planner has no predecessor among the AD-020/AD-031 roles and no requirement describes
-  // it, so it gets sight of the work and nothing more. Inventing authority for it would be
-  // inventing a business rule (AGENTS.md rule 4); widening it is a decision-log entry.
+  // Planner and Adviser Remediation are two roles that share remediation routing
+  // (OD-019, implemented 2026-08-31): the portal binds both to the same Contact-scoped
+  // remediation permission and page rule, so they carry the same authority here. A finer
+  // split between them is a permission-model change, not a gap.
   { role: 'AL Portal - Planner', resource: 'page.cases', level: 'View' },
+  { role: 'AL Portal - Planner', resource: 'page.remediation', level: 'Edit' },
+  { role: 'AL Portal - Planner', resource: 'remediation.complete', level: 'Edit' },
 
   // Portal Administrator and Administrators both manage configuration and the permission
   // model. Two roles carry it because Administrators is the Power Pages built-in that real

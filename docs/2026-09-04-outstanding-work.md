@@ -1,19 +1,20 @@
 # Outstanding work
 
-Started 2026-09-04 at commit `77c1ab7`. **Last reviewed 2026-09-05**, after the case detail
-incident, the DEV verification pass, and both deployments that day — the portal repairs and
-drain switch-on, then the PP-15 proof run that closed OD-032, OD-033 and OD-028 with it.
-Every environment claim below was re-queried that day rather than carried forward.
+Started 2026-09-04 at commit `77c1ab7`. **Last reviewed 2026-09-06**, after the users, roles
+and exports work — which closed most of item 5, corrected three latent defects and put the
+app onto Contact and the Power Pages web roles. Every environment claim below was re-queried
+that day rather than carried forward.
 
-This is the register of what is left, not a status report. `docs/2026-09-05-delivery-status.md`
-is the current one; `docs/2026-09-03-delivery-status.md`, `docs/2026-09-04-delivery-status.md` and
+This is the register of what is left, not a status report. `docs/2026-09-06-delivery-status.md`
+is the current one; `docs/2026-09-03-delivery-status.md` through `docs/2026-09-05-delivery-status.md` and
 the deployment records under `docs/deployment/` cover what exists and how it got there. Every item names an owner, the evidence it rests on,
 and what "done" looks like, so nothing here needs re-deriving.
 
 **Ordered by what it costs to leave alone, not by effort.** Re-ranked 2026-09-06, after the
-AD-013 round trip closed the `src/`↔DEV gap. **Nothing below is a defect in something already
-delivered**, and only one item — OD-034 — is an engineering problem at all; the rest are
-decisions, scheduled security work and environment set-up owned outside Delivery.
+users and roles work reduced item 5 to two pieces. **Nothing below is a defect in something already
+delivered**, and only two items are engineering problems at all — OD-034, and the role detail
+view under item 5; the rest are decisions, scheduled security work and environment set-up
+owned outside Delivery.
 
 **Sequencing, by project owner direction 2026-09-06:** the other environments are set up once
 everything is tested and approved in DEV. So no item here is waiting on TEST or PROD, and
@@ -115,27 +116,40 @@ when to expect a response. Still unstated: hours and response targets, split bet
 portal-down and a single user blocked; and who the hand-off goes to when something needs a
 configuration or platform change, since AQS and Tax do not hold Power Pages or Dataverse admin.
 
-## 5. Users and roles rework
+## 5. Users and roles rework — mostly delivered, two pieces left
 
-**Owner:** Delivery, on project owner direction 2026-09-04. **Not started.**
+**Owner:** Delivery. **Status: delivered 2026-09-06 except the two items below.**
+See `docs/2026-09-06-delivery-status.md`, AD-085 to AD-088.
 
-Direction: the app's user table shows only contacts holding an AL Portal web role; `al_User`
-is retired in favour of Contact; roles are managed in both Power Pages management and the
-app; selecting a role shows its permissions, details and assignees.
+Delivered: `al_User` is retired in favour of Contact (AD-085), People and Users are one
+directory (AD-086), and roles are the Power Pages web roles — read live, assignable and
+manageable in the app, with permissions configurable per role (AD-087).
 
-Two points need resolving before design:
+**The first blocker resolved itself on inspection.** Retiring `al_User` was thought to collide
+with `al_AssignCase` needing both a `systemuser` and a Contact. It does not: all three DEV
+contacts have enabled Read-Write systemusers, so both halves resolve. `al_User` was never the
+source of either. The directory did shrink to 3, exactly as predicted — those three are the
+only real people in the environment.
 
-- **Retiring `al_User`** collides with `al_AssignCase`, which resolves a work email to **both**
-  a `systemuser` and a Contact and refuses if either is missing. Contact cannot take that
-  over — Dataverse ownership and audit need the system user. DEV holds 3 active contacts
-  against 10 seeded `al_User` rows, so the directory would shrink to 3.
-- **Managing roles in both places** is the only option that keeps BR-012's audit trail
-  (AD-041 requires role assignment to be written by an audited Custom API; Power Pages
-  management writes outside that). It needs a stated conflict rule, plus a rule for
-  `Authenticated Users`, which is auto-granted and so has no per-person membership at all.
-  Narrower than it was on 2026-09-04: `Administrators` no longer carries the flag and
-  `Checker` no longer exists (OD-033), so `Authenticated Users` is the only case left — but
-  it is the stock role, so the rule is still owed.
+Still owed:
+
+- **A role detail view.** The direction included "selecting a role shows its permissions,
+  details and assignees". **Not built.** Security configuration lists roles, assignments and
+  permission rules as three separate tables, so answering "what does this role actually
+  grant, and who holds it" still means reading across all three. The data is all present and
+  already in the app — this is a screen, not a model change. Done looks like: pick a role,
+  see its description, its rules by resource and level, and the people holding it, with the
+  existing edit and withdraw actions in place.
+- **A conflict rule for roles managed in two places**, plus a rule for `Authenticated Users`.
+  Unchanged by today's work and now sharper for it. The app writes role assignment through an
+  audited Custom API (AD-041, BR-012) *and* associates the contact, so an assignment made in
+  Power Pages management writes the association with **no** audit event and no mirror row.
+  Today's resolver unions both sources, so such an assignment still grants access — it is
+  simply invisible to the audit trail and to the People screen. That is the conflict rule
+  that is owed: whether a portal-side assignment is legitimate, reconciled on a schedule, or
+  refused. `Authenticated Users` remains the separate case, auto-granted with no per-person
+  membership; it is excluded from the app's vocabulary (AD-087), which is a decision to
+  confirm rather than a rule.
 
 ## 6. OD-011 — Code Apps production readiness, tenant availability and licensing
 
@@ -179,6 +193,23 @@ confirmed.
 
 ## Closed on 2026-09-06
 
+- **The app's user registry is Contact, and People and Users are one screen** (AD-085,
+  AD-086). `al_user` held ten fictional `@example.com` rows against three real contacts, with
+  **no overlap at any row**; it now holds none. Safe because authorisation never read it —
+  the environment's only role mapping was for an email that had no `al_user` row at all.
+- **Roles come from the Power Pages web roles** (AD-087), read live, assignable and
+  manageable in the app, with 52 permission rules seeded across the eight business roles. No
+  schema changed: web role names travel through the `al_rolecode` column AD-044 already
+  reserved for custom roles.
+- **Every allocation had been broken since it was written.** `AssignCasePlugin` filtered
+  `systemuser` on `internalemailid`, which is not an attribute, so Dataverse rejected the
+  query and both the `al_AssignCase` command and the portal claim path failed for every
+  caller. Invisible because no case had ever been allocated in DEV, and because the unit test
+  seeded the same wrong column — the fake has no metadata to contradict it, so the test
+  agreed with the bug. Fixed, with a regression case seeding the real shape.
+- **The export Download control was never defective.** No case was `Closed`, so the batch was
+  legitimately empty; the app simply never said so. Three cases were driven to `Closed` and
+  the export now yields three rows with both graded columns populated.
 - **`src/` is the source of truth again.** The AD-013 export-and-replace round trip ran
   against DEV: `src/Entities/al_Notification/` now exists, `src/customapis/` holds 22 APIs
   (adding `al_DrainNotifications`), `src/SdkMessageProcessingSteps/` holds 14 (adding the PP-15

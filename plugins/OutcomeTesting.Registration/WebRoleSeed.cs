@@ -78,8 +78,12 @@ public static class WebRoleSeed
         yield return (OutcomeTestingManager, "command.assign", AccessEdit);
         yield return (OutcomeTestingManager, "export.generate", AccessEdit);
 
-        // No requirement describes the Planner, so it sees the work and decides nothing.
+        // Planner and Adviser Remediation share remediation routing (OD-019, implemented
+        // 2026-08-31): the portal binds both to the same Contact-scoped remediation
+        // permission and page rule, so they carry the same authority here.
         yield return (Planner, "page.cases", AccessView);
+        yield return (Planner, "page.remediation", AccessEdit);
+        yield return (Planner, "remediation.complete", AccessEdit);
 
         foreach (var admin in new[] { PortalAdministrator, Administrators })
         {
