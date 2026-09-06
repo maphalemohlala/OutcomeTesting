@@ -187,7 +187,7 @@ namespace OutcomeTesting.Plugins
         {
             var query = new QueryExpression(AuditEntity)
             {
-                ColumnSet = new ColumnSet("al_targetid", "al_details"),
+                ColumnSet = new ColumnSet("al_targettable", "al_targetid", "al_details"),
                 TopCount = 1,
                 Criteria = new FilterExpression(),
             };
