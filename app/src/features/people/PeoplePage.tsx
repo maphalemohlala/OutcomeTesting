@@ -11,6 +11,7 @@ import { useIntentKeys } from '../../hooks/useIntentKey';
 import { messageForFailure } from '../../services/errors';
 import { setUserActive } from '../../services/commands/users';
 import { useCaseWorklist } from '../cases/useCaseWorklist';
+import { useSecurityConfig } from '../admin/useSecurityConfig';
 import { caseloadByName, type PersonCaseload, type PersonRole } from './peopleDirectory';
 import { CreatePersonModal, EditPersonModal } from './PersonModals';
 import './PeoplePage.css';
@@ -20,6 +21,7 @@ const EXPORT_HEADERS = [
   'Name',
   'Work email',
   'Status',
+  'Roles',
   'Positions',
   'Code',
   'Cases',
@@ -47,6 +49,8 @@ interface PersonRow {
   createdOn: string | null;
   user: DirectoryUser | null;
   load: PersonCaseload | null;
+  /** Web roles held, from the role mappings (AD-041). */
+  roles: string[];
 }
 
 function formatDate(iso: string | null): string {
@@ -72,6 +76,7 @@ export function PeoplePage() {
   const [reloadKey, setReloadKey] = useState(0);
   const directory = useUserDirectory(reloadKey);
   const cases = useCaseWorklist();
+  const security = useSecurityConfig(reloadKey);
 
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
@@ -84,6 +89,29 @@ export function PeoplePage() {
     () => caseloadByName(cases.status === 'ready' ? cases.cases : []),
     [cases],
   );
+
+  /**
+   * Each person's roles, keyed on work email.
+   *
+   * Read from the role mappings rather than the web role associations directly: assigning
+   * writes both, so the mapping carries the same facts and is a table the app can already
+   * read. Withdrawn assignments are left out — the row is kept for the audit trail, but it
+   * no longer describes what someone holds.
+   */
+  const rolesByEmail = useMemo(() => {
+    const byEmail = new Map<string, string[]>();
+    if (security.status !== 'ready') return byEmail;
+
+    for (const mapping of security.mappings) {
+      if (!mapping.active) continue;
+      const key = mapping.email.trim().toLowerCase();
+      if (key === '') continue;
+      const held = byEmail.get(key) ?? [];
+      if (!held.includes(mapping.role)) held.push(mapping.role);
+      byEmail.set(key, held);
+    }
+    return byEmail;
+  }, [security]);
 
   const rows = useMemo<PersonRow[]>(() => {
     const users = directory.status === 'ready' ? directory.users : [];
@@ -101,6 +129,7 @@ export function PeoplePage() {
         createdOn: user.createdOn,
         user,
         load: loads.get(key) ?? null,
+        roles: rolesByEmail.get(user.email.trim().toLowerCase()) ?? [],
       } satisfies PersonRow;
     });
 
@@ -115,19 +144,21 @@ export function PeoplePage() {
         createdOn: null,
         user: null,
         load,
+        roles: [],
       }) satisfies PersonRow);
 
     return [...registered, ...unregistered].sort(
       (a, b) => (b.load?.totalCases ?? 0) - (a.load?.totalCases ?? 0) || a.name.localeCompare(b.name),
     );
-  }, [directory, loads]);
+  }, [directory, loads, rolesByEmail]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return rows.filter((row) => {
       if (activeFilter === 'active' && !row.active) return false;
       if (activeFilter === 'inactive' && row.active) return false;
-      if (term && !`${row.name} ${row.email} ${row.load?.code ?? ''}`.toLowerCase().includes(term)) {
+      const haystack = `${row.name} ${row.email} ${row.load?.code ?? ''} ${row.roles.join(' ')}`;
+      if (term && !haystack.toLowerCase().includes(term)) {
         return false;
       }
       return true;
@@ -180,6 +211,7 @@ export function PeoplePage() {
                     row.name,
                     row.email,
                     row.user ? (row.active ? 'Active' : 'Inactive') : 'Not in directory',
+                    row.roles.join(', '),
                     (row.load?.roles ?? []).join(', '),
                     row.load?.code ?? '',
                     row.load?.totalCases ?? 0,
@@ -228,6 +260,13 @@ export function PeoplePage() {
             The directory is the Contacts in this environment. Caseload is joined by the name
             recorded on the case — adviser, paraplanner and checker come from the intake extract,
             owner is the person the case is allocated to (BR-003, AD-029).
+            {canManage ? (
+              <>
+                {' '}
+                Roles are Power Pages web roles; assign and configure them under{' '}
+                <Link to="/admin/security">Security configuration</Link>.
+              </>
+            ) : null}
             {unregisteredCount > 0
               ? ` ${unregisteredCount} name${unregisteredCount === 1 ? '' : 's'} on cases ${unregisteredCount === 1 ? 'is' : 'are'} not in the directory, and cannot be allocated work until added.`
               : ''}
@@ -273,6 +312,7 @@ export function PeoplePage() {
                   <th scope="col">Name</th>
                   <th scope="col">Work email</th>
                   <th scope="col">Status</th>
+                  <th scope="col">Roles</th>
                   <th scope="col">Positions</th>
                   <th scope="col" className="people__numeric">
                     Cases
@@ -295,7 +335,7 @@ export function PeoplePage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8 + OUTCOMES.length + (canManage ? 1 : 0)} className="people__empty">
+                    <td colSpan={9 + OUTCOMES.length + (canManage ? 1 : 0)} className="people__empty">
                       No people match your current filters.
                     </td>
                   </tr>
@@ -320,6 +360,7 @@ export function PeoplePage() {
                             </span>
                           )}
                         </td>
+                        <td>{row.roles.join(', ') || '—'}</td>
                         <td>{(row.load?.roles ?? []).join(', ') || '—'}</td>
                         <td className="people__numeric">{row.load?.totalCases ?? 0}</td>
                         <td className="people__numeric">{row.load?.openCases ?? 0}</td>
