@@ -129,5 +129,101 @@ namespace OutcomeTesting.Plugins.Tests
         {
             Assert.Equal("[]", RoleHolders.ToJson(new List<RoleHolder>()));
         }
+
+        [Fact]
+        public void TwoContactsWithNoEmailProduceTwoHolders()
+        {
+            // Contacts without email should NOT collapse to a single holder.
+            var contact1Id = Guid.NewGuid();
+            var contact2Id = Guid.NewGuid();
+            var contact1 = new Entity("contact", contact1Id);
+            contact1["emailaddress1"] = null;
+            contact1["fullname"] = "Contact One";
+            var contact2 = new Entity("contact", contact2Id);
+            contact2["emailaddress1"] = null;
+            contact2["fullname"] = "Contact Two";
+
+            var holders = RoleHolders.Merge(new Entity[0], new[] { contact1, contact2 });
+
+            Assert.Equal(2, holders.Count);
+            Assert.Equal(new[] { "Contact One", "Contact Two" }, holders.Select(h => h.Name).OrderBy(n => n));
+            Assert.All(holders, h => Assert.Empty(h.Email));
+            Assert.All(holders, h => Assert.Null(h.MappingId));
+            Assert.All(holders, h => Assert.True(h.Associated));
+        }
+
+        [Fact]
+        public void BlankEmailMappingAndBlankEmailContactProduceTwoHolders()
+        {
+            // A blank-email mapping and a blank-email contact must not fabricate agreement.
+            var mappingId = Guid.NewGuid();
+            var contactId = Guid.NewGuid();
+            var mapping = new Entity("al_userrolemapping", mappingId);
+            mapping["al_useremail"] = string.Empty;
+            mapping["statecode"] = new OptionSetValue(0);
+            var contact = new Entity("contact", contactId);
+            contact["emailaddress1"] = string.Empty;
+            contact["fullname"] = "Portal Contact";
+
+            var holders = RoleHolders.Merge(new[] { mapping }, new[] { contact });
+
+            Assert.Equal(2, holders.Count);
+            Assert.All(holders, h => Assert.Empty(h.Email));
+            // Neither holder should report both MappingId and Associated.
+            var mappingHolder = holders.First(h => h.MappingId.HasValue);
+            var contactHolder = holders.First(h => !h.MappingId.HasValue);
+            Assert.True(mappingHolder.MappingActive);
+            Assert.False(mappingHolder.Associated);
+            Assert.True(contactHolder.Associated);
+            Assert.Null(contactHolder.MappingActive);
+        }
+
+        [Fact]
+        public void WhitespaceOnlyEmailBehavesLikeEmptyEmail()
+        {
+            // Whitespace-only emails should be normalized like empty ones.
+            var contact1Id = Guid.NewGuid();
+            var contact2Id = Guid.NewGuid();
+            var contact1 = new Entity("contact", contact1Id);
+            contact1["emailaddress1"] = "   ";
+            contact1["fullname"] = "Whitespace One";
+            var contact2 = new Entity("contact", contact2Id);
+            contact2["emailaddress1"] = "\t\n";
+            contact2["fullname"] = "Whitespace Two";
+
+            var holders = RoleHolders.Merge(new Entity[0], new[] { contact1, contact2 });
+
+            Assert.Equal(2, holders.Count);
+            Assert.All(holders, h => Assert.Empty(h.Email));
+        }
+
+        [Fact]
+        public void OrderingOfBlankEmailHoldersIsStableAcrossRepeatedMergeCalls()
+        {
+            // Repeated Merge calls with the same input should produce the same ordering
+            // even for blank-email holders.
+            var contact1Id = Guid.NewGuid();
+            var contact2Id = Guid.NewGuid();
+            var mappingId = Guid.NewGuid();
+
+            var contact1 = new Entity("contact", contact1Id);
+            contact1["emailaddress1"] = null;
+            contact1["fullname"] = "Contact A";
+            var contact2 = new Entity("contact", contact2Id);
+            contact2["emailaddress1"] = null;
+            contact2["fullname"] = "Contact B";
+            var mapping = new Entity("al_userrolemapping", mappingId);
+            mapping["al_useremail"] = null;
+            mapping["statecode"] = new OptionSetValue(0);
+
+            var holders1 = RoleHolders.Merge(new[] { mapping }, new[] { contact1, contact2 });
+            var holders2 = RoleHolders.Merge(new[] { mapping }, new[] { contact1, contact2 });
+
+            // Both merge results should have the same order — check the names and associated flags
+            // to verify deterministic ordering.
+            Assert.Equal(holders1.Select(h => h.Name), holders2.Select(h => h.Name));
+            Assert.Equal(holders1.Select(h => h.Associated), holders2.Select(h => h.Associated));
+            Assert.Equal(holders1.Select(h => h.MappingId), holders2.Select(h => h.MappingId));
+        }
     }
 }
