@@ -19,7 +19,7 @@ namespace OutcomeTesting.Plugins
     /// own read privileges; the command's write still runs as the caller so Dataverse
     /// create/write privilege remains the primary platform gate.
     /// </summary>
-    internal static class PermissionHelpers
+    public static class PermissionHelpers
     {
         public const int AccessNone = 120910766;
         public const int AccessView = 120910767;
@@ -107,7 +107,12 @@ namespace OutcomeTesting.Plugins
             return service.RetrieveMultiple(query).Entities.Count > 0;
         }
 
-        private static string GetCallerEmail(IOrganizationService service, IPluginExecutionContext context)
+        /// <summary>
+        /// The work email of the caller (AD-010). Public so al_GetMyRoles reports on the
+        /// SAME person the gate authorises, resolved the SAME way — one implementation
+        /// rather than two that can disagree about who is calling.
+        /// </summary>
+        public static string GetCallerEmail(IOrganizationService service, IPluginExecutionContext context)
         {
             var user = service.Retrieve("systemuser", context.InitiatingUserId, new ColumnSet("internalemailaddress"));
             var email = user.GetAttributeValue<string>("internalemailaddress");
@@ -170,6 +175,23 @@ namespace OutcomeTesting.Plugins
         /// and a rule written against an AD-044 custom role are indistinguishable to the
         /// gate — as they should be.
         /// </summary>
+        /// <summary>
+        /// The role codes a person holds, as the gate resolves them (AD-089).
+        ///
+        /// Public so al_GetMyRoles can hand the client the SAME answer the server enforces
+        /// with. The client used to derive its own from the mapping table alone, which meant
+        /// a portal-side assignment authorised writes the UI would not offer.
+        ///
+        /// Built-in al_approle values are not returned: they have no code to match a
+        /// permission rule on, and AD-087 stopped offering the picklist. A caller holding
+        /// only a picklist role still resolves server-side through GetActiveRoles,
+        /// unchanged.
+        /// </summary>
+        public static List<string> ResolveRoleCodesForEmail(IOrganizationService service, string email)
+        {
+            return GetActiveRoles(service, (email ?? string.Empty).Trim()).RoleCodes;
+        }
+
         private static CallerRoles GetActiveRoles(IOrganizationService service, string email)
         {
             var roles = GetMappedRoles(service, email);
