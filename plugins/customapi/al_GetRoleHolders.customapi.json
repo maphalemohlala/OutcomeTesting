@@ -1,0 +1,35 @@
+{
+  "$comment": "Contract for the GetRoleHolders read (AD-003, AD-089). Deployed via the registration console (plugins/OutcomeTesting.Registration) and added to the OutcomeTesting solution via a solution-file import (src/customapis/al_GetRoleHolders). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_GetRoleHolders",
+    "name": "al_GetRoleHolders",
+    "displayname": "Get Role Holders",
+    "description": "Everyone holding one application role, from both sources: the al_userrolemapping rows and the Power Pages web role associations. Returns the raw facts so the caller can see where the two disagree (AD-089). Enforces permission.manage View. Reads only; writes nothing and audits nothing.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.GetRoleHoldersPlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "RoleCode",
+      "name": "RoleCode",
+      "displayname": "Role code",
+      "description": "The web role name, which is what al_rolecode carries (AD-044).",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "Holders",
+      "name": "Holders",
+      "displayname": "Holders",
+      "description": "JSON array of { email, name, mappingId, mappingActive, associated }. mappingId and mappingActive are null when the role was granted in Power Pages and never mirrored.",
+      "type": 10
+    }
+  ]
+}
