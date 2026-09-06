@@ -251,6 +251,11 @@ if (args.Length >= 3 && args[0].Equals("addmetadatatosolution", StringComparison
     return AddMetadataToSolution(args[1], args[2], args.Length >= 4 ? args[3] : null);
 }
 
+if (args.Length >= 3 && args[0].Equals("fetch", StringComparison.OrdinalIgnoreCase))
+{
+    return Fetch(args[1], args[2]);
+}
+
 if (args.Length < 1)
 {
     Console.Error.WriteLine("Usage: dotnet run -- <orgUrl> [<pluginDllPath>]   |   dotnet run -- verify <orgUrl>");
@@ -258,6 +263,55 @@ if (args.Length < 1)
 }
 
 return Register(args);
+
+// Read-only ad-hoc query. Takes FetchXML inline or as a file path (@path) and prints the
+// rows as JSON, so a question about what is actually in an environment can be answered
+// from evidence rather than assumption. Refuses anything that is not a <fetch> query, so
+// this verb cannot be turned into a write path.
+int Fetch(string orgUrl, string fetchXmlOrFile)
+{
+    var xml = fetchXmlOrFile.StartsWith("@", StringComparison.Ordinal)
+        ? File.ReadAllText(fetchXmlOrFile.Substring(1))
+        : fetchXmlOrFile;
+
+    if (xml.IndexOf("<fetch", StringComparison.OrdinalIgnoreCase) < 0)
+    {
+        Console.Error.WriteLine("Not a FetchXML query.");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var results = svc.RetrieveMultiple(new FetchExpression(xml));
+    var rows = new List<Dictionary<string, object?>>();
+    foreach (var entity in results.Entities)
+    {
+        var row = new Dictionary<string, object?>();
+        foreach (var pair in entity.Attributes)
+        {
+            object? value = pair.Value switch
+            {
+                EntityReference reference => reference.Name + " [" + reference.Id.ToString("D") + "]",
+                OptionSetValue option => entity.FormattedValues.ContainsKey(pair.Key)
+                    ? entity.FormattedValues[pair.Key] + " (" + option.Value + ")"
+                    : (object)option.Value,
+                Money money => money.Value,
+                AliasedValue aliased => aliased.Value is EntityReference alias
+                    ? alias.Name + " [" + alias.Id.ToString("D") + "]"
+                    : aliased.Value,
+                _ => pair.Value,
+            };
+            row[pair.Key] = value;
+        }
+
+        rows.Add(row);
+    }
+
+    Console.WriteLine(JsonSerializer.Serialize(
+        new { count = rows.Count, moreRecords = results.MoreRecords, rows },
+        new JsonSerializerOptions { WriteIndented = true }));
+    return 0;
+}
 
 int Register(string[] a)
 {
