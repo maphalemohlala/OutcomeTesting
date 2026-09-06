@@ -16,9 +16,11 @@ namespace OutcomeTesting.Plugins.Tests
     /// because the read sat behind a service call.
     ///
     /// Deliberately partial. It supports what the plug-ins actually issue - equality and
-    /// inequality conditions, link-entity filtering, TopCount and Orders - and throws on
-    /// anything else rather than quietly returning a wrong answer, because a fake that
-    /// guesses is worse than no fake.
+    /// inequality conditions, link-entity filtering, TopCount and Orders for QueryExpression,
+    /// and flat (no-join) FetchXML for FetchExpression. For joined FetchXML, tests must
+    /// enqueue results via FetchResults. Throws on QueryExpression shapes not listed and on
+    /// unsupported FetchXML patterns rather than quietly returning wrong answers, because a
+    /// fake that guesses is worse than no fake.
     /// </summary>
     public sealed class FakeOrganizationService : IOrganizationService
     {
@@ -148,17 +150,25 @@ namespace OutcomeTesting.Plugins.Tests
             var fetch = query as FetchExpression;
             if (fetch != null)
             {
+                // Always record the fetch first.
                 FetchXml.Add(fetch.Query);
 
-                // If FetchResults are queued, use those (for explicit test setup).
-                // Otherwise, try to execute the FetchXML against seeded data.
+                // If FetchResults has an entry, dequeue and return it — for any shape.
+                // Later tasks queue results for joined fetches.
                 if (FetchResults.Count > 0)
                 {
                     return FetchResults.Dequeue();
                 }
 
-                // Simple FetchXML execution: parse and filter by name if it's a simple entity query.
-                // This handles WebRoleRegistry.FindByName's use case.
+                // Check for joined FetchXML (contains <link-entity>).
+                if (fetch.Query.Contains("<link-entity"))
+                {
+                    throw new NotSupportedException(
+                        "Joined FetchExpression is not executed by this fake; enqueue a FetchResults entry for it.");
+                }
+
+                // Flat FetchXML (no joins): execute against the seeded table.
+                // This handles WebRoleRegistry.FindByName and similar single-entity queries.
                 return ExecuteSimpleFetch(fetch.Query);
             }
 
