@@ -6,7 +6,9 @@ namespace OutcomeTesting.Plugins
     /// <summary>
     /// Server-side command UpdateUser (AD-003, AD-041). Registered against the Custom API
     /// message <c>al_UpdateUser</c>. An administrator amends an existing application user's
-    /// display name (al_user). Work email is the stable identifier (AD-010) and is not
+    /// display name. The registry is <c>contact</c> (see <see cref="ContactRegistry"/>) and
+    /// the name is written as firstname/lastname because fullname is calculated.
+    /// Work email is the stable identifier (AD-010) and is not
     /// changed here. Enforces the AD-041 <c>permission.manage</c> Manage permission, applies
     /// optimistic concurrency and idempotency, and writes an immutable Audit Event
     /// (BR-012, NFR-AUD-01). The write runs as the initiating user so Dataverse privilege
@@ -22,9 +24,6 @@ namespace OutcomeTesting.Plugins
         private const string OutUserId = "UserId";
         private const string OutAuditEventId = "AuditEventId";
         private const string OutConflict = "Conflict";
-
-        private const string UserEntity = "al_user";
-        private const string NameAttr = "al_name";
 
         private const int CommandUpdateUser = 120910786;
 
@@ -58,14 +57,19 @@ namespace OutcomeTesting.Plugins
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "permission.manage", PermissionHelpers.AccessManage);
 
-            var before = userService.Retrieve(UserEntity, userId, new Microsoft.Xrm.Sdk.Query.ColumnSet(NameAttr, "al_workemail"));
-            var previousName = before.GetAttributeValue<string>(NameAttr);
-            var workEmail = before.GetAttributeValue<string>("al_workemail");
+            var before = userService.Retrieve(
+                ContactRegistry.Entity,
+                userId,
+                new Microsoft.Xrm.Sdk.Query.ColumnSet(
+                    ContactRegistry.FullNameAttr,
+                    ContactRegistry.FirstNameAttr,
+                    ContactRegistry.LastNameAttr,
+                    ContactRegistry.EmailAttr));
+            var previousName = ContactRegistry.NameOf(before);
+            var workEmail = before.GetAttributeValue<string>(ContactRegistry.EmailAttr);
 
-            var update = new Entity(UserEntity, userId)
-            {
-                [NameAttr] = fullName,
-            };
+            var update = new Entity(ContactRegistry.Entity, userId);
+            ContactRegistry.SetName(update, fullName);
 
             if (string.IsNullOrEmpty(expectedRowVersion))
             {
@@ -88,7 +92,7 @@ namespace OutcomeTesting.Plugins
                     {
                         SetResponse(context, userId.ToString("D"), Guid.Empty, true);
                         throw new InvalidPluginExecutionException(
-                            CommandHelpers.ConflictPrefix + "This user was changed by someone else. Refresh and try again.");
+                            CommandHelpers.ConflictPrefix + "This person was changed by someone else. Refresh and try again.");
                     }
 
                     throw;
@@ -97,7 +101,7 @@ namespace OutcomeTesting.Plugins
 
             var details = "Name " + (previousName ?? string.Empty) + " -> " + fullName;
             var auditId = CommandHelpers.WriteAuditEvent(
-                systemService, CommandUpdateUser, "UpdateUser " + workEmail, UserEntity, userId,
+                systemService, CommandUpdateUser, "UpdateUser " + workEmail, ContactRegistry.Entity, userId,
                 null, details, idempotencyKey, context);
 
             SetResponse(context, userId.ToString("D"), auditId, false);

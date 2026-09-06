@@ -7,9 +7,12 @@ namespace OutcomeTesting.Plugins
     /// <summary>
     /// Server-side command CreateUser (AD-003, AD-041, AD-044). Registered against the
     /// Custom API <c>al_CreateUser</c>. An Administrator adds a person to the application
-    /// user registry (al_user), keyed on work email (AD-010). Enforces the caller holds
-    /// Manage on <c>permission.manage</c>, upserts on the work email (idempotent,
-    /// NFR-REL-01) and writes an immutable Audit Event (BR-012, NFR-AUD-01).
+    /// user registry, keyed on work email (AD-010). Enforces the caller holds Manage on
+    /// <c>permission.manage</c>, upserts on the work email (idempotent, NFR-REL-01) and
+    /// writes an immutable Audit Event (BR-012, NFR-AUD-01).
+    ///
+    /// The registry is <c>contact</c>; see <see cref="ContactRegistry"/> for why. The
+    /// display name is written as firstname/lastname because fullname is calculated.
     /// </summary>
     public class CreateUserPlugin : PluginBase
     {
@@ -22,8 +25,6 @@ namespace OutcomeTesting.Plugins
         private const string OutAuditEventId = "AuditEventId";
         private const string OutConflict = "Conflict";
 
-        private const string UserEntity = "al_user";
-        private const string ActiveAttr = "al_isactive";
         private const int CommandCreateUser = 120910785;
 
         public CreateUserPlugin(string unsecureConfiguration, string secureConfiguration)
@@ -66,7 +67,7 @@ namespace OutcomeTesting.Plugins
             // that deactivation withdrew (OD-010), audited only as "Created". Reactivation
             // is its own command, al_SetUserActive, and its own Audit Event.
             var existing = FindByWorkEmail(userService, workEmail);
-            if (existing != null && !(existing.GetAttributeValue<bool?>(ActiveAttr) ?? true))
+            if (existing != null && !ContactRegistry.IsActive(existing))
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix +
@@ -79,36 +80,40 @@ namespace OutcomeTesting.Plugins
                 // Already registered and active: this is the idempotent re-run. Only the
                 // display name is refreshed — the active state is not this command's to set.
                 userId = existing.Id;
-                userService.Update(new Entity(UserEntity, userId) { ["al_name"] = fullName });
+                var rename = new Entity(ContactRegistry.Entity, userId);
+                ContactRegistry.SetName(rename, fullName);
+                userService.Update(rename);
             }
             else
             {
-                userId = userService.Create(new Entity(UserEntity)
+                // statecode is left alone: a new contact is created active, and setting it
+                // here would make this command a reactivation path, which it must not be.
+                var contact = new Entity(ContactRegistry.Entity)
                 {
-                    ["al_name"] = fullName,
-                    ["al_workemail"] = workEmail,
-                    [ActiveAttr] = true,
-                });
+                    [ContactRegistry.EmailAttr] = workEmail,
+                };
+                ContactRegistry.SetName(contact, fullName);
+                userId = userService.Create(contact);
             }
 
             var auditId = CommandHelpers.WriteAuditEvent(
-                systemService, CommandCreateUser, "CreateUser " + workEmail, UserEntity, userId,
+                systemService, CommandCreateUser, "CreateUser " + workEmail, ContactRegistry.Entity, userId,
                 fullName, workEmail, idempotencyKey, context);
 
             SetResponse(context, userId.ToString("D"), "Created", auditId, false);
         }
 
-        /// <summary>The al_user registry row for a work email, or null. Read as the caller,
-        /// so a row they cannot see is not silently overwritten on their behalf.</summary>
+        /// <summary>The registry row for a work email, or null. Read as the caller, so a
+        /// row they cannot see is not silently overwritten on their behalf.</summary>
         private static Entity FindByWorkEmail(IOrganizationService service, string workEmail)
         {
-            var query = new QueryExpression(UserEntity)
+            var query = new QueryExpression(ContactRegistry.Entity)
             {
-                ColumnSet = new ColumnSet(ActiveAttr),
+                ColumnSet = new ColumnSet(ContactRegistry.StateCodeAttr),
                 TopCount = 1,
                 Criteria = new FilterExpression(),
             };
-            query.Criteria.AddCondition("al_workemail", ConditionOperator.Equal, workEmail);
+            query.Criteria.AddCondition(ContactRegistry.EmailAttr, ConditionOperator.Equal, workEmail);
 
             var found = service.RetrieveMultiple(query).Entities;
             return found.Count > 0 ? found[0] : null;

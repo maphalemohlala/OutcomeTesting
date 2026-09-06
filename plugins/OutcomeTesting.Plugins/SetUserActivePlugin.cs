@@ -7,8 +7,10 @@ namespace OutcomeTesting.Plugins
     /// <summary>
     /// Server-side command SetUserActive (AD-003, AD-041, AD-037/OD-010). Registered against
     /// the Custom API message <c>al_SetUserActive</c>. Deactivation is the sanctioned
-    /// alternative to hard deletion for retained data (OD-010): the al_user row and its
-    /// history are preserved and only <c>al_isactive</c> is flipped. Enforces the AD-041
+    /// alternative to hard deletion for retained data (OD-010): the registry row and its
+    /// history are preserved and only the state is flipped. The registry is <c>contact</c>
+    /// (see <see cref="ContactRegistry"/>), so the flag is statecode/statuscode rather than
+    /// a bespoke boolean. Enforces the AD-041
     /// <c>permission.manage</c> Manage permission and writes an immutable Audit Event
     /// (BR-012, NFR-AUD-01). The write runs as the initiating user so Dataverse privilege
     /// remains the platform gate.
@@ -22,9 +24,6 @@ namespace OutcomeTesting.Plugins
         private const string OutUserId = "UserId";
         private const string OutActive = "Active";
         private const string OutAuditEventId = "AuditEventId";
-
-        private const string UserEntity = "al_user";
-        private const string ActiveAttr = "al_isactive";
 
         private const int CommandSetUserActive = 120910787;
 
@@ -57,20 +56,29 @@ namespace OutcomeTesting.Plugins
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "permission.manage", PermissionHelpers.AccessManage);
 
-            var before = userService.Retrieve(UserEntity, userId, new ColumnSet(ActiveAttr, "al_workemail"));
-            var workEmail = before.GetAttributeValue<string>("al_workemail");
-            var wasActive = before.GetAttributeValue<bool?>(ActiveAttr) ?? true;
+            var before = userService.Retrieve(
+                ContactRegistry.Entity,
+                userId,
+                new ColumnSet(ContactRegistry.StateCodeAttr, ContactRegistry.EmailAttr));
+            var workEmail = before.GetAttributeValue<string>(ContactRegistry.EmailAttr);
+            var wasActive = ContactRegistry.IsActive(before);
 
-            var update = new Entity(UserEntity, userId)
+            // statuscode travels with statecode: setting the state alone leaves the reason
+            // code pointing at the state the row just left, which reads as a half-applied
+            // change wherever the reason is displayed.
+            var update = new Entity(ContactRegistry.Entity, userId)
             {
-                [ActiveAttr] = active,
+                [ContactRegistry.StateCodeAttr] = new OptionSetValue(
+                    active ? ContactRegistry.StateActive : ContactRegistry.StateInactive),
+                [ContactRegistry.StatusCodeAttr] = new OptionSetValue(
+                    active ? ContactRegistry.StatusActive : ContactRegistry.StatusInactive),
             };
             userService.Update(update);
 
             var details = "Active " + wasActive + " -> " + active;
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandSetUserActive, (active ? "ReactivateUser " : "DeactivateUser ") + workEmail,
-                UserEntity, userId, null, details, idempotencyKey, context);
+                ContactRegistry.Entity, userId, null, details, idempotencyKey, context);
 
             SetResponse(context, userId.ToString("D"), active, auditId);
         }
