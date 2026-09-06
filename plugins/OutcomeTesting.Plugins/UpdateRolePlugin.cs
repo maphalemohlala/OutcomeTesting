@@ -8,7 +8,8 @@ namespace OutcomeTesting.Plugins
     /// <summary>
     /// Server-side command UpdateRole (AD-003, AD-041, AD-044). Registered against the Custom
     /// API message <c>al_UpdateRole</c>. An administrator renames, re-describes or retires a
-    /// role in the extensible registry (al_role).
+    /// role in the extensible registry, which is the Power Pages web roles (see
+    /// <see cref="WebRoleRegistry"/>).
     ///
     /// <c>al_rolecode</c> is deliberately NOT editable: it is the stable business key that
     /// al_userrolemapping and al_pagepermission reference, so renaming a role must leave every
@@ -84,7 +85,10 @@ namespace OutcomeTesting.Plugins
             try
             {
                 before = userService.Retrieve(
-                    RoleEntity, roleId, new ColumnSet("al_name", "al_description", "al_rolecode", "al_isactive"));
+                    WebRoleRegistry.RoleEntity,
+                    roleId,
+                    new ColumnSet(
+                        WebRoleRegistry.NameAttr, WebRoleRegistry.DescriptionAttr, "statecode"));
             }
             catch (System.ServiceModel.FaultException<OrganizationServiceFault>)
             {
@@ -92,17 +96,19 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.NotFoundPrefix + "That role no longer exists. Refresh and try again.");
             }
 
-            var previousName = before.GetAttributeValue<string>("al_name");
+            var previousName = before.GetAttributeValue<string>(WebRoleRegistry.NameAttr);
             var previousDescription = before.GetAttributeValue<string>("al_description");
-            var wasActive = before.GetAttributeValue<bool?>("al_isactive") ?? true;
-            var roleCode = before.GetAttributeValue<string>("al_rolecode");
+            var wasActive = CommandHelpers.IsActive(before);
+            // A web role has no separate business key: its name is what al_rolecode carries
+            // on every assignment and permission rule that references it.
+            var roleCode = previousName;
 
-            var update = new Entity(RoleEntity, roleId);
+            var update = new Entity(WebRoleRegistry.RoleEntity, roleId);
             var details = new StringBuilder();
 
             if (!string.IsNullOrWhiteSpace(roleName) && roleName.Trim() != previousName)
             {
-                update["al_name"] = roleName.Trim();
+                update[WebRoleRegistry.NameAttr] = roleName.Trim();
                 Append(details, "Name " + (previousName ?? string.Empty) + " -> " + roleName.Trim());
             }
 
@@ -133,7 +139,7 @@ namespace OutcomeTesting.Plugins
 
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandUpdateRole, "UpdateRole " + (roleCode ?? roleId.ToString("D")),
-                RoleEntity, roleId, null, details.ToString(), idempotencyKey, context);
+                WebRoleRegistry.RoleEntity, roleId, null, details.ToString(), idempotencyKey, context);
 
             SetResponse(context, roleId.ToString("D"), auditId, false);
         }

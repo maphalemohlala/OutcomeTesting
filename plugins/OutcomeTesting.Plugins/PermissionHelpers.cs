@@ -6,9 +6,15 @@ namespace OutcomeTesting.Plugins
 {
     /// <summary>
     /// Server-side enforcement of the application RBAC model (AD-041). Resolves the
-    /// caller's app roles from al_userrolemapping (keyed on work email, AD-010) and the
-    /// effective access level from al_pagepermission, then refuses an action the caller is
-    /// not granted. This is the authoritative gate the client permission reader only
+    /// caller's app roles from their Power Pages web roles AND from al_userrolemapping
+    /// (keyed on work email, AD-010), then the effective access level from
+    /// al_pagepermission, and refuses an action the caller is not granted.
+    ///
+    /// The two sources are unioned rather than one replacing the other. Web roles are the
+    /// authority — assignment associates a contact with a role for real — but the mapping
+    /// table mirrors the same facts and still carries any older assignment. Reading only
+    /// the web roles would withdraw access from anyone the mirror had but the intersect did
+    /// not; reading only the mirror would make the web roles decorative. This is the authoritative gate the client permission reader only
     /// mirrors. Reads use the system service so the check does not depend on the caller's
     /// own read privileges; the command's write still runs as the caller so Dataverse
     /// create/write privilege remains the primary platform gate.
@@ -156,7 +162,34 @@ namespace OutcomeTesting.Plugins
             }
         }
 
+        /// <summary>
+        /// The caller's roles: their web roles, plus whatever the mapping table holds.
+        ///
+        /// A web role contributes its NAME as a role code, which is the same shape
+        /// al_pagepermission.al_rolecode matches on, so a rule written against a web role
+        /// and a rule written against an AD-044 custom role are indistinguishable to the
+        /// gate — as they should be.
+        /// </summary>
         private static CallerRoles GetActiveRoles(IOrganizationService service, string email)
+        {
+            var roles = GetMappedRoles(service, email);
+
+            var contact = WebRoleRegistry.FindContactByEmail(service, email);
+            if (contact != null)
+            {
+                foreach (var webRole in WebRoleRegistry.RolesForContact(service, contact.Id))
+                {
+                    if (!roles.RoleCodes.Contains(webRole))
+                    {
+                        roles.RoleCodes.Add(webRole);
+                    }
+                }
+            }
+
+            return roles;
+        }
+
+        private static CallerRoles GetMappedRoles(IOrganizationService service, string email)
         {
             var query = new QueryExpression(MappingEntity)
             {

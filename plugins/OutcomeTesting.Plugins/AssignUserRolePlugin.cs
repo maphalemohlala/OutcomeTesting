@@ -59,11 +59,17 @@ namespace OutcomeTesting.Plugins
             Entity mapping;
             string code;
             string auditRole;
+            Entity webRole = null;
             if (!string.IsNullOrWhiteSpace(roleCode))
             {
                 // Custom role (AD-044): identified by its al_role business code, not the picklist.
                 var normalizedCode = roleCode.Trim();
-                if (!CustomRoleExists(systemService, normalizedCode))
+
+                // A role code names EITHER a web role (the registry, AD-041) or an AD-044
+                // al_role. Web roles are checked first because they are the source the app
+                // now offers; al_role stays valid so nothing already assigned breaks.
+                webRole = WebRoleRegistry.FindByName(systemService, normalizedCode);
+                if (webRole == null && !CustomRoleExists(systemService, normalizedCode))
                 {
                     throw new InvalidPluginExecutionException(
                         CommandHelpers.ValidationPrefix + "The role code does not match an active role.");
@@ -103,11 +109,87 @@ namespace OutcomeTesting.Plugins
 
             var mappingId = Upsert(userService, MappingEntity, "al_userrolemappingcode", code, mapping);
 
+            // The mapping row is the mirror; the association is the assignment. Doing both
+            // is what stops the app and the portal disagreeing about who holds a role.
+            // Deliberately after the mirror exists: an association with no row behind it is
+            // invisible to every screen that reads the mapping table.
+            if (webRole != null)
+            {
+                AssociateWebRole(systemService, email, webRole.Id);
+            }
+
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandAssignUserRole, "AssignUserRole " + code, MappingEntity, mappingId,
                 auditRole, email, idempotencyKey, context);
 
             SetResponse(context, mappingId.ToString("D"), "Assigned", auditId, false);
+        }
+
+        /// <summary>
+        /// Associates the contact behind a work email with a web role, tolerating the case
+        /// where the association already exists.
+        ///
+        /// Contacts and web roles are the two halves AD-010 already keys on one email, so a
+        /// person with no contact cannot hold a web role — that is reported rather than
+        /// silently skipped, because the caller believes they just granted access.
+        /// </summary>
+        internal static void AssociateWebRole(IOrganizationService service, string email, Guid webRoleId)
+        {
+            var contact = WebRoleRegistry.FindContactByEmail(service, email);
+            if (contact == null)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "No contact has the work email " + email + ", so the web role cannot be granted to them.");
+            }
+
+            try
+            {
+                service.Associate(
+                    ContactRegistry.Entity,
+                    contact.Id,
+                    new Relationship(WebRoleRegistry.ContactRelationship),
+                    new EntityReferenceCollection
+                    {
+                        new EntityReference(WebRoleRegistry.RoleEntity, webRoleId),
+                    });
+            }
+            catch (System.ServiceModel.FaultException<OrganizationServiceFault>)
+            {
+                // Already associated. Assigning a role someone already holds is the
+                // idempotent outcome this command promises (NFR-REL-01), not a failure.
+            }
+        }
+
+        /// <summary>
+        /// Withdraws the association behind a mapping row, so deactivating an assignment in
+        /// the app actually removes the portal role rather than only greying out a mirror.
+        /// </summary>
+        internal static void DisassociateWebRole(IOrganizationService service, string email, string roleName)
+        {
+            var contact = WebRoleRegistry.FindContactByEmail(service, email);
+            var webRole = WebRoleRegistry.FindByName(service, roleName);
+            if (contact == null || webRole == null)
+            {
+                return;
+            }
+
+            try
+            {
+                service.Disassociate(
+                    ContactRegistry.Entity,
+                    contact.Id,
+                    new Relationship(WebRoleRegistry.ContactRelationship),
+                    new EntityReferenceCollection
+                    {
+                        new EntityReference(WebRoleRegistry.RoleEntity, webRole.Id),
+                    });
+            }
+            catch (System.ServiceModel.FaultException<OrganizationServiceFault>)
+            {
+                // Not associated. Withdrawing a role someone does not hold is already the
+                // state the caller asked for.
+            }
         }
 
         /// <summary>True when an al_role exists with the given business code.</summary>

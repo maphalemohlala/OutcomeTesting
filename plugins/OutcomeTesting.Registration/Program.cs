@@ -277,6 +277,16 @@ if (args.Length >= 2 && args[0].Equals("probewebrole", StringComparison.OrdinalI
     return ProbeWebRole(args[1]);
 }
 
+if (args.Length >= 2 && args[0].Equals("seedwebroles", StringComparison.OrdinalIgnoreCase))
+{
+    return SeedWebRoles(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("proveroles", StringComparison.OrdinalIgnoreCase))
+{
+    return ProveRoles(args[1]);
+}
+
 if (args.Length < 1)
 {
     Console.Error.WriteLine("Usage: dotnet run -- <orgUrl> [<pluginDllPath>]   |   dotnet run -- verify <orgUrl>");
@@ -532,6 +542,115 @@ int ProbeWebRole(string orgUrl)
             }
         }
     }
+}
+
+// Puts the web role model into effect: mirrors the contact-to-web-role associations into
+// al_userrolemapping and seeds the al_pagepermission rules that make a web role mean
+// something server-side. WRITES CONFIGURATION, so the org URL is repeated after --confirm.
+int SeedWebRoles(string[] a)
+{
+    var orgUrl = a[1];
+    var confirmed = a.Length >= 4
+        && a[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase)
+        && a[3].TrimEnd('/').Equals(orgUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+
+    if (!confirmed)
+    {
+        Console.Error.WriteLine(
+            "This writes access configuration. Re-run as: seedwebroles <orgUrl> --confirm <orgUrl>");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+    return WebRoleSeed.Run(svc);
+}
+
+// Proves the role path end to end through the commands the app calls: assign a web role to
+// a contact, confirm the association really exists, then withdraw it and confirm it is
+// gone. Leaves the environment as it found it.
+int ProveRoles(string orgUrl)
+{
+    using var svc = Connect(orgUrl);
+
+    const string probeRole = "AL Portal - Planner";
+    var contact = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name='contact'><attribute name='fullname'/><attribute name='emailaddress1'/>" +
+        "<filter><condition attribute='emailaddress1' operator='not-null'/></filter></entity></fetch>"))
+        .Entities.FirstOrDefault();
+    if (contact == null)
+    {
+        Console.Error.WriteLine("No contact with a work email to test with.");
+        return 1;
+    }
+
+    var email = contact.GetAttributeValue<string>("emailaddress1").Trim();
+    Console.WriteLine($"Test subject: {contact.GetAttributeValue<string>("fullname")} <{email}>");
+
+    var held = RolesOf(svc, contact.Id);
+    Console.WriteLine($"  roles before: {(held.Count == 0 ? "(none)" : string.Join(", ", held))}");
+    if (held.Contains(probeRole))
+    {
+        Console.Error.WriteLine($"  {probeRole} is already held; pick a different probe role.");
+        return 1;
+    }
+
+    var assign = svc.Execute(new OrganizationRequest("al_AssignUserRole")
+    {
+        ["UserEmail"] = email,
+        ["RoleCode"] = probeRole,
+        // Sent empty rather than omitted: the platform's request validator refuses a call
+        // that leaves an optional Custom API parameter out entirely.
+        ["AppRole"] = string.Empty,
+        ["IdempotencyKey"] = "PROVE-ROLES-ASSIGN-" + Guid.NewGuid().ToString("N"),
+    });
+    var mappingId = (string)assign["MappingId"];
+    Console.WriteLine($"  al_AssignUserRole -> mapping {mappingId}");
+
+    var after = RolesOf(svc, contact.Id);
+    Console.WriteLine($"  roles after assign: {string.Join(", ", after)}");
+    var granted = after.Contains(probeRole);
+    Console.WriteLine(granted
+        ? "  ASSIGN: PASS - the web role association exists, not just a mapping row."
+        : "  ASSIGN: FAIL - the mapping row was written but no association was made.");
+
+    svc.Execute(new OrganizationRequest("al_SetRoleAssignmentActive")
+    {
+        ["MappingId"] = mappingId,
+        ["Active"] = false,
+        ["IdempotencyKey"] = "PROVE-ROLES-WITHDRAW-" + Guid.NewGuid().ToString("N"),
+    });
+
+    var withdrawn = RolesOf(svc, contact.Id);
+    Console.WriteLine($"  roles after withdraw: {(withdrawn.Count == 0 ? "(none)" : string.Join(", ", withdrawn))}");
+    var removed = !withdrawn.Contains(probeRole);
+    Console.WriteLine(removed
+        ? "  WITHDRAW: PASS - the association was removed, not just greyed out."
+        : "  WITHDRAW: FAIL - the person still holds the web role.");
+
+    // Clean up the mirror row the probe created, so the environment is left as found.
+    try { svc.Delete("al_userrolemapping", new Guid(mappingId)); Console.WriteLine("  cleanup: probe mapping deleted."); }
+    catch (Exception ex) { Console.Error.WriteLine("  cleanup failed: " + ex.Message); }
+
+    return granted && removed ? 0 : 2;
+}
+
+List<string> RolesOf(IOrganizationService svc, Guid contactId)
+{
+    var fetch =
+        "<fetch><entity name='contact'>" +
+          "<filter><condition attribute='contactid' operator='eq' value='" + contactId.ToString("D") + "'/></filter>" +
+          "<link-entity name='powerpagecomponent_mspp_webrole_contact' from='contactid' to='contactid' intersect='true'>" +
+            "<link-entity name='powerpagecomponent' from='powerpagecomponentid' to='powerpagecomponentid' alias='role'>" +
+              "<attribute name='name'/>" +
+            "</link-entity>" +
+          "</link-entity>" +
+        "</entity></fetch>";
+
+    return svc.RetrieveMultiple(new FetchExpression(fetch)).Entities
+        .Select(r => (r.GetAttributeValue<AliasedValue>("role.name")?.Value as string ?? string.Empty).Trim())
+        .Where(n => n.Length > 0)
+        .Distinct()
+        .ToList();
 }
 
 int Register(string[] a)

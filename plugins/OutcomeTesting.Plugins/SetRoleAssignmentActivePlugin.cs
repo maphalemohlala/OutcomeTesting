@@ -63,7 +63,8 @@ namespace OutcomeTesting.Plugins
             Entity before;
             try
             {
-                before = userService.Retrieve(MappingEntity, mappingId, new ColumnSet("al_useremail", "statecode"));
+                before = userService.Retrieve(
+                    MappingEntity, mappingId, new ColumnSet("al_useremail", "al_rolecode", "statecode"));
             }
             catch (System.ServiceModel.FaultException<OrganizationServiceFault>)
             {
@@ -75,6 +76,26 @@ namespace OutcomeTesting.Plugins
             var wasActive = CommandHelpers.IsActive(before);
 
             CommandHelpers.SetState(userService, MappingEntity, mappingId, active);
+
+            // The mirror row records the decision; the association is what actually grants
+            // the role. Withdrawing only the row would leave the person holding the web role
+            // on the portal while the app showed the assignment as withdrawn.
+            var roleCode = before.GetAttributeValue<string>("al_rolecode");
+            if (!string.IsNullOrWhiteSpace(roleCode) && !string.IsNullOrWhiteSpace(email))
+            {
+                if (active)
+                {
+                    var webRole = WebRoleRegistry.FindByName(systemService, roleCode.Trim());
+                    if (webRole != null)
+                    {
+                        AssignUserRolePlugin.AssociateWebRole(systemService, email, webRole.Id);
+                    }
+                }
+                else
+                {
+                    AssignUserRolePlugin.DisassociateWebRole(systemService, email, roleCode.Trim());
+                }
+            }
 
             var details = "Active " + wasActive + " -> " + active;
             var auditId = CommandHelpers.WriteAuditEvent(

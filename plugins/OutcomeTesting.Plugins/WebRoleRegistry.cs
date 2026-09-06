@@ -1,0 +1,141 @@
+using System;
+using System.Collections.Generic;
+using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
+
+namespace OutcomeTesting.Plugins
+{
+    /// <summary>
+    /// Power Pages web roles read as the application role vocabulary (AD-041, AD-044).
+    ///
+    /// This environment runs the enhanced portal data model, so the table is
+    /// <c>mspp_webrole</c> — a typed surface over <c>powerpagecomponent</c> — and not
+    /// <c>adx_webrole</c>. The contact link is the intersect
+    /// <c>powerpagecomponent_mspp_webrole_contact</c>, reached from the CONTACT side:
+    /// mspp_webrole carries no many-to-many of its own, which is why a query starting at
+    /// the role finds nothing.
+    ///
+    /// A web role travels through the existing <c>al_rolecode</c> text column, which
+    /// AD-044 already reserved for custom roles and which outranks the al_approle
+    /// picklist. Nothing in the schema changes to support this.
+    /// </summary>
+    public static class WebRoleRegistry
+    {
+        public const string RoleEntity = "mspp_webrole";
+        public const string NameAttr = "mspp_name";
+        public const string DescriptionAttr = "mspp_description";
+        public const string WebsiteAttr = "mspp_websiteid";
+        public const string AuthenticatedAttr = "mspp_authenticatedusersrole";
+        public const string AnonymousAttr = "mspp_anonymoususersrole";
+        public const string ContactRelationship = "powerpagecomponent_mspp_webrole_contact";
+
+        /// <summary>
+        /// Roles that exist to make Power Pages work rather than to describe a job. Offering
+        /// them as application roles would invite granting business access to "everyone who
+        /// is signed in", which is not a decision any requirement makes.
+        /// </summary>
+        private static readonly HashSet<string> SystemRoles =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "Anonymous Users",
+                "Authenticated Users",
+            };
+
+        public static bool IsSystemRole(string roleName)
+        {
+            return roleName != null && SystemRoles.Contains(roleName.Trim());
+        }
+
+        /// <summary>
+        /// The web role names associated with a contact.
+        ///
+        /// FetchXML rather than QueryExpression: mspp_webrole does not answer a plain
+        /// QueryExpression in this environment, and the join has to start at the contact
+        /// because the intersect hangs off contact, not off the role.
+        /// </summary>
+        public static List<string> RolesForContact(IOrganizationService service, Guid contactId)
+        {
+            var fetch =
+                "<fetch>" +
+                  "<entity name='contact'>" +
+                    "<attribute name='contactid'/>" +
+                    "<filter><condition attribute='contactid' operator='eq' value='" + contactId.ToString("D") + "'/></filter>" +
+                    "<link-entity name='" + ContactRelationship + "' from='contactid' to='contactid' intersect='true'>" +
+                      "<link-entity name='powerpagecomponent' from='powerpagecomponentid' to='powerpagecomponentid' alias='role'>" +
+                        "<attribute name='name'/>" +
+                      "</link-entity>" +
+                    "</link-entity>" +
+                  "</entity>" +
+                "</fetch>";
+
+            var names = new List<string>();
+            foreach (var row in service.RetrieveMultiple(new FetchExpression(fetch)).Entities)
+            {
+                var aliased = row.GetAttributeValue<AliasedValue>("role.name");
+                var name = aliased == null ? null : aliased.Value as string;
+                if (!string.IsNullOrWhiteSpace(name) && !names.Contains(name.Trim()))
+                {
+                    names.Add(name.Trim());
+                }
+            }
+
+            return names;
+        }
+
+        /// <summary>The contact carrying a work email, or null. Web roles hang off contacts.</summary>
+        public static Entity FindContactByEmail(IOrganizationService service, string email)
+        {
+            var query = new QueryExpression(ContactRegistry.Entity)
+            {
+                ColumnSet = new ColumnSet(ContactRegistry.FullNameAttr, ContactRegistry.EmailAttr),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition(ContactRegistry.EmailAttr, ConditionOperator.Equal, email);
+
+            var found = service.RetrieveMultiple(query).Entities;
+            return found.Count == 0 ? null : found[0];
+        }
+
+        /// <summary>
+        /// A web role by name. Matched on name because that is what al_rolecode carries and
+        /// what the permission rules reference.
+        /// </summary>
+        public static Entity FindByName(IOrganizationService service, string roleName)
+        {
+            // No `top` attribute: mspp_webrole ignores it and returns nothing.
+            var fetch =
+                "<fetch>" +
+                  "<entity name='" + RoleEntity + "'>" +
+                    "<attribute name='" + NameAttr + "'/>" +
+                    "<attribute name='" + WebsiteAttr + "'/>" +
+                    "<filter><condition attribute='" + NameAttr + "' operator='eq' value='" +
+                      System.Security.SecurityElement.Escape(roleName) + "'/></filter>" +
+                  "</entity>" +
+                "</fetch>";
+
+            var found = service.RetrieveMultiple(new FetchExpression(fetch)).Entities;
+            return found.Count == 0 ? null : found[0];
+        }
+
+        /// <summary>The website every web role belongs to, taken from any existing role.</summary>
+        public static EntityReference AnyWebsite(IOrganizationService service)
+        {
+            var fetch =
+                "<fetch><entity name='" + RoleEntity + "'>" +
+                  "<attribute name='" + WebsiteAttr + "'/>" +
+                "</entity></fetch>";
+
+            foreach (var role in service.RetrieveMultiple(new FetchExpression(fetch)).Entities)
+            {
+                var website = role.GetAttributeValue<EntityReference>(WebsiteAttr);
+                if (website != null)
+                {
+                    return website;
+                }
+            }
+
+            return null;
+        }
+    }
+}

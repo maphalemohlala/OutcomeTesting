@@ -14,7 +14,7 @@ import {
   setPermissionRuleActive,
   setRoleAssignmentActive,
 } from '../../services/commands/permissions';
-import { ACCESS_LEVELS, APP_ROLES, RESOURCE_KEYS, type AppRole } from '../../types/permissions';
+import { ACCESS_LEVELS, RESOURCE_KEYS } from '../../types/permissions';
 import './SecurityConfigPage.css';
 
 type Notice = { tone: 'ok' | 'error'; message: string } | null;
@@ -53,14 +53,14 @@ export function SecurityConfigPage() {
   const [editingRole, setEditingRole] = useState<RoleRow | null>(null);
 
   const [email, setEmail] = useState('');
-  const [assignRole, setAssignRole] = useState<string>(`builtin:${APP_ROLES[0]}`);
+  const [assignRole, setAssignRole] = useState<string>('');
   const [assignBusy, setAssignBusy] = useState(false);
   const [assignNotice, setAssignNotice] = useState<Notice>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   /** Set when the assign form is changing an existing assignment, so the old one is withdrawn. */
   const [replacing, setReplacing] = useState<RoleMappingRow | null>(null);
 
-  const [permRole, setPermRole] = useState<string>(`builtin:${APP_ROLES[0]}`);
+  const [permRole, setPermRole] = useState<string>('');
   const [resource, setResource] = useState<string>(RESOURCE_KEYS[0]);
   const [level, setLevel] = useState<string>(ACCESS_LEVELS[1]);
   const [permBusy, setPermBusy] = useState(false);
@@ -70,15 +70,22 @@ export function SecurityConfigPage() {
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [rowNotice, setRowNotice] = useState<Notice>(null);
 
-  // Built-in roles use the al_approle picklist; custom roles (AD-044) enforce by al_role code.
-  const roleOptions: RoleOption[] = [
-    ...APP_ROLES.map((role) => ({ value: `builtin:${role}`, label: role, custom: false })),
-    ...(roles.status === 'ready'
-      ? roles.roles
-          .filter((role) => role.active && !APP_ROLES.includes(role.name as AppRole))
-          .map((role) => ({ value: `custom:${role.code}`, label: `${role.name} (custom)`, custom: true }))
-      : []),
-  ];
+  // Every role is a Power Pages web role, and its name is the code that assignments and
+  // permission rules match on (al_rolecode, AD-044). The al_approle picklist is no longer
+  // offered — the server still reads it, so anything already assigned by it keeps working,
+  // but new configuration is written against the web roles the portal actually enforces.
+  const roleOptions: RoleOption[] = roles.status === 'ready'
+    ? roles.roles
+        .filter((role) => role.active)
+        .map((role) => ({ value: `custom:${role.code}`, label: role.name, custom: true }))
+    : [];
+
+  // The role list is not known at first render, so the selections fall back to the first
+  // option rather than being synced into state by an effect — deriving avoids the cascading
+  // render that syncing causes, and keeps an explicit choice once one is made.
+  const firstRole = roleOptions.length > 0 ? roleOptions[0].value : '';
+  const selectedAssignRole = assignRole || firstRole;
+  const selectedPermRole = permRole || firstRole;
 
   function reloadConfig() {
     setReloadKey((k) => k + 1);
@@ -100,7 +107,7 @@ export function SecurityConfigPage() {
     setAssignBusy(true);
     setAssignNotice(null);
 
-    const { appRole, roleCode, label } = roleArgs(assignRole);
+    const { appRole, roleCode, label } = roleArgs(selectedAssignRole);
     const token = `assign:${email.trim().toLowerCase()}:${label}`;
     const result = await assignUserRole({
       userEmail: email.trim(),
@@ -144,8 +151,11 @@ export function SecurityConfigPage() {
 
   function openPermission(existing: PagePermissionRow | null) {
     if (existing) {
-      const known = APP_ROLES.includes(existing.role as AppRole);
-      setPermRole(known ? `builtin:${existing.role}` : `custom:${existing.role}`);
+      // Every role now enforces by code, so an existing rule reopens as a code selection
+      // whether it was written against a web role or an older custom role. A rule still
+      // carrying an al_approle label has no matching option and falls back to the first,
+      // which is honest: it cannot be re-saved as a picklist role from here any more.
+      setPermRole(`custom:${existing.role}`);
       setResource(existing.resource);
       setLevel(existing.level);
     }
@@ -158,7 +168,7 @@ export function SecurityConfigPage() {
     setPermBusy(true);
     setPermNotice(null);
 
-    const { appRole, roleCode, label } = roleArgs(permRole);
+    const { appRole, roleCode, label } = roleArgs(selectedPermRole);
     const token = `perm:${label}:${resource}:${level}`;
     const result = await setPagePermission({
       appRole,
@@ -396,7 +406,7 @@ export function SecurityConfigPage() {
             </label>
             <label className="security__field">
               <span>Role</span>
-              <select value={assignRole} onChange={(e) => setAssignRole(e.target.value)}>
+              <select value={selectedAssignRole} onChange={(e) => setAssignRole(e.target.value)}>
                 {roleOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -440,7 +450,7 @@ export function SecurityConfigPage() {
           <form className="security__form" onSubmit={onSetPermission}>
             <label className="security__field">
               <span>Role</span>
-              <select value={permRole} onChange={(e) => setPermRole(e.target.value)}>
+              <select value={selectedPermRole} onChange={(e) => setPermRole(e.target.value)}>
                 {roleOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}

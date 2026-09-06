@@ -40,8 +40,13 @@ export function assignUserRole(input: AssignUserRoleInput): Promise<CommandResul
     UserEmail: input.userEmail,
     IdempotencyKey: input.idempotencyKey,
   };
-  if (input.roleCode) body.RoleCode = input.roleCode;
-  else if (input.appRole) body.AppRole = input.appRole;
+  // Both keys are always sent, with the unused one empty. The Custom API declares them
+  // optional, but the platform's request validator still refused a call that omitted
+  // AppRole entirely — which is every web role assignment. The plug-in branches on
+  // RoleCode first and treats an empty string as absent, so this changes nothing
+  // server-side and stops the refusal.
+  body.RoleCode = input.roleCode ?? '';
+  body.AppRole = input.roleCode ? '' : (input.appRole ?? '');
   return executeCommand<AssignUserRoleOutput>('al_AssignUserRole', body);
 }
 
@@ -53,8 +58,8 @@ export function setPagePermission(
     AccessLevel: input.accessLevel,
     IdempotencyKey: input.idempotencyKey,
   };
-  if (input.roleCode) body.RoleCode = input.roleCode;
-  else if (input.appRole) body.AppRole = input.appRole;
+  body.RoleCode = input.roleCode ?? '';
+  body.AppRole = input.roleCode ? '' : (input.appRole ?? '');
   return executeCommand<SetPagePermissionOutput>('al_SetPagePermission', body);
 }
 

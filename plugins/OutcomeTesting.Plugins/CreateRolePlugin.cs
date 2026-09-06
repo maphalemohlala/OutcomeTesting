@@ -7,7 +7,8 @@ namespace OutcomeTesting.Plugins
     /// <summary>
     /// Server-side command CreateRole (AD-003, AD-041, AD-044). Registered against the
     /// Custom API <c>al_CreateRole</c>. An Administrator adds a role to the extensible role
-    /// registry (al_role). Enforces the caller holds Manage on <c>permission.manage</c>,
+    /// registry, which is the Power Pages web roles (see <see cref="WebRoleRegistry"/>).
+    /// Enforces the caller holds Manage on <c>permission.manage</c>,
     /// upserts the role on its business code (idempotent, NFR-REL-01) and writes an
     /// immutable Audit Event (BR-012, NFR-AUD-01).
     /// </summary>
@@ -54,24 +55,50 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            var code = "ROLE-" + Slug(roleName);
-            var role = new Entity(RoleEntity)
+            // The role name IS the code. Permission rules and role assignments both match
+            // on al_rolecode, and a web role has no separate business key, so deriving a
+            // slug would put a second identifier in play that nothing else references.
+            var existing = WebRoleRegistry.FindByName(systemService, roleName);
+            Guid roleId;
+            if (existing != null)
             {
-                ["al_name"] = roleName,
-                ["al_rolecode"] = code,
-                ["al_isactive"] = true,
-                ["statecode"] = new OptionSetValue(0),
-                ["statuscode"] = new OptionSetValue(1),
-            };
-            if (!string.IsNullOrWhiteSpace(description))
+                // Same name, same role: the idempotent re-run. Only the description moves.
+                roleId = existing.Id;
+                if (!string.IsNullOrWhiteSpace(description))
+                {
+                    userService.Update(new Entity(WebRoleRegistry.RoleEntity, roleId)
+                    {
+                        [WebRoleRegistry.DescriptionAttr] = description.Trim(),
+                    });
+                }
+            }
+            else
             {
-                role["al_description"] = description.Trim();
+                var website = WebRoleRegistry.AnyWebsite(systemService);
+                if (website == null)
+                {
+                    throw new InvalidPluginExecutionException(
+                        CommandHelpers.PreconditionPrefix +
+                        "No Power Pages website was found, so a web role cannot be created.");
+                }
+
+                var role = new Entity(WebRoleRegistry.RoleEntity)
+                {
+                    [WebRoleRegistry.NameAttr] = roleName,
+                    [WebRoleRegistry.WebsiteAttr] = website,
+                    [WebRoleRegistry.AuthenticatedAttr] = false,
+                    [WebRoleRegistry.AnonymousAttr] = false,
+                };
+                if (!string.IsNullOrWhiteSpace(description))
+                {
+                    role[WebRoleRegistry.DescriptionAttr] = description.Trim();
+                }
+
+                roleId = userService.Create(role);
             }
 
-            var roleId = AssignUserRolePlugin.Upsert(userService, RoleEntity, "al_rolecode", code, role);
-
             var auditId = CommandHelpers.WriteAuditEvent(
-                systemService, CommandCreateRole, "CreateRole " + code, RoleEntity, roleId,
+                systemService, CommandCreateRole, "CreateRole " + roleName, WebRoleRegistry.RoleEntity, roleId,
                 roleName, description, idempotencyKey, context);
 
             SetResponse(context, roleId.ToString("D"), "Created", auditId, false);

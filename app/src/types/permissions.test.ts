@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   accessMeets,
+  APP_ROLES,
   can,
   DEFAULT_PERMISSIONS,
   levelFor,
@@ -26,39 +27,39 @@ describe('resolvePermissions', () => {
   });
 
   it('gives the Administrator Manage on the security page and permission model', () => {
-    const set = resolvePermissions(['Administrator']);
+    const set = resolvePermissions(['AL Portal - Portal Administrator']);
     expect(can(set, 'page.admin.security', 'Manage')).toBe(true);
     expect(can(set, 'permission.manage', 'Manage')).toBe(true);
     expect(can(set, 'page.admin.questions', 'Manage')).toBe(true);
   });
 
   it('lets only the T&C Manager (or escalation) regrade and sign off', () => {
-    expect(can(resolvePermissions(['T&C Manager']), 'command.regrade', 'Edit')).toBe(true);
-    expect(can(resolvePermissions(['T&C Manager']), 'command.signoff', 'Edit')).toBe(true);
-    expect(can(resolvePermissions(['Adviser']), 'command.regrade', 'Edit')).toBe(false);
-    expect(can(resolvePermissions(['AQS Checker']), 'command.signoff', 'Edit')).toBe(false);
+    expect(can(resolvePermissions(['AL Portal - T&C Supervisor']), 'command.regrade', 'Edit')).toBe(true);
+    expect(can(resolvePermissions(['AL Portal - T&C Supervisor']), 'command.signoff', 'Edit')).toBe(true);
+    expect(can(resolvePermissions(['AL Portal - Adviser Remediation']), 'command.regrade', 'Edit')).toBe(false);
+    expect(can(resolvePermissions(['AL Portal - AQS Reviewer']), 'command.signoff', 'Edit')).toBe(false);
   });
 
   it('lets the Adviser complete their own remediation but not manage exports', () => {
-    const set = resolvePermissions(['Adviser']);
+    const set = resolvePermissions(['AL Portal - Adviser Remediation']);
     expect(can(set, 'remediation.complete', 'Edit')).toBe(true);
     expect(can(set, 'page.exports', 'Manage')).toBe(false);
   });
 
   it('takes the highest level across multiple roles', () => {
-    const set = resolvePermissions(['AQS Checker', 'T&C Manager']);
+    const set = resolvePermissions(['AL Portal - AQS Reviewer', 'AL Portal - T&C Supervisor']);
     // AQS Checker has View on cases, T&C Manager has Edit; the higher wins.
     expect(levelFor(set, 'page.cases')).toBe('Edit');
   });
 
   it('honours a custom rule set over the defaults', () => {
-    const rules = [{ role: 'Adviser' as AppRole, resource: 'page.exports' as const, level: 'Manage' as const }];
-    const set = resolvePermissions(['Adviser'], rules);
+    const rules = [{ role: 'AL Portal - Adviser Remediation' as AppRole, resource: 'page.exports' as const, level: 'Manage' as const }];
+    const set = resolvePermissions(['AL Portal - Adviser Remediation'], rules);
     expect(can(set, 'page.exports', 'Manage')).toBe(true);
   });
 
   it('gives every role at least a dashboard view', () => {
-    for (const role of ['Tax Checker', 'AQS Checker', 'Adviser', 'T&C Manager', 'Outcome Testing Manager', 'Administrator'] as AppRole[]) {
+    for (const role of APP_ROLES) {
       expect(can(resolvePermissions([role]), 'page.dashboard', 'View')).toBe(true);
     }
   });
@@ -81,29 +82,47 @@ describe('pageResourceForPath', () => {
 
 describe('DEFAULT_PERMISSIONS integrity', () => {
   it('never grants the Adviser access to the security admin page', () => {
-    expect(can(resolvePermissions(['Adviser']), 'page.admin.security')).toBe(false);
+    expect(can(resolvePermissions(['AL Portal - Adviser Remediation']), 'page.admin.security')).toBe(false);
   });
 
-  it('only the Administrator can manage the permission model', () => {
+  it('only the administrative roles can manage the permission model', () => {
+    // Two roles carry administration: the portal's own administrator role and the Power
+    // Pages built-in that real administrators already hold. Dropping the built-in would
+    // have locked out the accounts currently configuring the system.
+    const admins = ['AL Portal - Portal Administrator', 'Administrators'];
     const managers = DEFAULT_PERMISSIONS.filter(
       (r) => r.resource === 'permission.manage' && accessMeets(r.level, 'Manage'),
     );
-    expect(managers.every((r) => r.role === 'Administrator')).toBe(true);
-    expect(managers.length).toBeGreaterThan(0);
+    expect(managers.every((r) => admins.includes(r.role))).toBe(true);
+    expect(managers.length).toBe(admins.length);
   });
 
   // The remediation route is gated on page.remediation; without these the oversight roles
   // would silently lose the access they had while the route was ungated.
   it('lets the oversight roles view remediation without being able to complete it', () => {
-    for (const role of ['Outcome Testing Manager', 'Administrator'] as AppRole[]) {
+    for (const role of ['AL Portal - Outcome Testing Manager', 'AL Portal - Portal Administrator'] as AppRole[]) {
       const set = resolvePermissions([role]);
       expect(can(set, 'page.remediation')).toBe(true);
       expect(can(set, 'remediation.complete', 'Edit')).toBe(false);
     }
   });
 
+  it('gives the Planner sight of the work and no authority over it', () => {
+    // No requirement describes this role, so it deliberately holds View and nothing more.
+    const set = resolvePermissions(['AL Portal - Planner']);
+    expect(can(set, 'page.cases')).toBe(true);
+    expect(can(set, 'page.cases', 'Edit')).toBe(false);
+    expect(can(set, 'command.assign', 'Edit')).toBe(false);
+    expect(can(set, 'permission.manage', 'Manage')).toBe(false);
+  });
+
+  it('excludes the Power Pages system roles from the vocabulary', () => {
+    expect(APP_ROLES).not.toContain('Authenticated Users');
+    expect(APP_ROLES).not.toContain('Anonymous Users');
+  });
+
   it('lets the Adviser and T&C Manager work remediation', () => {
-    for (const role of ['Adviser', 'T&C Manager'] as AppRole[]) {
+    for (const role of ['AL Portal - Adviser Remediation', 'AL Portal - T&C Supervisor'] as AppRole[]) {
       expect(can(resolvePermissions([role]), 'page.remediation', 'Edit')).toBe(true);
     }
   });

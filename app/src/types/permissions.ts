@@ -8,20 +8,48 @@
  * vocabulary. Do not add a role or capability here without a requirement/AD ID.
  */
 
-/** App roles, reused from AD-020/AD-031 rather than invented (rule 4). */
+/**
+ * App roles are the Power Pages web roles (AD-041, AD-044). The list here is the
+ * vocabulary the permission matrix is written against; the live list the app offers comes
+ * from mspp_webrole, so a role added on the portal appears without a code change.
+ *
+ * These names travel through al_rolecode — the free-text column AD-044 reserved for custom
+ * roles, which already outranks the al_approle picklist — so nothing in the schema changed
+ * to support them.
+ */
 export const APP_ROLES = [
-  'Tax Checker',
-  'AQS Checker',
-  'Adviser',
-  'T&C Manager',
-  'Outcome Testing Manager',
-  'Administrator',
+  'AL Portal - Tax Reviewer',
+  'AL Portal - AQS Reviewer',
+  'AL Portal - Adviser Remediation',
+  'AL Portal - T&C Supervisor',
+  'AL Portal - Outcome Testing Manager',
+  'AL Portal - Planner',
+  'AL Portal - Portal Administrator',
+  'Administrators',
 ] as const;
 
 export type AppRole = (typeof APP_ROLES)[number];
 
-/** Dataverse option values for al_approle (AD-041, block 1209107 60-65). */
-export const APP_ROLE_VALUES: Record<AppRole, number> = {
+/**
+ * Web roles that exist to make Power Pages work rather than to describe a job. Excluded
+ * from the app's role list: granting business access to "everyone who is signed in" is not
+ * a decision any requirement makes.
+ */
+export const SYSTEM_WEB_ROLES: readonly string[] = ['Anonymous Users', 'Authenticated Users'];
+
+export function isSystemWebRole(name: string): boolean {
+  return SYSTEM_WEB_ROLES.some((role) => role.toLowerCase() === name.trim().toLowerCase());
+}
+
+/**
+ * The six role names the al_approle picklist holds (AD-041, block 1209107 60-65).
+ *
+ * Retained only to label rows that already carry al_approle. The picklist is no longer
+ * offered when assigning or when writing a permission rule — web roles are the vocabulary —
+ * but the server still reads it, so an existing assignment keeps working and nothing is
+ * silently revoked.
+ */
+export const LEGACY_APP_ROLE_VALUES: Record<string, number> = {
   'Tax Checker': 120910760,
   'AQS Checker': 120910761,
   Adviser: 120910762,
@@ -30,10 +58,10 @@ export const APP_ROLE_VALUES: Record<AppRole, number> = {
   Administrator: 120910765,
 };
 
-/** Reverse of APP_ROLE_VALUES: al_approle option value to role label. */
-export const APP_ROLE_BY_VALUE: Record<number, AppRole> = Object.fromEntries(
-  (Object.entries(APP_ROLE_VALUES) as [AppRole, number][]).map(([role, value]) => [value, role]),
-) as Record<number, AppRole>;
+/** Reverse of LEGACY_APP_ROLE_VALUES: al_approle option value to role label. */
+export const APP_ROLE_BY_VALUE: Record<number, string> = Object.fromEntries(
+  Object.entries(LEGACY_APP_ROLE_VALUES).map(([role, value]) => [value, role]),
+);
 
 /**
  * Resource keys the permission model governs. Page keys gate navigation and
@@ -119,45 +147,54 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   // Everyone who can sign in sees their own work.
   ...APP_ROLES.map((role) => ({ role, resource: 'page.dashboard' as ResourceKey, level: 'View' as AccessLevel })),
 
-  // Tax + AQS checkers work cases and reviews.
-  { role: 'Tax Checker', resource: 'page.cases', level: 'View' },
-  { role: 'Tax Checker', resource: 'page.reviews', level: 'Edit' },
-  { role: 'AQS Checker', resource: 'page.cases', level: 'View' },
-  { role: 'AQS Checker', resource: 'page.reviews', level: 'Edit' },
+  // Tax + AQS reviewers work cases and reviews (AD-020 section ownership).
+  { role: 'AL Portal - Tax Reviewer', resource: 'page.cases', level: 'View' },
+  { role: 'AL Portal - Tax Reviewer', resource: 'page.reviews', level: 'Edit' },
+  { role: 'AL Portal - AQS Reviewer', resource: 'page.cases', level: 'View' },
+  { role: 'AL Portal - AQS Reviewer', resource: 'page.reviews', level: 'Edit' },
 
   // Advisers own remediation (AD-020, BR-006).
-  { role: 'Adviser', resource: 'page.remediation', level: 'Edit' },
-  { role: 'Adviser', resource: 'remediation.complete', level: 'Edit' },
+  { role: 'AL Portal - Adviser Remediation', resource: 'page.remediation', level: 'Edit' },
+  { role: 'AL Portal - Adviser Remediation', resource: 'remediation.complete', level: 'Edit' },
 
-  // T&C Manager owns outcome corrections and sign-off (AD-031).
-  { role: 'T&C Manager', resource: 'page.cases', level: 'Edit' },
-  { role: 'T&C Manager', resource: 'page.remediation', level: 'Edit' },
-  { role: 'T&C Manager', resource: 'page.reports', level: 'View' },
-  { role: 'T&C Manager', resource: 'command.regrade', level: 'Edit' },
-  { role: 'T&C Manager', resource: 'command.signoff', level: 'Edit' },
-  { role: 'T&C Manager', resource: 'command.assign', level: 'Edit' },
+  // T&C Supervisor owns outcome corrections and sign-off (AD-031).
+  { role: 'AL Portal - T&C Supervisor', resource: 'page.cases', level: 'Edit' },
+  { role: 'AL Portal - T&C Supervisor', resource: 'page.remediation', level: 'Edit' },
+  { role: 'AL Portal - T&C Supervisor', resource: 'page.reports', level: 'View' },
+  { role: 'AL Portal - T&C Supervisor', resource: 'command.regrade', level: 'Edit' },
+  { role: 'AL Portal - T&C Supervisor', resource: 'command.signoff', level: 'Edit' },
+  { role: 'AL Portal - T&C Supervisor', resource: 'command.assign', level: 'Edit' },
 
-  // Outcome Testing Manager runs intake, allocation, reporting and exports.
-  { role: 'Outcome Testing Manager', resource: 'page.cases', level: 'Edit' },
-  { role: 'Outcome Testing Manager', resource: 'page.imports', level: 'Edit' },
-  { role: 'Outcome Testing Manager', resource: 'page.remediation', level: 'View' },
-  { role: 'Outcome Testing Manager', resource: 'page.reports', level: 'View' },
-  { role: 'Outcome Testing Manager', resource: 'page.exports', level: 'Manage' },
-  { role: 'Outcome Testing Manager', resource: 'command.assign', level: 'Edit' },
-  { role: 'Outcome Testing Manager', resource: 'export.generate', level: 'Edit' },
+  // Outcome Testing Manager runs intake, allocation, reporting and exports (AD-040).
+  { role: 'AL Portal - Outcome Testing Manager', resource: 'page.cases', level: 'Edit' },
+  { role: 'AL Portal - Outcome Testing Manager', resource: 'page.imports', level: 'Edit' },
+  { role: 'AL Portal - Outcome Testing Manager', resource: 'page.remediation', level: 'View' },
+  { role: 'AL Portal - Outcome Testing Manager', resource: 'page.reports', level: 'View' },
+  { role: 'AL Portal - Outcome Testing Manager', resource: 'page.exports', level: 'Manage' },
+  { role: 'AL Portal - Outcome Testing Manager', resource: 'command.assign', level: 'Edit' },
+  { role: 'AL Portal - Outcome Testing Manager', resource: 'export.generate', level: 'Edit' },
 
-  // Administrator manages configuration and the permission model itself.
-  { role: 'Administrator', resource: 'page.cases', level: 'View' },
-  { role: 'Administrator', resource: 'page.imports', level: 'Edit' },
-  { role: 'Administrator', resource: 'page.remediation', level: 'View' },
-  { role: 'Administrator', resource: 'page.reports', level: 'View' },
-  { role: 'Administrator', resource: 'page.exports', level: 'Manage' },
-  { role: 'Administrator', resource: 'page.admin.questions', level: 'Manage' },
-  { role: 'Administrator', resource: 'page.admin.security', level: 'Manage' },
-  { role: 'Administrator', resource: 'page.admin.users', level: 'Manage' },
-  { role: 'Administrator', resource: 'question.retire', level: 'Edit' },
-  { role: 'Administrator', resource: 'export.generate', level: 'Edit' },
-  { role: 'Administrator', resource: 'permission.manage', level: 'Manage' },
+  // Planner has no predecessor among the AD-020/AD-031 roles and no requirement describes
+  // it, so it gets sight of the work and nothing more. Inventing authority for it would be
+  // inventing a business rule (AGENTS.md rule 4); widening it is a decision-log entry.
+  { role: 'AL Portal - Planner', resource: 'page.cases', level: 'View' },
+
+  // Portal Administrator and Administrators both manage configuration and the permission
+  // model. Two roles carry it because Administrators is the Power Pages built-in that real
+  // administrators already hold, and dropping it would lock the current admins out.
+  ...(['AL Portal - Portal Administrator', 'Administrators'] as const).flatMap((role) => [
+    { role, resource: 'page.cases' as ResourceKey, level: 'View' as AccessLevel },
+    { role, resource: 'page.imports' as ResourceKey, level: 'Edit' as AccessLevel },
+    { role, resource: 'page.remediation' as ResourceKey, level: 'View' as AccessLevel },
+    { role, resource: 'page.reports' as ResourceKey, level: 'View' as AccessLevel },
+    { role, resource: 'page.exports' as ResourceKey, level: 'Manage' as AccessLevel },
+    { role, resource: 'page.admin.questions' as ResourceKey, level: 'Manage' as AccessLevel },
+    { role, resource: 'page.admin.security' as ResourceKey, level: 'Manage' as AccessLevel },
+    { role, resource: 'page.admin.users' as ResourceKey, level: 'Manage' as AccessLevel },
+    { role, resource: 'question.retire' as ResourceKey, level: 'Edit' as AccessLevel },
+    { role, resource: 'export.generate' as ResourceKey, level: 'Edit' as AccessLevel },
+    { role, resource: 'permission.manage' as ResourceKey, level: 'Manage' as AccessLevel },
+  ]),
 ];
 
 /** Collapse a set of rules for one or more roles into the highest level per resource. */
