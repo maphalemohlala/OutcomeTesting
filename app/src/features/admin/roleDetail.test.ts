@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRoleGrants, buildRoleHolders } from './roleDetail';
+import { buildRoleGrants, buildRoleHolders, classifyHolder } from './roleDetail';
 import type { PagePermissionRow, RoleMappingRow } from './useSecurityConfig';
 
 const TAX = 'AL Portal - Tax Reviewer';
@@ -150,5 +150,59 @@ describe('buildRoleHolders', () => {
 
     expect(holders).toHaveLength(1);
     expect(holders[0].email).toBe('');
+  });
+});
+
+describe('classifyHolder', () => {
+  const base = {
+    email: 'a@ascotlloyd.co.uk',
+    name: 'A Person',
+    mappingId: 'map-1' as string | null,
+    mappingActive: true as boolean | null,
+    associated: true,
+  };
+
+  it('reports an assignment made in the app as needing nothing', () => {
+    const result = classifyHolder(base);
+    expect(result.state).toBe('consistent');
+    expect(result.canAdopt).toBe(false);
+    expect(result.canRevoke).toBe(false);
+  });
+
+  it('reports a grant made only in Power Pages as unadopted', () => {
+    const result = classifyHolder({ ...base, mappingId: null, mappingActive: null });
+    expect(result.state).toBe('portal-only');
+    expect(result.canAdopt).toBe(true);
+    expect(result.canRevoke).toBe(true);
+  });
+
+  it('reports a withdrawn assignment that is still granted', () => {
+    // The dangerous one: the app says withdrawn and the access is live.
+    const result = classifyHolder({ ...base, mappingActive: false });
+    expect(result.state).toBe('withdrawn-still-granted');
+    expect(result.canRevoke).toBe(true);
+  });
+
+  it('reports an assignment whose association was removed elsewhere', () => {
+    const result = classifyHolder({ ...base, associated: false });
+    expect(result.state).toBe('association-missing');
+    expect(result.canAdopt).toBe(true);
+  });
+
+  it('gives every state a label that says what is true, not what is wrong', () => {
+    const states = [
+      classifyHolder(base),
+      classifyHolder({ ...base, mappingId: null, mappingActive: null }),
+      classifyHolder({ ...base, mappingActive: false }),
+      classifyHolder({ ...base, associated: false }),
+    ];
+    expect(new Set(states.map((s) => s.label)).size).toBe(4);
+    expect(states.every((s) => s.label.length > 0)).toBe(true);
+  });
+
+  it('treats a withdrawn assignment with no association as fully withdrawn', () => {
+    const result = classifyHolder({ ...base, mappingActive: false, associated: false });
+    expect(result.state).toBe('consistent');
+    expect(result.canAdopt).toBe(false);
   });
 });

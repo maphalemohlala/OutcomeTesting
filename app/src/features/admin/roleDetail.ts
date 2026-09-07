@@ -128,3 +128,74 @@ export function buildRoleHolders(
         a.email.localeCompare(b.email),
     );
 }
+
+/** One person's relationship to one role, as al_GetRoleHolders reports it. */
+export interface RoleHolderRecord {
+  email: string;
+  name: string | null;
+  /** Null when no mapping row exists — the role was granted in Power Pages only. */
+  mappingId: string | null;
+  mappingActive: boolean | null;
+  associated: boolean;
+}
+
+export type HolderState =
+  | 'consistent'
+  | 'portal-only'
+  | 'withdrawn-still-granted'
+  | 'association-missing';
+
+export interface HolderClassification {
+  state: HolderState;
+  label: string;
+  canAdopt: boolean;
+  canRevoke: boolean;
+}
+
+/**
+ * What the two sources say, and what an administrator can do about it (AD-089).
+ *
+ * Adopt converges on granted and Revoke converges on not granted, so a state offers the
+ * action that would make the two sources agree — and a state where they already agree
+ * offers neither.
+ *
+ * A withdrawn mapping with no association is `consistent`: both sources say the person
+ * does not hold the role, which is exactly what a completed withdrawal looks like.
+ */
+export function classifyHolder(record: RoleHolderRecord): HolderClassification {
+  const held = record.mappingActive === true;
+
+  if (record.mappingId === null && record.associated) {
+    return {
+      state: 'portal-only',
+      label: 'Granted in Power Pages, not adopted',
+      canAdopt: true,
+      canRevoke: true,
+    };
+  }
+
+  if (record.mappingActive === false && record.associated) {
+    return {
+      state: 'withdrawn-still-granted',
+      label: 'Withdrawn in app, still granted',
+      canAdopt: true,
+      canRevoke: true,
+    };
+  }
+
+  if (held && !record.associated) {
+    return {
+      state: 'association-missing',
+      label: 'Assigned in app, association missing',
+      canAdopt: true,
+      canRevoke: true,
+    };
+  }
+
+  return {
+    state: 'consistent',
+    label: held ? 'Assigned in app' : 'Withdrawn',
+    canAdopt: false,
+    canRevoke: false,
+  };
+}
