@@ -115,7 +115,12 @@
 
 <ul class="ot-tiles">
   <li>
-    <a class="ot-tile" href="/cases">
+    {% comment %}
+      Scoped, because the count above is scoped. This tile used to link to /cases, which
+      renders every case in the environment - a tile reading nine that opened a list of
+      thirteen. The list honours ?mine=1 and offers All cases as a deliberate second click.
+    {% endcomment %}
+    <a class="ot-tile" href="/cases?mine=1">
       <span class="ot-tile__count">{{ total_cases }}</span>
       <span class="ot-tile__label">My cases</span>
     </a>

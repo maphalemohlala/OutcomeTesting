@@ -1198,75 +1198,39 @@ adx_webtemplate:
   CheckSum: f5338dfed0c0569789a9741ef1877403ed27b9f0dc21d85409b0b7af6fea99da
   IsDeleted: false
 annotation:
-- RecordId: 14dff71e-99a3-f111-aaac-e4fade069307
-  DisplayName: robots.txt
-  CheckSum: 816ebec604248bc467fbf8e89fdd68f11b6e5b9a418872278c8edf41c792907e
-  IsDeleted: false
-- RecordId: 19dff71e-99a3-f111-aaac-e4fade069307
-  DisplayName: Circle-3.png
-  CheckSum: cc25601618f10be006171c9dd8a341ec8321a0d9cd3f62113dbde24d85769258
-  IsDeleted: false
-- RecordId: 1fdff71e-99a3-f111-aaac-e4fade069307
-  DisplayName: Cat-PC.png
-  CheckSum: 667ae3d2227e352c6117921d726a7a7e0b53bcf0aecfb22c59e0321d18fd43b0
-  IsDeleted: false
-- RecordId: 20dff71e-99a3-f111-aaac-e4fade069307
-  DisplayName: theme.css
-  CheckSum: cce62722fc5aaa146cdcfa97d3b9581e904c8c24e3728af9e667735ecfa2e453
-  IsDeleted: false
-- RecordId: 34dff71e-99a3-f111-aaac-e4fade069307
-  DisplayName: PWALogo.png
-  CheckSum: 1aba48b2f94fea43f7dac8861bb5baec6026a948b86b17a390692dda9cd04853
-  IsDeleted: false
-- RecordId: 38dff71e-99a3-f111-aaac-e4fade069307
-  DisplayName: bootstrap.min.css
-  CheckSum: 13d4302834e01e642fb08117c0a09f04afada16826b489efe4247dac92fa42f2
-  IsDeleted: false
-- RecordId: 41dff71e-99a3-f111-aaac-e4fade069307
-  DisplayName: Circle-1.png
-  CheckSum: 311ba6267a85310aa26825d6da8e68adbb6f85490e575b63e89b1d8a33e95f55
-  IsDeleted: false
-- RecordId: 47dff71e-99a3-f111-aaac-e4fade069307
-  DisplayName: OfflinePage.png
-  CheckSum: 2e5c77073369ced8ce2eec41adf26cb1fc72d2e2a4a808f119b93cb22fbaa1b5
-  IsDeleted: false
-- RecordId: 4fdff71e-99a3-f111-aaac-e4fade069307
-  DisplayName: Site-mockup-1.png
-  CheckSum: ee637e2f746d6e82fb42d73a7f9920634de855a1e8617a1748c050e6b398e39e
-  IsDeleted: false
-- RecordId: 5140384b-f6a3-f111-aaac-e4fade069307
-  DisplayName: outcome-testing.css
-  CheckSum: ae2763cecd0f06a28fb9fcc0094d33140c8084816926e0c33466d1944296a520
-  IsDeleted: false
-- RecordId: 58dff71e-99a3-f111-aaac-e4fade069307
-  DisplayName: Geometric-2.png
-  CheckSum: deec3ddef66d1a8b0e752ea6088213a785423398d29a0a2eaf91f144ce2d5f86
-  IsDeleted: false
-- RecordId: 5adff71e-99a3-f111-aaac-e4fade069307
+- RecordId: 823f2757-3ea8-f111-aaac-e4fade069307
   DisplayName: Logo-sm-64.png
-  CheckSum: b104eb0f1f20181b995e0ae539ec91c9080e202547421107f99e407cd4624175
+  CheckSum: f53082c338db20e335c0d33d9fd30573c412ec0a5c9ed0219be7b61a140d2ee2
   IsDeleted: false
-- RecordId: 6edff71e-99a3-f111-aaac-e4fade069307
-  DisplayName: Geometric-4.png
-  CheckSum: 66cf6ba56f11cc9abdf0ba17137a6ce4da6cb89a850d26f6431f42a4cb90358f
+- RecordId: 883f2757-3ea8-f111-aaac-e4fade069307
+  DisplayName: robots.txt
+  CheckSum: bde54cfabf42af0fbd75540b97519680a6734a6f8c594abda60d8bdae380cb22
   IsDeleted: false
-- RecordId: 6fdff71e-99a3-f111-aaac-e4fade069307
-  DisplayName: Video 1.mp4
-  CheckSum: 810126ed4a350e8db4e9355396fa5a42d17fb6b30c7f8303b06d01a2aeb37b74
+- RecordId: 8e3f2757-3ea8-f111-aaac-e4fade069307
+  DisplayName: theme.css
+  CheckSum: 70ac6054c7355502ea5408a84e6914eec93e3ba703ab7e4728181917f5f81fcc
   IsDeleted: false
-- RecordId: 70dff71e-99a3-f111-aaac-e4fade069307
-  DisplayName: Graph-1.png
-  CheckSum: b241f61228f001129eaec69291839ab69f859da80c94cda2e3b6af8f81166c1c
+- RecordId: 943f2757-3ea8-f111-aaac-e4fade069307
+  DisplayName: PWALogo.png
+  CheckSum: 4835884278c65383e40fc740f888cdfca44d0e4d9a740cc4b339a47d9b265cfb
   IsDeleted: false
-- RecordId: f3def71e-99a3-f111-aaac-e4fade069307
+- RecordId: 9a3f2757-3ea8-f111-aaac-e4fade069307
   DisplayName: PWAManifest.json
-  CheckSum: d500214e9e2d281ecf31f0fe58771ddc039cfe34b8e270e92c5994db5facd09b
+  CheckSum: 4193755d56dff6fc26dffee3cb35c4fbf473b309bb6749ea130a4cb8242547f3
   IsDeleted: false
-- RecordId: f4def71e-99a3-f111-aaac-e4fade069307
-  DisplayName: Circle-2.png
-  CheckSum: 88807d79aa0be846c689895e19b47f6d8ee621c4ae95945e443eca387751be6a
+- RecordId: a03f2757-3ea8-f111-aaac-e4fade069307
+  DisplayName: bootstrap.min.css
+  CheckSum: 1a3df3cf2d29f969d3caafab7946e3f6d914c30cac38888729f53e3938764202
   IsDeleted: false
-- RecordId: f5def71e-99a3-f111-aaac-e4fade069307
+- RecordId: a73f2757-3ea8-f111-aaac-e4fade069307
+  DisplayName: OfflinePage.png
+  CheckSum: dab6086ac47a0c089cb4ec68107b8a1f20cd058ee20fa3ea5ab8fdfa5ed14644
+  IsDeleted: false
+- RecordId: ae3f2757-3ea8-f111-aaac-e4fade069307
   DisplayName: portalbasictheme.css
-  CheckSum: d52d1856c683dde935565ea02f391244415b1c981364f3257e3611bbd8a767c2
+  CheckSum: 95d4a34a68665813a8cf0748c0b2aa877abb76d8623d6beda2492ddf59184f56
+  IsDeleted: false
+- RecordId: f065878a-f8a9-f111-aaac-e4fade069307
+  DisplayName: outcome-testing.css
+  CheckSum: 836e45336889deccd8c33568eaca47c25ef96a97a4e23070e171f07265649917
   IsDeleted: false

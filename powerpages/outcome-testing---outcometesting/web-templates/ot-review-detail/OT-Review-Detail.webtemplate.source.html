@@ -144,137 +144,6 @@
         <strong>This review is assigned to someone else.</strong>
         You can read it, but only the assigned reviewer can record or change answers on it.
       </div>
-    {% else %}
-      {% comment %}
-        Submit panel. The button is only an affordance: the submission re-checks the
-        transition, every mandatory question and the Tax-before-AQS rule server-side,
-        so hiding or showing it changes nothing about what is permitted (NFR-SEC-01).
-      {% endcomment %}
-      <section class="ot-card ot-submit"
-               data-ot-submit
-               data-review-id="{{ rv.al_reviewinstanceid }}"
-               aria-labelledby="ot-submit-heading">
-        <h2 class="ot-card__title" id="ot-submit-heading">Submit this review</h2>
-        <p>
-          Submitting locks the review. Every question marked Required must be answered
-          first; the check runs server-side, so a missing answer is refused rather than
-          silently accepted.
-        </p>
-        <p>
-          <button type="button" class="ot-btn ot-btn--primary" data-ot-submit-button>
-            Submit review
-          </button>
-        </p>
-        <p class="ot-submit__status" data-ot-submit-status aria-live="polite"></p>
-      </section>
-      <script>
-        /*
-         * Submit Review (PP-07, PP-08, PP-11).
-         *
-         * Path: review page -> PATCH al_reviewinstance -> SubmitRequestPlugin -> Dataverse.
-         *
-         * The portals Web API does not support calling actions, so the al_SubmitReview
-         * Custom API cannot be invoked from a page. Rather than bridge that with a Power
-         * Automate flow, the page sets one allowlisted boolean and a synchronous plug-in
-         * does the work - the same mechanic the autosave above already uses for answers
-         * (AD-053). Because the step is synchronous, a refusal comes back on this request
-         * with its message intact.
-         *
-         * This script is progressive enhancement only. Every rule that matters - the
-         * transition, mandatory questions, Tax before AQS, idempotency and the submission
-         * lock - is enforced in the plug-in. Disabling the button here is a courtesy to the
-         * user, never an access control (NFR-SEC-01).
-         */
-        (function () {
-          'use strict';
-
-          var root = document.querySelector('[data-ot-submit]');
-          if (!root) { return; }
-
-          var button = root.querySelector('[data-ot-submit-button]');
-          var status = root.querySelector('[data-ot-submit-status]');
-          var reviewId = root.getAttribute('data-review-id');
-
-          if (!button || !reviewId) { return; }
-
-          function show(message, kind) {
-            if (!status) { return; }
-            status.textContent = message;
-            status.className = 'ot-submit__status ot-submit__status--' + (kind || 'info');
-            status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
-          }
-
-          /*
-           * The plug-in prefixes its failures so the client can branch without parsing
-           * prose. Messages here say what happened, what is still safe, and what to do
-           * next, and never expose a table name, query, id or stack trace (PP-16).
-           */
-          function friendlyError(raw) {
-            var text = String(raw || '');
-            if (text.indexOf('CONFLICT:') !== -1) {
-              return 'This review changed since you opened it. Reload the page and try again - your answers are still saved.';
-            }
-            if (text.indexOf('UNAUTHORIZED:') !== -1) {
-              return 'You do not have permission to submit this review.';
-            }
-            if (text.indexOf('PRECONDITION:') !== -1) {
-              // Carries the actionable detail, e.g. how many required questions remain.
-              var idx = text.indexOf('PRECONDITION:');
-              return text.substring(idx + 'PRECONDITION:'.length).trim();
-            }
-            return 'We could not submit this review. Nothing has been changed. Please try again, and contact support if it keeps happening.';
-          }
-
-          function setBusy(busy) {
-            button.disabled = busy;
-            button.setAttribute('aria-busy', busy ? 'true' : 'false');
-            button.textContent = busy ? 'Submitting...' : 'Submit review';
-          }
-
-          button.addEventListener('click', function () {
-            if (button.disabled) { return; }
-
-            if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
-              show('This page did not load completely. Refresh and try again.', 'error');
-              return;
-            }
-
-            setBusy(true);
-            show('Submitting your review...', 'info');
-
-            /*
-             * The Web API requires the request verification token; shell.getTokenDeferred
-             * supplies the one this session was issued. Without it the write is rejected
-             * before it reaches Dataverse.
-             */
-            window.shell.getTokenDeferred().done(function (token) {
-              var request = new XMLHttpRequest();
-              request.open('PATCH', '/_api/al_reviewinstances(' + reviewId + ')', true);
-              request.setRequestHeader('Content-Type', 'application/json');
-              request.setRequestHeader('__RequestVerificationToken', token);
-
-              request.onreadystatechange = function () {
-                if (request.readyState !== 4) { return; }
-
-                if (request.status >= 200 && request.status < 300) {
-                  show('Review submitted. Reloading...', 'success');
-                  window.setTimeout(function () { window.location.reload(); }, 800);
-                  return;
-                }
-
-                show(friendlyError(request.responseText), 'error');
-                setBusy(false);
-              };
-
-              request.send(JSON.stringify({ al_submitrequested: true }));
-            }).fail(function () {
-              show('This page did not load completely. Refresh and try again.', 'error');
-              setBusy(false);
-            });
-          });
-        })();
-
-      </script>
     {% endif %}
 
     {% if cv_id == null %}
@@ -734,6 +603,166 @@
         {% endif %}
 
       {% endif %}
+    {% endif %}
+
+    {% comment %}
+      Submit panel (PP-07, PP-11). Deliberately the last thing on the page.
+
+      It used to sit directly under the summary card, above the questionnaire, so on a
+      42-question checklist the button was off-screen by the time a reviewer had answered
+      anything and submitting meant scrolling back up past every answer. Submitting is the
+      end of the task, so it belongs at the end of the page - reached by finishing the
+      questionnaire rather than by scrolling away from it.
+
+      The button is only an affordance: the submission re-checks the transition, every
+      mandatory question and the Tax-before-AQS rule server-side, so moving, hiding or
+      showing it changes nothing about what is permitted (NFR-SEC-01).
+    {% endcomment %}
+    {% if editable %}
+      <section class="ot-card ot-submit"
+               data-ot-submit
+               data-review-id="{{ rv.al_reviewinstanceid }}"
+               aria-labelledby="ot-submit-heading">
+        <h2 class="ot-card__title" id="ot-submit-heading">Submit this review</h2>
+        <p>
+          Submitting locks the review. Every question marked Required must be answered
+          first; the check runs server-side, so a missing answer is refused rather than
+          silently accepted.
+        </p>
+        <p>
+          <button type="button" class="ot-btn ot-btn--primary" data-ot-submit-button>
+            Submit review
+          </button>
+        </p>
+        <p class="ot-submit__status" data-ot-submit-status aria-live="polite"></p>
+      </section>
+      <script>
+        /*
+         * Submit Review (PP-07, PP-08, PP-11).
+         *
+         * Path: review page -> PATCH al_reviewinstance -> SubmitRequestPlugin -> Dataverse.
+         *
+         * The portals Web API does not support calling actions, so the al_SubmitReview
+         * Custom API cannot be invoked from a page. Rather than bridge that with a Power
+         * Automate flow, the page sets one allowlisted boolean and a synchronous plug-in
+         * does the work - the same mechanic the autosave above already uses for answers
+         * (AD-053). Because the step is synchronous, a refusal comes back on this request
+         * with its message intact.
+         *
+         * The request is built exactly like the autosave's api() helper, and that is the
+         * point rather than a coincidence. This block used to differ from it in three ways -
+         * no OData version headers, no Accept, and the anti-forgery token taken from
+         * shell.getTokenDeferred() instead of the hidden field the autosave reads - and
+         * answering worked while submitting returned a refusal carrying none of the
+         * plug-in's prefixes. Two writes to the same site over the same API should not be
+         * assembled two different ways; the one that is known to work is the reference.
+         *
+         * If-Match: * matters. Without it a PATCH to the Dataverse Web API is an upsert,
+         * and the table permission grants write but not create (see the Review Instance -
+         * assigned to me row), so the create half of an upsert is refused. It pins this to
+         * an update of a row that already exists.
+         *
+         * This script is progressive enhancement only. Every rule that matters - the
+         * transition, mandatory questions, Tax before AQS, idempotency and the submission
+         * lock - is enforced in the plug-in. Disabling the button here is a courtesy to the
+         * user, never an access control (NFR-SEC-01).
+         */
+        (function () {
+          'use strict';
+
+          var root = document.querySelector('[data-ot-submit]');
+          if (!root) { return; }
+
+          var button = root.querySelector('[data-ot-submit-button]');
+          var status = root.querySelector('[data-ot-submit-status]');
+          var reviewId = root.getAttribute('data-review-id');
+
+          if (!button || !reviewId) { return; }
+
+          function show(message, kind) {
+            if (!status) { return; }
+            status.textContent = message;
+            status.className = 'ot-submit__status ot-submit__status--' + (kind || 'info');
+            status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+          }
+
+          /*
+           * The plug-in prefixes its failures so the client can branch without parsing
+           * prose. Messages here say what happened, what is still safe, and what to do
+           * next, and never expose a table name, query, id or stack trace (PP-16).
+           *
+           * httpStatus is read as well as the body. A refusal that carries no prefix did
+           * not come from the plug-in at all - it came from the portal, before Dataverse
+           * was reached - and 401/403 there means the site would not accept the write
+           * rather than that anything went wrong transiently. Telling that user to "try
+           * again" sends them round a loop that cannot terminate, which is what the single
+           * generic message used to do for every non-2xx alike.
+           */
+          function friendlyError(raw, httpStatus) {
+            var text = String(raw || '');
+            if (text.indexOf('CONFLICT:') !== -1) {
+              return 'This review changed since you opened it. Reload the page and try again - your answers are still saved.';
+            }
+            if (text.indexOf('UNAUTHORIZED:') !== -1) {
+              return 'You do not have permission to submit this review.';
+            }
+            if (text.indexOf('PRECONDITION:') !== -1) {
+              // Carries the actionable detail, e.g. how many required questions remain.
+              var idx = text.indexOf('PRECONDITION:');
+              return text.substring(idx + 'PRECONDITION:'.length).trim();
+            }
+            if (httpStatus === 401 || httpStatus === 403) {
+              return 'The site would not accept this submission from your account. Your answers are still saved. Reload the page and try once more - if it happens again, contact support and say the submission was refused with status ' + httpStatus + '.';
+            }
+            return 'We could not submit this review. Nothing has been changed. Please try again, and contact support if it keeps happening'
+              + (httpStatus ? ', quoting status ' + httpStatus + '.' : '.');
+          }
+
+          function setBusy(busy) {
+            button.disabled = busy;
+            button.setAttribute('aria-busy', busy ? 'true' : 'false');
+            button.textContent = busy ? 'Submitting...' : 'Submit review';
+          }
+
+          button.addEventListener('click', function () {
+            if (button.disabled) { return; }
+
+            setBusy(true);
+            show('Submitting your review...', 'info');
+
+            var request = new XMLHttpRequest();
+            request.open('PATCH', '/_api/al_reviewinstances(' + reviewId + ')', true);
+            request.setRequestHeader('Content-Type', 'application/json');
+            request.setRequestHeader('Accept', 'application/json');
+            request.setRequestHeader('OData-MaxVersion', '4.0');
+            request.setRequestHeader('OData-Version', '4.0');
+            request.setRequestHeader('If-Match', '*');
+
+            // Power Pages requires the request verification token on every write. Same
+            // hidden field the autosave reads, so both writes present the same credential.
+            var token = document.querySelector('[name="__RequestVerificationToken"]');
+            if (token) { request.setRequestHeader('__RequestVerificationToken', token.value); }
+
+            request.onload = function () {
+              if (request.status >= 200 && request.status < 300) {
+                show('Review submitted. Reloading...', 'success');
+                window.setTimeout(function () { window.location.reload(); }, 800);
+                return;
+              }
+
+              show(friendlyError(request.responseText, request.status), 'error');
+              setBusy(false);
+            };
+
+            request.onerror = function () {
+              show('The submission did not reach the server. Check your connection and try again - your answers are still saved.', 'error');
+              setBusy(false);
+            };
+
+            request.send(JSON.stringify({ al_submitrequested: true }));
+          });
+        })();
+      </script>
     {% endif %}
   {% endif %}
 {% endif %}

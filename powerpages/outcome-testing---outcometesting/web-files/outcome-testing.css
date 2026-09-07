@@ -501,6 +501,21 @@ footer a:focus-visible, .footer a:focus-visible {
   border-top: 1px solid var(--colour-border);
 }
 
+/* ------------------------------------------------------------------
+   Scope switch. "My cases" against "All cases" is two states of one
+   list rather than a filter, so it sits above the results and outside
+   the filter form. Same flex-and-gap row as .ot-filters__actions; the
+   active state is carried by .ot-btn--primary, so no colour is minted
+   here.
+   ------------------------------------------------------------------ */
+
+.ot-scope {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
 .ot-btn {
   display: inline-block;
   font-family: var(--font-body);

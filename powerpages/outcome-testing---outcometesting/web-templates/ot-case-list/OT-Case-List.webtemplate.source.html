@@ -12,8 +12,15 @@
   al_casetype 120910510-120910513. These are schema values, not display
   strings, so referencing them directly is safe.
 
-  Filtering to your own assigned work still needs al_assignedcontactid,
-  which arrives with the Phase 2 schema delta (AD-047).
+  Two scopes share this page. `?mine=1` is the reviewer's own worklist - the cases
+  carrying a review instance assigned to the signed-in contact (AD-047, AD-050) - and the
+  bare URL is every case. My Work's "My cases" tile and the primary-navigation "Cases"
+  link used to point at the same unscoped URL, so a tile that counted nine opened a list
+  of thirteen; the tile now carries the parameter and this page honours it.
+
+  Scoping is presentation, never a boundary. Under OD-022 every authenticated user may
+  read every case, and the write boundary is the Contact-anchored table permission chain
+  (AD-056, AD-069). What the scope buys is a reviewer seeing their own work first.
 {% endcomment %}
 
 {% assign f_ref      = request.params['ref']      | default: '' %}
@@ -25,6 +32,17 @@
 {% assign f_from     = request.params['from']     | default: '' %}
 {% assign f_to       = request.params['to']       | default: '' %}
 {% assign f_outcome  = request.params['outcome']  | default: '' %}
+
+{% comment %}
+  `mine` is a scope, not a filter: it does not appear in the filter chips or count towards
+  has_filter, because "my cases, unfiltered" is a starting point rather than a search the
+  user should be invited to clear. It is dropped for an anonymous visitor - an unguarded
+  {{ user.id }} would emit an empty condition value and match every row, turning "my cases"
+  into "all cases" silently, which is the exact over-report this parameter exists to stop.
+{% endcomment %}
+{% assign f_mine = request.params['mine'] | default: '' %}
+{% if user == null %}{% assign f_mine = '' %}{% endif %}
+{% if f_mine != '' and f_mine != '1' %}{% assign f_mine = '' %}{% endif %}
 
 {% comment %}
   Outcome filter (PP-17). This is the list the outcome cards on Home drill into, so the
@@ -63,7 +81,7 @@
 {% assign page_number = request.params['page'] | integer | default: 1 %}
 {% if page_number < 1 %}{% assign page_number = 1 %}{% endif %}
 
-{% capture qs %}ref={{ f_ref | url_escape }}&client={{ f_client | url_escape }}&adviser={{ f_adviser | url_escape }}&status={{ f_status | url_escape }}&priority={{ f_priority | url_escape }}&type={{ f_type | url_escape }}&from={{ f_from | url_escape }}&to={{ f_to | url_escape }}&outcome={{ f_outcome | url_escape }}{% endcapture %}
+{% capture qs %}mine={{ f_mine | url_escape }}&ref={{ f_ref | url_escape }}&client={{ f_client | url_escape }}&adviser={{ f_adviser | url_escape }}&status={{ f_status | url_escape }}&priority={{ f_priority | url_escape }}&type={{ f_type | url_escape }}&from={{ f_from | url_escape }}&to={{ f_to | url_escape }}&outcome={{ f_outcome | url_escape }}{% endcapture %}
 
 <form class="ot-filters" method="get" action="/cases" role="search" aria-label="Filter cases">
   <div class="ot-filters__grid">
@@ -140,12 +158,27 @@
   </div>
   <div class="ot-filters__actions">
     <button type="submit" class="ot-btn ot-btn--primary">Apply filters</button>
-    {% if has_filter %}<a class="ot-btn" href="/cases">Clear filters</a>{% endif %}
+    {% if has_filter %}<a class="ot-btn" href="/cases?mine={{ f_mine | url_escape }}">Clear filters</a>{% endif %}
+    {% comment %}
+      The scope survives Apply, so a reviewer who filters their own list keeps it. A hidden
+      input rather than a query-string fragment, because the form is a GET and would
+      otherwise drop everything not named in it.
+    {% endcomment %}
+    {% if f_mine == '1' %}<input type="hidden" name="mine" value="1">{% endif %}
   </div>
 </form>
 
+{% if user %}
+  <nav class="ot-scope" aria-label="Case scope">
+    <a class="ot-btn{% if f_mine == '1' %} ot-btn--primary{% endif %}" href="/cases?mine=1"
+       {% if f_mine == '1' %}aria-current="page"{% endif %}>My cases</a>
+    <a class="ot-btn{% if f_mine != '1' %} ot-btn--primary{% endif %}" href="/cases"
+       {% if f_mine != '1' %}aria-current="page"{% endif %}>All cases</a>
+  </nav>
+{% endif %}
+
 {% fetchxml cases %}
-<fetch count="{{ page_size }}" page="{{ page_number }}" returntotalrecordcount="true">
+<fetch count="{{ page_size }}" page="{{ page_number }}" returntotalrecordcount="true"{% if f_mine == '1' %} distinct="true"{% endif %}>
   <entity name="al_outcomecase">
     <attribute name="al_outcomecaseid" />
     <attribute name="al_casereference" />
@@ -158,6 +191,19 @@
     <attribute name="al_duedate" />
     {% if has_filter %}<filter type="and">{% if f_ref != '' %}<condition attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" />{% endif %}{% if f_client != '' %}<condition attribute="al_clientname" operator="like" value="%{{ f_client | xml_escape }}%" />{% endif %}{% if f_adviser != '' %}<condition attribute="al_advisername" operator="like" value="%{{ f_adviser | xml_escape }}%" />{% endif %}{% if f_status != '' %}<condition attribute="al_casestatus" operator="eq" value="{{ f_status | xml_escape }}" />{% endif %}{% if f_priority != '' %}<condition attribute="al_priority" operator="eq" value="{{ f_priority | xml_escape }}" />{% endif %}{% if f_type != '' %}<condition attribute="al_casetype" operator="eq" value="{{ f_type | xml_escape }}" />{% endif %}{% if f_from != '' %}<condition attribute="al_advicedate" operator="on-or-after" value="{{ f_from | xml_escape }}" />{% endif %}{% if f_to != '' %}<condition attribute="al_advicedate" operator="on-or-before" value="{{ f_to | xml_escape }}" />{% endif %}{% if f_outcome == 'none' %}<condition entityname="oc" attribute="al_outcomeid" operator="null" />{% elsif f_outcome != '' %}<filter type="or"><condition entityname="oc" attribute="al_finaloutcome" operator="eq" value="{{ o_final }}" /><filter type="and"><condition entityname="oc" attribute="al_finaloutcome" operator="null" /><condition entityname="oc" attribute="al_initialoutcome" operator="eq" value="{{ o_initial }}" /></filter></filter>{% endif %}</filter>{% endif %}
     <order attribute="al_casereference" descending="false" />
+    {% comment %}
+      The scope join (AD-047). Inner, because a case with no review assigned to this
+      contact is not their case. Joined on the review rather than on al_caseassignment so
+      the list matches the "Reviews assigned to you" table on My Work, which reads the same
+      lookup - a case can be allocated and its review reassigned, and it is the review that
+      says whose work it is now.
+
+      A case carrying both a Tax and an AQS review assigned to the same person matches this
+      join twice, which is why the fetch above turns on distinct when the scope is active.
+      Without it a reviewer holding both disciplines on one case would see it listed twice
+      and the page count would disagree with the tile.
+    {% endcomment %}
+    {% if f_mine == '1' %}<link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="mine"><filter type="and"><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" /></filter></link-entity>{% endif %}
     {% comment %}
       Outer, and joined on the case rather than the review: a case with no outcome yet must
       still appear in an unfiltered list, and "Not yet graded" is a real drill-down target
@@ -183,7 +229,7 @@
 
 <section class="ot-card" aria-labelledby="ot-cases-heading">
   <h2 class="ot-card__title" id="ot-cases-heading">
-    {% if has_filter %}Filtered cases{% else %}All cases{% endif %}
+    {% if f_mine == '1' %}{% if has_filter %}My cases, filtered{% else %}My cases{% endif %}{% else %}{% if has_filter %}Filtered cases{% else %}All cases{% endif %}{% endif %}
     <span class="ot-count">{{ total }}</span>
   </h2>
 
@@ -229,6 +275,13 @@
     </nav>
   {% elsif has_filter %}
     {% include 'OT Empty State' title: 'No cases match these filters' message: 'Widen or clear the filters to see more cases.' %}
+  {% elsif f_mine == '1' %}
+    {% comment %}
+      A distinct message from the unfiltered one. "No cases found" on a scoped list reads as
+      an empty environment when what it means is an empty worklist, and the two call for
+      different actions.
+    {% endcomment %}
+    {% include 'OT Empty State' title: 'Nothing assigned to you' message: 'Cases appear here once a team lead allocates one to you, or you claim one from the queue. Choose All cases to see everything.' %}
   {% else %}
     {% include 'OT Empty State' title: 'No cases found' message: 'Cases appear here once an Intelligent Office extract has been imported and validated.' %}
   {% endif %}

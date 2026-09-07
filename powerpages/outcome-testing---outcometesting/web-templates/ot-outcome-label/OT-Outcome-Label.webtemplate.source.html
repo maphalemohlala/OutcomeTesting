@@ -17,6 +17,15 @@
   (the design skill's rule against exposing Dataverse internals). A row this cannot resolve
   yields empty, and the caller renders its own "not yet graded" state rather than a number.
 
+  Component id, and why it is not the obvious one. Web templates and page templates are
+  both rows of powerpagecomponent under the enhanced data model, so they share one id
+  space. This template was first minted on a1000000-...-0022, which the environment was
+  already using for the OT Case Detail Page *page template*. The id was taken, so every
+  upload left this template uncreated while reporting success elsewhere, and /cases
+  rendered "Template 'OT Outcome Label' not found" in its outcome column. It now sits on
+  a1000000-...-001e, inside the web-template block, clear of the page templates at 0020
+  and above. Do not move it back onto a page template's id.
+
   .label is used where the platform supplies it. The numeric map is the fallback for the
   reads where it does not come through - an aliased column from a link-entity does not
   always carry its formatted value - and it is the reason this file exists as one include
