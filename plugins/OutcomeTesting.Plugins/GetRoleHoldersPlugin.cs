@@ -26,6 +26,9 @@ namespace OutcomeTesting.Plugins
 
         private const string MappingEntity = "al_userrolemapping";
 
+        /// <summary>Rows fetched per page when paging the contact-side FetchXML below.</summary>
+        private const int PageSize = 5000;
+
         public GetRoleHoldersPlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(GetRoleHoldersPlugin))
         {
@@ -72,11 +75,49 @@ namespace OutcomeTesting.Plugins
         /// Contacts associated with the role. Starts at contact because the intersect hangs
         /// off contact, not off the role — the same reason WebRoleRegistry.RolesForContact
         /// does, in the opposite direction.
+        ///
+        /// Pages via the FetchXML page/count attributes and paging-cookie, following
+        /// CommandHelpers.RetrieveAll's own warning: a bare RetrieveMultiple stops at 5000
+        /// rows with no error and no signal, which here would report every dropped contact
+        /// as associated:false — a fabricated "association missing" that invites an
+        /// administrator to act on a fact that is not true. CommandHelpers.RetrieveAll itself
+        /// only follows QueryExpression's PagingInfo, not a hand-built FetchXML string, so
+        /// the paging is done here instead.
         /// </summary>
         private static List<Entity> ContactsHolding(IOrganizationService service, string roleName)
         {
-            var fetch =
-                "<fetch>" +
+            var rows = new List<Entity>();
+            string cookie = null;
+            var page = 1;
+
+            while (true)
+            {
+                var fetch = BuildContactsFetch(roleName, page, PageSize, cookie);
+                var result = service.RetrieveMultiple(new FetchExpression(fetch));
+                rows.AddRange(result.Entities);
+
+                if (!result.MoreRecords)
+                {
+                    return rows;
+                }
+
+                cookie = result.PagingCookie;
+                page++;
+            }
+        }
+
+        private static string BuildContactsFetch(string roleName, int page, int count, string pagingCookie)
+        {
+            var pagingAttrs = " page='" + page + "' count='" + count + "'";
+            if (!string.IsNullOrEmpty(pagingCookie))
+            {
+                // The cookie Dataverse hands back already carries its own quoting; escaping it
+                // again is what keeps it well-formed once embedded inside this attribute.
+                pagingAttrs += " paging-cookie='" + System.Security.SecurityElement.Escape(pagingCookie) + "'";
+            }
+
+            return
+                "<fetch" + pagingAttrs + ">" +
                   "<entity name='contact'>" +
                     "<attribute name='contactid'/>" +
                     "<attribute name='emailaddress1'/>" +
@@ -89,14 +130,6 @@ namespace OutcomeTesting.Plugins
                     "</link-entity>" +
                   "</entity>" +
                 "</fetch>";
-
-            var rows = new List<Entity>();
-            foreach (var row in service.RetrieveMultiple(new FetchExpression(fetch)).Entities)
-            {
-                rows.Add(row);
-            }
-
-            return rows;
         }
     }
 }

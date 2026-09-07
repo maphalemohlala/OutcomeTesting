@@ -51,13 +51,20 @@ namespace OutcomeTesting.Plugins
         ///
         /// Two reasons, and the second is the one that matters. `Anonymous Users` and
         /// `Authenticated Users` are Power Pages plumbing and excluded by name. Beyond them, ANY
-        /// role carrying <c>mspp_authenticatedusersrole</c> is auto-granted to every signed-in
-        /// contact, so treating it as an application role grants that role to everyone —
-        /// which is exactly what OD-033 found `Administrators` doing in DEV.
+        /// role carrying <c>mspp_authenticatedusersrole</c> OR <c>mspp_anonymoususersrole</c> is
+        /// auto-granted (to every signed-in contact, or to everyone at all) rather than to
+        /// people a decision put there, so treating it as an application role grants that role
+        /// to everyone — which is exactly what OD-033 found `Administrators` doing in DEV.
         ///
-        /// A role that cannot be looked up is NOT excluded. Absence of evidence that a role is
-        /// auto-granted is not evidence that it is, and excluding on a failed read would withdraw
-        /// access from everyone holding it.
+        /// Deliberately NOT FindByName: mspp_name carries no website filter and FindByName
+        /// returns an arbitrary found[0], so a second web role sharing a name with a flagged
+        /// one — with the flag off — would make this return false for a role that IS
+        /// auto-granted under that name. Every row matching the name is checked, and ANY of
+        /// them carrying either flag is enough to exclude.
+        ///
+        /// A role that cannot be looked up at all is NOT excluded. Absence of evidence that a
+        /// role is auto-granted is not evidence that it is, and excluding on a failed read
+        /// would withdraw access from everyone holding it.
         /// </summary>
         public static bool ExcludedFromResolution(IOrganizationService service, string roleName)
         {
@@ -66,13 +73,47 @@ namespace OutcomeTesting.Plugins
                 return true;
             }
 
-            var role = FindByName(service, (roleName ?? string.Empty).Trim());
-            if (role == null)
+            var trimmed = (roleName ?? string.Empty).Trim();
+            var matches = FindAllByName(service, trimmed);
+            if (matches.Count == 0)
             {
                 return false;
             }
 
-            return role.GetAttributeValue<bool?>(AuthenticatedAttr) ?? false;
+            foreach (var role in matches)
+            {
+                if ((role.GetAttributeValue<bool?>(AuthenticatedAttr) ?? false) ||
+                    (role.GetAttributeValue<bool?>(AnonymousAttr) ?? false))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Every web role row named <paramref name="roleName"/>, not just an arbitrary one.
+        /// Backs <see cref="ExcludedFromResolution"/> only; <see cref="FindByName"/> keeps its
+        /// found[0] behaviour for association targets, which is a separate pre-existing
+        /// concern this does not touch.
+        /// </summary>
+        private static List<Entity> FindAllByName(IOrganizationService service, string roleName)
+        {
+            // No `top` attribute: mspp_webrole ignores it and returns nothing.
+            var fetch =
+                "<fetch>" +
+                  "<entity name='" + RoleEntity + "'>" +
+                    "<attribute name='" + NameAttr + "'/>" +
+                    "<attribute name='" + AuthenticatedAttr + "'/>" +
+                    "<attribute name='" + AnonymousAttr + "'/>" +
+                    "<attribute name='" + WebsiteAttr + "'/>" +
+                    "<filter><condition attribute='" + NameAttr + "' operator='eq' value='" +
+                      System.Security.SecurityElement.Escape(roleName) + "'/></filter>" +
+                  "</entity>" +
+                "</fetch>";
+
+            return new List<Entity>(service.RetrieveMultiple(new FetchExpression(fetch)).Entities);
         }
 
         /// <summary>

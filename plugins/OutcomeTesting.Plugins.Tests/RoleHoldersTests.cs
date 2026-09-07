@@ -85,6 +85,47 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void AnActiveRowIsNeverMaskedByAWithdrawnRow_ActiveSeededFirst()
+        {
+            // AdoptRoleAssignmentPlugin's revoke branch deactivates every row rather than
+            // assuming uniqueness, and PermissionHelpers.GetMappedRoles honours ANY active
+            // row. Unconditionally overwriting on each row meant whichever was enumerated
+            // LAST won — so a withdrawn row seen after an active one could report the person
+            // "Withdrawn" while they still hold live access.
+            var activeId = Guid.NewGuid();
+            var withdrawnId = Guid.NewGuid();
+            var holders = RoleHolders.Merge(
+                new[]
+                {
+                    Mapping("both@ascotlloyd.co.uk", active: true, id: activeId),
+                    Mapping("both@ascotlloyd.co.uk", active: false, id: withdrawnId),
+                },
+                new Entity[0]);
+
+            var only = Assert.Single(holders);
+            Assert.True(only.MappingActive);
+            Assert.Equal(activeId, only.MappingId);
+        }
+
+        [Fact]
+        public void AnActiveRowIsNeverMaskedByAWithdrawnRow_WithdrawnSeededFirst()
+        {
+            var activeId = Guid.NewGuid();
+            var withdrawnId = Guid.NewGuid();
+            var holders = RoleHolders.Merge(
+                new[]
+                {
+                    Mapping("both@ascotlloyd.co.uk", active: false, id: withdrawnId),
+                    Mapping("both@ascotlloyd.co.uk", active: true, id: activeId),
+                },
+                new Entity[0]);
+
+            var only = Assert.Single(holders);
+            Assert.True(only.MappingActive);
+            Assert.Equal(activeId, only.MappingId);
+        }
+
+        [Fact]
         public void MatchesTheTwoSourcesRegardlessOfEmailCasing()
         {
             var holders = RoleHolders.Merge(

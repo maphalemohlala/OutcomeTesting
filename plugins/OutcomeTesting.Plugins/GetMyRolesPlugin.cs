@@ -33,10 +33,23 @@ namespace OutcomeTesting.Plugins
             var context = localPluginContext.PluginExecutionContext;
             var systemService = localPluginContext.PluginUserService;
 
-            var email = PermissionHelpers.GetCallerEmail(systemService, context);
-            var codes = string.IsNullOrWhiteSpace(email)
-                ? new List<string>()
-                : PermissionHelpers.ResolveRoleCodesForEmail(systemService, email);
+            // GetCallerEmail THROWS on a blank work email rather than returning one — it
+            // never falls through to the string.IsNullOrWhiteSpace check that used to sit
+            // here, which made that check dead code and the "holds nothing" fallback it
+            // implied unreachable. Without this catch, a caller with no work email got an
+            // API failure instead, and the client turns that into its permissive fail-open —
+            // the opposite of what the sign-in path should do. Catching here makes the
+            // intended fallback real.
+            List<string> codes;
+            try
+            {
+                var email = PermissionHelpers.GetCallerEmail(systemService, context);
+                codes = PermissionHelpers.ResolveRoleCodesForEmail(systemService, email);
+            }
+            catch (InvalidPluginExecutionException)
+            {
+                codes = new List<string>();
+            }
 
             context.OutputParameters[OutRoleCodes] = ToJson(codes);
         }

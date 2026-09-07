@@ -73,6 +73,57 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void LeavesOutAMappingRowForARoleAutoGrantedToEveryone()
+        {
+            // AD-090: the web-role loop already skips a flagged role (the test above), but
+            // GetMappedRoles reads al_rolecode verbatim, and nothing stopped a mapping row
+            // from naming a flagged role — the app's own "Assign a role" modal offers it
+            // under a name that is not one of the two picklist system roles it filters by,
+            // and a restored row (al_SetRoleAssignmentActive) never passes through that
+            // filter at all. This has to be excluded at the resolver, not only at the
+            // writers, for the rule to hold for every writer present and future.
+            // No contact seeded: this exercises GetMappedRoles in isolation (it runs before
+            // the web-role/contact lookup), so nothing here should touch the FetchResults
+            // queue that a joined web-role fetch would need.
+            var svc = new FakeOrganizationService();
+            svc.Seed(
+                "al_userrolemapping",
+                Guid.NewGuid(),
+                "al_useremail", Email,
+                "al_rolecode", "Administrators",
+                "statecode", new OptionSetValue(0));
+            svc.Seed(
+                WebRoleRegistry.RoleEntity,
+                Guid.NewGuid(),
+                WebRoleRegistry.NameAttr, "Administrators",
+                WebRoleRegistry.AuthenticatedAttr, true);
+
+            Assert.DoesNotContain("Administrators", PermissionHelpers.ResolveRoleCodesForEmail(svc, Email));
+        }
+
+        [Fact]
+        public void TranslatesAPicklistOnlyMappingToItsLabel()
+        {
+            // AD-089: a person whose only active mapping carries the legacy al_approle
+            // picklist, with no al_rolecode, used to resolve to an empty array here — read by
+            // the client as "resolved and holds nothing" — while the gate (MaxLevel) still
+            // honoured the picklist and accepted their writes. The client needs the same
+            // label ParseRole accepts so a permission rule written against it still matches.
+            var svc = WithContact(Guid.NewGuid());
+            svc.Seed(
+                "al_userrolemapping",
+                Guid.NewGuid(),
+                "al_useremail", Email,
+                "al_approle", new OptionSetValue(120910760),
+                "statecode", new OptionSetValue(0));
+            ReturnsWebRoles(svc);
+
+            var codes = PermissionHelpers.ResolveRoleCodesForEmail(svc, Email);
+
+            Assert.Contains("Tax Checker", codes);
+        }
+
+        [Fact]
         public void LeavesOutAWithdrawnMapping()
         {
             var svc = WithContact(Guid.NewGuid());

@@ -51,14 +51,18 @@ namespace OutcomeTesting.Plugins
             var active = CommandHelpers.GetRequiredBool(context, InActive);
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
 
+            // Permission check before the idempotency lookup (matching AssignUserRolePlugin
+            // and AdoptRoleAssignmentPlugin): otherwise an unauthorised caller could probe
+            // whether a key exists and receive a real audit id back for work they were never
+            // allowed to trigger.
+            PermissionHelpers.EnsureAppPermission(systemService, context, "permission.manage", PermissionHelpers.AccessManage);
+
             var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandSetRoleAssignmentActive);
             if (existingAudit != null)
             {
                 SetResponse(context, mappingId.ToString("D"), active, existingAudit.Id);
                 return;
             }
-
-            PermissionHelpers.EnsureAppPermission(systemService, context, "permission.manage", PermissionHelpers.AccessManage);
 
             Entity before;
             try

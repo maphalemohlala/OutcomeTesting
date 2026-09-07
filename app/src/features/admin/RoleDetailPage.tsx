@@ -319,7 +319,6 @@ export function RoleDetailPage() {
   }
 
   const loading = config.status === 'loading';
-  const unavailable = config.status === 'unavailable';
 
   return (
     <>
@@ -364,10 +363,10 @@ export function RoleDetailPage() {
         </p>
       ) : null}
 
-      {unavailable ? (
+      {config.status === 'unavailable' ? (
         <section className="security__unavailable" aria-labelledby="detail-unavailable">
           <h2 id="detail-unavailable">Grants and holders cannot be shown</h2>
-          <p>{config.status === 'unavailable' ? config.reason : ''}</p>
+          <p>{config.reason}</p>
         </section>
       ) : null}
 

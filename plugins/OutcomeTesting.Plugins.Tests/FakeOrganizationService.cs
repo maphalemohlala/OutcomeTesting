@@ -153,23 +153,28 @@ namespace OutcomeTesting.Plugins.Tests
                 // Always record the fetch first.
                 FetchXml.Add(fetch.Query);
 
-                // If FetchResults has an entry, dequeue and return it — for any shape.
-                // Later tasks queue results for joined fetches.
+                // Flat FetchXML (no joins) always executes against the seeded table, and the
+                // queue is consulted only for a joined fetch. This handles
+                // WebRoleRegistry.FindByName/FindAllByName and similar single-entity queries.
+                //
+                // The shape check has to come BEFORE the queue, not after: AD-090's resolver
+                // fix made GetMappedRoles issue a flat WebRoleRegistry lookup for every
+                // mapping row ahead of the joined contact-to-web-role fetch a test may have
+                // queued, so a FIFO "dequeue whatever is next, any shape" would let that flat
+                // lookup steal the item a later joined call actually needs — exactly the
+                // interleaving no test exercised before that fix.
+                if (!fetch.Query.Contains("<link-entity"))
+                {
+                    return ExecuteSimpleFetch(fetch.Query);
+                }
+
                 if (FetchResults.Count > 0)
                 {
                     return FetchResults.Dequeue();
                 }
 
-                // Check for joined FetchXML (contains <link-entity>).
-                if (fetch.Query.Contains("<link-entity"))
-                {
-                    throw new NotSupportedException(
-                        "Joined FetchExpression is not executed by this fake; enqueue a FetchResults entry for it.");
-                }
-
-                // Flat FetchXML (no joins): execute against the seeded table.
-                // This handles WebRoleRegistry.FindByName and similar single-entity queries.
-                return ExecuteSimpleFetch(fetch.Query);
+                throw new NotSupportedException(
+                    "Joined FetchExpression is not executed by this fake; enqueue a FetchResults entry for it.");
             }
 
             var q = query as QueryExpression;
@@ -423,11 +428,17 @@ namespace OutcomeTesting.Plugins.Tests
                 var attrName = match.Groups[1].Value;
                 var encodedValue = match.Groups[2].Value;
 
-                // Decode XML entities (SecurityElement.Escape escapes &, <, >)
+                // Decode XML entities. SecurityElement.Escape emits all five — &, <, >, ' and
+                // " — so a role name carrying an apostrophe or quote needs both of the last
+                // two unescaped too. Missing them used to mean such a test would silently get
+                // FindByName == null (the condition never matches) and pass with the guard it
+                // meant to exercise never actually running.
                 var attrValue = encodedValue
                     .Replace("&amp;", "&")
                     .Replace("&lt;", "<")
-                    .Replace("&gt;", ">");
+                    .Replace("&gt;", ">")
+                    .Replace("&apos;", "'")
+                    .Replace("&quot;", "\"");
 
                 results = results.Where(r =>
                 {

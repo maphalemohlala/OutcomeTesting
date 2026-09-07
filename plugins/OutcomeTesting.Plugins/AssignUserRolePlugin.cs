@@ -74,6 +74,9 @@ namespace OutcomeTesting.Plugins
                     throw new InvalidPluginExecutionException(
                         CommandHelpers.ValidationPrefix + "The role code does not match an active role.");
                 }
+
+                RefuseIfAutoGranted(systemService, normalizedCode);
+
                 code = "URM-" + email.ToLowerInvariant() + "-" + normalizedCode;
                 mapping = new Entity(MappingEntity)
                 {
@@ -193,6 +196,28 @@ namespace OutcomeTesting.Plugins
             {
                 // Not associated. Withdrawing a role someone does not hold is already the
                 // state the caller asked for.
+            }
+        }
+
+        /// <summary>
+        /// Refuses a role code AD-090 excludes from resolution, before any mapping row is
+        /// built. useRoles.ts filters the picklist's two system roles BY NAME, so a flagged
+        /// role under another name is still offered in the "Assign a role" modal, and writing
+        /// a mapping row for it would look successful while
+        /// PermissionHelpers.GetMappedRoles (which also enforces AD-090) silently never
+        /// resolves it. Refusing here at write time gives a clear reason instead of a row
+        /// that quietly does nothing. Extracted as its own method and public, like
+        /// AdoptRoleAssignmentPlugin.Apply and GetRoleHoldersPlugin.Read, so it is testable
+        /// without a full plug-in context.
+        /// </summary>
+        public static void RefuseIfAutoGranted(IOrganizationService systemService, string roleCode)
+        {
+            if (WebRoleRegistry.ExcludedFromResolution(systemService, roleCode))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.ValidationPrefix + "The role " + roleCode +
+                    " is granted automatically to every signed-in user, so it cannot be " +
+                    "assigned as an application role (AD-090).");
             }
         }
 

@@ -57,5 +57,65 @@ namespace OutcomeTesting.Plugins.Tests
             var svc = new FakeOrganizationService();
             Assert.False(WebRoleRegistry.ExcludedFromResolution(svc, "AL Portal - Planner"));
         }
+
+        [Fact]
+        public void ExcludesADuplicateNamedRoleRegardlessOfWhichOneIsFlagged_FlaggedSeededFirst()
+        {
+            // FindByName has no website filter and returns an arbitrary found[0], so a
+            // second web role sharing a name with a flagged one — with the flag off — must
+            // not make this return false for a name that IS auto-granted. Every row named
+            // "Administrators" is checked, not just whichever one a query happens to return
+            // first.
+            var svc = new FakeOrganizationService();
+            svc.Seed(
+                WebRoleRegistry.RoleEntity,
+                Guid.Parse("11111111-1111-4111-8111-111111111111"),
+                WebRoleRegistry.NameAttr, "Administrators",
+                WebRoleRegistry.AuthenticatedAttr, true);
+            svc.Seed(
+                WebRoleRegistry.RoleEntity,
+                Guid.Parse("22222222-2222-4222-8222-222222222222"),
+                WebRoleRegistry.NameAttr, "Administrators",
+                WebRoleRegistry.AuthenticatedAttr, false);
+
+            Assert.True(WebRoleRegistry.ExcludedFromResolution(svc, "Administrators"));
+        }
+
+        [Fact]
+        public void ExcludesADuplicateNamedRoleRegardlessOfWhichOneIsFlagged_FlaggedSeededSecond()
+        {
+            // Same as above with the seed order reversed, since a Dictionary's enumeration
+            // order is what FindByName's found[0] actually depends on.
+            var svc = new FakeOrganizationService();
+            svc.Seed(
+                WebRoleRegistry.RoleEntity,
+                Guid.Parse("33333333-3333-4333-8333-333333333333"),
+                WebRoleRegistry.NameAttr, "Administrators",
+                WebRoleRegistry.AuthenticatedAttr, false);
+            svc.Seed(
+                WebRoleRegistry.RoleEntity,
+                Guid.Parse("44444444-4444-4444-8444-444444444444"),
+                WebRoleRegistry.NameAttr, "Administrators",
+                WebRoleRegistry.AuthenticatedAttr, true);
+
+            Assert.True(WebRoleRegistry.ExcludedFromResolution(svc, "Administrators"));
+        }
+
+        [Fact]
+        public void ExcludesARoleCarryingTheAnonymousUsersFlagWhateverItIsCalled()
+        {
+            // M9: the anonymous-users flag excludes for the same reason the
+            // authenticated-users flag does — it is granted to everyone, not to people a
+            // decision put there.
+            var svc = new FakeOrganizationService();
+            svc.Seed(
+                WebRoleRegistry.RoleEntity,
+                Guid.NewGuid(),
+                WebRoleRegistry.NameAttr, "Public Access",
+                WebRoleRegistry.AuthenticatedAttr, false,
+                WebRoleRegistry.AnonymousAttr, true);
+
+            Assert.True(WebRoleRegistry.ExcludedFromResolution(svc, "Public Access"));
+        }
     }
 }

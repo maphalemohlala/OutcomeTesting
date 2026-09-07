@@ -228,4 +228,12 @@ describe('classifyHolder', () => {
     expect(result.label).toBe('Not held');
     expect(result.state).toBe('consistent');
   });
+
+  it('labels a mapping with an unresolved active state as Held rather than asserting Withdrawn', () => {
+    // mappingActive === null with a mapping present is a state nothing here actually
+    // observed as withdrawn; 'Withdrawn' would assert a fact the data does not carry.
+    const result = classifyHolder({ ...base, mappingActive: null });
+    expect(result.label).toBe('Held');
+    expect(result.state).toBe('consistent');
+  });
 });

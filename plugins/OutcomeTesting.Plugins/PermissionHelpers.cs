@@ -181,7 +181,26 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static List<string> ResolveRoleCodesForEmail(IOrganizationService service, string email)
         {
-            return GetActiveRoles(service, (email ?? string.Empty).Trim()).RoleCodes;
+            var roles = GetActiveRoles(service, (email ?? string.Empty).Trim());
+
+            // A person whose only active mapping carries the legacy al_approle picklist (no
+            // al_rolecode) has to show up here too. RoleCodes alone used to be returned, so
+            // such a person resolved to an empty array and the client — now treating "empty"
+            // as "resolved and holds nothing" rather than "unconfigured" — showed them "No
+            // access" everywhere, while the server (which reads AppRoles separately in
+            // MaxLevel) still accepted their writes. Translating the option value to its
+            // label lets the client match the same permission rules the gate does.
+            var codes = new List<string>(roles.RoleCodes);
+            foreach (var appRole in roles.AppRoles)
+            {
+                var label = AppRoleLabel(appRole);
+                if (label != null && !codes.Contains(label))
+                {
+                    codes.Add(label);
+                }
+            }
+
+            return codes;
         }
 
         /// <summary>
@@ -238,7 +257,23 @@ namespace OutcomeTesting.Plugins
                 var code = entity.GetAttributeValue<string>("al_rolecode");
                 if (!string.IsNullOrWhiteSpace(code))
                 {
-                    roles.RoleCodes.Add(code.Trim());
+                    var trimmed = code.Trim();
+
+                    // AD-090: a mapping row is the OTHER half of the union GetActiveRoles
+                    // forms (the web-role loop below already skips an excluded role), and
+                    // nothing stopped a mapping row from being written for a role flagged
+                    // auto-granted-to-everyone — al_AssignUserRole's own picklist name filter
+                    // does not catch a flagged role under another name, and a restored row
+                    // never passed through that filter at all. Filtering HERE, at the
+                    // resolver both write paths feed, is what makes AD-090 true for every
+                    // writer that exists today and every one added later, rather than only
+                    // for the ones a reviewer remembered to guard individually.
+                    if (WebRoleRegistry.ExcludedFromResolution(service, trimmed))
+                    {
+                        continue;
+                    }
+
+                    roles.RoleCodes.Add(trimmed);
                     continue;
                 }
 
@@ -311,6 +346,29 @@ namespace OutcomeTesting.Plugins
                 default:
                     throw new InvalidPluginExecutionException(
                         CommandHelpers.PreconditionPrefix + "Unknown app role '" + label + "'.");
+            }
+        }
+
+        /// <summary>
+        /// The inverse of <see cref="ParseRole"/>: an al_approle option value back to its
+        /// label. Exists so a legacy picklist-only assignment resolves in the client the
+        /// same way it resolves in the gate (AD-089) — ResolveRoleCodesForEmail has to hand
+        /// the client something to match a permission rule written against the label, and
+        /// the option value alone carries no name. Kept to the same six labels ParseRole
+        /// accepts; "T&C Manager" is returned rather than the "T and C Manager" alias since
+        /// that is the one form both sides of the map agree on.
+        /// </summary>
+        public static string AppRoleLabel(int value)
+        {
+            switch (value)
+            {
+                case 120910760: return "Tax Checker";
+                case 120910761: return "AQS Checker";
+                case 120910762: return "Adviser";
+                case 120910763: return "T&C Manager";
+                case 120910764: return "Outcome Testing Manager";
+                case 120910765: return "Administrator";
+                default: return null;
             }
         }
 

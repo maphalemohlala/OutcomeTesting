@@ -73,6 +73,12 @@ export function buildRoleGrants(
   roleCode: string,
   permissions: readonly PagePermissionRow[],
 ): RoleGrant[] {
+  // Keyed by resource, so two active rules for the same (role, resource) leave this holding
+  // only the LAST one's id — withdrawing the override would then withdraw one rule while the
+  // row stays and does not fall back to the default. setPagePermission upserts on
+  // (role, resource), so two simultaneous active rules for the same pair should not occur in
+  // practice; recorded here rather than guarded against, since this is a read path with no
+  // behaviour change to make.
   const overrideById = new Map<ResourceKey, string>();
   const overrides: PermissionRule[] = [];
 
@@ -197,7 +203,15 @@ export function classifyHolder(record: RoleHolderRecord): HolderClassification {
 
   return {
     state: 'consistent',
-    label: hasMapping && record.mappingActive === true ? 'Assigned in app' : hasMapping ? 'Withdrawn' : 'Not held',
+    // A mapping row's mappingActive is documented as never null in practice (see
+    // RoleHolderRecord above), but the type permits it, and asserting 'Withdrawn' for an
+    // unknown state stated a fact nothing here actually knows. 'Held' says only what is
+    // true: a mapping row exists and its active state could not be read as false.
+    label: hasMapping && record.mappingActive === true
+      ? 'Assigned in app'
+      : hasMapping
+        ? (record.mappingActive === false ? 'Withdrawn' : 'Held')
+        : 'Not held',
     canAdopt: false,
     canRevoke: false,
   };

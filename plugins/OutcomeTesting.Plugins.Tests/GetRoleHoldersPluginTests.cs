@@ -112,5 +112,50 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Contains("Tax &amp; &lt;Advice&gt;", Assert.Single(svc.FetchXml));
         }
+
+        [Fact]
+        public void PagesThroughEveryAssociatedContactRatherThanStoppingAtOnePage()
+        {
+            // CommandHelpers.RetrieveAll's own doc comment warns that a bare RetrieveMultiple
+            // stops at 5000 rows with no error and no signal. Here that would report every
+            // dropped contact as associated:false — a fabricated "association missing" that
+            // invites an administrator to act on a fact that is not true. This proves the
+            // contact-side read keeps going while MoreRecords is true.
+            var svc = new FakeOrganizationService();
+            var page1 = new EntityCollection(new[]
+            {
+                NewContact("a@ascotlloyd.co.uk"),
+            })
+            {
+                MoreRecords = true,
+                PagingCookie = "<cookie page=\"1\" />",
+            };
+            var page2 = new EntityCollection(new[]
+            {
+                NewContact("b@ascotlloyd.co.uk"),
+            })
+            {
+                MoreRecords = false,
+            };
+            svc.FetchResults.Enqueue(page1);
+            svc.FetchResults.Enqueue(page2);
+
+            var holders = GetRoleHoldersPlugin.Read(svc, Role);
+
+            Assert.Equal(2, holders.Count);
+            Assert.Equal(
+                new[] { "a@ascotlloyd.co.uk", "b@ascotlloyd.co.uk" },
+                holders.Select(h => h.Email).OrderBy(e => e));
+            Assert.Equal(2, svc.FetchXml.Count);
+            Assert.Contains("paging-cookie", svc.FetchXml[1]);
+        }
+
+        private static Entity NewContact(string email)
+        {
+            var contact = new Entity("contact", Guid.NewGuid());
+            contact["emailaddress1"] = email;
+            contact["fullname"] = "Person " + email;
+            return contact;
+        }
     }
 }
