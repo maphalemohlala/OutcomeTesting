@@ -800,11 +800,21 @@
               return text.substring(idx + 'PRECONDITION:'.length).trim();
             }
             if (httpStatus === 401 || httpStatus === 403) {
-              // Reloading and trying once more was the wrong advice: this refusal is the
-              // permission chain, and it will refuse again. Say what is actually missing.
-              return 'Your account is not allowed to submit this review, so nothing was submitted. Your answers are '
-                + 'still saved. Submitting needs a Tax or AQS reviewer role on your portal account, and the review has '
-                + 'to be assigned to you. Ask an administrator to check both rather than retrying.';
+              /*
+               * Reloading and trying once more was the wrong advice: this refusal is the
+               * permission chain, and it will refuse again.
+               *
+               * It also used to promise "your answers are still saved", and that promise was
+               * false in the case that produces it. Answering and submitting travel the same
+               * Contact-scoped permission chain, so an account refused here was refused on
+               * every autosave too - the answers were never written, and a reader who trusts
+               * the message loses the lot on reload. Reported exactly that way. It now says
+               * what is true, which is that it does not know.
+               */
+              return 'Your account is not allowed to submit this review, so nothing was submitted. Check your answers '
+                + 'are still on screen before leaving the page - the same permission stops them being saved, so they '
+                + 'may not have been. Submitting needs a Tax or AQS reviewer role on your portal account, and the '
+                + 'review has to be assigned to you. Ask an administrator to check both rather than retrying.';
             }
             return 'We could not submit this review. Nothing has been changed. Please try again, and contact support if it keeps happening'
               + (httpStatus ? ', quoting status ' + httpStatus + '.' : '.');

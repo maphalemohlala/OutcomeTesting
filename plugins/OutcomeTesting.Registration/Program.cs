@@ -5,6 +5,7 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 
@@ -79,6 +80,12 @@ using System.Text.Json;
 //   It refuses to start unless the subject holds the role in neither source, so it can
 //   only put back what it found. The audit events the commands write are immutable
 //   (NFR-AUD-01) and remain afterwards - that is the record of the run, not litter.
+//
+// Import seed data: dotnet run -- importseed <orgUrl> <packageFolder> --confirm <orgUrl>
+//   Upserts a Configuration Migration package (data_schema.xml + data.xml) on the ids the
+//   package gives its records, so a re-import is idempotent. Exists because there is no
+//   `pac data import` in 2.11.2 and the supported tool is a desktop GUI; the reference data
+//   under data/ could otherwise not be applied from a session at all.
 //
 // Add to solution: dotnet run -- addtosolution <orgUrl> [<solutionUniqueName>]
 //   Adds the plug-in assembly (and its plug-in type) to the target solution for clean ALM
@@ -301,6 +308,11 @@ if (args.Length >= 2 && args[0].Equals("proveroles", StringComparison.OrdinalIgn
 if (args.Length >= 2 && args[0].Equals("proveadoption", StringComparison.OrdinalIgnoreCase))
 {
     return ProveAdoption(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("importseed", StringComparison.OrdinalIgnoreCase))
+{
+    return ImportSeed(args);
 }
 
 if (args.Length < 1)
@@ -953,6 +965,205 @@ int ProveAdoption(string[] a)
             : hasMapping
                 ? (mappingActive == false ? "Withdrawn" : "Held")
                 : "Not held");
+}
+
+// Imports a Configuration Migration data package (data_schema.xml + data.xml) by upserting
+// every record on the id the package gives it.
+//
+// This exists because `pac` cannot. There is no `pac data import` in 2.11.2 — the only
+// first-party route is the Configuration Migration Tool, which is a desktop GUI, so a seed
+// change could not be applied from a session at all. Same reason restoretablepermissions
+// exists: the supported tool for the job is not one this environment can run.
+//
+// Schema-driven rather than metadata-driven: data_schema.xml already declares the type of
+// every field the package writes, so the conversion cannot disagree with the file it is
+// reading, and the import spends no metadata calls. A field the schema does not declare is
+// an error rather than a skip — a typo in a seed that silently writes nothing is exactly the
+// failure a seed importer must not have.
+//
+// Upsert on the package's own id, so re-importing is idempotent and a record that already
+// exists keeps its relationships. Records are written in file order, which is why the
+// package lists parents before children.
+//
+// WRITES REFERENCE DATA. The org URL is repeated after --confirm, like every other writing
+// verb here.
+int ImportSeed(string[] a)
+{
+    var orgUrl = a[1];
+    var folder = a.Length > 2 ? a[2] : string.Empty;
+    var confirmIndex = Array.FindIndex(a, x => x.Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+    var confirmed = folder.Length > 0
+        && confirmIndex > 2
+        && confirmIndex + 1 < a.Length
+        && a[confirmIndex + 1].TrimEnd('/').Equals(orgUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+
+    if (!confirmed)
+    {
+        Console.Error.WriteLine(
+            "This writes reference data. Re-run as: importseed <orgUrl> <packageFolder> --confirm <orgUrl>");
+        return 1;
+    }
+
+    folder = Path.GetFullPath(folder);
+    var schemaPath = Path.Combine(folder, "data_schema.xml");
+    var dataPath = Path.Combine(folder, "data.xml");
+    if (!File.Exists(schemaPath) || !File.Exists(dataPath))
+    {
+        Console.Error.WriteLine($"Expected data_schema.xml and data.xml under {folder}.");
+        return 1;
+    }
+
+    var schema = System.Xml.Linq.XDocument.Load(schemaPath);
+    var fields = new Dictionary<string, Dictionary<string, (string Type, string LookupType)>>(StringComparer.OrdinalIgnoreCase);
+    foreach (var entity in schema.Descendants("entity"))
+    {
+        var name = (string?)entity.Attribute("name");
+        if (name == null) continue;
+
+        var map = new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var field in entity.Descendants("field"))
+        {
+            var fieldName = (string?)field.Attribute("name");
+            if (fieldName == null) continue;
+            map[fieldName] = ((string?)field.Attribute("type") ?? "string", (string?)field.Attribute("lookupType") ?? string.Empty);
+        }
+
+        fields[name] = map;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var created = 0;
+    var updated = 0;
+    var data = System.Xml.Linq.XDocument.Load(dataPath);
+
+    foreach (var entityNode in data.Descendants("entity"))
+    {
+        var logicalName = (string?)entityNode.Attribute("name");
+        if (logicalName == null) continue;
+
+        if (!fields.TryGetValue(logicalName, out var fieldTypes))
+        {
+            Console.Error.WriteLine($"{logicalName}: not declared in data_schema.xml.");
+            return 1;
+        }
+
+        Console.WriteLine($"{logicalName}…");
+
+        foreach (var recordNode in entityNode.Descendants("record"))
+        {
+            var rawId = (string?)recordNode.Attribute("id");
+            if (rawId == null || !Guid.TryParse(rawId, out var id))
+            {
+                Console.Error.WriteLine($"  {logicalName}: a record has no usable id.");
+                return 1;
+            }
+
+            var row = new Entity(logicalName, id);
+            foreach (var fieldNode in recordNode.Elements("field"))
+            {
+                var name = (string?)fieldNode.Attribute("name");
+                var value = (string?)fieldNode.Attribute("value");
+                if (name == null) continue;
+
+                if (!fieldTypes.TryGetValue(name, out var type))
+                {
+                    Console.Error.WriteLine($"  {logicalName}.{name}: not declared in data_schema.xml.");
+                    return 1;
+                }
+
+                row[name] = SeedValue(logicalName, name, type.Type, type.LookupType, value, fieldNode);
+            }
+
+            // Retrieve rather than RetrieveMultiple: the id is the whole question, and a
+            // "does not exist" fault is the answer rather than a failure.
+            var exists = true;
+            try
+            {
+                svc.Retrieve(logicalName, id, new ColumnSet(false));
+            }
+            catch (System.ServiceModel.FaultException<OrganizationServiceFault>)
+            {
+                exists = false;
+            }
+
+            if (exists)
+            {
+                svc.Update(row);
+                updated++;
+            }
+            else
+            {
+                svc.Create(row);
+                created++;
+            }
+        }
+    }
+
+    Console.WriteLine($"Done. {created} created, {updated} updated.");
+    return 0;
+}
+
+object SeedValue(
+    string entity, string field, string type, string lookupType, string? value,
+    System.Xml.Linq.XElement fieldNode)
+{
+    switch (type.ToLowerInvariant())
+    {
+        case "string":
+        case "memo":
+            return value ?? string.Empty;
+
+        case "bool":
+        case "boolean":
+            return string.Equals(value, "True", StringComparison.OrdinalIgnoreCase);
+
+        case "number":
+        case "integer":
+            if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
+            {
+                return number;
+            }
+
+            throw new InvalidOperationException($"{entity}.{field}: '{value}' is not a whole number.");
+
+        case "optionsetvalue":
+            if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var option))
+            {
+                return new OptionSetValue(option);
+            }
+
+            throw new InvalidOperationException($"{entity}.{field}: '{value}' is not an option value.");
+
+        case "datetime":
+            if (DateTime.TryParse(
+                    value, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var moment))
+            {
+                return moment;
+            }
+
+            throw new InvalidOperationException($"{entity}.{field}: '{value}' is not a date and time.");
+
+        case "entityreference":
+            // The target table comes from the record when it names one, and from the schema
+            // otherwise. A polymorphic lookup carries its own; a plain one does not.
+            var target = (string?)fieldNode.Attribute("lookupentity") ?? lookupType;
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                throw new InvalidOperationException($"{entity}.{field}: no lookup table for this reference.");
+            }
+
+            if (!Guid.TryParse(value, out var reference))
+            {
+                throw new InvalidOperationException($"{entity}.{field}: '{value}' is not a record id.");
+            }
+
+            return new EntityReference(target, reference);
+
+        default:
+            throw new InvalidOperationException($"{entity}.{field}: unsupported field type '{type}'.");
+    }
 }
 
 int Register(string[] a)
