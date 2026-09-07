@@ -1,4 +1,4 @@
-{% extends 'OT Layout' %}
+﻿{% extends 'OT Layout' %}
 {% block content %}
 {% comment %}
   Review detail: renders the questionnaire version issued to this review
@@ -417,10 +417,13 @@
                 if (xhr.status >= 200 && xhr.status < 300) {
                   onDone(xhr);
                 } else {
-                  onFail(xhr.responseText || xhr.statusText);
+                  // The status travels with the body. A refusal carrying no plug-in prefix
+                  // did not come from the plug-in at all, and only the status says whether
+                  // it was the portal turning the write away or something transient.
+                  onFail(xhr.responseText || xhr.statusText, xhr.status);
                 }
               };
-              xhr.onerror = function () { onFail(''); };
+              xhr.onerror = function () { onFail('', 0); };
               xhr.send(body ? JSON.stringify(body) : null);
             }
 
@@ -428,8 +431,18 @@
              * The plug-in prefixes its failures so the client can branch without parsing
              * prose. Messages say what happened, what is still safe and what to do next,
              * and never expose a table name, query, id or stack trace (PP-16).
+             *
+             * The status is read as well as the body, because the most common failure here
+             * never reaches the plug-in and so carries no prefix: the portal refuses the
+             * write on the table permission chain and answers 403. "Not saved - retry" was
+             * wrong for that case in the only way that matters - it is not going to work on
+             * the retry, or the one after, and the person is given nothing to act on.
+             *
+             * The write path is Contact-scoped through contact_al_reviewinstance and carried
+             * by the two checker web roles, so a 403 means one of exactly two things, and
+             * both are worth naming rather than summarising as "permission".
              */
-            function friendlyError(raw) {
+            function friendlyError(raw, httpStatus) {
               var text = String(raw || '');
               if (text.indexOf('CONFLICT:') !== -1) {
                 return 'This review has been submitted and can no longer be changed. Reload the page.';
@@ -441,7 +454,16 @@
                 var idx = text.indexOf('PRECONDITION:');
                 return text.substring(idx + 'PRECONDITION:'.length).trim();
               }
-              return 'Not saved - retry. Your other answers are unaffected.';
+              if (httpStatus === 401 || httpStatus === 403) {
+                return 'Your account is not allowed to record answers on this review, so nothing was saved. '
+                  + 'Answering needs a Tax or AQS reviewer role on your portal account, and the review has to be '
+                  + 'assigned to you. Ask an administrator to check both - retrying will not help.';
+              }
+              if (httpStatus === 0) {
+                return 'That answer did not reach the server. Check your connection; it will save when you next change it.';
+              }
+              return 'Not saved - retry. Your other answers are unaffected.'
+                + (httpStatus ? ' If it keeps happening, contact support and quote status ' + httpStatus + '.' : '');
             }
 
             function idFromHeader(xhr) {
@@ -525,7 +547,7 @@
                   show('Saved ' + two(now.getHours()) + ':' + two(now.getMinutes()), 'saved');
                 }
 
-                function fail(raw) { show(friendlyError(raw), 'error'); }
+                function fail(raw, httpStatus) { show(friendlyError(raw, httpStatus), 'error'); }
 
                 if (responseId) {
                   api('PATCH', 'al_responses(' + responseId + ')', body, done, fail);
@@ -568,13 +590,13 @@
                     'al_responses(' + responseId + ')/al_failreason_response/$ref',
                     { '@odata.id': '/_api/al_failreasons(' + box.value + ')' },
                     function () { show('Saved', 'saved'); },
-                    function (raw) { box.checked = false; show(friendlyError(raw), 'error'); });
+                    function (raw, httpStatus) { box.checked = false; show(friendlyError(raw, httpStatus), 'error'); });
                 } else {
                   api('DELETE',
                     'al_responses(' + responseId + ')/al_failreason_response/$ref?$id=/_api/al_failreasons(' + box.value + ')',
                     null,
                     function () { show('Saved', 'saved'); },
-                    function (raw) { box.checked = true; show(friendlyError(raw), 'error'); });
+                    function (raw, httpStatus) { box.checked = true; show(friendlyError(raw, httpStatus), 'error'); });
                 }
               }
 
@@ -712,7 +734,11 @@
               return text.substring(idx + 'PRECONDITION:'.length).trim();
             }
             if (httpStatus === 401 || httpStatus === 403) {
-              return 'The site would not accept this submission from your account. Your answers are still saved. Reload the page and try once more - if it happens again, contact support and say the submission was refused with status ' + httpStatus + '.';
+              // Reloading and trying once more was the wrong advice: this refusal is the
+              // permission chain, and it will refuse again. Say what is actually missing.
+              return 'Your account is not allowed to submit this review, so nothing was submitted. Your answers are '
+                + 'still saved. Submitting needs a Tax or AQS reviewer role on your portal account, and the review has '
+                + 'to be assigned to you. Ask an administrator to check both rather than retrying.';
             }
             return 'We could not submit this review. Nothing has been changed. Please try again, and contact support if it keeps happening'
               + (httpStatus ? ', quoting status ' + httpStatus + '.' : '.');

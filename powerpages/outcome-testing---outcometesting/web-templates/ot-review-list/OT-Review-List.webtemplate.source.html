@@ -1,4 +1,4 @@
-{% comment %}
+﻿{% comment %}
   Shared review worklist (PP-07, PP-08). Include with:
     (% include 'OT Review List' reviewtype: 120910200 heading: 'Tax reviews' %)
 
@@ -16,6 +16,28 @@
 {% assign page_number = request.params['page'] | integer | default: 1 %}
 {% if page_number < 1 %}{% assign page_number = 1 %}{% endif %}
 
+{% comment %}
+  Scope (AD-047, AD-056). `?mine=1` narrows the list to the reviews assigned to the signed-in
+  contact; the bare URL is every review in the discipline. This is what the "Shell stage"
+  notice used to promise and is why that notice is gone.
+
+  Default is every review, matching the Cases page rather than guessing: a manager landing
+  here sees the discipline's work, and a reviewer is one click from their own. Making "mine"
+  the default would show an empty page to everyone who does not personally hold a review,
+  which reads as a broken list rather than as a scope.
+
+  Scoping is presentation, never a boundary. Reading another reviewer's work is intended
+  under AD-056; the write boundary is the Contact-anchored table permission chain.
+
+  Dropped for an anonymous visitor for the reason the case list records: an unguarded
+  {{ user.id }} emits an empty condition value, which matches every row and turns "mine"
+  into "all" silently.
+{% endcomment %}
+{% assign f_mine = request.params['mine'] | default: '' %}
+{% if user == null %}{% assign f_mine = '' %}{% endif %}
+{% if f_mine != '' and f_mine != '1' %}{% assign f_mine = '' %}{% endif %}
+{% capture scope_qs %}{% if f_mine == '1' %}mine=1&amp;{% endif %}{% endcapture %}
+
 {% fetchxml reviews %}
 <fetch count="{{ page_size }}" page="{{ page_number }}" returntotalrecordcount="true">
   <entity name="al_reviewinstance">
@@ -27,6 +49,7 @@
     <attribute name="al_submittedon" />
     <filter type="and">
       <condition attribute="al_reviewtype" operator="eq" value="{{ reviewtype }}" />
+      {% if f_mine == '1' %}<condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" />{% endif %}
     </filter>
     <order attribute="al_startedon" descending="true" />
     <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
@@ -170,13 +193,19 @@
   {% endif %}
 {% endif %}
 
-<div class="ot-notice" role="status">
-  <strong>Shell stage.</strong> This list shows every {{ heading | downcase }} instance in the
-  environment. Filtering to your own assigned work arrives with the Phase&nbsp;2 security build.
-</div>
+{% if user %}
+  <nav class="ot-scope" aria-label="Review scope">
+    <a class="ot-btn{% if f_mine == '1' %} ot-btn--primary{% endif %}" href="?mine=1"
+       {% if f_mine == '1' %}aria-current="page"{% endif %}>Assigned to me</a>
+    <a class="ot-btn{% if f_mine != '1' %} ot-btn--primary{% endif %}" href="?"
+       {% if f_mine != '1' %}aria-current="page"{% endif %}>All {{ heading | downcase }}</a>
+  </nav>
+{% endif %}
 
 <section class="ot-card" aria-labelledby="ot-reviews-heading">
-  <h2 class="ot-card__title" id="ot-reviews-heading">{{ heading | escape }}</h2>
+  <h2 class="ot-card__title" id="ot-reviews-heading">
+    {% if f_mine == '1' %}{{ heading | escape }} assigned to me{% else %}{{ heading | escape }}{% endif %}
+  </h2>
 
   {% if rows.size > 0 %}
     <div class="ot-table-wrap">
@@ -225,14 +254,18 @@
 
     <nav aria-label="Pagination" style="margin-top: 1rem;">
       {% if page_number > 1 %}
-        <a href="?page={{ page_number | minus: 1 }}">&laquo; Previous</a>
+        <a href="?{{ scope_qs }}page={{ page_number | minus: 1 }}">&laquo; Previous</a>
       {% endif %}
       {% if rows.size == page_size %}
-        <a href="?page={{ page_number | plus: 1 }}" style="margin-left: 1rem;">Next &raquo;</a>
+        <a href="?{{ scope_qs }}page={{ page_number | plus: 1 }}" style="margin-left: 1rem;">Next &raquo;</a>
       {% endif %}
     </nav>
   {% else %}
-    {% include 'OT Empty State' title: 'No review instances' message: 'A review instance is created when a case is routed to this team.' %}
+    {% if f_mine == '1' %}
+      {% include 'OT Empty State' title: 'Nothing assigned to you' message: 'No review in this discipline is assigned to you. Select "All" above to see what the team is working on, or pick a case up from the queue.' %}
+    {% else %}
+      {% include 'OT Empty State' title: 'No review instances' message: 'A review instance is created when a case is routed to this team. Nothing has been routed here yet.' %}
+    {% endif %}
   {% endif %}
 </section>
 
