@@ -161,11 +161,14 @@ export interface HolderClassification {
  *
  * A withdrawn mapping with no association is `consistent`: both sources say the person
  * does not hold the role, which is exactly what a completed withdrawal looks like.
+ *
+ * mappingId is the sole authority on whether a mapping row exists, so mappingActive
+ * can never be read as evidence of one.
  */
 export function classifyHolder(record: RoleHolderRecord): HolderClassification {
-  const held = record.mappingActive === true;
+  const hasMapping = record.mappingId !== null;
 
-  if (record.mappingId === null && record.associated) {
+  if (!hasMapping && record.associated) {
     return {
       state: 'portal-only',
       label: 'Granted in Power Pages, not adopted',
@@ -174,7 +177,7 @@ export function classifyHolder(record: RoleHolderRecord): HolderClassification {
     };
   }
 
-  if (record.mappingActive === false && record.associated) {
+  if (hasMapping && record.mappingActive === false && record.associated) {
     return {
       state: 'withdrawn-still-granted',
       label: 'Withdrawn in app, still granted',
@@ -183,7 +186,7 @@ export function classifyHolder(record: RoleHolderRecord): HolderClassification {
     };
   }
 
-  if (held && !record.associated) {
+  if (hasMapping && record.mappingActive === true && !record.associated) {
     return {
       state: 'association-missing',
       label: 'Assigned in app, association missing',
@@ -194,7 +197,7 @@ export function classifyHolder(record: RoleHolderRecord): HolderClassification {
 
   return {
     state: 'consistent',
-    label: held ? 'Assigned in app' : 'Withdrawn',
+    label: hasMapping && record.mappingActive === true ? 'Assigned in app' : hasMapping ? 'Withdrawn' : 'Not held',
     canAdopt: false,
     canRevoke: false,
   };

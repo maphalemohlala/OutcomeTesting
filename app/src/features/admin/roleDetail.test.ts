@@ -180,6 +180,7 @@ describe('classifyHolder', () => {
     // The dangerous one: the app says withdrawn and the access is live.
     const result = classifyHolder({ ...base, mappingActive: false });
     expect(result.state).toBe('withdrawn-still-granted');
+    expect(result.canAdopt).toBe(true);
     expect(result.canRevoke).toBe(true);
   });
 
@@ -187,6 +188,7 @@ describe('classifyHolder', () => {
     const result = classifyHolder({ ...base, associated: false });
     expect(result.state).toBe('association-missing');
     expect(result.canAdopt).toBe(true);
+    expect(result.canRevoke).toBe(true);
   });
 
   it('gives every state a label that says what is true, not what is wrong', () => {
@@ -195,8 +197,9 @@ describe('classifyHolder', () => {
       classifyHolder({ ...base, mappingId: null, mappingActive: null }),
       classifyHolder({ ...base, mappingActive: false }),
       classifyHolder({ ...base, associated: false }),
+      classifyHolder({ ...base, mappingId: null, mappingActive: null, associated: false }),
     ];
-    expect(new Set(states.map((s) => s.label)).size).toBe(4);
+    expect(new Set(states.map((s) => s.label)).size).toBe(5);
     expect(states.every((s) => s.label.length > 0)).toBe(true);
   });
 
@@ -204,5 +207,25 @@ describe('classifyHolder', () => {
     const result = classifyHolder({ ...base, mappingActive: false, associated: false });
     expect(result.state).toBe('consistent');
     expect(result.canAdopt).toBe(false);
+  });
+
+  it('rejects the lying combination: mappingId null with mappingActive true', () => {
+    // Though the server never emits this, the type permits it. The function must make it unreachable.
+    const result = classifyHolder({ ...base, mappingId: null, mappingActive: true, associated: false });
+    expect(result.state).not.toBe('association-missing');
+    expect(result.label).not.toContain('Assigned in app');
+  });
+
+  it('ignores mappingActive null when a mapping exists', () => {
+    const result = classifyHolder({ ...base, mappingActive: null });
+    expect(result.state).toBe('consistent');
+    expect(result.canAdopt).toBe(false);
+    expect(result.canRevoke).toBe(false);
+  });
+
+  it('labels a person with no mapping and no association as not held', () => {
+    const result = classifyHolder({ ...base, mappingId: null, mappingActive: null, associated: false });
+    expect(result.label).toBe('Not held');
+    expect(result.state).toBe('consistent');
   });
 });
