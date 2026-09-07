@@ -1,4 +1,4 @@
-<entities>
+﻿<entities>
   <entity name="al_checklist" displayname="Checklist">
     <records>
       <record id="11110000-0000-4c00-8000-000000000001">
@@ -38,7 +38,7 @@
         <field name="al_checklistversionid" lookupentity="al_checklistversion" value="22220000-0000-4c00-8000-000000000008" />
       </record>
       <record id="33330000-0000-4c00-8000-000000000003">
-        <field name="al_name" value="File Quality outcome" />
+        <field name="al_name" value="File Quality: AQS" />
         <field name="al_sectioncode" value="S-FQOUT" />
         <field name="al_displayorder" value="3" />
         <field name="al_ownerrole" value="120910101" />
@@ -112,6 +112,29 @@
         <field name="al_sectioncode" value="S-GRADE" />
         <field name="al_displayorder" value="11" />
         <field name="al_ownerrole" value="120910101" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" lookupentity="al_checklistversion" value="22220000-0000-4c00-8000-000000000008" />
+      </record>
+      <!--
+        File Quality: Tax. Tax and AQS each reach a file quality outcome on the same file,
+        and until now only AQS had a section to record one in - a Tax checker either had
+        nowhere to put theirs or wrote it into the AQS team's row, which is the shared-row
+        problem this splits. Owner is the Tax team (120910100), so the review page's AD-020
+        filter puts it on Tax reviews and only Tax reviews.
+
+        Display order 2 places it directly after the Tax check, which is the order a Tax
+        checker works in. It repeats the order S-AMLCRA carries and that is not a clash: a
+        review renders one owner's sections, so the two are never ordered against each other.
+
+        The questions repeat the AQS wording deliberately. This is the same judgement, made
+        by a different team about the same file; asking it in different words would make two
+        answers to one question look like answers to two.
+      -->
+      <record id="33330000-0000-4c00-8000-000000000090">
+        <field name="al_name" value="File Quality: Tax" />
+        <field name="al_sectioncode" value="S-FQTAX" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_ownerrole" value="120910100" />
         <field name="al_isconditional" value="False" />
         <field name="al_checklistversionid" lookupentity="al_checklistversion" value="22220000-0000-4c00-8000-000000000008" />
       </record>
@@ -370,6 +393,24 @@
         <field name="al_questioncode" value="Q-GR-04" />
         <field name="al_displayorder" value="4" />
         <field name="al_sectionid" lookupentity="al_section" value="33330000-0000-4c00-8000-000000000011" />
+      </record>
+      <record id="44440000-0000-4c00-8000-000000000091">
+        <field name="al_name" value="File quality outcome" />
+        <field name="al_questioncode" value="Q-FQTAX-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" lookupentity="al_section" value="33330000-0000-4c00-8000-000000000090" />
+      </record>
+      <record id="44440000-0000-4c00-8000-000000000092">
+        <field name="al_name" value="Fail observation" />
+        <field name="al_questioncode" value="Q-FQTAX-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" lookupentity="al_section" value="33330000-0000-4c00-8000-000000000090" />
+      </record>
+      <record id="44440000-0000-4c00-8000-000000000093">
+        <field name="al_name" value="Remedial action required?" />
+        <field name="al_questioncode" value="Q-FQTAX-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" lookupentity="al_section" value="33330000-0000-4c00-8000-000000000090" />
       </record>
     </records>
   </entity>
@@ -836,6 +877,39 @@
         <field name="al_ismandatory" value="False" />
         <field name="al_responsetype" value="120910001" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000042" />
+      </record>
+      <record id="55550000-0000-4c00-8000-000000000091">
+        <field name="al_name" value="Q-FQTAX-01 v1" />
+        <field name="al_questionversioncode" value="Q-FQTAX-01-V1" />
+        <field name="al_questiontext" value="File quality outcome" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910005" />
+        <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000091" />
+      </record>
+      <record id="55550000-0000-4c00-8000-000000000092">
+        <field name="al_name" value="Q-FQTAX-02 v1" />
+        <field name="al_questionversioncode" value="Q-FQTAX-02-V1" />
+        <field name="al_questiontext" value="Fail observation" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
+        <field name="al_ismandatory" value="False" />
+        <field name="al_responsetype" value="120910001" />
+        <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000092" />
+      </record>
+      <record id="55550000-0000-4c00-8000-000000000093">
+        <field name="al_name" value="Q-FQTAX-03 v1" />
+        <field name="al_questionversioncode" value="Q-FQTAX-03-V1" />
+        <field name="al_questiontext" value="Remedial action required?" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910007" />
+        <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000093" />
       </record>
     </records>
   </entity>

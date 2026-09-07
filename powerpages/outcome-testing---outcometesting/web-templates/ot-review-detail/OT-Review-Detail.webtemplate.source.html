@@ -197,8 +197,17 @@
 
       {% comment %}
         Fail reasons (FR-013, AD-054). Reference data, fetched once and reused by every
-        answer rather than per question. The picker is revealed by the client only for a
-        non-pass selection.
+        answer rather than per question.
+
+        Scoped to the reviewing team, as the sections are. The category IS the team split in
+        the V8 catalogue - "Tax check" reasons are the Tax team's, and AML, Breach and Record
+        Keeping are the AQS checker's - so a Tax reviewer offered all twenty is being asked to
+        pick from another team's vocabulary, and an AQS reviewer offered the tax ones can
+        record a tax failure the tax team never found.
+
+        AQS is expressed as "not Tax check" rather than as a list of the three. A category
+        added later then lands with AQS, which is where the catalogue's own categories all
+        sit; an explicit list would silently drop it and nobody would see the picker shrink.
       {% endcomment %}
       {% fetchxml failreasons %}
       <fetch>
@@ -207,6 +216,13 @@
           <attribute name="al_name" />
           <attribute name="al_category" />
           <attribute name="al_displayorder" />
+          <filter type="and">
+            {% if owner_role == 120910100 %}
+              <condition attribute="al_category" operator="eq" value="120910403" />
+            {% else %}
+              <condition attribute="al_category" operator="ne" value="120910403" />
+            {% endif %}
+          </filter>
           <order attribute="al_displayorder" />
         </entity>
       </fetch>
@@ -345,8 +361,38 @@
                 (app/src/features/reviews/useReviewDetail.ts, noteOf). The client reveals it
                 only for a non-pass selection; it stays optional under AD-019.
               {% endcomment %}
+              {% comment %}
+                Whether the fail reasons and the evidence note start open.
+
+                They used to be emitted hidden always, and revealed by the autosave script's
+                revealConditional() on load. That script is only emitted for an editable
+                review - so on a submitted review, or one belonging to another reviewer, the
+                reasons a checker had recorded were never shown to anyone reading it. The
+                answer was there and its reasons were invisible, which is the one thing a
+                read-only view of a completed check must not do.
+
+                So the decision is made here, from the record, and the client only takes over
+                once someone changes the answer. Open when the answer is a non-pass, or when
+                anything has already been recorded against it - reasons attached or a note
+                written - because a person who wrote something must be able to see it.
+
+                The non-pass set matches revealConditional's, including "No": an AML or CRA
+                question answered No is exactly what the FR-AML reasons exist to describe.
+              {% endcomment %}
+              {% assign nonpass_values = '120910301,120910302,120910303,120910304,120910306' | split: ',' %}
+              {% capture chosen_value %}{{ existing.al_answerchoice.value }}{% endcapture %}
+              {% assign is_nonpass = false %}
+              {% for v in nonpass_values %}{% if v == chosen_value %}{% assign is_nonpass = true %}{% endif %}{% endfor %}
+
+              {% capture reason_prefix %}|{{ existing.al_responseid }}~{% endcapture %}
+              {% assign has_reasons = false %}
+              {% if existing.al_responseid and selected_reason_pairs contains reason_prefix %}{% assign has_reasons = true %}{% endif %}
+
+              {% assign has_note = false %}
+              {% if existing.al_answertext and existing.al_answertext != empty %}{% assign has_note = true %}{% endif %}
+
               {% if column == 'choice' or column == 'choices' %}
-                <div class="ot-answer__reasons" data-ot-reasons hidden>
+                <div class="ot-answer__reasons" data-ot-reasons{% unless is_nonpass or has_reasons %} hidden{% endunless %}>
                   <p class="ot-answer__note-label">Fail reasons — select all that apply</p>
                   {% for fr in failreasons.results.entities %}
                     <label class="ot-answer__option">
@@ -355,7 +401,7 @@
                     </label>
                   {% endfor %}
                 </div>
-                <div class="ot-answer__note" data-ot-note hidden>
+                <div class="ot-answer__note" data-ot-note{% unless is_nonpass or has_note %} hidden{% endunless %}>
                   <label class="ot-answer__note-label" for="note-{{ qv_id }}">
                     Evidence or observation (optional)
                   </label>
@@ -394,7 +440,15 @@
             'use strict';
 
             var DEBOUNCE_MS = 800;
-            var NON_PASS = [120910301, 120910302, 120910304];
+            /*
+             * Fail, Insufficient evidence, Pass with issues, Potential harm, and No.
+             *
+             * "No" and "Pass with issues" were missing, so an AML or CRA question answered No
+             * offered no way to attach the FR-AML reason written for exactly that answer, and
+             * a Pass-with-issues grade offered none either. Kept in step with the same list in
+             * the markup above.
+             */
+            var NON_PASS = [120910301, 120910302, 120910303, 120910304, 120910306];
 
             var shell = document.querySelector('[data-ot-questionnaire]');
             if (!shell) { return; }
@@ -533,8 +587,20 @@
                   if (inputs[i].checked) { chosen = parseInt(inputs[i].value, 10); }
                 }
                 var isNonPass = NON_PASS.indexOf(chosen) !== -1;
-                if (note) { note.hidden = !isNonPass; }
-                if (reasons) { reasons.hidden = !isNonPass; }
+
+                // Never hide what has something in it. Switching a Fail back to a Pass used
+                // to fold the reasons away with the reasons still attached and the note still
+                // written, leaving a person unable to see - let alone clear - what they had
+                // recorded. The server makes the same judgement when it renders the page.
+                var keptReason = false;
+                var boxes = reasons ? reasons.querySelectorAll('[data-ot-reason]') : [];
+                for (var r = 0; r < boxes.length; r++) {
+                  if (boxes[r].checked) { keptReason = true; }
+                }
+                var keptNote = !!(noteInput && noteInput.value);
+
+                if (note) { note.hidden = !(isNonPass || keptNote); }
+                if (reasons) { reasons.hidden = !(isNonPass || keptReason); }
               }
 
               function save() {

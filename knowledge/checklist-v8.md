@@ -12,7 +12,7 @@ Every displayed answerable question is mandatory before its section can be submi
 
 | Section | Owner role |
 |---|---|
-| `S-TAX` | Tax team |
+| `S-TAX`, `S-FQTAX` | Tax team |
 | `S-AMLCRA`, `S-FQOUT` | AQS checker |
 | `S-E1` to `S-E5`, `S-CRP`, `S-CD`, `S-GRADE` | AQS checker |
 | Remediation (separate form) | Adviser |
@@ -26,8 +26,8 @@ Every displayed answerable question is mandatory before its section can be submi
 | Case header | `Outcome Case` columns, captured at intake. Not versioned questions. |
 | Tax check section | Section `S-TAX`, owned by the Tax reviewer |
 | AML and CRA checking points | Section `S-AMLCRA` |
-| File Quality fail points | `al_FailReason` seed rows, attached to `Response`. Not questions. |
-| File Quality outcome | Section `S-FQOUT` |
+| File Quality fail points | `al_FailReason` seed rows, attached to `Response`. Not questions. Scoped per team by category — see below. |
+| File Quality outcome | Two sections, one per team: `S-FQTAX` and `S-FQOUT` |
 | Suitability core checks E1–E5 | Sections `S-E1` to `S-E5` |
 | Centralised Retirement Proposition | Section `S-CRP`, conditional |
 | Consumer Duty overlay | Section `S-CD` |
@@ -99,15 +99,37 @@ Owner: AQS checker. Response type `YesNoNA` throughout, all mandatory.
 | Q-AML-04 | CDD, source of funds/wealth and ongoing monitoring requirements met where applicable. |
 | Q-AML-05 | High Risk CRA cases have supporting form, approval and rationale on file. |
 
-## S-FQOUT — File Quality outcome
+## File Quality outcome — one section per team
 
-Owner: AQS checker.
+Tax and AQS both reach a file quality outcome on the same file, and they are not the same
+judgement: the Tax team is answering for the tax work, the AQS checker for the advice. One
+shared section made them share a row, so whoever answered second overwrote the first — or,
+where the AD-020 owner filter kept the Tax team out of the AQS section, gave the Tax team
+nowhere to record an outcome at all. Split 2026-09-07.
+
+### S-FQOUT — File Quality: AQS
+
+Owner: AQS checker. The section code is unchanged: `al_sectioncodekey` is an alternate key,
+so re-coding it on a seed import would create a second section and orphan its questions. Only
+the displayed name moved.
 
 | Code | Question | Response type | Mandatory |
 |---|---|---|---|
 | Q-FQ-01 | File quality outcome | PassFail | Yes |
 | Q-FQ-02 | Fail observation | MultilineText | No |
 | Q-FQ-03 | Remedial action required? | YesNo | Yes |
+
+### S-FQTAX — File Quality: Tax
+
+Owner: Tax team. Display order 2, directly after the Tax check. The wording repeats the AQS
+section deliberately — the same question asked of the same file by a different team, so that
+the two answers can be read against each other.
+
+| Code | Question | Response type | Mandatory |
+|---|---|---|---|
+| Q-FQTAX-01 | File quality outcome | PassFail | Yes |
+| Q-FQTAX-02 | Fail observation | MultilineText | No |
+| Q-FQTAX-03 | Remedial action required? | YesNo | Yes |
 
 ## Suitability core checks
 
@@ -206,6 +228,16 @@ Q-GR-01 matches the four BR-005 outcomes and the AD-008 colour tokens exactly. Q
 ## Fail reasons — `al_FailReason` seed rows
 
 Two-part codes preserve the document's category prefix.
+
+**The category is the team split.** `Tax check` reasons belong to the Tax team; `AML`,
+`Breach` and `Record Keeping` belong to the AQS checker, and the review page offers each team
+only its own. AQS is expressed as "not Tax check" rather than as a list of three, so a
+category added later lands with AQS rather than disappearing from both pickers unnoticed.
+
+This is a scoping rule in the page, not a boundary: `ResponseGuardPlugin` enforces the
+submission lock on a fail-reason association but does not check the team. AD-020 section
+ownership, which IS enforced server-side, is what stops a reviewer answering another
+discipline's questions in the first place.
 
 | Code | Category | Reason |
 |---|---|---|
