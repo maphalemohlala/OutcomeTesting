@@ -3,7 +3,6 @@
   <EntityRelationship Name="al_checklist_checklistversion" />
   <EntityRelationship Name="al_checklistversion_reviewinstance" />
   <EntityRelationship Name="al_checklistversion_section" />
-  <EntityRelationship Name="al_contact_al_outcomecase" />
   <EntityRelationship Name="al_exportbatch_exportrecord" />
   <EntityRelationship Name="al_failreason_response" />
   <EntityRelationship Name="al_importbatch_importexception" />
