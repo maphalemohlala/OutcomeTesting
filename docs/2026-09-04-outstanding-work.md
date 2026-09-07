@@ -191,7 +191,7 @@ confirmed.
 - **OD-029** per-team allocation scoping.
 - **Senior Checker** needs `command.assign` granted as a Dataverse row.
 - **Optimistic concurrency is not sent on the portal submit path.**
-- **10 `react-hooks/exhaustive-deps` lint warnings**, all pre-existing, zero errors.
+- **9 `react-hooks/exhaustive-deps` lint warnings**, all pre-existing, zero errors.
 
 ## Closed on 2026-09-06
 
