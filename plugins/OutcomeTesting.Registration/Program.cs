@@ -1,4 +1,4 @@
-using OutcomeTesting.Registration;
+﻿using OutcomeTesting.Registration;
 using Microsoft.Crm.Sdk.Messages;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
@@ -68,6 +68,17 @@ using System.Text.Json;
 //   created — its own seeded case, allocated to the account the drain runs as, both deleted
 //   afterwards — but the al_notification row is left in place deliberately: it is the
 //   evidence. Same --confirm discipline as the verify modes, for the same reason.
+//
+// Prove AD-089: dotnet run -- proveadoption <orgUrl> <subjectEmail> [<roleName>] --confirm <orgUrl>
+//   Proves the write path the conflict rule exists for: grants a web role in Power Pages
+//   ONLY, checks it surfaces as unadopted, adopts it, withdraws it in the app, puts the
+//   association back, and checks the row then reads "Withdrawn in app, still granted".
+//
+//   This GRANTS A REAL PERSON A REAL PORTAL ROLE for the length of the run, which is why
+//   the subject is named rather than picked and the org URL is repeated after --confirm.
+//   It refuses to start unless the subject holds the role in neither source, so it can
+//   only put back what it found. The audit events the commands write are immutable
+//   (NFR-AUD-01) and remain afterwards - that is the record of the run, not litter.
 //
 // Add to solution: dotnet run -- addtosolution <orgUrl> [<solutionUniqueName>]
 //   Adds the plug-in assembly (and its plug-in type) to the target solution for clean ALM
@@ -285,6 +296,11 @@ if (args.Length >= 2 && args[0].Equals("seedwebroles", StringComparison.OrdinalI
 if (args.Length >= 2 && args[0].Equals("proveroles", StringComparison.OrdinalIgnoreCase))
 {
     return ProveRoles(args[1]);
+}
+
+if (args.Length >= 2 && args[0].Equals("proveadoption", StringComparison.OrdinalIgnoreCase))
+{
+    return ProveAdoption(args);
 }
 
 if (args.Length < 1)
@@ -651,6 +667,292 @@ List<string> RolesOf(IOrganizationService svc, Guid contactId)
         .Where(n => n.Length > 0)
         .Distinct()
         .ToList();
+}
+
+// Proves the AD-089 write path: a role granted in Power Pages ONLY surfaces as unadopted,
+// can be adopted, and - once withdrawn in the app while the association is put back -
+// reads "withdrawn, still granted" rather than "withdrawn".
+//
+// This is the half proveroles cannot reach. proveroles drives the app's own commands, so
+// both sources are always written together and never disagree; the conflict rule has
+// something to classify only when an association is written on its own, which is what the
+// bare Associate below does - exactly what Power Pages management does.
+//
+// It GRANTS A REAL PERSON A REAL PORTAL ROLE for the length of the run. Hence the subject
+// is named rather than picked (proveroles takes the first contact it finds, which is not
+// acceptable when the run is about access), the org URL is repeated after --confirm, and
+// it refuses to start unless the subject holds the role in NEITHER source - so it can only
+// ever put back what it found. Cleanup runs in a finally, so a failure part way through
+// still cannot leave someone holding a role.
+int ProveAdoption(string[] a)
+{
+    const string DefaultProbeRole = "AL Portal - Planner";
+    const string ContactRelationship = "powerpagecomponent_mspp_webrole_contact";
+    const string RoleEntity = "mspp_webrole";
+    const string MappingEntity = "al_userrolemapping";
+
+    var orgUrl = a[1];
+    var email = a.Length > 2 ? a[2].Trim() : string.Empty;
+    var confirmIndex = Array.FindIndex(a, x => x.Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+    var roleCode = confirmIndex > 3 ? a[3].Trim() : DefaultProbeRole;
+    var confirmed = email.Length > 0
+        && !email.StartsWith("--", StringComparison.Ordinal)
+        && confirmIndex > 2
+        && confirmIndex + 1 < a.Length
+        && a[confirmIndex + 1].TrimEnd('/').Equals(orgUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+
+    if (!confirmed)
+    {
+        Console.Error.WriteLine(
+            "This grants a real portal role to a real person for the length of the run. Re-run as: " +
+            "proveadoption <orgUrl> <subjectEmail> [<roleName>] --confirm <orgUrl>");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var contact = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name='contact'><attribute name='fullname'/><attribute name='emailaddress1'/>" +
+        "<filter><condition attribute='emailaddress1' operator='eq' value='" +
+        System.Security.SecurityElement.Escape(email) + "'/></filter></entity></fetch>"))
+        .Entities.FirstOrDefault();
+    if (contact == null)
+    {
+        Console.Error.WriteLine($"No contact has the work email {email}, so no web role can be granted to them.");
+        return 1;
+    }
+
+    // FetchXML, not QueryExpression: mspp_webrole is a typed surface over powerpagecomponent
+    // and does not answer a plain QueryExpression here (see WebRoleRegistry).
+    var role = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name='" + RoleEntity + "'><attribute name='mspp_name'/>" +
+        "<attribute name='mspp_authenticatedusersrole'/><attribute name='mspp_anonymoususersrole'/>" +
+        "<filter><condition attribute='mspp_name' operator='eq' value='" +
+        System.Security.SecurityElement.Escape(roleCode) + "'/></filter></entity></fetch>"))
+        .Entities.FirstOrDefault();
+    if (role == null)
+    {
+        Console.Error.WriteLine($"No web role is named {roleCode}.");
+        return 1;
+    }
+
+    // AD-090 refuses to ADOPT an auto-granted role, so a run against one would fail at
+    // step 2 for a reason that has nothing to do with the write path being proved.
+    if ((role.GetAttributeValue<bool?>("mspp_authenticatedusersrole") ?? false)
+        || (role.GetAttributeValue<bool?>("mspp_anonymoususersrole") ?? false))
+    {
+        Console.Error.WriteLine(
+            $"{roleCode} is auto-granted to every signed-in user, so AD-090 refuses to adopt it. Pick another role.");
+        return 1;
+    }
+
+    Console.WriteLine($"Subject:    {contact.GetAttributeValue<string>("fullname")} <{email}>");
+    Console.WriteLine($"Probe role: {roleCode} [{role.Id:D}]");
+
+    var before = ReadHolder(svc, roleCode, email);
+    if (before.found && (before.associated || before.mappingId != null))
+    {
+        Console.Error.WriteLine(
+            $"  {email} already has a relationship to {roleCode} (mappingId=" +
+            (before.mappingId ?? "none") + $", associated={before.associated}). This run would " +
+            "change state it did not create; pick a role they hold in neither source.");
+        return 1;
+    }
+
+    Console.WriteLine("Precondition: no mapping row and no association - OK");
+
+    var passes = 0;
+    var checks = 0;
+    Guid createdMapping = Guid.Empty;
+
+    bool Step(string title, string expectedState, (bool found, string? mappingId, bool? mappingActive, bool associated) row)
+    {
+        checks++;
+        var classification = Classify(row.mappingId, row.mappingActive, row.associated);
+        Console.WriteLine(
+            "   al_GetRoleHolders -> mappingId=" + (row.mappingId ?? "null") +
+            " mappingActive=" + (row.mappingActive.HasValue ? (row.mappingActive.Value ? "true" : "false") : "null") +
+            " associated=" + (row.associated ? "true" : "false") +
+            (row.found ? string.Empty : "  (no row returned)"));
+        Console.WriteLine($"   classify -> {classification.state} \"{classification.label}\"");
+
+        var ok = classification.state == expectedState;
+        Console.WriteLine($"   {title}: " + (ok ? "PASS" : $"FAIL - expected {expectedState}"));
+        if (ok)
+        {
+            passes++;
+        }
+
+        return ok;
+    }
+
+    try
+    {
+        Console.WriteLine();
+        Console.WriteLine("1. Grant in Power Pages only - a bare Associate, no mapping row.");
+        svc.Associate(
+            "contact", contact.Id, new Relationship(ContactRelationship),
+            new EntityReferenceCollection { new EntityReference(RoleEntity, role.Id) });
+        Step("STEP 1", "portal-only", ReadHolder(svc, roleCode, email));
+
+        Console.WriteLine();
+        Console.WriteLine("2. al_AdoptRoleAssignment Decision=Adopt.");
+        var adopt = svc.Execute(new OrganizationRequest("al_AdoptRoleAssignment")
+        {
+            ["UserEmail"] = email,
+            ["RoleCode"] = roleCode,
+            ["Decision"] = "Adopt",
+            ["IdempotencyKey"] = "PROVE-ADOPTION-ADOPT-" + Guid.NewGuid().ToString("N"),
+        });
+        var mappingId = (string)adopt["MappingId"];
+        Console.WriteLine($"   -> MappingId {mappingId}, Adopted={adopt["Adopted"]}, AuditEventId {adopt["AuditEventId"]}");
+        if (!string.IsNullOrWhiteSpace(mappingId))
+        {
+            createdMapping = new Guid(mappingId);
+        }
+
+        Step("STEP 2", "consistent", ReadHolder(svc, roleCode, email));
+
+        Console.WriteLine();
+        Console.WriteLine("3. al_SetRoleAssignmentActive Active=false - withdraw in the app.");
+        svc.Execute(new OrganizationRequest("al_SetRoleAssignmentActive")
+        {
+            ["MappingId"] = mappingId,
+            ["Active"] = false,
+            ["IdempotencyKey"] = "PROVE-ADOPTION-WITHDRAW-" + Guid.NewGuid().ToString("N"),
+        });
+        Step("STEP 3", "consistent", ReadHolder(svc, roleCode, email));
+
+        Console.WriteLine();
+        Console.WriteLine("4. Re-associate in Power Pages - the drift AD-089 exists to surface.");
+        svc.Associate(
+            "contact", contact.Id, new Relationship(ContactRelationship),
+            new EntityReferenceCollection { new EntityReference(RoleEntity, role.Id) });
+        Step("STEP 4", "withdrawn-still-granted", ReadHolder(svc, roleCode, email));
+
+        Console.WriteLine();
+        Console.WriteLine("5. al_AdoptRoleAssignment Decision=Revoke - converge on not granted.");
+        var revoke = svc.Execute(new OrganizationRequest("al_AdoptRoleAssignment")
+        {
+            ["UserEmail"] = email,
+            ["RoleCode"] = roleCode,
+            ["Decision"] = "Revoke",
+            ["IdempotencyKey"] = "PROVE-ADOPTION-REVOKE-" + Guid.NewGuid().ToString("N"),
+        });
+        Console.WriteLine($"   -> Adopted={revoke["Adopted"]}, AuditEventId {revoke["AuditEventId"]}");
+        Step("STEP 5", "consistent", ReadHolder(svc, roleCode, email));
+
+        Console.WriteLine();
+        Console.WriteLine($"PROVE ADOPTION: {(passes == checks ? "PASS" : "FAIL")} ({passes} of {checks})");
+        return passes == checks ? 0 : 2;
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine("PROVE ADOPTION FAILED: " + ex.Message.Replace("\r", " ").Replace("\n", " "));
+        return 2;
+    }
+    finally
+    {
+        // Put back exactly what was found: no association, no mapping row. Both are
+        // attempted regardless of where the run stopped, because the failure that matters
+        // is the one that leaves a real person holding a role nobody granted them.
+        try
+        {
+            svc.Disassociate(
+                "contact", contact.Id, new Relationship(ContactRelationship),
+                new EntityReferenceCollection { new EntityReference(RoleEntity, role.Id) });
+            Console.WriteLine("cleanup: association removed.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("cleanup: no association to remove (" + ex.Message.Replace("\r", " ").Replace("\n", " ") + ").");
+        }
+
+        if (createdMapping != Guid.Empty)
+        {
+            try
+            {
+                svc.Delete(MappingEntity, createdMapping);
+                Console.WriteLine("cleanup: probe mapping deleted.");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"cleanup FAILED, delete {MappingEntity} {createdMapping:D} by hand: " +
+                    ex.Message.Replace("\r", " ").Replace("\n", " "));
+            }
+        }
+
+        var after = ReadHolder(svc, roleCode, email);
+        Console.WriteLine(
+            "final: mappingId=" + (after.mappingId ?? "null") +
+            " associated=" + (after.associated ? "true" : "false") +
+            (after.found ? "  - STILL PRESENT, CHECK BY HAND" : "  - as found"));
+    }
+}
+
+// One person's row from al_GetRoleHolders, or "no row" when the read returned none - which
+// is itself a fact worth carrying, since a person with neither a mapping nor an association
+// is absent from the list rather than present and empty.
+(bool found, string? mappingId, bool? mappingActive, bool associated) ReadHolder(
+    ServiceClient svc, string roleCode, string email)
+{
+    var response = svc.Execute(new OrganizationRequest("al_GetRoleHolders")
+    {
+        ["RoleCode"] = roleCode,
+    });
+
+    using var document = JsonDocument.Parse((string)response["Holders"]);
+    foreach (var element in document.RootElement.EnumerateArray())
+    {
+        var rowEmail = (element.GetProperty("email").GetString() ?? string.Empty).Trim();
+        if (!rowEmail.Equals(email, StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        var mapping = element.GetProperty("mappingId");
+        var active = element.GetProperty("mappingActive");
+        return (
+            true,
+            mapping.ValueKind == JsonValueKind.Null ? null : mapping.GetString(),
+            active.ValueKind == JsonValueKind.Null ? null : active.GetBoolean(),
+            element.GetProperty("associated").GetBoolean());
+    }
+
+    return (false, null, null, false);
+}
+
+// Mirrors classifyHolder in app/src/features/admin/roleDetail.ts. Duplicated rather than
+// shared for the same reason the PP-15 constants above are: that is TypeScript in the code
+// app and this is a net8.0 console. Asserting on the LABEL rather than on the raw fields is
+// the point - the proof is about what an administrator would see on the role detail screen,
+// and a rule that reads the fields correctly but labels them wrongly is still wrong.
+(string state, string label) Classify(string? mappingId, bool? mappingActive, bool associated)
+{
+    var hasMapping = mappingId != null;
+
+    if (!hasMapping && associated)
+    {
+        return ("portal-only", "Granted in Power Pages, not adopted");
+    }
+
+    if (hasMapping && mappingActive == false && associated)
+    {
+        return ("withdrawn-still-granted", "Withdrawn in app, still granted");
+    }
+
+    if (hasMapping && mappingActive == true && !associated)
+    {
+        return ("association-missing", "Assigned in app, association missing");
+    }
+
+    return (
+        "consistent",
+        hasMapping && mappingActive == true
+            ? "Assigned in app"
+            : hasMapping
+                ? (mappingActive == false ? "Withdrawn" : "Held")
+                : "Not held");
 }
 
 int Register(string[] a)
