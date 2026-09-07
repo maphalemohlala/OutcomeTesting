@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
@@ -458,13 +458,82 @@ namespace OutcomeTesting.Plugins.Tests
         public List<Tuple<string, EntityReference, EntityReference>> Disassociations { get; } =
             new List<Tuple<string, EntityReference, EntityReference>>();
 
+        /// <summary>
+        /// The associations that actually EXIST, as opposed to the calls that were made.
+        ///
+        /// Dataverse refuses a DUPLICATE Associate with a fault, and a fake that accepted it
+        /// silently is precisely what let AD-089's adopt path ship broken: the plug-in caught
+        /// that fault and carried on, which the platform answers by aborting the entire
+        /// transaction ("ISV code reduced the open transaction count"). Every unit test
+        /// passed; the first real adopt failed.
+        ///
+        /// Disassociate is deliberately NOT symmetrical here. Removing a pair that is not
+        /// associated was observed to succeed against Env_AQ_Dev on 2026-09-07, so a fake
+        /// that faulted on it would be stricter than the platform and would fail code the
+        /// platform accepts — a different way of lying.
+        /// </summary>
+        private readonly HashSet<string> _associated = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// How many times Associate was CALLED, accepted or not — which is the fact that
+        /// matters here. A plug-in cannot recover from a fault raised inside its own
+        /// transaction, so the defect is attempting a write that will fault, not failing to
+        /// handle the fault afterwards. Asserting on <see cref="Associations"/> alone would
+        /// be satisfied by code that attempts the duplicate and swallows the result.
+        /// </summary>
+        public int AssociateAttempts { get; private set; }
+
+        /// <summary>How many times Disassociate was called, accepted or not.</summary>
+        public int DisassociateAttempts { get; private set; }
+
+        private static string AssociationKey(string relationship, Guid target, Guid related)
+        {
+            return relationship + "|" + target.ToString("D") + "|" + related.ToString("D");
+        }
+
+        /// <summary>
+        /// Seeds a contact-to-web-role association that already exists, in BOTH the places
+        /// the code under test can see it: the intersect table WebRoleRegistry.IsAssociated
+        /// queries, and the set Associate/Disassociate enforce against. One call, so a test
+        /// cannot half-seed an association and prove nothing with it.
+        /// </summary>
+        public void SeedWebRoleAssociation(Guid contactId, Guid webRoleId)
+        {
+            SeedIntersectRow(contactId, webRoleId);
+            _associated.Add(AssociationKey(WebRoleRegistry.ContactRelationship, contactId, webRoleId));
+        }
+
+        private void SeedIntersectRow(Guid contactId, Guid webRoleId)
+        {
+            Seed(
+                WebRoleRegistry.ContactRelationship,
+                Guid.NewGuid(),
+                "contactid", contactId,
+                "powerpagecomponentid", webRoleId);
+        }
+
         public void Associate(
             string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities)
         {
             foreach (var related in relatedEntities)
             {
+                AssociateAttempts++;
+                if (!_associated.Add(AssociationKey(relationship.SchemaName, entityId, related.Id)))
+                {
+                    throw Fault(
+                        "Cannot insert duplicate key. That pair is already associated through "
+                        + relationship.SchemaName + ".");
+                }
+
+                // Logged only once the write has been accepted, so a test asserting on
+                // Associations is asserting on what happened rather than on what was tried.
                 Associations.Add(Tuple.Create(
                     relationship.SchemaName, new EntityReference(entityName, entityId), related));
+
+                if (relationship.SchemaName == WebRoleRegistry.ContactRelationship)
+                {
+                    SeedIntersectRow(entityId, related.Id);
+                }
             }
         }
 
@@ -473,9 +542,34 @@ namespace OutcomeTesting.Plugins.Tests
         {
             foreach (var related in relatedEntities)
             {
+                DisassociateAttempts++;
+
+                // No fault when the pair is not associated: see the note on _associated.
+                _associated.Remove(AssociationKey(relationship.SchemaName, entityId, related.Id));
+
                 Disassociations.Add(Tuple.Create(
                     relationship.SchemaName, new EntityReference(entityName, entityId), related));
+
+                if (relationship.SchemaName == WebRoleRegistry.ContactRelationship)
+                {
+                    var table = Table(WebRoleRegistry.ContactRelationship);
+                    var stale = table.Values
+                        .Where(r => Equals(r.GetAttributeValue<object>("contactid"), entityId)
+                                 && Equals(r.GetAttributeValue<object>("powerpagecomponentid"), related.Id))
+                        .Select(r => r.Id)
+                        .ToList();
+                    foreach (var id in stale)
+                    {
+                        table.Remove(id);
+                    }
+                }
             }
+        }
+
+        private static System.ServiceModel.FaultException<OrganizationServiceFault> Fault(string message)
+        {
+            return new System.ServiceModel.FaultException<OrganizationServiceFault>(
+                new OrganizationServiceFault { Message = message }, message);
         }
     }
 }

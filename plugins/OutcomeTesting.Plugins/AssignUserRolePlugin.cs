@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -133,8 +133,8 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Associates the contact behind a work email with a web role, tolerating the case
-        /// where the association already exists.
+        /// Associates the contact behind a work email with a web role, skipping the write
+        /// when the association already exists.
         ///
         /// Contacts and web roles are the two halves AD-010 already keys on one email, so a
         /// person with no contact cannot hold a web role — that is reported rather than
@@ -150,22 +150,28 @@ namespace OutcomeTesting.Plugins
                     "No contact has the work email " + email + ", so the web role cannot be granted to them.");
             }
 
-            try
+            // Checked, not attempted-and-caught. Assigning a role someone already holds is
+            // still the idempotent outcome NFR-REL-01 promises — but a plug-in cannot deliver
+            // it by swallowing the duplicate-key fault, because the platform then aborts the
+            // whole transaction ("ISV code reduced the open transaction count"). See
+            // WebRoleRegistry.IsAssociated.
+            //
+            // A concurrent caller could still associate between this read and the write. That
+            // fault is left to propagate deliberately: once it is raised the transaction is
+            // already unusable, so failing the command is the only honest outcome.
+            if (WebRoleRegistry.IsAssociated(service, contact.Id, webRoleId))
             {
-                service.Associate(
-                    ContactRegistry.Entity,
-                    contact.Id,
-                    new Relationship(WebRoleRegistry.ContactRelationship),
-                    new EntityReferenceCollection
-                    {
-                        new EntityReference(WebRoleRegistry.RoleEntity, webRoleId),
-                    });
+                return;
             }
-            catch (System.ServiceModel.FaultException<OrganizationServiceFault>)
-            {
-                // Already associated. Assigning a role someone already holds is the
-                // idempotent outcome this command promises (NFR-REL-01), not a failure.
-            }
+
+            service.Associate(
+                ContactRegistry.Entity,
+                contact.Id,
+                new Relationship(WebRoleRegistry.ContactRelationship),
+                new EntityReferenceCollection
+                {
+                    new EntityReference(WebRoleRegistry.RoleEntity, webRoleId),
+                });
         }
 
         /// <summary>
@@ -181,22 +187,24 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            try
+            // The catch this replaces was never load-bearing: removing a pair that is not
+            // associated was observed to SUCCEED against DEV on 2026-09-07, so nothing was
+            // ever being swallowed here. It still goes, because a catch that would abort the
+            // transaction if it ever did fire is not worth keeping for a case the check
+            // below handles for free — and the two sides now read the same way.
+            if (!WebRoleRegistry.IsAssociated(service, contact.Id, webRole.Id))
             {
-                service.Disassociate(
-                    ContactRegistry.Entity,
-                    contact.Id,
-                    new Relationship(WebRoleRegistry.ContactRelationship),
-                    new EntityReferenceCollection
-                    {
-                        new EntityReference(WebRoleRegistry.RoleEntity, webRole.Id),
-                    });
+                return;
             }
-            catch (System.ServiceModel.FaultException<OrganizationServiceFault>)
-            {
-                // Not associated. Withdrawing a role someone does not hold is already the
-                // state the caller asked for.
-            }
+
+            service.Disassociate(
+                ContactRegistry.Entity,
+                contact.Id,
+                new Relationship(WebRoleRegistry.ContactRelationship),
+                new EntityReferenceCollection
+                {
+                    new EntityReference(WebRoleRegistry.RoleEntity, webRole.Id),
+                });
         }
 
         /// <summary>

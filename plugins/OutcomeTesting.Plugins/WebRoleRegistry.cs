@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -150,6 +150,39 @@ namespace OutcomeTesting.Plugins
             }
 
             return names;
+        }
+
+        /// <summary>
+        /// Whether a contact is already associated with one web role.
+        ///
+        /// Exists so the association writes can CHECK rather than attempt-and-catch.
+        /// Dataverse aborts a plug-in's whole transaction when it swallows a fault from an
+        /// OrganizationService call and carries on — "ISV code reduced the open transaction
+        /// count" — so the tolerant catch that used to sit in AssignUserRolePlugin turned the
+        /// idempotent case into a hard failure. That case is not an edge: adopting a
+        /// portal-only grant (AD-089) associates a contact that is ALREADY associated, every
+        /// single time, which is what the DEV write-path proof hit at its first adopt.
+        ///
+        /// Queried on the intersect directly, with no join. mspp_webrole is a typed surface
+        /// over powerpagecomponent and will not answer a plain QueryExpression, but the
+        /// intersect does answer a flat FetchXML on its two id columns — and
+        /// mspp_webroleid and powerpagecomponentid are the same id, which is why the role id
+        /// goes into the second condition unchanged.
+        /// </summary>
+        public static bool IsAssociated(IOrganizationService service, Guid contactId, Guid webRoleId)
+        {
+            var fetch =
+                "<fetch>" +
+                  "<entity name='" + ContactRelationship + "'>" +
+                    "<attribute name='contactid'/>" +
+                    "<filter>" +
+                      "<condition attribute='contactid' operator='eq' value='" + contactId.ToString("D") + "'/>" +
+                      "<condition attribute='powerpagecomponentid' operator='eq' value='" + webRoleId.ToString("D") + "'/>" +
+                    "</filter>" +
+                  "</entity>" +
+                "</fetch>";
+
+            return service.RetrieveMultiple(new FetchExpression(fetch)).Entities.Count > 0;
         }
 
         /// <summary>The contact carrying a work email, or null. Web roles hang off contacts.</summary>
