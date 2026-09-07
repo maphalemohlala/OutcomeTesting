@@ -358,10 +358,9 @@
               {% comment %}
                 al_answertext doubles as the evidence note held with a structured answer,
                 which is how the Code App already reads the record
-                (app/src/features/reviews/useReviewDetail.ts, noteOf). The client reveals it
-                only for a non-pass selection; it stays optional under AD-019.
-              {% endcomment %}
-              {% comment %}
+                (app/src/features/reviews/useReviewDetail.ts, noteOf). It stays optional
+                under AD-019.
+
                 Whether the fail reasons and the evidence note start open.
 
                 They used to be emitted hidden always, and revealed by the autosave script's

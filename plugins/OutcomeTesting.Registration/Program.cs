@@ -1037,6 +1037,17 @@ int ImportSeed(string[] a)
     var updated = 0;
     var data = System.Xml.Linq.XDocument.Load(dataPath);
 
+    // Package id -> the id the environment actually holds.
+    //
+    // A package's ids are its own. This environment was first seeded through the
+    // Configuration Migration tool, which mints its own, so a row that exists is not found
+    // by the package's id and re-creating it collides with the business key instead. Rows
+    // are therefore matched on that business key, and every lookup is translated through
+    // this map before it is written — otherwise a child would point at an id no row has.
+    //
+    // Parents are listed before children in the package, which is what makes one pass enough.
+    var idMap = new Dictionary<Guid, Guid>();
+
     foreach (var entityNode in data.Descendants("entity"))
     {
         var logicalName = (string?)entityNode.Attribute("name");
@@ -1059,7 +1070,7 @@ int ImportSeed(string[] a)
                 return 1;
             }
 
-            var row = new Entity(logicalName, id);
+            var values = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
             foreach (var fieldNode in recordNode.Elements("field"))
             {
                 var name = (string?)fieldNode.Attribute("name");
@@ -1072,31 +1083,78 @@ int ImportSeed(string[] a)
                     return 1;
                 }
 
-                row[name] = SeedValue(logicalName, name, type.Type, type.LookupType, value, fieldNode);
+                var converted = SeedValue(logicalName, name, type.Type, type.LookupType, value, fieldNode);
+                if (converted is EntityReference reference && idMap.TryGetValue(reference.Id, out var mapped))
+                {
+                    converted = new EntityReference(reference.LogicalName, mapped);
+                }
+
+                values[name] = converted;
             }
 
-            // Retrieve rather than RetrieveMultiple: the id is the whole question, and a
-            // "does not exist" fault is the answer rather than a failure.
-            var exists = true;
+            // Every table in these packages carries "<logical name>code" as its business key
+            // — al_sectioncode, al_questionversioncode, and so on — which is what makes one
+            // uniform rule enough rather than a table of special cases.
+            var codeAttr = logicalName + "code";
+            var existingId = Guid.Empty;
+
             try
             {
-                svc.Retrieve(logicalName, id, new ColumnSet(false));
+                existingId = svc.Retrieve(logicalName, id, new ColumnSet(false)).Id;
             }
             catch (System.ServiceModel.FaultException<OrganizationServiceFault>)
             {
-                exists = false;
+                // Not under the package's id. Fall through to the business key.
             }
 
-            if (exists)
+            if (existingId == Guid.Empty && fieldTypes.ContainsKey(codeAttr) && values.ContainsKey(codeAttr))
             {
+                var byCode = new QueryExpression(logicalName)
+                {
+                    ColumnSet = new ColumnSet(false),
+                    TopCount = 2,
+                    Criteria = new FilterExpression(),
+                };
+                byCode.Criteria.AddCondition(codeAttr, ConditionOperator.Equal, (string)values[codeAttr]);
+
+                var found = svc.RetrieveMultiple(byCode).Entities;
+                if (found.Count > 1)
+                {
+                    Console.Error.WriteLine(
+                        $"  {logicalName} {values[codeAttr]}: {found.Count} rows carry this code; refusing to guess.");
+                    return 1;
+                }
+
+                if (found.Count == 1)
+                {
+                    existingId = found[0].Id;
+                }
+            }
+
+            if (existingId != Guid.Empty)
+            {
+                var row = new Entity(logicalName, existingId);
+                foreach (var pair in values)
+                {
+                    row[pair.Key] = pair.Value;
+                }
+
                 svc.Update(row);
                 updated++;
             }
             else
             {
-                svc.Create(row);
+                var row = new Entity(logicalName, id);
+                foreach (var pair in values)
+                {
+                    row[pair.Key] = pair.Value;
+                }
+
+                existingId = svc.Create(row);
                 created++;
             }
+
+            idMap[id] = existingId;
         }
     }
 
