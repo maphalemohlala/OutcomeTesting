@@ -45,7 +45,7 @@ Read by query, not inferred.
 |---|---|
 | Why is the Tax reviews page empty? | **There are no Tax reviews.** All 9 `al_reviewinstance` rows are AQS (`120910201`). Nothing has been routed to Tax. |
 | Why can an "administrator" not see everything? | The `Administrators` web role appeared in **no** read rule — every "Restrict read" rule named the seven `AL Portal -` roles and stopped. Fixed, see below. |
-| Which roles does the reporting account hold? | `Simunye.Radingwana@ascotlloyd.co.uk` holds `AL Portal - AQS Reviewer` **and nothing else**. It is not an administrator of the portal in any sense the rules can see. |
+| Which roles does the reporting account hold? | The CONTACT `Simunye.Radingwana@ascotlloyd.co.uk` holds `AL Portal - AQS Reviewer` and nothing else. **This turned out to be the wrong question** — see the addendum below. |
 | Who holds the manager roles? | **Nobody.** `AL Portal - Portal Administrator` and `AL Portal - Outcome Testing Manager` are named in the page rules and held by no contact. |
 | Were the table permissions or Web API settings wrong? | No. All 13 permissions carry their roles, and every `Webapi/*` setting is correct. Checked before anything was changed. |
 
@@ -151,6 +151,62 @@ place keeping the id it already had.
 | Sections | 12, with `File Quality: Tax` / Tax team / order 2 and `File Quality: AQS` / AQS checker / order 3 |
 | Tax file quality questions | 3, correct response types and mandatory flags |
 | Table permissions | 13 in source, 13 in the environment, nothing else |
+
+## Addendum — the sign-in does not reach the contact that holds the role
+
+Added after the report *"I hold an AQS reviewer permission, still I cannot see the AQS review
+page"*, which everything above says should have worked.
+
+Every piece of configuration checks out by query, and each was checked rather than assumed:
+
+| Checked | Result |
+|---|---|
+| Contact ↔ role association | Present: `Sims Rad` ↔ `AL Portal - AQS Reviewer` |
+| The associated component | A genuine, Active `Web Role` on this site — not an id collision |
+| Web roles' website | All ten belong to the one site |
+| The AQS page's rule | Names `…0091`, and the cascading Home rule names it too |
+| Every page's publishing state | Published, one website |
+| Rule ↔ publishing state | Empty, and irrelevant: that relationship governs Grant Change, not Restrict Read |
+
+So the configuration is not the fault. **The sign-in is.**
+
+`adx_externalidentity` holds exactly **one** record in this environment:
+
+| Username | Provider | Contact |
+|---|---|---|
+| `e044a8e9-34ac-4503-8da4-e9573ccd234b` | `https://sts.windows.net/4abde4fc-…/` (Entra, the Ascot Lloyd tenant) | **Dev Account** (`svc.automate.aq-dev@ascotlloyd.co.uk`) |
+
+**An Entra sign-in to this portal lands on the `Dev Account` contact**, and `Dev Account` holds
+`AL Portal - Tax Reviewer`. The `Sims Rad` contact, which holds the AQS role, is reached only by
+the local forms login `Sims` — its `adx_identity_username`.
+
+That single fact accounts for every report in this batch, in order:
+
+- *"Signed in as an administrator, but I can only see tax review page"* — resolved to
+  `Dev Account`, which holds Tax Reviewer and nothing else. The Tax page is the one page it can
+  read.
+- *"Signed in again as an AQS reviewer, still cannot see the AQS Reviews page"* — the AQS role
+  was granted to `Sims Rad`. Granting a role to a contact the session never resolves to changes
+  nothing about that session.
+- *"Not saved – retry" on every answer* — the write permission is Contact-scoped through
+  `contact_al_reviewinstance`. `Sims Rad` is the assigned contact on IO-100001, IO-100004 and
+  IO-100007; a session that is `Dev Account` is refused on all three. Which is the 403 the
+  message was mistranslating as "retry".
+
+**Nothing was changed to fix this.** Rebinding an external identity, or granting a person's role
+to a service account, is a decision about a real person's access in a shared environment, and
+the three ways of resolving it are not equivalent:
+
+1. Move the external identity onto the `Sims Rad` contact — correct, and it takes the portal
+   sign-in away from `Dev Account`.
+2. Grant `AL Portal - AQS Reviewer` to `Dev Account` — quickest, and conflates a named person
+   with a service account in every audit row that follows.
+3. Sign in with the local `Sims` username instead of Entra — changes nothing, and proves the
+   diagnosis in one attempt.
+
+The Home page now prints the contact and the roles the portal resolved, so this is a one-glance
+check rather than an investigation. That is what makes the difference between the three options
+a decision someone can take rather than a guess.
 
 ## Still owed
 
