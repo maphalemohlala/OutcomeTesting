@@ -113,13 +113,19 @@ template cache.
 every future upload. It is a leftover of a Standard-model download and should be removed
 from the web file yml so a real failure is not lost in a familiar one.
 
-## Still owed
+## Still owed — both closed later the same day
 
-- The write-path proof in DEV: associate a contact with a role in Power Pages only, confirm
-  it surfaces as unadopted, adopt it, then withdraw and re-associate to confirm the row
-  reads "withdrawn, still granted" rather than "Withdrawn". Not run — it grants a real
-  person a role in a shared environment, so it needs direction on whose account to use.
-- `src/customapis/al_GetMyRoles`, `al_GetRoleHolders` and `al_AdoptRoleAssignment` have no
-  checked-in solution source. The components are in the environment's solution, so DEV is
-  correct, but the repo's unpacked solution tree now lags it. That matters for the TEST/PROD
-  promotion path (OD-011), not for DEV.
+Recorded here as they stood; the evidence is in
+`docs/deployment/2026-09-07-ad089-write-path-proof.md`.
+
+- ~~The write-path proof in DEV~~ **Run, and it failed the first time.** The project owner
+  named `svc.automate.aq@ascotlloyd.co.uk` as the subject. Adopting a portal-only grant
+  aborted the transaction: `AssignUserRolePlugin.AssociateWebRole` caught the duplicate-key
+  fault from `Associate` and carried on, which the platform refuses. Since a portal-only
+  grant is by definition one where the association already exists, `al_AdoptRoleAssignment`
+  Adopt could never have worked against the state it exists for — and no unit test could see
+  it, because the fake modelled the call and not the constraint. Fixed, and the re-run passes
+  5 of 5.
+- ~~`src/customapis` lags the environment~~ **Closed by an AD-013 round trip.** 22 → 25
+  Custom APIs, additions only, `pac solution pack --folder src` clean. OD-011 is unchanged by
+  it: correct source makes a promotion possible, it does not make TEST or PROD exist.
