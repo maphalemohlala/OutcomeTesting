@@ -1,4 +1,4 @@
-{% extends 'OT Layout' %}
+﻿{% extends 'OT Layout' %}
 {% block content %}
 {% comment %}
   Case worklist and search (PP-04).
@@ -82,6 +82,147 @@
 {% if page_number < 1 %}{% assign page_number = 1 %}{% endif %}
 
 {% capture qs %}mine={{ f_mine | url_escape }}&ref={{ f_ref | url_escape }}&client={{ f_client | url_escape }}&adviser={{ f_adviser | url_escape }}&status={{ f_status | url_escape }}&priority={{ f_priority | url_escape }}&type={{ f_type | url_escape }}&from={{ f_from | url_escape }}&to={{ f_to | url_escape }}&outcome={{ f_outcome | url_escape }}{% endcapture %}
+
+{% comment %}
+  Case dashboard (PP-04).
+
+  Five stages and a total, each one a card that opens the very list it counted. The point of
+  a number on a dashboard is that you can act on it, so every card links to a filter this
+  page already supports rather than to a view that has to be assembled by hand; a card whose
+  drill-down did not exist would be decoration.
+
+  The stages are the ones where a case is WAITING FOR SOMEONE - queued for a checker,
+  assigned and not started, being checked, submitted, awaiting the adviser. Closed and No
+  check required are deliberately absent: they are not work, and putting them on a dashboard
+  invites reading the biggest number as the most important one. Imported, Validation failed
+  and Ready for allocation belong to intake, which happens in the app, not here.
+
+  Each card honours the scope. Under "My cases" the counts and the links both carry mine=1,
+  so the figure on a card and the count on the page it opens are the same number - the
+  mismatch AD-047 already had to fix once between My Work's tile and this list.
+
+  Six small aggregates rather than one grouped query, for the reason the Home cards record:
+  a grouped fetch would make the page depend on how an aliased choice column renders in
+  Liquid, and a card showing "120910583" instead of a stage is worse than a sixth round trip.
+  Status values are numeric literals from src/Entities/al_OutcomeCase/Entity.xml.
+{% endcomment %}
+
+{% capture scope_qs %}{% if f_mine == '1' %}mine=1&amp;{% endif %}{% endcapture %}
+
+{% fetchxml n_queued %}
+<fetch aggregate="true">
+  <entity name="al_outcomecase">
+    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
+    <filter type="and"><condition attribute="al_casestatus" operator="eq" value="120910583" /></filter>
+    {% if f_mine == '1' %}<link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="mine"><filter type="and"><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" /></filter></link-entity>{% endif %}
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml n_assigned %}
+<fetch aggregate="true">
+  <entity name="al_outcomecase">
+    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
+    <filter type="and"><condition attribute="al_casestatus" operator="eq" value="120910584" /></filter>
+    {% if f_mine == '1' %}<link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="mine"><filter type="and"><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" /></filter></link-entity>{% endif %}
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml n_inprogress %}
+<fetch aggregate="true">
+  <entity name="al_outcomecase">
+    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
+    <filter type="and"><condition attribute="al_casestatus" operator="eq" value="120910585" /></filter>
+    {% if f_mine == '1' %}<link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="mine"><filter type="and"><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" /></filter></link-entity>{% endif %}
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml n_submitted %}
+<fetch aggregate="true">
+  <entity name="al_outcomecase">
+    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
+    <filter type="and"><condition attribute="al_casestatus" operator="eq" value="120910586" /></filter>
+    {% if f_mine == '1' %}<link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="mine"><filter type="and"><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" /></filter></link-entity>{% endif %}
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml n_remediation %}
+<fetch aggregate="true">
+  <entity name="al_outcomecase">
+    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
+    <filter type="and"><condition attribute="al_casestatus" operator="eq" value="120910587" /></filter>
+    {% if f_mine == '1' %}<link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="mine"><filter type="and"><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" /></filter></link-entity>{% endif %}
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml n_all %}
+<fetch aggregate="true">
+  <entity name="al_outcomecase">
+    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
+    {% if f_mine == '1' %}<link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="mine"><filter type="and"><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" /></filter></link-entity>{% endif %}
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}
+  An aggregate fetch returns no result set at all when the caller cannot read the table, and
+  indexing entities[0] straight away then fails with "Index was outside the bounds of the
+  array" - which renders as the card's number. Same guard as Home and My Work, for the same
+  reason: a card shows a figure or nothing, never an error string.
+{% endcomment %}
+{% assign c_queued = 0 %}{% if n_queued.results and n_queued.results.entities.size > 0 %}{% assign c_queued = n_queued.results.entities[0].total %}{% endif %}
+{% assign c_assigned = 0 %}{% if n_assigned.results and n_assigned.results.entities.size > 0 %}{% assign c_assigned = n_assigned.results.entities[0].total %}{% endif %}
+{% assign c_inprogress = 0 %}{% if n_inprogress.results and n_inprogress.results.entities.size > 0 %}{% assign c_inprogress = n_inprogress.results.entities[0].total %}{% endif %}
+{% assign c_submitted = 0 %}{% if n_submitted.results and n_submitted.results.entities.size > 0 %}{% assign c_submitted = n_submitted.results.entities[0].total %}{% endif %}
+{% assign c_remediation = 0 %}{% if n_remediation.results and n_remediation.results.entities.size > 0 %}{% assign c_remediation = n_remediation.results.entities[0].total %}{% endif %}
+{% assign c_all = 0 %}{% if n_all.results and n_all.results.entities.size > 0 %}{% assign c_all = n_all.results.entities[0].total %}{% endif %}
+
+<section class="ot-card" aria-labelledby="ot-cases-dashboard">
+  <h2 class="ot-card__title" id="ot-cases-dashboard">
+    {% if f_mine == '1' %}My cases by stage{% else %}Cases by stage{% endif %}
+    <span class="ot-count">{{ c_all }}</span>
+  </h2>
+  <p>
+    Where each case is waiting. Select a card to open the cases behind it.
+  </p>
+
+  <ul class="ot-tiles">
+    <li>
+      <a class="ot-tile" href="/cases?{{ scope_qs }}status=120910583">
+        <span class="ot-tile__count">{{ c_queued }}</span>
+        <span class="ot-tile__label">Queued</span>
+      </a>
+    </li>
+    <li>
+      <a class="ot-tile" href="/cases?{{ scope_qs }}status=120910584">
+        <span class="ot-tile__count">{{ c_assigned }}</span>
+        <span class="ot-tile__label">Assigned</span>
+      </a>
+    </li>
+    <li>
+      <a class="ot-tile" href="/cases?{{ scope_qs }}status=120910585">
+        <span class="ot-tile__count">{{ c_inprogress }}</span>
+        <span class="ot-tile__label">Review in progress</span>
+      </a>
+    </li>
+    <li>
+      <a class="ot-tile" href="/cases?{{ scope_qs }}status=120910586">
+        <span class="ot-tile__count">{{ c_submitted }}</span>
+        <span class="ot-tile__label">Submitted</span>
+      </a>
+    </li>
+    <li>
+      <a class="ot-tile ot-tile--alert" href="/cases?{{ scope_qs }}status=120910587">
+        <span class="ot-tile__count">{{ c_remediation }}</span>
+        <span class="ot-tile__label">Awaiting remediation</span>
+      </a>
+    </li>
+  </ul>
+</section>
 
 <form class="ot-filters" method="get" action="/cases" role="search" aria-label="Filter cases">
   <div class="ot-filters__grid">

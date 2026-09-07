@@ -398,9 +398,72 @@ namespace OutcomeTesting.Plugins.Tests
                 return new OrganizationResponse();
             }
 
+            if (request.RequestName == "RetrieveAttribute")
+            {
+                return RetrieveAttribute(request);
+            }
+
             throw new NotSupportedException(
                 "Message '" + request.RequestName + "' is not supported by this fake. "
                 + "Add it deliberately rather than letting a request silently succeed.");
+        }
+
+        /// <summary>
+        /// Option-set metadata this fake will answer RetrieveAttribute with, keyed
+        /// "entity.attribute". Seeded per test: an attribute nobody seeded is answered with a
+        /// String attribute, which is what OptionLabels falls back to the raw number for.
+        /// </summary>
+        private readonly Dictionary<string, Dictionary<int, string>> _optionSets =
+            new Dictionary<string, Dictionary<int, string>>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Seeds one choice column's options as (value, label) pairs.</summary>
+        public void SeedOptionSet(string entityLogicalName, string attribute, params object[] valueLabelPairs)
+        {
+            var map = new Dictionary<int, string>();
+            for (var i = 0; i + 1 < valueLabelPairs.Length; i += 2)
+            {
+                map[(int)valueLabelPairs[i]] = (string)valueLabelPairs[i + 1];
+            }
+
+            _optionSets[entityLogicalName + "." + attribute] = map;
+        }
+
+        /// <summary>How many RetrieveAttribute calls were made, so caching can be asserted on.</summary>
+        public int MetadataReads { get; private set; }
+
+        private OrganizationResponse RetrieveAttribute(OrganizationRequest request)
+        {
+            MetadataReads++;
+
+            var key = (string)request["EntityLogicalName"] + "." + (string)request["LogicalName"];
+            Dictionary<int, string> options;
+
+            Microsoft.Xrm.Sdk.Metadata.AttributeMetadata metadata;
+            if (_optionSets.TryGetValue(key, out options))
+            {
+                var set = new Microsoft.Xrm.Sdk.Metadata.OptionSetMetadata();
+                foreach (var pair in options)
+                {
+                    set.Options.Add(new Microsoft.Xrm.Sdk.Metadata.OptionMetadata(
+                        new Microsoft.Xrm.Sdk.Label(pair.Value, 1033), pair.Key));
+                }
+
+                metadata = new Microsoft.Xrm.Sdk.Metadata.PicklistAttributeMetadata { OptionSet = set };
+            }
+            else
+            {
+                // Not a choice column as far as this fake knows. Answering with a String
+                // attribute is what the platform would do for, say, al_clientname, and it is
+                // the case OptionLabels has to survive without throwing.
+                metadata = new Microsoft.Xrm.Sdk.Metadata.StringAttributeMetadata();
+            }
+
+            // A real RetrieveAttributeResponse, not a bare OrganizationResponse carrying the
+            // same Results: OptionLabels casts, as any caller of a typed message does, and a
+            // fake that returns the base type tests nothing the platform will do.
+            var response = new Microsoft.Xrm.Sdk.Messages.RetrieveAttributeResponse();
+            response.Results["AttributeMetadata"] = metadata;
+            return response;
         }
 
         private EntityCollection ExecuteSimpleFetch(string fetchXml)

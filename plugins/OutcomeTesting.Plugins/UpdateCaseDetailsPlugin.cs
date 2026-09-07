@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Microsoft.Xrm.Sdk;
@@ -93,23 +93,31 @@ namespace OutcomeTesting.Plugins
             var update = new Entity(CaseEntity, targetId);
             var changes = new List<string>();
 
+            // The change lines below are what a person reads on the case history screen
+            // (FR-033), so choices are named rather than numbered. Resolved against the
+            // system service, and once per column — see OptionLabels.
+            var labels = new OptionLabels(systemService);
+
             // Legacy scalar parameters, retained so existing callers keep working.
             if (status.HasValue)
             {
                 update[StatusAttr] = new OptionSetValue(status.Value);
-                changes.Add("Status " + Describe(before.GetAttributeValue<OptionSetValue>(StatusAttr)) + " -> " + status.Value);
+                changes.Add("Status " + labels.Describe(CaseEntity, StatusAttr, before.GetAttributeValue<OptionSetValue>(StatusAttr))
+                    + " -> " + labels.Label(CaseEntity, StatusAttr, status.Value));
             }
 
             if (routeId.HasValue)
             {
                 update[RouteAttr] = new EntityReference(RouteEntity, routeId.Value);
-                changes.Add("Route " + Describe(before.GetAttributeValue<EntityReference>(RouteAttr)) + " -> " + routeId.Value.ToString("D"));
+                changes.Add("Route " + Describe(before.GetAttributeValue<EntityReference>(RouteAttr))
+                    + " -> " + RouteName(systemService, routeId.Value));
             }
 
             if (priority.HasValue)
             {
                 update[PriorityAttr] = new OptionSetValue(priority.Value);
-                changes.Add("Priority " + Describe(before.GetAttributeValue<OptionSetValue>(PriorityAttr)) + " -> " + priority.Value);
+                changes.Add("Priority " + labels.Describe(CaseEntity, PriorityAttr, before.GetAttributeValue<OptionSetValue>(PriorityAttr))
+                    + " -> " + labels.Label(CaseEntity, PriorityAttr, priority.Value));
             }
 
             if (dueDate.HasValue)
@@ -119,7 +127,7 @@ namespace OutcomeTesting.Plugins
             }
 
             // General editable case fields, addressed by logical name via the Fields payload.
-            ApplyFields(fields, before, update, changes);
+            ApplyFields(fields, before, update, changes, labels);
 
             // One lifecycle check for both status paths — the legacy Status parameter and
             // the Fields payload both land on the same attribute, so validating after they
@@ -289,7 +297,7 @@ namespace OutcomeTesting.Plugins
             }
 
             update[RouteAttr] = new EntityReference(RouteEntity, routeId.Value);
-            changes.Add("Route " + Describe(currentRoute) + " -> " + routeId.Value.ToString("D") + " (" + code + ", derived BR-004)");
+            changes.Add("Route " + Describe(currentRoute) + " -> " + code + " (derived BR-004)");
         }
 
         private static Guid? FindRouteByCode(IOrganizationService service, string code)
@@ -305,14 +313,37 @@ namespace OutcomeTesting.Plugins
             return result.Entities.Count > 0 ? result.Entities[0].Id : (Guid?)null;
         }
 
-        private static string Describe(OptionSetValue value)
-        {
-            return value == null ? "(none)" : value.Value.ToString(CultureInfo.InvariantCulture);
-        }
-
+        /// <summary>
+        /// A lookup as its name. Retrieve populates EntityReference.Name from the primary
+        /// name column, so the route a case was on can be named without a second read; the
+        /// id remains the fallback for a reference that arrived without one.
+        /// </summary>
         private static string Describe(EntityReference value)
         {
-            return value == null ? "(none)" : value.Id.ToString("D");
+            if (value == null)
+            {
+                return "(none)";
+            }
+
+            return string.IsNullOrWhiteSpace(value.Name) ? value.Id.ToString("D") : value.Name;
+        }
+
+        /// <summary>
+        /// The route code behind an id the caller supplied. The explicit RouteId path is the
+        /// AD-036/OD-008 reassignment, where the caller sends a bare guid and nothing on the
+        /// case names it yet — so the history line has to go and look it up or print a guid.
+        /// </summary>
+        private static string RouteName(IOrganizationService service, Guid routeId)
+        {
+            var route = service.Retrieve(RouteEntity, routeId, new ColumnSet(RouteCodeAttr, "al_name"));
+            var code = route.GetAttributeValue<string>(RouteCodeAttr);
+            if (!string.IsNullOrWhiteSpace(code))
+            {
+                return code;
+            }
+
+            var name = route.GetAttributeValue<string>("al_name");
+            return string.IsNullOrWhiteSpace(name) ? routeId.ToString("D") : name;
         }
 
         private static string Describe(DateTime? value)
@@ -441,7 +472,8 @@ namespace OutcomeTesting.Plugins
             Dictionary<string, string> fields,
             Entity before,
             Entity update,
-            List<string> changes)
+            List<string> changes,
+            OptionLabels labels)
         {
             foreach (var pair in fields)
             {
@@ -470,7 +502,7 @@ namespace OutcomeTesting.Plugins
                             if (value.Length == 0)
                             {
                                 update[attr] = null;
-                                changes.Add(def.Label + " " + Describe(before.GetAttributeValue<OptionSetValue>(attr)) + " -> (none)");
+                                changes.Add(def.Label + " " + labels.Describe(CaseEntity, attr, before.GetAttributeValue<OptionSetValue>(attr)) + " -> (none)");
                                 break;
                             }
 
@@ -482,7 +514,8 @@ namespace OutcomeTesting.Plugins
                             }
 
                             update[attr] = new OptionSetValue(option);
-                            changes.Add(def.Label + " " + Describe(before.GetAttributeValue<OptionSetValue>(attr)) + " -> " + option);
+                            changes.Add(def.Label + " " + labels.Describe(CaseEntity, attr, before.GetAttributeValue<OptionSetValue>(attr))
+                                + " -> " + labels.Label(CaseEntity, attr, option));
                             break;
                         }
 

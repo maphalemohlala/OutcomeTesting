@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -88,6 +88,14 @@ namespace OutcomeTesting.Plugins
             var email = NotificationOutbox.UserEmail(service, assignment.GetAttributeValue<EntityReference>("al_assigneduserid"))
                 ?? NotificationOutbox.ContactEmail(service, assignment.GetAttributeValue<EntityReference>("al_assignedcontactid"));
 
+            // "Open it in the portal" is an instruction, not a way in: the recipient still
+            // has to find the site, sign in and search for the reference the email just gave
+            // them. Where the environment has a portal, the email carries the case itself.
+            var link = NotificationOutbox.CaseLink(service, caseRef);
+            var body = link == null
+                ? "Case " + reference + " is now assigned to you for checking. Open it in the portal to start the review."
+                : "Case " + reference + " is now assigned to you for checking. Open it to start the review: " + link;
+
             NotificationOutbox.Queue(
                 service,
                 context,
@@ -96,7 +104,7 @@ namespace OutcomeTesting.Plugins
                 assignmentId,
                 email,
                 "Case " + reference + " has been allocated to you",
-                "Case " + reference + " is now assigned to you for checking. Open it in the portal to start the review.");
+                body);
         }
 
         private static void QueueRemediationAssigned(IOrganizationService service, IPluginExecutionContext context, Guid actionId)

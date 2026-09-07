@@ -1,3 +1,18 @@
+﻿{% comment %}
+  Ascot Lloyd's mark as the browser-tab icon.
+
+  It sits in the header rather than in a head block because this site's pages carry
+  adx_usewebsiteheaderandfooter, so Power Pages owns <head> and this template is the last
+  source-controlled thing that renders on every page. Browsers hoist a <link rel="icon">
+  found in the body, which is why this works where a stylesheet link would not be worth
+  relying on.
+
+  /Logo-sm-64.png is the web file already deployed for the brand mark, so the icon cannot
+  drift from the logo and nothing new has to be uploaded for it.
+{% endcomment %}
+<link rel="icon" type="image/png" href="/Logo-sm-64.png">
+<link rel="apple-touch-icon" href="/Logo-sm-64.png">
+
 {% assign defaultlang = settings['LanguageLocale/Code'] | default: 'en-us' %}
 {% assign homeurl = website.adx_partialurl %}
 <div class=' navbar-expand-xl navbar navbar-dark static-top' style="flex-wrap:wrap;" role='banner'>

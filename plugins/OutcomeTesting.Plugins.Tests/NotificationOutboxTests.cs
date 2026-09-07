@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
 using OutcomeTesting.Plugins;
@@ -242,5 +242,39 @@ namespace OutcomeTesting.Plugins.Tests
         {
             Assert.Null(NotificationOutbox.ParaplannerEmail(new FakeOrganizationService(), null));
         }
-    }
+    
+        [Fact]
+        public void Links_a_case_at_the_environments_own_portal_domain()
+        {
+            // Read from the site row, so a solution promoted out of DEV cannot mail a PROD
+            // checker a link into DEV.
+            var service = new FakeOrganizationService();
+            service.Seed("powerpagesite", Guid.NewGuid(), "primarydomainname", "outcometesting.powerappsportals.com");
+
+            var link = NotificationOutbox.CaseLink(service, new EntityReference("al_outcomecase", Target));
+
+            Assert.Equal(
+                "https://outcometesting.powerappsportals.com/case-details?id=" + Target.ToString("D"),
+                link);
+        }
+
+        [Fact]
+        public void Offers_no_link_where_the_environment_has_no_portal()
+        {
+            // A half-built link reads as a broken one. Saying nothing is the honest answer,
+            // and the body falls back to prose that does not promise a way in.
+            var service = new FakeOrganizationService();
+
+            Assert.Null(NotificationOutbox.CaseLink(service, new EntityReference("al_outcomecase", Target)));
+        }
+
+        [Fact]
+        public void Offers_no_link_where_the_site_has_no_domain_yet()
+        {
+            var service = new FakeOrganizationService();
+            service.Seed("powerpagesite", Guid.NewGuid(), "primarydomainname", "   ");
+
+            Assert.Null(NotificationOutbox.CaseLink(service, new EntityReference("al_outcomecase", Target)));
+        }
+}
 }

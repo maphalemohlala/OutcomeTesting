@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.ServiceModel;
 using Microsoft.Xrm.Sdk;
@@ -30,6 +30,10 @@ namespace OutcomeTesting.Plugins
     public static class NotificationOutbox
     {
         public const string NotificationEntity = "al_notification";
+
+        // The Power Pages site, for the links the bodies carry. See CaseLink.
+        private const string SiteEntity = "powerpagesite";
+        private const string SiteDomainAttr = "primarydomainname";
 
         // Option values from the al_notification_event set created with the table.
         public const int EventAllocation = 120910800;
@@ -247,6 +251,46 @@ namespace OutcomeTesting.Plugins
 
             var row = service.Retrieve("al_outcomecase", outcomeCase.Id, new ColumnSet("al_casereference"));
             return row.GetAttributeValue<string>("al_casereference");
+        }
+
+        /// <summary>
+        /// A portal link to one case, or null when this environment has no site to link into.
+        ///
+        /// The domain is read from the Power Pages site row rather than from configuration.
+        /// Power Pages already records it per environment, so the link is right in DEV, TEST
+        /// and PROD with nothing to set — and, more to the point, a solution promoted from
+        /// DEV cannot carry DEV's URL into PROD, which is the failure a copied setting has
+        /// and the one that would send a checker to the wrong environment's case.
+        ///
+        /// Null rather than a bare path when there is no site or no domain. An email that
+        /// says "/case-details?id=..." is worse than one that says nothing: it looks like a
+        /// link, and the reader spends their time working out why it does not work.
+        /// </summary>
+        public static string CaseLink(IOrganizationService service, EntityReference outcomeCase)
+        {
+            if (outcomeCase == null)
+            {
+                return null;
+            }
+
+            var sites = service.RetrieveMultiple(new QueryExpression(SiteEntity)
+            {
+                ColumnSet = new ColumnSet(SiteDomainAttr),
+                TopCount = 1,
+            }).Entities;
+
+            if (sites.Count == 0)
+            {
+                return null;
+            }
+
+            var domain = sites[0].GetAttributeValue<string>(SiteDomainAttr);
+            if (string.IsNullOrWhiteSpace(domain))
+            {
+                return null;
+            }
+
+            return "https://" + domain.Trim().TrimEnd('/') + "/case-details?id=" + outcomeCase.Id.ToString("D");
         }
 
         private static string Truncate(string value, int length)
