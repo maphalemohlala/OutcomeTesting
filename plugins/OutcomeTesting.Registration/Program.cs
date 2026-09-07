@@ -87,6 +87,34 @@ using System.Text.Json;
 //   `pac data import` in 2.11.2 and the supported tool is a desktop GUI; the reference data
 //   under data/ could otherwise not be applied from a session at all.
 //
+// Who a sign-in reaches: dotnet run -- identities <orgUrl>
+//   Read-only. Joins adx_externalidentity, systemuser.azureactivedirectoryobjectid and the
+//   web role associations, and lists the contacts nothing is bound to. Exists because each
+//   of those read alone is enough to reach the wrong conclusion: a binding names a contact,
+//   so it looks settled, while the object id inside it can belong to a different account
+//   entirely — which is exactly what DEV turned out to hold.
+//
+// Bind an identity: dotnet run -- bindidentity <orgUrl> <entraObjectId> <contactEmail> --confirm <orgUrl>
+//   Binds one Entra object id to one contact, so that person's own sign-in reaches their own
+//   contact. The identity provider is copied from a binding that already works rather than
+//   typed, because a plausible-looking wrong issuer produces a sign-in that reaches nobody.
+//
+//   This CHANGES WHO A REAL PERSON IS on the portal. Additive — it does not disturb a
+//   binding that already exists, and reports rather than repoints one that already claims
+//   the same object id.
+//
+// Grant a role: dotnet run -- grantrole <orgUrl> <contactEmail> <roleName> --confirm <orgUrl>
+//   Grants one web role through al_AssignUserRole, the command the app itself calls, so the
+//   association and the al_userrolemapping mirror are written together. Unlike proveroles it
+//   does not withdraw afterwards: it GRANTS A REAL PERSON REAL PORTAL ACCESS permanently.
+//
+// Route a case: dotnet run -- routecase <orgUrl> <caseName> <routeName> [<assigneeEmail>] --confirm <orgUrl>
+//   Points a case at a review route and, given an assignee, allocates it the way the portal
+//   claim does — al_caseassignment carrying only the case and the contact, leaving
+//   ClaimCasePlugin to decide the discipline and create the review instance. Deliberately
+//   does not write the review itself: a hand-written one would prove the pages render, not
+//   that routing produces the right check.
+//
 // Add to solution: dotnet run -- addtosolution <orgUrl> [<solutionUniqueName>]
 //   Adds the plug-in assembly (and its plug-in type) to the target solution for clean ALM
 //   promotion. Idempotent. The Custom API is added separately via a solution-file import
@@ -313,6 +341,26 @@ if (args.Length >= 2 && args[0].Equals("proveadoption", StringComparison.Ordinal
 if (args.Length >= 2 && args[0].Equals("importseed", StringComparison.OrdinalIgnoreCase))
 {
     return ImportSeed(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("identities", StringComparison.OrdinalIgnoreCase))
+{
+    return Identities(args[1]);
+}
+
+if (args.Length >= 2 && args[0].Equals("bindidentity", StringComparison.OrdinalIgnoreCase))
+{
+    return BindIdentity(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("grantrole", StringComparison.OrdinalIgnoreCase))
+{
+    return GrantRole(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("routecase", StringComparison.OrdinalIgnoreCase))
+{
+    return RouteCase(args);
 }
 
 if (args.Length < 1)
@@ -679,6 +727,389 @@ List<string> RolesOf(IOrganizationService svc, Guid contactId)
         .Where(n => n.Length > 0)
         .Distinct()
         .ToList();
+}
+
+// Finds a web role by name. Separate from FindId because mspp_webrole is a surface over
+// powerpagecomponent and does not answer a plain QueryExpression — the shared helper comes
+// back empty for a role that plainly exists, which reads as "no such role" and is not.
+// The name is escaped because one of the shipped roles is "AL Portal - T&C Supervisor".
+static Guid WebRoleId(IOrganizationService svc, string roleName)
+{
+    var fetch =
+        "<fetch><entity name='mspp_webrole'>" +
+          "<attribute name='mspp_webroleid'/>" +
+          "<filter><condition attribute='mspp_name' operator='eq' value='" +
+            System.Security.SecurityElement.Escape(roleName) + "'/></filter>" +
+        "</entity></fetch>";
+
+    return svc.RetrieveMultiple(new FetchExpression(fetch)).Entities.FirstOrDefault()?.Id ?? Guid.Empty;
+}
+
+// Shared --confirm check: the org URL has to be repeated, so a write against the wrong
+// environment cannot happen by muscle memory. Same discipline as the verify modes.
+static bool ConfirmedFor(string[] a, string orgUrl)
+{
+    for (var i = 2; i < a.Length - 1; i++)
+    {
+        if (a[i].Equals("--confirm", StringComparison.OrdinalIgnoreCase))
+        {
+            return a[i + 1].TrimEnd('/').Equals(orgUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    return false;
+}
+
+// Read-only: what a sign-in actually reaches. Answers the one question the portal cannot
+// be asked from the outside — which contact an external identity resolves to, and what
+// that contact may therefore do — by joining the three facts that have to agree:
+// adx_externalidentity (the binding), systemuser.azureactivedirectoryobjectid (whose Entra
+// account the bound object id really is) and the web role associations.
+//
+// It exists because reading any one of them alone is what produced the wrong diagnosis:
+// a binding names a contact, so it looks settled, while the object id in it can belong to
+// an entirely different account from the one the contact is named after.
+int Identities(string orgUrl)
+{
+    using var svc = Connect(orgUrl);
+
+    var users = svc.RetrieveMultiple(new QueryExpression("systemuser")
+    {
+        ColumnSet = new ColumnSet("fullname", "internalemailaddress", "azureactivedirectoryobjectid"),
+    }).Entities;
+
+    Guid OidOf(Entity u) => u.GetAttributeValue<Guid?>("azureactivedirectoryobjectid") ?? Guid.Empty;
+
+    Console.WriteLine("External identities — who a portal sign-in becomes:");
+    var identities = svc.RetrieveMultiple(new QueryExpression("adx_externalidentity")
+    {
+        ColumnSet = new ColumnSet("adx_username", "adx_identityprovidername", "adx_contactid"),
+    }).Entities;
+
+    if (identities.Count == 0)
+    {
+        Console.WriteLine("  (none) — no Entra sign-in can reach any contact.");
+    }
+
+    foreach (var id in identities)
+    {
+        var username = id.GetAttributeValue<string>("adx_username") ?? string.Empty;
+        var contactRef = id.GetAttributeValue<EntityReference>("adx_contactid");
+        var owner = Guid.TryParse(username, out var oid)
+            ? users.FirstOrDefault(u => OidOf(u) == oid)
+            : null;
+
+        Console.WriteLine($"  {username}");
+        Console.WriteLine($"    provider : {id.GetAttributeValue<string>("adx_identityprovidername")}");
+        Console.WriteLine($"    Entra    : {(owner == null ? "not a systemuser in this environment" : owner.GetAttributeValue<string>("internalemailaddress"))}");
+        Console.WriteLine($"    contact  : {contactRef?.Name ?? "(none)"}");
+
+        if (contactRef != null)
+        {
+            var roles = RolesOf(svc, contactRef.Id);
+            Console.WriteLine($"    roles    : {(roles.Count == 0 ? "(none)" : string.Join(", ", roles))}");
+        }
+
+        // The crossing that is invisible when either half is read on its own.
+        if (owner != null && contactRef != null)
+        {
+            var contact = svc.Retrieve("contact", contactRef.Id, new ColumnSet("emailaddress1"));
+            var contactEmail = (contact.GetAttributeValue<string>("emailaddress1") ?? string.Empty).Trim();
+            var userEmail = (owner.GetAttributeValue<string>("internalemailaddress") ?? string.Empty).Trim();
+            if (contactEmail.Length > 0
+                && !contactEmail.Equals(userEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine(
+                    $"    NOTE     : the bound Entra account ({userEmail}) is not the contact it resolves to ({contactEmail}).");
+            }
+        }
+
+        Console.WriteLine();
+    }
+
+    Console.WriteLine("Contacts with no binding — their roles are unreachable by Entra sign-in:");
+    var bound = identities
+        .Select(i => i.GetAttributeValue<EntityReference>("adx_contactid")?.Id ?? Guid.Empty)
+        .ToHashSet();
+
+    foreach (var c in svc.RetrieveMultiple(new QueryExpression("contact")
+             {
+                 ColumnSet = new ColumnSet("fullname", "emailaddress1"),
+             }).Entities.Where(c => !bound.Contains(c.Id)))
+    {
+        var roles = RolesOf(svc, c.Id);
+        Console.WriteLine(
+            $"  {c.GetAttributeValue<string>("fullname")} <{c.GetAttributeValue<string>("emailaddress1")}> — " +
+            (roles.Count == 0 ? "(no roles)" : string.Join(", ", roles)));
+    }
+
+    return 0;
+}
+
+// Binds one Entra object id to one contact, so that person's own sign-in reaches their own
+// contact and the roles granted to it.
+//
+// This CHANGES WHO A REAL PERSON IS on the portal, which is why the contact is named by
+// email rather than picked and the org URL is repeated after --confirm.
+//
+// The identity provider is copied from a binding that already works rather than typed:
+// the issuer has to match the site's provider exactly, and a plausible-looking wrong value
+// produces a sign-in that silently reaches nobody. If the environment has no binding to
+// copy from, it says so instead of guessing.
+int BindIdentity(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 4 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This changes who a real person is on the portal. Re-run as: " +
+            "bindidentity <orgUrl> <entraObjectId> <contactEmail> --confirm <orgUrl>");
+        return 1;
+    }
+
+    if (!Guid.TryParse(a[2], out var objectId))
+    {
+        Console.Error.WriteLine($"'{a[2]}' is not an Entra object id (a GUID).");
+        return 1;
+    }
+
+    var email = a[3].Trim();
+
+    using var svc = Connect(orgUrl);
+
+    var contactId = FindId(svc, "contact", ("emailaddress1", email));
+    if (contactId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No contact has the email {email}.");
+        return 1;
+    }
+
+    var existing = svc.RetrieveMultiple(new QueryExpression("adx_externalidentity")
+    {
+        ColumnSet = new ColumnSet("adx_username", "adx_identityprovidername", "adx_contactid"),
+    }).Entities;
+
+    var already = existing.FirstOrDefault(e =>
+        Guid.TryParse(e.GetAttributeValue<string>("adx_username"), out var u) && u == objectId);
+    if (already != null)
+    {
+        var who = already.GetAttributeValue<EntityReference>("adx_contactid");
+        Console.WriteLine(
+            $"Already bound: {objectId:D} -> {who?.Name ?? "(no contact)"}. Nothing written.");
+        return who != null && who.Id == contactId ? 0 : 2;
+    }
+
+    var providers = existing
+        .Select(e => (e.GetAttributeValue<string>("adx_identityprovidername") ?? string.Empty).Trim())
+        .Where(p => p.Length > 0)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    if (providers.Count != 1)
+    {
+        Console.Error.WriteLine(providers.Count == 0
+            ? "No existing external identity to copy the provider from, so the issuer cannot be established. Bind one through the portal first."
+            : $"{providers.Count} different providers are in use, so which one this binding needs is not decidable here.");
+        return 1;
+    }
+
+    var provider = providers[0];
+    var contact = svc.Retrieve("contact", contactId, new ColumnSet("fullname"));
+
+    var newId = svc.Create(new Entity("adx_externalidentity")
+    {
+        ["adx_username"] = objectId.ToString("D"),
+        ["adx_identityprovidername"] = provider,
+        ["adx_contactid"] = new EntityReference("contact", contactId),
+    });
+
+    Console.WriteLine($"Bound {objectId:D} -> {contact.GetAttributeValue<string>("fullname")} <{email}>.");
+    Console.WriteLine($"  provider     : {provider}");
+    Console.WriteLine($"  identity row : {newId:D}");
+    Console.WriteLine($"  roles now reachable by that sign-in: {string.Join(", ", RolesOf(svc, contactId))}");
+    return 0;
+}
+
+// Grants one web role to one contact through al_AssignUserRole — the command the app
+// itself calls — so the association and the al_userrolemapping mirror are written together
+// and the AD-089 conflict rule has nothing to classify.
+//
+// It differs from proveroles in one way that matters: proveroles withdraws what it granted,
+// because it is a probe. This leaves the grant in place, so it GRANTS A REAL PERSON REAL
+// PORTAL ACCESS permanently. Hence the named subject and the repeated org URL.
+int GrantRole(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 4 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This grants a real person real portal access. Re-run as: " +
+            "grantrole <orgUrl> <contactEmail> <roleName> --confirm <orgUrl>");
+        return 1;
+    }
+
+    var email = a[2].Trim();
+    var roleName = a[3].Trim();
+
+    using var svc = Connect(orgUrl);
+
+    var contactId = FindId(svc, "contact", ("emailaddress1", email));
+    if (contactId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No contact has the email {email}.");
+        return 1;
+    }
+
+    // Checked before the call so a typo produces "no such role" rather than a mapping row
+    // pointing at a role that does not exist — which reads as granted and is not.
+    //
+    // FetchXML, not FindId: mspp_webrole does not answer a plain QueryExpression, so the
+    // shared helper returns "no such role" for every role that exists.
+    var roleId = WebRoleId(svc, roleName);
+    if (roleId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No web role is named '{roleName}'.");
+        return 1;
+    }
+
+    var before = RolesOf(svc, contactId);
+    Console.WriteLine($"roles before: {(before.Count == 0 ? "(none)" : string.Join(", ", before))}");
+
+    var response = svc.Execute(new OrganizationRequest("al_AssignUserRole")
+    {
+        ["UserEmail"] = email,
+        ["RoleCode"] = roleName,
+        // Sent empty rather than omitted: the platform's request validator refuses a call
+        // that leaves an optional Custom API parameter out entirely.
+        ["AppRole"] = string.Empty,
+        // Stable per (person, role), so a re-run returns the same mapping instead of a
+        // second one.
+        ["IdempotencyKey"] = "GRANTROLE-" + email.ToLowerInvariant() + "-" + roleName,
+    });
+
+    Console.WriteLine($"  al_AssignUserRole -> mapping {response["MappingId"]}");
+
+    var after = RolesOf(svc, contactId);
+    Console.WriteLine($"roles after : {string.Join(", ", after)}");
+
+    // The association is the fact the portal reads; the mapping row alone would leave the
+    // grant invisible to the site.
+    if (!after.Contains(roleName))
+    {
+        Console.Error.WriteLine("FAIL: the mapping row was written but no association was made.");
+        return 2;
+    }
+
+    Console.WriteLine($"PASS: {email} holds '{roleName}' as a web role association.");
+    return 0;
+}
+
+// Points a case at a review route, and optionally allocates it, so a discipline that has
+// never been exercised in an environment can be.
+//
+// The review instance is NOT written here. Allocating creates an al_caseassignment
+// carrying only the case and the contact, exactly as the portal claim does, and
+// ClaimCasePlugin then decides the discipline from the route and creates the review. Doing
+// it that way is the point: a hand-written review instance would prove the pages render,
+// not that routing produces the right check.
+//
+// It MUTATES A REAL CASE and the Audit Event the claim writes is immutable (NFR-AUD-01),
+// so the case is named and the org URL repeated.
+int RouteCase(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 4 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This mutates a real case. Re-run as: " +
+            "routecase <orgUrl> <caseName> <routeName> [<assigneeEmail>] --confirm <orgUrl>");
+        return 1;
+    }
+
+    var caseName = a[2].Trim();
+    var routeName = a[3].Trim();
+    var assigneeEmail = a.Length >= 5 && !a[4].StartsWith("--", StringComparison.Ordinal)
+        ? a[4].Trim()
+        : null;
+
+    using var svc = Connect(orgUrl);
+
+    var caseId = FindId(svc, "al_outcomecase", ("al_name", caseName));
+    if (caseId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No case is named {caseName}.");
+        return 1;
+    }
+
+    var routeId = FindId(svc, "al_reviewroute", ("al_name", routeName));
+    if (routeId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No review route is named '{routeName}'.");
+        return 1;
+    }
+
+    var route = svc.Retrieve(
+        "al_reviewroute", routeId, new ColumnSet("al_requirestaxreview", "al_requiresaqsreview"));
+    Console.WriteLine(
+        $"Route '{routeName}': Tax={route.GetAttributeValue<bool?>("al_requirestaxreview") ?? false}, " +
+        $"AQS={route.GetAttributeValue<bool?>("al_requiresaqsreview") ?? false}");
+
+    svc.Update(new Entity("al_outcomecase", caseId)
+    {
+        ["al_reviewrouteid"] = new EntityReference("al_reviewroute", routeId),
+    });
+    Console.WriteLine($"{caseName} -> route '{routeName}'.");
+
+    if (assigneeEmail == null)
+    {
+        Console.WriteLine("No assignee given, so nothing was allocated and no review exists yet.");
+        return 0;
+    }
+
+    var outcomeCase = svc.Retrieve("al_outcomecase", caseId, new ColumnSet("al_casestatus"));
+    var status = outcomeCase.GetAttributeValue<OptionSetValue>("al_casestatus")?.Value ?? 0;
+    if (status != CaseStatusQueued)
+    {
+        Console.Error.WriteLine(
+            $"{caseName} is at status {status}, not Queued ({CaseStatusQueued}), so a claim would be refused. " +
+            "The route was set; allocate it from the portal or re-run once it is back in the queue.");
+        return 2;
+    }
+
+    var contactId = FindId(svc, "contact", ("emailaddress1", assigneeEmail));
+    if (contactId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No contact has the email {assigneeEmail}.");
+        return 1;
+    }
+
+    svc.Create(new Entity("al_caseassignment")
+    {
+        ["al_outcomecaseid"] = new EntityReference("al_outcomecase", caseId),
+        ["al_assignedcontactid"] = new EntityReference("contact", contactId),
+    });
+    Console.WriteLine($"Allocated to {assigneeEmail}.");
+
+    // Read back what the plug-in decided rather than reporting what was asked for.
+    var reviews = svc.RetrieveMultiple(new QueryExpression("al_reviewinstance")
+    {
+        ColumnSet = new ColumnSet("al_name", "al_reviewtype", "al_reviewstatus", "al_assignedcontactid"),
+        Criteria =
+        {
+            Conditions = { new ConditionExpression("al_outcomecaseid", ConditionOperator.Equal, caseId) },
+        },
+    }).Entities;
+
+    foreach (var r in reviews)
+    {
+        var type = r.GetAttributeValue<OptionSetValue>("al_reviewtype")?.Value ?? 0;
+        Console.WriteLine(
+            $"  review: {r.GetAttributeValue<string>("al_name")} " +
+            $"type={(type == 120910200 ? "Tax" : type == 120910201 ? "AQS" : type.ToString(CultureInfo.InvariantCulture))} " +
+            $"assigned={r.GetAttributeValue<EntityReference>("al_assignedcontactid")?.Name ?? "(nobody)"}");
+    }
+
+    return reviews.Count > 0 ? 0 : 2;
 }
 
 // Proves the AD-089 write path: a role granted in Power Pages ONLY surfaces as unadopted,
