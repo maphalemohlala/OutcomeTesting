@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Adopted">
+  <description default="True when the decision was Adopt, false when it was Revoke.">
+    <label description="True when the decision was Adopt, false when it was Revoke." languagecode="1033" />
+  </description>
+  <displayname default="Adopted">
+    <label description="Adopted" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>Adopted</name>
+  <type>0</type>
+</customapiresponseproperty>

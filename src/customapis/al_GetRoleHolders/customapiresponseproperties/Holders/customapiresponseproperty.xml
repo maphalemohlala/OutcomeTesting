@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Holders">
+  <description default="JSON array of { email, name, mappingId, mappingActive, associated }; nulls when unmirrored.">
+    <label description="JSON array of { email, name, mappingId, mappingActive, associated }; nulls when unmirrored." languagecode="1033" />
+  </description>
+  <displayname default="Holders">
+    <label description="Holders" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>Holders</name>
+  <type>10</type>
+</customapiresponseproperty>

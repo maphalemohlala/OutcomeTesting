@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Decision">
+  <description default="Adopt or Revoke. Adopt makes both sources say the person holds the role; Revoke makes both say they do not.">
+    <label description="Adopt or Revoke. Adopt makes both sources say the person holds the role; Revoke makes both say they do not." languagecode="1033" />
+  </description>
+  <displayname default="Decision">
+    <label description="Decision" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>Decision</name>
+  <type>10</type>
+</customapirequestparameter>

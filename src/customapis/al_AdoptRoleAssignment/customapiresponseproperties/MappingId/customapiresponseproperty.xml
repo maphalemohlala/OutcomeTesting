@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="MappingId">
+  <description default="Id of the al_userrolemapping row written or reconciled. Empty when no such row exists.">
+    <label description="Id of the al_userrolemapping row written or reconciled. Empty when no such row exists." languagecode="1033" />
+  </description>
+  <displayname default="Mapping id">
+    <label description="Mapping id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>MappingId</name>
+  <type>10</type>
+</customapiresponseproperty>

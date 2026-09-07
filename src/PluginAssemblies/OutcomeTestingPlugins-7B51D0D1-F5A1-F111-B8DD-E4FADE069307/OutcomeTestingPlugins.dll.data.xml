@@ -5,6 +5,9 @@
   <IntroducedVersion>1.0</IntroducedVersion>
   <FileName>/PluginAssemblies/OutcomeTestingPlugins-7B51D0D1-F5A1-F111-B8DD-E4FADE069307/OutcomeTestingPlugins.dll</FileName>
   <PluginTypes>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.AdoptRoleAssignmentPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="a62dfa98-8caa-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.AdoptRoleAssignmentPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.AdoptRoleAssignmentPlugin</FriendlyName>
+    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.AssignCasePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="81aadd88-aca6-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.AssignCasePlugin">
       <FriendlyName>OutcomeTesting.Plugins.AssignCasePlugin</FriendlyName>
     </PluginType>
@@ -34,6 +37,12 @@
     </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.GenerateExportPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="a822aeb5-20a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.GenerateExportPlugin">
       <FriendlyName>OutcomeTesting.Plugins.GenerateExportPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.GetMyRolesPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="e0ba1b28-8daa-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.GetMyRolesPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.GetMyRolesPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.GetRoleHoldersPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="f7ba1b28-8daa-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.GetRoleHoldersPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.GetRoleHoldersPlugin</FriendlyName>
     </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.ImportCasesPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="aaeaca7d-c2a7-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.ImportCasesPlugin">
       <FriendlyName>OutcomeTesting.Plugins.ImportCasesPlugin</FriendlyName>

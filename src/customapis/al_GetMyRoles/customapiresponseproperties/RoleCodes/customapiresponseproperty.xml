@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="RoleCodes">
+  <description default="JSON array of the role codes the caller holds, less any auto-granted to everyone (AD-090).">
+    <label description="JSON array of the role codes the caller holds, less any auto-granted to everyone (AD-090)." languagecode="1033" />
+  </description>
+  <displayname default="Role codes">
+    <label description="Role codes" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>RoleCodes</name>
+  <type>10</type>
+</customapiresponseproperty>

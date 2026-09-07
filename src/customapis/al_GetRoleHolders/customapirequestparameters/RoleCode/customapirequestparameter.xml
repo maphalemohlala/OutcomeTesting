@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="RoleCode">
+  <description default="The web role name, which is what al_rolecode carries (AD-044).">
+    <label description="The web role name, which is what al_rolecode carries (AD-044)." languagecode="1033" />
+  </description>
+  <displayname default="Role code">
+    <label description="Role code" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>RoleCode</name>
+  <type>10</type>
+</customapirequestparameter>

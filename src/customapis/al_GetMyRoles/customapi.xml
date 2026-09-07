@@ -1,0 +1,18 @@
+<customapi uniquename="al_GetMyRoles">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="The role codes the caller holds, resolved exactly as the server gate resolves them (AD-089). No permission is enforced: the caller asks only about themselves, and gating it would make sign-in depend on a permission that cannot resolve until sign-in completes. Reads only.">
+    <label description="The role codes the caller holds, resolved exactly as the server gate resolves them (AD-089). No permission is enforced: the caller asks only about themselves, and gating it would make sign-in depend on a permission that cannot resolve until sign-in completes. Reads only." languagecode="1033" />
+  </description>
+  <displayname default="Get My Roles">
+    <label description="Get My Roles" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_GetMyRoles</name>
+  <plugintypeid>
+    <plugintypeexportkey>e0ba1b28-8daa-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

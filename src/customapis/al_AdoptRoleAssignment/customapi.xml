@@ -1,0 +1,18 @@
+<customapi uniquename="al_AdoptRoleAssignment">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Reconciles a role held in two places (AD-089). Adopt converges both sources on granted; Revoke on not granted. Enforces permission.manage Manage and writes an immutable Audit Event naming the administrator who decided (BR-012). Reuses existing command values (AD-076).">
+    <label description="Reconciles a role held in two places (AD-089). Adopt converges both sources on granted; Revoke on not granted. Enforces permission.manage Manage and writes an immutable Audit Event naming the administrator who decided (BR-012). Reuses existing command values (AD-076)." languagecode="1033" />
+  </description>
+  <displayname default="Adopt Role Assignment">
+    <label description="Adopt Role Assignment" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_AdoptRoleAssignment</name>
+  <plugintypeid>
+    <plugintypeexportkey>a62dfa98-8caa-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

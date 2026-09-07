@@ -1,0 +1,18 @@
+<customapi uniquename="al_GetRoleHolders">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Everyone holding one application role, from both sources: the al_userrolemapping rows and the Power Pages web role associations. Returns the raw facts so the caller can see where the two disagree (AD-089). Enforces permission.manage View. Reads only; writes nothing and audits nothing.">
+    <label description="Everyone holding one application role, from both sources: the al_userrolemapping rows and the Power Pages web role associations. Returns the raw facts so the caller can see where the two disagree (AD-089). Enforces permission.manage View. Reads only; writes nothing and audits nothing." languagecode="1033" />
+  </description>
+  <displayname default="Get Role Holders">
+    <label description="Get Role Holders" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_GetRoleHolders</name>
+  <plugintypeid>
+    <plugintypeexportkey>f7ba1b28-8daa-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>
