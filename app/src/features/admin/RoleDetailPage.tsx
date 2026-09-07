@@ -3,18 +3,18 @@ import { Link, useParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import { useIntentKeys } from '../../hooks/useIntentKey';
-import { useUserDirectory } from '../../hooks/useUserDirectory';
 import { updateRole } from '../../services/commands/roles';
 import {
   assignUserRole,
   setPagePermission,
   setPermissionRuleActive,
-  setRoleAssignmentActive,
 } from '../../services/commands/permissions';
+import { adoptRoleAssignment } from '../../services/commands/roleReconciliation';
 import { ACCESS_LEVELS, RESOURCE_KEYS } from '../../types/permissions';
 import { useRoles, type RoleRow } from './useRoles';
 import { useSecurityConfig } from './useSecurityConfig';
-import { buildRoleGrants, buildRoleHolders, sameRoleCode, type RoleGrant } from './roleDetail';
+import { useRoleHolders } from './useRoleHolders';
+import { buildRoleGrants, classifyHolder, sameRoleCode, type RoleGrant, type RoleHolderRecord } from './roleDetail';
 import {
   AssignRoleModal,
   PermissionModal,
@@ -61,7 +61,6 @@ export function RoleDetailPage() {
   const [rolesReloadKey, setRolesReloadKey] = useState(0);
   const config = useSecurityConfig(reloadKey);
   const roles = useRoles(rolesReloadKey);
-  const directory = useUserDirectory();
   const intent = useIntentKeys();
 
   const [rowBusy, setRowBusy] = useState<string | null>(null);
@@ -94,20 +93,11 @@ export function RoleDetailPage() {
     [role, config],
   );
 
-  const holders = useMemo(
-    () => (role && config.status === 'ready' ? buildRoleHolders(role.code, config.mappings) : []),
-    [role, config],
-  );
-
-  /** Contact names by work email, so a holder reads as a person rather than an address. */
-  const nameByEmail = useMemo(() => {
-    const names = new Map<string, string>();
-    if (directory.status !== 'ready') return names;
-    for (const user of directory.users) {
-      names.set(user.email.trim().toLowerCase(), user.name);
-    }
-    return names;
-  }, [directory]);
+  // The role code is not known until `role` resolves, but this hook must stay above the
+  // early returns below (loading / unavailable / not-found) for the rule of hooks — so it
+  // runs with an empty code until then, and useRoleHolders no-ops on that (AD-089).
+  const holdersState = useRoleHolders(role?.code ?? '', reloadKey);
+  const holders = holdersState.status === 'ready' ? holdersState.holders : [];
 
   function reloadConfig() {
     setReloadKey((key) => key + 1);
@@ -225,15 +215,16 @@ export function RoleDetailPage() {
     }
   }
 
-  async function onSetHolderActive(holder: { id: string; email: string; active: boolean }) {
-    if (rowBusy) return;
-    setRowBusy(holder.id);
+  async function onReconcile(holder: RoleHolderRecord, decision: 'Adopt' | 'Revoke') {
+    if (rowBusy || !role) return;
+    setRowBusy(holder.email);
     setRowNotice(null);
 
-    const token = `assignment-active:${holder.id}:${!holder.active}`;
-    const result = await setRoleAssignmentActive({
-      id: holder.id,
-      active: !holder.active,
+    const token = `adopt:${holder.email}:${role.code}:${decision}`;
+    const result = await adoptRoleAssignment({
+      userEmail: holder.email,
+      roleCode: role.code,
+      decision,
       idempotencyKey: intent.keyFor(token),
     });
 
@@ -242,7 +233,9 @@ export function RoleDetailPage() {
       intent.release(token);
       setRowNotice({
         tone: 'ok',
-        message: `${role?.name} ${holder.active ? 'withdrawn from' : 'restored for'} ${holder.email}.`,
+        message: decision === 'Adopt'
+          ? `${role.name} adopted for ${holder.email}. The decision is now in the audit trail.`
+          : `${role.name} revoked for ${holder.email} in both Power Pages and this app.`,
       });
       reloadConfig();
     } else {
@@ -468,9 +461,9 @@ export function RoleDetailPage() {
             ) : null}
           </div>
           <p className="security__hint">
-            Assignments made in this application. A role granted directly in Power Pages
-            management writes the association but no assignment record, so it would not appear
-            here — the conflict rule for roles managed in both places is still open.
+            Both sources at once: assignments made here, and web roles granted directly in Power
+            Pages. A role granted in Power Pages already grants access; adopting it records the
+            decision in the audit trail, and revoking it removes the access (AD-089).
           </p>
           {assignNotice && !assignOpen ? (
             <p className={`security__notice security__notice--${assignNotice.tone}`} role="status">
@@ -478,8 +471,15 @@ export function RoleDetailPage() {
             </p>
           ) : null}
 
-          {loading ? (
-            <p role="status">Loading assignments…</p>
+          {holdersState.status === 'loading' ? (
+            <p role="status">Loading holders…</p>
+          ) : holdersState.status === 'unavailable' ? (
+            // Distinct from the config-unavailable section above: this hook has its own
+            // failure mode (the Custom API, not the mappings/permissions read), and its own
+            // reason to show rather than silently rendering an empty holders list.
+            <p className="security__notice security__notice--error" role="status">
+              {holdersState.reason}
+            </p>
           ) : holders.length === 0 ? (
             <p>Nobody holds this role yet.</p>
           ) : (
@@ -493,29 +493,43 @@ export function RoleDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {holders.map((holder) => (
-                  <tr key={holder.id} data-inactive={holder.active ? undefined : 'true'}>
-                    <td>{nameByEmail.get(holder.email.toLowerCase()) ?? '—'}</td>
-                    <td>{holder.email || '—'}</td>
-                    <td>{holder.active ? 'Active' : 'Withdrawn'}</td>
-                    {canManage ? (
-                      <td className="security__row-actions">
-                        <button
-                          type="button"
-                          className="security__link-btn"
-                          onClick={() => onSetHolderActive(holder)}
-                          disabled={rowBusy !== null}
-                        >
-                          {rowBusy === holder.id
-                            ? 'Working…'
-                            : holder.active
-                              ? 'Withdraw'
-                              : 'Restore'}
-                        </button>
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
+                {holders.map((holder) => {
+                  const state = classifyHolder(holder);
+                  return (
+                    <tr
+                      key={holder.email}
+                      data-inactive={state.state === 'consistent' && !holder.mappingActive ? 'true' : undefined}
+                    >
+                      <td>{holder.name ?? '—'}</td>
+                      <td>{holder.email || '—'}</td>
+                      <td>{state.label}</td>
+                      {canManage ? (
+                        <td className="security__row-actions">
+                          {state.canAdopt ? (
+                            <button
+                              type="button"
+                              className="security__link-btn"
+                              onClick={() => onReconcile(holder, 'Adopt')}
+                              disabled={rowBusy !== null}
+                            >
+                              {rowBusy === holder.email ? 'Working…' : 'Adopt'}
+                            </button>
+                          ) : null}
+                          {state.canRevoke ? (
+                            <button
+                              type="button"
+                              className="security__link-btn"
+                              onClick={() => onReconcile(holder, 'Revoke')}
+                              disabled={rowBusy !== null}
+                            >
+                              Revoke
+                            </button>
+                          ) : null}
+                        </td>
+                      ) : null}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
