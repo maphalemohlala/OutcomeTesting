@@ -210,8 +210,39 @@ uploaded, and `Deploy-Portal.ps1` restored `table-permissions/` on its way out. 
 | `Check-ComponentIds` | 237 identities, no duplicates, no web file faults |
 | `Check-PortalSecurity` | all assertions pass |
 
-With the ids restored, the site source is byte-identical to the last successfully deployed
-state, so there is nothing outstanding to upload.
+### The confirming run
+
+Re-run with the ids restored, and it settles the comparison rather than assuming it:
+
+```
+Found 72 records to process across 48 entities
+Manifest loaded successfully.
+Updating table powerpagecomponent with record ID:f065878a-… FAILED
+  due to Entity 'powerpagecomponent' With Id = f065878a-… Does Not Exist
+Uploading - [####################] 100,0% (Events: 19/19)
+Power Pages website upload succeeded in 14,97 secs.
+```
+
+**The same dead id, the same FAILED line, and 19 of 19 events.** The line is emitted and the
+upload carries on to completion — which is the whole point: with the key present the failure is
+one line of noise, and without it the manifest never finishes loading.
+
+Then 13 table permissions written by `restoretablepermissions`, and verified by query: 13 in
+source, 13 in DEV, nothing else. `Portal deployed and verified.`
+
+## What was deployed, in order
+
+| # | Step | Command | Result |
+|---|---|---|---|
+| 1 | Code App | `npm run build` then `npx pa app push` | Built clean, pushed successfully |
+| 2 | Portal | `Deploy-Portal.ps1 -OrgUrl <orgUrl>` | Upload succeeded 19/19, 13 of 13 permissions written and verified |
+
+The plug-in assembly was **not** redeployed and did not need to be: the only C# change in this
+batch is `plugins/OutcomeTesting.Registration`, a local console that ships in nothing. The
+schema change — deleting `al_contact_al_outcomecase` — was applied directly to DEV by
+`deleterelationship`, so no solution import was required either.
+
+Suites at the deployed commit: **plug-ins 376/376**, **app 192/192**, `tsc` clean.
 
 ## Still owed
 
