@@ -11,10 +11,10 @@ the deployment records under `docs/deployment/` cover what exists and how it got
 and what "done" looks like, so nothing here needs re-deriving.
 
 **Ordered by what it costs to leave alone, not by effort.** Re-ranked 2026-09-06, after the
-users and roles work reduced item 5 to two pieces. **Nothing below is a defect in something already
-delivered**, and only two items are engineering problems at all — OD-034, and the role detail
-view under item 5; the rest are decisions, scheduled security work and environment set-up
-owned outside Delivery.
+users and roles work reduced item 5 to two pieces, both since delivered (AD-089, AD-090) —
+item 5 is now closed. **Nothing below is a defect in something already delivered**, and only
+one item is an engineering problem at all — OD-034; the rest are decisions, scheduled security
+work and environment set-up owned outside Delivery.
 
 **Sequencing, by project owner direction 2026-09-06:** the other environments are set up once
 everything is tested and approved in DEV. So no item here is waiting on TEST or PROD, and
@@ -116,10 +116,11 @@ when to expect a response. Still unstated: hours and response targets, split bet
 portal-down and a single user blocked; and who the hand-off goes to when something needs a
 configuration or platform change, since AQS and Tax do not hold Power Pages or Dataverse admin.
 
-## 5. Users and roles rework — mostly delivered, two pieces left
+## 5. Users and roles rework — delivered
 
-**Owner:** Delivery. **Status: delivered 2026-09-06 except the two items below.**
-See `docs/2026-09-06-delivery-status.md`, AD-085 to AD-088.
+**Owner:** Delivery. **Status: delivered.** Roles and users landed 2026-09-06
+(`docs/2026-09-06-delivery-status.md`, AD-085 to AD-088); the two pieces this section used to
+carry as owed are delivered too, settled by AD-089 and AD-090 and deployed to `Env_AQ_Dev`.
 
 Delivered: `al_User` is retired in favour of Contact (AD-085), People and Users are one
 directory (AD-086), and roles are the Power Pages web roles — read live, assignable and
@@ -131,25 +132,26 @@ contacts have enabled Read-Write systemusers, so both halves resolve. `al_User` 
 source of either. The directory did shrink to 3, exactly as predicted — those three are the
 only real people in the environment.
 
-Still owed:
+Both items this section used to list as still owed are now delivered:
 
 - **A role detail view.** The direction included "selecting a role shows its permissions,
-  details and assignees". **Not built.** Security configuration lists roles, assignments and
-  permission rules as three separate tables, so answering "what does this role actually
-  grant, and who holds it" still means reading across all three. The data is all present and
-  already in the app — this is a screen, not a model change. Done looks like: pick a role,
-  see its description, its rules by resource and level, and the people holding it, with the
-  existing edit and withdraw actions in place.
+  details and assignees". Built: pick a role, see its description, its rules by resource and
+  level, and the people holding it (`al_GetRoleHolders`, `roleDetailPath`), with the existing
+  edit and withdraw actions in place, plus a Status column showing where the two sources
+  (mapping and association) agree or disagree.
 - **A conflict rule for roles managed in two places**, plus a rule for `Authenticated Users`.
-  Unchanged by today's work and now sharper for it. The app writes role assignment through an
-  audited Custom API (AD-041, BR-012) *and* associates the contact, so an assignment made in
-  Power Pages management writes the association with **no** audit event and no mirror row.
-  Today's resolver unions both sources, so such an assignment still grants access — it is
-  simply invisible to the audit trail and to the People screen. That is the conflict rule
-  that is owed: whether a portal-side assignment is legitimate, reconciled on a schedule, or
-  refused. `Authenticated Users` remains the separate case, auto-granted with no per-person
-  membership; it is excluded from the app's vocabulary (AD-087), which is a decision to
-  confirm rather than a rule.
+  Settled by AD-089 and AD-090. The app writes role assignment through an audited Custom API
+  (AD-041, BR-012) *and* associates the contact, so an assignment made in Power Pages
+  management used to write the association with no audit event and no mirror row, and the
+  client used to disagree with the server about what that meant — `PermissionProvider` now
+  asks `al_GetMyRoles` rather than re-deriving the answer from a mapping-table read (AD-089).
+  A portal-side assignment grants access and is visible immediately, surfaced on the role
+  detail screen and counted on the Security configuration page, and is not authoritative
+  until an administrator adopts or revokes it through `al_AdoptRoleAssignment` — each decision
+  audited, never a schedule. `Authenticated Users`, and any role sharing its
+  `mspp_authenticatedusersrole` flag, is excluded from role resolution server-side (AD-090),
+  closing the drift OD-033 found in DEV rather than only confirming the by-name exclusion
+  AD-087 already had.
 
 ## 6. OD-011 — Code Apps production readiness, tenant availability and licensing
 

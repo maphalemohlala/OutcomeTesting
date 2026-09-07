@@ -15,9 +15,9 @@ import {
 } from '../../types/permissions';
 import {
   Al_pagepermissionsService,
-  Al_userrolemappingsService,
   ContactsService,
 } from '../../generated';
+import { executeCommand } from '../../services/commands/commandClient';
 import { useCurrentUser } from '../../services/auth/useCurrentUser';
 import { PermissionContext, type PermissionContextValue } from './permissionContext';
 
@@ -27,15 +27,15 @@ interface Resolved {
 }
 
 /**
- * Resolves the effective permissions for the signed-in user (AD-041). Roles come
- * from al_userrolemapping keyed on work email (AD-010); admin-maintained rules in
- * al_pagepermission overlay the code defaults. Fail-open for view (permissive when
- * the mapping table is empty or unreadable) is safe because every write is enforced
- * server-side by the Custom API commands.
+ * Resolves the effective permissions for the signed-in user (AD-041). Roles come from
+ * `al_GetMyRoles` (AD-089, AD-090), which asks the server what the caller holds rather than
+ * having the client re-derive it: admin-maintained rules in al_pagepermission overlay the
+ * code defaults. Fail-open for view (permissive when the API call fails outright) is safe
+ * because every write is enforced server-side by the Custom API commands.
  */
 async function loadPermissions(email: string): Promise<Resolved> {
-  const [mapResult, permResult, userResult] = await Promise.all([
-    Al_userrolemappingsService.getAll({ filter: 'statecode eq 0', top: 5000 }),
+  const [rolesResult, permResult, userResult] = await Promise.all([
+    executeCommand<{ RoleCodes: string }>('al_GetMyRoles', {}),
     Al_pagepermissionsService.getAll({ filter: 'statecode eq 0', top: 5000 }),
     ContactsService.getAll({
       filter: `emailaddress1 eq '${odataEscape(email.trim().toLowerCase())}'`,
@@ -43,7 +43,6 @@ async function loadPermissions(email: string): Promise<Resolved> {
     }),
   ]);
 
-  const mappings = mapResult.success ? mapResult.data : null;
   const perms = permResult.success ? permResult.data : [];
 
   // Deactivation (OD-010) withdraws access, so a deactivated registry row resolves to no
@@ -55,18 +54,23 @@ async function loadPermissions(email: string): Promise<Resolved> {
     return { roles: [], permissions: resolvePermissions([]) };
   }
 
-  // Bootstrap / fail-open: before any mapping exists (or if the table is unreadable),
-  // grant every role so the first administrator can configure access. Server commands
-  // still gate writes, so this only affects what the UI shows.
+  // Bootstrap / fail-open: the trigger is no longer "the mapping table is unreadable or has
+  // zero rows" (the client no longer reads that table at all) — it is "al_GetMyRoles could
+  // not answer", whether the call itself failed or its response will not parse. Either way
+  // the permissive set stands in so the first administrator can still configure access, and
+  // server commands still gate every write, so this only affects what the UI offers. A call
+  // that SUCCEEDS and answers an empty array is not the bootstrap case: al_GetMyRoles unions
+  // al_userrolemapping with the caller's web role associations and applies the AD-090
+  // exclusion server-side, so an empty result means the caller genuinely holds nothing.
   let roles: string[];
-  if (!mappings || mappings.length === 0) {
+  if (!rolesResult.ok) {
     roles = [...APP_ROLES];
   } else {
-    const needle = email.trim().toLowerCase();
-    roles = mappings
-      .filter((m) => (m.al_useremail ?? '').trim().toLowerCase() === needle)
-      .map((m) => m.al_rolecode?.trim() || APP_ROLE_BY_VALUE[Number(m.al_approle)])
-      .filter((role): role is string => Boolean(role));
+    try {
+      roles = JSON.parse(rolesResult.data.RoleCodes) as string[];
+    } catch {
+      roles = [...APP_ROLES];
+    }
   }
 
   const dataRules: PermissionRule[] = perms

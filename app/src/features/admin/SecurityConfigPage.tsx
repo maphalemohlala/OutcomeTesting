@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { Tabs } from '../../components/navigation/Tabs';
@@ -13,6 +13,8 @@ import {
   setPermissionRuleActive,
   setRoleAssignmentActive,
 } from '../../services/commands/permissions';
+import { executeCommand } from '../../services/commands/commandClient';
+import { logTechnical } from '../../services/errors';
 import { ACCESS_LEVELS, RESOURCE_KEYS } from '../../types/permissions';
 import {
   AssignRoleModal,
@@ -21,8 +23,14 @@ import {
   type Notice,
   type RoleOption,
 } from './SecurityModals';
-import { roleDetailPath } from './roleDetail';
+import { classifyHolder, roleDetailPath, type RoleHolderRecord } from './roleDetail';
 import './SecurityConfigPage.css';
+
+/** One role whose holders include a state `classifyHolder` does not call `consistent` (AD-089). */
+interface UnreconciledRole {
+  code: string;
+  name: string;
+}
 
 /** Splits the `builtin:Label` / `custom:CODE` select value into the two command arguments. */
 function roleArgs(selected: string): { appRole?: string; roleCode?: string; label: string } {
@@ -43,6 +51,46 @@ export function SecurityConfigPage() {
   const [rolesReloadKey, setRolesReloadKey] = useState(0);
   const roles = useRoles(rolesReloadKey);
   const intent = useIntentKeys();
+
+  // The discrepancy count an administrator sees first (AD-089): one al_GetRoleHolders call
+  // per active role, tolerating an individual failure rather than losing the whole count.
+  // Fan-out warning (see task brief): acceptable at this environment's eight business roles;
+  // past roughly twenty, move this server-side into a dedicated read instead of looping
+  // harder here.
+  const [unreconciled, setUnreconciled] = useState<UnreconciledRole[]>([]);
+
+  useEffect(() => {
+    if (roles.status !== 'ready') return;
+    let cancelled = false;
+    const activeRoles = roles.roles.filter((role) => role.active);
+
+    Promise.all(
+      activeRoles.map(async (role): Promise<UnreconciledRole | null> => {
+        const result = await executeCommand<{ Holders: string }>('al_GetRoleHolders', {
+          RoleCode: role.code,
+        });
+        if (!result.ok) {
+          logTechnical('role reconciliation count', result.message);
+          return null;
+        }
+        try {
+          const holders = JSON.parse(result.data.Holders) as RoleHolderRecord[];
+          const hasDiscrepancy = holders.some((holder) => classifyHolder(holder).state !== 'consistent');
+          return hasDiscrepancy ? { code: role.code, name: role.name } : null;
+        } catch (error) {
+          logTechnical('role reconciliation count parse', error);
+          return null;
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      setUnreconciled(results.filter((entry): entry is UnreconciledRole => entry !== null));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [roles]);
 
   const [roleName, setRoleName] = useState('');
   const [roleDesc, setRoleDesc] = useState('');
@@ -334,6 +382,19 @@ export function SecurityConfigPage() {
             Map a person&rsquo;s work email to an application role. People are registered on the{' '}
             <Link to="/admin/users">Users</Link> page.
           </p>
+          {unreconciled.length > 0 ? (
+            <p className="security__notice security__notice--error" role="status">
+              {unreconciled.length === 1
+                ? '1 role has an assignment made outside this app: '
+                : `${unreconciled.length} roles have assignments made outside this app: `}
+              {unreconciled.map((entry, index) => (
+                <span key={entry.code}>
+                  {index > 0 ? ', ' : ''}
+                  <Link to={roleDetailPath(entry.code)}>{entry.name}</Link>
+                </span>
+              ))}
+            </p>
+          ) : null}
           {assignNotice && !assignOpen ? (
             <p className={`security__notice security__notice--${assignNotice.tone}`} role="status">
               {assignNotice.message}
