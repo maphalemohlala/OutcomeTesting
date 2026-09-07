@@ -12,9 +12,10 @@ and what "done" looks like, so nothing here needs re-deriving.
 
 **Ordered by what it costs to leave alone, not by effort.** Re-ranked 2026-09-06, after the
 users and roles work reduced item 5 to two pieces, both since delivered (AD-089, AD-090) —
-item 5 is now closed. **Nothing below is a defect in something already delivered**, and only
-one item is an engineering problem at all — OD-034; the rest are decisions, scheduled security
-work and environment set-up owned outside Delivery.
+item 5 is now closed. Re-ranked again 2026-09-07: **OD-034 is closed too**, by
+`powerpages/Deploy-Portal.ps1`. **Nothing below is a defect in something already delivered**,
+and no item remaining is an engineering problem — what is left is decisions, scheduled
+security work and environment set-up owned outside Delivery.
 
 **Sequencing, by project owner direction 2026-09-06:** the other environments are set up once
 everything is tested and approved in DEV. So no item here is waiting on TEST or PROD, and
@@ -24,7 +25,23 @@ promotion readiness is a state to be *ready for*, not a task in flight.
 
 ## 1. OD-034 — portal deployment has no working CLI path
 
-**Owner:** Delivery. **Status:** OD-035 is CLOSED. OD-034 unsolved.
+**Owner:** Delivery. **Status: CLOSED 2026-09-07.** OD-035 was closed 2026-09-05.
+
+> **OD-034 closed 2026-09-07 by `powerpages/Deploy-Portal.ps1`** (`eb52fb3`), which is now
+> the only sanctioned upload path — `powerpages/README.md` says so, and the script refuses to
+> upload if either gate fails. It does not work around the fault; it removes what makes it
+> reachable. The `adx_entitypermission` and `adx_entitypermission_webrole` sections come out
+> of the manifest before `pac` runs, so there is nothing to route down the Standard-model
+> path and nothing to reconcile away — the second of which is what deleted 11 of 13 table
+> permissions on 2026-09-06. Permissions are then written by `restoretablepermissions`, and
+> the result is verified by query, because on this site a successful-looking upload is not
+> evidence that a component landed.
+>
+> First run 2026-09-07: upload succeeded, 13 of 13 permissions written and verified, both
+> gates clean beforehand. The manifest is deliberately left stripped. Record:
+> `docs/deployment/2026-09-07-role-conflict-rule-deployment.md`.
+>
+> The account of the failure below is kept as written — it is the diagnosis the fix rests on.
 
 > **OD-035 closed 2026-09-05.** Both `case-details` web pages were repointed at `…002b` and
 > verified; the page renders. Correction to the diagnosis: the pages were **not** carrying a
