@@ -4,6 +4,7 @@
  */
 
 // Models
+export * as Al_AdoptRoleAssignmentModel from './models/Al_AdoptRoleAssignmentModel';
 export * as Al_AssignCaseModel from './models/Al_AssignCaseModel';
 export * as Al_AssignUserRoleModel from './models/Al_AssignUserRoleModel';
 export * as Al_CompleteRemediationModel from './models/Al_CompleteRemediationModel';
@@ -11,6 +12,8 @@ export * as Al_CreateExportBatchModel from './models/Al_CreateExportBatchModel';
 export * as Al_CreateRoleModel from './models/Al_CreateRoleModel';
 export * as Al_CreateUserModel from './models/Al_CreateUserModel';
 export * as Al_GenerateExportModel from './models/Al_GenerateExportModel';
+export * as Al_GetMyRolesModel from './models/Al_GetMyRolesModel';
+export * as Al_GetRoleHoldersModel from './models/Al_GetRoleHoldersModel';
 export * as Al_ImportCasesModel from './models/Al_ImportCasesModel';
 export * as Al_RegradeCaseModel from './models/Al_RegradeCaseModel';
 export * as Al_ResolveImportExceptionModel from './models/Al_ResolveImportExceptionModel';
@@ -45,6 +48,7 @@ export * as ContactsModel from './models/ContactsModel';
 export * as Mspp_webrolesModel from './models/Mspp_webrolesModel';
 
 // Services
+export * from './services/Al_AdoptRoleAssignmentService';
 export * from './services/Al_AssignCaseService';
 export * from './services/Al_AssignUserRoleService';
 export * from './services/Al_CompleteRemediationService';
@@ -52,6 +56,8 @@ export * from './services/Al_CreateExportBatchService';
 export * from './services/Al_CreateRoleService';
 export * from './services/Al_CreateUserService';
 export * from './services/Al_GenerateExportService';
+export * from './services/Al_GetMyRolesService';
+export * from './services/Al_GetRoleHoldersService';
 export * from './services/Al_ImportCasesService';
 export * from './services/Al_RegradeCaseService';
 export * from './services/Al_ResolveImportExceptionService';

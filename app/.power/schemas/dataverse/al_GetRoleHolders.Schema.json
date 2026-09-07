@@ -1,0 +1,43 @@
+{
+  "name": "al_GetRoleHolders",
+  "title": "al_GetRoleHolders",
+  "type": "Microsoft.PowerApps/dataverseOperation",
+  "properties": {
+    "displayName": "al_GetRoleHolders",
+    "swagger": {
+      "swagger": "2.0",
+      "info": {
+        "title": "al_GetRoleHolders",
+        "version": "1.0"
+      },
+      "basePath": "/api/data/v9.2",
+      "paths": {
+        "/al_GetRoleHolders": {
+          "post": {
+            "operationId": "al_GetRoleHolders",
+            "parameters": [
+              {
+                "name": "RoleCode",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              }
+            ],
+            "responses": {
+              "200": {
+                "description": "Success",
+                "schema": {
+                  "type": "object",
+                  "x-ms-dataverse-type": "LookupType",
+                  "x-ms-csdl-type": "mscrm.al_GetRoleHoldersResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -5,6 +5,49 @@
  */
 
 export const dataSourcesInfo = {
+  "al_adoptroleassignment": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_AdoptRoleAssignment": {
+        "path": "/api/data/v9.2/al_AdoptRoleAssignment",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "UserEmail",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "RoleCode",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Decision",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
   "al_assigncase": {
     "tableId": "",
     "version": "",
@@ -290,6 +333,49 @@ export const dataSourcesInfo = {
           },
           {
             "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "al_getmyroles": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_GetMyRoles": {
+        "path": "/api/data/v9.2/al_GetMyRoles",
+        "method": "POST",
+        "parameters": [],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "al_getroleholders": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_GetRoleHolders": {
+        "path": "/api/data/v9.2/al_GetRoleHolders",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "RoleCode",
             "in": "body",
             "required": true,
             "type": "string"

@@ -1,0 +1,34 @@
+{
+  "name": "al_GetMyRoles",
+  "title": "al_GetMyRoles",
+  "type": "Microsoft.PowerApps/dataverseOperation",
+  "properties": {
+    "displayName": "al_GetMyRoles",
+    "swagger": {
+      "swagger": "2.0",
+      "info": {
+        "title": "al_GetMyRoles",
+        "version": "1.0"
+      },
+      "basePath": "/api/data/v9.2",
+      "paths": {
+        "/al_GetMyRoles": {
+          "post": {
+            "operationId": "al_GetMyRoles",
+            "parameters": [],
+            "responses": {
+              "200": {
+                "description": "Success",
+                "schema": {
+                  "type": "object",
+                  "x-ms-dataverse-type": "LookupType",
+                  "x-ms-csdl-type": "mscrm.al_GetMyRolesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

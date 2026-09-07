@@ -5,6 +5,7 @@
  * it and the command fails before it reaches Dataverse. operations.test.ts enforces this.
  */
 export const COMMAND_OPERATIONS = [
+  'al_AdoptRoleAssignment',
   'al_AssignCase',
   'al_AssignUserRole',
   'al_CompleteRemediation',
@@ -12,6 +13,8 @@ export const COMMAND_OPERATIONS = [
   'al_CreateRole',
   'al_CreateUser',
   'al_GenerateExport',
+  'al_GetMyRoles',
+  'al_GetRoleHolders',
   'al_ImportCases',
   'al_RegradeCase',
   'al_ResolveImportException',
