@@ -26,34 +26,46 @@ promotion readiness is a state to be *ready for*, not a task in flight.
 **Owner:** Project owner. These are the only items standing between DEV and a full walk-through
 by a real person.
 
-### 1.1 Tax writes as a named person
+### 1.1 Tax writes as a named person — SETTLED 2026-09-07
 
-`Sims Rad` holds AQS Reviewer plus both manager roles, so it **reads** the Tax reviews page,
-the `File Quality: Tax` section and recorded fail reasons. It cannot **write** a Tax answer:
-`Review Instance - assigned to me (write scope)` names only `AL Portal - Tax Reviewer` and
-`AL Portal - AQS Reviewer`, and the manager roles carry page read only.
+`AL Portal - Tax Reviewer` is granted to the `Sims Rad` contact, through `al_AssignUserRole`
+and verified by reading the association back.
 
-The Tax review created on 2026-09-07 is assigned to `Dev Account` precisely because that
-contact holds Tax Reviewer — so the Tax write path *is* exercisable today, just not as
-yourself.
-
-**Done when:** either the grant is made, or it is recorded that Tax is verified through the
-`Dev Account` sign-in and left there.
+**The grant on its own would not have finished it.** The write scope is Contact-anchored
+through `contact_al_reviewinstance`, so holding the role admits nobody to a review that is not
+assigned to them — and the only Tax review was on `Dev Account`. A second fixture,
+`IO-DEV-VERIFY-002`, was routed `Tax only` and allocated, so there are now two Tax reviews, one
+per contact, and both sign-ins can exercise the Tax path end to end.
 
 ```
-grantrole <orgUrl> Simunye.Radingwana@ascotlloyd.co.uk "AL Portal - Tax Reviewer" --confirm <orgUrl>
+roles: AL Portal - Tax Reviewer, AL Portal - AQS Reviewer,
+       AL Portal - Outcome Testing Manager, AL Portal - Portal Administrator
+reviews: 11 — 9 AQS, 2 Tax (Dev Account, Sims Rad)
 ```
 
-### 1.2 The crossed external identity
+**Carry this, because it is the cost of the decision:** one contact now holds reviewer and
+manager authority at once. That is what makes a one-person walk-through possible, and it is
+also what would hide a role-separation defect — anything that ought to be refused to a reviewer
+will be permitted to this account by its manager roles, and nothing will say which grant
+allowed it. Any test of the separation itself (PP-08, the Tax/AQS boundary, AD-020's owner
+filter) needs a contact holding one role, not this one.
+
+### 1.2 The crossed external identity — now unblocked
 
 `adx_externalidentity` binds the Entra object id of **`svc.automate.aq`** to the **`Dev Account`**
 contact (`svc.automate.aq-dev`). Two different accounts. The consequence is live: the
 `Service Account` contact holds `Administrators` and **is reachable by no sign-in at all**, so
 the one role that reads every page belongs to nobody who can log in.
 
-Left alone on 2026-09-07 because the Tax Reviewer path currently runs through that binding, and
-repointing it removes the only way to write a Tax check (1.1). The two decisions are coupled:
-settle 1.1 and this becomes free.
+It was left alone earlier on 2026-09-07 because the Tax Reviewer path ran through that binding,
+and repointing it would have removed the only way to write a Tax check. **1.1 removed that
+constraint**: `Sims Rad` now holds Tax Reviewer and has a Tax review of its own, so nothing is
+lost by repointing the crossed binding or by leaving `Dev Account` without one.
+
+The remaining question is only what the *service* accounts should be able to do. Adding a
+binding for the `Service Account` contact is the additive option and would make `Administrators`
+reachable by a sign-in for the first time; repointing the existing one is the tidier option and
+takes portal access away from `svc.automate.aq` as `Dev Account`.
 
 **Done when:** the binding is repointed, or a second binding is added for the Service Account
 contact, or it is recorded as intentional.

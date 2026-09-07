@@ -246,16 +246,23 @@ Suites at the deployed commit: **plug-ins 376/376**, **app 192/192**, `tsc` clea
 
 ## Still owed
 
-- **Writing Tax answers as `Sims Rad` needs `AL Portal - Tax Reviewer` on that contact.** The
-  manager roles carry page *read* only; the write-scope permission
-  (`Review Instance - assigned to me`) names just the two Reviewer roles. Reading the Tax
-  page, the `File Quality: Tax` section and recorded fail reasons all work as things stand.
-  One command closes it, and it is a real access grant, so it is left as a decision:
-  `grantrole <orgUrl> Simunye.Radingwana@ascotlloyd.co.uk "AL Portal - Tax Reviewer" --confirm <orgUrl>`
-- **The crossed binding is still crossed.** `svc.automate.aq` still signs in as the
-  `Dev Account` contact, and the `Service Account` contact — the one holding `Administrators`
-  — is still reachable by no sign-in. Left alone because the Tax Reviewer path is currently
-  the only way to write a Tax check, and repointing it would remove that.
+- ~~Writing Tax answers as `Sims Rad` needs `AL Portal - Tax Reviewer`~~ **Settled later the
+  same day.** The role is granted and verified by association readback. The grant alone would
+  not have finished it: the write scope is Contact-anchored, so holding the role admits nobody
+  to a review that is not assigned to them, and the only Tax review was on `Dev Account`.
+  `IO-DEV-VERIFY-002` was routed `Tax only` and allocated, so there are now two Tax reviews,
+  one per contact, and both sign-ins exercise the Tax path end to end.
+
+  The cost of the decision, recorded rather than left to be discovered: one contact now holds
+  reviewer **and** manager authority. That is what makes a one-person walk-through possible and
+  equally what would hide a role-separation defect — anything that ought to be refused to a
+  reviewer is permitted to this account by its manager roles, and nothing says which grant
+  allowed it. Testing the separation itself needs a contact holding one role.
+- **The crossed binding is still crossed**, but it is no longer pinned. `svc.automate.aq` still
+  signs in as the `Dev Account` contact, and the `Service Account` contact — the one holding
+  `Administrators` — is still reachable by no sign-in. It was left alone because the Tax
+  Reviewer path ran through that binding; **that constraint is gone**, so the only open question
+  is what the service accounts should be able to do.
 - **A way to stop the `FAILED … Does Not Exist` line hiding a real failure** that is not
   deleting the `annotationid` — see the addendum for why that route is closed.
 - ~~The stale `5140384b-…` in the portal manifest~~ **Already gone.** `eb52fb3` removed it as
