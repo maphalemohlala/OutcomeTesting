@@ -115,6 +115,12 @@ using System.Text.Json;
 //   does not write the review itself: a hand-written one would prove the pages render, not
 //   that routing produces the right check.
 //
+// Delete a relationship: dotnet run -- deleterelationship <orgUrl> <schemaName> --confirm <orgUrl>
+//   Deletes a custom relationship and, for a many-to-many, the intersect table behind it.
+//   IRREVERSIBLE — re-creating one later mints a different table — so it refuses unless the
+//   relationship is custom, unmanaged, and its intersect is empty. An intersect with rows in
+//   it is data somebody is relying on, whatever a register says.
+//
 // Add to solution: dotnet run -- addtosolution <orgUrl> [<solutionUniqueName>]
 //   Adds the plug-in assembly (and its plug-in type) to the target solution for clean ALM
 //   promotion. Idempotent. The Custom API is added separately via a solution-file import
@@ -361,6 +367,11 @@ if (args.Length >= 2 && args[0].Equals("grantrole", StringComparison.OrdinalIgno
 if (args.Length >= 2 && args[0].Equals("routecase", StringComparison.OrdinalIgnoreCase))
 {
     return RouteCase(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("deleterelationship", StringComparison.OrdinalIgnoreCase))
+{
+    return DeleteRelationship(args);
 }
 
 if (args.Length < 1)
@@ -727,6 +738,92 @@ List<string> RolesOf(IOrganizationService svc, Guid contactId)
         .Where(n => n.Length > 0)
         .Distinct()
         .ToList();
+}
+
+// Deletes a custom relationship, and the intersect table behind a many-to-many.
+//
+// This is a DESTRUCTIVE SCHEMA CHANGE and it is irreversible: the intersect table and every
+// row in it go with the relationship, and re-creating it later mints a different table. So
+// it refuses on every count it can check first — the relationship has to exist, be custom,
+// be unmanaged, and, for a many-to-many, its intersect has to be empty. An intersect with
+// rows in it is data somebody is relying on, whatever the register says.
+int DeleteRelationship(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 3 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This deletes schema and cannot be undone. Re-run as: " +
+            "deleterelationship <orgUrl> <schemaName> --confirm <orgUrl>");
+        return 1;
+    }
+
+    var schemaName = a[2].Trim();
+
+    using var svc = Connect(orgUrl);
+
+    RelationshipMetadataBase metadata;
+    try
+    {
+        metadata = ((RetrieveRelationshipResponse)svc.Execute(
+            new RetrieveRelationshipRequest { Name = schemaName })).RelationshipMetadata;
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"No relationship named '{schemaName}': {ex.Message}");
+        return 1;
+    }
+
+    Console.WriteLine($"{schemaName}: {metadata.RelationshipType}, " +
+        $"custom={metadata.IsCustomRelationship}, managed={metadata.IsManaged}");
+
+    if (metadata.IsManaged == true)
+    {
+        Console.Error.WriteLine("It is managed here, so it can only be removed by the solution that owns it.");
+        return 1;
+    }
+
+    if (metadata.IsCustomRelationship != true)
+    {
+        Console.Error.WriteLine("It is a system relationship, not a custom one. Refusing.");
+        return 1;
+    }
+
+    if (metadata is ManyToManyRelationshipMetadata manyToMany)
+    {
+        var intersect = manyToMany.IntersectEntityName;
+        var rows = svc.RetrieveMultiple(new QueryExpression(intersect)
+        {
+            ColumnSet = new ColumnSet(false),
+            TopCount = 1,
+        }).Entities.Count;
+
+        if (rows > 0)
+        {
+            Console.Error.WriteLine(
+                $"The intersect '{intersect}' holds rows. Refusing — deleting the relationship deletes them too.");
+            return 1;
+        }
+
+        Console.WriteLine($"  intersect '{intersect}' is empty.");
+    }
+
+    svc.Execute(new DeleteRelationshipRequest { Name = schemaName });
+    Console.WriteLine($"Deleted {schemaName}.");
+
+    // Read back rather than trusting the call: a delete that the platform queued rather than
+    // applied would otherwise be reported as done.
+    try
+    {
+        svc.Execute(new RetrieveRelationshipRequest { Name = schemaName });
+        Console.Error.WriteLine("FAIL: it is still there.");
+        return 2;
+    }
+    catch
+    {
+        Console.WriteLine("Confirmed gone.");
+        return 0;
+    }
 }
 
 // Finds a web role by name. Separate from FindId because mspp_webrole is a surface over

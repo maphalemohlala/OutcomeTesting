@@ -1,21 +1,19 @@
 # Outstanding work
 
-Started 2026-09-04 at commit `77c1ab7`. **Last reviewed 2026-09-06**, after the users, roles
-and exports work — which closed most of item 5, corrected three latent defects and put the
-app onto Contact and the Power Pages web roles. Every environment claim below was re-queried
-that day rather than carried forward.
+Started 2026-09-04. **Last reviewed 2026-09-07**, after the portal fixes batch, the AD-089
+write-path proof, the AD-013 round trip and the sign-in repair. Every environment claim below
+was re-queried that day rather than carried forward.
 
 This is the register of what is left, not a status report. `docs/2026-09-06-delivery-status.md`
-is the current one; `docs/2026-09-03-delivery-status.md` through `docs/2026-09-05-delivery-status.md` and
-the deployment records under `docs/deployment/` cover what exists and how it got there. Every item names an owner, the evidence it rests on,
-and what "done" looks like, so nothing here needs re-deriving.
+is the current one; the earlier delivery statuses and the deployment records under
+`docs/deployment/` cover what exists and how it got there. Every item names an owner, the
+evidence it rests on, and what "done" looks like, so nothing here needs re-deriving.
 
-**Ordered by what it costs to leave alone, not by effort.** Re-ranked 2026-09-06, after the
-users and roles work reduced item 5 to two pieces, both since delivered (AD-089, AD-090) —
-item 5 is now closed. Re-ranked again 2026-09-07: **OD-034 is closed too**, by
-`powerpages/Deploy-Portal.ps1`. **Nothing below is a defect in something already delivered**,
-and no item remaining is an engineering problem — what is left is decisions, scheduled
-security work and environment set-up owned outside Delivery.
+**Ordered by what it costs to leave alone, not by effort.** Re-ranked 2026-09-07: **OD-034 and
+OD-035 are closed**, item 5's users-and-roles work is closed, and the four small engineering
+leftovers this register carried are closed or mechanised. **Nothing below is a defect in
+something already delivered.** What is left is four decisions, one blocked command, scheduled
+security work, and environment set-up owned outside Delivery.
 
 **Sequencing, by project owner direction 2026-09-06:** the other environments are set up once
 everything is tested and approved in DEV. So no item here is waiting on TEST or PROD, and
@@ -23,74 +21,71 @@ promotion readiness is a state to be *ready for*, not a task in flight.
 
 ---
 
-## 1. OD-034 — portal deployment has no working CLI path
+## 1. Four decisions, all cheap, all blocking something visible
 
-**Owner:** Delivery. **Status: CLOSED 2026-09-07.** OD-035 was closed 2026-09-05.
+**Owner:** Project owner. These are the only items standing between DEV and a full walk-through
+by a real person.
 
-> **OD-034 closed 2026-09-07 by `powerpages/Deploy-Portal.ps1`** (`eb52fb3`), which is now
-> the only sanctioned upload path — `powerpages/README.md` says so, and the script refuses to
-> upload if either gate fails. It does not work around the fault; it removes what makes it
-> reachable. The `adx_entitypermission` and `adx_entitypermission_webrole` sections come out
-> of the manifest before `pac` runs, so there is nothing to route down the Standard-model
-> path and nothing to reconcile away — the second of which is what deleted 11 of 13 table
-> permissions on 2026-09-06. Permissions are then written by `restoretablepermissions`, and
-> the result is verified by query, because on this site a successful-looking upload is not
-> evidence that a component landed.
->
-> First run 2026-09-07: upload succeeded, 13 of 13 permissions written and verified, both
-> gates clean beforehand. The manifest is deliberately left stripped. Record:
-> `docs/deployment/2026-09-07-role-conflict-rule-deployment.md`.
->
-> The account of the failure below is kept as written — it is the diagnosis the fix rests on.
+### 1.1 Tax writes as a named person
 
-> **OD-035 closed 2026-09-05.** Both `case-details` web pages were repointed at `…002b` and
-> verified; the page renders. Correction to the diagnosis: the pages were **not** carrying a
-> null page template — both pointed at `…0022`, the colliding id, which is now the
-> `OT Outcome Label` web template. A lookup aimed at the wrong component type projects as
-> blank, which is what read as null. See
-> `docs/deployment/2026-09-05-portal-repairs-and-drain-enable.md`.
+`Sims Rad` holds AQS Reviewer plus both manager roles, so it **reads** the Tax reviews page,
+the `File Quality: Tax` section and recorded fail reasons. It cannot **write** a Tax answer:
+`Review Instance - assigned to me (write scope)` names only `AL Portal - Tax Reviewer` and
+`AL Portal - AQS Reviewer`, and the manager roles carry page read only.
 
-**OD-035.** Both `case-details` web pages (`…032` root, `…042` content) carry a **null** page
-template in DEV, so the page returns the generic Power Pages error. The page template
-`…002b` exists and is correctly bound to the `OT Case Detail` web template (`…0015`), and
-source declares `…002b` on both pages. Re-verified 2026-09-05: page template correct, both
-web pages still null. It is a two-row fix.
+The Tax review created on 2026-09-07 is assigned to `Dev Account` precisely because that
+contact holds Tax Reviewer — so the Tax write path *is* exercisable today, just not as
+yourself.
 
-Repair command: `repointwebpage <orgUrl> case-details "OT Case Detail Page"`.
+**Done when:** either the grant is made, or it is recorded that Tax is verified through the
+`Dev Account` sign-in and left there.
 
-**OD-034 is why OD-035 is stuck.** `pac pages upload` aborts at ~44 % on a single
-`adx_entitypermission` record (`a1000000-…-072`) that is **already correct** in DEV — the site
-is on the enhanced data model, `adx_entitypermission` does not exist in the environment, and
-`pac` routes that one record down the Standard path regardless of `-mv Enhanced`. Four
-attempts now — three on 2026-09-04 (delta twice, `--forceUploadAll` once) and one on
-2026-09-05 — all aborting on the same record.
+```
+grantrole <orgUrl> Simunye.Radingwana@ascotlloyd.co.uk "AL Portal - Tax Reviewer" --confirm <orgUrl>
+```
 
-**Corrected 2026-09-05:** the 09-04 note said the abort lands *before web pages are
-processed*, so no web page change could deploy at all. That is wrong. The 09-05 run reached
-86.4 % (19 of 22 events) and **did** write the web pages — both `case-details` rows carry
-that run's timestamp. What never lands is the parent-scoped permission itself and whatever
-is ordered after it, and which components those are depends on what happens to be dirty.
-The damage is unpredictability, not a blanket block.
+### 1.2 The crossed external identity
 
-`pac pages upload` has no scoping flag — only `--path`, `--deploymentProfile`,
-`--forceUploadAll`, `--modelVersion` — so the record cannot be skipped. Removing it from
-source was considered and rejected: `pac` deletes components absent from source.
+`adx_externalidentity` binds the Entra object id of **`svc.automate.aq`** to the **`Dev Account`**
+contact (`svc.automate.aq-dev`). Two different accounts. The consequence is live: the
+`Service Account` contact holds `Administrators` and **is reachable by no sign-in at all**, so
+the one role that reads every page belongs to nobody who can log in.
 
-> **2026-09-05: root cause found, and the fix is proven on the export side.** `pac` routes
-> **parent-scoped** table permissions down the Standard-model path on an enhanced-data-model
-> site. Only two permissions are parent-scoped and the run aborts on the first. Upgrading pac
-> is not available (2.11.2 is the latest published version) and the upload has no scoping flag.
->
-> The site and its **250 components** are now in the `OutcomeTesting` solution, and an export
-> carries all of them — including the parent-scoped permission that breaks the upload, intact
-> with its scope, parent and role links. `addsitetosolution` does this; `pac` cannot, because
-> 2.11.2 rejects the Power Pages component types by name *and* by number.
+Left alone on 2026-09-07 because the Tax Reviewer path currently runs through that binding, and
+repointing it removes the only way to write a Tax check (1.1). The two decisions are coupled:
+settle 1.1 and this becomes free.
 
-**Done when:** the **import** side is proven — export from DEV, import into a second
-environment, and confirm the site reconstitutes. That is untested here because only DEV is
-authenticated. And a decision is taken on Microsoft documenting Power Pages solution
-awareness as a **preview feature**, "not meant for production use": that is a call for the
-platform owner before it becomes the PROD promotion path, not a tooling detail.
+**Done when:** the binding is repointed, or a second binding is added for the Service Account
+contact, or it is recorded as intentional.
+
+### 1.3 OD-037 — delete or keep `al_User` / `al_Role`
+
+`al_user` holds 0 rows and nothing reads it. It ships in the managed solution, so deleting it
+is a destructive ALM change and was deliberately not taken.
+
+**Done when:** either the tables are dropped and `src/` re-exported, or they are recorded as
+retained-and-empty so nobody re-raises it.
+
+### 1.4 The unused `al_contact_al_outcomecase` intersect
+
+OD-022 is resolved — neither N:N nor per-persona lookups; all authenticated users read all
+cases. The N:N built on 2026-08-30 to test the alternative is therefore unnecessary, and
+OD-022's own text says it **should be deleted** so an unused intersect does not outlive the
+question it was built to answer.
+
+Verified 2026-09-07: **the intersect holds 0 rows.** The command exists and is guarded — it
+refuses unless the relationship is custom, unmanaged and its intersect is empty:
+
+```
+deleterelationship <orgUrl> al_contact_al_outcomecase --confirm <orgUrl>
+```
+
+**Status:** the run was **blocked by the session's permission classifier**, correctly — it is
+an irreversible schema delete. It needs to be run with that permission granted, and
+`src/Other/Relationships.xml` and `src/Other/Relationships/Contact.xml` updated in the same
+change so `src/` does not drift from DEV.
+
+**Done when:** the relationship is gone from DEV and from `src/`.
 
 ## 2. Name PP-15's other four events
 
@@ -117,7 +112,7 @@ Be clear about the shape of the cost, because it is what keeps deferring this: r
 changes the public key token and so requires re-registering every plug-in type in every
 environment, and history removal means a force-push over commits already published to
 `github.com/maphalemohlala/OutcomeTesting`. **Both get more expensive with every push** —
-five more landed across 2026-09-04 and 2026-09-05.
+eight more landed across 2026-09-04 to 2026-09-07.
 
 This is defence-in-depth, not a live exploit: strong-naming is not a .NET trust boundary and
 abusing it needs Dataverse deployment privilege. That is a reason to schedule it, not to keep
@@ -133,52 +128,12 @@ when to expect a response. Still unstated: hours and response targets, split bet
 portal-down and a single user blocked; and who the hand-off goes to when something needs a
 configuration or platform change, since AQS and Tax do not hold Power Pages or Dataverse admin.
 
-## 5. Users and roles rework — delivered
-
-**Owner:** Delivery. **Status: delivered.** Roles and users landed 2026-09-06
-(`docs/2026-09-06-delivery-status.md`, AD-085 to AD-088); the two pieces this section used to
-carry as owed are delivered too, settled by AD-089 and AD-090 and deployed to `Env_AQ_Dev`.
-
-Delivered: `al_User` is retired in favour of Contact (AD-085), People and Users are one
-directory (AD-086), and roles are the Power Pages web roles — read live, assignable and
-manageable in the app, with permissions configurable per role (AD-087).
-
-**The first blocker resolved itself on inspection.** Retiring `al_User` was thought to collide
-with `al_AssignCase` needing both a `systemuser` and a Contact. It does not: all three DEV
-contacts have enabled Read-Write systemusers, so both halves resolve. `al_User` was never the
-source of either. The directory did shrink to 3, exactly as predicted — those three are the
-only real people in the environment.
-
-Both items this section used to list as still owed are now delivered:
-
-- **A role detail view.** The direction included "selecting a role shows its permissions,
-  details and assignees". Built: pick a role, see its description, its rules by resource and
-  level, and the people holding it (`al_GetRoleHolders`, `roleDetailPath`), with the existing
-  edit and withdraw actions in place, plus a Status column showing where the two sources
-  (mapping and association) agree or disagree.
-- **A conflict rule for roles managed in two places**, plus a rule for `Authenticated Users`.
-  Settled by AD-089 and AD-090. The app writes role assignment through an audited Custom API
-  (AD-041, BR-012) *and* associates the contact, so an assignment made in Power Pages
-  management used to write the association with no audit event and no mirror row, and the
-  client used to disagree with the server about what that meant — `PermissionProvider` now
-  asks `al_GetMyRoles` rather than re-deriving the answer from a mapping-table read (AD-089).
-  A portal-side assignment grants access and is visible immediately, surfaced on the role
-  detail screen and counted on the Security configuration page, and is not authoritative
-  until an administrator adopts or revokes it through `al_AdoptRoleAssignment` — each decision
-  audited, never a schedule. `Authenticated Users`, and any role sharing its
-  `mspp_authenticatedusersrole` flag, is excluded from role resolution server-side (AD-090),
-  closing the drift OD-033 found in DEV rather than only confirming the by-name exclusion
-  AD-087 already had.
-
-## 6. OD-011 — Code Apps production readiness, tenant availability and licensing
+## 5. OD-011 — Code Apps production readiness, tenant availability and licensing
 
 **Owner:** Platform owner. **Status:** partially resolved since 2026-08-26.
 
 Code app operations are enabled on `Env_AQ_Dev` and `pa app push` succeeds there. Still open:
-enabling TEST and PROD, and confirming licensing for **every persona**. It was deferred "until
-the app is ready to promote", and it previously rode along under the `src/` gap item — it now
-stands on its own, because that gap is closed and this is what is left between a working DEV
-and a second environment.
+enabling TEST and PROD, and confirming licensing for **every persona**.
 
 Ranked last deliberately, and not because it is unimportant: **project owner direction
 2026-09-06 is that the other environments are set up once everything is tested and approved in
@@ -186,6 +141,18 @@ DEV.** So this is sequenced behind DEV sign-off rather than blocked on anything 
 
 **Done when:** TEST and PROD have code app operations enabled and per-persona licensing is
 confirmed.
+
+## 6. The import side of Power Pages solution promotion
+
+**Owner:** Platform owner. Carried over from OD-034, which is otherwise closed.
+
+The site and its components are in the `OutcomeTesting` solution and an export carries them.
+**The import side is unproven** — export from DEV, import into a second environment, confirm
+the site reconstitutes — because only DEV is authenticated. And Microsoft documents Power Pages
+solution awareness as a **preview feature**, "not meant for production use": that is a call for
+the platform owner before it becomes the PROD promotion path, not a tooling detail.
+
+Sequenced behind item 5 for the same reason.
 
 ---
 
@@ -198,9 +165,21 @@ confirmed.
   broke `/case-details`. The id-band comments in source are not enforced anywhere, so this
   guard is the only thing standing between a hand-minted id and a deleted component. It
   currently passes at 237 identities.
-- **Verify every portal upload by query afterwards.** While OD-034 stands the upload aborts
-  partway, so an exit code says nothing about what landed.
-- **Check Custom API solution membership after `registerall`.** Now automatic: `registerall`
+- **`powerpages/Deploy-Portal.ps1` is the only sanctioned upload path.** Not `pac pages upload`
+  directly, which either aborts partway or reconciles away every table permission the manifest
+  lists and source no longer holds. The script refuses to run if either gate fails, and
+  verifies by query afterwards.
+- **`plugins/deploy/Pack-Schema-Solution.ps1` is the only sanctioned way to pack `src/`.** Not
+  `pac solution pack --folder src` directly — that puts the committed plug-in assembly in the
+  zip, and an import replaces the live assembly with whatever was last committed, at the same
+  version and token (AD-062). New 2026-09-07; see "Closed on 2026-09-07" for why a one-off
+  deletion could not fix this.
+- **Verify a portal deployment by query afterwards.** Kept, with its reason updated: this used
+  to be justified by OD-034's partial aborts. OD-034 is closed and uploads now run to
+  completion, but the site still holds components `pac` does not own — table permissions are
+  written by `restoretablepermissions`, not by the upload — so an exit code still is not
+  evidence that a component landed.
+- **Check Custom API solution membership after `registerall`.** Automatic: `registerall`
   reports any API missing from `OutcomeTesting` and prints the command that adds it.
 
 ## Carry — known and accepted, unchanged
@@ -209,6 +188,61 @@ confirmed.
 - **Senior Checker** needs `command.assign` granted as a Dataverse row.
 - **Optimistic concurrency is not sent on the portal submit path.**
 - **9 `react-hooks/exhaustive-deps` lint warnings**, all pre-existing, zero errors.
+
+## Closed on 2026-09-07
+
+- **OD-034 — portal deployment has a working CLI path** (`eb52fb3`). `Deploy-Portal.ps1` does
+  not work around the fault; it removes what makes it reachable. The `adx_entitypermission`
+  and `adx_entitypermission_webrole` sections come out of the manifest before `pac` runs, so
+  there is nothing to route down the Standard-model path and nothing to reconcile away — the
+  second of which deleted 11 of 13 table permissions on 2026-09-06. First run: upload
+  succeeded, 13 of 13 permissions written and verified. The diagnosis it rests on is in
+  `docs/deployment/2026-09-05-portal-repairs-and-drain-enable.md`.
+- **The stale `5140384b-…` manifest id went with it.** This register and the 2026-09-03 status
+  both carried it as an open tidy-up needing a deliberate `pac pages download`. It is not in
+  the tree — `eb52fb3` removed it as a side effect of stripping the manifest. Recorded because
+  it was listed as outstanding twice after it had already gone.
+- **AD-089 and AD-090 — the role conflict rule, proved.** A portal-only grant surfaces as
+  unadopted, can be adopted, and once withdrawn in the app while the association is put back
+  reads "withdrawn, still granted". It failed on its first run: `AssignUserRolePlugin` caught
+  the duplicate-key fault from `Associate` and carried on, which the platform refuses — so
+  Adopt could never have worked against the state it exists for, and no unit test could see it
+  because the fake modelled the call and not the constraint. Re-run passes 5 of 5.
+- **The portal fixes batch.** "Not saved – retry" and the refused-submission message were one
+  cause — a Contact-anchored 403 the autosave path never read the status of. Both now name
+  what is missing. The submit message's promise that "your answers are still saved" was false
+  and is gone. `File Quality` is a section per team (`S-FQTAX` / `S-FQOUT`), fail reasons are
+  emitted from the record rather than revealed by a script that only runs for an editable
+  review, and every "Restrict read" rule gained the `Administrators` role.
+- **The sign-in reaches the right contact.** The 2026-09-07 addendum had the conclusion right
+  and the account wrong: the bound object id is `svc.automate.aq`'s, not `svc.automate.aq-dev`'s,
+  and `Simunye.Radingwana@ascotlloyd.co.uk`'s own object id had **no binding at all** — the
+  actual root cause. Two of the three ways out that addendum listed were unavailable
+  (`LocalLoginEnabled` and `OpenRegistrationEnabled` are both `false`). A fourth option was
+  taken instead: bind the person's own object id to their own contact, additive, so no service
+  account impersonates a named person. `AL Portal - Portal Administrator` and
+  `AL Portal - Outcome Testing Manager` now belong to a contact. See
+  `docs/deployment/2026-09-07-identity-binding-and-tax-routing.md`.
+- **There is Tax data in DEV.** The recorded reason there was none — "nothing has been routed
+  to Tax" — was weaker than the fact: **all 13 cases carried the `AQS only` route**, so no case
+  could ever have produced a Tax review. One fixture now carries `Tax only` and holds a Tax
+  review; both Tax-owned sections (`S-TAX`, `S-FQTAX`) render on it.
+- **All nine stale `annotationid`s are out of the web file ymls.** A query first established
+  that **no `annotation` row exists for any web file on this site** — the content lives in a
+  file column on `powerpagecomponent` under the enhanced data model — so every one of the nine
+  was dead, not just the one that produced the `FAILED … Does Not Exist` line. Only that one
+  produced it because it is the only file whose content changes.
+- **AD-062 is mechanised rather than closed, and the distinction matters.** The decision said
+  the durable fix was "removing `src/PluginAssemblies/` entirely". It cannot be, on its own:
+  **the AD-013 round trip is what puts the DLL back**, by construction, every time `src/` is
+  refreshed from an export. So a one-off deletion fixes it until the next round trip and then
+  silently stops. `plugins/deploy/Pack-Schema-Solution.ps1` strips the folder from a staged
+  copy on every pack and then **reads the zip back** to confirm no assembly is in it, deleting
+  the output if one is. Verified: 209 entries, 0 DLLs, `pac` reporting the assembly root
+  component as "not defined in customizations" beside the long-standing `CanvasApps` line.
+  **What is still owed if full removal is wanted:** dropping `RootComponent type="91"` from
+  `src/Other/Solution.xml` interacts with the 14 `type="92"` SDK step components that bind to
+  plug-in types in that assembly, so it is a promotion-architecture decision, not a tidy-up.
 
 ## Closed on 2026-09-06
 
@@ -233,8 +267,7 @@ confirmed.
   against DEV: `src/Entities/al_Notification/` now exists, `src/customapis/` holds 22 APIs
   (adding `al_DrainNotifications`), `src/SdkMessageProcessingSteps/` holds 14 (adding the PP-15
   drain step and three emitter steps), and the plug-in manifest declares **31 types, matching
-  the 31 the assembly builds**. `pac solution pack --folder src` succeeds with only the
-  expected `CanvasApps` warning (AD-012). See
+  the 31 the assembly builds**. Re-run 2026-09-07 at 25 Custom APIs. See
   `docs/deployment/2026-09-06-ad013-round-trip.md`.
 - **A quiet drift the round trip found and corrected:** 30 custom API parameter and response
   files carried `<name>al_AssignCase.Reason</name>`-style qualified names where DEV holds the
@@ -243,48 +276,44 @@ confirmed.
 
 ## Closed on 2026-09-05
 
+- **OD-035 — the `case-details` page renders.** Both web pages were repointed at `…002b` and
+  verified. Correction to the diagnosis: the pages were **not** carrying a null page template
+  — both pointed at `…0022`, the colliding id. A lookup aimed at the wrong component type
+  projects as blank, which is what read as null.
 - **The registration tool's runtime trap.** It targets `net8.0` against a machine carrying
   only the .NET 10 runtime and failed to launch with a message that reads like a missing SDK.
-  `<RollForward>LatestMajor</RollForward>` is now in the csproj; the exe launches with no
-  environment variable. The tested target framework is unchanged deliberately.
+  `<RollForward>LatestMajor</RollForward>` is now in the csproj.
 - **Custom APIs silently staying out of the solution.** `registerall` now reports membership
   rather than leaving it to be noticed by hand.
 - **PP-15 is proved, not just switched on.** An allocation raised in DEV travelled emitter
-  → outbox row → asynchronous drain → server-side email → **delivered**, twice. Two
-  `al_notification` rows sit at `Sent`, each with an Outgoing/`Sent` email activity and an
-  Incoming/`Received` copy of the same message tracked back into the service mailbox. The
-  `MaxRows: 1` backlog procedure this register carried is now moot: there was never a backlog,
-  and there is not one now. Reproduce with `provepp15`; read the standing evidence with
-  `pp15evidence`.
-- **OD-033 — both halves.** `Administrators` had its flag cleared in the morning;
-  **`Checker` was deleted** on project owner direction, after `deletewebrole` confirmed no
-  site component referenced it. The pipeline could never have removed it, which is exactly
-  why it needed a decision rather than another upload.
-- **OD-032 — `SetFailAccountability` has its own value.** `al_command` now carries
-  `120910792`, the plug-in writes it, and the cut-over date is **2026-09-05**: pre-cut-over
-  rows on `120910788` are identified by `al_name` and `al_targettable`, and no data was
-  touched. The `(key, command)` replay scope is restored.
-- **OD-028.** Confirmed and marked resolved by Delivery, 2026-09-05. Evidence unchanged since
-  2026-09-03; it needed a name and a date, which it now has.
+  → outbox row → asynchronous drain → server-side email → **delivered**, twice. Reproduce with
+  `provepp15`; read the standing evidence with `pp15evidence`.
+- **OD-033 — both halves.** `Administrators` had its flag cleared; **`Checker` was deleted** on
+  project owner direction, after `deletewebrole` confirmed no site component referenced it.
+- **OD-032 — `SetFailAccountability` has its own value.** `al_command` now carries `120910792`
+  and the cut-over date is **2026-09-05**; no data was touched.
+- **OD-028.** Confirmed and marked resolved by Delivery, 2026-09-05.
 
 ## What is *not* outstanding
 
 Recorded so it is not re-investigated: PP-01 to PP-14, PP-16 and PP-17 are built; **PP-15 is
 built, deployed, switched on and proved end to end** for its five enumerated events — only
-the other four events (item 3) are outstanding, and they are unnamed rather than unbuilt.
+the other four events (item 2) are outstanding, and they are unnamed rather than unbuilt.
 OD-030 is resolved; **the DEV mailbox is approved and tested**; and **DEV sends from the
-approved account** `svc.automate.aq@ascotlloyd.co.uk` (project owner direction 2026-09-05),
-so the `-dev` mailbox at `Pending Approval` is not a question either.
+approved account** `svc.automate.aq@ascotlloyd.co.uk` (project owner direction 2026-09-05).
 
-Also settled 2026-09-05: `Checker` is gone and `Administrators` reads `No`, so the
-authenticated-users flag is no longer drift anywhere — `Authenticated Users` is the only role
-carrying it, which is what `webrole.yml` declares. `SetFailAccountability` still has **no
-caller in the app at all**, which is why OD-032's replay collision was never reachable; the
-`(key, command)` scope is restored anyway, because doing it before a caller exists is the
-cheap version.
+Settled 2026-09-05: `Checker` is gone and `Administrators` reads `No`, so the
+authenticated-users flag is no longer drift anywhere. `SetFailAccountability` still has **no
+caller in the app at all**, which is why OD-032's replay collision was never reachable.
 
-Also settled, from the 2026-09-04 diagnosis: the case detail page's own three FetchXML
-queries run clean against DEV and every web template it includes is present, so Liquid,
-missing includes and table permissions are all ruled out for OD-035. `pac.exe` **is** present
-at `%USERPROFILE%\.dotnet\tools\pac.exe` — re-confirmed 2026-09-05, and every query in this
-round ran from it.
+Settled 2026-09-07, and each was checked rather than assumed before the sign-in fault was
+diagnosed: the contact-to-role association, the associated component's type and state, every
+web role's website, the AQS page's access rule and the cascading Home rule, every page's
+publishing state, all 13 table permissions and every `Webapi/*` site setting. **None of them is
+at fault** — the empty `mspp_entitypermission_webrole` and `mspp_webpageaccesscontrolrule_webrole`
+intersects included, which look exactly like a failed deployment and are not: on the enhanced
+data model the roles live inside the component's `content` JSON.
+
+`pac.exe` is at `%USERPROFILE%\.dotnet\tools\pac.exe` and `dotnet` at
+`C:\Program Files\dotnet\dotnet.exe`; neither is on `PATH` in a non-interactive shell, which
+reads as "not installed" and is not.

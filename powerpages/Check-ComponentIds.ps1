@@ -113,12 +113,21 @@ foreach ($file in Get-ChildItem -LiteralPath $SitePath -Recurse -File -Filter '*
     }
 }
 
-# A web file is two records: the adx_webfile and the annotation holding its bytes.
-# `objectid` points the note at the file, so it equals adx_webfileid — but the note
-# has its own id, and giving annotationid the SAME guid as adx_webfileid makes the
-# pair collide. The upload then writes the note and drops the file's own metadata,
-# leaving a record with content but no adx_partialurl: the URL 404s and the site
-# renders unstyled. Every working web file has a distinct annotationid.
+# On the STANDARD data model a web file is two records: the adx_webfile and the
+# annotation holding its bytes. `objectid` points the note at the file, so it equals
+# adx_webfileid — but the note has its own id, and giving annotationid the SAME guid
+# as adx_webfileid makes the pair collide. The upload then writes the note and drops
+# the file's own metadata, leaving a record with content but no adx_partialurl: the
+# URL 404s and the site renders unstyled.
+#
+# This site runs the ENHANCED model, where the bytes live in a file column on
+# `powerpagecomponent` and no annotation exists for any web file — confirmed by query
+# on 2026-09-07, for all nine ids in source and by filename. All nine `annotationid`
+# lines were removed that day, so this check is currently inert.
+#
+# Kept anyway, and deliberately: `pac pages download` against a Standard-model site
+# writes the key back, and the collision it guards against is silent when it happens.
+# An inert check costs nothing; re-deriving this one after an outage costs a day.
 $webFileFaults = [System.Collections.Generic.List[object]]::new()
 foreach ($file in Get-ChildItem -LiteralPath $SitePath -Recurse -File -Filter '*.webfile.yml') {
     $lines = Get-Content -LiteralPath $file.FullName
