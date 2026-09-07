@@ -94,14 +94,19 @@ using System.Text.Json;
 //   so it looks settled, while the object id inside it can belong to a different account
 //   entirely — which is exactly what DEV turned out to hold.
 //
-// Bind an identity: dotnet run -- bindidentity <orgUrl> <entraObjectId> <contactEmail> --confirm <orgUrl>
+// Bind an identity: dotnet run -- bindidentity <orgUrl> <entraObjectId> <contactEmail> [--repoint] --confirm <orgUrl>
 //   Binds one Entra object id to one contact, so that person's own sign-in reaches their own
 //   contact. The identity provider is copied from a binding that already works rather than
 //   typed, because a plausible-looking wrong issuer produces a sign-in that reaches nobody.
 //
-//   This CHANGES WHO A REAL PERSON IS on the portal. Additive — it does not disturb a
-//   binding that already exists, and reports rather than repoints one that already claims
-//   the same object id.
+//   This CHANGES WHO A REAL PERSON IS on the portal. Additive by default — it does not
+//   disturb a binding that already exists, and refuses rather than repoints one that already
+//   claims the same object id.
+//
+//   `--repoint` moves an existing binding. That is a different act from granting one: it
+//   takes a sign-in away from whoever holds it today, so it needs its own flag rather than
+//   being what happens when an "add" is re-run. It reports what the previous contact can no
+//   longer be reached by, which is the half of a repoint nobody asks for and everybody needs.
 //
 // Grant a role: dotnet run -- grantrole <orgUrl> <contactEmail> <roleName> --confirm <orgUrl>
 //   Grants one web role through al_AssignUserRole, the command the app itself calls, so the
@@ -971,6 +976,7 @@ int BindIdentity(string[] a)
     }
 
     var email = a[3].Trim();
+    var repoint = a.Any(x => x.Equals("--repoint", StringComparison.OrdinalIgnoreCase));
 
     using var svc = Connect(orgUrl);
 
@@ -991,9 +997,44 @@ int BindIdentity(string[] a)
     if (already != null)
     {
         var who = already.GetAttributeValue<EntityReference>("adx_contactid");
+        if (who != null && who.Id == contactId)
+        {
+            Console.WriteLine($"Already bound: {objectId:D} -> {who.Name}. Nothing to do.");
+            return 0;
+        }
+
+        // Repointing takes a sign-in away from whoever holds it today, which is a
+        // different act from granting one and is not something to do by re-running a
+        // command that reads as "add". Hence its own flag rather than an overwrite.
+        if (!repoint)
+        {
+            Console.Error.WriteLine(
+                $"{objectId:D} is already bound to {who?.Name ?? "(no contact)"}. " +
+                "Re-run with --repoint to move it, which takes that sign-in away from them.");
+            return 2;
+        }
+
+        svc.Update(new Entity("adx_externalidentity", already.Id)
+        {
+            ["adx_contactid"] = new EntityReference("contact", contactId),
+        });
+
+        var moved = svc.Retrieve("contact", contactId, new ColumnSet("fullname"));
         Console.WriteLine(
-            $"Already bound: {objectId:D} -> {who?.Name ?? "(no contact)"}. Nothing written.");
-        return who != null && who.Id == contactId ? 0 : 2;
+            $"Repointed {objectId:D}: {who?.Name ?? "(no contact)"} -> {moved.GetAttributeValue<string>("fullname")} <{email}>.");
+        Console.WriteLine($"  roles now reachable by that sign-in: {string.Join(", ", RolesOf(svc, contactId))}");
+
+        // Said out loud because it is the half of a repoint nobody asks for and
+        // everybody needs: what the previous contact can no longer be reached by.
+        if (who != null)
+        {
+            var orphanedRoles = RolesOf(svc, who.Id);
+            Console.WriteLine(
+                $"  {who.Name} is now reachable by no sign-in; it holds: " +
+                (orphanedRoles.Count == 0 ? "(no roles)" : string.Join(", ", orphanedRoles)));
+        }
+
+        return 0;
     }
 
     var providers = existing

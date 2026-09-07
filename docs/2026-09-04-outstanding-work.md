@@ -67,8 +67,31 @@ binding for the `Service Account` contact is the additive option and would make 
 reachable by a sign-in for the first time; repointing the existing one is the tidier option and
 takes portal access away from `svc.automate.aq` as `Dev Account`.
 
-**Done when:** the binding is repointed, or a second binding is added for the Service Account
-contact, or it is recorded as intentional.
+**Decided 2026-09-07: repoint it** onto the `Service Account` contact, which is the contact
+`svc.automate.aq` is actually named after and which holds `Administrators`. That makes the
+binding truthful and makes `Administrators` reachable by a sign-in for the first time.
+
+`bindidentity` grew a `--repoint` flag for it — a separate act from granting a binding, because
+it takes a sign-in away from whoever holds it today, so it is not what happens when an "add" is
+re-run. The refusal without the flag is verified:
+
+```
+e044a8e9-… is already bound to Dev Account.
+Re-run with --repoint to move it, which takes that sign-in away from them.
+```
+
+**Not yet run — the call was blocked by the session's permission classifier.**
+
+```
+bindidentity <orgUrl> e044a8e9-34ac-4503-8da4-e9573ccd234b svc.automate.aq@ascotlloyd.co.uk --repoint --confirm <orgUrl>
+```
+
+**One consequence to expect, not a fault:** `Dev Account` then holds `AL Portal - Tax Reviewer`
+and a Tax review on `IO-DEV-VERIFY-003` while being reachable by no sign-in. Nothing is lost —
+`Sims Rad` holds Tax Reviewer and its own Tax review since 1.1, and its manager roles read every
+review including that one. Reassign or leave it as a fixture; it does not need deciding now.
+
+**Done when:** the repoint has run and `identities` shows no `NOTE` line.
 
 ### 1.3 OD-037 — delete or keep `al_User` / `al_Role`
 
