@@ -4,7 +4,7 @@
     "uniquename": "al_GetMyRoles",
     "name": "al_GetMyRoles",
     "displayname": "Get My Roles",
-    "description": "The role codes the caller holds, resolved exactly as the server gate resolves them (AD-089). No permission is enforced: the caller is asking about themselves, and gating it would make the sign-in path depend on a permission that cannot be resolved until that path completes. Reads only; writes nothing and audits nothing.",
+    "description": "The role codes the caller holds, resolved exactly as the server gate resolves them (AD-089). No permission is enforced: the caller asks only about themselves, and gating it would make sign-in depend on a permission that cannot resolve until sign-in completes. Reads only.",
     "bindingtype": 0,
     "boundentitylogicalname": null,
     "isfunction": false,
@@ -19,7 +19,7 @@
       "uniquename": "RoleCodes",
       "name": "RoleCodes",
       "displayname": "Role codes",
-      "description": "JSON array of the role codes the caller holds: active mappings unioned with web role associations, less any role auto-granted to everyone (AD-090).",
+      "description": "JSON array of the role codes the caller holds, less any auto-granted to everyone (AD-090).",
       "type": 10
     }
   ]

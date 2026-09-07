@@ -28,7 +28,7 @@
       "uniquename": "Holders",
       "name": "Holders",
       "displayname": "Holders",
-      "description": "JSON array of { email, name, mappingId, mappingActive, associated }. mappingId and mappingActive are null when the role was granted in Power Pages and never mirrored.",
+      "description": "JSON array of { email, name, mappingId, mappingActive, associated }; nulls when unmirrored.",
       "type": 10
     }
   ]

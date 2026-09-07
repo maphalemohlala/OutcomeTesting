@@ -4,7 +4,7 @@
     "uniquename": "al_AdoptRoleAssignment",
     "name": "al_AdoptRoleAssignment",
     "displayname": "Adopt Role Assignment",
-    "description": "Reconciles a role held in two places (AD-089). Adopt converges both sources on granted; Revoke converges both on not granted. Enforces permission.manage Manage and writes an immutable Audit Event naming the administrator who decided (BR-012). Reuses the AssignUserRole and SetRoleAssignmentActive command values rather than minting a new one (AD-076).",
+    "description": "Reconciles a role held in two places (AD-089). Adopt converges both sources on granted; Revoke on not granted. Enforces permission.manage Manage and writes an immutable Audit Event naming the administrator who decided (BR-012). Reuses existing command values (AD-076).",
     "bindingtype": 0,
     "boundentitylogicalname": null,
     "isfunction": false,
@@ -52,7 +52,7 @@
       "uniquename": "MappingId",
       "name": "MappingId",
       "displayname": "Mapping id",
-      "description": "Id of the al_userrolemapping row written or reconciled. Empty when revoking a portal-only grant that never had one.",
+      "description": "Id of the al_userrolemapping row written or reconciled. Empty when no such row exists.",
       "type": 10
     },
     {
