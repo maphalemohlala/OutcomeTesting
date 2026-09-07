@@ -1,4 +1,4 @@
-{% extends 'OT Layout' %}
+﻿{% extends 'OT Layout' %}
 {% block content %}
 {% comment %}
   Access denied (PP-01, PP-16).
@@ -9,6 +9,18 @@
 
   No technical detail is shown. The correlation id is rendered only so a
   user can quote it to support; the underlying error is logged separately.
+
+  It DOES show the reader their own identity and their own web roles, and that is
+  not a disclosure: it is the one fact they cannot look up for themselves and the
+  only one that explains this page. "I hold the AQS reviewer role and still cannot
+  see the AQS page" is unanswerable from the outside — the role could be attached
+  to a different contact, the sign-in could have resolved to a contact nobody
+  granted anything to, or the session could be holding roles from before a grant.
+  Every one of those looks identical from the reader's chair, and every one of them
+  is settled by printing what the portal actually resolved for them.
+
+  PP-16 is about not confirming whether a RECORD exists. A person's own roles are
+  neither a record they are being denied nor anyone else's business.
 {% endcomment %}
 
 <section class="ot-card" aria-labelledby="ot-denied">
@@ -20,11 +32,43 @@
   </p>
   <p>
     {% if user %}
-      You are signed in as {{ user.fullname | escape }}.
+      You are signed in as <strong>{{ user.fullname | escape }}</strong>
+      {% if user.emailaddress1 %}({{ user.emailaddress1 | escape }}){% endif %}.
     {% else %}
       You are not signed in. <a href="{{ website.sign_in_url_substitution }}">Sign in</a> and try again.
     {% endif %}
   </p>
+
+  {% if user %}
+    {% comment %}
+      What the portal resolved, not what anyone believes was granted. `user.roles` is
+      the same list the access rules are evaluated against, so if a role a person was
+      given is missing here, it was never reaching the rules and no amount of checking
+      the rules would have found that.
+
+      A stale session is the common cause and the cheapest thing to rule out, which is
+      why signing out is offered first rather than as a last resort.
+    {% endcomment %}
+    <p>
+      Your roles on this site:
+      {% assign role_count = 0 %}
+      {% for role in user.roles %}{% assign role_count = role_count | plus: 1 %}{% endfor %}
+      {% if role_count > 0 %}
+        <strong>{% for role in user.roles %}{{ role | escape }}{% unless forloop.last %}, {% endunless %}{% endfor %}</strong>.
+      {% else %}
+        <strong>none</strong>. Nothing on this site is open to an account with no role,
+        which is why this page is where you landed.
+      {% endif %}
+    </p>
+    <p>
+      If a role you were granted is not in that list, the portal has not picked it up
+      for this session yet.
+      <a href="{{ website.sign_out_url_substitution }}">Sign out</a> and sign back in,
+      and if it is still missing, send this page's contents to your Outcome Testing
+      manager — it says which account the site is treating you as, which is the part
+      nobody can check from the other side.
+    </p>
+  {% endif %}
   <p class="ot-support">
     Reference: <code>{{ request.params['id'] | default: 'none' | escape | truncate: 12 }}</code>
     &middot; quote this if you contact support.

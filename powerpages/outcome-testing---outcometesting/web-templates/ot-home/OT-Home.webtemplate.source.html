@@ -1,4 +1,4 @@
-{% extends 'OT Layout' %}
+﻿{% extends 'OT Layout' %}
 {% block content %}
 {% comment %}
   Portal landing page.
@@ -232,5 +232,32 @@
     when a case requires both. Case import, allocation, question administration and
     reporting are handled by managers in the Outcome Testing app.
   </p>
+
+  {% if user %}
+    {% comment %}
+      What this site can see about you, on the one page everyone reaches.
+
+      Which pages appear here depends entirely on the roles the portal resolves, and a
+      person has no other way to find out what those are. Without this the only symptom
+      of a role that has not taken effect is a menu item that is not there - which looks
+      identical to a menu item that was never built, and is unreportable as anything more
+      useful than "I cannot see the page".
+
+      `user.roles` is the same list the access rules are evaluated against, so a role that
+      is missing here was never reaching them.
+    {% endcomment %}
+    {% assign role_count = 0 %}
+    {% for role in user.roles %}{% assign role_count = role_count | plus: 1 %}{% endfor %}
+    <p class="ot-support">
+      Signed in as {{ user.fullname | escape }}{% if user.emailaddress1 %} ({{ user.emailaddress1 | escape }}){% endif %}.
+      {% if role_count > 0 %}
+        Your roles: {% for role in user.roles %}{{ role | escape }}{% unless forloop.last %}, {% endunless %}{% endfor %}.
+      {% else %}
+        You hold no roles on this site yet, so most pages will be hidden.
+      {% endif %}
+      A role you were granted but cannot see here has not reached this session - sign out
+      and back in, then tell your Outcome Testing manager if it is still missing.
+    </p>
+  {% endif %}
 </section>
 {% endblock %}
