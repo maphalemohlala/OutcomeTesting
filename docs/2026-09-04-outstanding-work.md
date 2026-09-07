@@ -227,11 +227,28 @@ Sequenced behind item 5 for the same reason.
   to Tax" — was weaker than the fact: **all 13 cases carried the `AQS only` route**, so no case
   could ever have produced a Tax review. One fixture now carries `Tax only` and holds a Tax
   review; both Tax-owned sections (`S-TAX`, `S-FQTAX`) render on it.
-- **All nine stale `annotationid`s are out of the web file ymls.** A query first established
-  that **no `annotation` row exists for any web file on this site** — the content lives in a
-  file column on `powerpagecomponent` under the enhanced data model — so every one of the nine
-  was dead, not just the one that produced the `FAILED … Does Not Exist` line. Only that one
-  produced it because it is the only file whose content changes.
+- **The `annotationid` question is settled, and the answer is "leave them".** The removal was
+  made and then **reverted the same day, on evidence.** The reasoning for removing them was
+  sound as far as it went: no `annotation` row exists for any web file on this site — checked
+  for all nine ids and by filename — because the content lives in a file column on
+  `powerpagecomponent` under the enhanced data model. So all nine ids point at nothing.
+  **`pac` needs the key anyway.** With it gone the upload does not merely warn, it dies:
+
+  ```
+  Record skipped: missing primary key 'annotationid' for entity 'annotation'
+  Sorry, the app encountered a non-recoverable error … System.InvalidCastException
+  ```
+
+  `pac` reads a `.webfile.yml` as declaring an `annotation` record as well as an
+  `adx_webfile` — `filename`, `mimetype`, `isdocument`, `objectid` and `objecttypecode` are
+  all annotation columns — and it needs a primary key for it whether or not the row exists.
+  So the `FAILED … Does Not Exist` line is the *cheaper* of the two failure modes, and the
+  right treatment for a familiar error hiding a real one is not to delete the key.
+
+  The crash happens while loading the manifest, before any component is uploaded. Verified
+  afterwards: 13 of 13 table permissions still deployed, `Check-ComponentIds` clean at 237,
+  portal security assertions all pass. Nothing was damaged, which is the one useful thing
+  about failing that early.
 - **AD-062 is mechanised rather than closed, and the distinction matters.** The decision said
   the durable fix was "removing `src/PluginAssemblies/` entirely". It cannot be, on its own:
   **the AD-013 round trip is what puts the DLL back**, by construction, every time `src/` is

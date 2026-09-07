@@ -114,18 +114,16 @@ render on it:
 | Tax check | `S-TAX` | Tax team |
 | File Quality: Tax | `S-FQTAX` | Tax team |
 
-## 4. The stale `annotationid`
+## 4. The stale `annotationid` — removed, then put back
 
-Removed from `outcome-testing.css.webfile.yml`. A query first confirmed the reasoning behind
-it: **no `annotation` row exists for any web file on this site** — not for any of the nine ids
-in source, and none by filename either. On the enhanced data model the content lives in a file
+Removed from `outcome-testing.css.webfile.yml`, on reasoning a query supported: **no
+`annotation` row exists for any web file on this site** — not for any of the nine ids in
+source, and none by filename either. On the enhanced data model the content lives in a file
 column on `powerpagecomponent`, so every one of those ids is dead.
 
-Only this one is removed. It is the only file whose content changes, so it is the only one
-that produces the `FAILED … Does Not Exist` line today; the other eight carry an equally dead
-id and will produce it the moment they are edited. Left in place deliberately — the next
-upload is the evidence for whether removing it is the right treatment, and that evidence is
-worth having before applying it to eight more files.
+The other eight were left in place deliberately, because the next upload was the evidence for
+whether removing it was the right treatment. **That evidence arrived later the same day and
+says it is not** — see the addendum at the end of this record.
 
 The other stale id, `5140384b-…` in `.portalconfig/…-manifest.yml`, is a different record and
 is untouched.
@@ -171,6 +169,50 @@ Review instances: **10** — 9 AQS, **1 Tax** (`Tax check`, Assigned, `Dev Accou
 Nothing was deployed: no assembly, no portal upload, no app push. The only code change is the
 registration tool, which is a local console and ships in nothing.
 
+## Addendum — the `annotationid` removal is wrong, and the upload said so
+
+Added after the remaining eight were removed and a portal deploy was run to test it. The
+deploy **terminated**:
+
+```
+Loading Power Pages website manifest...
+Record skipped: missing primary key 'annotationid' for entity 'annotation'
+Record skipped: missing primary key 'annotationid' for entity 'annotation'
+Sorry, the app encountered a non-recoverable error and will need to terminate.
+Exception Type: System.InvalidCastException
+```
+
+`pac` reads a `.webfile.yml` as declaring an **`annotation` record as well as** an
+`adx_webfile` — `filename`, `mimetype`, `isdocument`, `objectid` and `objecttypecode` are all
+annotation columns — and it requires a primary key for that record **whether or not the row
+exists**. The id being dead is exactly what the earlier query established, and it turns out not
+to be the question: `pac` never looks.
+
+So the two failure modes are not equivalent, and the familiar one is the cheaper:
+
+| | With the id | Without it |
+|---|---|---|
+| What happens | `FAILED … Does Not Exist`, one line, upload continues | `InvalidCastException`, upload terminates |
+| What deploys | everything | nothing |
+
+**All nine ids are restored.** The `FAILED … Does Not Exist` line is noise that will keep
+appearing, and the original concern behind removing it — that a real failure would be lost in a
+familiar one — stands. It needs a different answer than deleting the key; the two candidates
+are a `pac pages download` against this site to see what the tool itself writes, and reading the
+upload log for the *set* of failure lines rather than their absence.
+
+**Nothing was damaged.** The crash happens while loading the manifest, before any component is
+uploaded, and `Deploy-Portal.ps1` restored `table-permissions/` on its way out. Verified after:
+
+| Check | Result |
+|---|---|
+| Table permissions | 13 in source, 13 in DEV, nothing else |
+| `Check-ComponentIds` | 237 identities, no duplicates, no web file faults |
+| `Check-PortalSecurity` | all assertions pass |
+
+With the ids restored, the site source is byte-identical to the last successfully deployed
+state, so there is nothing outstanding to upload.
+
 ## Still owed
 
 - **Writing Tax answers as `Sims Rad` needs `AL Portal - Tax Reviewer` on that contact.** The
@@ -183,5 +225,8 @@ registration tool, which is a local console and ships in nothing.
   `Dev Account` contact, and the `Service Account` contact — the one holding `Administrators`
   — is still reachable by no sign-in. Left alone because the Tax Reviewer path is currently
   the only way to write a Tax check, and repointing it would remove that.
-- **The eight remaining stale `annotationid`s**, pending the next upload's evidence.
-- **The stale `5140384b-…` in the portal manifest**, unchanged from the 2026-09-03 record.
+- **A way to stop the `FAILED … Does Not Exist` line hiding a real failure** that is not
+  deleting the `annotationid` — see the addendum for why that route is closed.
+- ~~The stale `5140384b-…` in the portal manifest~~ **Already gone.** `eb52fb3` removed it as
+  a side effect of stripping the manifest for `Deploy-Portal.ps1`; it had been carried as
+  outstanding in two records after it had been fixed.

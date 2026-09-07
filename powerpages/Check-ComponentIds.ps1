@@ -121,13 +121,21 @@ foreach ($file in Get-ChildItem -LiteralPath $SitePath -Recurse -File -Filter '*
 # URL 404s and the site renders unstyled.
 #
 # This site runs the ENHANCED model, where the bytes live in a file column on
-# `powerpagecomponent` and no annotation exists for any web file — confirmed by query
-# on 2026-09-07, for all nine ids in source and by filename. All nine `annotationid`
-# lines were removed that day, so this check is currently inert.
+# `powerpagecomponent`, and no annotation exists for any web file — confirmed by query
+# on 2026-09-07, for all nine ids in source and by filename. So every `annotationid`
+# here points at a row that does not exist, and each produces a `FAILED ... Does Not
+# Exist` line on upload.
 #
-# Kept anyway, and deliberately: `pac pages download` against a Standard-model site
-# writes the key back, and the collision it guards against is silent when it happens.
-# An inert check costs nothing; re-deriving this one after an outage costs a day.
+# Removing them was tried on 2026-09-07 and reverted the same day. `pac` reads this
+# file as declaring an `annotation` record as well as an `adx_webfile` — `filename`,
+# `mimetype`, `isdocument`, `objectid` and `objecttypecode` are all annotation columns
+# — and it needs a primary key for it whether or not the row exists. Without one the
+# upload does not warn, it terminates:
+#
+#   Record skipped: missing primary key 'annotationid' for entity 'annotation'
+#   Sorry, the app encountered a non-recoverable error ... System.InvalidCastException
+#
+# So the ids stay, the FAILED lines stay with them, and this check stays live.
 $webFileFaults = [System.Collections.Generic.List[object]]::new()
 foreach ($file in Get-ChildItem -LiteralPath $SitePath -Recurse -File -Filter '*.webfile.yml') {
     $lines = Get-Content -LiteralPath $file.FullName
