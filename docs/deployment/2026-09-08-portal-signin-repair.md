@@ -200,7 +200,39 @@ API, so it passed while this path stayed broken — the same "seeding a result i
 path stops being walked" failure that record's own section 2 names. A proof that runs as an
 administrator proves nothing about a table permission.
 
-## 10. Standing correction
+## 10. The AppendTo fix was incomplete, and the audit that should have come first
+
+Section 9's fix did not make answers savable. `al_response` binds **two** lookups, and only
+one had been granted:
+
+```
+body['al_reviewinstanceid@odata.bind']  = '/al_reviewinstances(' + REVIEW_ID + ')';
+body['al_questionversionid@odata.bind'] = '/al_questionversions(' + questionVersion + ')';
+```
+
+Rather than grant the second and retest, every `@odata.bind` in every web template was
+listed and checked against the permission matrix. That is the whole set of writes the portal
+performs, and it should have been the first move rather than the third:
+
+| Create | Binds | Was | Now |
+|---|---|---|---|
+| `al_response` | `al_reviewinstance` | `appendto` false | true |
+| `al_response` | `al_questionversion` | `appendto` false | true |
+| `al_caseassignment` | *(the row itself)* | `append` false | true |
+| `al_caseassignment` | `al_outcomecase` | `appendto` false | true |
+| `al_caseassignment` | `contact` | no permission at all | **left alone** |
+
+The claim from the queue was failing for the same reason and had also never worked:
+`al_caseassignment` could be created but not related to anything.
+
+**The contact binding is deliberately not granted.** Power Pages gives a signed-in user
+implicit access to their own contact, and the claim binds `{{ user.id }}` — their own. A
+contact table permission is a security decision about who can see people, not a debugging
+step, and adding one speculatively to a table full of real individuals is the wrong way to
+find out whether it is needed. If a claim still fails naming `prvAppendToContact`, that is
+the evidence to decide on.
+
+## 11. Standing correction
 
 This record's own first diagnosis was wrong, and it was wrong in the way this project keeps
 finding: **a confirmed abnormal state was treated as the cause because it was the only
@@ -208,3 +240,15 @@ abnormal state that had been looked for.** The orphaned username was real, is fi
 never why anyone saw an error page. The discriminator that eventually worked — testing a third
 account whose configuration differed in a different dimension — cost one sign-in and would
 have saved a deployment had it come first.
+
+The same shape repeated on the write path in section 10: one missing grant was found and
+fixed, and the fix shipped without asking what else the same question would have turned up.
+Enumerating the write payloads took one command and found three more gaps.
+
+**None of these portal write paths has ever been exercised by a real portal user.** Claiming
+a case and saving an answer are the two things the site exists to do, and both were refused
+by the platform before any of this project's code ran. Every "proof" recorded to date drove
+the plug-ins through the SDK as an administrator, which bypasses table permissions entirely.
+Until a signed-in checker claims a case and saves an answer in a browser, the write paths are
+unproven whatever this or any other record says — and the fixes here are, at the time of
+writing, verified only by reading the deployed permissions back.

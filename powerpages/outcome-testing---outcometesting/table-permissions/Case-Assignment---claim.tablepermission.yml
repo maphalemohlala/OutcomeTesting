@@ -1,4 +1,4 @@
-adx_append: false
+adx_append: true
 adx_appendto: false
 adx_contactrelationship: contact_al_caseassignment
 adx_create: true
