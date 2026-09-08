@@ -1,4 +1,4 @@
-# Deployment — the remediation loop had no beginning, and three portal repairs
+﻿# Deployment — the remediation loop had no beginning, and three portal repairs
 
 Date: 2026-09-09
 Target: `Env_AQ_Dev` (`org0b075da8`, environment `d50d27e8-cb3b-e718-b6e2-30aa92d944aa`)
@@ -141,6 +141,12 @@ points — the `al_SubmitReview` Custom API and the portal's trigger-column path
 
 ## 5. Deployment
 
+| # | Component | Command | Result |
+|---|---|---|---|
+| 1 | Plug-in assembly | `dotnet run -- registerall` | `updated pluginassembly: 7b51d0d1-…`, 25 commands |
+| 2 | Portal | `Deploy-Portal.ps1` | Upload succeeded 17.53s, **14 of 14** table permissions verified |
+| 3 | Code App | `npm run build` then `npx pa app push` | Built clean, pushed successfully |
+
 ```
 dotnet run -- registerall https://org0b075da8.crm11.dynamics.com/
   Plug-in assembly…
@@ -156,6 +162,35 @@ was written. Both steps were already registered and Enabled:
 |---|---|
 | `CustomApi 'al_SubmitReview' implementation` (Main Operation, sync) | Enabled |
 | `NotificationEmitterPlugin: Create of al_remediationaction` (Post-operation) | Enabled |
+
+The three changed web templates were verified **by querying the deployed content**, not by
+trusting the upload — `Deploy-Portal.ps1` says in its own summary that on this site a
+successful-looking upload is not evidence a component landed. `OT Review List` carries
+`openChecklist`, `OT Case Detail` carries `submitted_reviews`, and `OT Review Detail` carries
+the submitted-only gate.
+
+### A stale `annotationid` makes every upload look half-failed
+
+The run printed, mid-progress:
+
+```
+Updating table powerpagecomponent with record ID:f065878a-… FAILED due to
+Entity 'powerpagecomponent' With Id = f065878a-… Does Not Exist
+```
+
+**Nothing was lost.** `f065878a-…` is the `annotationid` recorded in
+`web-files/outcome-testing.css.webfile.yml` and the manifest. This site is on the enhanced
+data model, where a web file's bytes live in a `filecontent` file column on
+`powerpagecomponent` rather than in an `annotation` — there are no `.css` annotations in the
+environment at all. `pac` tried the annotation path first, failed, and then wrote the file
+correctly: `outcome-testing.css` (`a1000000-…050`) has `filecontent` `239f3d5d-…` and
+`modifiedon` matching this deploy.
+
+It is local drift, not a deployment fault, and it predates this work. Left alone deliberately:
+a `pac pages download` rebuilds the id truthfully, and hand-editing it risks the upload path
+this site has already been burned by twice (OD-034). Recorded because the message names a
+FAILED update in the middle of a run that then reports success, which is exactly the shape of
+thing that costs an hour the next time someone sees it.
 
 ## 6. The backfill, and the loop proving itself
 
