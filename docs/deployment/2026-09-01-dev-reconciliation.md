@@ -1,11 +1,11 @@
-# DEV reconciliation after the origin/main merge — 2026-09-01
+﻿# DEV reconciliation after the origin/main merge — 2026-09-01
 
 Target: `Env_AQ_Dev` (`https://org0b075da8.crm11.dynamics.com/`), authenticated `pac`
 profile `svc.automate.aq@ascotlloyd.co.uk`.
 
 ## Why this run exists
 
-`992cdf8` merged `43fccf7` (editable RBAC) into the outcome-creation branch and onto
+`53c71fa` merged `a56d05b` (editable RBAC) into the outcome-creation branch and onto
 `main`. The merge produced a source tree holding **20 plug-in types and 18 Custom APIs**.
 DEV held 17 and 15.
 
@@ -21,7 +21,7 @@ The Code App on `main` calls all three, through `app/src/services/commands/roles
 `permissions.ts` and `operations.ts` plus their generated services. **Until they exist in
 DEV, the editable-RBAC screens fail against APIs that are not there.**
 
-Note for the record: `43fccf7`'s commit message states "solution imported and published to
+Note for the record: `a56d05b`'s commit message states "solution imported and published to
 DEV… src is round-tripped from a fresh export so it matches DEV." That is not true of
 `Env_AQ_Dev` — its three new components were absent when this run started. Either that work
 targeted a different environment or the claim is inaccurate. It needs settling, because the

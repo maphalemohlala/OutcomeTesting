@@ -1,7 +1,7 @@
-# Delivery status — 2026-09-02
+﻿# Delivery status — 2026-09-02
 
 > **Superseded by `docs/2026-09-03-delivery-status.md`.** This document was written at
-> commit `470fc61` and does not cover the four commits that followed it — the manager MI
+> commit `8c742af` and does not cover the four commits that followed it — the manager MI
 > drill-down and Excel exports, Tax-only export rows, the portal queue and self-claim. It
 > stays as the record of what was true on 2026-09-02; read the 2026-09-03 document for
 > current state.

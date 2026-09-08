@@ -1,8 +1,8 @@
-# Deployment — contacts registry, web role model, export fixes
+﻿# Deployment — contacts registry, web role model, export fixes
 
 Date: 2026-09-06
 Target: `Env_AQ_Dev` (`org0b075da8`, environment `d50d27e8-cb3b-e718-b6e2-30aa92d944aa`)
-Source: commit `a2a40d1`
+Source: commit `cffb561`
 Deployed by: `svc.automate.aq@ascotlloyd.co.uk`
 
 Covers AD-085 to AD-088 and the export fixes. Design in

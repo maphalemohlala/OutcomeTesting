@@ -1,6 +1,6 @@
-# Delivery status — 2026-09-04 (afternoon)
+﻿# Delivery status — 2026-09-04 (afternoon)
 
-Written at commit `a590a98`. Supersedes nothing; it sits alongside
+Written at commit `b04e9e3`. Supersedes nothing; it sits alongside
 `docs/2026-09-04-outstanding-work.md`, which remains the register of what is left.
 This document records what changed today after that register was written, and what
 state `Env_AQ_Dev` is actually in.
@@ -62,7 +62,7 @@ succeed; every web template the page includes (`OT Layout`, `OT Status Badge`,
 `OT Empty State`) was confirmed present. So it was neither Liquid, nor a missing
 include, nor a table permission.
 
-**State now:** source is fixed and pushed (`a590a98`) — page template reminted to
+**State now:** source is fixed and pushed (`b04e9e3`) — page template reminted to
 `...002b`, both web pages repointed, guard passes at 237 identities. In DEV the page
 template `...002b` **was** created and is bound to `OT Case Detail`. The two web pages
 **were not** updated and still carry a null page template, so **the page is still

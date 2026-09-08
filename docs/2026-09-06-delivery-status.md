@@ -1,6 +1,6 @@
-# Delivery status — 2026-09-06
+﻿# Delivery status — 2026-09-06
 
-Written at commit `faab916`. Sits alongside `docs/2026-09-04-outstanding-work.md`, which is
+Written at commit `6a3b548`. Sits alongside `docs/2026-09-04-outstanding-work.md`, which is
 the register of what is left. Supersedes `docs/2026-09-05-delivery-status.md` as the current
 status; that one still records how PP-15 was proved.
 

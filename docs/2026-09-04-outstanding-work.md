@@ -1,4 +1,4 @@
-# Outstanding work
+﻿# Outstanding work
 
 Started 2026-09-04. **Last reviewed 2026-09-07**, after the portal fixes batch, the AD-089
 write-path proof, the AD-013 round trip and the sign-in repair. Every environment claim below
@@ -200,7 +200,7 @@ close, and it is not built yet.
 
 ### The two halves that remain, and why the second is the one that matters
 
-**History removal.** The key entered at `be52b4a`, the initial snapshot, so **166 of the 174
+**History removal.** The key entered at `31d5de7`, the initial snapshot, so **166 of the 174
 commits** carry it and a rewrite touches all of them. Neither `git filter-repo` nor BFG is
 installed here. Two costs, the second not previously recorded:
 
@@ -301,7 +301,7 @@ Sequenced behind item 5 for the same reason.
 
 ## Closed on 2026-09-07
 
-- **OD-034 — portal deployment has a working CLI path** (`eb52fb3`). `Deploy-Portal.ps1` does
+- **OD-034 — portal deployment has a working CLI path** (`6e2e6ec`). `Deploy-Portal.ps1` does
   not work around the fault; it removes what makes it reachable. The `adx_entitypermission`
   and `adx_entitypermission_webrole` sections come out of the manifest before `pac` runs, so
   there is nothing to route down the Standard-model path and nothing to reconcile away — the
@@ -310,7 +310,7 @@ Sequenced behind item 5 for the same reason.
   `docs/deployment/2026-09-05-portal-repairs-and-drain-enable.md`.
 - **The stale `5140384b-…` manifest id went with it.** This register and the 2026-09-03 status
   both carried it as an open tidy-up needing a deliberate `pac pages download`. It is not in
-  the tree — `eb52fb3` removed it as a side effect of stripping the manifest. Recorded because
+  the tree — `6e2e6ec` removed it as a side effect of stripping the manifest. Recorded because
   it was listed as outstanding twice after it had already gone.
 - **AD-089 and AD-090 — the role conflict rule, proved.** A portal-only grant surfaces as
   unadopted, can be adopted, and once withdrawn in the app while the association is put back

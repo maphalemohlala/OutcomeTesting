@@ -1,6 +1,6 @@
-# Delivery status — 2026-09-03
+﻿# Delivery status — 2026-09-03
 
-Supersedes `docs/2026-09-02-delivery-status.md`, which was written at commit `470fc61` and
+Supersedes `docs/2026-09-02-delivery-status.md`, which was written at commit `8c742af` and
 missed the four commits that followed it. This document covers those four, plus the work
 done on 2026-09-03, and re-states current state as a whole.
 
@@ -13,7 +13,7 @@ not inferred. Where something was **not** verified, it says so.
 
 These landed after the 2026-09-02 status document was written, so nothing recorded them.
 
-### Manager MI drill-down and Excel exports (`56dd370` — BR-005, BR-010, AD-039)
+### Manager MI drill-down and Excel exports (`b6d5583` — BR-005, BR-010, AD-039)
 
 The largest of the four. Managers could see counts but could not reach the cases behind
 them, and nothing left the system except the screen it was rendered on.
@@ -35,7 +35,7 @@ them, and nothing left the system except the screen it was rendered on.
   inline strings — written rather than taken from npm because the bundle ships to the
   Power Apps player.
 
-### Tax-only export rows (`33c045a` — AD-075, closes OD-031)
+### Tax-only export rows (`c5abde4` — AD-075, closes OD-031)
 
 A closed Tax-only case is now exported with AD-039 columns 10 and 15 blank rather than
 refusing the batch. Both graded columns are sourced from the AQS review, so on a Tax-only
@@ -48,7 +48,7 @@ The same commit carried a previously uncommitted completeness gate closing two h
 Closed case with no Outcome escaped every check, and a missing `Q-FQ-01` answer shipped a
 blank column 10.
 
-### Portal self-claim and queue list (`33c045a`, `d02d46f` — AD-076)
+### Portal self-claim and queue list (`c5abde4`, `de224e3` — AD-076)
 
 A queue section on the Tax and AQS review pages lists cases at `Queued` whose route puts
 that discipline next. "Run checks" POSTs an `al_caseassignment` row; `ClaimCasePlugin`
@@ -61,7 +61,7 @@ own carries a permission of its own. Authorization here cannot be a caller check
 Pages write reaches Dataverse as the site's application user (AD-053) — so Contact scope
 through `contact_al_caseassignment` is what supplies identity.
 
-`d02d46f` then gated the whole action behind a new site setting
+`de224e3` then gated the whole action behind a new site setting
 `OutcomeTesting/Claim/Enabled`, deployed **false**, because `ClaimCasePlugin` could not be
 compiled on the authoring machine. Without the guard registered, the Web API create still
 succeeds — `al_name`, `al_caseassignmentcode`, `al_assignedon` and `al_isactive` are only
@@ -73,7 +73,7 @@ That commit also corrected a stale assumption worth carrying forward: **DEV does
 portal contacts with emails.** The 2026-09-02 document's "blocking demonstration" gap is
 therefore closed.
 
-### Portal page parameter (`2554ad8`)
+### Portal page parameter (`5a5b246`)
 
 `integer` rather than `times: 1` to coerce the page parameter.
 
@@ -83,7 +83,7 @@ therefore closed.
 
 ### The .NET SDK blocker was stale
 
-`33c045a` and `d02d46f` both recorded "this machine has no .NET SDK" as the reason
+`c5abde4` and `de224e3` both recorded "this machine has no .NET SDK" as the reason
 `ClaimCasePlugin` was unbuilt, untested and undeployed. **The machine has .NET SDK
 10.0.400.** The assembly compiles clean and the full plug-in suite passes, including nine
 tests for `ClaimCasePlugin` that had never been run.
@@ -93,7 +93,7 @@ commits without being re-tested.
 
 ### ClaimCasePlugin registered in DEV
 
-Step 1 of the three-step switch-on from `d02d46f`:
+Step 1 of the three-step switch-on from `de224e3`:
 
 | Step | Command | Result |
 |---|---|---|
@@ -109,7 +109,7 @@ Two operational notes. `plugins/OutcomeTesting.Registration` targets `net8.0` an
 not on `PATH`; it lives at `%USERPROFILE%\.dotnet\tools\pac.exe`.
 
 **Steps 2 and 3 are not done.** The `Case Assignment - claim` table permission and the
-`OutcomeTesting/Claim/Enabled` setting both remain as `d02d46f` left them, so the queue
+`OutcomeTesting/Claim/Enabled` setting both remain as `de224e3` left them, so the queue
 list renders and the claim action stays inert. The guard now exists, which is what made
 the permission safe to create — that was the stated reason for holding it back.
 

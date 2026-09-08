@@ -1,8 +1,8 @@
-# Deployment — role assignment conflict rule, and the portal upload path
+﻿# Deployment — role assignment conflict rule, and the portal upload path
 
 Date: 2026-09-07
 Target: `Env_AQ_Dev` (`org0b075da8`, environment `d50d27e8-cb3b-e718-b6e2-30aa92d944aa`)
-Source: commit `5b61849`
+Source: commit `441a1ab`
 Deployed by: `svc.automate.aq@ascotlloyd.co.uk`
 
 Covers AD-089 and AD-090, and the first portal upload through `Deploy-Portal.ps1`. Design in
@@ -31,7 +31,7 @@ nor any local validation:
 
 The safe bounds were derived from the contracts already deployed rather than guessed:
 request parameter descriptions run to 285 characters in the existing set and are accepted,
-so `Decision` at 107 was left alone instead of trimmed defensively. Fixed in `091bbd1`.
+so `Decision` at 107 was left alone instead of trimmed defensively. Fixed in `a19737c`.
 
 **The console's idempotency is what made this recoverable.** The first run created a
 plug-in type and then died on the description; the second updated that same type and carried

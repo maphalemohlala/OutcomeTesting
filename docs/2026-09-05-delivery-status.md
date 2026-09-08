@@ -1,6 +1,6 @@
-# Delivery status — 2026-09-05
+﻿# Delivery status — 2026-09-05
 
-Written at commit `2296423`. Supersedes nothing; it sits alongside
+Written at commit `1bb67c5`. Supersedes nothing; it sits alongside
 `docs/2026-09-04-outstanding-work.md`, which remains the register of what is left and which
 was re-ranked and trimmed today. This records what changed across the day and what state
 `Env_AQ_Dev` is actually in.

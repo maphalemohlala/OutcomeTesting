@@ -1,4 +1,4 @@
-# Deployment — the sign-in reaches the right contact, and Tax exists in DEV
+﻿# Deployment — the sign-in reaches the right contact, and Tax exists in DEV
 
 Date: 2026-09-07
 Target: `Env_AQ_Dev` (`org0b075da8`, environment `d50d27e8-cb3b-e718-b6e2-30aa92d944aa`)
@@ -125,8 +125,8 @@ The other eight were left in place deliberately, because the next upload was the
 whether removing it was the right treatment. **That evidence arrived later the same day and
 says it is not** — see the addendum at the end of this record.
 
-The other stale id, `5140384b-…` in `.portalconfig/…-manifest.yml`, is a different record and
-is untouched.
+The other stale id, `5140384b-…` in `.portalconfig/…-manifest.yml`, is a different record.
+Recorded here as still outstanding; **it was not** — see "Still owed" below.
 
 ## 5. New tooling
 
@@ -265,6 +265,6 @@ Suites at the deployed commit: **plug-ins 376/376**, **app 192/192**, `tsc` clea
   is what the service accounts should be able to do.
 - **A way to stop the `FAILED … Does Not Exist` line hiding a real failure** that is not
   deleting the `annotationid` — see the addendum for why that route is closed.
-- ~~The stale `5140384b-…` in the portal manifest~~ **Already gone.** `eb52fb3` removed it as
+- ~~The stale `5140384b-…` in the portal manifest~~ **Already gone.** `6e2e6ec` removed it as
   a side effect of stripping the manifest for `Deploy-Portal.ps1`; it had been carried as
   outstanding in two records after it had been fixed.

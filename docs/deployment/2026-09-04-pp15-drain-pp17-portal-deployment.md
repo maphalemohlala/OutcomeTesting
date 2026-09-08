@@ -1,7 +1,7 @@
-# Deployment — PP-15 drain and PP-17 portal drill-down, 2026-09-04
+﻿# Deployment — PP-15 drain and PP-17 portal drill-down, 2026-09-04
 
 Target: `Env_AQ_Dev` (`https://org0b075da8.crm11.dynamics.com/`), as
-`svc.automate.aq@ascotlloyd.co.uk`. Source commit `52fe14c`.
+`svc.automate.aq@ascotlloyd.co.uk`. Source commit `9390177`.
 
 Every line below was verified by FetchXML query against the environment after the fact, not
 inferred from a command exiting zero. The portal upload in particular does not run to

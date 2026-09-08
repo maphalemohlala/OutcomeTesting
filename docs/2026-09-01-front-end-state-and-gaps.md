@@ -1,6 +1,6 @@
-# Front-end state and gaps — 2026-09-01
+﻿# Front-end state and gaps — 2026-09-01
 
-Where the two front ends actually stand, and what is missing, as of `21ff635`. Written so
+Where the two front ends actually stand, and what is missing, as of `42e328b`. Written so
 the next person can pick the work up without re-deriving any of it.
 
 Method: read against `knowledge/requirements-index.md` (BR/FR/PP ids) and verified against
