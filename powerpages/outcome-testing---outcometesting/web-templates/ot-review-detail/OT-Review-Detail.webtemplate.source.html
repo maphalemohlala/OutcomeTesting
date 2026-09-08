@@ -153,19 +153,17 @@
         <p class="ot-print-action">
           <button type="button" class="ot-btn" data-ot-print>Save as PDF</button>
         </p>
+
+        <script>
+          (function () {
+            'use strict';
+            var button = document.querySelector('[data-ot-print]');
+            if (!button) { return; }
+            button.addEventListener('click', function () { window.print(); });
+          })();
+        </script>
       {% endif %}
     </section>
-
-    {% if rv.al_submittedon %}
-      <script>
-        (function () {
-          'use strict';
-          var button = document.querySelector('[data-ot-print]');
-          if (!button) { return; }
-          button.addEventListener('click', function () { window.print(); });
-        })();
-      </script>
-    {% endif %}
 
     {% if rv.al_submittedon %}
       <div class="ot-notice" role="status">

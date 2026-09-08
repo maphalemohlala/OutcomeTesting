@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -31,7 +31,7 @@ namespace OutcomeTesting.Plugins
         private const string ActionLookup = "al_remediationactionid";
         private const string CaseLookup = "al_outcomecaseid";
 
-        private const int StatusCompleted = 120910602;
+        private const int StatusCompleted = Remediation.StatusCompleted;
         private const int DecisionRejectedValue = 120910721;
 
         public SignoffGuardPlugin(string unsecureConfiguration, string secureConfiguration)

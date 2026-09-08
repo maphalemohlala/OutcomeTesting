@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -30,8 +30,8 @@ namespace OutcomeTesting.Plugins
 
         private const string ActionEntity = "al_remediationaction";
         private const string ActionStatus = "al_actionstatus";
-        private const int StatusInProgress = 120910601;
-        private const int StatusCompleted = 120910602;
+        private const int StatusInProgress = Remediation.StatusInProgress;
+        private const int StatusCompleted = Remediation.StatusCompleted;
 
         private const string SignoffEntity = "al_signoff";
         private const string DecisionApproved = "Approved";

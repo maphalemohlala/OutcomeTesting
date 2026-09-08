@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -28,7 +28,7 @@ namespace OutcomeTesting.Plugins
         private const string ActionLookup = "al_remediationactionid";
         private const string CaseLookup = "al_outcomecaseid";
 
-        private const int StatusInProgress = 120910601;
+        private const int StatusInProgress = Remediation.StatusInProgress;
         private const int DecisionApprovedValue = 120910720;
         private const int DecisionRejectedValue = 120910721;
 

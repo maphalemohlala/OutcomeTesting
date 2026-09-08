@@ -103,9 +103,9 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Closes_a_case_on_an_aqs_pass()
+        public void Closes_a_case_on_an_unflagged_aqs_pass()
         {
-            Assert.Equal(CaseLifecycle.Closed, OutcomeRules.NextCaseStatusForAqs(OutcomeRules.OutcomePass));
+            Assert.Equal(CaseLifecycle.Closed, OutcomeRules.NextCaseStatusForAqs(OutcomeRules.OutcomePass, remedialActionFlagged: false));
         }
 
         [Theory]
@@ -114,7 +114,7 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData(OutcomeRules.OutcomePotentialHarm)]
         public void Sends_a_non_pass_aqs_case_to_remediation(int outcome)
         {
-            Assert.Equal(CaseLifecycle.AwaitingRemediation, OutcomeRules.NextCaseStatusForAqs(outcome));
+            Assert.Equal(CaseLifecycle.AwaitingRemediation, OutcomeRules.NextCaseStatusForAqs(outcome, remedialActionFlagged: false));
         }
 
         [Fact]
@@ -124,7 +124,7 @@ namespace OutcomeTesting.Plugins.Tests
             // allocate rather than a case parked with nobody working it.
             Assert.Equal(
                 CaseLifecycle.Queued,
-                OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, true));
+                OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, true, remedialActionFlagged: false));
         }
 
         [Theory]
@@ -137,13 +137,13 @@ namespace OutcomeTesting.Plugins.Tests
             // with the Tax failure unaddressed (BR-006).
             Assert.Equal(
                 CaseLifecycle.AwaitingRemediation,
-                OutcomeRules.NextCaseStatusForTax(answer, true));
+                OutcomeRules.NextCaseStatusForTax(answer, true, remedialActionFlagged: false));
         }
 
         [Fact]
-        public void Closes_a_tax_only_case_that_passed()
+        public void Closes_an_unflagged_tax_only_case_that_passed()
         {
-            Assert.Equal(CaseLifecycle.Closed, OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, false));
+            Assert.Equal(CaseLifecycle.Closed, OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, false, remedialActionFlagged: false));
         }
 
         [Theory]
@@ -151,7 +151,7 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData(ResponseRules.ChoiceInsufficient)]
         public void Sends_a_tax_only_non_pass_to_remediation(int answer)
         {
-            Assert.Equal(CaseLifecycle.AwaitingRemediation, OutcomeRules.NextCaseStatusForTax(answer, false));
+            Assert.Equal(CaseLifecycle.AwaitingRemediation, OutcomeRules.NextCaseStatusForTax(answer, false, remedialActionFlagged: false));
         }
 
         [Theory]
@@ -163,7 +163,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // Stops the two tables drifting apart: every status a submit can produce
             // must be reachable from Submitted per AD-057.
-            var next = OutcomeRules.NextCaseStatusForAqs(outcome);
+            var next = OutcomeRules.NextCaseStatusForAqs(outcome, remedialActionFlagged: false);
             Assert.True(CaseLifecycle.IsAllowed(CaseLifecycle.Submitted, next));
         }
 
@@ -172,7 +172,7 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData(ResponseRules.ChoiceFail, false)]
         public void Tax_finalisation_is_also_reachable_from_Submitted(int answer, bool aqsStillToCome)
         {
-            var next = OutcomeRules.NextCaseStatusForTax(answer, aqsStillToCome);
+            var next = OutcomeRules.NextCaseStatusForTax(answer, aqsStillToCome, remedialActionFlagged: false);
             Assert.True(CaseLifecycle.IsAllowed(CaseLifecycle.Submitted, next));
         }
 
@@ -180,7 +180,7 @@ namespace OutcomeTesting.Plugins.Tests
         public void Tax_handoff_to_the_queue_is_reachable_from_Review_In_Progress()
         {
             // The case is still being reviewed when Tax submits on a two-stage route.
-            var next = OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, true);
+            var next = OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, true, remedialActionFlagged: false);
             Assert.True(CaseLifecycle.IsAllowed(CaseLifecycle.ReviewInProgress, next));
         }
 

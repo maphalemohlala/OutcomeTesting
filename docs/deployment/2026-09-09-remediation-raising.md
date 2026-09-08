@@ -198,10 +198,12 @@ thing that costs an hour the next time someone sees it.
 submit left to raise anything. A case stranded that way cannot heal itself.
 
 `backfillremediation` was added to `OutcomeTesting.Registration` for it — deliberately narrow.
-It refuses a case not in Awaiting Remediation, refuses one that already has an action, takes
-every value from the case and its submitted review rather than from arguments, and repeats the
-org URL after `--confirm` for the reason the verify modes state: it writes a real business
+It refused a case not in Awaiting Remediation, refused one that already had an action, took
+every value from the case and its submitted review rather than from arguments, and repeated
+the org URL after `--confirm` for the reason the verify modes state: it writes a real business
 record and sends real email.
+
+**It has since been removed** — see section 8.
 
 ```
 PASS: raised REM-IO-DEV-VERIFY-003-1 (468f32ee-…) on IO-DEV-VERIFY-003.
@@ -238,9 +240,19 @@ fresh case, claimed, answered with **"Remedial action required? = Yes" on an oth
 file**, and submitted. Per the 2026-09-09 direction that case must land in Awaiting
 Remediation rather than Closed, and carry an action due ten working days out.
 
-**The `AddWorkingDays` copy in the backfill verb is a second description of the same
-arithmetic.** It cannot be shared: the plug-in assembly is `net462` and the tool is `net8.0`,
-so they cannot reference one another and the `Microsoft.Xrm.Sdk` each binds to is a different
-assembly identity. It is confined to the one backfill verb, nothing on the ongoing path uses
-it, and it is checked by producing the same date as `RemediationTests` for the same input. It
-should go when the last stranded case is backfilled.
+## 8. The backfill verb was removed the same day
+
+A quality pass over the diff asked whether anything in it was already dead. The verb was: a
+query for cases in Awaiting Remediation, Remediation In Progress or Awaiting Sign-off without
+an action returned **one row, `IO-DEV-VERIFY-003`, and it now has one**. Nothing is stranded,
+so the verb had no remaining input.
+
+Leaving it would have kept its `AddWorkingDays` copy alive — a second description of the
+BR-010 arithmetic that could not be shared with `Remediation.AddWorkingDays`, because the
+plug-in assembly is `net462` and the tool is `net8.0`, so they cannot reference one another
+and the `Microsoft.Xrm.Sdk` each binds to is a different assembly identity. Two descriptions
+of a date rule that must agree with a third in `workingDays.ts` is the drift this codebase
+keeps writing comments about.
+
+It is one `git show` away in history if another environment ever inherits cases mid-remediation
+— which is the only scenario that would want it, and not one that exists today.

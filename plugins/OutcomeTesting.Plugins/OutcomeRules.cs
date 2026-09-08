@@ -138,16 +138,9 @@ namespace OutcomeTesting.Plugins
             }
         }
 
-        /// <summary>Where an AQS submit leaves the case: closed on a Pass, awaiting
-        /// remediation on anything else (BR-006).</summary>
-        public static int NextCaseStatusForAqs(int outcome)
-        {
-            return NextCaseStatusForAqs(outcome, false);
-        }
-
         /// <summary>
-        /// Where an AQS submit leaves the case, taking the checklist's remedial flag into
-        /// account as well as the grade (BR-006).
+        /// Where an AQS submit leaves the case: closed on an unflagged Pass, awaiting
+        /// remediation on anything else (BR-006).
         ///
         /// Raising an action decides the status: a flagged Pass goes to Awaiting
         /// Remediation rather than Closed (project owner direction, 2026-09-09). Closing it
@@ -167,15 +160,6 @@ namespace OutcomeTesting.Plugins
         /// the route (BR-006, OD-027) — only a passed Tax check hands off to AQS. When the
         /// Tax check passed and AQS is still to come, the case returns to the shared queue
         /// for manual allocation (BR-003, AD-040). Otherwise the Tax result finalises it.
-        /// </summary>
-        public static int NextCaseStatusForTax(int answerChoice, bool aqsStillToCome)
-        {
-            return NextCaseStatusForTax(answerChoice, aqsStillToCome, false);
-        }
-
-        /// <summary>
-        /// Where a Tax submit leaves the case, taking the checklist's remedial flag into
-        /// account as well as the Q-TAX-02 result.
         ///
         /// A flagged Tax pass is held for remediation before AQS rather than handed off
         /// (project owner direction, 2026-09-09). That is the reasoning OD-027 already

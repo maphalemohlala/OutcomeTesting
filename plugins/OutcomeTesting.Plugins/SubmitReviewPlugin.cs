@@ -503,14 +503,20 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// The al_answerchoice this review recorded for a question, by business code.
-        /// Returns null when the question was not answered.
+        /// The response this review recorded for a question, by business code, carrying
+        /// <paramref name="columns"/>. Returns null when the question was not answered.
+        ///
+        /// Matched on question CODE, so a question retired and succeeded under BR-013 /
+        /// AD-004 can leave this review holding an answer against more than one version of
+        /// the same question. The latest answer is the one that grades the review; without
+        /// an order Dataverse could return the superseded one.
         /// </summary>
-        private static int? AnswerChoiceFor(IOrganizationService service, Guid reviewId, string questionCode)
+        private static Entity AnswerFor(
+            IOrganizationService service, Guid reviewId, string questionCode, params string[] columns)
         {
             var query = new QueryExpression(ResponseEntity)
             {
-                ColumnSet = new ColumnSet("al_answerchoice"),
+                ColumnSet = new ColumnSet(columns),
                 TopCount = 1,
                 Criteria = new FilterExpression(),
             };
@@ -519,20 +525,25 @@ namespace OutcomeTesting.Plugins
             var version = query.AddLink(QuestionVersionEntity, "al_questionversionid", "al_questionversionid");
             var question = version.AddLink("al_question", "al_questionid", "al_questionid");
             question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.Equal, questionCode);
-
-            // Matched on question CODE, so a question retired and succeeded under BR-013 /
-            // AD-004 can leave this review holding an answer against more than one version
-            // of the same question. The latest answer is the one that grades the review;
-            // without an order Dataverse could return the superseded one.
             query.AddOrder("modifiedon", OrderType.Descending);
 
             var found = service.RetrieveMultiple(query).Entities;
-            if (found.Count == 0)
+            return found.Count == 0 ? null : found[0];
+        }
+
+        /// <summary>
+        /// The al_answerchoice this review recorded for a question, by business code.
+        /// Returns null when the question was not answered.
+        /// </summary>
+        private static int? AnswerChoiceFor(IOrganizationService service, Guid reviewId, string questionCode)
+        {
+            var response = AnswerFor(service, reviewId, questionCode, "al_answerchoice");
+            if (response == null)
             {
                 return null;
             }
 
-            var choice = found[0].GetAttributeValue<OptionSetValue>("al_answerchoice");
+            var choice = response.GetAttributeValue<OptionSetValue>("al_answerchoice");
             return choice == null ? (int?)null : choice.Value;
         }
 
@@ -600,6 +611,13 @@ namespace OutcomeTesting.Plugins
             var isAqs = reviewType == ResponseRules.ReviewTypeAqs;
             int nextStatus;
 
+            // Read once. The Outcome's code and the remediation action's are both built from
+            // this pair, so resolving it here is what keeps OUT- and REM- pointing at the same
+            // submission on a replay - and saves reading the case twice in one transaction.
+            var outcomeCase = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet("al_casereference"));
+            var caseReference = outcomeCase.GetAttributeValue<string>("al_casereference") ?? caseRef.Id.ToString("D");
+            var sequence = review.GetAttributeValue<int?>("al_sequence") ?? 1;
+
             // The checklist's own trigger, read for both disciplines. Mandatory in each, so
             // a submitted review has always answered it; RemedialActionFlagged still treats
             // an absent answer as No rather than inventing a remediation.
@@ -628,7 +646,7 @@ namespace OutcomeTesting.Plugins
                         PreconditionPrefix + "The advice quality grade holds a value this solution does not recognise (" + answer.Value + ").");
                 }
 
-                CreateOutcome(service, review, targetId, caseRef, outcomeValue);
+                CreateOutcome(service, targetId, caseRef, caseReference, sequence, outcomeValue);
                 nextStatus = OutcomeRules.NextCaseStatusForAqs(outcomeValue, remedialFlagged);
                 requiresRemediation = OutcomeRules.RequiresRemediation(outcomeValue, remedialFlagged);
                 remediationReason = new OptionLabels(service).Label(OutcomeEntity, "al_initialoutcome", outcomeValue);
@@ -666,9 +684,10 @@ namespace OutcomeTesting.Plugins
             {
                 RaiseRemediation(
                     service,
-                    review,
                     targetId,
                     caseRef,
+                    caseReference,
+                    sequence,
                     remediationReason,
                     isAqs ? AqsObservationQuestionCode : TaxObservationQuestionCode);
             }
@@ -693,11 +712,13 @@ namespace OutcomeTesting.Plugins
         /// to set, and BR-007 requires both to be preserved separately.
         /// </summary>
         private static void CreateOutcome(
-            IOrganizationService service, Entity review, Guid reviewId, EntityReference caseRef, int outcomeValue)
+            IOrganizationService service,
+            Guid reviewId,
+            EntityReference caseRef,
+            string caseReference,
+            int sequence,
+            int outcomeValue)
         {
-            var outcomeCase = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet("al_casereference"));
-            var caseReference = outcomeCase.GetAttributeValue<string>("al_casereference") ?? caseRef.Id.ToString("D");
-            var sequence = review.GetAttributeValue<int?>("al_sequence") ?? 1;
             var code = "OUT-" + caseReference + "-" + sequence;
 
             var outcome = new Entity(OutcomeEntity)
@@ -725,16 +746,13 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         private static void RaiseRemediation(
             IOrganizationService service,
-            Entity review,
             Guid reviewId,
             EntityReference caseRef,
+            string caseReference,
+            int sequence,
             string reason,
             string observationQuestionCode)
         {
-            var outcomeCase = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet("al_casereference"));
-            var caseReference = outcomeCase.GetAttributeValue<string>("al_casereference") ?? caseRef.Id.ToString("D");
-            var sequence = review.GetAttributeValue<int?>("al_sequence") ?? 1;
-
             Remediation.Raise(
                 service,
                 caseRef,
@@ -749,26 +767,12 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>
         /// The al_answertext this review recorded for a question, by business code.
-        /// Returns null when the question was not answered. The choice-column sibling of
-        /// <see cref="AnswerChoiceFor"/>, ordered the same way and for the same reason.
+        /// Returns null when the question was not answered.
         /// </summary>
         private static string AnswerTextFor(IOrganizationService service, Guid reviewId, string questionCode)
         {
-            var query = new QueryExpression(ResponseEntity)
-            {
-                ColumnSet = new ColumnSet("al_answertext"),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
-
-            var version = query.AddLink(QuestionVersionEntity, "al_questionversionid", "al_questionversionid");
-            var question = version.AddLink("al_question", "al_questionid", "al_questionid");
-            question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.Equal, questionCode);
-            query.AddOrder("modifiedon", OrderType.Descending);
-
-            var found = service.RetrieveMultiple(query).Entities;
-            return found.Count == 0 ? null : found[0].GetAttributeValue<string>("al_answertext");
+            var response = AnswerFor(service, reviewId, questionCode, "al_answertext");
+            return response == null ? null : response.GetAttributeValue<string>("al_answertext");
         }
 
         /// <summary>

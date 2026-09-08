@@ -28,9 +28,10 @@ namespace OutcomeTesting.Plugins
         private const string ActionStatus = "al_actionstatus";
         private const string ActionCompletedOn = "al_completedon";
         private const string ActionAdviserResponse = "al_adviserresponse";
-        private const int StatusOpen = 120910600;
-        private const int StatusInProgress = 120910601;
-        private const int StatusCompleted = 120910602;
+        // Values live on Remediation, which writes this column when an action is raised.
+        private const int StatusOpen = Remediation.StatusOpen;
+        private const int StatusInProgress = Remediation.StatusInProgress;
+        private const int StatusCompleted = Remediation.StatusCompleted;
 
         // al_auditevent.
         private const string AuditEntity = "al_auditevent";

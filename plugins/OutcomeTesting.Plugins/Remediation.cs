@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -23,8 +23,8 @@ namespace OutcomeTesting.Plugins
     /// </summary>
     public static class Remediation
     {
-        public const string ActionEntity = "al_remediationaction";
-        public const string ActionCodeAttr = "al_remediationactioncode";
+        private const string ActionEntity = "al_remediationaction";
+        private const string ActionCodeAttr = "al_remediationactioncode";
 
         // al_remediationaction.al_actionstatus.
         public const int StatusOpen = 120910600;
@@ -86,7 +86,7 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>Monday to Friday. Bank holidays are not deducted (OD-018).</summary>
-        public static bool IsWorkingDay(DateTime day)
+        private static bool IsWorkingDay(DateTime day)
         {
             return day.DayOfWeek != DayOfWeek.Saturday && day.DayOfWeek != DayOfWeek.Sunday;
         }
