@@ -1,8 +1,13 @@
 ﻿# Outstanding work
 
-Started 2026-09-04. **Last reviewed 2026-09-07**, after the portal fixes batch, the AD-089
-write-path proof, the AD-013 round trip and the sign-in repair. Every environment claim below
-was re-queried that day rather than carried forward.
+Started 2026-09-04. **Last reviewed 2026-09-08**, after the deactivation fix, the signing-key
+removal and the four decisions the 2026-09-07 sign-in work left open. Every environment claim
+below was re-queried that day rather than carried forward.
+
+> **2026-09-08 in one line: following a register item nobody thought was urgent found that
+> deactivating a leaver withdrew nothing.** Two live defects came out of OD-037, which this
+> register had recorded as housekeeping on unused tables. Record:
+> `docs/deployment/2026-09-08-deactivation-fix-and-key-removal.md`.
 
 This is the register of what is left, not a status report. `docs/2026-09-06-delivery-status.md`
 is the current one; the earlier delivery statuses and the deployment records under
@@ -143,12 +148,25 @@ legacy `al_role`.
   `deletetable` command exists and is guarded (custom, unmanaged, empty). **The run was blocked
   by the session's permission classifier**, so it stays owed:
   `deletetable <orgUrl> al_user --confirm <orgUrl>`
-- **`al_Role` is NOT ready, and the register was wrong to imply it was.** It holds **11 rows** —
+- **`al_Role` is not ready, and the register was wrong to imply it was.** It holds **11 rows** —
   the old vocabulary, `ROLE-ADMINISTRATOR`, `ROLE-AQS-CHECKER` and so on — and it is still read
   as the fallback half of `RoleCodeExists`. Deleting it would fault that read for any code that
-  is not a web role. No active `al_userrolemapping` uses a legacy code, so dropping the fallback
-  is probably safe, but that is a behaviour decision and it needs taking before the table goes.
-- **The AD-013 round trip** afterwards, so `src/Entities/al_User` goes with it.
+  is not a web role.
+
+  **Queried 2026-09-08, and it settles the question: nothing uses those rows.** Every
+  `al_rolecode` in play, in both tables that carry one, is a web role name — not one legacy
+  `ROLE-*` code appears anywhere:
+
+  | Table | Codes in use |
+  |---|---|
+  | `al_pagepermission` (52 rules) | the seven `AL Portal - *` roles, and `Administrators` |
+  | `al_userrolemapping` | four `AL Portal - *` roles, and `Administrators` |
+
+  So dropping the fallback changes no behaviour. It is still a behaviour change rather than a
+  tidy-up, so it is taken deliberately and in this order: drop `CustomRoleExists` from
+  `RoleCodeExists` → rebuild and `registerall` → `deletetable al_role`.
+- **The AD-013 round trip** afterwards, so `src/Entities/al_User` and `src/Entities/al_Role` go
+  with them.
 
 ### 1.4 The unused `al_contact_al_outcomecase` intersect
 
