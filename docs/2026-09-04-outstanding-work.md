@@ -55,50 +55,36 @@ will be permitted to this account by its manager roles, and nothing will say whi
 allowed it. Any test of the separation itself (PP-08, the Tax/AQS boundary, AD-020's owner
 filter) needs a contact holding one role, not this one.
 
-### 1.2 The crossed external identity — now unblocked
+### 1.2 The crossed external identity — SETTLED 2026-09-08
 
-`adx_externalidentity` binds the Entra object id of **`svc.automate.aq`** to the **`Dev Account`**
-contact (`svc.automate.aq-dev`). Two different accounts. The consequence is live: the
-`Service Account` contact holds `Administrators` and **is reachable by no sign-in at all**, so
-the one role that reads every page belongs to nobody who can log in.
+`adx_externalidentity` bound the Entra object id of **`svc.automate.aq`** to the **`Dev Account`**
+contact (`svc.automate.aq-dev`) — two different accounts, which is why the `Service Account`
+contact held `Administrators` and was reachable by no sign-in at all.
 
-It was left alone earlier on 2026-09-07 because the Tax Reviewer path ran through that binding,
-and repointing it would have removed the only way to write a Tax check. **1.1 removed that
-constraint**: `Sims Rad` now holds Tax Reviewer and has a Tax review of its own, so nothing is
-lost by repointing the crossed binding or by leaving `Dev Account` without one.
-
-The remaining question is only what the *service* accounts should be able to do. Adding a
-binding for the `Service Account` contact is the additive option and would make `Administrators`
-reachable by a sign-in for the first time; repointing the existing one is the tidier option and
-takes portal access away from `svc.automate.aq` as `Dev Account`.
-
-**Decided 2026-09-07: repoint it** onto the `Service Account` contact, which is the contact
-`svc.automate.aq` is actually named after and which holds `Administrators`. That makes the
-binding truthful and makes `Administrators` reachable by a sign-in for the first time.
-
-`bindidentity` grew a `--repoint` flag for it — a separate act from granting a binding, because
-it takes a sign-in away from whoever holds it today, so it is not what happens when an "add" is
-re-run. The refusal without the flag is verified:
+**Repointed onto the `Service Account` contact**, which is what `svc.automate.aq` is actually
+named after:
 
 ```
-e044a8e9-… is already bound to Dev Account.
-Re-run with --repoint to move it, which takes that sign-in away from them.
+Repointed e044a8e9-…: Dev Account -> Service Account <svc.automate.aq@ascotlloyd.co.uk>
+  roles now reachable by that sign-in: Administrators
+  Dev Account is now reachable by no sign-in; it holds: AL Portal - Tax Reviewer
 ```
 
-**Not yet run — the call was blocked by the session's permission classifier.**
+`identities` reports no `NOTE` line. `Administrators` is reachable by a sign-in for the first
+time.
 
-```
-bindidentity <orgUrl> e044a8e9-34ac-4503-8da4-e9573ccd234b svc.automate.aq@ascotlloyd.co.uk --repoint --confirm <orgUrl>
-```
+`bindidentity` grew a `--repoint` flag for it rather than overwriting. Moving a binding takes a
+sign-in away from whoever holds it today, which is a different act from granting one and should
+not be what happens when a command reading as "add" is re-run. The refusal without the flag is
+verified. It also reports what the previous contact can no longer be reached by — a contact left
+holding roles and no way in looks like nothing at all from the environment.
 
-**One consequence to expect, not a fault:** `Dev Account` then holds `AL Portal - Tax Reviewer`
-and a Tax review on `IO-DEV-VERIFY-003` while being reachable by no sign-in. Nothing is lost —
-`Sims Rad` holds Tax Reviewer and its own Tax review since 1.1, and its manager roles read every
-review including that one. Reassign or leave it as a fixture; it does not need deciding now.
+**Expected, not a fault:** `Dev Account` keeps `AL Portal - Tax Reviewer` and a Tax review on
+`IO-DEV-VERIFY-003` while reachable by no sign-in. Nothing is lost — `Sims Rad` holds Tax
+Reviewer and its own Tax review since 1.1, and its manager roles read every review including
+that one.
 
-**Done when:** the repoint has run and `identities` shows no `NOTE` line.
-
-### 1.3 OD-037 — delete or keep `al_User` / `al_Role`
+### 1.3 OD-037 — `al_User` deleted, `al_Role` one command away
 
 **Corrected 2026-09-08. "Nothing reads it" is wrong, and acting on it would take the app down.**
 This register and the 2026-09-06 status both described this as purely a destructive ALM change
@@ -144,50 +130,39 @@ legacy `al_role`.
 
 ### What is left of OD-037
 
-- **`al_User`** — 0 rows, no longer read by any deployed code. Ready to delete; the
-  `deletetable` command exists and is guarded (custom, unmanaged, empty). **The run was blocked
-  by the session's permission classifier**, so it stays owed:
-  `deletetable <orgUrl> al_user --confirm <orgUrl>`
-- **`al_Role` is not ready, and the register was wrong to imply it was.** It holds **11 rows** —
-  the old vocabulary, `ROLE-ADMINISTRATOR`, `ROLE-AQS-CHECKER` and so on — and it is still read
-  as the fallback half of `RoleCodeExists`. Deleting it would fault that read for any code that
-  is not a web role.
+**`al_User` is deleted** — 0 rows, and no deployed code read it. The first attempt was refused
+with *"referenced by 1 other component"*, which named a GUID and a type code and nothing else.
+`deletetable` now resolves dependencies before trying, and it named the blocker: **the code
+app's own `appId`**. The app still declared `al_user` and `al_role` as data sources, which no
+amount of plug-in work would have surfaced.
 
-  **Queried 2026-09-08, and it settles the question: nothing uses those rows.** Every
-  `al_rolecode` in play, in both tables that carry one, is a web role name — not one legacy
-  `ROLE-*` code appears anywhere:
+That is fixed too, and one part of it was a defect: `Al_rolesService` fed the full extract's
+**Roles** sheet, so that report had been presenting the eleven retired `al_role` rows as the
+role list. It now reads `Mspp_webrolesService`, the registry since AD-087. `Al_usersService`
+was used nowhere and is gone. Both data sources are out of `power.config.json`, with their
+generated models and services.
 
-  | Table | Codes in use |
-  |---|---|
-  | `al_pagepermission` (52 rules) | the seven `AL Portal - *` roles, and `Administrators` |
-  | `al_userrolemapping` | four `AL Portal - *` roles, and `Administrators` |
+The `al_role` fallback in `RoleCodeExists` is dropped, so nothing reads either table. Order
+matters and is not negotiable: **app and assembly deployed first, table deleted after** —
+Dataverse cannot see a plug-in's `RetrieveMultiple` as a dependency, so the environment has to
+already be running code that does not read it.
 
-  So dropping the fallback changes no behaviour. It is still a behaviour change rather than a
-  tidy-up, so it is taken deliberately and in this order: drop `CustomRoleExists` from
-  `RoleCodeExists` → rebuild and `registerall` → `deletetable al_role`.
-- **The AD-013 round trip** afterwards, so `src/Entities/al_User` and `src/Entities/al_Role` go
-  with them.
+**AD-013 round trip ran.** `al_User` absent (24 entities), `al_contact_al_outcomecase` absent
+from the relationships — the export agreeing with the hand edit made when it was deleted. 25
+Custom APIs, 14 SDK steps, **34 plug-in types against 34 classes built**. Pack succeeds at 209
+entries.
 
-### 1.4 The unused `al_contact_al_outcomecase` intersect
-
-OD-022 is resolved — neither N:N nor per-persona lookups; all authenticated users read all
-cases. The N:N built on 2026-08-30 to test the alternative is therefore unnecessary, and
-OD-022's own text says it **should be deleted** so an unused intersect does not outlive the
-question it was built to answer.
-
-Verified 2026-09-07: **the intersect holds 0 rows.** The command exists and is guarded — it
-refuses unless the relationship is custom, unmanaged and its intersect is empty:
+**Only one thing is left:**
 
 ```
-deleterelationship <orgUrl> al_contact_al_outcomecase --confirm <orgUrl>
+deletetable <orgUrl> al_role --with-rows --confirm <orgUrl>
 ```
 
-**Status:** the run was **blocked by the session's permission classifier**, correctly — it is
-an irreversible schema delete. It needs to be run with that permission granted, and
-`src/Other/Relationships.xml` and `src/Other/Relationships/Contact.xml` updated in the same
-change so `src/` does not drift from DEV.
-
-**Done when:** the relationship is gone from DEV and from `src/`.
+Nothing reads the table and nothing references its eleven rows, but they are rows, so
+`deletetable` refuses without a second explicit opt-in — a command that silently destroys data
+is one nobody can safely re-run. `--with-rows` prints every row first, so the run's own output
+is the record of what was there. **Blocked by the session's permission classifier.** Once it
+runs, `src/Entities/al_Role` goes with the next round trip.
 
 ## 2. PP-15's other events — DESCOPED 2026-09-08
 
@@ -216,7 +191,7 @@ working tree's index and cannot be committed again. It is **still on disk**, bec
 supplied out of band. That gap is exactly what Key Vault injection at build time is meant to
 close, and it is not built yet.
 
-### History removal — done on `main`, NOT finished on the repository
+### History removal — done, and it does not close the finding
 
 **2026-09-08.** `git filter-repo` (installed via pip; neither it nor BFG was present)
 stripped the key from all 175 commits on every local branch, and `main` was force-pushed.
@@ -231,25 +206,26 @@ intact, every remaining 7-hex token in `docs/` resolving to a commit except `024
 `1209107`, which were never SHAs (a CRM email tracking token and an option-value block). Suite
 384/384 after the rewrite, and the assembly still signs.
 
-**The key is still on GitHub.** Two remote branches were never rewritten and still carry it:
+**Both stale branches are rewritten too.** They were the reason the key stayed fetchable after
+`main` was clean:
 
 | Branch | Remote (old) | Local (rewritten) | Unique work |
 |---|---|---|---|
 | `feat/role-assignment-conflict-rule` | `5b61849` | `441a1ab` | none — merged |
 | `feature/outcome-creation-dev-deployment` | `cc112da` | `de224e3` | none — merged |
 
-Both are fully merged into `main`, so force-pushing their rewritten versions loses nothing and
-is safer than deleting someone's branches. **The run was blocked by the session's permission
-classifier**, so this is owed:
+Both were fully merged, so force-pushing their rewritten versions lost nothing and was safer
+than deleting someone's branches. Re-checked after a pruning fetch: **0 commits touch the file
+and 0 `.snk` objects are reachable**, local or remote.
 
-```
-git push --force origin feat/role-assignment-conflict-rule feature/outcome-creation-dev-deployment
-```
+**The method is the part worth keeping.** A check of `main` alone reported success while the key
+was still fetchable from two other branches; only `--all` reachability showed it. A
+secret-removal that verifies solely the branch it rewrote will tell you it worked.
 
-Until that runs, anyone can fetch either branch and get the key — **so the history removal is
-not yet true of the repository, only of `main`.** This was caught by verifying after the push
-rather than trusting it; `--all` reachability is what shows it, and a check of `main` alone
-reports success.
+**None of this closes OD-025.** The key was public on GitHub, so it is compromised whatever the
+history now says — anyone who cloned or forked still holds it, and GitHub may serve the old
+objects by direct SHA until it garbage-collects, which is worth asking Support to force. Only
+rotation closes this.
 
 **Rotation, which is the part that actually closes the finding.** The key has been public on
 GitHub, so it must be treated as compromised: **history removal does not un-publish it.** Anyone

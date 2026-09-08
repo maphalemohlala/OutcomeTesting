@@ -12,11 +12,11 @@ import {
   Al_remediationactionsService,
   Al_responsesService,
   Al_reviewinstancesService,
-  Al_rolesService,
   Al_sectionsService,
   Al_signoffsService,
   Al_userrolemappingsService,
   ContactsService,
+  Mspp_webrolesService,
 } from '../../generated';
 import type { CellValue, Sheet } from '../../lib/tabular';
 
@@ -83,7 +83,10 @@ const SOURCES: { name: string; read: () => Promise<{ success: boolean; data?: un
   { name: 'Questions', read: () => Al_questionsService.getAll({ top: EXTRACT_ROW_LIMIT }) },
   { name: 'Question versions', read: () => Al_questionversionsService.getAll({ top: EXTRACT_ROW_LIMIT }) },
   { name: 'People', read: () => ContactsService.getAll({ top: EXTRACT_ROW_LIMIT }) },
-  { name: 'Roles', read: () => Al_rolesService.getAll({ top: EXTRACT_ROW_LIMIT }) },
+  // The registry is the Power Pages web roles (AD-087). This read al_role, which has
+  // held the retired vocabulary since - eleven rows nothing resolves against - so the
+  // sheet was reporting roles nobody can hold as though they were the role list.
+  { name: 'Roles', read: () => Mspp_webrolesService.getAll({ top: EXTRACT_ROW_LIMIT }) },
   { name: 'Role assignments', read: () => Al_userrolemappingsService.getAll({ top: EXTRACT_ROW_LIMIT }) },
   { name: 'Permission rules', read: () => Al_pagepermissionsService.getAll({ top: EXTRACT_ROW_LIMIT }) },
 ];

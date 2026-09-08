@@ -92,14 +92,21 @@ namespace OutcomeTesting.Plugins.Tests
     }
 
     /// <summary>
-    /// AD-044/AD-087. A role code names either a web role or a legacy al_role, and both are
-    /// assignable. `al_SetPagePermission` accepted only the second, so configuring a permission
-    /// for any of the seven `AL Portal - *` roles the app actually offers was refused — none of
-    /// the eleven al_role rows carries such a code.
+    /// AD-087/OD-037. The registry is the Power Pages web roles, and a role code is checked
+    /// against them alone.
     ///
-    /// It stayed hidden because the 52 web role rules in DEV were written directly by
+    /// Two things are pinned here, and the second is the one that will look wrong later.
+    /// `al_SetPagePermission` used to validate against `al_role` **only**, and no `al_role` row
+    /// carries an `AL Portal - *` code, so configuring a permission for any role the app offers
+    /// was refused — hidden because the 52 web role rules in DEV were written directly by
     /// `seedwebroles` rather than through the command. Seeding a result is how a broken path
     /// stops being walked.
+    ///
+    /// The legacy `al_role` fallback that briefly replaced it is **deliberately gone**. It could
+    /// only ever have matched a code nothing carries: every `al_rolecode` in `al_pagepermission`
+    /// and `al_userrolemapping` is a web role name, verified against DEV. Dropping it is what
+    /// lets the table be deleted, because a read against a table that has gone faults and
+    /// Dataverse cannot see a plug-in's RetrieveMultiple as a dependency.
     /// </summary>
     public class RoleCodeExistsTests
     {
@@ -114,11 +121,6 @@ namespace OutcomeTesting.Plugins.Tests
                 Guid.Parse("11111111-bbbb-4bbb-8bbb-111111111111"),
                 WebRoleRegistry.NameAttr, WebRoleName,
                 WebRoleRegistry.AuthenticatedAttr, false);
-            svc.Seed(
-                "al_role",
-                Guid.Parse("22222222-bbbb-4bbb-8bbb-222222222222"),
-                "al_rolecode", LegacyCode,
-                "statecode", new OptionSetValue(0));
             return svc;
         }
 
@@ -129,15 +131,26 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void StillAcceptsALegacyAlRoleCode()
-        {
-            Assert.True(AssignUserRolePlugin.RoleCodeExists(Seeded(), LegacyCode));
-        }
-
-        [Fact]
-        public void RefusesACodeThatIsNeither()
+        public void RefusesACodeThatIsNotAWebRole()
         {
             Assert.False(AssignUserRolePlugin.RoleCodeExists(Seeded(), "ROLE-NOT-A-THING"));
+        }
+
+        /// <summary>
+        /// The retired vocabulary is not consulted, and this must keep failing to match even
+        /// with a row present — otherwise the check is still reachable and `al_role` cannot go.
+        /// </summary>
+        [Fact]
+        public void DoesNotConsultTheRetiredAlRoleTable()
+        {
+            var svc = Seeded();
+            svc.Seed(
+                "al_role",
+                Guid.Parse("22222222-bbbb-4bbb-8bbb-222222222222"),
+                "al_rolecode", LegacyCode,
+                "statecode", new OptionSetValue(0));
+
+            Assert.False(AssignUserRolePlugin.RoleCodeExists(svc, LegacyCode));
         }
     }
 }

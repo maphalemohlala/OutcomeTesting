@@ -89,16 +89,6 @@
           "logicalName": "al_exportrecord",
           "isHidden": false
         },
-        "roles": {
-          "entitySetName": "al_roles",
-          "logicalName": "al_role",
-          "isHidden": false
-        },
-        "users": {
-          "entitySetName": "al_users",
-          "logicalName": "al_user",
-          "isHidden": false
-        },
         "environment_39a902ba": {
           "entitySetName": "Environment",
           "logicalName": "environment_39a902ba",

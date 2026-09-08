@@ -1,4 +1,4 @@
-# Deployment — deactivation withdraws access again, and the signing key leaves git
+﻿# Deployment — deactivation withdraws access again, and the signing key leaves git
 
 Date: 2026-09-08
 Target: `Env_AQ_Dev` (`org0b075da8`, environment `d50d27e8-cb3b-e718-b6e2-30aa92d944aa`)
@@ -71,8 +71,10 @@ role".
 It stayed hidden because the 52 web role rules in DEV were written directly by `seedwebroles`,
 never through the command. **Seeding a result is how a broken path stops being walked.**
 
-Both call sites now use `AssignUserRolePlugin.RoleCodeExists`, which accepts a web role or a
-legacy `al_role`, matching what `al_AssignUserRole` already did.
+Both call sites now use `AssignUserRolePlugin.RoleCodeExists`, which at this point accepted a
+web role or a legacy `al_role`, matching what `al_AssignUserRole` already did. **The legacy half
+was dropped later the same day** — see the addendum: it could only ever have matched a code
+nothing carries, and it was the last thing reading `al_role`.
 
 ## 3. The sign-in now reaches the contact it is named after
 
@@ -134,7 +136,8 @@ remaining 7-hex token in `docs/` resolving to a commit except `0249002` and `120
 were never SHAs but a CRM email tracking token and an option-value block. The diff was 47
 insertions against 47 deletions — what a pure remap should look like.
 
-**It is still fetchable.** Two remote branches were never rewritten:
+**It was still fetchable at this point, and the check that found it is the part worth keeping.**
+Two remote branches had not been rewritten — closed in the addendum below:
 
 | Branch | Remote (old) | Local (rewritten) | Unique work |
 |---|---|---|---|
@@ -167,14 +170,54 @@ step here is reversible.
 | Portal security assertions | All pass |
 | Key in history | 0 commits and 0 objects on `main`; **present on two remote branches** |
 
+## 7. Addendum — the rest of the batch, run later the same day
+
+**The key is unreachable from every ref.** Both stale branches were force-pushed to their
+rewritten versions: `feat/role-assignment-conflict-rule` `5b61849→441a1ab` and
+`feature/outcome-creation-dev-deployment` `cc112da→de224e3`. Re-checked after a pruning fetch:
+**0 commits touch the file and 0 `.snk` objects are reachable**, local or remote.
+
+**`al_user` is deleted**, and getting there found what the register had not. The first attempt
+was refused: *"referenced by 1 other component"*, which names a GUID and a type code and leaves
+the rest as an exercise. `deletetable` now asks `RetrieveDependenciesForDeleteRequest` **before**
+trying and resolves each dependency to something actionable. It reported component type 300, id
+`5d9fc475-…` — **the code app's own `appId`**: the app still declared `al_user` and `al_role`
+as data sources, which no amount of plug-in work would have revealed.
+
+So the app had to change first:
+
+- `Al_usersService` was exported and used nowhere — removed outright.
+- `Al_rolesService` fed the full extract's **Roles** sheet, which means that report had been
+  presenting the eleven retired `al_role` rows as the role list. It now reads
+  `Mspp_webrolesService`, the actual registry since AD-087. That is a defect fixed, not a
+  substitution: the sheet was naming roles nobody can hold.
+- Both data sources removed from `power.config.json` (19 remain) and their generated models,
+  services and exports deleted.
+
+The `al_role` fallback in `RoleCodeExists` is gone too, so nothing reads either table.
+
+**Order, and why it is not negotiable:** app and assembly deployed *first*, table deleted
+*after*. Dataverse cannot see a plug-in's `RetrieveMultiple` as a dependency — it is a fault at
+run time on whatever path reads first — so the environment must already be running code that
+does not read the table.
+
+**AD-013 round trip ran**, and the export is independent confirmation rather than a restatement:
+`al_User` is absent (24 entities, was 25), and `al_contact_al_outcomecase` is absent from
+`Other/Relationships*`, which agrees with the hand edit made when it was deleted. 25 Custom APIs,
+14 SDK steps, and **34 plug-in types in the manifest against 34 classes the assembly builds**.
+`Pack-Schema-Solution.ps1` succeeds at 209 entries with no assembly.
+
+Deployed after the round trip: code app pushed, portal uploaded 19/19 in 16.86s with 13 of 13
+permissions verified.
+
 ## Still owed
 
-- **`deletetable <orgUrl> al_user --confirm <orgUrl>`** — 0 rows, no deployed code reads it.
-  Blocked by the session's permission classifier.
-- **`al_role`** — 11 rows, still the fallback half of `RoleCodeExists`. Every `al_rolecode` in
-  use across `al_pagepermission` and `al_userrolemapping` is a web role name, so dropping the
-  fallback changes no behaviour; it is still a behaviour change and is taken in order: drop the
-  fallback → rebuild and `registerall` → `deletetable al_role` → AD-013 round trip.
-- **`git push --force origin feat/role-assignment-conflict-rule feature/outcome-creation-dev-deployment`**
-  — until this runs the key is fetchable. Blocked by the classifier.
-- **OD-025 rotation**, which is the only thing that actually closes the finding.
+- **`deletetable <orgUrl> al_role --with-rows --confirm <orgUrl>`.** Nothing reads the table now
+  and nothing references its eleven rows, but they *are* rows, so `deletetable` refuses without
+  an explicit second opt-in — a command that silently destroys data is one nobody can safely
+  re-run. `--with-rows` prints every row before deleting so the run's own output is the record.
+  Blocked by the session's permission classifier. Once it runs, `src/Entities/al_Role` goes with
+  the next round trip.
+- **OD-025 rotation.** The key was public on GitHub, so it is compromised whatever the history
+  now says. Nothing done today changes that, and only a new key does. GitHub may also retain the
+  old objects until it garbage-collects, which is worth asking Support to force.

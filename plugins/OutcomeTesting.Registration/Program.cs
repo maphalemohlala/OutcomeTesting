@@ -120,8 +120,12 @@ using System.Text.Json;
 //   does not write the review itself: a hand-written one would prove the pages render, not
 //   that routing produces the right check.
 //
-// Delete a table: dotnet run -- deletetable <orgUrl> <logicalName> --confirm <orgUrl>
-//   Deletes a custom table. IRREVERSIBLE. Refuses unless it is custom, unmanaged and empty.
+// Delete a table: dotnet run -- deletetable <orgUrl> <logicalName> [--with-rows] --confirm <orgUrl>
+//   Deletes a custom table. IRREVERSIBLE. Refuses unless it is custom, unmanaged and empty,
+//   and reports what still references it rather than leaving the platform's "referenced by 1
+//   other component" to be decoded. `--with-rows` allows a table that holds data, prints every
+//   row first so the run's own output is the record, and is a separate opt-in because a
+//   command that silently destroys rows is one nobody can safely re-run.
 //   It cannot check the thing that actually breaks an environment — whether deployed code
 //   still reads the table — because a plug-in's RetrieveMultiple is not a dependency
 //   Dataverse can see. Retire the read, deploy that, then delete.
@@ -812,19 +816,60 @@ int DeleteTable(string[] a)
         return 1;
     }
 
+    var withRows = a.Any(x => x.Equals("--with-rows", StringComparison.OrdinalIgnoreCase));
+
     var rows = svc.RetrieveMultiple(new QueryExpression(logicalName)
     {
-        ColumnSet = new ColumnSet(false),
-        TopCount = 1,
-    }).Entities.Count;
+        ColumnSet = new ColumnSet(true),
+    }).Entities;
 
-    if (rows > 0)
+    if (rows.Count > 0 && !withRows)
     {
-        Console.Error.WriteLine($"'{logicalName}' holds rows. Refusing — deleting the table deletes them.");
+        Console.Error.WriteLine(
+            $"'{logicalName}' holds {rows.Count} row(s). Refusing — deleting the table deletes them. " +
+            "Re-run with --with-rows if destroying them is the intent.");
         return 1;
     }
 
-    Console.WriteLine("  it holds no rows.");
+    if (rows.Count > 0)
+    {
+        // Printed in full before anything is destroyed, so the run's own output is the
+        // record of what was there. A table worth deleting is usually one nobody can
+        // describe any more, and "it held eleven rows" is not a description.
+        var primaryName = metadata.PrimaryNameAttribute;
+        Console.WriteLine($"  destroying {rows.Count} row(s):");
+        foreach (var row in rows)
+        {
+            var label = primaryName != null ? row.GetAttributeValue<string>(primaryName) : null;
+            Console.WriteLine($"    {row.Id:D}  {label ?? "(no name)"}");
+        }
+    }
+    else
+    {
+        Console.WriteLine("  it holds no rows.");
+    }
+
+    // Ask what still points at it before trying, rather than reading the platform's
+    // refusal afterwards. "referenced by 1 other component" names a GUID and a type code
+    // and leaves the rest as an exercise; a delete that is going to be refused should say
+    // what to go and remove.
+    var dependencies = ((RetrieveDependenciesForDeleteResponse)svc.Execute(
+        new RetrieveDependenciesForDeleteRequest { ObjectId = metadata.MetadataId ?? Guid.Empty, ComponentType = 1 }))
+        .EntityCollection.Entities;
+
+    if (dependencies.Count > 0)
+    {
+        Console.Error.WriteLine($"'{logicalName}' is referenced by {dependencies.Count} component(s):");
+        foreach (var d in dependencies)
+        {
+            var type = d.GetAttributeValue<OptionSetValue>("dependentcomponenttype");
+            var id = d.GetAttributeValue<Guid?>("dependentcomponentobjectid");
+            Console.Error.WriteLine($"  {DescribeComponent(svc, type?.Value ?? -1, id)}");
+        }
+
+        Console.Error.WriteLine("Remove those first. Refusing.");
+        return 1;
+    }
 
     svc.Execute(new DeleteEntityRequest { LogicalName = logicalName });
     Console.WriteLine($"Deleted {logicalName}.");
@@ -844,6 +889,53 @@ int DeleteTable(string[] a)
     {
         Console.WriteLine("Confirmed gone.");
         return 0;
+    }
+}
+
+// Turns a solution component type code and id into something a person can act on.
+//
+// The type codes are the whole difficulty: a dependency reported as "type 26" is a saved
+// query and "type 60" a form, and neither is guessable from the number. The common ones are
+// named, and anything else prints its code rather than a wrong guess — then the id is
+// resolved to a name where the table can be read.
+static string DescribeComponent(IOrganizationService svc, int componentType, Guid? id)
+{
+    var known = new Dictionary<int, (string Label, string Entity, string NameAttr)>
+    {
+        [1] = ("Table", "entity", null),
+        [2] = ("Column", null, null),
+        [10] = ("Relationship", null, null),
+        [26] = ("View", "savedquery", "name"),
+        [59] = ("Chart", "savedqueryvisualization", "name"),
+        [60] = ("Form", "systemform", "name"),
+        [61] = ("Web resource", "webresource", "name"),
+        [90] = ("Plug-in type", "plugintype", "typename"),
+        [91] = ("Plug-in assembly", "pluginassembly", "name"),
+        [92] = ("SDK message step", "sdkmessageprocessingstep", "name"),
+        [93] = ("SDK step image", "sdkmessageprocessingstepimage", "name"),
+        [371] = ("Custom API", "customapi", "uniquename"),
+        [372] = ("Custom API request parameter", "customapirequestparameter", "uniquename"),
+        [373] = ("Custom API response property", "customapiresponseproperty", "uniquename"),
+    };
+
+    if (!known.TryGetValue(componentType, out var info))
+    {
+        return $"component type {componentType}, id {id:D}";
+    }
+
+    if (info.Entity == null || info.NameAttr == null || id == null)
+    {
+        return $"{info.Label}, id {id:D}";
+    }
+
+    try
+    {
+        var row = svc.Retrieve(info.Entity, id.Value, new ColumnSet(info.NameAttr));
+        return $"{info.Label} '{row.GetAttributeValue<string>(info.NameAttr)}' ({id:D})";
+    }
+    catch
+    {
+        return $"{info.Label}, id {id:D}";
     }
 }
 

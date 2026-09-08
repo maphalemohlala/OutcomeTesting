@@ -100,7 +100,6 @@
       <RootComponent type="1" schemaName="al_role" behavior="0" />
       <RootComponent type="1" schemaName="al_section" behavior="0" />
       <RootComponent type="1" schemaName="al_signoff" behavior="0" />
-      <RootComponent type="1" schemaName="al_user" behavior="0" />
       <RootComponent type="1" schemaName="al_userrolemapping" behavior="0" />
       <RootComponent type="1" schemaName="contact" behavior="1" />
       <RootComponent type="20" id="{367c6daf-28a2-f111-b8dd-e4fade069307}" behavior="0" />

@@ -68,11 +68,11 @@ namespace OutcomeTesting.Plugins
                 // A role code names EITHER a web role (the registry, AD-041) or an AD-044
                 // al_role. Web roles are checked first because they are the source the app
                 // now offers; al_role stays valid so nothing already assigned breaks.
+                // Same rule as RoleCodeExists, kept inline because the web role entity is
+                // needed below and re-reading it to share one boolean would cost a query.
                 webRole = WebRoleRegistry.FindByName(systemService, normalizedCode);
-                if (webRole == null && !CustomRoleExists(systemService, normalizedCode))
+                if (webRole == null)
                 {
-                    // Same rule as RoleCodeExists, kept inline because the web role entity is
-                    // needed below and re-reading it to share one boolean would cost a query.
                     throw new InvalidPluginExecutionException(
                         CommandHelpers.ValidationPrefix + "The role code does not match an active role.");
                 }
@@ -232,32 +232,22 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// True when a role code names something assignable — a web role (the registry since
-        /// AD-087) or an AD-044 <c>al_role</c>.
+        /// True when a role code names an assignable role.
         ///
-        /// The order matters and the fallback is deliberate: web roles are what the app now
-        /// offers, and <c>al_role</c> stays valid so nothing already assigned breaks. It is
-        /// also what lets the legacy table be retired later — once nothing carries an
-        /// <c>al_role</c>-only code, dropping the second half changes no behaviour.
+        /// The registry is the Power Pages web roles (AD-087), and this is now the only thing
+        /// consulted. It carried an <c>al_role</c> fallback so nothing already assigned would
+        /// break while the vocabulary changed over — that changeover is complete: every
+        /// <c>al_rolecode</c> in `al_pagepermission` and `al_userrolemapping` is a web role
+        /// name, and no legacy `ROLE-*` code appears in either, so the eleven `al_role` rows
+        /// are referenced by nothing and the fallback could only ever have matched a code
+        /// that no longer exists (OD-037, verified against DEV 2026-09-08).
+        ///
+        /// Dropping it is what lets `al_role` be deleted: a read against a table that has gone
+        /// faults, and Dataverse cannot see a plug-in's RetrieveMultiple as a dependency.
         /// </summary>
         public static bool RoleCodeExists(IOrganizationService service, string roleCode)
         {
-            return WebRoleRegistry.FindByName(service, roleCode) != null
-                || CustomRoleExists(service, roleCode);
-        }
-
-        /// <summary>True when an al_role exists with the given business code.</summary>
-        internal static bool CustomRoleExists(IOrganizationService service, string roleCode)
-        {
-            var query = new QueryExpression("al_role")
-            {
-                ColumnSet = new ColumnSet(false),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("al_rolecode", ConditionOperator.Equal, roleCode);
-            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
-            return service.RetrieveMultiple(query).Entities.Count > 0;
+            return WebRoleRegistry.FindByName(service, roleCode) != null;
         }
 
         internal static Guid Upsert(IOrganizationService service, string entity, string codeAttr, string code, Entity values)
