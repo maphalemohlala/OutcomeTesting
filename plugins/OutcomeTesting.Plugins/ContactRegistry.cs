@@ -24,11 +24,34 @@ namespace OutcomeTesting.Plugins
         public const string FullNameAttr = "fullname";
         public const string StateCodeAttr = "statecode";
         public const string StatusCodeAttr = "statuscode";
+        public const string SecurityStampAttr = "adx_identity_securitystamp";
 
         public const int StateActive = 0;
         public const int StateInactive = 1;
         public const int StatusActive = 1;
         public const int StatusInactive = 2;
+
+        /// <summary>
+        /// Gives a contact being created the ASP.NET Identity security stamp Power Pages
+        /// validates the authentication cookie against.
+        ///
+        /// Power Pages writes this itself for a contact it creates from an external sign-in,
+        /// and for nobody else. A contact created here, by a seed or by hand therefore gets
+        /// an identity binding and no stamp, and the gap is invisible from
+        /// adx_externalidentity — it presents as a generic error page after a SUCCESSFUL
+        /// authentication, which points at nothing. DEV had two contacts in that state and
+        /// neither could sign in; the one contact Power Pages had built itself could.
+        ///
+        /// Written on create only. Rotating an existing stamp signs the person out
+        /// everywhere, so this must never be applied to an update path.
+        /// </summary>
+        public static void SetSecurityStamp(Entity contact)
+        {
+            if (contact != null)
+            {
+                contact[SecurityStampAttr] = System.Guid.NewGuid().ToString("D");
+            }
+        }
 
         /// <summary>
         /// The surname half of a display name.

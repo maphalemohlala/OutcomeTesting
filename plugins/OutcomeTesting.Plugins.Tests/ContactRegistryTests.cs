@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Xrm.Sdk;
 using OutcomeTesting.Plugins;
 using Xunit;
@@ -58,6 +59,35 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal("Sims", contact[ContactRegistry.FirstNameAttr]);
             Assert.Equal("Rad", contact[ContactRegistry.LastNameAttr]);
             Assert.False(contact.Contains(ContactRegistry.FullNameAttr));
+        }
+
+        [Fact]
+        public void WritesASecurityStampAContactCanSignInWith()
+        {
+            // Power Pages writes this only for contacts it creates itself, and a contact
+            // without one authenticates and then fails on a generic error page. DEV had two.
+            var contact = new Entity(ContactRegistry.Entity);
+
+            ContactRegistry.SetSecurityStamp(contact);
+
+            var stamp = contact.GetAttributeValue<string>(ContactRegistry.SecurityStampAttr);
+            Assert.True(Guid.TryParse(stamp, out _));
+        }
+
+        [Fact]
+        public void GivesEveryContactItsOwnSecurityStamp()
+        {
+            // A shared constant would be worse than none: the stamp is what invalidates one
+            // person's session, so two people holding the same one is not a stamp at all.
+            var first = new Entity(ContactRegistry.Entity);
+            var second = new Entity(ContactRegistry.Entity);
+
+            ContactRegistry.SetSecurityStamp(first);
+            ContactRegistry.SetSecurityStamp(second);
+
+            Assert.NotEqual(
+                first.GetAttributeValue<string>(ContactRegistry.SecurityStampAttr),
+                second.GetAttributeValue<string>(ContactRegistry.SecurityStampAttr));
         }
 
         [Fact]

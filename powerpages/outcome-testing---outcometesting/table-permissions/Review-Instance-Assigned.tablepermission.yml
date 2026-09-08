@@ -1,5 +1,5 @@
 adx_append: false
-adx_appendto: false
+adx_appendto: true
 adx_contactrelationship: contact_al_reviewinstance
 adx_create: false
 adx_delete: false

@@ -124,3 +124,87 @@ refused by name. The link between the orphaned username and the *generic* error 
 inference — a confirmed abnormal state, and the only abnormal state found on that path, but
 the error page named nothing. If `svc.automate.aq` still fails, the investigation restarts
 rather than a second fix being stacked on this one.
+
+---
+
+# Addendum, same day — the username was not the cause
+
+Section 6 said the investigation would restart if `svc.automate.aq` still failed. It did, and
+this is that restart. **Sections 1 and 2 above describe a real defect that is correctly fixed,
+and a cause that was wrong.** Both statements hold; keeping them together is the point.
+
+## 7. What the retest showed
+
+`svc.automate.aq-dev` signed in. `svc.automate.aq` did not. The binding, the username and the
+site settings were by then identical in shape across both, so the difference was not on the
+path this record had been examining at all.
+
+`Sims Rad` was then tested as a discriminator and **failed the same way**. That killed the
+remaining role-shaped theory — `Administrators` versus `AL Portal - *` — because `Sims Rad`
+holds four `AL Portal` roles and no `Administrators`.
+
+| Contact | `adx_identity_securitystamp` | Created | Signs in |
+|---|---|---|---|
+| Dev Account | set | 08-29, **by Power Pages** | yes |
+| Service Account | null | 09-03, by hand | no |
+| Sims Rad | null | 09-03, by hand | no |
+
+**Power Pages writes the ASP.NET Identity security stamp only for a contact it creates
+itself.** It is the value the authentication cookie is validated against. A contact created by
+hand gets an external identity binding and no stamp, and nothing about that is visible from
+`adx_externalidentity` — which is why two rounds of investigation went past it.
+
+Confirmed by single-variable test rather than by reasoning: the stamp was set on `Sims Rad`
+alone, with `Service Account` deliberately left as an untouched control. `Sims Rad` signed in;
+`Service Account` still did not. `Service Account` was then stamped too.
+
+## 8. The command was fixed, again, not the rows
+
+`CreateUserPlugin` created a contact carrying an email and a name and nothing else, so **every
+person created through the app was born unable to sign in to the portal.** DEV had two such
+contacts and both were the ones failing.
+
+`ContactRegistry.SetSecurityStamp` is called on the **create branch only**. The idempotent
+re-run must not touch it: rotating a stamp signs the person out everywhere, so a command that
+reads as "create or refresh" must not quietly invalidate a session. Two tests pin it,
+including that two contacts never receive the same stamp — a shared constant would be worse
+than no stamp at all, since the stamp's only job is to invalidate one person's session.
+
+`setsecuritystamp` fills the gap for contacts that already exist. It writes one column,
+refuses a contact that already has a stamp, and deliberately leaves `adx_identity_lockoutenabled`
+alone — that column also differs between a hand-made contact and one Power Pages built, and
+changing both at once would have made the DEV test unreadable.
+
+## 9. Answers could never be saved from the portal
+
+Reported separately and found to be unrelated: a reviewer with the right role, on a review
+assigned to them, in a fresh session, was refused with the portal's 401/403 message.
+
+Creating an `al_response` that references an `al_reviewinstance` needs **Append on the child
+and AppendTo on the parent**. `Response - on a review assigned to me` carries both. Neither
+`al_reviewinstance` permission carried `AppendTo`:
+
+| Permission | Table | Append | AppendTo |
+|---|---|---|---|
+| Response - on a review assigned to me | `al_response` | true | true |
+| Review Instance - assigned to me (write scope) | `al_reviewinstance` | false | **false** |
+| Review Instance - read all | `al_reviewinstance` | false | false |
+
+`adx_appendto` is now `true` on `…071`, contact-scoped, so it reaches only reviews assigned to
+the person holding a reviewer role. The repo already applied this pattern to `al_failreason`
+and `al_remediationaction`; `al_reviewinstance` was the one that was missed.
+
+**This had never worked from the portal for anyone.** The AD-089 write-path proof of
+2026-09-07 exercised role adoption through the SDK, not the response write through the Web
+API, so it passed while this path stayed broken — the same "seeding a result is how a broken
+path stops being walked" failure that record's own section 2 names. A proof that runs as an
+administrator proves nothing about a table permission.
+
+## 10. Standing correction
+
+This record's own first diagnosis was wrong, and it was wrong in the way this project keeps
+finding: **a confirmed abnormal state was treated as the cause because it was the only
+abnormal state that had been looked for.** The orphaned username was real, is fixed, and was
+never why anyone saw an error page. The discriminator that eventually worked — testing a third
+account whose configuration differed in a different dimension — cost one sign-in and would
+have saved a deployment had it come first.

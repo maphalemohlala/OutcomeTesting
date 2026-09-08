@@ -399,6 +399,11 @@ if (args.Length >= 2 && args[0].Equals("setsitesetting", StringComparison.Ordina
     return SetSiteSetting(args);
 }
 
+if (args.Length >= 2 && args[0].Equals("setsecuritystamp", StringComparison.OrdinalIgnoreCase))
+{
+    return SetSecurityStamp(args);
+}
+
 if (args.Length < 1)
 {
     Console.Error.WriteLine("Usage: dotnet run -- <orgUrl> [<pluginDllPath>]   |   dotnet run -- verify <orgUrl>");
@@ -1287,6 +1292,65 @@ int BindIdentity(string[] a)
     Console.WriteLine($"  identity row : {newId:D}");
     Console.WriteLine($"  roles now reachable by that sign-in: {string.Join(", ", RolesOf(svc, contactId))}");
     return 0;
+}
+
+// Gives one contact an ASP.NET Identity security stamp, which is the value Power Pages
+// validates the authentication cookie against.
+//
+// Power Pages writes this itself for a contact it creates from an external sign-in. A
+// contact created by hand — by migratetocontacts, by a seed, or in the maker portal — gets
+// an external identity binding and no stamp, and the difference is invisible until someone
+// tries to sign in as them.
+//
+// DELIBERATELY NARROW while what the stamp actually causes is still being established: it
+// writes one column, refuses a contact that already has one, and does not touch
+// adx_identity_lockoutenabled or anything else that differs between a hand-made contact and
+// one Power Pages built. Widening it before the single-column change is shown to be the one
+// that matters would make the next result unreadable.
+int SetSecurityStamp(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 3 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This changes whether a real person can sign in. Re-run as: " +
+            "setsecuritystamp <orgUrl> <contactEmail> --confirm <orgUrl>");
+        return 1;
+    }
+
+    var email = a[2].Trim();
+
+    using var svc = Connect(orgUrl);
+
+    var contactId = FindId(svc, "contact", ("emailaddress1", email));
+    if (contactId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No contact has the email {email}.");
+        return 1;
+    }
+
+    var contact = svc.Retrieve(
+        "contact", contactId, new ColumnSet("fullname", "adx_identity_securitystamp"));
+    var existing = contact.GetAttributeValue<string>("adx_identity_securitystamp");
+
+    // Refused rather than reissued: rotating a stamp signs the person out everywhere, and
+    // this command exists to fill a gap, not to invalidate sessions.
+    if (!string.IsNullOrWhiteSpace(existing))
+    {
+        Console.WriteLine(
+            $"{contact.GetAttributeValue<string>("fullname")} already has a security stamp. Nothing to do.");
+        return 0;
+    }
+
+    var stamp = Guid.NewGuid().ToString("D");
+    svc.Update(new Entity("contact", contactId) { ["adx_identity_securitystamp"] = stamp });
+
+    var after = svc.Retrieve("contact", contactId, new ColumnSet("adx_identity_securitystamp"))
+        .GetAttributeValue<string>("adx_identity_securitystamp");
+
+    Console.WriteLine($"{contact.GetAttributeValue<string>("fullname")} <{email}>: stamp set.");
+    Console.WriteLine($"  read back: {(string.IsNullOrWhiteSpace(after) ? "(still empty — the write did not land)" : after)}");
+    return string.IsNullOrWhiteSpace(after) ? 1 : 0;
 }
 
 // Sets one site setting to one value, and reads it back.

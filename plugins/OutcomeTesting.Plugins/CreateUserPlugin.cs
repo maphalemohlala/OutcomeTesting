@@ -93,6 +93,13 @@ namespace OutcomeTesting.Plugins
                     [ContactRegistry.EmailAttr] = workEmail,
                 };
                 ContactRegistry.SetName(contact, fullName);
+
+                // On the create branch only: a person made here has to be able to sign in to
+                // the portal, and Power Pages only writes this for contacts it creates
+                // itself. The idempotent re-run above must not touch it — rotating a stamp
+                // signs the person out everywhere.
+                ContactRegistry.SetSecurityStamp(contact);
+
                 userId = userService.Create(contact);
             }
 
