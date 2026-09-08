@@ -498,6 +498,14 @@
                 xhr.setRequestHeader('OData-MaxVersion', '4.0');
                 xhr.setRequestHeader('OData-Version', '4.0');
                 xhr.setRequestHeader('__RequestVerificationToken', token);
+                // If-Match: * pins this PATCH to a row that already exists. Without it the
+                // Web API treats the PATCH as an upsert, and the Review Instance - assigned
+                // to me table permission grants write but not create, so the create half of
+                // an upsert is refused. Every caller of api() now PATCHes an al_reviewinstance
+                // row the page already loaded, so the header is always safe here - see the
+                // submit block below (data-ot-submit script, "If-Match: * matters") for the
+                // fuller account of why it exists and what broke without it.
+                xhr.setRequestHeader('If-Match', '*');
 
                 xhr.onload = function () {
                   if (xhr.status >= 200 && xhr.status < 300) {
@@ -538,8 +546,18 @@
                 return 'You do not have permission to change this answer.';
               }
               if (text.indexOf('PRECONDITION:') !== -1) {
+                // text is the raw response body, not the parsed message field, so it still
+                // carries whatever JSON follows the message inside it - a closing quote and
+                // then ,"errorCode":... or the like. Cutting at the first " after the prefix
+                // ends the message where the JSON string value itself ends, rather than
+                // showing that trailing JSON to the reviewer.
                 var idx = text.indexOf('PRECONDITION:');
-                return text.substring(idx + 'PRECONDITION:'.length).trim();
+                var message = text.substring(idx + 'PRECONDITION:'.length);
+                var quoteIdx = message.indexOf('"');
+                if (quoteIdx !== -1) {
+                  message = message.substring(0, quoteIdx);
+                }
+                return message.trim();
               }
               /*
                * 401 and 403 are deliberately not the same message. They were, and that
@@ -637,7 +655,8 @@
                   answerChoice: answer.al_answerchoice === undefined ? null : answer.al_answerchoice,
                   answerChoices: answer.al_answerchoices === undefined ? null : answer.al_answerchoices,
                   answerDate: answer.al_answerdate === undefined ? null : answer.al_answerdate,
-                  failReasons: selectedReasonIds()
+                  failReasons: selectedReasonIds(),
+                  renderedReasons: renderedReasonIds()
                 };
                 return request;
               }
@@ -648,6 +667,22 @@
                 for (var i = 0; i < boxes.length; i++) {
                   if (boxes[i].checked) { ids.push(boxes[i].value); }
                 }
+                return ids;
+              }
+
+              /*
+               * Every reason checkbox this answer put on screen, ticked or not - the
+               * category-filtered failreasons fetch (template ~line 217), not the full
+               * catalogue. AnswerWriter.ReconcileFailReasons only ever disassociates an id
+               * that is both in this list and missing from selectedReasonIds(); a reason
+               * linked to the answer but outside this list (the other team's category) is
+               * left alone, because its absent checkbox never gave the reviewer a chance to
+               * untick it (finding 2, 2026-09-08 review).
+               */
+              function renderedReasonIds() {
+                var boxes = root.querySelectorAll('[data-ot-reason]');
+                var ids = [];
+                for (var i = 0; i < boxes.length; i++) { ids.push(boxes[i].value); }
                 return ids;
               }
 

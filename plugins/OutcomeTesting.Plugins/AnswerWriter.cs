@@ -43,6 +43,14 @@ namespace OutcomeTesting.Plugins
         /// ResponseGuardPlugin on Create (see ResponseRules.BuildResponseCode), so it is not
         /// available yet on the way in - matching on the two lookups directly is what a
         /// caller can always do, before the row exists and after.
+        ///
+        /// TopCount = 1 with no ordering is safe only because that same alternate key -
+        /// al_ResponseCodeKey over al_responsecode (src/Entities/al_Response/Entity.xml) -
+        /// makes a second al_response for this review and question version impossible to
+        /// create, not merely unlikely. If that key is ever dropped or loosened, this query
+        /// can silently start picking an arbitrary one of several rows instead of the one
+        /// row that is guaranteed to exist; add an explicit order (or reject the ambiguity)
+        /// before removing the key.
         /// </summary>
         public static Guid? FindExisting(IOrganizationService service, Guid reviewId, Guid questionVersionId)
         {
@@ -86,35 +94,50 @@ namespace OutcomeTesting.Plugins
             // Reconciled on both the create and the update path: a fail reason named on the
             // very first save has to attach just as much as one added on a later edit, and a
             // reason dropped from the list has to be disassociated whichever path got here.
-            ReconcileFailReasons(service, responseId, payload.FailReasons);
+            ReconcileFailReasons(service, responseId, payload.FailReasons, payload.RenderedReasons);
             return responseId;
         }
 
         /// <summary>
         /// Associates every reason in <paramref name="wanted"/> that is not already linked to
-        /// the response, and disassociates every currently-linked reason that is not in
-        /// <paramref name="wanted"/> - the add/remove diff the page's $ref calls used to do
-        /// one at a time, now done in one pass from the full list the payload carries.
+        /// the response, and disassociates every currently-linked reason that is both in
+        /// <paramref name="rendered"/> and missing from <paramref name="wanted"/> - the
+        /// add/remove diff the page's $ref calls used to do one at a time, now done in one
+        /// pass from the two lists the payload carries.
         ///
-        /// An unparsable entry is dropped silently rather than raising a PRECONDITION: this
-        /// class shapes the write, it does not judge the payload, and a stray non-GUID string
-        /// here is not a rule ResponseGuardPlugin has a rule for either - it simply cannot be
-        /// resolved to something to associate.
+        /// <paramref name="rendered"/> exists because CurrentReasons reads every reason ever
+        /// linked to this response, but the page's picker is category-filtered by the
+        /// review's owner_role (template ~line 217: Tax sees al_category eq 120910403, AQS
+        /// sees ne) - so a reason from the other team's category can be linked and rendered
+        /// nowhere on this page. Before this parameter existed, such a reason was simply
+        /// absent from <paramref name="wanted"/> (there was no checkbox for it to appear in),
+        /// which this method read as "the reviewer unticked it" and disassociated on the very
+        /// next save, including one triggered by editing an unrelated evidence note. That
+        /// silently deleted FR-013 data while the page reported "Saved". Restricting removal
+        /// to ids the page actually rendered a checkbox for closes that path: an id outside
+        /// <paramref name="rendered"/> was never offered to this reviewer, so its absence from
+        /// <paramref name="wanted"/> says nothing about their intent and must not be read as
+        /// one.
+        ///
+        /// A null or empty <paramref name="rendered"/> removes nothing at all, deliberately -
+        /// it is read as "the caller cannot vouch for what was on screen" rather than as
+        /// "nothing was rendered, so remove everything currently linked". The latter is the
+        /// exact bug this parameter exists to close: an older client, or a payload that failed
+        /// to collect the rendered set, must fail safe (no deletion) rather than fail open
+        /// (delete everything). Additions are unaffected either way - an id in
+        /// <paramref name="wanted"/> was explicitly ticked by the reviewer this save, so it is
+        /// always safe to associate regardless of what the rendered set says.
+        ///
+        /// An unparsable entry in either list is dropped silently rather than raising a
+        /// PRECONDITION: this class shapes the write, it does not judge the payload, and a
+        /// stray non-GUID string here is not a rule ResponseGuardPlugin has a rule for either
+        /// - it simply cannot be resolved to something to associate or remove.
         /// </summary>
-        public static void ReconcileFailReasons(IOrganizationService service, Guid responseId, string[] wanted)
+        public static void ReconcileFailReasons(
+            IOrganizationService service, Guid responseId, string[] wanted, string[] rendered)
         {
-            var desired = new System.Collections.Generic.HashSet<Guid>();
-            if (wanted != null)
-            {
-                foreach (var raw in wanted)
-                {
-                    Guid parsed;
-                    if (Guid.TryParse(raw, out parsed))
-                    {
-                        desired.Add(parsed);
-                    }
-                }
-            }
+            var desired = ParseGuids(wanted);
+            var renderedSet = ParseGuids(rendered);
 
             var current = CurrentReasons(service, responseId);
 
@@ -130,7 +153,7 @@ namespace OutcomeTesting.Plugins
             var toRemove = new EntityReferenceCollection();
             foreach (var id in current)
             {
-                if (!desired.Contains(id))
+                if (renderedSet.Contains(id) && !desired.Contains(id))
                 {
                     toRemove.Add(new EntityReference(FailReasonEntity, id));
                 }
@@ -148,6 +171,30 @@ namespace OutcomeTesting.Plugins
             {
                 service.Disassociate(target.LogicalName, target.Id, relationship, toRemove);
             }
+        }
+
+        /// <summary>
+        /// Parses every well-formed GUID string in <paramref name="raw"/> into a set, dropping
+        /// anything else silently. Shared by the wanted and rendered lists in
+        /// ReconcileFailReasons, which both arrive as the same shape for the same reason: JSON
+        /// has no native GUID type, so the template sends checkbox values as strings.
+        /// </summary>
+        private static System.Collections.Generic.HashSet<Guid> ParseGuids(string[] raw)
+        {
+            var set = new System.Collections.Generic.HashSet<Guid>();
+            if (raw != null)
+            {
+                foreach (var value in raw)
+                {
+                    Guid parsed;
+                    if (Guid.TryParse(value, out parsed))
+                    {
+                        set.Add(parsed);
+                    }
+                }
+            }
+
+            return set;
         }
 
         /// <summary>

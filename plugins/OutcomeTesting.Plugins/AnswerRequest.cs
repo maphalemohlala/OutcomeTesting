@@ -38,6 +38,16 @@ namespace OutcomeTesting.Plugins
 
         [DataMember(Name = "failReasons")]
         public string[] FailReasons { get; set; }
+
+        /// <summary>
+        /// Every fail reason id the page rendered a checkbox for on this answer - ticked or
+        /// not - so AnswerWriter.ReconcileFailReasons can tell "not offered to this reviewer"
+        /// (category-filtered by owner_role, template line ~217) apart from "offered and left
+        /// unticked". Only the second means "remove it"; see ReconcileFailReasons for what
+        /// happens when this is absent or empty.
+        /// </summary>
+        [DataMember(Name = "renderedReasons")]
+        public string[] RenderedReasons { get; set; }
     }
 
     public static class AnswerRequest

@@ -89,16 +89,77 @@ namespace OutcomeTesting.Plugins.Tests
 
             var payload = Choice(ResponseRules.ChoiceNo);
             payload.FailReasons = new[] { keep.ToString("D"), drop.ToString("D") };
+            payload.RenderedReasons = new[] { keep.ToString("D"), drop.ToString("D") };
             var id = AnswerWriter.Save(svc, ReviewId, payload);
 
+            // Both reasons were on screen (RenderedReasons) but only `keep` is ticked this
+            // time, so `drop` is a genuine untick and must be removed.
             var second = Choice(ResponseRules.ChoiceNo);
             second.FailReasons = new[] { keep.ToString("D") };
+            second.RenderedReasons = new[] { keep.ToString("D"), drop.ToString("D") };
             AnswerWriter.Save(svc, ReviewId, second);
 
             Assert.Contains(svc.Associations, a => a.RelatedId == keep);
             Assert.Contains(svc.Disassociations, d => d.RelatedId == drop);
             Assert.DoesNotContain(svc.Disassociations, d => d.RelatedId == keep);
             Assert.Equal(id, svc.Associations[0].TargetId);
+        }
+
+        [Fact]
+        public void A_reason_outside_the_rendered_set_survives_a_save_that_does_not_tick_it()
+        {
+            // FR-013 regression (finding 2, 2026-09-08 review). `outsideCategory` is linked to
+            // the response but was never offered on this page - e.g. it belongs to the other
+            // team's category filter (template ~line 217, owner_role) - so it never appears in
+            // RenderedReasons. Its absence from FailReasons on this save must not be read as
+            // an untick: there was no checkbox for the reviewer to untick.
+            var svc = new FakeOrganizationService();
+            var visible = Guid.Parse("33333333-3333-4333-8333-333333333333");
+            var outsideCategory = Guid.Parse("44444444-4444-4444-8444-444444444444");
+
+            var payload = Choice(ResponseRules.ChoiceNo);
+            payload.FailReasons = new[] { visible.ToString("D"), outsideCategory.ToString("D") };
+            payload.RenderedReasons = new[] { visible.ToString("D"), outsideCategory.ToString("D") };
+            AnswerWriter.Save(svc, ReviewId, payload);
+
+            // A later save - triggered by editing the evidence note, say - only renders and
+            // ticks `visible`. `outsideCategory` is absent from both FailReasons and
+            // RenderedReasons, so it must be left alone rather than disassociated.
+            var second = Choice(ResponseRules.ChoiceNo);
+            second.FailReasons = new[] { visible.ToString("D") };
+            second.RenderedReasons = new[] { visible.ToString("D") };
+            AnswerWriter.Save(svc, ReviewId, second);
+
+            Assert.DoesNotContain(svc.Disassociations, d => d.RelatedId == outsideCategory);
+
+            var stillLinked = svc.RetrieveMultiple(new Microsoft.Xrm.Sdk.Query.QueryExpression("al_al_failreason_al_response")
+            {
+                ColumnSet = new Microsoft.Xrm.Sdk.Query.ColumnSet("al_failreasonid"),
+            }).Entities;
+            Assert.Contains(stillLinked, e => e.GetAttributeValue<Guid>("al_failreasonid") == outsideCategory);
+        }
+
+        [Fact]
+        public void An_absent_rendered_set_removes_nothing_rather_than_everything()
+        {
+            // The safe default: a caller that cannot vouch for what was on screen (an older
+            // client, or a payload that failed to collect RenderedReasons) must fail closed.
+            // Reading "nothing rendered" as "remove everything currently linked" is exactly
+            // the bug finding 2 closes, so RenderedReasons left null must not reinstate it.
+            var svc = new FakeOrganizationService();
+            var linked = Guid.Parse("55555555-5555-4555-8555-555555555555");
+
+            var payload = Choice(ResponseRules.ChoiceNo);
+            payload.FailReasons = new[] { linked.ToString("D") };
+            payload.RenderedReasons = new[] { linked.ToString("D") };
+            AnswerWriter.Save(svc, ReviewId, payload);
+
+            var second = Choice(ResponseRules.ChoiceNo);
+            second.FailReasons = null;
+            second.RenderedReasons = null;
+            AnswerWriter.Save(svc, ReviewId, second);
+
+            Assert.DoesNotContain(svc.Disassociations, d => d.RelatedId == linked);
         }
     }
 }
