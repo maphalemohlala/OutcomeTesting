@@ -95,11 +95,44 @@ review including that one. Reassign or leave it as a fixture; it does not need d
 
 ### 1.3 OD-037 — delete or keep `al_User` / `al_Role`
 
-`al_user` holds 0 rows and nothing reads it. It ships in the managed solution, so deleting it
-is a destructive ALM change and was deliberately not taken.
+**Corrected 2026-09-08. "Nothing reads it" is wrong, and acting on it would take the app down.**
+This register and the 2026-09-06 status both described this as purely a destructive ALM change
+on empty tables. Two **live** reads remain in the deployed assembly:
 
-**Done when:** either the tables are dropped and `src/` re-exported, or they are recorded as
-retained-and-empty so nobody re-raises it.
+| Where | Reads | What a missing table does |
+|---|---|---|
+| `PermissionHelpers.IsRegisteredActive` | `al_user` on **every permission check** | `RetrieveMultiple` throws, so **every command fails** |
+| `AssignUserRolePlugin.CustomRoleExists` | `al_role` on role assignment | throws on assign |
+
+`al_user` being empty is exactly why this is invisible: `IsRegisteredActive` treats "no row" as
+permitted, so a table with no rows and a table that is gone look identical right up until the
+query itself faults. Deleting the tables first would be a self-inflicted outage on the
+authorisation path.
+
+Two further references are **dead code** and can go regardless: `CreateRolePlugin.RoleEntity`
+and `UpdateRolePlugin.RoleEntity` both declare `"al_role"` while the code uses
+`WebRoleRegistry.RoleEntity` (`mspp_webrole`).
+
+**So the order is fixed, and it is not one step:**
+
+1. Remove the two live reads, with a decision on what replaces `IsRegisteredActive` (below).
+2. Rebuild and `pac plugin push` — the app must be running code that does not read the tables
+   **before** they go.
+3. Delete `al_User` and `al_Role`.
+4. AD-013 round trip so `src/Entities/al_User` and `src/Entities/al_Role` go with them.
+
+**The decision this needs is not "delete or keep".** It is what happens to deactivation.
+`IsRegisteredActive` is the only thing `al_SetUserActive` acts on: withdrawing it removes the
+ability to deactivate a person in the app at all, unless that moves to the Contact's own
+`statecode`. Pick one:
+
+- **Move it to Contact `statecode`** — the registry is Contact since AD-085, so this is where it
+  belongs; `al_SetUserActive` keeps working and starts meaning something again.
+- **Drop deactivation** — smaller change, but `al_SetUserActive` becomes a command that reports
+  success and does nothing, which is worse than not having it.
+
+**Done when:** the four steps above have run, or the tables are recorded as retained-and-empty
+with the two live reads left in place so nobody re-raises it.
 
 ### 1.4 The unused `al_contact_al_outcomecase` intersect
 
