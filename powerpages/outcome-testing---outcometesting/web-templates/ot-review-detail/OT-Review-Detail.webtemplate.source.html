@@ -10,10 +10,13 @@
   renders the wording, order and response type that applied when it was
   answered (BR-013, FR-030, FR-031).
 
-  Answerable by the assigned checker (AD-053). Answers are written straight to
-  al_response over the portal Web API, which supports create and update; only
-  actions are unsupported, which is why submission still goes through a cloud
-  flow and answering does not. Every rule that matters - the submission lock,
+  Answerable by the assigned checker (AD-053). Answers travel as a JSON payload on
+  al_reviewinstance.al_answerrequest rather than as a direct al_response write - Power
+  Pages refuses the create's @odata.bind association, and a fail reason's $ref
+  associate, with error 90040106 regardless of table permissions, so AnswerRequestPlugin
+  parses the payload and AnswerWriter does the al_response create/update instead.
+  Submission still goes through a cloud flow because the Portals Web API cannot invoke
+  an action; that part has not changed. Every rule that matters - the submission lock,
   the AD-023 column match, the option subset and AD-020 section ownership - is
   enforced by ResponseGuardPlugin, so nothing here is a security boundary
   (NFR-SEC-01).
@@ -424,12 +427,20 @@
           /*
            * Answer autosave and fail reasons (PP-07, PP-08, FR-013, AD-053, AD-054).
            *
-           * Path: page -> Portals Web API -> al_response -> ResponseGuardPlugin.
+           * Path: page -> Portals Web API PATCH al_reviewinstance.al_answerrequest ->
+           * AnswerRequestPlugin -> AnswerWriter -> al_response -> ResponseGuardPlugin.
            *
-           * Unlike submission, this needs no cloud flow. The Portals Web API supports
-           * create, update and associate; only actions are unsupported, which is why
-           * al_SubmitReview goes through Power Automate and answering does not. It also
-           * keeps a debounced edit from spending a flow run.
+           * This used to PATCH or POST al_response directly - a create binding two
+           * @odata.bind lookups, a ticked reason a $ref associate/disassociate. Power
+           * Pages refuses both with error 90040106, and no table permission value fixes
+           * it; five were tried. So the page now writes one JSON payload (currentRequest())
+           * onto the review instance's al_answerrequest column, which is allowlisted for
+           * the Web API, and AnswerRequestPlugin parses it and calls AnswerWriter to do the
+           * actual al_response create-or-update and reason reconciliation.
+           *
+           * This still needs no cloud flow, and a PATCH still cannot invoke an action,
+           * which is why al_SubmitReview still goes through Power Automate and answering
+           * still does not. It also keeps a debounced edit from spending a flow run.
            *
            * Every rule that matters - the submission lock, the AD-023 column match, the
            * option subset and AD-020 section ownership - is enforced in the plug-in. This
@@ -454,30 +465,47 @@
             var REVIEW_ID = shell.getAttribute('data-review-id');
             if (!REVIEW_ID) { return; }
 
+            /*
+             * The anti-forgery token comes from shell.getTokenDeferred(), which is the
+             * only supported way to obtain it and the way the claim and remediation
+             * writes on this site already do it.
+             *
+             * It used to read a hidden [name="__RequestVerificationToken"] input instead,
+             * and guard that read with `if (token)`. Power Pages renders that input on a
+             * server-rendered form; this page is a hand-written template and carries no
+             * form, so the element never existed, the guard silently dropped the header,
+             * and every write left the browser unauthenticated. That is why the refusal
+             * was 401 rather than the 403 a table permission produces - the request was
+             * never attributed to the signed-in contact at all.
+             */
             function api(method, path, body, onDone, onFail) {
-              var xhr = new XMLHttpRequest();
-              xhr.open(method, '/_api/' + path, true);
-              xhr.setRequestHeader('Content-Type', 'application/json');
-              xhr.setRequestHeader('Accept', 'application/json');
-              xhr.setRequestHeader('OData-MaxVersion', '4.0');
-              xhr.setRequestHeader('OData-Version', '4.0');
+              if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
+                onFail('', 0);
+                return;
+              }
 
-              // Power Pages requires the request verification token on every write.
-              var token = document.querySelector('[name="__RequestVerificationToken"]');
-              if (token) { xhr.setRequestHeader('__RequestVerificationToken', token.value); }
+              window.shell.getTokenDeferred().done(function (token) {
+                var xhr = new XMLHttpRequest();
+                xhr.open(method, '/_api/' + path, true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.setRequestHeader('Accept', 'application/json');
+                xhr.setRequestHeader('OData-MaxVersion', '4.0');
+                xhr.setRequestHeader('OData-Version', '4.0');
+                xhr.setRequestHeader('__RequestVerificationToken', token);
 
-              xhr.onload = function () {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                  onDone(xhr);
-                } else {
-                  // The status travels with the body. A refusal carrying no plug-in prefix
-                  // did not come from the plug-in at all, and only the status says whether
-                  // it was the portal turning the write away or something transient.
-                  onFail(xhr.responseText || xhr.statusText, xhr.status);
-                }
-              };
-              xhr.onerror = function () { onFail('', 0); };
-              xhr.send(body ? JSON.stringify(body) : null);
+                xhr.onload = function () {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    onDone(xhr);
+                  } else {
+                    // The status travels with the body. A refusal carrying no plug-in prefix
+                    // did not come from the plug-in at all, and only the status says whether
+                    // it was the portal turning the write away or something transient.
+                    onFail(xhr.responseText || xhr.statusText, xhr.status);
+                  }
+                };
+                xhr.onerror = function () { onFail('', 0); };
+                xhr.send(body ? JSON.stringify(body) : null);
+              }).fail(function () { onFail('', 0); });
             }
 
             /*
@@ -507,10 +535,22 @@
                 var idx = text.indexOf('PRECONDITION:');
                 return text.substring(idx + 'PRECONDITION:'.length).trim();
               }
-              if (httpStatus === 401 || httpStatus === 403) {
+              /*
+               * 401 and 403 are deliberately not the same message. They were, and that
+               * cost three rounds of investigation: a 401 was read as a table permission
+               * refusal and sent everyone to look at web roles that were correct all
+               * along. The portal answers 403 when the permission chain turns a write
+               * away, and 401 when the request never authenticated - an expired session,
+               * or a missing anti-forgery token.
+               */
+              if (httpStatus === 403) {
                 return 'Your account is not allowed to record answers on this review, so nothing was saved. '
                   + 'Answering needs a Tax or AQS reviewer role on your portal account, and the review has to be '
                   + 'assigned to you. Ask an administrator to check both - retrying will not help.';
+              }
+              if (httpStatus === 401) {
+                return 'Your session was not accepted, so nothing was saved. Reload the page and sign in again, '
+                  + 'then check this answer is still on screen before carrying on.';
               }
               if (httpStatus === 0) {
                 return 'That answer did not reach the server. Check your connection; it will save when you next change it.';
@@ -519,12 +559,11 @@
                 + (httpStatus ? ' If it keeps happening, contact support and quote status ' + httpStatus + '.' : '');
             }
 
-            function idFromHeader(xhr) {
-              // Create returns the new row's URI in OData-EntityId.
-              var header = xhr.getResponseHeader('OData-EntityId') || '';
-              var match = header.match(/\(([0-9a-f-]{36})\)/i);
-              return match ? match[1] : null;
-            }
+            // idFromHeader() used to read the new row's id back out of OData-EntityId
+            // after a direct al_response create, so save() could remember it for the next
+            // PATCH. There is no create here any more - AnswerWriter finds or creates the
+            // row server-side - so nothing on this page needs the id, and the function is
+            // gone with the create it served.
 
             function two(n) { return (n < 10 ? '0' : '') + n; }
 
@@ -565,14 +604,45 @@
                 } else {
                   var picked = [];
                   for (i = 0; i < inputs.length; i++) {
-                    if (inputs[i].checked) { picked.push(inputs[i].value); }
+                    if (inputs[i].checked) { picked.push(parseInt(inputs[i].value, 10)); }
                   }
-                  // A multi-select choice column is sent as a comma-separated value list.
-                  body.al_answerchoices = picked.length ? picked.join(',') : null;
+                  // AnswerRequestPlugin's answerChoices is an int[] (AnswerRequest.cs,
+                  // AnswerChoices), not the comma-separated value list this used to build -
+                  // that format was for the OData multiselect column this page no longer
+                  // writes directly. currentRequest() below sends this array through as-is.
+                  body.al_answerchoices = picked.length ? picked : null;
                   body.al_answertext = noteInput && noteInput.value ? noteInput.value : null;
                 }
 
                 return body;
+              }
+
+              /*
+               * The answer and its reasons in one object. It travels as a JSON string on
+               * al_answerrequest rather than as an al_response create, because Power Pages
+               * refuses the create's @odata.bind association (90040106) whatever the table
+               * permissions say. AnswerRequestPlugin does the write.
+               */
+              function currentRequest() {
+                var answer = currentPayload();
+                var request = {
+                  questionVersionId: questionVersion,
+                  answerText: answer.al_answertext === undefined ? null : answer.al_answertext,
+                  answerChoice: answer.al_answerchoice === undefined ? null : answer.al_answerchoice,
+                  answerChoices: answer.al_answerchoices === undefined ? null : answer.al_answerchoices,
+                  answerDate: answer.al_answerdate === undefined ? null : answer.al_answerdate,
+                  failReasons: selectedReasonIds()
+                };
+                return request;
+              }
+
+              function selectedReasonIds() {
+                var boxes = root.querySelectorAll('[data-ot-reason]');
+                var ids = [];
+                for (var i = 0; i < boxes.length; i++) {
+                  if (boxes[i].checked) { ids.push(boxes[i].value); }
+                }
+                return ids;
               }
 
               /*
@@ -602,9 +672,20 @@
                 if (reasons) { reasons.hidden = !(isNonPass || keptReason); }
               }
 
+              /*
+               * One PATCH replaces the create/update pair that used to target al_response
+               * directly. The create branch used to set two @odata.bind lookups
+               * (al_reviewinstance_response, al_questionversion_response) so Power Pages
+               * would associate the new row to its review and question version - and that
+               * association is exactly what error 90040106 refuses, whatever the table
+               * permissions say. This PATCHes the review instance's al_answerrequest column
+               * instead; AnswerRequestPlugin parses the JSON and AnswerWriter does the
+               * create-or-update against al_response server-side. The responseId branch and
+               * the data-response-id bookkeeping that went with it go with it - there is no
+               * create left here to remember an id for.
+               */
               function save() {
-                var responseId = root.getAttribute('data-response-id');
-                var body = currentPayload();
+                var body = { al_answerrequest: JSON.stringify(currentRequest()) };
                 show('Saving...', 'saving');
 
                 function done() {
@@ -612,23 +693,9 @@
                   show('Saved ' + two(now.getHours()) + ':' + two(now.getMinutes()), 'saved');
                 }
 
-                function fail(raw, httpStatus) { show(friendlyError(raw, httpStatus), 'error'); }
-
-                if (responseId) {
-                  api('PATCH', 'al_responses(' + responseId + ')', body, done, fail);
-                  return;
-                }
-
-                // The two lookups are set only on create. They are not on the Web API
-                // field allowlist, so they travel as bind properties rather than columns.
-                body['al_reviewinstanceid@odata.bind'] = '/al_reviewinstances(' + REVIEW_ID + ')';
-                body['al_questionversionid@odata.bind'] = '/al_questionversions(' + questionVersion + ')';
-
-                api('POST', 'al_responses', body, function (xhr) {
-                  var created = idFromHeader(xhr);
-                  if (created) { root.setAttribute('data-response-id', created); }
-                  done();
-                }, fail);
+                api('PATCH', 'al_reviewinstances(' + REVIEW_ID + ')', body,
+                  done,
+                  function (raw, httpStatus) { show(friendlyError(raw, httpStatus), 'error'); });
               }
 
               function queue() {
@@ -638,31 +705,12 @@
               }
 
               /*
-               * FR-013 permits several reasons on one answer, so this is an N:N
-               * association rather than a column. A reason can only attach once the
-               * answer row exists, which is why it waits on data-response-id.
+               * A reason is now part of the answer payload, so ticking one is just another
+               * change to save. The old "choose an answer first" rule went with the
+               * association it protected.
                */
-              function toggleReason(box) {
-                var responseId = root.getAttribute('data-response-id');
-                if (!responseId) {
-                  show('Choose an answer first, then add its reasons.', 'error');
-                  box.checked = !box.checked;
-                  return;
-                }
-
-                if (box.checked) {
-                  api('POST',
-                    'al_responses(' + responseId + ')/al_failreason_response/$ref',
-                    { '@odata.id': '/_api/al_failreasons(' + box.value + ')' },
-                    function () { show('Saved', 'saved'); },
-                    function (raw, httpStatus) { box.checked = false; show(friendlyError(raw, httpStatus), 'error'); });
-                } else {
-                  api('DELETE',
-                    'al_responses(' + responseId + ')/al_failreason_response/$ref?$id=/_api/al_failreasons(' + box.value + ')',
-                    null,
-                    function () { show('Saved', 'saved'); },
-                    function (raw, httpStatus) { box.checked = true; show(friendlyError(raw, httpStatus), 'error'); });
-                }
+              function toggleReason() {
+                queue();
               }
 
               for (var i = 0; i < inputs.length; i++) {
@@ -673,11 +721,11 @@
               }
               if (noteInput) { noteInput.addEventListener('input', queue); }
 
+              // No closure over the box is needed any more: toggleReason() no longer takes
+              // one, since a tick is just another field feeding queue() -> save().
               var reasonBoxes = root.querySelectorAll('[data-ot-reason]');
               for (var r = 0; r < reasonBoxes.length; r++) {
-                reasonBoxes[r].addEventListener('change', (function (box) {
-                  return function () { toggleReason(box); };
-                })(reasonBoxes[r]));
+                reasonBoxes[r].addEventListener('change', toggleReason);
               }
 
               revealConditional();
@@ -737,12 +785,16 @@
          * with its message intact.
          *
          * The request is built exactly like the autosave's api() helper, and that is the
-         * point rather than a coincidence. This block used to differ from it in three ways -
-         * no OData version headers, no Accept, and the anti-forgery token taken from
-         * shell.getTokenDeferred() instead of the hidden field the autosave reads - and
-         * answering worked while submitting returned a refusal carrying none of the
-         * plug-in's prefixes. Two writes to the same site over the same API should not be
-         * assembled two different ways; the one that is known to work is the reference.
+         * point rather than a coincidence. Two writes to the same site over the same API
+         * should not be assembled two different ways.
+         *
+         * They were once reconciled the other way round: this block took its token from
+         * shell.getTokenDeferred() and was changed to read the autosave's hidden field
+         * because the autosave was "known to work". It was not - no portal write path on
+         * this site had ever been exercised by a signed-in user, and the hidden field the
+         * autosave read has never existed on this page. Reconciling on an unproven
+         * reference moved the working half onto the broken one. Both now use
+         * getTokenDeferred(), which is the documented mechanism.
          *
          * If-Match: * matters. Without it a PATCH to the Dataverse Web API is an upsert,
          * and the table permission grants write but not create (see the Review Instance -
@@ -798,7 +850,7 @@
               var idx = text.indexOf('PRECONDITION:');
               return text.substring(idx + 'PRECONDITION:'.length).trim();
             }
-            if (httpStatus === 401 || httpStatus === 403) {
+            if (httpStatus === 403) {
               /*
                * Reloading and trying once more was the wrong advice: this refusal is the
                * permission chain, and it will refuse again.
@@ -815,6 +867,15 @@
                 + 'may not have been. Submitting needs a Tax or AQS reviewer role on your portal account, and the '
                 + 'review has to be assigned to you. Ask an administrator to check both rather than retrying.';
             }
+            /*
+             * Split from 403 for the reason given on the autosave's friendlyError: a 401
+             * is the session, not the permission chain, and conflating them sent three
+             * rounds of investigation at web roles that were correct.
+             */
+            if (httpStatus === 401) {
+              return 'Your session was not accepted, so nothing was submitted. Reload the page and sign in again, '
+                + 'then check your answers are still on screen before submitting.';
+            }
             return 'We could not submit this review. Nothing has been changed. Please try again, and contact support if it keeps happening'
               + (httpStatus ? ', quoting status ' + httpStatus + '.' : '.');
           }
@@ -828,39 +889,49 @@
           button.addEventListener('click', function () {
             if (button.disabled) { return; }
 
+            if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
+              show('This page did not load completely. Refresh and try again.', 'error');
+              return;
+            }
+
             setBusy(true);
             show('Submitting your review...', 'info');
 
-            var request = new XMLHttpRequest();
-            request.open('PATCH', '/_api/al_reviewinstances(' + reviewId + ')', true);
-            request.setRequestHeader('Content-Type', 'application/json');
-            request.setRequestHeader('Accept', 'application/json');
-            request.setRequestHeader('OData-MaxVersion', '4.0');
-            request.setRequestHeader('OData-Version', '4.0');
-            request.setRequestHeader('If-Match', '*');
-
-            // Power Pages requires the request verification token on every write. Same
-            // hidden field the autosave reads, so both writes present the same credential.
-            var token = document.querySelector('[name="__RequestVerificationToken"]');
-            if (token) { request.setRequestHeader('__RequestVerificationToken', token.value); }
-
-            request.onload = function () {
-              if (request.status >= 200 && request.status < 300) {
-                show('Review submitted. Reloading...', 'success');
-                window.setTimeout(function () { window.location.reload(); }, 800);
-                return;
-              }
-
-              show(friendlyError(request.responseText, request.status), 'error');
-              setBusy(false);
-            };
-
-            request.onerror = function () {
+            function unreachable() {
               show('The submission did not reach the server. Check your connection and try again - your answers are still saved.', 'error');
               setBusy(false);
-            };
+            }
 
-            request.send(JSON.stringify({ al_submitrequested: true }));
+            // Power Pages requires the request verification token on every write, and
+            // shell.getTokenDeferred() is the only supported way to obtain it. Same
+            // mechanism the autosave above uses, so both writes present the same
+            // credential - which is what the hidden-field read was meant to achieve and
+            // did not, because this page renders no form to carry that field.
+            window.shell.getTokenDeferred().done(function (token) {
+              var request = new XMLHttpRequest();
+              request.open('PATCH', '/_api/al_reviewinstances(' + reviewId + ')', true);
+              request.setRequestHeader('Content-Type', 'application/json');
+              request.setRequestHeader('Accept', 'application/json');
+              request.setRequestHeader('OData-MaxVersion', '4.0');
+              request.setRequestHeader('OData-Version', '4.0');
+              request.setRequestHeader('If-Match', '*');
+              request.setRequestHeader('__RequestVerificationToken', token);
+
+              request.onload = function () {
+                if (request.status >= 200 && request.status < 300) {
+                  show('Review submitted. Reloading...', 'success');
+                  window.setTimeout(function () { window.location.reload(); }, 800);
+                  return;
+                }
+
+                show(friendlyError(request.responseText, request.status), 'error');
+                setBusy(false);
+              };
+
+              request.onerror = unreachable;
+
+              request.send(JSON.stringify({ al_submitrequested: true }));
+            }).fail(unreachable);
           });
         })();
       </script>
