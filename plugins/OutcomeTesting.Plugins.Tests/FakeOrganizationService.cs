@@ -30,6 +30,16 @@ namespace OutcomeTesting.Plugins.Tests
         /// <summary>Every Update the code under test issued, in order.</summary>
         public List<Entity> Updates { get; } = new List<Entity>();
 
+        /// <summary>
+        /// Drops everything recorded in <see cref="Updates"/> so far, without touching the
+        /// stored rows. Lets a test isolate the Update issued by a second action from the one
+        /// issued by the setup that came before it.
+        /// </summary>
+        public void ClearUpdates()
+        {
+            Updates.Clear();
+        }
+
         /// <summary>Every Create the code under test issued, in order.</summary>
         public List<Entity> Creates { get; } = new List<Entity>();
 
