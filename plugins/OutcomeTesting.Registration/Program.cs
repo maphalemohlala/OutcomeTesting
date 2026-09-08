@@ -394,6 +394,11 @@ if (args.Length >= 2 && args[0].Equals("deletetable", StringComparison.OrdinalIg
     return DeleteTable(args);
 }
 
+if (args.Length >= 2 && args[0].Equals("setsitesetting", StringComparison.OrdinalIgnoreCase))
+{
+    return SetSiteSetting(args);
+}
+
 if (args.Length < 1)
 {
     Console.Error.WriteLine("Usage: dotnet run -- <orgUrl> [<pluginDllPath>]   |   dotnet run -- verify <orgUrl>");
@@ -1193,7 +1198,16 @@ int BindIdentity(string[] a)
         var who = already.GetAttributeValue<EntityReference>("adx_contactid");
         if (who != null && who.Id == contactId)
         {
-            Console.WriteLine($"Already bound: {objectId:D} -> {who.Name}. Nothing to do.");
+            // Not "nothing to do": the binding can point here while the identity username
+            // this object id signs in as still sits on the contact it was moved away from.
+            // A repoint written before that was understood leaves exactly that state, and
+            // it is invisible from adx_externalidentity alone, so re-running the command
+            // has to be able to repair it rather than report success and change nothing.
+            var repaired = MoveIdentityUsername(svc, objectId, contactId);
+            Console.WriteLine($"Already bound: {objectId:D} -> {who.Name}.");
+            Console.WriteLine(repaired
+                ? "  Identity username reconciled onto that contact."
+                : "  Identity username already sits on that contact. Nothing to do.");
             return 0;
         }
 
@@ -1212,6 +1226,13 @@ int BindIdentity(string[] a)
         {
             ["adx_contactid"] = new EntityReference("contact", contactId),
         });
+
+        // The binding is only half of a sign-in. Power Pages also keeps the ASP.NET Identity
+        // username on the contact, and moving the binding without moving that leaves the
+        // object id signing in as one contact while its username belongs to another — which
+        // presents as a generic error page after a successful authentication, not as a
+        // refusal, so nothing about it points back here.
+        MoveIdentityUsername(svc, objectId, contactId);
 
         var moved = svc.Retrieve("contact", contactId, new ColumnSet("fullname"));
         Console.WriteLine(
@@ -1255,11 +1276,121 @@ int BindIdentity(string[] a)
         ["adx_contactid"] = new EntityReference("contact", contactId),
     });
 
+    // Power Pages sets the identity username to the object id itself when it creates a
+    // contact from an external sign-in — that is where the one on this site came from — so
+    // a binding made by hand matches what the platform would have written rather than
+    // leaving the contact half-formed.
+    MoveIdentityUsername(svc, objectId, contactId);
+
     Console.WriteLine($"Bound {objectId:D} -> {contact.GetAttributeValue<string>("fullname")} <{email}>.");
     Console.WriteLine($"  provider     : {provider}");
     Console.WriteLine($"  identity row : {newId:D}");
     Console.WriteLine($"  roles now reachable by that sign-in: {string.Join(", ", RolesOf(svc, contactId))}");
     return 0;
+}
+
+// Sets one site setting to one value, and reads it back.
+//
+// `sitesetting.yml` under the site folder is the source of truth for these, and a
+// `pac pages upload` is what normally applies it. This exists for the narrower job of
+// putting a single setting back to its tracked value without redeploying pages, templates
+// and table permissions that are already correct — the blast radius of a full upload on
+// this site is documented at the top of Deploy-Portal.ps1 and is not worth taking for one
+// field. It writes the same value the next upload would, so the two converge rather than
+// fighting.
+//
+// An authentication setting decides who can get into the portal at all, hence --confirm
+// and the repeated org URL. Use an empty string to clear a setting.
+int SetSiteSetting(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 4 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This can change who is able to sign in. Re-run as: " +
+            "setsitesetting <orgUrl> <name> <value> --confirm <orgUrl>");
+        return 1;
+    }
+
+    var name = a[2].Trim();
+    var value = a[3];
+
+    using var svc = Connect(orgUrl);
+
+    var found = svc.RetrieveMultiple(new QueryExpression("mspp_sitesetting")
+    {
+        ColumnSet = new ColumnSet("mspp_name", "mspp_value"),
+        Criteria = new FilterExpression
+        {
+            Conditions = { new ConditionExpression("mspp_name", ConditionOperator.Equal, name) },
+        },
+    }).Entities;
+
+    // Refused rather than created: a setting this site does not already carry is far more
+    // likely to be a mistyped name than a new one, and a typo that silently creates a row
+    // reads as applied while changing nothing about the site's behaviour.
+    if (found.Count != 1)
+    {
+        Console.Error.WriteLine(found.Count == 0
+            ? $"No site setting is named '{name}'. Nothing was written."
+            : $"{found.Count} site settings are named '{name}', so which one to write is not decidable here.");
+        return 1;
+    }
+
+    var before = found[0].GetAttributeValue<string>("mspp_value");
+
+    svc.Update(new Entity("mspp_sitesetting", found[0].Id)
+    {
+        ["mspp_value"] = value.Length == 0 ? null : value,
+    });
+
+    // Read back, because on this site a successful-looking write is not evidence.
+    var after = svc.Retrieve("mspp_sitesetting", found[0].Id, new ColumnSet("mspp_value"))
+        .GetAttributeValue<string>("mspp_value");
+
+    Console.WriteLine($"{name}: {Show(before)} -> {Show(after)}");
+    return 0;
+
+    static string Show(string? v) => string.IsNullOrEmpty(v) ? "(empty)" : v;
+}
+
+// Puts the ASP.NET Identity username for one Entra object id on the contact that object id
+// now signs in as, and takes it off any other contact still holding it.
+//
+// adx_identity_username is unique across contacts, so the clear has to land before the set
+// or the set is refused. That ordering is the whole reason this is one function rather than
+// two calls at the call site.
+//
+// Returns true if anything moved, so a caller that found the binding already correct can
+// still say whether it repaired something.
+static bool MoveIdentityUsername(ServiceClient svc, Guid objectId, Guid contactId)
+{
+    var username = objectId.ToString("D");
+
+    var holders = svc.RetrieveMultiple(new QueryExpression("contact")
+    {
+        ColumnSet = new ColumnSet("adx_identity_username"),
+        Criteria = new FilterExpression
+        {
+            Conditions =
+            {
+                new ConditionExpression("adx_identity_username", ConditionOperator.Equal, username),
+            },
+        },
+    }).Entities;
+
+    if (holders.Count == 1 && holders[0].Id == contactId)
+    {
+        return false;
+    }
+
+    foreach (var holder in holders.Where(h => h.Id != contactId))
+    {
+        svc.Update(new Entity("contact", holder.Id) { ["adx_identity_username"] = null });
+    }
+
+    svc.Update(new Entity("contact", contactId) { ["adx_identity_username"] = username });
+    return true;
 }
 
 // Grants one web role to one contact through al_AssignUserRole — the command the app
