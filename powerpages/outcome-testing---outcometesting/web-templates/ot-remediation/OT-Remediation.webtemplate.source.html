@@ -516,7 +516,9 @@
           al_signoffdecision: Number(decision.value),
           al_notes: notes.value
         };
-        payload['al_remediationactionid@odata.bind'] = '/al_remediationactions(' + actionId + ')';
+        // Navigation property name, not the lookup's logical name. See the same correction
+        // on the claim and the answer create; `relationships <orgUrl> al_signoff` prints it.
+        payload['al_remediationaction_signoff@odata.bind'] = '/al_remediationactions(' + actionId + ')';
 
         window.shell.getTokenDeferred().done(function (token) {
           var request = new XMLHttpRequest();

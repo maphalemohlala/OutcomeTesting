@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -55,6 +55,16 @@ namespace OutcomeTesting.Plugins
         private const string OutcomeEntity = "al_outcome";
         private const string GradeQuestionCode = "Q-GR-01";
         private const string TaxOutcomeQuestionCode = "Q-TAX-02";
+
+        // The checklist's own remediation trigger, per discipline (V8: "Remedial action
+        // required?", a mandatory Yes/No in each File Quality section), and the fail
+        // observation beside it that gives the adviser something to work from. Both are
+        // matched on question code, so a question retired and succeeded under BR-013 keeps
+        // working.
+        private const string AqsRemedialQuestionCode = "Q-FQ-03";
+        private const string AqsObservationQuestionCode = "Q-FQ-02";
+        private const string TaxRemedialQuestionCode = "Q-FQTAX-03";
+        private const string TaxObservationQuestionCode = "Q-FQTAX-02";
 
         // al_auditevent.
         private const string AuditEntity = "al_auditevent";
@@ -128,7 +138,8 @@ namespace OutcomeTesting.Plugins
             Guid actorId,
             Guid correlationId,
             bool requireCallerOwnsReview,
-            string details)
+            string details,
+            string actorName = null)
         {
             // Idempotency: a replay with the same key is a success no-op (NFR-REL-01).
             var existingAudit = FindAuditByKey(service, idempotencyKey);
@@ -160,7 +171,7 @@ namespace OutcomeTesting.Plugins
             // (BR-007, PP-11). Reopening is a privileged T&C Manager command (AD-031).
             if (currentStatus == StatusSubmitted)
             {
-                var replayAudit = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details);
+                var replayAudit = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details, actorName);
                 return new SubmitResult
                 {
                     Status = StatusName(StatusSubmitted),
@@ -216,7 +227,7 @@ namespace OutcomeTesting.Plugins
 
             FinaliseReview(service, review, targetId);
 
-            var auditId = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details);
+            var auditId = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details, actorName);
 
             QueueSubmittedNotification(service, correlationId, review, targetId);
 
@@ -586,9 +597,22 @@ namespace OutcomeTesting.Plugins
             }
 
             var reviewType = review.GetAttributeValue<OptionSetValue>(ReviewType).Value;
+            var isAqs = reviewType == ResponseRules.ReviewTypeAqs;
             int nextStatus;
 
-            if (reviewType == ResponseRules.ReviewTypeAqs)
+            // The checklist's own trigger, read for both disciplines. Mandatory in each, so
+            // a submitted review has always answered it; RemedialActionFlagged still treats
+            // an absent answer as No rather than inventing a remediation.
+            var remedialFlagged = OutcomeRules.RemedialActionFlagged(
+                AnswerChoiceFor(
+                    service,
+                    targetId,
+                    isAqs ? AqsRemedialQuestionCode : TaxRemedialQuestionCode));
+
+            bool requiresRemediation;
+            string remediationReason;
+
+            if (isAqs)
             {
                 var answer = AnswerChoiceFor(service, targetId, GradeQuestionCode);
                 if (!answer.HasValue)
@@ -605,7 +629,9 @@ namespace OutcomeTesting.Plugins
                 }
 
                 CreateOutcome(service, review, targetId, caseRef, outcomeValue);
-                nextStatus = OutcomeRules.NextCaseStatusForAqs(outcomeValue);
+                nextStatus = OutcomeRules.NextCaseStatusForAqs(outcomeValue, remedialFlagged);
+                requiresRemediation = OutcomeRules.RequiresRemediation(outcomeValue, remedialFlagged);
+                remediationReason = new OptionLabels(service).Label(OutcomeEntity, "al_initialoutcome", outcomeValue);
             }
             else
             {
@@ -624,7 +650,27 @@ namespace OutcomeTesting.Plugins
                 }
 
                 var aqsStillToCome = AqsStillToCome(service, caseRef.Id);
-                nextStatus = OutcomeRules.NextCaseStatusForTax(answer.Value, aqsStillToCome);
+                nextStatus = OutcomeRules.NextCaseStatusForTax(answer.Value, aqsStillToCome, remedialFlagged);
+                requiresRemediation = taxRequiresRemediation || remedialFlagged;
+                remediationReason = "Tax check: "
+                    + new OptionLabels(service).Label(ResponseEntity, "al_answerchoice", answer.Value);
+            }
+
+            // BR-006's other half. The case status alone has always said remediation was
+            // owed; the action is what an adviser can actually be given, and what the
+            // response, the completion, the sign-off and the BR-010 clock all hang off.
+            // Inside the submit transaction, so a case can never reach Awaiting Remediation
+            // with nothing on the worklist to explain why - which is exactly the state the
+            // environment was in before this existed.
+            if (requiresRemediation)
+            {
+                RaiseRemediation(
+                    service,
+                    review,
+                    targetId,
+                    caseRef,
+                    remediationReason,
+                    isAqs ? AqsObservationQuestionCode : TaxObservationQuestionCode);
             }
 
             // OutcomeRules.HopsFor is the single description of the route a submit takes:
@@ -664,6 +710,65 @@ namespace OutcomeTesting.Plugins
             };
 
             AssignUserRolePlugin.Upsert(service, OutcomeEntity, "al_outcomecode", code, outcome);
+        }
+
+        /// <summary>
+        /// Raises the BR-006 remediation action for this submission.
+        ///
+        /// The observation is the checker's own words from the discipline's fail
+        /// observation question, which AD-019 leaves optional - so the description
+        /// <see cref="Remediation.Describe"/> builds has to stand without it.
+        ///
+        /// The action is keyed on the case reference and the review's sequence, so a
+        /// replayed submit finds the row it already raised instead of raising a second one,
+        /// and an adviser part-way through their response is never sent back to Open.
+        /// </summary>
+        private static void RaiseRemediation(
+            IOrganizationService service,
+            Entity review,
+            Guid reviewId,
+            EntityReference caseRef,
+            string reason,
+            string observationQuestionCode)
+        {
+            var outcomeCase = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet("al_casereference"));
+            var caseReference = outcomeCase.GetAttributeValue<string>("al_casereference") ?? caseRef.Id.ToString("D");
+            var sequence = review.GetAttributeValue<int?>("al_sequence") ?? 1;
+
+            Remediation.Raise(
+                service,
+                caseRef,
+                caseReference,
+                reviewId,
+                sequence,
+                reason,
+                AnswerTextFor(service, reviewId, observationQuestionCode),
+                Remediation.AdviserContact(service, caseRef),
+                DateTime.UtcNow);
+        }
+
+        /// <summary>
+        /// The al_answertext this review recorded for a question, by business code.
+        /// Returns null when the question was not answered. The choice-column sibling of
+        /// <see cref="AnswerChoiceFor"/>, ordered the same way and for the same reason.
+        /// </summary>
+        private static string AnswerTextFor(IOrganizationService service, Guid reviewId, string questionCode)
+        {
+            var query = new QueryExpression(ResponseEntity)
+            {
+                ColumnSet = new ColumnSet("al_answertext"),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
+
+            var version = query.AddLink(QuestionVersionEntity, "al_questionversionid", "al_questionversionid");
+            var question = version.AddLink("al_question", "al_questionid", "al_questionid");
+            question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.Equal, questionCode);
+            query.AddOrder("modifiedon", OrderType.Descending);
+
+            var found = service.RetrieveMultiple(query).Entities;
+            return found.Count == 0 ? null : found[0].GetAttributeValue<string>("al_answertext");
         }
 
         /// <summary>
@@ -793,7 +898,8 @@ namespace OutcomeTesting.Plugins
             string idempotencyKey,
             Guid actorId,
             Guid correlationId,
-            string details)
+            string details,
+            string actorName)
         {
             var audit = new Entity(AuditEntity)
             {
@@ -806,6 +912,18 @@ namespace OutcomeTesting.Plugins
                 ["al_correlationid"] = correlationId.ToString("D"),
                 ["al_occurredon"] = DateTime.UtcNow,
             };
+
+            // Same reason CommandHelpers.WriteAuditEvent does it: nothing wrote this column,
+            // so "who submitted this review?" was answered by createdbyname - the portal's
+            // application user on every portal submit, which is every submit there is.
+            var resolved = string.IsNullOrWhiteSpace(actorName)
+                ? CommandHelpers.ResolveActorName(service, actorId)
+                : actorName.Trim();
+
+            if (!string.IsNullOrEmpty(resolved))
+            {
+                audit["al_actorname"] = resolved;
+            }
 
             if (!string.IsNullOrEmpty(details))
             {

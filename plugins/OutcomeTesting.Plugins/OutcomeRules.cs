@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace OutcomeTesting.Plugins
 {
@@ -52,6 +52,36 @@ namespace OutcomeTesting.Plugins
         public static bool RequiresRemediation(int outcome)
         {
             return outcome != OutcomePass;
+        }
+
+        /// <summary>
+        /// BR-006 widened by the checklist's own trigger: remediation is required when the
+        /// outcome is anything but a Pass, OR when the checker answered Yes to "Remedial
+        /// action required?" (Q-FQ-03 on the AQS checklist, Q-FQTAX-03 on the Tax one).
+        ///
+        /// The flag is not a restatement of the outcome. A non-pass already demanded
+        /// remediation and still does; what the flag adds is the case the grade cannot
+        /// express - a file the checker was content to pass that nonetheless has something
+        /// on it the adviser must put right. Both questions are mandatory, so the answer is
+        /// always present by the time a review can be submitted.
+        /// </summary>
+        public static bool RequiresRemediation(int outcome, bool remedialActionFlagged)
+        {
+            return remedialActionFlagged || RequiresRemediation(outcome);
+        }
+
+        /// <summary>
+        /// Whether the answer to "Remedial action required?" is a Yes.
+        ///
+        /// Null is "not answered", never a Yes. Both questions are mandatory so an
+        /// unanswered one cannot reach a submit, but defaulting an absent answer to a raise
+        /// would invent remediation nobody asked for - a mistake much harder to notice than
+        /// a missing one, because the case moves and an adviser is emailed about work that
+        /// was never flagged.
+        /// </summary>
+        public static bool RemedialActionFlagged(int? answerChoice)
+        {
+            return answerChoice.HasValue && answerChoice.Value == ResponseRules.ChoiceYes;
         }
 
         /// <summary>
@@ -112,7 +142,22 @@ namespace OutcomeTesting.Plugins
         /// remediation on anything else (BR-006).</summary>
         public static int NextCaseStatusForAqs(int outcome)
         {
-            return RequiresRemediation(outcome)
+            return NextCaseStatusForAqs(outcome, false);
+        }
+
+        /// <summary>
+        /// Where an AQS submit leaves the case, taking the checklist's remedial flag into
+        /// account as well as the grade (BR-006).
+        ///
+        /// Raising an action decides the status: a flagged Pass goes to Awaiting
+        /// Remediation rather than Closed (project owner direction, 2026-09-09). Closing it
+        /// would leave an open action on a case in a terminal state - AD-057 permits no
+        /// transition out of Closed, so the adviser could never work it and the sign-off
+        /// could never land. An open action always sits on an open case.
+        /// </summary>
+        public static int NextCaseStatusForAqs(int outcome, bool remedialActionFlagged)
+        {
+            return RequiresRemediation(outcome, remedialActionFlagged)
                 ? CaseLifecycle.AwaitingRemediation
                 : CaseLifecycle.Closed;
         }
@@ -125,11 +170,27 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static int NextCaseStatusForTax(int answerChoice, bool aqsStillToCome)
         {
+            return NextCaseStatusForTax(answerChoice, aqsStillToCome, false);
+        }
+
+        /// <summary>
+        /// Where a Tax submit leaves the case, taking the checklist's remedial flag into
+        /// account as well as the Q-TAX-02 result.
+        ///
+        /// A flagged Tax pass is held for remediation before AQS rather than handed off
+        /// (project owner direction, 2026-09-09). That is the reasoning OD-027 already
+        /// applies to a Tax non-pass, for the same reason: AQS must not review a file with
+        /// something on it still unaddressed. The case returns to the queue for its AQS
+        /// check once the action is signed off, which is the transition
+        /// <see cref="CaseLifecycle"/> already permits out of Awaiting Sign-off.
+        /// </summary>
+        public static int NextCaseStatusForTax(int answerChoice, bool aqsStillToCome, bool remedialActionFlagged)
+        {
             // OD-027: a Tax non-pass enters remediation whatever the route (BR-006). Only a
             // passed Tax check hands off to AQS — a case whose Tax check failed must not
             // proceed to an advice quality review with the failure unaddressed, and a later
             // AQS pass would otherwise close the case with the Tax fail unremediated.
-            if (TaxResultRequiresRemediation(answerChoice))
+            if (remedialActionFlagged || TaxResultRequiresRemediation(answerChoice))
             {
                 return CaseLifecycle.AwaitingRemediation;
             }

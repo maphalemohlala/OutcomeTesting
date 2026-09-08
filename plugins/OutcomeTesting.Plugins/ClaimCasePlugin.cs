@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -177,7 +177,12 @@ namespace OutcomeTesting.Plugins
                 "Claimed review " + review.Id.ToString("D") + " from the portal queue for " + checkerName
                     + " <" + email.Trim() + ">",
                 assignment.GetAttributeValue<string>(AssignmentCodeAttr),
-                context);
+                context,
+                // The checker who took the case, not the site's application user the portal
+                // write arrives as (AD-053). checkerName is already resolved above, so the
+                // audit event costs no extra read to name the person who acted.
+                actorId: contactRef.Id,
+                actorName: checkerName);
         }
 
         /// <summary>

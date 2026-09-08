@@ -169,9 +169,6 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
     setModalError(null);
 
     const found: string[] = [];
-    if (!reason.trim()) {
-      found.push('Enter a reason for the change.');
-    }
     const changed = changedFields();
     if (Object.keys(changed).length === 0) {
       found.push('Change at least one field.');
@@ -228,8 +225,8 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
       {open ? (
         <Modal title="Edit case details" onClose={() => setOpen(false)}>
           <p className="case-edit__intro">
-            Amend any case field. Only the fields you change are saved, each recorded with your
-            reason in the audit history (BR-012).
+            Amend any case field. Only the fields you change are saved, each recorded in the
+            audit history with the change itself and your reason where you give one (BR-012).
           </p>
 
           <ValidationSummary errors={errors} />
@@ -286,7 +283,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
             ))}
 
             <label className="case-edit__field" htmlFor="case-edit-reason">
-              <span>Reason</span>
+              <span>Reason <span className="case-edit__optional">(optional)</span></span>
               <textarea
                 id="case-edit-reason"
                 value={reason}

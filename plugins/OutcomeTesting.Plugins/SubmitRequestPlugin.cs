@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -72,25 +72,34 @@ namespace OutcomeTesting.Plugins
             // cannot supply a stable key across page loads, so it is derived here.
             var idempotencyKey = "portal-submit-" + reviewId.ToString("N");
 
-            // Recorded because the caller identity is the portal application user, not the
-            // checker. Without the contact the trail would say only that "the portal" did it.
-            var details = "Submitted from the portal by contact " + DescribeAssignedContact(service, reviewId) + ".";
+            // The checker, not the caller: a Power Pages write reaches Dataverse as the site's
+            // application user, so InitiatingUserId names the site (AD-053). The contact is
+            // carried in the details line as it always was, and is now also the audit event's
+            // actor - the details line was the only place the person's identity survived, and
+            // free text is not where a history log should have to look for it.
+            var contact = AssignedContact(service, reviewId);
+            var details = "Submitted from the portal by contact " + Describe(contact) + ".";
 
             SubmitReviewPlugin.Submit(
                 service,
                 reviewId,
                 idempotencyKey,
                 expectedRowVersion: null,
-                actorId: context.InitiatingUserId,
+                actorId: contact == null ? context.InitiatingUserId : contact.Id,
                 correlationId: context.CorrelationId,
                 requireCallerOwnsReview: false,
-                details: details);
+                details: details,
+                actorName: contact == null ? null : contact.Name);
         }
 
-        private static string DescribeAssignedContact(IOrganizationService service, Guid reviewId)
+        private static EntityReference AssignedContact(IOrganizationService service, Guid reviewId)
         {
             var review = service.Retrieve(ReviewEntity, reviewId, new ColumnSet(AssignedContactAttr));
-            var contact = review.GetAttributeValue<EntityReference>(AssignedContactAttr);
+            return review.GetAttributeValue<EntityReference>(AssignedContactAttr);
+        }
+
+        private static string Describe(EntityReference contact)
+        {
             if (contact == null)
             {
                 return "(none recorded)";

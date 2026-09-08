@@ -5,6 +5,8 @@ import {
   Al_reviewinstancesService,
   Al_responsesService,
   Al_questionversionsService,
+  Al_failreasonsService,
+  Al_al_failreason_al_responsesetService,
 } from '../../generated';
 import {
   Al_reviewinstancesal_reviewstatus,
@@ -29,6 +31,8 @@ export interface ReviewResponse {
   answer: string | null;
   note: string | null;
   answeredOn: string | null;
+  /** The AD-023 fail reasons recorded against this answer, by name. Empty when none are. */
+  failReasons: string[];
 }
 
 export interface ReviewHeader {
@@ -95,9 +99,69 @@ function noteOf(record: Al_responses): string | null {
   return structured ? text(record.al_answertext) : null;
 }
 
+/**
+ * Fail reasons are a many-to-many between al_response and al_failreason through
+ * al_al_failreason_al_response, so they cannot be read off the response row. The generated
+ * client has no $expand - IGetAllOptions is select/filter/orderBy/top/skip/count - so the
+ * intersect is queried directly and joined here, which is what AnswerWriter does
+ * server-side for the same reason.
+ *
+ * Chunked because the filter is an OR per response id and a review with many questions
+ * would otherwise build a URL long enough to be refused.
+ */
+const LINK_CHUNK = 20;
+
+async function failReasonsByResponse(
+  responseIds: string[],
+): Promise<Map<string, string[]>> {
+  const byResponse = new Map<string, string[]>();
+  if (responseIds.length === 0) return byResponse;
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < responseIds.length; i += LINK_CHUNK) {
+    chunks.push(responseIds.slice(i, i + LINK_CHUNK));
+  }
+
+  const [reasons, ...linkResults] = await Promise.all([
+    Al_failreasonsService.getAll({ select: ['al_failreasonid', 'al_name'], top: 500 }),
+    ...chunks.map((chunk) =>
+      Al_al_failreason_al_responsesetService.getAll({
+        filter: chunk.map((id) => `al_responseid eq ${id}`).join(' or '),
+        top: 1000,
+      }),
+    ),
+  ]);
+
+  // A reason whose row cannot be read still counts as recorded, so the id is shown rather
+  // than the link being dropped - a missing reason on a Fail reads as "no reason given",
+  // which is a materially different claim about the review.
+  const nameById = new Map<string, string>();
+  if (reasons.success) {
+    for (const reason of reasons.data) {
+      nameById.set(reason.al_failreasonid, reason.al_name);
+    }
+  }
+
+  for (const result of linkResults) {
+    if (!result.success) continue;
+    for (const link of result.data) {
+      const list = byResponse.get(link.al_responseid) ?? [];
+      list.push(nameById.get(link.al_failreasonid) ?? link.al_failreasonid);
+      byResponse.set(link.al_responseid, list);
+    }
+  }
+
+  for (const list of byResponse.values()) {
+    list.sort((a, b) => a.localeCompare(b));
+  }
+
+  return byResponse;
+}
+
 function toResponse(
   record: Al_responses,
   versions: Map<string, Al_questionversions>,
+  failReasons: Map<string, string[]>,
 ): ReviewResponse {
   const version = record._al_questionversionid_value
     ? versions.get(record._al_questionversionid_value)
@@ -115,6 +179,7 @@ function toResponse(
     answer: answerOf(record),
     note: noteOf(record),
     answeredOn: date(record.al_answerdate) ?? date(record.modifiedon),
+    failReasons: failReasons.get(record.al_responseid) ?? [],
   };
 }
 
@@ -175,7 +240,7 @@ export function useReviewDetail(
       }),
       Al_questionversionsService.getAll({ top: 500 }),
     ])
-      .then(([review, responses, versions]) => {
+      .then(async ([review, responses, versions]) => {
         if (cancelled) return;
         if (!review.success || !review.data) {
           setState({
@@ -193,9 +258,20 @@ export function useReviewDetail(
           }
         }
 
+        // Read after the responses because the intersect is keyed by response id. A
+        // failure here leaves every list empty rather than failing the page: the answers
+        // are the substance and are already in hand.
+        const reasonsByResponse = responses.success
+          ? await failReasonsByResponse(responses.data.map((r) => r.al_responseid)).catch(
+              () => new Map<string, string[]>(),
+            )
+          : new Map<string, string[]>();
+
+        if (cancelled) return;
+
         const rows = responses.success
           ? responses.data
-              .map((response) => toResponse(response, versionById))
+              .map((response) => toResponse(response, versionById, reasonsByResponse))
               .sort((a, b) => a.order - b.order)
           : [];
 

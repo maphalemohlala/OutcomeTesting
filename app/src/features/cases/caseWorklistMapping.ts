@@ -68,7 +68,7 @@ const NEXT_ACTION: Record<CaseStatus, string> = {
   Assigned: 'Start the review',
   'Review In Progress': 'Complete the review',
   Submitted: 'Awaiting outcome',
-  'Awaiting Remediation': 'Raise remediation actions',
+  'Awaiting Remediation': 'Awaiting the adviser’s response',
   'Remediation In Progress': 'Complete remediation',
   'Awaiting Sign-off': 'Awaiting T&C sign-off',
   'Awaiting Recheck': 'Recheck and set final outcome',

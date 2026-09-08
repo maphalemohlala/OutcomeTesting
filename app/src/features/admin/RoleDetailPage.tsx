@@ -190,7 +190,7 @@ export function RoleDetailPage() {
     event.preventDefault();
     if (!role) return;
     if (!email.trim()) {
-      setAssignNotice({ tone: 'error', message: 'Enter a work email.' });
+      setAssignNotice({ tone: 'error', message: 'Select the person to assign this role to.' });
       return;
     }
     setAssignBusy(true);

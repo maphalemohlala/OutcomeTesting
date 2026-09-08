@@ -50,14 +50,32 @@ export function DashboardPage() {
               <span className="dashboard__stat-value">{state.data.validationFailed}</span>
               <span className="dashboard__stat-label">Failed validation</span>
             </Link>
-            <div className="dashboard__stat" data-tone="waiting">
+            {/*
+              Both of these were plain divs. They carry the same dashboard__stat class as
+              the two cards beside them, so they read as cards and invite a click that did
+              nothing. Every stat card now opens the set it counted: "Awaiting a route"
+              drills into the unrouted cases through the same route=none sentinel the
+              outcome filter already uses for "Not yet graded", and the oldest-open age
+              opens the one case it is measuring.
+            */}
+            <Link className="dashboard__stat" data-tone="waiting" to="/cases?route=none">
               <span className="dashboard__stat-value">{state.data.unrouted}</span>
               <span className="dashboard__stat-label">Awaiting a route</span>
-            </div>
-            <div className="dashboard__stat">
-              <span className="dashboard__stat-value">{state.data.oldestOpenDays}</span>
-              <span className="dashboard__stat-label">Oldest open (days)</span>
-            </div>
+            </Link>
+            {state.data.oldestOpenCaseId ? (
+              <Link
+                className="dashboard__stat"
+                to={`/cases/${encodeURIComponent(state.data.oldestOpenCaseId)}`}
+              >
+                <span className="dashboard__stat-value">{state.data.oldestOpenDays}</span>
+                <span className="dashboard__stat-label">Oldest open (days)</span>
+              </Link>
+            ) : (
+              <div className="dashboard__stat">
+                <span className="dashboard__stat-value">{state.data.oldestOpenDays}</span>
+                <span className="dashboard__stat-label">Oldest open (days)</span>
+              </div>
+            )}
           </section>
 
           <section aria-labelledby="dashboard-outcomes">

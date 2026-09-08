@@ -108,6 +108,16 @@
           "entitySetName": "mspp_webroles",
           "logicalName": "mspp_webrole",
           "isHidden": false
+        },
+        "al_al_failreason_al_response": {
+          "entitySetName": "al_al_failreason_al_responseset",
+          "logicalName": "al_al_failreason_al_response",
+          "isHidden": false
+        },
+        "failreasons": {
+          "entitySetName": "al_failreasons",
+          "logicalName": "al_failreason",
+          "isHidden": false
         }
       },
       "environmentVariableName": ""

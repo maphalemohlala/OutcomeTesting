@@ -23,6 +23,13 @@ function AnswerCell({ response }: { response: ReviewResponse }) {
         {response.answer ?? 'Not answered'}
       </span>
       {response.note ? <span className="review__answer-note">{response.note}</span> : null}
+      {response.failReasons.length > 0 ? (
+        <ul className="review__answer-reasons">
+          {response.failReasons.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      ) : null}
     </>
   );
 }
@@ -53,6 +60,21 @@ export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
           <PageIntro
             title={`${reviewType} check — ${state.detail.header.reference}`}
             purpose={INTRO[reviewType]}
+            actions={
+              /*
+               * The browser's own print dialogue, which is where "Save as PDF" lives on
+               * every platform. It renders what is on screen through the print rules in
+               * base.css, so the exported checklist cannot drift from the one being read -
+               * which a separately generated PDF would.
+               */
+              <button
+                type="button"
+                className="dashboard__link"
+                onClick={() => window.print()}
+              >
+                Save as PDF
+              </button>
+            }
           />
 
           {state.detail.header.typeMismatch ? (

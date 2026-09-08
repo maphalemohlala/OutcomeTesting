@@ -129,3 +129,10 @@
   border-color: var(--colour-border);
   cursor: not-allowed;
 }
+
+/* Reason is optional: the audit event records the field-by-field change regardless, so a
+   reason adds context rather than being what makes the change accountable (BR-012). */
+.case-edit__optional {
+  font-weight: 400;
+  color: var(--colour-text-muted);
+}

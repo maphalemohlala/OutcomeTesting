@@ -50,6 +50,23 @@
 </fetch>
 {% endfetchxml %}
 
+{% comment %}
+  Submitted reviews, counted separately from the outstanding ones above. The outstanding
+  tile is labelled "Reviews to complete" and must keep counting only what is still to do,
+  so this is a fourth count rather than a widened one.
+{% endcomment %}
+{% fetchxml submitted_count %}
+<fetch aggregate="true">
+  <entity name="al_reviewinstance">
+    <attribute name="al_reviewinstanceid" alias="total" aggregate="count" />
+    <filter type="and">
+      <condition attribute="al_assignedcontactid" operator="eq" value="{{ me | xml_escape }}" />
+      <condition attribute="al_submittedon" operator="not-null" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
 {% fetchxml remediation_count %}
 <fetch aggregate="true">
   <entity name="al_remediationaction">
@@ -63,21 +80,37 @@
 {% endfetchxml %}
 
 {% comment %}
-  The list is the reviews assigned to this contact and not yet submitted, ordered by the
-  case due date so the most pressing sits first. A submitted review is finished work and
-  belongs on the review list, not on a to-do.
+  Every review assigned to this contact, submitted or not.
+
+  This list used to carry a second condition, al_submittedon is null, on the reasoning
+  that a submitted review is finished work and belongs on the review list rather than on
+  a to-do. What that actually produced was a review vanishing from the page at the moment
+  it was submitted, with nothing on My Work left to say it had been - so the one place a
+  checker looks after submitting was the one place that no longer mentioned the review.
+  The case-level views could not fill the gap either: CaseTransitions.MoveThrough hops the
+  case through Submitted to its destination in the same transaction (OutcomeRules.HopsFor),
+  so no case list ever rests on "Submitted" and the review row is the only record of it.
+
+  A submitted review stays here, badged Submitted and carrying its submitted date, and its
+  link opens the same read-only questionnaire the review page already renders for a locked
+  review (PP-11). The tile above still counts only what is outstanding, because its label
+  says "Reviews to complete".
+
+  Ordered submitted-last (al_submittedon ascending sorts nulls first), then by case due
+  date so the most pressing outstanding review still sits at the top.
 {% endcomment %}
 {% fetchxml my_reviews %}
-<fetch top="10">
+<fetch top="25">
   <entity name="al_reviewinstance">
     <attribute name="al_reviewinstanceid" />
     <attribute name="al_reviewtype" />
     <attribute name="al_reviewstatus" />
     <attribute name="al_startedon" />
+    <attribute name="al_submittedon" />
     <filter type="and">
       <condition attribute="al_assignedcontactid" operator="eq" value="{{ me | xml_escape }}" />
-      <condition attribute="al_submittedon" operator="null" />
     </filter>
+    <order attribute="al_submittedon" descending="false" />
     <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="case">
       <attribute name="al_outcomecaseid" />
       <attribute name="al_casereference" />
@@ -108,6 +141,11 @@
   {% assign total_reviews = review_count.results.entities[0].total %}
 {% endif %}
 
+{% assign total_submitted = 0 %}
+{% if submitted_count.results and submitted_count.results.entities.size > 0 %}
+  {% assign total_submitted = submitted_count.results.entities[0].total %}
+{% endif %}
+
 {% assign total_remediations = 0 %}
 {% if remediation_count.results and remediation_count.results.entities.size > 0 %}
   {% assign total_remediations = remediation_count.results.entities[0].total %}
@@ -132,6 +170,18 @@
     </a>
   </li>
   <li>
+    {% comment %}
+      Lands on the reviews table further down this page, which is where a submitted review
+      now lives - there is no review list page that filters to submitted, and a tile that
+      opens the whole discipline would not be the set it counted. Every tile on this page
+      goes somewhere; a card that only displays a number reads as broken.
+    {% endcomment %}
+    <a class="ot-tile" href="#ot-recent-heading">
+      <span class="ot-tile__count">{{ total_submitted }}</span>
+      <span class="ot-tile__label">Reviews you have submitted</span>
+    </a>
+  </li>
+  <li>
     <a class="ot-tile ot-tile--alert" href="/remediation">
       <span class="ot-tile__count">{{ total_remediations }}</span>
       <span class="ot-tile__label">Open remediation actions</span>
@@ -145,7 +195,10 @@
   {% if my_reviews.results.entities.size > 0 %}
     <div class="ot-table-wrap">
       <table class="ot-table">
-        <caption>Your ten most pressing open reviews, by case due date.</caption>
+        <caption>
+          Your reviews, outstanding first by case due date, then the ones you have
+          submitted. A submitted review opens read-only.
+        </caption>
         <thead>
           <tr>
             <th scope="col">Case reference</th>
@@ -154,6 +207,7 @@
             <th scope="col">Adviser</th>
             <th scope="col">Status</th>
             <th scope="col">Due</th>
+            <th scope="col">Submitted</th>
           </tr>
         </thead>
         <tbody>
@@ -169,6 +223,7 @@
               <td>{{ r['case.al_advisername'] | escape }}</td>
               <td>{% include 'OT Status Badge' status: r.al_reviewstatus.label %}</td>
               <td>{{ r['case.al_duedate'] | date: 'dd MMM yyyy' }}</td>
+              <td>{{ r.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>
             </tr>
           {% endfor %}
         </tbody>

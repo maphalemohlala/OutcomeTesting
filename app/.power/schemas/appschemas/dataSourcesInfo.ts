@@ -48,6 +48,13 @@ export const dataSourcesInfo = {
       }
     }
   },
+  "al_al_failreason_al_responseset": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "al_al_failreason_al_responseid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "al_assigncase": {
     "tableId": "",
     "version": "",
@@ -312,6 +319,13 @@ export const dataSourcesInfo = {
     "tableId": "",
     "version": "",
     "primaryKey": "al_exportrecordid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "al_failreasons": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "al_failreasonid",
     "dataSourceType": "Dataverse",
     "apis": {}
   },

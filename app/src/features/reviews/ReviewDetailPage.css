@@ -121,6 +121,23 @@
   color: var(--colour-text-muted);
 }
 
+/*
+ * Fail reasons sit under the answer they belong to, as a list rather than a joined
+ * sentence: they are discrete recorded selections (AD-023) and a comma-separated run reads
+ * as one prose reason. Marked with the same muted treatment as the note, since both are
+ * supporting detail for the answer above them.
+ */
+.review__answer-reasons {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--colour-text-muted);
+}
+
+.review__answer-reasons li {
+  margin-top: 2px;
+}
+
 .review__unavailable {
   max-width: 60ch;
   padding: var(--space-4);

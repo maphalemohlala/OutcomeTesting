@@ -94,3 +94,76 @@ button {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * Print, which is how a case checklist becomes a PDF (every browser's print dialogue
+ * offers "Save as PDF"). Deliberately not a generated document: a PDF library would be a
+ * second copy of this layout to keep in step with the screen, and the thing people asked
+ * to keep is what they are already reading.
+ *
+ * The rules are structural, not per-page. Anything that only exists to navigate or act on
+ * the record is not part of the record, so the rail, the header, the skip link and every
+ * button and filter come out; what is left is the page's own content. Colours are forced
+ * to black on white because a checklist printed at a default browser setting drops
+ * background fills, and a status that reads only as a colour would vanish - the labels are
+ * always text (NFR-ACC-01), so nothing is lost by removing the fills deliberately.
+ */
+@media print {
+  :root {
+    --colour-text: #000;
+    --colour-text-muted: #333;
+    --colour-surface: #fff;
+    --colour-background: #fff;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .shell {
+    display: block;
+  }
+
+  .shell__header,
+  .shell__rail,
+  .skip-link,
+  .page-intro__actions,
+  .filter-bar,
+  .export-menu,
+  .review__back,
+  [data-print="hide"] {
+    display: none !important;
+  }
+
+  .shell__main {
+    padding: 0;
+    overflow: visible;
+  }
+
+  /* A checklist runs long, so a row split across a page break costs the reader the
+     question the answer belonged to. */
+  tr,
+  li {
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  h1,
+  h2 {
+    break-after: avoid;
+  }
+
+  a {
+    text-decoration: none;
+    color: #000;
+  }
+
+  /* The href is the only thing a printed link can carry, and on a checklist it is noise. */
+  a[href]::after {
+    content: '';
+  }
+}

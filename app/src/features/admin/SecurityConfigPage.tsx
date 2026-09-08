@@ -148,7 +148,7 @@ export function SecurityConfigPage() {
   async function onAssign(event: React.FormEvent) {
     event.preventDefault();
     if (!email.trim()) {
-      setAssignNotice({ tone: 'error', message: 'Enter a work email.' });
+      setAssignNotice({ tone: 'error', message: 'Select the person to assign this role to.' });
       return;
     }
     setAssignBusy(true);
@@ -379,8 +379,9 @@ export function SecurityConfigPage() {
             ) : null}
           </div>
           <p className="security__hint">
-            Map a person&rsquo;s work email to an application role. People are registered on the{' '}
-            <Link to="/admin/users">Users</Link> page.
+            Give a registered person an application role. The assignment is keyed on their work
+            email, and only people on the{' '}
+            <Link to="/admin/users">Users</Link> page can be chosen.
           </p>
           {unreconciled.length > 0 ? (
             <p className="security__notice security__notice--error" role="status">

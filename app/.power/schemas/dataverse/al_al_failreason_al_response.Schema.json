@@ -1,0 +1,58 @@
+{
+  "name": "al_al_failreason_al_response",
+  "title": "al_al_failreason_al_response",
+  "schema": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "x-ms-dataverse-entity": true,
+      "x-ms-dataverse-entityset": "al_al_failreason_al_responseset",
+      "x-ms-dataverse-primary-id": "al_al_failreason_al_responseid",
+      "x-ms-dataverse-primary-name": null,
+      "properties": {
+        "al_al_failreason_al_responseid": {
+          "type": "string",
+          "title": "al_al_failreason_al_responseid",
+          "x-ms-dataverse-attribute": "al_al_failreason_al_responseid",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "al_al_failreason_al_responseId",
+          "x-ms-read-only": true,
+          "x-ms-dataverse-primary-id": true,
+          "required": true,
+          "x-ms-keyType": "primary"
+        },
+        "al_failreasonid": {
+          "type": "string",
+          "title": "al_failreasonid",
+          "x-ms-dataverse-attribute": "al_failreasonid",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "al_failreasonid",
+          "x-ms-read-only": true,
+          "required": true
+        },
+        "al_responseid": {
+          "type": "string",
+          "title": "al_responseid",
+          "x-ms-dataverse-attribute": "al_responseid",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "al_responseid",
+          "x-ms-read-only": true,
+          "required": true
+        },
+        "versionnumber": {
+          "type": "string",
+          "title": "versionnumber",
+          "x-ms-dataverse-attribute": "versionnumber",
+          "x-ms-dataverse-type": "BigIntType",
+          "x-ms-schema-name": "VersionNumber",
+          "x-ms-read-only": true
+        }
+      },
+      "required": [
+        "al_al_failreason_al_responseid",
+        "al_failreasonid",
+        "al_responseid"
+      ]
+    }
+  }
+}

@@ -132,7 +132,40 @@
         <div><dt>Started</dt><dd>{{ rv.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
         <div><dt>Submitted</dt><dd>{{ rv.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
       </dl>
+
+      {% comment %}
+        Keeping a copy of the checklist. The browser's print dialogue is the export - every
+        platform's offers "Save as PDF" - and the print rules in outcome-testing.css strip
+        the chrome so what lands in the file is this page's questionnaire and answers.
+
+        No PDF library, for two reasons: Power Pages serves scripts only from an allowlisted
+        set of CDNs, and a generated document would be a second description of this layout to
+        keep in step with the one people read. The button itself is .ot-btn, which the print
+        rules hide, so it never appears in the output.
+
+        Offered on a submitted review only. What this exports is a record of the check, and
+        before submission there is no check to record - the answers are still being edited,
+        so a file saved from here would be a draft that reads exactly like a final one and
+        carries no submission date to say otherwise. The button appears the moment the
+        review is submitted and the page turns read-only.
+      {% endcomment %}
+      {% if rv.al_submittedon %}
+        <p class="ot-print-action">
+          <button type="button" class="ot-btn" data-ot-print>Save as PDF</button>
+        </p>
+      {% endif %}
     </section>
+
+    {% if rv.al_submittedon %}
+      <script>
+        (function () {
+          'use strict';
+          var button = document.querySelector('[data-ot-print]');
+          if (!button) { return; }
+          button.addEventListener('click', function () { window.print(); });
+        })();
+      </script>
+    {% endif %}
 
     {% if rv.al_submittedon %}
       <div class="ot-notice" role="status">

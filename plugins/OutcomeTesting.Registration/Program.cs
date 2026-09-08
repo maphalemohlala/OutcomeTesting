@@ -45,6 +45,22 @@ using System.Text.Json;
 //   Do not register it until server-side email is approved and tested for that account's
 //   mailbox (OD-030). Until then rows rest at Pending, which is the honest state.
 //
+// Backfill remediation: dotnet run -- backfillremediation <orgUrl> <caseRef> --confirm <orgUrl>
+//   One-off. Raises the BR-006 remediation action for a case that reached Awaiting
+//   Remediation BEFORE SubmitReviewPlugin learned to raise one - the state every such case
+//   in this environment was left in, with the adviser response, the sign-off and the BR-010
+//   clock all waiting on a row nothing could create.
+//
+//   Not a general tool, and deliberately narrow. It refuses a case that is not in Awaiting
+//   Remediation, refuses one that already has an action, and takes every value from the
+//   case and its submitted review rather than from arguments, so a backfilled row is the
+//   row the plug-in would have written. New submissions raise their own action and must
+//   never come through here.
+//
+//   This CREATES A REAL BUSINESS RECORD and, through NotificationEmitterPlugin, queues a
+//   real "Remediation required" notification to the adviser. Same --confirm discipline as
+//   the verify modes, for the same reason.
+//
 // Add a command value: dotnet run -- addcommandvalue <orgUrl> <value> <label>
 //   Mints one value on al_auditevent.al_command, the option set every command stamps on its
 //   audit row. Additive: rows already written keep the value they carry, which under
@@ -407,6 +423,11 @@ if (args.Length >= 2 && args[0].Equals("setsitesetting", StringComparison.Ordina
 if (args.Length >= 2 && args[0].Equals("setsecuritystamp", StringComparison.OrdinalIgnoreCase))
 {
     return SetSecurityStamp(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("backfillremediation", StringComparison.OrdinalIgnoreCase))
+{
+    return BackfillRemediation(args);
 }
 
 if (args.Length < 1)
@@ -4789,6 +4810,201 @@ int AddMetadataToSolution(string orgUrl, string entityName, string? attributeNam
 }
 
 /// <summary>What a registered step is set to do, so a check can report it rather than restate it.</summary>
+// One-off backfill for the cases stranded by the gap this repaired: a case sitting in
+// Awaiting Remediation whose review was submitted before SubmitReviewPlugin raised an
+// action. Everything downstream - the adviser response (FR-020), the T and C sign-off
+// (FR-023), the BR-010 clock - hangs off a row that could not exist, so the portal's
+// remediation worklist was correct and empty.
+//
+// The arithmetic below is a deliberate second copy of Remediation.AddWorkingDays. It cannot
+// be shared: the plug-in assembly is net462 and this tool is net8.0, so they cannot
+// reference one another, and the Microsoft.Xrm.Sdk each binds to is a different assembly
+// identity. The copy is confined to this one backfill verb and is checked against the
+// plug-in's own unit tests (RemediationTests) by producing the same date for the same
+// input. Nothing on the ongoing path uses it.
+int BackfillRemediation(string[] args)
+{
+    var orgUrl = args[1];
+    var caseRef = args.Length > 2 ? args[2] : string.Empty;
+
+    // The org URL repeated after --confirm, for the reason the verify modes state: this
+    // writes a real business record and sends a real notification, so it must not be
+    // reachable by muscle memory.
+    var confirmed = args.Length > 4
+        && args[3].Equals("--confirm", StringComparison.OrdinalIgnoreCase)
+        && args[4].TrimEnd('/').Equals(orgUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+
+    if (string.IsNullOrWhiteSpace(caseRef) || !confirmed)
+    {
+        Console.Error.WriteLine(
+            "Usage: dotnet run -- backfillremediation <orgUrl> <caseReference> --confirm <orgUrl>");
+        return 1;
+    }
+
+    const int AwaitingRemediation = 120910587;
+    const int StatusOpen = 120910600;
+    const int ThresholdWorkingDays = 10;
+
+    using var svc = Connect(orgUrl);
+
+    var cases = new QueryExpression("al_outcomecase")
+    {
+        ColumnSet = new ColumnSet("al_casereference", "al_casestatus", "al_advisername"),
+        TopCount = 2,
+        Criteria = new FilterExpression(),
+    };
+    cases.Criteria.AddCondition("al_casereference", ConditionOperator.Equal, caseRef);
+    var found = svc.RetrieveMultiple(cases).Entities;
+
+    if (found.Count != 1)
+    {
+        Console.Error.WriteLine($"FAIL: {found.Count} cases match '{caseRef}'. Expected exactly one.");
+        return 1;
+    }
+
+    var outcomeCase = found[0];
+    var status = outcomeCase.GetAttributeValue<OptionSetValue>("al_casestatus");
+    if (status == null || status.Value != AwaitingRemediation)
+    {
+        Console.Error.WriteLine(
+            $"FAIL: {caseRef} is not in Awaiting Remediation (al_casestatus={status?.Value.ToString() ?? "null"}). " +
+            "Only a case stranded in that state is a backfill; anything else raises its own action on submit.");
+        return 1;
+    }
+
+    // The submitted review that took the case there. Its sequence is half the action's
+    // business code, and its submission date is where the BR-010 clock should have started.
+    var reviews = new QueryExpression("al_reviewinstance")
+    {
+        ColumnSet = new ColumnSet("al_sequence", "al_submittedon", "al_reviewtype"),
+        TopCount = 1,
+        Criteria = new FilterExpression(),
+    };
+    reviews.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, outcomeCase.Id);
+    reviews.Criteria.AddCondition("al_submittedon", ConditionOperator.NotNull);
+    reviews.AddOrder("al_submittedon", OrderType.Descending);
+    var submitted = svc.RetrieveMultiple(reviews).Entities;
+
+    if (submitted.Count == 0)
+    {
+        Console.Error.WriteLine($"FAIL: {caseRef} has no submitted review, so nothing raised its remediation.");
+        return 1;
+    }
+
+    var review = submitted[0];
+    var sequence = review.GetAttributeValue<int?>("al_sequence") ?? 1;
+    var submittedOn = review.GetAttributeValue<DateTime?>("al_submittedon") ?? DateTime.UtcNow;
+    var code = $"REM-{caseRef}-{sequence}";
+    if (code.Length > 100)
+    {
+        code = code.Substring(0, 100);
+    }
+
+    var existing = new QueryExpression("al_remediationaction")
+    {
+        ColumnSet = new ColumnSet(false),
+        TopCount = 1,
+        Criteria = new FilterExpression(),
+    };
+    existing.Criteria.AddCondition("al_remediationactioncode", ConditionOperator.Equal, code);
+    if (svc.RetrieveMultiple(existing).Entities.Count > 0)
+    {
+        Console.WriteLine($"Nothing to do: {code} already exists.");
+        return 0;
+    }
+
+    // The adviser, resolved the way Remediation.AdviserContact resolves them: two rows read
+    // rather than one, because the second is what proves the match was unambiguous. An
+    // unresolved adviser leaves the action unassigned rather than guessing at a person.
+    EntityReference? adviser = null;
+    var adviserName = outcomeCase.GetAttributeValue<string>("al_advisername");
+    if (!string.IsNullOrWhiteSpace(adviserName))
+    {
+        var contacts = new QueryExpression("contact")
+        {
+            ColumnSet = new ColumnSet(false),
+            TopCount = 2,
+            Criteria = new FilterExpression(),
+        };
+        contacts.Criteria.AddCondition("fullname", ConditionOperator.Equal, adviserName.Trim());
+        contacts.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+        var matches = svc.RetrieveMultiple(contacts).Entities;
+        if (matches.Count == 1)
+        {
+            adviser = matches[0].ToEntityReference();
+        }
+    }
+
+    var due = AddWorkingDays(submittedOn, ThresholdWorkingDays);
+
+    var name = $"Remediation {caseRef}";
+    if (name.Length > 100)
+    {
+        name = name.Substring(0, 100);
+    }
+
+    var action = new Entity("al_remediationaction")
+    {
+        ["al_name"] = name,
+        ["al_remediationactioncode"] = code,
+        ["al_description"] =
+            "Raised for a review submitted before this solution raised remediation actions " +
+            "automatically. Review the file and record what you have put right.",
+        ["al_outcomecaseid"] = outcomeCase.ToEntityReference(),
+        ["al_reviewinstanceid"] = review.ToEntityReference(),
+        ["al_actionstatus"] = new OptionSetValue(StatusOpen),
+        ["al_duedate"] = due,
+    };
+
+    if (adviser != null)
+    {
+        action["al_assignedcontactid"] = adviser;
+    }
+
+    var id = svc.Create(action);
+
+    Console.WriteLine($"PASS: raised {code} ({id:D}) on {caseRef}.");
+    Console.WriteLine($"  review    {review.Id:D} sequence {sequence}, submitted {submittedOn:yyyy-MM-dd}");
+    Console.WriteLine($"  due       {due:yyyy-MM-dd} (10 working days, submission day counted as day 1)");
+    Console.WriteLine($"  assigned  {(adviser == null ? "unassigned - the adviser name matched no single contact" : adviserName)}");
+    return 0;
+
+    // Mirrors Remediation.AddWorkingDays: Monday to Friday, the starting day counts as day
+    // 1 (OD-018), bank holidays are not deducted, and an action never falls due on a
+    // weekend. See the note above this method on why it is a copy.
+    static DateTime AddWorkingDays(DateTime start, int count)
+    {
+        static bool IsWorkingDay(DateTime d) =>
+            d.DayOfWeek != DayOfWeek.Saturday && d.DayOfWeek != DayOfWeek.Sunday;
+
+        var utc = start.Kind == DateTimeKind.Utc ? start : start.ToUniversalTime();
+        var cursor = utc.Date;
+
+        var remaining = count;
+        if (remaining > 0 && IsWorkingDay(cursor))
+        {
+            remaining -= 1;
+        }
+
+        while (remaining > 0)
+        {
+            cursor = cursor.AddDays(1);
+            if (IsWorkingDay(cursor))
+            {
+                remaining -= 1;
+            }
+        }
+
+        while (!IsWorkingDay(cursor))
+        {
+            cursor = cursor.AddDays(1);
+        }
+
+        return cursor;
+    }
+}
+
+
 sealed record StepFacts(bool Enabled, int Mode, int Stage, Guid RunAs)
 {
     public string Describe() =>

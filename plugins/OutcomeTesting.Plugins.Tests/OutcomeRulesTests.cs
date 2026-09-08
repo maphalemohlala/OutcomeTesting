@@ -1,4 +1,4 @@
-using OutcomeTesting.Plugins;
+﻿using OutcomeTesting.Plugins;
 using Xunit;
 
 namespace OutcomeTesting.Plugins.Tests
@@ -236,6 +236,109 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.DoesNotContain(
                 CaseLifecycle.Submitted,
                 OutcomeRules.HopsFor(CaseLifecycle.ReviewInProgress, CaseLifecycle.Queued));
+        }
+
+        // The checklist's own trigger (Q-FQ-03 / Q-FQTAX-03, "Remedial action required?").
+        // Both are mandatory Yes/No questions, so the flag is always answered by the time a
+        // review can be submitted. It widens BR-006 rather than restating it: a non-pass
+        // outcome already demanded remediation, and this adds the case the outcome cannot
+        // see - a checker who grades the file a Pass but has still found something the
+        // adviser must put right.
+
+        [Fact]
+        public void Reads_a_flagged_remedial_answer_as_a_yes()
+        {
+            Assert.True(OutcomeRules.RemedialActionFlagged(ResponseRules.ChoiceYes));
+            Assert.False(OutcomeRules.RemedialActionFlagged(ResponseRules.ChoiceNo));
+        }
+
+        [Fact]
+        public void Treats_an_unanswered_remedial_question_as_unflagged()
+        {
+            // Null is "not answered", never "yes". Both questions are mandatory, so this
+            // is unreachable through a submit - but defaulting an absent answer to a raise
+            // would invent remediation nobody asked for, which is the harder mistake to
+            // spot than the one it replaces.
+            Assert.False(OutcomeRules.RemedialActionFlagged(null));
+        }
+
+        [Fact]
+        public void A_flagged_pass_still_requires_remediation()
+        {
+            Assert.True(OutcomeRules.RequiresRemediation(OutcomeRules.OutcomePass, true));
+        }
+
+        [Fact]
+        public void An_unflagged_pass_requires_no_remediation()
+        {
+            Assert.False(OutcomeRules.RequiresRemediation(OutcomeRules.OutcomePass, false));
+        }
+
+        [Theory]
+        [InlineData(OutcomeRules.OutcomePassWithIssues)]
+        [InlineData(OutcomeRules.OutcomeInsufficient)]
+        [InlineData(OutcomeRules.OutcomePotentialHarm)]
+        public void A_non_pass_requires_remediation_whether_or_not_it_was_flagged(int outcome)
+        {
+            Assert.True(OutcomeRules.RequiresRemediation(outcome, false));
+            Assert.True(OutcomeRules.RequiresRemediation(outcome, true));
+        }
+
+        [Fact]
+        public void Sends_a_flagged_aqs_pass_to_remediation_instead_of_closing_it()
+        {
+            // Project owner direction 2026-09-09: raising an action decides the status. A
+            // case closed with an open action against it would sit on the remediation
+            // worklist with nothing able to move it, since Closed is terminal (AD-057).
+            Assert.Equal(
+                CaseLifecycle.AwaitingRemediation,
+                OutcomeRules.NextCaseStatusForAqs(OutcomeRules.OutcomePass, true));
+        }
+
+        [Fact]
+        public void Holds_a_flagged_tax_pass_for_remediation_before_aqs()
+        {
+            // Direction 2026-09-09, and the same reasoning OD-027 applies to a Tax
+            // non-pass: AQS must not review a file with something unaddressed on it. The
+            // case returns to the queue for its AQS check once the action is signed off.
+            Assert.Equal(
+                CaseLifecycle.AwaitingRemediation,
+                OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, true, true));
+        }
+
+        [Fact]
+        public void Sends_a_flagged_tax_only_pass_to_remediation_instead_of_closing_it()
+        {
+            Assert.Equal(
+                CaseLifecycle.AwaitingRemediation,
+                OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, false, true));
+        }
+
+        [Fact]
+        public void Leaves_an_unflagged_pass_routing_exactly_as_it_was()
+        {
+            // The flag only ever adds remediation. Nothing about the existing routes
+            // changes when the checker answers No.
+            Assert.Equal(
+                CaseLifecycle.Closed,
+                OutcomeRules.NextCaseStatusForAqs(OutcomeRules.OutcomePass, false));
+            Assert.Equal(
+                CaseLifecycle.Queued,
+                OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, true, false));
+            Assert.Equal(
+                CaseLifecycle.Closed,
+                OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, false, false));
+        }
+
+        [Theory]
+        [InlineData(OutcomeRules.OutcomePass)]
+        [InlineData(OutcomeRules.OutcomePassWithIssues)]
+        public void Every_status_a_flagged_submit_produces_is_reachable_from_Submitted(int outcome)
+        {
+            Assert.True(CaseLifecycle.IsAllowed(
+                CaseLifecycle.Submitted, OutcomeRules.NextCaseStatusForAqs(outcome, true)));
+            Assert.True(CaseLifecycle.IsAllowed(
+                CaseLifecycle.Submitted, OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, false, true)));
         }
     }
 }

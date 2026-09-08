@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { useUserDirectory } from '../../hooks/useUserDirectory';
+import { useUserDirectory, type DirectoryUser } from '../../hooks/useUserDirectory';
 import './UserPicker.css';
 
 interface Props {
@@ -9,6 +9,14 @@ interface Props {
   onChange: (value: string) => void;
   /** Shown as the empty option. */
   placeholder?: string;
+  /**
+   * Which registry column the stored value is. A person field on a case holds the display
+   * name (AD-029); a role assignment is keyed on work email (AD-010). Both are a choice of
+   * one person from the same registry, so both use this control and differ only in what
+   * they store. Every option is labelled with the name and the email either way, so the
+   * two forms read identically to the person choosing.
+   */
+  field?: 'name' | 'email';
 }
 
 /**
@@ -18,16 +26,23 @@ interface Props {
  * (AD-029: the user lookups on the case remain text). When the directory cannot load, this
  * degrades to a plain text input so editing is never blocked.
  */
-export function UserPicker({ id, value, onChange, placeholder = 'Select a person' }: Props) {
+export function UserPicker({
+  id,
+  value,
+  onChange,
+  placeholder = 'Select a person',
+  field = 'name',
+}: Props) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const directory = useUserDirectory();
+  const storedValue = (user: DirectoryUser) => (field === 'email' ? user.email : user.name);
 
   if (directory.status !== 'ready') {
     return (
       <input
         id={inputId}
-        type="text"
+        type={field === 'email' ? 'email' : 'text'}
         className="user-picker__fallback"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -37,8 +52,8 @@ export function UserPicker({ id, value, onChange, placeholder = 'Select a person
   }
 
   const active = directory.users.filter((u) => u.active);
-  const knownNames = new Set(active.map((u) => u.name));
-  const hasUnlistedValue = value.trim().length > 0 && !knownNames.has(value);
+  const known = new Set(active.map(storedValue));
+  const hasUnlistedValue = value.trim().length > 0 && !known.has(value);
 
   return (
     <select
@@ -50,7 +65,7 @@ export function UserPicker({ id, value, onChange, placeholder = 'Select a person
       <option value="">{placeholder}</option>
       {hasUnlistedValue ? <option value={value}>{value} (not in the people directory)</option> : null}
       {active.map((user) => (
-        <option key={user.id} value={user.name}>
+        <option key={user.id} value={storedValue(user)}>
           {user.name} — {user.email}
         </option>
       ))}

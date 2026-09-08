@@ -40,7 +40,10 @@ function applyFilters(cases: CaseSummary[], filters: Filters): CaseSummary[] {
   const search = filters.q.trim().toLowerCase();
   return cases.filter((item) => {
     if (filters.status && item.status !== filters.status) return false;
-    if (filters.route && item.route !== filters.route) return false;
+    if (filters.route === 'none' && item.route) return false;
+    if (filters.route && filters.route !== 'none' && item.route !== filters.route) {
+      return false;
+    }
     if (filters.priority && (item.priority ?? '') !== filters.priority) return false;
     if (filters.outcome === 'none' && item.latestOutcome) return false;
     if (filters.outcome && filters.outcome !== 'none' && item.latestOutcome !== filters.outcome) {
@@ -173,6 +176,7 @@ export function CaseWorklistPage() {
                     {route}
                   </option>
                 ))}
+                <option value="none">Not routed</option>
               </select>
             </FilterField>
             {priorities.length > 0 ? (

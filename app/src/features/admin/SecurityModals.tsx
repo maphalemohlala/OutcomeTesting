@@ -1,4 +1,5 @@
 import { Modal } from '../../components/feedback/Modal';
+import { UserPicker } from '../../components/form/UserPicker';
 import { ACCESS_LEVELS, RESOURCE_KEYS } from '../../types/permissions';
 import type { RoleRow } from './useRoles';
 
@@ -77,15 +78,27 @@ export function AssignRoleModal(props: AssignRoleModalProps) {
       <NoticeLine notice={props.notice} />
       <form className="security__form" onSubmit={props.onSubmit}>
         <label className="security__field">
-          <span>Work email</span>
-          <input
-            type="email"
-            value={props.email}
-            onChange={(e) => props.onEmailChange(e.target.value)}
-            placeholder="person@ascotlloyd.co.uk"
-            autoComplete="off"
-            readOnly={props.emailReadOnly}
-          />
+          <span>Person</span>
+          {/*
+            Chosen from the registry rather than typed. An assignment is keyed on work email
+            (AD-010), and a typo in a free-text box produced a row that matched nobody: the
+            grant looked made, the person still had no access, and the mistake was only
+            visible by reading the assignments table character by character. The same picker
+            the case person fields use, so the registry is the one source for both.
+
+            Changing someone's role keeps the read-only line: the person is fixed there and
+            the role is what the form is for.
+          */}
+          {props.emailReadOnly ? (
+            <input type="email" value={props.email} readOnly />
+          ) : (
+            <UserPicker
+              field="email"
+              value={props.email}
+              onChange={props.onEmailChange}
+              placeholder="Select a person"
+            />
+          )}
         </label>
         <RoleField
           options={props.roleOptions}

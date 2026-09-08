@@ -51,6 +51,9 @@ namespace OutcomeTesting.Plugins.Tests
 
         public int RetrieveMultipleCount { get; private set; }
 
+        /// <summary>Every Retrieve issued, so a test can assert one was never asked for.</summary>
+        public int RetrieveCount { get; private set; }
+
         /// <summary>Seeds a row directly, bypassing the Create log.</summary>
         public Entity Seed(string logicalName, Guid id, params object[] attributePairs)
         {
@@ -98,6 +101,7 @@ namespace OutcomeTesting.Plugins.Tests
 
         public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet)
         {
+            RetrieveCount += 1;
             var row = Row(entityName, id);
             if (row == null)
             {

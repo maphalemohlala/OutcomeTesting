@@ -40,6 +40,8 @@ export interface DashboardData {
   byStatus: StatusCount[];
   ageing: AgeingBucket[];
   oldestOpenDays: number;
+  /** The case that age belongs to, so the card can open the case it counted. */
+  oldestOpenCaseId: string | null;
   /** BR-005 grades on cases that have reached an outcome, for the PP-17 drill-down. */
   completedOutcomes: OutcomeCount[];
   completedTotal: number;
@@ -87,6 +89,7 @@ function aggregate(
   let validationFailed = 0;
   let unrouted = 0;
   let oldestOpenDays = 0;
+  let oldestOpenCaseId: string | null = null;
 
   for (const record of records) {
     const status = Al_outcomecasesal_casestatus[record.al_casestatus] as CaseStatus;
@@ -99,7 +102,10 @@ function aggregate(
     if (!record._al_reviewrouteid_value) unrouted += 1;
 
     const age = ageInDays(record.createdon);
-    if (age > oldestOpenDays) oldestOpenDays = age;
+    if (age > oldestOpenDays || oldestOpenCaseId === null) {
+      oldestOpenDays = age;
+      oldestOpenCaseId = record.al_outcomecaseid;
+    }
 
     const bandIndex = AGEING_BANDS.findIndex((band) => age >= band.min && age <= band.max);
     if (bandIndex >= 0) bands[bandIndex].count += 1;
@@ -150,6 +156,7 @@ function aggregate(
     byStatus,
     ageing: bands,
     oldestOpenDays,
+    oldestOpenCaseId,
     completedOutcomes: OUTCOMES.map((outcome) => ({
       outcome,
       count: outcomeCounts.get(outcome) ?? 0,

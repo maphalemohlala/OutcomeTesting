@@ -1,4 +1,4 @@
-{% extends 'OT Layout' %}
+﻿{% extends 'OT Layout' %}
 {% block content %}
 {% comment %}
   Case detail (PP-05).
@@ -173,6 +173,40 @@
         {% include 'OT Empty State' title: 'No reviews yet' message: 'A review instance is created when the case is routed to Tax or AQS.' %}
       {% endif %}
     </section>
+
+    {% comment %}
+      The case as one document: header, reviews and remediation together. Same mechanism as
+      the review page - the browser's print dialogue, with outcome-testing.css's print rules
+      stripping the chrome - so the two exports cannot drift apart.
+
+      Offered only once at least one review on the case has been SUBMITTED, which is the
+      same test the review page now applies to its own button.
+
+      It used to be enough that a review instance existed. That put the export on a case
+      whose checks were still being answered, and the file it produced was a draft with no
+      submission date on it - indistinguishable, once printed, from the record of a finished
+      check. A case with no review at all was already excluded for the weaker version of the
+      same reason: nothing worth exporting had happened yet.
+    {% endcomment %}
+    {% assign submitted_reviews = 0 %}
+    {% for r in reviews.results.entities %}
+      {% if r.al_submittedon %}{% assign submitted_reviews = submitted_reviews | plus: 1 %}{% endif %}
+    {% endfor %}
+
+    {% if submitted_reviews > 0 %}
+      <p class="ot-print-action">
+        <button type="button" class="ot-btn" data-ot-print>Save as PDF</button>
+      </p>
+
+      <script>
+        (function () {
+          'use strict';
+          var button = document.querySelector('[data-ot-print]');
+          if (!button) { return; }
+          button.addEventListener('click', function () { window.print(); });
+        })();
+      </script>
+    {% endif %}
 
     <section class="ot-card" aria-labelledby="ot-case-remediation">
       <h2 class="ot-card__title" id="ot-case-remediation">Remediation</h2>

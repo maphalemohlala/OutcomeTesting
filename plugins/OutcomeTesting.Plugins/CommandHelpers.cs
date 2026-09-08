@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ServiceModel;
 using Microsoft.Xrm.Sdk;
@@ -198,6 +198,48 @@ namespace OutcomeTesting.Plugins
             return result.Entities.Count > 0 ? result.Entities[0] : null;
         }
 
+        /// <summary>
+        /// A display name for an audit actor, or null when it cannot be established.
+        ///
+        /// The actor is normally a Dataverse user, so systemuser is asked first. A portal
+        /// path passes the signed-in Contact instead - a Power Pages write reaches Dataverse
+        /// as the site's application user, so InitiatingUserId names the site rather than
+        /// the person (AD-053) - and that id resolves against contact. Asking both, in that
+        /// order, keeps one column meaningful for both kinds of actor without the audit
+        /// table having to record which kind it holds.
+        ///
+        /// Never throws. An audit event is immutable and required (NFR-AUD-01); losing the
+        /// whole event because a name lookup failed would be a strictly worse outcome than
+        /// an event whose actor is unnamed, and the id is stamped either way. That is also
+        /// why the catch is deliberately broad: a missing row, a privilege the plug-in user
+        /// lacks on systemuser, and a malformed id all arrive here as different exceptions
+        /// and all mean the same thing to this method.
+        /// </summary>
+        public static string ResolveActorName(IOrganizationService service, Guid actorId)
+        {
+            if (service == null || actorId == Guid.Empty)
+            {
+                return null;
+            }
+
+            return NameFrom(service, "systemuser", actorId)
+                ?? NameFrom(service, "contact", actorId);
+        }
+
+        private static string NameFrom(IOrganizationService service, string table, Guid id)
+        {
+            try
+            {
+                var row = service.Retrieve(table, id, new ColumnSet("fullname"));
+                var name = row == null ? null : row.GetAttributeValue<string>("fullname");
+                return string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
         public static Guid WriteAuditEvent(
             IOrganizationService service,
             int command,
@@ -207,19 +249,39 @@ namespace OutcomeTesting.Plugins
             string reason,
             string details,
             string idempotencyKey,
-            IPluginExecutionContext context)
+            IPluginExecutionContext context,
+            Guid? actorId = null,
+            string actorName = null)
         {
+            // The initiating user unless a caller names someone better. A portal path does:
+            // its write reaches Dataverse as the site's application user, so the context
+            // names the site and the signed-in Contact is the actual actor (AD-053).
+            var actor = actorId ?? context.InitiatingUserId;
+
             var audit = new Entity(AuditEntity)
             {
                 ["al_name"] = name,
                 ["al_command"] = new OptionSetValue(command),
                 ["al_targettable"] = targetTable,
                 ["al_targetid"] = targetId.ToString("D"),
-                ["al_actorid"] = context.InitiatingUserId.ToString("D"),
+                ["al_actorid"] = actor.ToString("D"),
                 ["al_idempotencykey"] = idempotencyKey,
                 ["al_correlationid"] = context.CorrelationId.ToString("D"),
                 ["al_occurredon"] = DateTime.UtcNow,
             };
+
+            // al_actorname was never written by anything, so every history log fell back to
+            // createdbyname - a service account on every row, whoever had actually acted.
+            // Resolved here rather than at each of the call sites so one writer cannot start
+            // naming its actor while the others carry on not naming theirs.
+            var resolved = string.IsNullOrWhiteSpace(actorName)
+                ? ResolveActorName(service, actor)
+                : actorName.Trim();
+
+            if (!string.IsNullOrEmpty(resolved))
+            {
+                audit["al_actorname"] = resolved;
+            }
 
             if (!string.IsNullOrEmpty(reason))
             {

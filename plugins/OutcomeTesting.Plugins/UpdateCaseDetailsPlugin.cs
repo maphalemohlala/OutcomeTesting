@@ -66,7 +66,19 @@ namespace OutcomeTesting.Plugins
 
             var targetId = CommandHelpers.ParseRequiredGuid(context, InTargetId);
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
-            var reason = CommandHelpers.GetRequiredString(context, InReason);
+            // Optional, by project owner direction 2026-09-08. It was mandatory on both sides,
+            // which made an amendment cost a sentence of justification every time and taught
+            // people to type "update" to get past it - a field that is always filled and never
+            // read is not an audit trail. What BR-012 actually needs is what changed, and the
+            // audit event's details line carries that field by field, computed here rather than
+            // supplied by the caller. A reason still travels when one is given; when it is not,
+            // the event says so plainly instead of holding an empty string that reads as though
+            // the column failed to save.
+            var reason = CommandHelpers.GetOptionalString(context, InReason);
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                reason = "(no reason given)";
+            }
             var expectedRowVersion = CommandHelpers.GetOptionalString(context, InExpectedRowVersion);
 
             var status = ParseOptionalInt(context, InStatus);

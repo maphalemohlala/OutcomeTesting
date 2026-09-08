@@ -1,8 +1,15 @@
 ﻿# Outstanding work
 
-Started 2026-09-04. **Last reviewed 2026-09-08**, after the deactivation fix, the signing-key
-removal and the four decisions the 2026-09-07 sign-in work left open. Every environment claim
-below was re-queried that day rather than carried forward.
+Started 2026-09-04. **Last reviewed 2026-09-09**, after the remediation-raising gap was found
+and closed. Every environment claim below was re-queried on 2026-09-08 or later rather than
+carried forward.
+
+> **2026-09-09 in one line: a reported permissions fault was a feature that had never been
+> built.** "The remediation page shows no cases" was true for every account, because nothing in
+> the solution had ever created an `al_remediationaction` — the whole loop behind it was built,
+> registered and waiting on a row with no author. This register never carried it, and neither
+> did any delivery status. Record:
+> `docs/deployment/2026-09-09-remediation-raising.md`.
 
 > **2026-09-08 in one line: following a register item nobody thought was urgent found that
 > deactivating a leaver withdrew nothing.** Two live defects came out of OD-037, which this
@@ -315,6 +322,30 @@ Sequenced behind item 5 for the same reason.
 - **Senior Checker** needs `command.assign` granted as a Dataverse row.
 - **Optimistic concurrency is not sent on the portal submit path.**
 - **9 `react-hooks/exhaustive-deps` lint warnings**, all pre-existing, zero errors.
+
+## Closed on 2026-09-09
+
+- **BR-006 remediation actions are raised — they never were.** A non-pass outcome moved a case
+  to Awaiting Remediation and always had, so the status and the case lists agreed and nothing
+  looked wrong. But no plug-in, command, page or flow created the `al_remediationaction` that
+  status implies: an unfiltered fetch returned **zero rows for the whole environment**. The
+  adviser response, `CompleteRemediationPlugin`, the T&C sign-off, the BR-010 clock and
+  `NotificationEmitterPlugin`'s already-registered `Create of al_remediationaction` step were
+  each correct and each unreachable. `SubmitReviewPlugin` now raises one inside the submit
+  transaction, on either trigger: a non-pass outcome, or the checklist's own mandatory
+  "Remedial action required?" (`Q-FQ-03` / `Q-FQTAX-03`).
+- **A flagged Pass no longer closes the case.** Project owner direction 2026-09-09 made the
+  rule uniform: anything that raises remediation sends the case to Awaiting Remediation, and a
+  flagged Tax pass is held before AQS. Closing a case with an open action against it would
+  have stranded the action — AD-057 permits no transition out of Closed.
+- **`IO-DEV-VERIFY-003` was backfilled** (`REM-IO-DEV-VERIFY-003-1`, due 2026-09-21, assigned
+  to `Sims Rad`), and the PP-15 chain delivered "Remediation required on case
+  IO-DEV-VERIFY-003" to the adviser off the back of it — emitter, outbox, drain and
+  server-side email, on the first row the table has ever held.
+- **Three portal repairs.** Picking a case up now opens its checklist instead of reloading the
+  queue; "Save as PDF" is gated on submission on both the review and the case page, where it
+  used to produce a draft indistinguishable from a finished record; and "Assign a role" picks
+  a registered person rather than accepting a free-text email that could match nobody.
 
 ## Closed on 2026-09-07
 

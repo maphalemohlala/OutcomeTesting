@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -311,6 +311,14 @@ namespace OutcomeTesting.Plugins
                 ["al_correlationid"] = correlationId.ToString("D"),
                 ["al_occurredon"] = DateTime.UtcNow,
             };
+
+            // Same omission as the other two audit writers had: the id was stamped and the
+            // name never was, so the history log showed whichever account the plug-in ran as.
+            var actorName = CommandHelpers.ResolveActorName(service, actorId);
+            if (!string.IsNullOrEmpty(actorName))
+            {
+                audit["al_actorname"] = actorName;
+            }
 
             if (!string.IsNullOrEmpty(details))
             {

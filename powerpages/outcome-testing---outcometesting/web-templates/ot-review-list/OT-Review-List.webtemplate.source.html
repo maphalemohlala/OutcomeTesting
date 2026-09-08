@@ -112,10 +112,54 @@
           <condition attribute="al_requirestaxreview" operator="eq" value="1" />
         {% else %}
           <condition attribute="al_requiresaqsreview" operator="eq" value="1" />
-          <condition attribute="al_requirestaxreview" operator="ne" value="1" />
         {% endif %}
       </filter>
     </link-entity>
+    {% comment %}
+      Which queue a Tax-then-AQS case belongs in, decided by what it still owes rather than
+      by the route alone.
+
+      The AQS queue used to ask the route for al_requirestaxreview ne 1, which excluded a
+      Tax-then-AQS case from it permanently - before its Tax check and, the reason this
+      changed, after it too. A passed Tax check returns the case to Queued (OutcomeRules
+      .NextCaseStatusForTax; HopsFor skips the Submitted hop precisely because the case is
+      not submitted, only its Tax review is), and the case then sat in a queue no AQS
+      checker could see while still being offered on the Tax page, where a second Tax
+      checker could pick up work already done.
+
+      The test is a *submitted* Tax review, not an open one. A queued case that nobody has
+      claimed has no review instance at all - ClaimCasePlugin creates it - so "no open Tax
+      review" is equally true before the Tax check and after it, and keying on that would
+      have put fresh Tax-then-AQS cases straight onto the AQS queue and broken BR-004's
+      ordering. "A Tax review has been submitted" separates the two states.
+
+        Tax queue - the route requires Tax and no Tax review has been submitted yet.
+        AQS queue - the route requires AQS, and either it never required Tax or the Tax
+                    review is in. BR-004's ordering is then enforced by the data rather
+                    than restated here.
+
+      An outer link asserted null on its alias is FetchXML's "no such row exists"; the OR
+      across two aliases is the same shape the case list uses for its outcome filter.
+
+      Nothing here is a boundary. ClaimCasePlugin re-reads the status and the route
+      server-side and refuses a claim this list should not have offered (NFR-SEC-01).
+    {% endcomment %}
+    <link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="taxdone">
+      <filter type="and">
+        <condition attribute="al_reviewtype" operator="eq" value="120910200" />
+        <condition attribute="al_submittedon" operator="not-null" />
+      </filter>
+    </link-entity>
+    <filter type="and">
+      {% if is_tax_queue %}
+        <condition entityname="taxdone" attribute="al_reviewinstanceid" operator="null" />
+      {% else %}
+        <filter type="or">
+          <condition entityname="route" attribute="al_requirestaxreview" operator="ne" value="1" />
+          <condition entityname="taxdone" attribute="al_reviewinstanceid" operator="not-null" />
+        </filter>
+      {% endif %}
+    </filter>
     <order attribute="al_duedate" />
   </entity>
 </fetch>
@@ -183,7 +227,8 @@
     <h2 class="ot-dialog__title" id="ot-claim-dialog-title">Start checks on this case?</h2>
     <p>
       You are about to start checks on <strong data-ot-claim-dialog-case></strong>. The case will be
-      assigned to you and will no longer be available for anyone else to pick up.
+      assigned to you and will no longer be available for anyone else to pick up. The checklist
+      opens straight away so you can start.
     </p>
     <p class="ot-dialog__actions">
       <button type="button" class="ot-btn" data-ot-claim-cancel>Cancel</button>
@@ -295,6 +340,7 @@
     if (!buttons.length) { return; }
 
     var contactId = '{{ user.id }}';
+    var reviewType = '{{ reviewtype }}';
     var dialog = document.querySelector('[data-ot-claim-dialog]');
     var dialogCase = document.querySelector('[data-ot-claim-dialog-case]');
     var cancel = document.querySelector('[data-ot-claim-cancel]');
@@ -309,7 +355,7 @@
       status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
     }
 
-    function friendlyError(raw) {
+    function friendlyError(raw, status) {
       var text = String(raw || '');
       var markers = ['PRECONDITION:', 'VALIDATION:', 'CONFLICT:'];
       for (var i = 0; i < markers.length; i += 1) {
@@ -318,14 +364,96 @@
           return text.substring(at + markers[i].length).trim();
         }
       }
-      // A user whose role carries no create permission lands here: the platform refuses
-      // before any of our code runs, so there is no prefix to branch on.
-      return 'We could not pick that case up. You may not have permission to run checks.';
+
+      /*
+       * Nothing our code raised, so the platform refused before ClaimCasePlugin ran. This
+       * used to answer "you may not have permission" for every such refusal, which sent
+       * the last two investigations down a permissions path when the fault was a payload
+       * the Web API could not parse - the wrong @odata.bind property names, answered 400.
+       * A 400 is never a permission problem, and an association refusal carries a code
+       * (90040105/90040106) that names the missing grant, so both are worth saying out
+       * loud rather than flattening into one guess.
+       */
+      if (status === 400) {
+        return 'The portal rejected the request before checking any permission, so nothing '
+          + 'was assigned. This is a fault in the page rather than in your account - please '
+          + 'report it.';
+      }
+
+      var code = /9004010[56]/.exec(text);
+      if (code) {
+        return 'This site is not allowed to link that case to your account (error ' + code[0]
+          + '), so nothing was assigned. Your reviewer role is not the problem - please report it.';
+      }
+
+      if (status === 401 || status === 403) {
+        return 'We could not pick that case up. You may not have permission to run checks.';
+      }
+
+      return 'We could not pick that case up, and nothing was assigned. Please try again, and '
+        + 'report it if it keeps happening.';
     }
 
     function close() {
       if (dialog.open) { dialog.close(); }
       pending = null;
+    }
+
+    /*
+     * The checklist this claim just created, opened straight away.
+     *
+     * A checker picks a case up in order to check it, so landing them back on the queue
+     * costs a second hunt for the row they were already looking at. The PATCH cannot
+     * carry the answer: the page wrote a contact, and the review instance is created
+     * downstream by ClaimCasePlugin. It exists by the time the write returns, though -
+     * the plug-in is a synchronous step in that transaction - so the id is read back here
+     * rather than guessed.
+     *
+     * Narrowed to this discipline and to an open review, because a Tax-then-AQS case can
+     * carry two instances and the one just created is the unsubmitted one for the queue
+     * this page renders.
+     *
+     * A failed lookup is not a failed claim. The case IS assigned by this point, so the
+     * fallback is the refreshed list - never an error message about work that was done.
+     */
+    function openChecklist(caseId) {
+      var filter = '_al_outcomecaseid_value eq ' + caseId
+        + ' and _al_assignedcontactid_value eq ' + contactId
+        + ' and al_reviewtype eq ' + reviewType
+        + ' and al_submittedon eq null';
+
+      var url = '/_api/al_reviewinstances?$select=al_reviewinstanceid'
+        + '&$filter=' + encodeURIComponent(filter)
+        + '&$orderby=' + encodeURIComponent('createdon desc')
+        + '&$top=1';
+
+      function fallback() {
+        window.setTimeout(function () { window.location.reload(); }, 800);
+      }
+
+      var lookup = new XMLHttpRequest();
+      lookup.open('GET', url, true);
+      lookup.setRequestHeader('Accept', 'application/json');
+
+      lookup.onreadystatechange = function () {
+        if (lookup.readyState !== 4) { return; }
+        if (lookup.status < 200 || lookup.status >= 300) { fallback(); return; }
+
+        var id = null;
+        try {
+          var body = JSON.parse(lookup.responseText);
+          if (body && body.value && body.value.length > 0) {
+            id = body.value[0].al_reviewinstanceid;
+          }
+        } catch (error) {
+          id = null;
+        }
+
+        if (!id) { fallback(); return; }
+        window.location.href = '/review?id=' + encodeURIComponent(id);
+      };
+
+      lookup.send();
     }
 
     function claim(button) {
@@ -337,13 +465,28 @@
       button.disabled = true;
       show('Assigning the case to you...', 'info');
 
-      var payload = {};
-      payload['al_outcomecaseid@odata.bind'] = '/al_outcomecases(' + button.getAttribute('data-case-id') + ')';
-      payload['al_assignedcontactid@odata.bind'] = '/contacts(' + contactId + ')';
+      /*
+       * One text column on the checker's own contact row - not an al_caseassignment carrying
+       * two @odata.bind lookups, which is what this used to send.
+       *
+       * Power Pages refused that association with 90040106 naming al_outcomecase, and went
+       * on refusing it through three verified permission repairs: AppendTo on the case,
+       * a contact permission, and the Tax and AQS Reviewer roles granted on both sides of
+       * the association. That is the same refusal the answering module hit, and the same
+       * resolution it reached (AD-053): the browser writes a trigger column and the server
+       * does the association. ClaimRequestPlugin creates the assignment as the application
+       * user, and ClaimCasePlugin then runs exactly as before.
+       *
+       * PATCHing your own contact is also a better boundary than the payload this replaces.
+       * The site's contact permission is Self-scoped, so this request can only ever reach
+       * the signed-in user's row, and the plug-in takes the claimant from the row it was
+       * given rather than from anything sent here.
+       */
+      var payload = { al_claimrequest: button.getAttribute('data-case-id') };
 
       window.shell.getTokenDeferred().done(function (token) {
         var request = new XMLHttpRequest();
-        request.open('POST', '/_api/al_caseassignments', true);
+        request.open('PATCH', '/_api/contacts(' + contactId + ')', true);
         request.setRequestHeader('Content-Type', 'application/json');
         request.setRequestHeader('__RequestVerificationToken', token);
 
@@ -351,12 +494,12 @@
           if (request.readyState !== 4) { return; }
 
           if (request.status >= 200 && request.status < 300) {
-            show('Assigned to you. Reloading...', 'success');
-            window.setTimeout(function () { window.location.reload(); }, 800);
+            show('Assigned to you. Opening the checklist...', 'success');
+            openChecklist(button.getAttribute('data-case-id'));
             return;
           }
 
-          show(friendlyError(request.responseText), 'error');
+          show(friendlyError(request.responseText, request.status), 'error');
           button.disabled = false;
         };
 
