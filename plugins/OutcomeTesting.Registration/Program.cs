@@ -231,6 +231,11 @@ if (args.Length >= 2 && args[0].Equals("createnotificationtable", StringComparis
     return CreateNotificationTable(args[1], args.Length > 2 ? args[2] : "OutcomeTesting");
 }
 
+if (args.Length >= 2 && args[0].Equals("addmemocolumn", StringComparison.OrdinalIgnoreCase))
+{
+    return AddMemoColumn(args);
+}
+
 if (args.Length >= 3 && args[0].Equals("restoretablepermissions", StringComparison.OrdinalIgnoreCase))
 {
     return RestoreTablePermissions(args[1], args[2]);
@@ -574,6 +579,26 @@ int Relationships(string orgUrl, string entity)
             + "  intersect=" + many.IntersectEntityName
             + "  " + many.Entity1LogicalName + "." + many.Entity1IntersectAttribute
             + " <-> " + many.Entity2LogicalName + "." + many.Entity2IntersectAttribute);
+    }
+
+    /*
+     * The lookups, and — the reason this block exists — the navigation property name each
+     * one is addressed by.
+     *
+     * `<attribute>@odata.bind` does NOT take the lookup's logical name. It takes the
+     * referencing navigation property, which carries the relationship's own casing and is
+     * case-sensitive. Guessing it from the logical name produces a payload the Web API
+     * rejects as malformed, and the portal answers 400 with nothing that names the
+     * property. Two portal write paths were built on that guess.
+     */
+    Console.WriteLine($"{entity} many-to-one (lookups):");
+    foreach (var one in response.EntityMetadata.ManyToOneRelationships.OrderBy(r => r.ReferencingAttribute))
+    {
+        Console.WriteLine(
+            "  " + one.ReferencingAttribute
+            + "  -> " + one.ReferencedEntity
+            + "  @odata.bind name=" + one.ReferencingEntityNavigationPropertyName
+            + "  (" + one.SchemaName + ")");
     }
 
     return 0;
@@ -1365,6 +1390,101 @@ int SetSecurityStamp(string[] a)
 //
 // An authentication setting decides who can get into the portal at all, hence --confirm
 // and the repeated org URL. Use an empty string to clear a setting.
+/// <summary>
+/// Adds one multiline text column to an existing table.
+///
+/// Written for `al_answerrequest`, the second trigger column on `al_reviewinstance`: the
+/// portal page PATCHes a payload onto it and a synchronous plug-in does the real write,
+/// because the Power Pages Web API refuses the write the page would otherwise make. That
+/// pattern now has two instances and will have more, so the column that carries it is
+/// worth a command rather than a click in the maker portal — a click leaves nothing behind
+/// that says the column was deliberate, and `al_submitrequested` is already in the solution
+/// with no record of who added it or why.
+///
+/// `--confirm`-gated like `setsitesetting`, for the same reason: this writes metadata to a
+/// live environment, and metadata changes are not quietly reversible.
+///
+/// It refuses a column that already exists rather than trying to alter it. Widening a
+/// column is a different operation with different consequences, and a command that silently
+/// did either would make "it ran clean" mean two different things.
+/// </summary>
+int AddMemoColumn(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 6 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This writes metadata to a live environment. Re-run as: addmemocolumn <orgUrl> " +
+            "<entityLogicalName> <SchemaName> <displayName> <maxLength> [<description>] --confirm <orgUrl>");
+        return 1;
+    }
+
+    var entity = a[2].Trim();
+    var schemaName = a[3].Trim();
+    var displayName = a[4];
+
+    int maxLength;
+    if (!int.TryParse(a[5], out maxLength) || maxLength < 1 || maxLength > 1048576)
+    {
+        Console.Error.WriteLine("Max length must be between 1 and 1048576.");
+        return 1;
+    }
+
+    var description = a.Length > 6 && !a[6].StartsWith("--", StringComparison.Ordinal) ? a[6] : string.Empty;
+    var logicalName = schemaName.ToLowerInvariant();
+
+    using var svc = Connect(orgUrl);
+
+    var existing = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    if (existing.EntityMetadata.Attributes.Any(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)))
+    {
+        Console.Error.WriteLine($"'{entity}' already has a column '{logicalName}'. Nothing was changed.");
+        return 1;
+    }
+
+    svc.Execute(new CreateAttributeRequest
+    {
+        SolutionUniqueName = SolutionUniqueName,
+        EntityName = entity,
+        Attribute = new MemoAttributeMetadata
+        {
+            SchemaName = schemaName,
+            LogicalName = logicalName,
+            MaxLength = maxLength,
+            Format = StringFormat.TextArea,
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+            DisplayName = NotificationTable.Text(displayName),
+            Description = NotificationTable.Text(description),
+        },
+    });
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    var after = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    var created = after.EntityMetadata.Attributes.FirstOrDefault(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)) as MemoAttributeMetadata;
+
+    if (created == null)
+    {
+        Console.Error.WriteLine($"'{logicalName}' was not found on '{entity}' after the create returned. Investigate before relying on it.");
+        return 1;
+    }
+
+    Console.WriteLine(
+        $"Created {entity}.{created.LogicalName} (memo, max {created.MaxLength}) in solution {SolutionUniqueName}.");
+    return 0;
+}
+
 int SetSiteSetting(string[] a)
 {
     var orgUrl = a[1];
