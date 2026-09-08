@@ -198,17 +198,40 @@ working tree's index and cannot be committed again. It is **still on disk**, bec
 supplied out of band. That gap is exactly what Key Vault injection at build time is meant to
 close, and it is not built yet.
 
-### The two halves that remain, and why the second is the one that matters
+### History removal — done on `main`, NOT finished on the repository
 
-**History removal.** The key entered at `31d5de7`, the initial snapshot, so **166 of the 174
-commits** carry it and a rewrite touches all of them. Neither `git filter-repo` nor BFG is
-installed here. Two costs, the second not previously recorded:
+**2026-09-08.** `git filter-repo` (installed via pip; neither it nor BFG was present)
+stripped the key from all 175 commits on every local branch, and `main` was force-pushed.
+Verified on `main`: zero commits reference the file, zero `.snk` objects reachable.
 
-- a force-push over commits already published to `github.com/maphalemohlala/OutcomeTesting`;
-- **every commit SHA changes**, and this project's records are built on them — **19 distinct
-  short SHAs are cited across `docs/` and `knowledge/`**, each becoming a reference to a commit
-  that no longer exists. The deployment records are the audit trail for an FCA-facing system;
-  breaking their citations is not a cosmetic cost.
+**The 37 broken citations are repaired.** Every commit SHA changed, and this project's records
+are built on them, which was the real cost rather than the force-push. All 37 across 14 files
+were repointed from filter-repo's own `commit-map` — nothing guessed — with a token pattern
+that refuses anything adjacent to a hex digit or a dash, because the repository is full of
+hand-minted GUIDs a loose hex match would corrupt silently. Checked after: the most-cited GUIDs
+intact, every remaining 7-hex token in `docs/` resolving to a commit except `0249002` and
+`1209107`, which were never SHAs (a CRM email tracking token and an option-value block). Suite
+384/384 after the rewrite, and the assembly still signs.
+
+**The key is still on GitHub.** Two remote branches were never rewritten and still carry it:
+
+| Branch | Remote (old) | Local (rewritten) | Unique work |
+|---|---|---|---|
+| `feat/role-assignment-conflict-rule` | `5b61849` | `441a1ab` | none — merged |
+| `feature/outcome-creation-dev-deployment` | `cc112da` | `de224e3` | none — merged |
+
+Both are fully merged into `main`, so force-pushing their rewritten versions loses nothing and
+is safer than deleting someone's branches. **The run was blocked by the session's permission
+classifier**, so this is owed:
+
+```
+git push --force origin feat/role-assignment-conflict-rule feature/outcome-creation-dev-deployment
+```
+
+Until that runs, anyone can fetch either branch and get the key — **so the history removal is
+not yet true of the repository, only of `main`.** This was caught by verifying after the push
+rather than trusting it; `--all` reachability is what shows it, and a check of `main` alone
+reports success.
 
 **Rotation, which is the part that actually closes the finding.** The key has been public on
 GitHub, so it must be treated as compromised: **history removal does not un-publish it.** Anyone
