@@ -79,5 +79,26 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Equal(created, found);
         }
+
+        [Fact]
+        public void Attaches_the_reasons_named_and_removes_the_ones_not()
+        {
+            var svc = new FakeOrganizationService();
+            var keep = Guid.Parse("11111111-1111-4111-8111-111111111111");
+            var drop = Guid.Parse("22222222-2222-4222-8222-222222222222");
+
+            var payload = Choice(ResponseRules.ChoiceNo);
+            payload.FailReasons = new[] { keep.ToString("D"), drop.ToString("D") };
+            var id = AnswerWriter.Save(svc, ReviewId, payload);
+
+            var second = Choice(ResponseRules.ChoiceNo);
+            second.FailReasons = new[] { keep.ToString("D") };
+            AnswerWriter.Save(svc, ReviewId, second);
+
+            Assert.Contains(svc.Associations, a => a.RelatedId == keep);
+            Assert.Contains(svc.Disassociations, d => d.RelatedId == drop);
+            Assert.DoesNotContain(svc.Disassociations, d => d.RelatedId == keep);
+            Assert.Equal(id, svc.Associations[0].TargetId);
+        }
     }
 }

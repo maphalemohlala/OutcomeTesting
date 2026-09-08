@@ -100,7 +100,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Contains(
                 svc.Associations,
-                a => a.Item1 == WebRoleRegistry.ContactRelationship);
+                a => a.Relationship == WebRoleRegistry.ContactRelationship);
         }
 
         [Fact]
@@ -113,7 +113,7 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.False(result.Adopted);
             Assert.Contains(
                 svc.Disassociations,
-                d => d.Item1 == WebRoleRegistry.ContactRelationship);
+                d => d.Relationship == WebRoleRegistry.ContactRelationship);
         }
 
         [Fact]

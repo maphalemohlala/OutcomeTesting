@@ -523,13 +523,19 @@ namespace OutcomeTesting.Plugins.Tests
             return new EntityCollection(results);
         }
 
-        /// <summary>Every Associate call, as (relationship, target, related).</summary>
-        public List<Tuple<string, EntityReference, EntityReference>> Associations { get; } =
-            new List<Tuple<string, EntityReference, EntityReference>>();
+        /// <summary>One Associate or Disassociate call, as the fake recorded it.</summary>
+        public sealed class Link
+        {
+            public Guid TargetId { get; set; }
+            public Guid RelatedId { get; set; }
+            public string Relationship { get; set; }
+        }
 
-        /// <summary>Every Disassociate call, as (relationship, target, related).</summary>
-        public List<Tuple<string, EntityReference, EntityReference>> Disassociations { get; } =
-            new List<Tuple<string, EntityReference, EntityReference>>();
+        /// <summary>Every Associate call the code under test issued, in order.</summary>
+        public List<Link> Associations { get; } = new List<Link>();
+
+        /// <summary>Every Disassociate call the code under test issued, in order.</summary>
+        public List<Link> Disassociations { get; } = new List<Link>();
 
         /// <summary>
         /// The associations that actually EXIST, as opposed to the calls that were made.
@@ -585,6 +591,16 @@ namespace OutcomeTesting.Plugins.Tests
                 "powerpagecomponentid", webRoleId);
         }
 
+        /// <summary>
+        /// The N:N relationship AnswerWriter.ReconcileFailReasons associates/disassociates
+        /// on, and the intersect entity backing it (src/Other/Relationships/al_FailReason.xml,
+        /// IntersectEntityName). Unlike WebRoleRegistry's hook above - where the intersect
+        /// table happens to share its name with the relationship - this one does not, so it
+        /// gets its own pair of constants rather than overloading SeedIntersectRow.
+        /// </summary>
+        private const string FailReasonRelationship = "al_failreason_response";
+        private const string FailReasonIntersect = "al_al_failreason_al_response";
+
         public void Associate(
             string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities)
         {
@@ -600,12 +616,28 @@ namespace OutcomeTesting.Plugins.Tests
 
                 // Logged only once the write has been accepted, so a test asserting on
                 // Associations is asserting on what happened rather than on what was tried.
-                Associations.Add(Tuple.Create(
-                    relationship.SchemaName, new EntityReference(entityName, entityId), related));
+                Associations.Add(new Link
+                {
+                    TargetId = entityId,
+                    RelatedId = related.Id,
+                    Relationship = relationship.SchemaName,
+                });
 
                 if (relationship.SchemaName == WebRoleRegistry.ContactRelationship)
                 {
                     SeedIntersectRow(entityId, related.Id);
+                }
+                else if (relationship.SchemaName == FailReasonRelationship)
+                {
+                    // Seeded as a real intersect row - keyed the way the platform's
+                    // al_al_failreason_al_response table is - so CurrentReasons can read it
+                    // back through the same RetrieveMultiple path AnswerWriter uses against
+                    // real Dataverse, rather than through a shortcut only the fake knows.
+                    Seed(
+                        FailReasonIntersect,
+                        Guid.NewGuid(),
+                        "al_failreasonid", related.Id,
+                        "al_responseid", entityId);
                 }
             }
         }
@@ -620,8 +652,12 @@ namespace OutcomeTesting.Plugins.Tests
                 // No fault when the pair is not associated: see the note on _associated.
                 _associated.Remove(AssociationKey(relationship.SchemaName, entityId, related.Id));
 
-                Disassociations.Add(Tuple.Create(
-                    relationship.SchemaName, new EntityReference(entityName, entityId), related));
+                Disassociations.Add(new Link
+                {
+                    TargetId = entityId,
+                    RelatedId = related.Id,
+                    Relationship = relationship.SchemaName,
+                });
 
                 if (relationship.SchemaName == WebRoleRegistry.ContactRelationship)
                 {
@@ -629,6 +665,19 @@ namespace OutcomeTesting.Plugins.Tests
                     var stale = table.Values
                         .Where(r => Equals(r.GetAttributeValue<object>("contactid"), entityId)
                                  && Equals(r.GetAttributeValue<object>("powerpagecomponentid"), related.Id))
+                        .Select(r => r.Id)
+                        .ToList();
+                    foreach (var id in stale)
+                    {
+                        table.Remove(id);
+                    }
+                }
+                else if (relationship.SchemaName == FailReasonRelationship)
+                {
+                    var table = Table(FailReasonIntersect);
+                    var stale = table.Values
+                        .Where(r => Equals(r.GetAttributeValue<object>("al_failreasonid"), related.Id)
+                                 && Equals(r.GetAttributeValue<object>("al_responseid"), entityId))
                         .Select(r => r.Id)
                         .ToList();
                     foreach (var id in stale)
