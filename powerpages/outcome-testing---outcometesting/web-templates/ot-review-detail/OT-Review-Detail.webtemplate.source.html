@@ -10,16 +10,18 @@
   renders the wording, order and response type that applied when it was
   answered (BR-013, FR-030, FR-031).
 
-  Answerable by the assigned checker (AD-053). Answers travel as a JSON payload on
-  al_reviewinstance.al_answerrequest rather than as a direct al_response write - Power
-  Pages refuses the create's @odata.bind association, and a fail reason's $ref
-  associate, with error 90040106 regardless of table permissions, so AnswerRequestPlugin
-  parses the payload and AnswerWriter does the al_response create/update instead.
-  Submission still goes through a cloud flow because the Portals Web API cannot invoke
-  an action; that part has not changed. Every rule that matters - the submission lock,
-  the AD-023 column match, the option subset and AD-020 section ownership - is
-  enforced by ResponseGuardPlugin, so nothing here is a security boundary
-  (NFR-SEC-01).
+  Answerable by the assigned checker (AD-053). Both writes on this page go through an
+  allowlisted trigger column and a synchronous plug-in rather than the Web API's own
+  create/update/action verbs, for two different reasons. Answering PATCHes a JSON payload
+  onto al_reviewinstance.al_answerrequest, because Power Pages refuses the al_response
+  create's @odata.bind association - and a fail reason's $ref associate - with error
+  90040106 regardless of table permissions; AnswerRequestPlugin parses the payload and
+  AnswerWriter does the al_response create/update instead. Submitting PATCHes
+  al_reviewinstance.al_submitrequested, because the Portals Web API cannot invoke the
+  al_SubmitReview Custom API at all; SubmitRequestPlugin does that work instead of a Power
+  Automate flow. Every rule that matters - the submission lock, the AD-023 column match,
+  the option subset and AD-020 section ownership - is enforced by ResponseGuardPlugin, so
+  nothing here is a security boundary (NFR-SEC-01).
 {% endcomment %}
 
 {% assign review_id = request.params['id'] %}
@@ -438,9 +440,13 @@
            * the Web API, and AnswerRequestPlugin parses it and calls AnswerWriter to do the
            * actual al_response create-or-update and reason reconciliation.
            *
-           * This still needs no cloud flow, and a PATCH still cannot invoke an action,
-           * which is why al_SubmitReview still goes through Power Automate and answering
-           * still does not. It also keeps a debounced edit from spending a flow run.
+           * This still needs no cloud flow. Submitting reaches Dataverse this same way now
+           * too: SubmitRequestPlugin fires off one allowlisted boolean
+           * (al_reviewinstance.al_submitrequested) rather than a Power Automate flow, the
+           * same AD-053 trigger-column pattern used here - a different reason (the Web API
+           * cannot invoke the al_SubmitReview action at all) landing on the same shape.
+           * There is no flow run left to spare by debouncing; it now simply keeps a fast
+           * typist from spending a synchronous plug-in execution on every keystroke.
            *
            * Every rule that matters - the submission lock, the AD-023 column match, the
            * option subset and AD-020 section ownership - is enforced in the plug-in. This
