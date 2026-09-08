@@ -37,7 +37,6 @@ namespace OutcomeTesting.Plugins
         private const string OutAuditEventId = "AuditEventId";
         private const string OutConflict = "Conflict";
 
-        private const string RoleEntity = "al_role";
         private const string MappingEntity = "al_userrolemapping";
         private const string PermissionEntity = "al_pagepermission";
 

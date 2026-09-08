@@ -62,9 +62,18 @@ namespace OutcomeTesting.Plugins
             string code;
             if (!string.IsNullOrWhiteSpace(roleCode))
             {
-                // Custom role (AD-044): identified by its al_role business code, not the picklist.
+                // A role code names EITHER a web role (the registry since AD-087) or an
+                // AD-044 al_role, so both are accepted — the same rule al_AssignUserRole
+                // applies.
+                //
+                // This asked al_role alone, which refused every web role: none of the eleven
+                // al_role rows carries an `AL Portal - *` code, so configuring a permission
+                // for any of the roles the app actually offers failed with "the role code
+                // does not match an active role". It was invisible because the 52 web role
+                // rules in DEV were written directly by `seedwebroles`, never through this
+                // command — the seeding is what stopped anyone exercising the path.
                 var normalizedCode = roleCode.Trim();
-                if (!AssignUserRolePlugin.CustomRoleExists(systemService, normalizedCode))
+                if (!AssignUserRolePlugin.RoleCodeExists(systemService, normalizedCode))
                 {
                     throw new InvalidPluginExecutionException(
                         CommandHelpers.ValidationPrefix + "The role code does not match an active role.");

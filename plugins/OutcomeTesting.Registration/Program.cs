@@ -120,6 +120,12 @@ using System.Text.Json;
 //   does not write the review itself: a hand-written one would prove the pages render, not
 //   that routing produces the right check.
 //
+// Delete a table: dotnet run -- deletetable <orgUrl> <logicalName> --confirm <orgUrl>
+//   Deletes a custom table. IRREVERSIBLE. Refuses unless it is custom, unmanaged and empty.
+//   It cannot check the thing that actually breaks an environment — whether deployed code
+//   still reads the table — because a plug-in's RetrieveMultiple is not a dependency
+//   Dataverse can see. Retire the read, deploy that, then delete.
+//
 // Delete a relationship: dotnet run -- deleterelationship <orgUrl> <schemaName> --confirm <orgUrl>
 //   Deletes a custom relationship and, for a many-to-many, the intersect table behind it.
 //   IRREVERSIBLE — re-creating one later mints a different table — so it refuses unless the
@@ -377,6 +383,11 @@ if (args.Length >= 2 && args[0].Equals("routecase", StringComparison.OrdinalIgno
 if (args.Length >= 2 && args[0].Equals("deleterelationship", StringComparison.OrdinalIgnoreCase))
 {
     return DeleteRelationship(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("deletetable", StringComparison.OrdinalIgnoreCase))
+{
+    return DeleteTable(args);
 }
 
 if (args.Length < 1)
@@ -743,6 +754,97 @@ List<string> RolesOf(IOrganizationService svc, Guid contactId)
         .Where(n => n.Length > 0)
         .Distinct()
         .ToList();
+}
+
+// Deletes a custom table.
+//
+// The most destructive thing in this tool, and the checks are the point: the table has to
+// exist, be custom, be unmanaged, and hold no rows. A table with rows in it is somebody's
+// data whatever a register says it is.
+//
+// It will not check the one thing that actually breaks an environment — whether deployed
+// code still reads the table. Dataverse refuses a delete that would orphan a relationship
+// or a dependent component, but a plug-in issuing RetrieveMultiple against a table that has
+// gone is not a dependency it can see; it is a fault at run time, on whatever path happens
+// to read first. Retire the read, deploy that, and only then delete.
+int DeleteTable(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 3 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This deletes a table and cannot be undone. Re-run as: " +
+            "deletetable <orgUrl> <logicalName> --confirm <orgUrl>");
+        return 1;
+    }
+
+    var logicalName = a[2].Trim().ToLowerInvariant();
+
+    using var svc = Connect(orgUrl);
+
+    EntityMetadata metadata;
+    try
+    {
+        metadata = ((RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+        {
+            LogicalName = logicalName,
+            EntityFilters = EntityFilters.Entity,
+        })).EntityMetadata;
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"No table named '{logicalName}': {ex.Message}");
+        return 1;
+    }
+
+    Console.WriteLine(
+        $"{logicalName}: custom={metadata.IsCustomEntity}, managed={metadata.IsManaged}");
+
+    if (metadata.IsManaged == true)
+    {
+        Console.Error.WriteLine("It is managed here, so only the solution that owns it can remove it.");
+        return 1;
+    }
+
+    if (metadata.IsCustomEntity != true)
+    {
+        Console.Error.WriteLine("It is a system table, not a custom one. Refusing.");
+        return 1;
+    }
+
+    var rows = svc.RetrieveMultiple(new QueryExpression(logicalName)
+    {
+        ColumnSet = new ColumnSet(false),
+        TopCount = 1,
+    }).Entities.Count;
+
+    if (rows > 0)
+    {
+        Console.Error.WriteLine($"'{logicalName}' holds rows. Refusing — deleting the table deletes them.");
+        return 1;
+    }
+
+    Console.WriteLine("  it holds no rows.");
+
+    svc.Execute(new DeleteEntityRequest { LogicalName = logicalName });
+    Console.WriteLine($"Deleted {logicalName}.");
+
+    // Read back rather than trusting the call.
+    try
+    {
+        svc.Execute(new RetrieveEntityRequest
+        {
+            LogicalName = logicalName,
+            EntityFilters = EntityFilters.Entity,
+        });
+        Console.Error.WriteLine("FAIL: it is still there.");
+        return 2;
+    }
+    catch
+    {
+        Console.WriteLine("Confirmed gone.");
+        return 0;
+    }
 }
 
 // Deletes a custom relationship, and the intersect table behind a many-to-many.

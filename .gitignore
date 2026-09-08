@@ -33,3 +33,10 @@ plugins/**/obj/
 
 # vendored obra/superpowers skills - installed locally, not committed
 /.github/skills/
+
+# Plug-in signing key (OD-025). Untracked 2026-09-08: it is a private key blob and it
+# reproduces the PublicKeyToken the registration tool expects. The file must still exist
+# here for the build - SignAssembly is on and the csproj names it - so a fresh clone
+# cannot build until the key is supplied out of band. That is the gap Key Vault injection
+# at build time is meant to close.
+plugins/OutcomeTesting.Plugins/OutcomeTesting.Plugins.snk

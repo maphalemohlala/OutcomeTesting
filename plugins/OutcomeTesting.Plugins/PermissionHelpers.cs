@@ -28,8 +28,6 @@ namespace OutcomeTesting.Plugins
 
         private const string MappingEntity = "al_userrolemapping";
         private const string PermissionEntity = "al_pagepermission";
-        private const string UserEntity = "al_user";
-        private const string ActiveAttr = "al_isactive";
 
         public static void EnsureAppPermission(
             IOrganizationService systemService,
@@ -126,21 +124,31 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// True when the caller has an al_user registry row that is active, or no row at
-        /// all. "No row" stays permissive on purpose: al_user is an application registry
-        /// that a Dataverse user can legitimately predate, and refusing there would lock
-        /// out anyone the registry has not caught up with. Only an explicit deactivation
-        /// withdraws access.
+        /// True when the caller has a contact registry row that is active, or no row at
+        /// all. "No row" stays permissive on purpose: a Dataverse user can legitimately
+        /// predate their contact, and refusing there would lock out anyone the registry has
+        /// not caught up with. Only an explicit deactivation withdraws access.
+        ///
+        /// This read used to ask <c>al_user</c>, and that was a live defect rather than
+        /// tidiness owed. <see cref="SetUserActivePlugin"/> has written the **contact's**
+        /// statecode since AD-085, while this asked a table migrated to zero rows the same
+        /// day — and the permissive rule turned an empty table into a blanket yes, so a
+        /// deactivated person kept full command access and nothing said so. OD-010 makes
+        /// deactivation the sanctioned alternative to deleting a leaver, which is exactly
+        /// the case it failed open on.
+        ///
+        /// Public so it can be driven directly by a test, matching WebRoleRegistry: the
+        /// defect was invisible from EnsureAppPermission, which needs a plug-in context.
         /// </summary>
-        private static bool IsRegisteredActive(IOrganizationService service, string email)
+        public static bool IsRegisteredActive(IOrganizationService service, string email)
         {
-            var query = new QueryExpression(UserEntity)
+            var query = new QueryExpression(ContactRegistry.Entity)
             {
-                ColumnSet = new ColumnSet(ActiveAttr),
+                ColumnSet = new ColumnSet(ContactRegistry.StateCodeAttr),
                 TopCount = 1,
                 Criteria = new FilterExpression(),
             };
-            query.Criteria.AddCondition("al_workemail", ConditionOperator.Equal, email);
+            query.Criteria.AddCondition(ContactRegistry.EmailAttr, ConditionOperator.Equal, email);
 
             var found = service.RetrieveMultiple(query).Entities;
             if (found.Count == 0)
@@ -148,7 +156,7 @@ namespace OutcomeTesting.Plugins
                 return true;
             }
 
-            return found[0].GetAttributeValue<bool?>(ActiveAttr) ?? true;
+            return ContactRegistry.IsActive(found[0]);
         }
 
         /// <summary>

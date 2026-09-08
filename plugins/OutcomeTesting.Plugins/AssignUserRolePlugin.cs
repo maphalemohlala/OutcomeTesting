@@ -71,6 +71,8 @@ namespace OutcomeTesting.Plugins
                 webRole = WebRoleRegistry.FindByName(systemService, normalizedCode);
                 if (webRole == null && !CustomRoleExists(systemService, normalizedCode))
                 {
+                    // Same rule as RoleCodeExists, kept inline because the web role entity is
+                    // needed below and re-reading it to share one boolean would cost a query.
                     throw new InvalidPluginExecutionException(
                         CommandHelpers.ValidationPrefix + "The role code does not match an active role.");
                 }
@@ -227,6 +229,21 @@ namespace OutcomeTesting.Plugins
                     " is granted automatically to every signed-in user, so it cannot be " +
                     "assigned as an application role (AD-090).");
             }
+        }
+
+        /// <summary>
+        /// True when a role code names something assignable — a web role (the registry since
+        /// AD-087) or an AD-044 <c>al_role</c>.
+        ///
+        /// The order matters and the fallback is deliberate: web roles are what the app now
+        /// offers, and <c>al_role</c> stays valid so nothing already assigned breaks. It is
+        /// also what lets the legacy table be retired later — once nothing carries an
+        /// <c>al_role</c>-only code, dropping the second half changes no behaviour.
+        /// </summary>
+        public static bool RoleCodeExists(IOrganizationService service, string roleCode)
+        {
+            return WebRoleRegistry.FindByName(service, roleCode) != null
+                || CustomRoleExists(service, roleCode);
         }
 
         /// <summary>True when an al_role exists with the given business code.</summary>

@@ -23,7 +23,6 @@ namespace OutcomeTesting.Plugins
         private const string OutAuditEventId = "AuditEventId";
         private const string OutConflict = "Conflict";
 
-        private const string RoleEntity = "al_role";
         private const int CommandCreateRole = 120910784;
 
         public CreateRolePlugin(string unsecureConfiguration, string secureConfiguration)

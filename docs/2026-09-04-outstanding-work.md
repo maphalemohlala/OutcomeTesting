@@ -113,26 +113,42 @@ Two further references are **dead code** and can go regardless: `CreateRolePlugi
 and `UpdateRolePlugin.RoleEntity` both declare `"al_role"` while the code uses
 `WebRoleRegistry.RoleEntity` (`mspp_webrole`).
 
-**So the order is fixed, and it is not one step:**
+**Decided 2026-09-08: move it to the Contact's `statecode`. Done, and it fixed a live defect
+rather than tidying one away.**
 
-1. Remove the two live reads, with a decision on what replaces `IsRegisteredActive` (below).
-2. Rebuild and `pac plugin push` — the app must be running code that does not read the tables
-   **before** they go.
-3. Delete `al_User` and `al_Role`.
-4. AD-013 round trip so `src/Entities/al_User` and `src/Entities/al_Role` go with them.
+`SetUserActivePlugin` has written the contact's `statecode`/`statuscode` since AD-085 — so
+deactivation *was* already on Contact, and only the **check** was left behind on `al_user`.
+With that table at zero rows and the read permissive on absence, **deactivating a leaver
+withdrew nothing**: they kept full command access and nothing anywhere said so. OD-010 makes
+deactivation the sanctioned alternative to deleting a leaver, which is exactly the case it
+failed open on.
 
-**The decision this needs is not "delete or keep".** It is what happens to deactivation.
-`IsRegisteredActive` is the only thing `al_SetUserActive` acts on: withdrawing it removes the
-ability to deactivate a person in the app at all, unless that moves to the Contact's own
-`statecode`. Pick one:
+`PermissionHelpers.IsRegisteredActive` now reads `contact` and `ContactRegistry.IsActive`, and
+is public so a test can drive it — the defect was unreachable from `EnsureAppPermission`, which
+needs a plug-in context. Five tests pin it, including that rows in the retired registry do not
+decide. Suite **384**, up from 376. Assembly deployed by `registerall`; 25 Custom APIs, all
+solution members.
 
-- **Move it to Contact `statecode`** — the registry is Contact since AD-085, so this is where it
-  belongs; `al_SetUserActive` keeps working and starts meaning something again.
-- **Drop deactivation** — smaller change, but `al_SetUserActive` becomes a command that reports
-  success and does nothing, which is worse than not having it.
+**A second live defect surfaced on the way, and is fixed.** `al_SetPagePermission` validated a
+role code against `al_role` **alone**, and none of the eleven `al_role` rows carries an
+`AL Portal - *` code — so configuring a page permission for any role the app actually offers
+was refused with "the role code does not match an active role". It stayed hidden because the 52
+web role rules in DEV were written directly by `seedwebroles`, never through the command.
+Both call sites now use `AssignUserRolePlugin.RoleCodeExists`, which accepts a web role or a
+legacy `al_role`.
 
-**Done when:** the four steps above have run, or the tables are recorded as retained-and-empty
-with the two live reads left in place so nobody re-raises it.
+### What is left of OD-037
+
+- **`al_User`** — 0 rows, no longer read by any deployed code. Ready to delete; the
+  `deletetable` command exists and is guarded (custom, unmanaged, empty). **The run was blocked
+  by the session's permission classifier**, so it stays owed:
+  `deletetable <orgUrl> al_user --confirm <orgUrl>`
+- **`al_Role` is NOT ready, and the register was wrong to imply it was.** It holds **11 rows** —
+  the old vocabulary, `ROLE-ADMINISTRATOR`, `ROLE-AQS-CHECKER` and so on — and it is still read
+  as the fallback half of `RoleCodeExists`. Deleting it would fault that read for any code that
+  is not a web role. No active `al_userrolemapping` uses a legacy code, so dropping the fallback
+  is probably safe, but that is a behaviour decision and it needs taking before the table goes.
+- **The AD-013 round trip** afterwards, so `src/Entities/al_User` goes with it.
 
 ### 1.4 The unused `al_contact_al_outcomecase` intersect
 
@@ -155,17 +171,17 @@ change so `src/` does not drift from DEV.
 
 **Done when:** the relationship is gone from DEV and from `src/`.
 
-## 2. Name PP-15's other four events
+## 2. PP-15's other events — DESCOPED 2026-09-08
 
-**Owner:** Product owner. **Effort:** additive once named.
+**Project owner direction: the five built events are what is wanted; the remainder are not
+needed.** They were never named in any requirement, knowledge file or design document
+(OD-030 gap (a)), and they are now not going to be.
 
-PP-15 says nine events; five are built, being the five AD-035 enumerates. The other four
-appear in no requirement, knowledge file or design document (OD-030 gap (a)). Adding option
-values later is additive and safe, which is why five shipped — but PP-15 is not met as
-written until someone names them.
-
-**Done when:** four events are named, with their recipients, and added to the option set and
-the emitters.
+The five that exist are the five AD-035 enumerates: allocation, submission, remediation
+assignment, sign-off outcome, rejection. PP-15 as originally written says nine; **it is met by
+five by direction**, which is a scope decision and not a gap. Nothing is owed here, and this
+item is kept only so the difference between the requirement text and the delivery is not
+re-raised as a defect.
 
 ## 3. OD-025 — the plug-in signing key is committed to the repository
 
@@ -176,25 +192,51 @@ the emitters.
 time is agreed; **rotation and history removal are not scheduled**, and the Key Vault does not
 close the finding while the committed key still reproduces the current token.
 
-Be clear about the shape of the cost, because it is what keeps deferring this: rotation
-changes the public key token and so requires re-registering every plug-in type in every
-environment, and history removal means a force-push over commits already published to
-`github.com/maphalemohlala/OutcomeTesting`. **Both get more expensive with every push** —
-eight more landed across 2026-09-04 to 2026-09-07.
+**2026-09-08, on project owner direction: the key is untracked and ignored.** It is out of the
+working tree's index and cannot be committed again. It is **still on disk**, because
+`SignAssembly` is on and the csproj names it — so a fresh clone cannot build until the key is
+supplied out of band. That gap is exactly what Key Vault injection at build time is meant to
+close, and it is not built yet.
 
-This is defence-in-depth, not a live exploit: strong-naming is not a .NET trust boundary and
-abusing it needs Dataverse deployment privilege. That is a reason to schedule it, not to keep
-deferring it.
+### The two halves that remain, and why the second is the one that matters
 
-## 4. OD-023 — support model: hours of cover and response targets
+**History removal.** The key entered at `be52b4a`, the initial snapshot, so **166 of the 174
+commits** carry it and a rewrite touches all of them. Neither `git filter-repo` nor BFG is
+installed here. Two costs, the second not previously recorded:
 
-**Owner:** Platform owner.
+- a force-push over commits already published to `github.com/maphalemohlala/OutcomeTesting`;
+- **every commit SHA changes**, and this project's records are built on them — **19 distinct
+  short SHAs are cited across `docs/` and `knowledge/`**, each becoming a reference to a commit
+  that no longer exists. The deployment records are the audit trail for an FCA-facing system;
+  breaking their citations is not a cosmetic cost.
 
-Owning teams are named (AQS and Tax) and escalation is human-triggered by direction, so
-**nothing fires on a timer** — which makes the hours of cover the only thing that tells a user
-when to expect a response. Still unstated: hours and response targets, split between
-portal-down and a single user blocked; and who the hand-off goes to when something needs a
-configuration or platform change, since AQS and Tax do not hold Power Pages or Dataverse admin.
+**Rotation, which is the part that actually closes the finding.** The key has been public on
+GitHub, so it must be treated as compromised: **history removal does not un-publish it.** Anyone
+who cloned or forked still holds it, and removing it from history changes nothing about that.
+Only a new key does.
+
+Rotation changes the `PublicKeyToken`, which changes the assembly identity, so Dataverse sees a
+**different assembly** — 31 plug-in types, 25 Custom APIs and 14 SDK steps all bind to the
+current one. DEV being the only environment makes this the cheapest it will ever be; it is still
+the largest single change left in the project.
+
+This remains defence-in-depth rather than a live exploit — strong-naming is not a .NET trust
+boundary and abusing it needs Dataverse deployment privilege. That is a reason to sequence it
+properly, not to treat untracking as the fix.
+
+**Done when:** a new key is generated, held in the Key Vault, injected at build time, and every
+plug-in type re-registered — with history removal decided separately on the SHA cost above.
+
+## 4. OD-023 — support model: OUT OF SCOPE 2026-09-08
+
+**Project owner direction: this is not in scope and is removed from the register.**
+
+Recorded rather than deleted outright, because the consequence is real and someone will meet
+it: owning teams are named (AQS and Tax) and escalation is human-triggered, so **nothing fires
+on a timer**. With no stated hours of cover or response targets, nothing tells a user when to
+expect a response, and there is no named hand-off for a change needing Power Pages or Dataverse
+admin — which AQS and Tax do not hold. That is now an accepted operating condition, not an open
+item.
 
 ## 5. OD-011 — Code Apps production readiness, tenant availability and licensing
 
