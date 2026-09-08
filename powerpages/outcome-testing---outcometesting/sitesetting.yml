@@ -101,10 +101,10 @@
   adx_name: Webapi/al_response/enabled
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a1
   adx_value: 'true'
-- adx_description: "Allowlist of columns the browser may write on al_response. Deliberately the four answer columns only: al_responsecode, al_name and both lookups stay off the list so the guard plug-in remains the sole authority for the alternate key (AD-053)."
+- adx_description: "Allowlist of columns the browser may write on al_response: the four answer columns, plus the two lookups the create binds. al_responsecode and al_name stay off the list, so the guard plug-in remains the sole authority for the alternate key (AD-053). The lookups were held off on the reasoning that an @odata.bind travels as a navigation property rather than a column and so escapes the allowlist. It does not - the setting governs the columns the Web API may act on however they are addressed, which is why Webapi/al_caseassignment/fields already lists al_outcomecaseid and al_assignedcontactid, and Webapi/al_signoff/fields already lists al_remediationactionid. al_response was the one write path that omitted its own, and the one whose create was refused. Listing them widens nothing the plug-in does not already police: ResponseGuardPlugin re-reads both, and the Parent-scoped table permission still confines the write to a review assigned to the caller."
   adx_name: Webapi/al_response/fields
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a2
-  adx_value: al_answertext,al_answerchoice,al_answerchoices,al_answerdate
+  adx_value: al_answertext,al_answerchoice,al_answerchoices,al_answerdate,al_reviewinstanceid,al_questionversionid
 - adx_description: "Exposes al_signoff to the portal Web API so a T&C Manager can attest to a completed remediation (PP-12, FR-023, BR-008). Sign-off is a create, which the Web API does support, so this needs no trigger column - and a separate table means create can be bound to the T&C Supervisor role alone."
   adx_name: Webapi/al_signoff/enabled
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a7
@@ -125,10 +125,10 @@
   adx_name: Webapi/al_reviewinstance/enabled
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a3
   adx_value: 'true'
-- adx_description: "Allowlist of columns the browser may write on al_reviewinstance. Deliberately the submit trigger alone: status, submitted-on and the assigned contact stay off the list so the plug-in remains the sole authority over what submission actually does."
+- adx_description: "Allowlist of columns the browser may write on al_reviewinstance. Two trigger columns: al_submitrequested, which SubmitRequestPlugin reads to drive submission; and al_answerrequest, which carries an answer payload consumed by AnswerRequestPlugin because the browser cannot create an al_response directly. Status, submitted-on and the assigned contact stay off the list so the plug-ins remain the sole authority."
   adx_name: Webapi/al_reviewinstance/fields
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a4
-  adx_value: al_submitrequested
+  adx_value: al_submitrequested,al_answerrequest
 - adx_description: "Exposes al_caseassignment to the portal Web API so a checker can pick a case up out of the shared queue (AD-076). A create, like the sign-off, so it needs no trigger column and can carry its own Contact-scoped permission - which is what ties the claim to the signed-in contact, since a portal write reaches Dataverse as the site's application user and cannot be attributed to a caller (AD-053)."
   adx_name: Webapi/al_caseassignment/enabled
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a9
