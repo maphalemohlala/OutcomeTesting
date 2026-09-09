@@ -676,67 +676,6 @@ footer a:focus-visible, .footer a:focus-visible {
   max-width: 70ch;
 }
 
-.ot-questions .ot-col-q { width: 55%; min-width: 22rem; }
-
-/* The document rules every cell of its grids, not just the row below, so the checklist
-   tables carry a full border rather than the row separator the site's data tables use. */
-.ot-questions th,
-.ot-questions td { border: 1px solid var(--colour-border); }
-.ot-questions tbody tr:last-child td { border-bottom: 1px solid var(--colour-border); }
-
-.ot-questions td.ot-col-q {
-  font-size: var(--text-base);
-  color: var(--colour-text);
-  line-height: 1.45;
-  font-variant-numeric: normal;
-}
-
-/* The checklist as the document lays it out (AD-098): a tick grid per block, so the
-   table is part of the page and never scrolls inside its card; the tick columns take
-   only the room a radio needs; a subsection row (E1 to E5) and the outcome lens row
-   read as headings and footnotes rather than as questions. */
-.ot-questions-wrap { max-height: none; overflow: visible; }
-.ot-questions th.ot-col-q {
-  font-size: var(--text-base);
-  font-weight: 500;
-  color: var(--colour-text);
-  line-height: 1.45;
-  text-transform: none;
-  letter-spacing: normal;
-}
-.ot-questions thead th.ot-col-q {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--colour-text-muted);
-}
-.ot-questions .ot-col-tick { width: 1%; text-align: center; white-space: nowrap; }
-.ot-questions td.ot-col-tick input[type="radio"],
-.ot-questions td.ot-col-tick input[type="checkbox"] { width: 1.15rem; height: 1.15rem; margin: 0; cursor: pointer; }
-.ot-questions td.ot-col-tick input[type="radio"]:focus-visible,
-.ot-questions td.ot-col-tick input[type="checkbox"]:focus-visible { outline: 3px solid var(--portalThemeColor1, #005a9e); outline-offset: 2px; }
-/* The fail reason is the row's label, so the whole reason is a hit target for its tick. */
-.ot-questions th.ot-col-q label { cursor: pointer; }
-.ot-questions tr.ot-subsection th {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--colour-text);
-  background: var(--colour-surface-header);
-  border-bottom: 1px solid var(--colour-border-strong);
-  text-transform: none;
-  letter-spacing: normal;
-}
-.ot-questions tr.ot-lens td {
-  font-size: var(--text-sm);
-  color: var(--colour-text-muted);
-  font-variant-numeric: normal;
-}
-
-/* On the document only "Outcome lens:" is emphasised; the question after it is set plainly. */
-.ot-lens__label { font-style: italic; font-weight: 600; }
-.ot-questions tbody tr.ot-subsection:hover,
-.ot-questions tbody tr.ot-lens:hover { background: transparent; }
 .ot-answer--row .ot-answer__status { font-weight: 400; }
 
 .ot-required {
@@ -1073,66 +1012,224 @@ fieldset.ot-response__field label { margin-right: var(--space-5); }
 .ot-remedial-form__block dt { font-weight: 600; }
 .ot-remedial-form__block dd { margin: 0; }
 
-/* ---------------------------------------------------------------------------------------
-   The checklist's tick boxes
+/* =========================================================================================
+   The Checker Checklist, drawn as the document
 
-   Every option box on the Checker Checklist is a square, whether the answer behind it takes
-   one value or several. Single-select groups stay <input type="radio"> so the browser keeps
-   enforcing one-of, and are restyled square; a round radio would read as a different control
-   from the one the document draws. Scoped to the questionnaire (and to the fail points table
-   inside it) so nothing else on the portal changes, and by attribute rather than !important
-   so Bootstrap's own input styles lose on specificity instead of being shouted down.
-   --------------------------------------------------------------------------------------- */
-[data-ot-questionnaire] input[type="radio"],
-[data-ot-questionnaire] input[type="checkbox"] {
+   Everything below is scoped to .ot-checklist, which wraps the questionnaire and nothing
+   else. The page around it keeps the site's brand; the form itself is the V8 document -
+   Calibri on white, every cell ruled in black, grey label and header bands, square tick
+   boxes. The site's own table styling (sticky uppercase headers, hover fills, row-only
+   rules) is exactly what made the headers read as deformed here, so none of it applies
+   inside this wrapper: these rules use the document's own class names rather than
+   .ot-table / .ot-questions, so there is nothing to override.
+   ========================================================================================= */
+
+.ot-checklist {
+  --line: #000;
+  --band: #d9d9d9;
+  --subband: #f2f2f2;
+  --ink: #000;
+
+  max-width: 1000px;
+  margin: 0 auto var(--space-6);
+  background: #fff;
+  padding: 32px 40px 48px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .25);
+  font-family: Calibri, "Segoe UI", Arial, sans-serif;
+  font-size: 11pt;
+  color: var(--ink);
+}
+
+.ot-checklist * { box-sizing: border-box; }
+
+.ot-checklist .doc-footer {
+  font-size: 9pt;
+  color: #444;
+  border-bottom: 1px solid #bbb;
+  padding-bottom: 4px;
+  margin-bottom: 20px;
+}
+
+.ot-checklist h1 {
+  font-family: Calibri, "Segoe UI", Arial, sans-serif;
+  font-size: 16pt;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 18px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.ot-checklist h2 {
+  font-family: Calibri, "Segoe UI", Arial, sans-serif;
+  font-size: 12pt;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 26px 0 8px;
+  padding: 0;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.ot-checklist .intro {
+  font-size: 10.5pt;
+  color: var(--ink);
+  max-width: none;
+  margin: 0 0 8px;
+}
+
+.ot-checklist table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 6px;
+  background: #fff;
+  font-size: 10.5pt;
+}
+
+.ot-checklist th,
+.ot-checklist td {
+  border: 1px solid var(--line);
+  padding: 5px 7px;
+  vertical-align: top;
+  font-size: 10.5pt;
+  text-align: left;
+  font-variant-numeric: normal;
+}
+
+/* The document's header cells: a grey band, bold, upright. Not sticky, not uppercase, not
+   letter-spaced - the three things that deformed them. */
+.ot-checklist th {
+  position: static;
+  background: var(--band);
+  color: var(--ink);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 10.5pt;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+}
+
+.ot-checklist tbody tr:hover { background: transparent; }
+
+/* ---- square boxes: radios and checkboxes both render as squares ---- */
+.ot-checklist .cc-box {
   appearance: none;
   -webkit-appearance: none;
-  width: 1.05rem;
-  height: 1.05rem;
-  padding: 0;
-  border: 1px solid var(--colour-text);
+  width: 13px;
+  height: 13px;
+  border: 1px solid #333;
   border-radius: 0;
-  background: var(--colour-surface);
+  background: #fff;
   display: inline-block;
-  vertical-align: middle;
+  vertical-align: -2px;
   cursor: pointer;
+  margin: 0;
+  padding: 0;
+  flex: none;
 }
 
-[data-ot-questionnaire] input[type="radio"]:disabled,
-[data-ot-questionnaire] input[type="checkbox"]:disabled {
-  border-color: var(--colour-border-strong);
-  background: var(--colour-surface-sunken);
-  cursor: default;
-}
-
-[data-ot-questionnaire] input[type="radio"]:checked::after,
-[data-ot-questionnaire] input[type="checkbox"]:checked::after {
+.ot-checklist .cc-box:checked::after {
   content: "\2713";
   display: block;
-  font-size: 0.85rem;
-  line-height: 0.95rem;
+  font-size: 11px;
+  line-height: 11px;
   text-align: center;
-  color: var(--colour-text);
+  color: var(--ink);
 }
 
-[data-ot-questionnaire] input[type="radio"]:focus-visible,
-[data-ot-questionnaire] input[type="checkbox"]:focus-visible {
-  outline: 3px solid var(--portalThemeColor1, #005a9e);
-  outline-offset: 2px;
+.ot-checklist .cc-box:focus-visible {
+  outline: 2px solid #005a9e;
+  outline-offset: 1px;
 }
 
-/* ---------------------------------------------------------------------------------------
-   Print
+.ot-checklist .cc-box:disabled { cursor: default; border-color: #767676; background: #f6f6f6; }
 
-   A submitted review offers "Save as PDF", which is the browser's own print dialogue, so
-   what prints is what is on screen. Site chrome, the page's own actions and the per-answer
-   save status carry nothing a printed record needs, and the ticks are drawn with a border
-   and a pseudo-element, both of which browsers drop by default when printing backgrounds -
-   hence print-color-adjust.
-   --------------------------------------------------------------------------------------- */
+.ot-checklist .opts { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.ot-checklist .opt { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.ot-checklist .opt.wrap { white-space: normal; }
+
+.ot-checklist input[type="text"],
+.ot-checklist input[type="date"],
+.ot-checklist textarea {
+  width: 100%;
+  border: 0;
+  font: inherit;
+  background: transparent;
+  padding: 1px 0;
+  resize: vertical;
+}
+
+.ot-checklist input[type="text"]:focus,
+.ot-checklist input[type="date"]:focus,
+.ot-checklist textarea:focus {
+  outline: 2px solid #005a9e;
+  outline-offset: 1px;
+}
+
+.ot-checklist textarea { min-height: 68px; }
+
+/* ---- header metadata grid ---- */
+.ot-checklist .meta td.lbl { width: 17%; font-weight: 700; background: var(--subband); }
+.ot-checklist .meta td.val { width: 33%; }
+
+/* ---- assessment grids ---- */
+.ot-checklist .grid td.label,
+.ot-checklist .grid th.label { width: 55%; }
+.ot-checklist .grid th.opt,
+.ot-checklist .grid td.optcell { width: 15%; text-align: center; }
+.ot-checklist .grid tr.section td { background: var(--band); font-weight: 700; }
+.ot-checklist .grid tr.lens td { background: var(--subband); font-size: 10pt; }
+.ot-checklist .grid tr.lens em { font-style: italic; font-weight: 700; }
+
+/* ---- fail points ---- */
+.ot-checklist .fails td.label,
+.ot-checklist .fails th.label { width: 90%; }
+.ot-checklist .fails th.tick,
+.ot-checklist .fails td.tick { width: 10%; text-align: center; }
+.ot-checklist .fails td.label label { cursor: pointer; }
+
+/* ---- root cause 3x3 ---- */
+.ot-checklist .rootcause td { width: 33.33%; }
+
+.ot-checklist .sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The autosave line. Not on the document, because the document is paper and does not save;
+   an autosaving form that never says so is worse than one line of 9pt grey, so it is kept
+   and made as quiet as possible. It prints away with the rest of the chrome. */
+.ot-checklist .ot-answer__status {
+  display: block;
+  min-height: 0;
+  margin: 2px 0 0;
+  font-size: 9pt;
+  font-weight: 400;
+  color: #595959;
+}
+.ot-checklist .ot-answer__status:empty { display: none; }
+.ot-checklist .ot-answer__status--error { color: #a4262c; font-weight: 700; }
+
+.ot-checklist .ot-required {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 8.5pt;
+  font-weight: 400;
+  color: #595959;
+  text-transform: none;
+  letter-spacing: normal;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
 @media print {
-  :root { --colour-surface: #fff; --colour-surface-sunken: #fff; --colour-surface-header: #fff; }
-
   header[role="banner"],
   nav,
   footer,
@@ -1140,33 +1237,24 @@ fieldset.ot-response__field label { margin-right: var(--space-5); }
   .ot-breadcrumb,
   .ot-print-action,
   .ot-submit,
-  .ot-answer__status,
-  .ot-dialog { display: none !important; }
+  .ot-notice,
+  .ot-dialog,
+  .ot-checklist .ot-answer__status,
+  .ot-checklist .ot-required { display: none !important; }
 
+  body { background: #fff; }
   .ot-page { padding: 0; }
   .ot-page__inner { max-width: none; }
 
-  .ot-card {
-    border: 1px solid #000;
-    break-inside: avoid;
+  .ot-checklist {
+    max-width: none;
+    padding: 0;
     box-shadow: none;
-  }
-
-  .ot-questions th,
-  .ot-questions td { border: 1px solid #000; }
-
-  .ot-questions-wrap,
-  .ot-table-wrap { overflow: visible; max-height: none; }
-
-  .ot-questions thead th { position: static; }
-
-  [data-ot-questionnaire] input[type="radio"],
-  [data-ot-questionnaire] input[type="checkbox"] {
+    margin: 0;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-    border-color: #000;
   }
 
-  a[href]::after { content: ""; }
+  .ot-checklist h2 { break-after: avoid; }
+  .ot-checklist tr { break-inside: avoid; }
 }
-

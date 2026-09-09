@@ -24,7 +24,6 @@
   Only the labels move. The values are unchanged, and ResponseRules.PermittedChoices is
   still the authority on which of them may be saved.
 {% endcomment %}
-{% assign columns = 0 %}
 {% case response_type %}
   {% when 120910005 %}
     {% assign values = '120910300,120910301' | split: ',' %}
@@ -46,23 +45,20 @@
     {% assign labels = 'PASS,PASS WITH ISSUES,INSUFFICIENT EVIDENCE,POTENTIAL HARM' | split: ',' %}
   {% else %}
     {% comment %}
-      Primary root cause: nine causes the document lays out three to a row, read left to
-      right, rather than as one long run of boxes.
+      Primary root cause. Reached only if something other than the review page includes this
+      for that type: the review page draws it itself, as the document does, in a 3x3 table of
+      its own rather than as a value cell of the block's table.
     {% endcomment %}
-    {% assign columns = 3 %}
     {% assign values = '120910320,120910321,120910322,120910323,120910324,120910325,120910326,120910327,120910328' | split: ',' %}
     {% assign labels = 'FactFind quality,Risk / capacity mismatch,Research / rationale,Charges / value,Client communication,Process / documentation,AML / CRA,Retirement Proposition,Adviser judgement' | split: ',' %}
 {% endcase %}
 
-<div class="ot-answer__options"{% if columns > 0 %} data-ot-columns="{{ columns }}"{% endif %}>
+<div class="opts">
   {% for value in values %}
-    <label class="ot-answer__option">
-      <input type="radio"
+    <label class="opt"><input type="radio" class="cc-box"
              name="q-{{ question }}"
              value="{{ value }}"
              data-ot-input{% unless editable %} disabled{% endunless %}
-             {% if selected and selected == value %}checked{% endif %} />
-      <span>{{ labels[forloop.index0] }}</span>
-    </label>
+             {% if selected and selected == value %}checked{% endif %} /> {{ labels[forloop.index0] }}</label>
   {% endfor %}
 </div>

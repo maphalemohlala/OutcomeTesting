@@ -250,29 +250,28 @@
     {% assign h_vulnerable = rv['case.al_vulnerableclient'] %}
     {% assign h_taxrequired = rv['case.al_taxcheckrequired'] %}
     {% assign h_taxdisposition = rv['case.al_taxteamdisposition'] %}
-    <section class="ot-card" aria-labelledby="ot-form-header">
-      <h2 class="ot-card__title" id="ot-form-header">Outcome Testing &ndash; Checker Checklist</h2>
-      <dl class="ot-dl">
-        <div><dt>Adviser name</dt><dd>{{ rv['case.al_advisername'] | default: '—' | escape }}</dd></div>
-        <div><dt>Adviser status</dt><dd>{{ h_adviserstatus.label | default: '—' | escape }}</dd></div>
-        <div><dt>Adviser code</dt><dd>{{ rv['case.al_advisercode'] | default: '—' | escape }}</dd></div>
-        <div><dt>Paraplanner</dt><dd>{{ rv['case.al_paraplanner'] | default: '—' | escape }}</dd></div>
-        <div><dt>Paraplanner code</dt><dd>{{ rv['case.al_paraplannercode'] | default: '—' | escape }}</dd></div>
-        <div><dt>Product(s)</dt><dd>{{ rv['case.al_products'] | default: '—' | escape }}</dd></div>
-        <div><dt>Case type</dt><dd>{{ h_casetype.label | default: '—' | escape }}</dd></div>
-        <div><dt>Advice date</dt><dd>{{ rv['case.al_advicedate'] | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
-        <div><dt>Product / solution type</dt><dd>{{ h_producttype.label | default: '—' | escape }}</dd></div>
-        <div><dt>Sample source</dt><dd>{{ h_samplesource.label | default: '—' | escape }}</dd></div>
-        <div><dt>Checker name</dt><dd>{{ rv['case.al_checkername'] | default: '—' | escape }}</dd></div>
-        <div><dt>Check date</dt><dd>{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
-        <div><dt>Client name / initials</dt><dd>{{ rv['case.al_clientname'] | default: '—' | escape }}</dd></div>
-        <div><dt>IO reference</dt><dd>{{ rv['case.al_casereference'] | default: '—' | escape }}</dd></div>
-        <div><dt>Pre or post check</dt><dd>{{ h_prepost.label | default: '—' | escape }}</dd></div>
-        <div><dt>Vulnerable client?</dt><dd>{{ h_vulnerable.label | default: '—' | escape }}</dd></div>
-        <div><dt>Tax check required</dt><dd>{{ h_taxrequired.label | default: '—' | escape }}</dd></div>
-        <div><dt>For Tax team usage</dt><dd>{{ h_taxdisposition.label | default: '—' | escape }}</dd></div>
-      </dl>
-    </section>
+    {% comment %}
+      The case header, held rather than emitted: on the document it is the first block of the
+      form, so it is written inside the checklist wrapper below rather than as a card of its
+      own above it. Outcome Case columns captured at intake, read only here as on the
+      checklist itself. Choice columns come through the alias as option objects, so their
+      label is read rather than their value.
+    {% endcomment %}
+    {% capture case_header %}
+      <table class="meta">
+        <tbody>
+          <tr><td class="lbl">Adviser name</td><td class="val">{{ rv['case.al_advisername'] | escape }}</td><td class="lbl">Adviser status</td><td class="val">{{ h_adviserstatus.label | escape }}</td></tr>
+          <tr><td class="lbl">Adviser code</td><td class="val">{{ rv['case.al_advisercode'] | escape }}</td><td class="lbl">Paraplanner</td><td class="val">{{ rv['case.al_paraplanner'] | escape }}</td></tr>
+          <tr><td class="lbl">Paraplanner code</td><td class="val">{{ rv['case.al_paraplannercode'] | escape }}</td><td class="lbl">Product(s)</td><td class="val">{{ rv['case.al_products'] | escape }}</td></tr>
+          <tr><td class="lbl">Case type</td><td class="val">{{ h_casetype.label | escape }}</td><td class="lbl">Advice date</td><td class="val">{{ rv['case.al_advicedate'] | date: 'dd MMM yyyy' }}</td></tr>
+          <tr><td class="lbl">Product / solution type</td><td class="val">{{ h_producttype.label | escape }}</td><td class="lbl">Sample source</td><td class="val">{{ h_samplesource.label | escape }}</td></tr>
+          <tr><td class="lbl">Checker name</td><td class="val">{{ rv['case.al_checkername'] | escape }}</td><td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' }}</td></tr>
+          <tr><td class="lbl">Client name / initials</td><td class="val">{{ rv['case.al_clientname'] | escape }}</td><td class="lbl">IO reference</td><td class="val">{{ rv['case.al_casereference'] | escape }}</td></tr>
+          <tr><td class="lbl">Pre or post check</td><td class="val">{{ h_prepost.label | escape }}</td><td class="lbl">Vulnerable client?</td><td class="val">{{ h_vulnerable.label | escape }}</td></tr>
+          <tr><td class="lbl">Tax check required<br>(Tax team to complete)</td><td class="val">{{ h_taxrequired.label | escape }}</td><td class="lbl">For Tax team usage</td><td class="val">{{ h_taxdisposition.label | escape }}</td></tr>
+        </tbody>
+      </table>
+    {% endcapture %}
 
     {% if cv_id == null %}
       {% include 'OT Empty State' title: 'No checklist version issued' message: 'This review has no checklist version, so no questions can be rendered.' %}
@@ -407,7 +406,10 @@
           type and writes the AD-023 typed column. The wrapper carries the review id so
           the autosave script does not have to re-parse the query string.
         {% endcomment %}
-        <div data-ot-questionnaire data-review-id="{{ rv.al_reviewinstanceid }}">
+        <div class="ot-checklist" data-ot-questionnaire data-review-id="{{ rv.al_reviewinstanceid }}">
+        <div class="doc-footer">Outcome Testing Checker Checklist | V5 Draft</div>
+        <h1>Outcome Testing - Checker Checklist</h1>
+        {{ case_header }}
         {% comment %}
           The document's blocks (AD-098). The checklist model holds Section then Question
           with no grouping level, but the Checker Checklist lays its sections out under its
@@ -506,19 +508,23 @@
             {% assign glabels = 'Yes,No,Insufficient evidence' | split: ',' %}
           {% endif %}
 
+          {% comment %}
+            The document's blocks, drawn as the document draws them: an h2, the intro line
+            where there is one, then one table. No cards, no badges, no scroll boxes - the
+            page around this keeps the site's brand, the form itself is the V8 checklist.
+
+            Three table shapes, matching the reference build:
+              .grid  - a test-point table, 55% label plus one 15% tick column per scale value
+              .meta  - a label / value table, 17% label plus the control across the rest
+              .fails - the fail points table, 90% reason plus a 10% Tick column
+          {% endcomment %}
           {% if block != current_block %}
             {% unless forloop.first %}
-              {% if block_layout == 'grid' %}
-                {% if block_subsections and prev_help != blank %}
-                  <tr class="ot-lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em class="ot-lens__label">Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
-                {% endif %}
-                  </tbody>
-                </table>
-              </div>
-              {% else %}
-              </div>
+              {% if block_subsections and prev_help != blank %}
+                <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
               {% endif %}
-            </section>
+              </tbody>
+            </table>
             {% endunless %}
             {% assign current_block = block %}
             {% assign current_section = '' %}
@@ -528,7 +534,7 @@
             {% if layout == 'grid' %}
               {% assign ncols = gvalues.size | plus: 1 %}
             {% else %}
-              {% assign ncols = 2 %}
+              {% assign ncols = 4 %}
             {% endif %}
 
             {% comment %}
@@ -539,74 +545,59 @@
               failPoints), not a picker under every non-pass answer. The ticks are recorded
               against the File quality outcome answer - the first question of the outcome
               block, which is what qv is at this boundary - because the intersect is
-              response-keyed (AD-025) and that is the answer these reasons explain. The outcome question's autosave binds the
-              list through data-ot-failpoints-for, so a tick saves like any other change to
-              that answer.
+              response-keyed (AD-025) and that is the answer these reasons explain. The
+              outcome question's autosave binds the list through data-ot-failpoints-for, so
+              a tick saves like any other change to that answer.
             {% endcomment %}
             {% if block == 'S-FQ' %}
               {% assign fq_existing = null %}
               {% for a in arows %}
                 {% if a.al_questionversionid.id == qv.al_questionversionid %}{% assign fq_existing = a %}{% endif %}
               {% endfor %}
-              <section class="ot-card" aria-labelledby="sec-failpoints">
-                <h2 class="ot-card__title" id="sec-failpoints">File Quality &ndash; Fail points</h2>
-                <div class="ot-table-wrap ot-questions-wrap">
-                  <table class="ot-table ot-questions" data-ot-failpoints-for="{{ qv.al_questionversionid }}">
-                    <thead>
-                      <tr>
-                        <th scope="col" class="ot-col-q">File Quality fail reason</th>
-                        <th scope="col" class="ot-col-tick">Tick</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for fr in failreasons.results.entities %}
-                        <tr>
-                          <th scope="row" class="ot-col-q">
-                            <label for="fr-{{ fr.al_failreasonid }}">{{ fr.al_name | escape }}</label>
-                          </th>
-                          <td class="ot-col-tick">
-                            {% capture pairkey %}|{{ fq_existing.al_responseid }}~{{ fr.al_failreasonid }}{% endcapture %}<input type="checkbox" id="fr-{{ fr.al_failreasonid }}" data-ot-reason value="{{ fr.al_failreasonid }}"{% unless editable %} disabled{% endunless %}{% if fq_existing.al_responseid and selected_reason_pairs contains pairkey %} checked{% endif %} />
-                          </td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+              <h2>File Quality &ndash; Fail points</h2>
+              <table class="fails" data-ot-failpoints-for="{{ qv.al_questionversionid }}">
+                <thead>
+                  <tr>
+                    <th class="label">File Quality fail reason</th>
+                    <th class="tick">Tick</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for fr in failreasons.results.entities %}
+                    <tr>
+                      <td class="label"><label for="fr-{{ fr.al_failreasonid }}">{{ fr.al_name | escape }}</label></td>
+                      <td class="tick">{% capture pairkey %}|{{ fq_existing.al_responseid }}~{{ fr.al_failreasonid }}{% endcapture %}<input type="checkbox" class="cc-box" id="fr-{{ fr.al_failreasonid }}" data-ot-reason value="{{ fr.al_failreasonid }}"{% unless editable %} disabled{% endunless %}{% if fq_existing.al_responseid and selected_reason_pairs contains pairkey %} checked{% endif %} /></td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
             {% endif %}
 
-            <section class="ot-card" aria-labelledby="blk-{{ block | replace: ' ', '-' }}">
-              <h2 class="ot-card__title" id="blk-{{ block | replace: ' ', '-' }}">
-                {{ block_title | escape }}
-                {% assign owner = qv['s.al_ownerrole'] %}
-                {% if owner and owner.label %}
-                  <span class="ot-badge ot-badge--waiting">{{ owner.label | escape }}</span>
-                {% endif %}
-              </h2>
-              {% if block_intro != blank %}
-                <p class="ot-section-help">{{ block_intro | escape }}</p>
-              {% endif %}
-              {% if layout == 'grid' %}
-              <div class="ot-table-wrap ot-questions-wrap">
-                <table class="ot-table ot-questions">
-                  <thead>
-                    <tr>
-                      <th scope="col" class="ot-col-q">{{ grid_col }}</th>
-                      {% for l in glabels %}<th scope="col" class="ot-col-tick">{{ l }}</th>{% endfor %}
-                    </tr>
-                  </thead>
-                  <tbody>
-              {% else %}
-              <div class="ot-answers">
-              {% endif %}
+            <h2>{{ block_title | escape }}</h2>
+            {% if block_intro != blank %}
+              <p class="intro">{{ block_intro | escape }}</p>
+            {% endif %}
+            {% if layout == 'grid' %}
+            <table class="grid">
+              <thead>
+                <tr>
+                  <th class="label">{{ grid_col }}</th>
+                  {% for l in glabels %}<th class="opt">{{ l }}</th>{% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+            {% else %}
+            <table class="meta">
+              <tbody>
+            {% endif %}
           {% endif %}
 
           {% if sid != current_section %}
             {% if block_subsections %}
               {% if current_section != '' and prev_help != blank %}
-                <tr class="ot-lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em class="ot-lens__label">Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
+                <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
               {% endif %}
-              <tr class="ot-subsection"><th scope="colgroup" colspan="{{ ncols }}">{{ scode | remove_first: 'S-' }}. {{ sname | escape }}</th></tr>
+              <tr class="section"><td colspan="{{ ncols }}">{{ scode | remove_first: 'S-' }}. {{ sname | escape }}</td></tr>
             {% endif %}
             {% assign current_section = sid %}
             {% assign prev_help = shelp %}
@@ -649,58 +640,68 @@
             {% endcomment %}
             {% assign lens_tick_id = qv_id %}
             {% assign lens_tick_span = 1 %}
-            {% capture lens_tick_cell %}<td class="ot-col-tick"><input type="checkbox" value="120910305" data-ot-input aria-label="{{ qv.al_questiontext | escape }}"{% unless editable %} disabled{% endunless %}{% if chosen_value == '120910305' %} checked{% endif %} /></td>{% endcapture %}
+            {% capture lens_tick_cell %}<td class="optcell"><input type="checkbox" class="cc-box" value="120910305" data-ot-input aria-label="{{ qv.al_questiontext | escape }}"{% unless editable %} disabled{% endunless %}{% if chosen_value == '120910305' %} checked{% endif %} /></td>{% endcapture %}
+
           {% elsif block_layout == 'grid' and rt == block_rt %}
-            <tr class="ot-answer ot-answer--row"
-                data-ot-answer
+            <tr data-ot-answer
                 data-question-version="{{ qv_id }}"
                 data-response-id="{{ existing.al_responseid }}"
                 data-response-type="{{ rt }}"
                 data-column="choice">
-              <th scope="row" class="ot-col-q">
-                {{ qv.al_questiontext | escape }}
-                {% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}
-                <p class="ot-answer__status" data-ot-status aria-live="polite"></p>
-              </th>
+              <td class="label">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></td>
               {% for v in gvalues %}
-                <td class="ot-col-tick">
-                  <input type="radio" name="q-{{ qv_id }}" value="{{ v }}" data-ot-input
-                         aria-label="{{ qv.al_questiontext | escape }}: {{ glabels[forloop.index0] }}"{% unless editable %} disabled{% endunless %}{% if chosen_value == v %} checked{% endif %} />
-                </td>
+                <td class="optcell"><input type="radio" class="cc-box" name="q-{{ qv_id }}" id="q-{{ qv_id }}-{{ v }}" value="{{ v }}" data-ot-input{% unless editable %} disabled{% endunless %}{% if chosen_value == v %} checked{% endif %} /><label class="sr-only" for="q-{{ qv_id }}-{{ v }}">{{ qv.al_questiontext | escape }}: {{ glabels[forloop.index0] }}</label></td>
               {% endfor %}
             </tr>
+
+          {% elsif rt == 120910003 %}
+            {% comment %}
+              Primary root cause. The document lays its nine causes out as a 3x3 grid under
+              their own heading rather than as a row of an adjacent table, so it breaks out
+              of the block's table into one of its own. The table is the autosave root: bind()
+              looks for its inputs and its status line inside whatever carries data-ot-answer,
+              and a table serves as well as a row.
+            {% endcomment %}
+              </tbody>
+            </table>
+            {% assign rcvalues = '120910320,120910321,120910322,120910323,120910324,120910325,120910326,120910327,120910328' | split: ',' %}
+            {% assign rclabels = 'FactFind quality,Risk / capacity mismatch,Research / rationale,Charges / value,Client communication,Process / documentation,AML / CRA,Retirement Proposition,Adviser judgement' | split: ',' %}
+            <table class="rootcause"
+                   data-ot-answer
+                   data-question-version="{{ qv_id }}"
+                   data-response-id="{{ existing.al_responseid }}"
+                   data-response-type="{{ rt }}"
+                   data-column="choice">
+              <tbody>
+                <tr><th colspan="3">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></th></tr>
+                <tr>
+                {% for v in rcvalues %}
+                  <td><label class="opt wrap"><input type="radio" class="cc-box" name="q-{{ qv_id }}" value="{{ v }}" data-ot-input{% unless editable %} disabled{% endunless %}{% if chosen_value == v %} checked{% endif %} /> {{ rclabels[forloop.index0] }}</label></td>
+                  {% if forloop.index == 3 or forloop.index == 6 %}</tr><tr>{% endif %}
+                {% endfor %}
+                </tr>
+              </tbody>
+            </table>
+            <table class="meta">
+              <tbody>
+
           {% else %}
-          {% if block_layout == 'grid' %}<tr><td colspan="{{ ncols }}">{% endif %}
-          <div class="ot-answer"
-               data-ot-answer
-               data-question-version="{{ qv_id }}"
-               data-response-id="{{ existing.al_responseid }}"
-               data-response-type="{{ rt }}"
-               data-column="{{ column }}">
-
-            <fieldset class="ot-answer__field">
-              <legend class="ot-answer__legend">
-                {{ qv.al_questiontext | escape }}
-                {% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}
-              </legend>
-
+            <tr data-ot-answer
+                data-question-version="{{ qv_id }}"
+                data-response-id="{{ existing.al_responseid }}"
+                data-response-type="{{ rt }}"
+                data-column="{{ column }}">
+              <td class="{% if block_layout == 'grid' %}label{% else %}lbl{% endif %}">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></td>
+              <td colspan="{{ ncols | minus: 1 }}">
               {% if column == 'text' %}
                 {% if rt == 120910001 %}
-                  <textarea class="ot-answer__input" rows="4"
-                            data-ot-input{% unless editable %} disabled{% endunless %}
-                            aria-label="{{ qv.al_questiontext | escape }}">{{ existing.al_answertext | escape }}</textarea>
+                  <textarea data-ot-input{% unless editable %} disabled{% endunless %} aria-label="{{ qv.al_questiontext | escape }}">{{ existing.al_answertext | escape }}</textarea>
                 {% else %}
-                  <input type="text" class="ot-answer__input"
-                         data-ot-input{% unless editable %} disabled{% endunless %}
-                         value="{{ existing.al_answertext | escape }}"
-                         aria-label="{{ qv.al_questiontext | escape }}" />
+                  <input type="text" data-ot-input{% unless editable %} disabled{% endunless %} value="{{ existing.al_answertext | escape }}" aria-label="{{ qv.al_questiontext | escape }}" />
                 {% endif %}
 
               {% elsif column == 'date' %}
-                <input type="date" class="ot-answer__input"
-                       data-ot-input{% unless editable %} disabled{% endunless %}
-                       value="{{ existing.al_answerdate | date: 'yyyy-MM-dd' }}"
-                       aria-label="{{ qv.al_questiontext | escape }}" />
+                <input type="date" data-ot-input{% unless editable %} disabled{% endunless %} value="{{ existing.al_answerdate | date: 'yyyy-MM-dd' }}" aria-label="{{ qv.al_questiontext | escape }}" />
 
               {% elsif column == 'choices' %}
                 {% comment %}
@@ -717,39 +718,26 @@
                 {% assign mlabels = 'LSA/LSDBA/TTFAC,Trust,IHT,Tax calculation,Other' | split: ',' %}
                 {% assign chosen = '' %}
                 {% for c in existing.al_answerchoices %}{% assign chosen = chosen | append: '|' | append: c.value | append: '|' %}{% endfor %}
-                <div class="ot-answer__options">
+                <div class="opts">
                   {% for opt in mvalues %}
                     {% assign optkey = '|' | append: opt | append: '|' %}
-                    <label class="ot-answer__option">
-                      <input type="checkbox" data-ot-input value="{{ opt }}"{% unless editable %} disabled{% endunless %}
-                             {% if chosen contains optkey or existing.al_answerchoices contains opt or existing.al_answerchoices contains mlabels[forloop.index0] %}checked{% endif %} />
-                      <span>{{ mlabels[forloop.index0] }}</span>
-                    </label>
+                    <label class="opt"><input type="checkbox" class="cc-box" data-ot-input value="{{ opt }}"{% unless editable %} disabled{% endunless %}{% if chosen contains optkey or existing.al_answerchoices contains opt or existing.al_answerchoices contains mlabels[forloop.index0] %} checked{% endif %} /> {{ mlabels[forloop.index0] }}</label>
                   {% endfor %}
                 </div>
 
               {% else %}
                 {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id editable: editable %}
               {% endif %}
-            </fieldset>
-
-            <p class="ot-answer__status" data-ot-status aria-live="polite"></p>
-          </div>
-          {% if block_layout == 'grid' %}</td></tr>{% endif %}
+              </td>
+            </tr>
           {% endif %}
 
           {% if forloop.last %}
-            {% if block_layout == 'grid' %}
-              {% if block_subsections and prev_help != blank %}
-                <tr class="ot-lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em class="ot-lens__label">Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
-              {% endif %}
-                  </tbody>
-                </table>
-              </div>
-            {% else %}
-              </div>
+            {% if block_subsections and prev_help != blank %}
+              <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
             {% endif %}
-            </section>
+              </tbody>
+            </table>
           {% endif %}
         {% endfor %}
         </div>
@@ -1074,136 +1062,16 @@
     {% endif %}
 
     {% comment %}
-      Remediation and escalation (AD-098): the document's closing block, read-only here as
-      the case page renders it. Per case rather than per review, as the actions are
-      (AD-095). The adviser's response and the supervisor's decision are recorded on the
-      remediation page and the sign-off, not here.
+      Remediation and escalation is NOT on this form.
+
+      The document carries it as a closing block marked "(PICKED UP ON ANOTHER FORM)", and
+      that is how it is built: al_RemediationAction, al_Signoff and al_Outcome, worked on the
+      remediation page and the sign-off step, per case rather than per review (AD-095). This
+      page used to render a read-only copy of it beneath the checklist; the project owner's
+      direction on 2026-09-09 was that the checklist form is the checklist and remediation
+      belongs to its own step, so the copy and its three fetches are gone. Nothing about the
+      remediation data changed - only where it is read.
     {% endcomment %}
-    {% assign rem_case_id = rv['case.al_outcomecaseid'] %}
-    {% if rem_case_id %}
-      {% fetchxml rem_actions %}
-      <fetch>
-        <entity name="al_remediationaction">
-          <attribute name="al_remediationactionid" />
-          <attribute name="al_name" />
-          <attribute name="al_description" />
-          <attribute name="al_actionstatus" />
-          <attribute name="al_duedate" />
-          <attribute name="al_completedon" />
-          <attribute name="al_adviserresponse" />
-          <attribute name="al_evidencereference" />
-          <attribute name="al_assignedcontactid" />
-          <attribute name="al_clientcontactrequired" />
-          <attribute name="al_recheckrequired" />
-          <attribute name="al_changesadvice" />
-          <filter type="and">
-            <condition attribute="al_outcomecaseid" operator="eq" value="{{ rem_case_id | xml_escape }}" />
-          </filter>
-          <order attribute="al_duedate" descending="false" />
-        </entity>
-      </fetch>
-      {% endfetchxml %}
-
-      {% fetchxml rem_signoffs %}
-      <fetch>
-        <entity name="al_signoff">
-          <attribute name="al_remediationactionid" />
-          <attribute name="al_signoffdecision" />
-          <attribute name="al_signedoffon" />
-          <attribute name="ownerid" />
-          <filter type="and">
-            <condition attribute="al_outcomecaseid" operator="eq" value="{{ rem_case_id | xml_escape }}" />
-          </filter>
-          <order attribute="al_signedoffon" descending="true" />
-        </entity>
-      </fetch>
-      {% endfetchxml %}
-
-      {% fetchxml rem_outcomes %}
-      <fetch top="1">
-        <entity name="al_outcome">
-          <attribute name="al_finaloutcome" />
-          <attribute name="al_finalisedon" />
-          <attribute name="al_regradedon" />
-          <filter type="and">
-            <condition attribute="al_outcomecaseid" operator="eq" value="{{ rem_case_id | xml_escape }}" />
-          </filter>
-          <order attribute="createdon" descending="true" />
-        </entity>
-      </fetch>
-      {% endfetchxml %}
-
-      <section class="ot-card" aria-labelledby="ot-form-remediation">
-        <h2 class="ot-card__title" id="ot-form-remediation">Remediation and escalation</h2>
-        {% assign rem_rows = rem_actions.results.entities %}
-        {% if rem_rows.size > 0 %}
-          {% assign rem_all_approved = true %}
-          {% assign rem_any_rejected = false %}
-          {% assign rem_supervisor = rem_signoffs.results.entities[0] %}
-          {% assign rem_adviser = null %}
-          {% assign rem_form = null %}
-          <div class="ot-table-wrap ot-questions-wrap">
-            <table class="ot-table">
-              <thead>
-                <tr>
-                  <th scope="col">No.</th>
-                  <th scope="col">Issue / fail reason</th>
-                  <th scope="col">Remedial action</th>
-                  <th scope="col">Owner</th>
-                  <th scope="col">Target date</th>
-                  <th scope="col">Sign-off</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for a in rem_rows %}
-                  {% assign rem_latest = null %}
-                  {% for so in rem_signoffs.results.entities %}{% if rem_latest == null and so.al_remediationactionid.id == a.al_remediationactionid %}{% assign rem_latest = so %}{% endif %}{% endfor %}
-                  {% if rem_latest %}
-                    {% if rem_latest.al_signoffdecision.value == 120910721 %}{% assign rem_any_rejected = true %}{% assign rem_all_approved = false %}{% endif %}
-                  {% else %}
-                    {% assign rem_all_approved = false %}
-                  {% endif %}
-                  {% if rem_form == null and a.al_clientcontactrequired %}{% assign rem_form = a %}{% endif %}
-                  {% if a.al_completedon %}
-                    {% if rem_adviser == null or a.al_completedon > rem_adviser.al_completedon %}{% assign rem_adviser = a %}{% endif %}
-                  {% endif %}
-                  <tr>
-                    <td>{{ forloop.index }}</td>
-                    <td>{{ a.al_description | escape | newline_to_br }}</td>
-                    <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
-                    <td>{{ a.al_assignedcontactid.name | default: 'Unassigned' | escape }}</td>
-                    <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
-                    <td>
-                      {% if rem_latest %}
-                        {{ rem_latest.al_signoffdecision.label | escape }} {{ rem_latest.al_signedoffon | date: 'dd MMM yyyy' }}
-                      {% elsif a.al_completedon %}
-                        Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}
-                      {% else %}
-                        {% include 'OT Status Badge' status: a.al_actionstatus.label %}
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% if rem_form == null %}{% assign rem_form = rem_rows[0] %}{% endif %}
-          {% assign rem_outcome = rem_outcomes.results.entities[0] %}
-          <dl class="ot-dl">
-            <div><dt>Client contact required?</dt><dd>{{ rem_form.al_clientcontactrequired.label | default: '—' | escape }}</dd></div>
-            <div><dt>Recheck required?</dt><dd>{{ rem_form.al_recheckrequired.label | default: '—' | escape }}</dd></div>
-            <div><dt>Do the remedial actions change the advice?</dt><dd>{{ rem_form.al_changesadvice.label | default: '—' | escape }}</dd></div>
-            <div><dt>All remedial actions checked and approved?</dt><dd>{% if rem_all_approved %}Yes{% elsif rem_any_rejected %}No{% else %}—{% endif %}</dd></div>
-            <div><dt>Regraded outcome</dt><dd>{% if rem_outcome and rem_outcome.al_finaloutcome %}{{ rem_outcome.al_finaloutcome.label | escape }}{% else %}—{% endif %}</dd></div>
-            <div><dt>Date</dt><dd>{% if rem_outcome and rem_outcome.al_regradedon %}{{ rem_outcome.al_regradedon | date: 'dd MMM yyyy' }}{% elsif rem_outcome and rem_outcome.al_finalisedon %}{{ rem_outcome.al_finalisedon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
-            <div><dt>Supervisor sign off</dt><dd>{% if rem_supervisor %}{{ rem_supervisor.al_signoffdecision.label | escape }}, {{ rem_supervisor.ownerid.name | escape }}, {{ rem_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
-            <div><dt>Adviser sign off</dt><dd>{% if rem_adviser %}{{ rem_adviser.al_assignedcontactid.name | escape }}, {{ rem_adviser.al_completedon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
-          </dl>
-        {% else %}
-          <p class="ot-section-help">No remedial action has been raised on this case. Actions appear here for a non-pass outcome or a flagged file, once the review is submitted.</p>
-        {% endif %}
-      </section>
-    {% endif %}
 
     {% comment %}
       Submit panel (PP-07, PP-11). Deliberately the last thing on the page.
