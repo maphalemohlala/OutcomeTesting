@@ -162,8 +162,8 @@ const string CommandAttribute = "al_command";
 // assembly. Duplicated rather than referenced because this tool targets net8.0 and the
 // assembly targets net462 (AD-062); every one of them is asserted against the environment on
 // each run, so drift shows up as a FAIL rather than a wrong answer.
-const int CaseStatusQueued = 120910583;
 const int CaseStatusImported = 120910580;
+const int CaseStatusQueued = 120910583;
 const int CaseStatusReadyForAllocation = 120910582;
 const int EventAllocation = 120910800;
 const int StatusPending = 120910810;
@@ -430,6 +430,11 @@ if (args.Length >= 2 && args[0].Equals("grantrole", StringComparison.OrdinalIgno
 if (args.Length >= 2 && args[0].Equals("routecase", StringComparison.OrdinalIgnoreCase))
 {
     return RouteCase(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("seedcases", StringComparison.OrdinalIgnoreCase))
+{
+    return SeedCases(args);
 }
 
 if (args.Length >= 2 && args[0].Equals("deleterelationship", StringComparison.OrdinalIgnoreCase))
@@ -2243,6 +2248,225 @@ int GrantRole(string[] a)
 //
 // It MUTATES A REAL CASE and the Audit Event the claim writes is immutable (NFR-AUD-01),
 // so the case is named and the org URL repeated.
+// Seeds test cases across all three review routes and allocates each to one person, so a
+// reviewer has work of every shape to open (project owner, 2026-09-09).
+//
+// It creates real al_outcomecase rows and real allocations, and every one of them leaves a
+// trail: the queueing rule (AD-093) hops the case to Queued, and the allocation creates an
+// al_reviewinstance and moves the case to Assigned. Hence --confirm <orgUrl>, as every other
+// write verb here. References are prefixed IO-SEED- so seeded work is obvious in a worklist
+// and easy to find again; a reference that already exists is left alone, so a second run
+// allocates what the first could not rather than creating a duplicate set.
+//
+// Routes come from data/route-seed: ROUTE-AQS is AQS only, ROUTE-TAX is Tax only, and
+// ROUTE-TAX-AQS is Tax then AQS. A Tax-then-AQS case gets its Tax review here; the AQS leg is
+// created by the hand-back when the Tax check is submitted, which is the flow under test
+// rather than something to fabricate up front.
+int SeedCases(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 3 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This creates real cases, allocations and reviews. Re-run as: " +
+            "seedcases <orgUrl> <assigneeEmail> [<perRoute>] --confirm <orgUrl>");
+        return 1;
+    }
+
+    var assigneeEmail = a[2].Trim();
+    var perRoute = 5;
+    if (a.Length >= 4 && !a[3].StartsWith("--", StringComparison.Ordinal)
+        && !int.TryParse(a[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out perRoute))
+    {
+        Console.Error.WriteLine($"'{a[3]}' is not a number of cases per route.");
+        return 1;
+    }
+
+    if (perRoute < 1 || perRoute > 50)
+    {
+        Console.Error.WriteLine("Cases per route must be between 1 and 50.");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var contactId = FindId(svc, "contact", ("emailaddress1", assigneeEmail));
+    if (contactId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No contact has the email {assigneeEmail}, so nothing could be allocated.");
+        return 1;
+    }
+
+    // Route code -> the reference tag, and the discipline whose review should appear first.
+    var routes = new[]
+    {
+        ("ROUTE-AQS", "AQS", "AQS"),
+        ("ROUTE-TAX", "TAX", "Tax"),
+        ("ROUTE-TAX-AQS", "TXA", "Tax"),
+    };
+
+    var created = 0;
+    var allocated = 0;
+    var skipped = 0;
+    var stuck = 0;
+
+    foreach (var (routeCode, tag, firstReview) in routes)
+    {
+        var routeId = FindId(svc, "al_reviewroute", ("al_routecode", routeCode));
+        if (routeId == Guid.Empty)
+        {
+            Console.Error.WriteLine($"No review route has the code {routeCode}; skipping that set.");
+            continue;
+        }
+
+        for (var n = 1; n <= perRoute; n++)
+        {
+            var reference = $"IO-SEED-{tag}-{n:D2}";
+
+            // A reference already seeded is finished rather than duplicated: an earlier run
+            // that created the case but could not allocate it leaves exactly that state, and
+            // re-running should complete it, not make a second copy.
+            var existingId = FindId(svc, "al_outcomecase", ("al_casereference", reference));
+            if (existingId != Guid.Empty)
+            {
+                if (HasActiveAssignment(svc, existingId))
+                {
+                    Console.WriteLine($"{reference}: already seeded and allocated, left alone.");
+                    skipped++;
+                    continue;
+                }
+
+                if (CaseStatus(svc, existingId) != CaseStatusQueued)
+                {
+                    svc.Update(new Entity("al_outcomecase", existingId)
+                    {
+                        ["al_casestatus"] = new OptionSetValue(CaseStatusQueued),
+                    });
+                }
+
+                if (Allocate(svc, existingId, contactId, reference, routeCode, assigneeEmail, firstReview))
+                {
+                    allocated++;
+                }
+                else
+                {
+                    stuck++;
+                }
+
+                continue;
+            }
+
+            var seeded = new Entity("al_outcomecase")
+            {
+                ["al_name"] = reference,
+                ["al_casereference"] = reference,
+                ["al_clientname"] = $"Seed Client {tag}{n:D2}",
+                ["al_advisername"] = $"Seed Adviser {n:D2}",
+                ["al_advisercode"] = $"ADV-S{n:D2}",
+                ["al_adviserstatus"] = new OptionSetValue(120910501),
+                ["al_paraplanner"] = $"Seed Paraplanner {n:D2}",
+                ["al_paraplannercode"] = $"PP-S{n:D2}",
+                ["al_products"] = "Pension; ISA",
+                ["al_casetype"] = new OptionSetValue(120910510),
+                ["al_advicedate"] = DateTime.UtcNow.Date.AddDays(-30),
+                ["al_productsolutiontype"] = new OptionSetValue(120910521),
+                ["al_samplesource"] = new OptionSetValue(120910530),
+                ["al_checkername"] = "Seed Checker",
+                ["al_checkdate"] = DateTime.UtcNow.Date,
+                ["al_preorpostcheck"] = new OptionSetValue(120910540),
+                ["al_vulnerableclient"] = new OptionSetValue(120910551),
+                ["al_taxcheckrequired"] = new OptionSetValue(
+                    routeCode == "ROUTE-AQS" ? 120910561 : 120910560),
+                // Queued directly, as provepp15 seeds its case. AD-093's queueing rule lives
+                // in the import and case-edit commands (CaseQueueing.QueueIfRouted), not in a
+                // step on the table, so a row created straight through the SDK never passes
+                // through it and would sit at Imported for ever. A claim is refused on a case
+                // that is not Queued, which is the state a checker picks work up from.
+                ["al_casestatus"] = new OptionSetValue(CaseStatusQueued),
+                ["al_reviewrouteid"] = new EntityReference("al_reviewroute", routeId),
+            };
+
+            var caseId = svc.Create(seeded);
+            created++;
+
+            if (Allocate(svc, caseId, contactId, reference, routeCode, assigneeEmail, firstReview))
+            {
+                allocated++;
+            }
+            else
+            {
+                stuck++;
+            }
+        }
+    }
+
+    Console.WriteLine(
+        $"Done. {created} created, {allocated} allocated, {skipped} already existed, {stuck} left unallocated.");
+    return stuck > 0 ? 2 : 0;
+}
+
+static int CaseStatus(ServiceClient svc, Guid caseId)
+{
+    return svc.Retrieve("al_outcomecase", caseId, new ColumnSet("al_casestatus"))
+        .GetAttributeValue<OptionSetValue>("al_casestatus")?.Value ?? 0;
+}
+
+static bool HasActiveAssignment(ServiceClient svc, Guid caseId)
+{
+    var query = new QueryExpression("al_caseassignment") { ColumnSet = new ColumnSet(false), TopCount = 1 };
+    query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+    query.Criteria.AddCondition("al_isactive", ConditionOperator.Equal, true);
+    return svc.RetrieveMultiple(query).Entities.Count > 0;
+}
+
+// Allocates one seeded case by creating the claim row ClaimCasePlugin fires on: it resolves
+// the contact to its systemuser (AD-010), creates or reuses the al_reviewinstance for the
+// discipline the route says comes first, and moves the case to Assigned. Reports what the
+// plug-in actually decided rather than what was asked for.
+static bool Allocate(
+    ServiceClient svc,
+    Guid caseId,
+    Guid contactId,
+    string reference,
+    string routeCode,
+    string assigneeEmail,
+    string firstReview)
+{
+    try
+    {
+        svc.Create(new Entity("al_caseassignment")
+        {
+            ["al_outcomecaseid"] = new EntityReference("al_outcomecase", caseId),
+            ["al_assignedcontactid"] = new EntityReference("contact", contactId),
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"{reference}: created, but the allocation was refused: {ex.Message}");
+        return false;
+    }
+
+    var reviews = svc.RetrieveMultiple(new QueryExpression("al_reviewinstance")
+    {
+        ColumnSet = new ColumnSet("al_reviewtype", "al_assignedcontactid"),
+        Criteria =
+        {
+            Conditions = { new ConditionExpression("al_outcomecaseid", ConditionOperator.Equal, caseId) },
+        },
+    }).Entities;
+
+    var types = string.Join(", ", reviews.Select(r =>
+    {
+        var t = r.GetAttributeValue<OptionSetValue>("al_reviewtype")?.Value ?? 0;
+        return t == 120910200 ? "Tax" : t == 120910201 ? "AQS" : t.ToString(CultureInfo.InvariantCulture);
+    }));
+
+    Console.WriteLine(
+        $"{reference}: {routeCode}, allocated to {assigneeEmail}, " +
+        $"review(s) [{(types.Length == 0 ? "none" : types)}], first check should be {firstReview}.");
+    return reviews.Count > 0;
+}
+
 int RouteCase(string[] a)
 {
     var orgUrl = a[1];
