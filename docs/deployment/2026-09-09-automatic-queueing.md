@@ -77,6 +77,17 @@ twice. Run these from the repository root, each with `DOTNET_ROLL_FORWARD=Major`
 
    Expected three rows.
 
+## Notes
+
+- Each backfilled case's audit event also carries a no-op line "Route <name> -> <name>",
+  because an explicit RouteId is what gives the command a change to record; it is not a route
+  change.
+- The route seed (`data/route-seed/data.xml`, codes ROUTE-AQS and ROUTE-TAX-AQS) is now a
+  prerequisite of the import command in every environment: without it, every row answering
+  "Tax check required" fails with the precondition message.
+- The backfill is idempotent per case by IdempotencyKey; a case that failed is retryable, and
+  a second `--confirm` run simply finds no candidates.
+
 ## Not changed
 
 Portal queue query, app worklist and its status filter, `CaseLifecycle` and the app's

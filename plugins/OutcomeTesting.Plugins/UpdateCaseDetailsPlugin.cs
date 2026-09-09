@@ -284,6 +284,18 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static void DeriveRoute(IOrganizationService service, Entity before, Entity update, List<string> changes)
         {
+            DeriveRoute(before, update, changes, code => FindRouteByCode(service, code));
+        }
+
+        /// <summary>
+        /// The same BR-004 derivation as the <see cref="IOrganizationService"/> overload, but
+        /// taking the route lookup as a resolver rather than a service. ImportCasesPlugin
+        /// builds one memoising resolver before its per-row loop (Important 1): an uncached
+        /// RetrieveMultiple per row is up to 1000 round trips at 1000 rows, inside the
+        /// two-minute plug-in budget the file's own comment exists to protect.
+        /// </summary>
+        public static void DeriveRoute(Entity before, Entity update, List<string> changes, Func<string, Guid?> findRoute)
+        {
             var beforeTax = before.GetAttributeValue<OptionSetValue>(TaxRequiredAttr);
             var afterTax = update.Contains(TaxRequiredAttr)
                 ? update.GetAttributeValue<OptionSetValue>(TaxRequiredAttr)
@@ -313,7 +325,7 @@ namespace OutcomeTesting.Plugins
                     return;
             }
 
-            var routeId = FindRouteByCode(service, code);
+            var routeId = findRoute(code);
             if (!routeId.HasValue)
             {
                 throw new InvalidPluginExecutionException(
@@ -329,7 +341,12 @@ namespace OutcomeTesting.Plugins
             changes.Add("Route " + Describe(currentRoute) + " -> " + code + " (derived BR-004)");
         }
 
-        private static Guid? FindRouteByCode(IOrganizationService service, string code)
+        /// <summary>
+        /// The route matching a route code, or null when it is not configured. Public so
+        /// ImportCasesPlugin can build its own memoising resolver over it (Important 1)
+        /// rather than paying an uncached RetrieveMultiple per imported row.
+        /// </summary>
+        public static Guid? FindRouteByCode(IOrganizationService service, string code)
         {
             var query = new QueryExpression(RouteEntity)
             {
@@ -500,7 +517,10 @@ namespace OutcomeTesting.Plugins
         /// <summary>
         /// AD-093 on the case-edit command. The rule reads the state the save leaves behind:
         /// the route after this call (set explicitly, derived by DeriveRoute, or already on
-        /// the case) and the status before it. A status the caller set in the same call is
+        /// the case) and the case's current status, read fresh (Minor 3) rather than from
+        /// <paramref name="before"/>, which was retrieved before the update ran; a case that
+        /// moved past the queue in the meantime must not have this update's hop refused
+        /// against a status it no longer holds. A status the caller set in the same call is
         /// theirs: EnsureLifecycleTransition has already checked it, and a second move on top
         /// of a deliberate one would make the history read as two decisions.
         /// </summary>
@@ -524,12 +544,12 @@ namespace OutcomeTesting.Plugins
             var routeAfter = update.Contains(RouteAttr)
                 ? update.GetAttributeValue<EntityReference>(RouteAttr)
                 : before.GetAttributeValue<EntityReference>(RouteAttr);
-            var status = before.GetAttributeValue<OptionSetValue>(StatusAttr);
+            var status = CaseTransitions.CurrentStatus(service, before.Id);
 
             return CaseQueueing.QueueIfRouted(
                 service,
                 before.Id,
-                status != null ? status.Value : (int?)null,
+                status,
                 routeAfter != null,
                 changes);
         }

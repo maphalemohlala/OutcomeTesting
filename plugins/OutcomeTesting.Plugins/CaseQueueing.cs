@@ -53,8 +53,13 @@ namespace OutcomeTesting.Plugins
         /// <summary>
         /// Queues the case when <see cref="ShouldQueue"/> says so, appending one line to
         /// <paramref name="changes"/> in the same shape the case-edit command writes for a
-        /// status change, so the case history reads the same whether a person or the rule
-        /// moved it. Returns whether the case moved.
+        /// status change. Returns whether the case moved.
+        ///
+        /// What becomes of that line is the caller's choice, not this method's: the case-edit
+        /// command writes it to the case's per-case Audit Event, so its history reads the same
+        /// whether a person or this rule moved it. The import command's caller discards
+        /// <paramref name="changes"/> - its audit event is batch-level - so a case queued
+        /// during import gets no per-case history line for it.
         /// </summary>
         public static bool QueueIfRouted(
             IOrganizationService service, Guid caseId, int? status, bool hasRoute, List<string> changes)

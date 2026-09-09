@@ -173,6 +173,11 @@ namespace OutcomeTesting.Plugins.Tests
             return record;
         }
 
+        private static Func<string, Guid?> Resolver(FakeOrganizationService service)
+        {
+            return code => UpdateCaseDetailsPlugin.FindRouteByCode(service, code);
+        }
+
         [Fact]
         public void A_row_that_answers_tax_check_required_lands_in_the_queue_with_its_route()
         {
@@ -180,9 +185,10 @@ namespace OutcomeTesting.Plugins.Tests
             // carries the answer needs no edit before a checker can pick the case up.
             var service = WithRoutes();
 
-            var caseId = ImportCasesPlugin.CreateRoutedCase(service, service, ImportedRecord(TaxCheckRequiredNo));
+            var result = ImportCasesPlugin.CreateRoutedCase(service, Resolver(service), ImportedRecord(TaxCheckRequiredNo));
 
-            var row = service.Row("al_outcomecase", caseId);
+            var row = service.Row("al_outcomecase", result.CaseId);
+            Assert.True(result.Queued);
             Assert.Equal(AqsOnlyRoute, row.GetAttributeValue<EntityReference>("al_reviewrouteid").Id);
             Assert.Equal(CaseLifecycle.Queued, row.GetAttributeValue<OptionSetValue>("al_casestatus").Value);
         }
@@ -194,12 +200,48 @@ namespace OutcomeTesting.Plugins.Tests
             // case-edit command queues it then.
             var service = WithRoutes();
 
-            var caseId = ImportCasesPlugin.CreateRoutedCase(service, service, ImportedRecord(null));
+            var result = ImportCasesPlugin.CreateRoutedCase(service, Resolver(service), ImportedRecord(null));
 
-            var row = service.Row("al_outcomecase", caseId);
+            var row = service.Row("al_outcomecase", result.CaseId);
+            Assert.False(result.Queued);
             Assert.False(row.Contains("al_reviewrouteid"));
             Assert.Equal(CaseLifecycle.Imported, row.GetAttributeValue<OptionSetValue>("al_casestatus").Value);
             Assert.Empty(service.Updates);
+        }
+
+        [Fact]
+        public void Resolves_a_route_code_at_most_once_across_the_whole_import()
+        {
+            // Important 1: DeriveRoute's route lookup was an uncached RetrieveMultiple per
+            // row. At 1000 rows sharing the same two route codes that is up to 1000 round
+            // trips inside the plug-in's two-minute budget. The resolver built once before
+            // the import loop must answer every later row from cache.
+            var service = WithRoutes();
+            var findRoute = ImportCasesPlugin.BuildRouteResolver(service);
+
+            ImportCasesPlugin.CreateRoutedCase(service, findRoute, ImportedRecord(TaxCheckRequiredNo));
+            ImportCasesPlugin.CreateRoutedCase(service, findRoute, ImportedRecord(TaxCheckRequiredNo));
+
+            Assert.Equal(1, service.RetrieveMultipleCount);
+        }
+
+        [Fact]
+        public void A_queue_failure_after_create_still_counts_the_case_as_created()
+        {
+            // Important 2: a throw from QueueIfRouted (a privilege refusal or an AD-057
+            // refusal) happens after userService.Create already succeeded. The case must not
+            // be treated as though it never existed - it stays Imported and the result says
+            // it was not queued, rather than the row being counted failed.
+            var service = WithRoutes();
+            service.UpdateThrows = new InvalidOperationException("Refused.");
+
+            var result = ImportCasesPlugin.CreateRoutedCase(service, Resolver(service), ImportedRecord(TaxCheckRequiredNo));
+
+            var row = service.Row("al_outcomecase", result.CaseId);
+            Assert.NotNull(row);
+            Assert.Equal(CaseLifecycle.Imported, row.GetAttributeValue<OptionSetValue>("al_casestatus").Value);
+            Assert.False(result.Queued);
+            Assert.Equal("Refused.", result.QueueError);
         }
     }
 }

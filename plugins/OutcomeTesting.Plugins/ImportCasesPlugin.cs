@@ -132,6 +132,11 @@ namespace OutcomeTesting.Plugins
 
             var existingReferences = FindExistingReferences(systemService, parsed.Valid);
 
+            // Important 1: one memoising resolver for the whole import rather than an
+            // uncached RetrieveMultiple per row - at 1000 rows sharing two route codes that
+            // was up to 1000 round trips inside the two-minute plug-in budget.
+            var findRoute = BuildRouteResolver(systemService);
+
             var imported = 0;
             var duplicates = 0;
             var failed = 0;
@@ -160,12 +165,20 @@ namespace OutcomeTesting.Plugins
 
                 try
                 {
-                    CreateRoutedCase(userService, systemService, record);
+                    var result = CreateRoutedCase(userService, findRoute, record);
                     imported++;
 
                     // Two rows in the same file naming the same reference are already caught
                     // in the parse; this covers the reference becoming taken mid-import.
                     existingReferences.Add(row.Reference);
+
+                    if (!result.Queued && result.QueueError != null)
+                    {
+                        // Important 2: the case exists - only the automatic queue hop failed
+                        // (a privilege refusal or an AD-057 refusal). That is not a row
+                        // failure, so it is reported, not written as an al_importexception.
+                        report.Add(ReportRow(row.RowNumber, row.Reference, "Imported (not queued)", result.QueueError, row.Raw));
+                    }
                 }
                 catch (Exception error)
                 {
@@ -219,22 +232,29 @@ namespace OutcomeTesting.Plugins
         /// derives its route (BR-004) and queues it (AD-093). The route is stamped before the
         /// create so the row never exists unrouted; the hops run after it because the
         /// lifecycle walker needs a row to move. A file that gives no answer leaves the case
-        /// at Imported, where the dashboard shows it as awaiting a route.
+        /// at Imported, where the dashboard shows it as awaiting a route. <paramref
+        /// name="changes"/> is not kept: the import's audit event is batch-level, not a
+        /// per-case history line the way the case-edit command's is.
         ///
         /// Inside the caller's per-row try: a missing route configuration surfaces as that
         /// row failing with the precondition message DeriveRoute already writes, not as a
-        /// case created in a state the queue will never offer.
+        /// case created in a state the queue will never offer. The queue hop itself (AD-093,
+        /// after the create) is different (Important 2): it runs inside its own try/catch
+        /// here, because by the time it can fail the case already exists. A refusal there -
+        /// privilege or AD-057 - does not throw out of this method; it comes back on the
+        /// result so the caller counts the row imported rather than failed, and does not
+        /// write an al_importexception for a case that is live.
         /// </summary>
-        public static Guid CreateRoutedCase(IOrganizationService userService, IOrganizationService systemService, Entity record)
+        public static RoutedCaseResult CreateRoutedCase(IOrganizationService userService, Func<string, Guid?> findRoute, Entity record)
         {
             if (userService == null)
             {
                 throw new ArgumentNullException(nameof(userService));
             }
 
-            if (systemService == null)
+            if (findRoute == null)
             {
-                throw new ArgumentNullException(nameof(systemService));
+                throw new ArgumentNullException(nameof(findRoute));
             }
 
             if (record == null)
@@ -243,18 +263,77 @@ namespace OutcomeTesting.Plugins
             }
 
             var changes = new List<string>();
-            UpdateCaseDetailsPlugin.DeriveRoute(systemService, new Entity(CaseEntity), record, changes);
+            UpdateCaseDetailsPlugin.DeriveRoute(new Entity(CaseEntity), record, changes, findRoute);
 
             var caseId = userService.Create(record);
 
-            CaseQueueing.QueueIfRouted(
-                userService,
-                caseId,
-                ImportRules.CaseStatusImported,
-                record.Contains("al_reviewrouteid"),
-                changes);
+            // Minor 4: read the status actually on the record rather than hardcoding
+            // Imported, so this does nothing surprising if it is ever called for another
+            // status.
+            var status = record.GetAttributeValue<OptionSetValue>("al_casestatus");
 
-            return caseId;
+            try
+            {
+                var queued = CaseQueueing.QueueIfRouted(
+                    userService,
+                    caseId,
+                    status != null ? status.Value : (int?)null,
+                    record.Contains("al_reviewrouteid"),
+                    changes);
+
+                return new RoutedCaseResult(caseId, queued, null);
+            }
+            catch (Exception error)
+            {
+                return new RoutedCaseResult(caseId, false, error.Message);
+            }
+        }
+
+        /// <summary>
+        /// A route-code resolver that answers every call after the first from cache
+        /// (Important 1). Built once before the import loop and passed to every row's
+        /// <see cref="CreateRoutedCase"/> call, so a file of 1000 rows sharing the same two
+        /// route codes costs at most two RetrieveMultiple calls rather than one per row.
+        /// </summary>
+        public static Func<string, Guid?> BuildRouteResolver(IOrganizationService service)
+        {
+            var cache = new Dictionary<string, Guid?>(StringComparer.OrdinalIgnoreCase);
+            return code =>
+            {
+                Guid? cached;
+                if (cache.TryGetValue(code, out cached))
+                {
+                    return cached;
+                }
+
+                var resolved = UpdateCaseDetailsPlugin.FindRouteByCode(service, code);
+                cache[code] = resolved;
+                return resolved;
+            };
+        }
+
+        /// <summary>
+        /// What <see cref="CreateRoutedCase"/> produced: the case's id always, and whether the
+        /// post-create queue hop moved it. AD-093's hop runs after the case exists, so a
+        /// failure there (Important 2) must not be mistaken for the row itself having failed -
+        /// the case is live either way. <see cref="QueueError"/> carries the failure's message
+        /// when the hop did not run to completion, and is null when it either queued the case
+        /// or had nothing to do.
+        /// </summary>
+        public struct RoutedCaseResult
+        {
+            public RoutedCaseResult(Guid caseId, bool queued, string queueError)
+            {
+                CaseId = caseId;
+                Queued = queued;
+                QueueError = queueError;
+            }
+
+            public Guid CaseId { get; }
+
+            public bool Queued { get; }
+
+            public string QueueError { get; }
         }
 
         /// <summary>

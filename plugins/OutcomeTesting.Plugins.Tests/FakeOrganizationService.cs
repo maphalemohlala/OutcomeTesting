@@ -138,8 +138,21 @@ namespace OutcomeTesting.Plugins.Tests
             return projected;
         }
 
+        /// <summary>
+        /// Set to make Update throw. Reproduces a privilege refusal or an AD-057 refusal from
+        /// the automatic queue hop landing after the case row itself was already created
+        /// successfully - the failure Important 2's fix has to survive without miscounting a
+        /// live case as a failed row.
+        /// </summary>
+        public Exception UpdateThrows { get; set; }
+
         public void Update(Entity entity)
         {
+            if (UpdateThrows != null)
+            {
+                throw UpdateThrows;
+            }
+
             var row = Row(entity.LogicalName, entity.Id);
             if (row == null)
             {

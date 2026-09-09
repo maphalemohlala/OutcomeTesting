@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
 using OutcomeTesting.Plugins;
 using Xunit;
 
@@ -112,6 +113,30 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.False(UpdateCaseDetailsPlugin.QueueAfterEdit(service, before, update, changes));
             Assert.Empty(service.Updates);
+        }
+
+        [Fact]
+        public void Reads_the_status_fresh_rather_than_the_stale_before_value()
+        {
+            // Minor 3: `before` is retrieved before the update runs. If the case moved past
+            // the queue in the meantime, using `before`'s status would still attempt the
+            // Imported hops - and the first hop is refused against the case's real current
+            // status, failing what is otherwise a valid detail edit.
+            var service = WithCase(CaseLifecycle.Imported, AqsOnly);
+            var before = service.Retrieve(CaseEntity, CaseId, new ColumnSet(StatusAttr, RouteAttr));
+
+            // The case moved on to Assigned out of band, after `before` was captured.
+            service.Row(CaseEntity, CaseId)[StatusAttr] = new OptionSetValue(CaseLifecycle.Assigned);
+
+            var update = new Entity(CaseEntity, CaseId);
+            update["al_priority"] = new OptionSetValue(120910540);
+            var changes = new List<string>();
+
+            var moved = UpdateCaseDetailsPlugin.QueueAfterEdit(service, before, update, changes);
+
+            Assert.False(moved);
+            Assert.Equal(CaseLifecycle.Assigned, StatusOf(service));
+            Assert.Empty(changes);
         }
     }
 }
