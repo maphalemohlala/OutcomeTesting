@@ -102,9 +102,18 @@
   font-weight: 600;
 }
 
-/* The issue is a list, one non-pass item per line, so its line breaks are kept. */
+/* One non-pass item to a cell; long ones wrap rather than stretching the table. */
 .remediation__issue {
+  min-width: 22ch;
+}
+
+/*
+ * The context an action carries behind its items - the checker's observation and why it
+ * was raised - sits under them as a footnote rather than being repeated on every row.
+ */
+.remediation__context td {
   white-space: pre-line;
+  padding-top: 0;
 }
 
 .remediation__table td[data-empty='true'] {

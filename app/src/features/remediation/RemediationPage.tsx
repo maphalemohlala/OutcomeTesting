@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { Notice } from '../../components/feedback/Notice';
@@ -9,6 +9,7 @@ import {
   type RemediationActionRow,
   type SignoffRow,
 } from './useRemediation';
+import { ACTION_COLUMNS, groupIssues } from './remediationIssues';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { completeRemediation } from '../../services/commands/completeRemediation';
 import { messageForFailure } from '../../services/errors';
@@ -57,38 +58,53 @@ function ActionsTable({
         </tr>
       </thead>
       <tbody>
-        {actions.map((action, index) => (
-          <tr key={action.id}>
-            <th scope="row">{index + 1}</th>
-            <td className="remediation__issue">{action.description}</td>
-            <td>
-              {action.remedialAction ?? '—'}
-              {action.evidenceReference ? (
-                <span className="remediation__note"> IO {action.evidenceReference}</span>
-              ) : null}
-            </td>
-            <td>{action.assignedTo ?? 'Unassigned'}</td>
-            <td>{action.dueOn ?? '—'}</td>
-            <td>{action.status}</td>
-            <td>{action.clientContactRequired ?? '—'}</td>
-            <td>{action.recheckRequired ?? '—'}</td>
-            <td>{action.changesAdvice ?? '—'}</td>
-            <td>{action.completedOn ?? '—'}</td>
-            <td>
-              {canComplete(action.status) ? (
-                <button
-                  type="button"
-                  className="remediation__action-btn"
-                  disabled={busyId !== null}
-                  onClick={() => onComplete(action)}
-                >
-                  {busyId === action.id ? 'Completing…' : 'Mark complete'}
-                </button>
-              ) : (
-                '—'
-              )}
-            </td>
-          </tr>
+        {groupIssues(actions).map(({ action, lines, note }) => (
+          <Fragment key={action.id}>
+            {lines.map(({ number, issue }, index) => (
+              <tr key={number}>
+                <th scope="row">{number}</th>
+                <td className="remediation__issue">{issue}</td>
+                {index === 0 ? (
+                  <>
+                    <td rowSpan={lines.length}>
+                      {action.remedialAction ?? '—'}
+                      {action.evidenceReference ? (
+                        <span className="remediation__note"> IO {action.evidenceReference}</span>
+                      ) : null}
+                    </td>
+                    <td rowSpan={lines.length}>{action.assignedTo ?? 'Unassigned'}</td>
+                    <td rowSpan={lines.length}>{action.dueOn ?? '—'}</td>
+                    <td rowSpan={lines.length}>{action.status}</td>
+                    <td rowSpan={lines.length}>{action.clientContactRequired ?? '—'}</td>
+                    <td rowSpan={lines.length}>{action.recheckRequired ?? '—'}</td>
+                    <td rowSpan={lines.length}>{action.changesAdvice ?? '—'}</td>
+                    <td rowSpan={lines.length}>{action.completedOn ?? '—'}</td>
+                    <td rowSpan={lines.length}>
+                      {canComplete(action.status) ? (
+                        <button
+                          type="button"
+                          className="remediation__action-btn"
+                          disabled={busyId !== null}
+                          onClick={() => onComplete(action)}
+                        >
+                          {busyId === action.id ? 'Completing…' : 'Mark complete'}
+                        </button>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  </>
+                ) : null}
+              </tr>
+            ))}
+            {note ? (
+              <tr className="remediation__context">
+                <td className="remediation__note" colSpan={ACTION_COLUMNS}>
+                  {note}
+                </td>
+              </tr>
+            ) : null}
+          </Fragment>
         ))}
       </tbody>
     </table>

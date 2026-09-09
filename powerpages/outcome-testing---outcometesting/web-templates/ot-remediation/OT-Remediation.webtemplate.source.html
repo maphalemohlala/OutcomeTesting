@@ -118,44 +118,132 @@
           </tr>
         </thead>
         <tbody>
+          {% comment %}
+            The No. column counts rows, and a row is now an item rather than an action, so
+            the count runs across the actions on the page. page_offset counts actions, not
+            items, so a later page starts a little low - the number is a position in the
+            list, not an identifier, and paging cannot know how many items the earlier
+            pages drew.
+          {% endcomment %}
+          {% assign row_no = page_offset %}
           {% for a in rows %}
-            <tr>
-              <td>{{ forloop.index | plus: page_offset }}</td>
-              <td>
-                {% assign cid = a['case.al_outcomecaseid'] %}
-                {% if cid %}
-                  <a href="/case-details?id={{ cid }}">
-                    {{ a['case.al_casereference'] | default: 'Untitled case' | escape }}
-                  </a>
-                {% else %}
-                  {{ a['case.al_casereference'] | default: '—' | escape }}
+            {% assign latest = null %}
+            {% if signoffs %}{% for s in signoffs.results.entities %}{% if latest == null and s.al_remediationactionid.id == a.al_remediationactionid %}{% assign latest = s %}{% endif %}{% endfor %}{% endif %}
+            {% comment %}
+              al_description carries the whole list Remediation.Describe built: a heading,
+              one "- item" line per thing the checker marked down, then the checker's
+              observation and the standing sentence. The agreed form numbers those items one
+              to a row, so they are split back out here and the rest is shown once, under
+              them.
+
+              Every filter used is one this site already relies on elsewhere, and the
+              arguments are the shapes it already passes: no two-argument truncate and no
+              multi-character split, both of which this Liquid rejects. The line break is
+              turned into a single character first (newline_to_br writes a tag this Liquid
+              understands whatever the stored line endings are) so the split is on one
+              character. A line is an item when putting "- " back in front of it with its
+              first "- " removed reproduces it - true only when the "- " was at the front,
+              so "AML - No CRA" is an item's text, not a bullet.
+
+              If any of that does not take, ot_count stays 0 and the action falls back to
+              the single row it drew before. Inline rather than in a snippet of its own: an
+              included template gets its own scope, so these assigns would not come back.
+              The same block is in OT Case Detail.
+            {% endcomment %}
+            {% assign ot_flat = a.al_description | newline_to_br | replace: '<br />', '|' | replace: '<br>', '|' %}
+            {% assign ot_lines = ot_flat | split: '|' %}
+            {% assign ot_count = 0 %}
+            {% capture ot_note %}{% for l in ot_lines %}{% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}{% if rebuilt == line %}{% assign ot_count = ot_count | plus: 1 %}{% elsif line != '' and line != 'Issues found on the check:' %}{{ line }} {% endif %}{% endfor %}{% endcapture %}
+            {% assign ot_note = ot_note | strip %}
+            {% if ot_count > 0 %}
+              {% assign ot_shown = 0 %}
+              {% for l in ot_lines %}
+                {% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}
+                {% if rebuilt == line %}
+                  {% assign ot_shown = ot_shown | plus: 1 %}
+                  {% assign row_no = row_no | plus: 1 %}
+                  <tr>
+                    <td>{{ row_no }}</td>
+                    {% if ot_shown == 1 %}
+                      <td rowspan="{{ ot_count }}">
+                        {% assign cid = a['case.al_outcomecaseid'] %}
+                        {% if cid %}
+                          <a href="/case-details?id={{ cid }}">
+                            {{ a['case.al_casereference'] | default: 'Untitled case' | escape }}
+                          </a>
+                        {% else %}
+                          {{ a['case.al_casereference'] | default: '—' | escape }}
+                        {% endif %}
+                      </td>
+                    {% endif %}
+                    <td>{{ rest | escape }}</td>
+                    {% if ot_shown == 1 %}
+                      <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                      <td rowspan="{{ ot_count }}">{{ a.al_assignedcontactid.name | default: a['case.al_advisername'] | default: 'Unassigned' | escape }}</td>
+                      <td rowspan="{{ ot_count }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+                      <td rowspan="{{ ot_count }}">{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
+                      <td rowspan="{{ ot_count }}">
+                        {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
+                        <span class="ot-age"
+                              data-ot-age
+                              data-opened="{{ clock_start | date: 'yyyy-MM-dd' }}"
+                              data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
+                              data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
+                      </td>
+                      <td rowspan="{{ ot_count }}">
+                        {% if latest %}
+                          {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
+                        {% elsif a.al_completedon %}
+                          Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor
+                        {% else %}
+                          —
+                        {% endif %}
+                      </td>
+                    {% endif %}
+                  </tr>
                 {% endif %}
-              </td>
-              <td>{{ a.al_description | escape | newline_to_br }}</td>
-              <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
-              <td>{{ a.al_assignedcontactid.name | default: a['case.al_advisername'] | default: 'Unassigned' | escape }}</td>
-              <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
-              <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
-              <td>
-                {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
-                <span class="ot-age"
-                      data-ot-age
-                      data-opened="{{ clock_start | date: 'yyyy-MM-dd' }}"
-                      data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
-                      data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
-              </td>
-              <td>
-                {% assign latest = null %}
-                {% if signoffs %}{% for s in signoffs.results.entities %}{% if latest == null and s.al_remediationactionid.id == a.al_remediationactionid %}{% assign latest = s %}{% endif %}{% endfor %}{% endif %}
-                {% if latest %}
-                  {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
-                {% elsif a.al_completedon %}
-                  Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor
-                {% else %}
-                  —
-                {% endif %}
-              </td>
-            </tr>
+              {% endfor %}
+              {% if ot_note != '' %}
+                <tr class="ot-issue-note"><td colspan="9">{{ ot_note | escape }}</td></tr>
+              {% endif %}
+            {% else %}
+              {% assign row_no = row_no | plus: 1 %}
+              <tr>
+                <td>{{ row_no }}</td>
+                <td>
+                  {% assign cid = a['case.al_outcomecaseid'] %}
+                  {% if cid %}
+                    <a href="/case-details?id={{ cid }}">
+                      {{ a['case.al_casereference'] | default: 'Untitled case' | escape }}
+                    </a>
+                  {% else %}
+                    {{ a['case.al_casereference'] | default: '—' | escape }}
+                  {% endif %}
+                </td>
+                <td>{{ a.al_description | escape | newline_to_br }}</td>
+                <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                <td>{{ a.al_assignedcontactid.name | default: a['case.al_advisername'] | default: 'Unassigned' | escape }}</td>
+                <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+                <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
+                <td>
+                  {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
+                  <span class="ot-age"
+                        data-ot-age
+                        data-opened="{{ clock_start | date: 'yyyy-MM-dd' }}"
+                        data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
+                        data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
+                </td>
+                <td>
+                  {% if latest %}
+                    {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
+                  {% elsif a.al_completedon %}
+                    Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+              </tr>
+            {% endif %}
             {% comment %}
               The adviser's half of the BR-008 loop (PP-12, FR-020, FR-021), inline rather
               than on a page of its own so the worklist and the response live together.

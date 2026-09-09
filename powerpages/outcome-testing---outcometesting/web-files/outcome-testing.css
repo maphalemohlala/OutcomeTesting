@@ -1263,3 +1263,19 @@ fieldset.ot-response__field label { margin-right: var(--space-5); }
   .ot-checklist h2 { break-after: avoid; }
   .ot-checklist tr { break-inside: avoid; }
 }
+
+/* ------------------------------------------------------------------
+   Remediation issue rows
+   ------------------------------------------------------------------ */
+
+/*
+ * The context an action carries behind its numbered items - the checker's observation and
+ * why the action was raised - sits under them once, rather than being repeated on every
+ * row. Set below the items in weight because the items are what the adviser answers.
+ */
+.ot-issue-note td {
+  padding-top: 0;
+  border-top: 0;
+  font-size: 0.9em;
+  color: var(--colour-text-muted);
+}

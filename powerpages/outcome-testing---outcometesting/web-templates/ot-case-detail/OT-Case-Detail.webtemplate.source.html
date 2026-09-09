@@ -268,6 +268,7 @@
               </tr>
             </thead>
             <tbody>
+              {% assign row_no = 0 %}
               {% for a in case_actions %}
                 {% assign latest = null %}
                 {% for s in case_signoffs.results.entities %}{% if latest == null and s.al_remediationactionid.id == a.al_remediationactionid %}{% assign latest = s %}{% endif %}{% endfor %}
@@ -277,22 +278,81 @@
                   {% assign all_approved = false %}
                 {% endif %}
                 {% if form_source == null and a.al_clientcontactrequired %}{% assign form_source = a %}{% endif %}
-                <tr>
-                  <td>{{ forloop.index }}</td>
-                  <td>{{ a.al_description | escape | newline_to_br }}</td>
-                  <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
-                  <td>{{ a.al_assignedcontactid.name | default: 'Unassigned' | escape }}</td>
-                  <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
-                  <td>
-                    {% if latest %}
-                      {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
-                    {% elsif a.al_completedon %}
-                      Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}
-                    {% else %}
-                      {% include 'OT Status Badge' status: a.al_actionstatus.label %}
+                {% comment %}
+                  al_description carries the whole list Remediation.Describe built: a
+                  heading, one "- item" line per thing the checker marked down, then the
+                  checker's observation and the standing sentence. The agreed form numbers
+                  those items one to a row, so they are split back out here and the rest is
+                  shown once, under them.
+
+                  Every filter used is one this site already relies on elsewhere, and the
+                  arguments are the shapes it already passes: no two-argument truncate and
+                  no multi-character split, both of which this Liquid rejects. The line
+                  break is turned into a single character first (newline_to_br writes a tag
+                  this Liquid understands whatever the stored line endings are) so the split
+                  is on one character. A line is an item when putting "- " back in front of
+                  it with its first "- " removed reproduces it - true only when the "- " was
+                  at the front, so "AML - No CRA" is an item's text, not a bullet.
+
+                  If any of that does not take, ot_count stays 0 and the action falls back
+                  to the single row it drew before. Inline rather than in a snippet of its
+                  own: an included template gets its own scope, so these assigns would not
+                  come back. The same block is in OT Remediation.
+                {% endcomment %}
+                {% assign ot_flat = a.al_description | newline_to_br | replace: '<br />', '|' | replace: '<br>', '|' %}
+                {% assign ot_lines = ot_flat | split: '|' %}
+                {% assign ot_count = 0 %}
+                {% capture ot_note %}{% for l in ot_lines %}{% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}{% if rebuilt == line %}{% assign ot_count = ot_count | plus: 1 %}{% elsif line != '' and line != 'Issues found on the check:' %}{{ line }} {% endif %}{% endfor %}{% endcapture %}
+                {% assign ot_note = ot_note | strip %}
+                {% if ot_count > 0 %}
+                  {% assign ot_shown = 0 %}
+                  {% for l in ot_lines %}
+                    {% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}
+                    {% if rebuilt == line %}
+                      {% assign ot_shown = ot_shown | plus: 1 %}
+                      {% assign row_no = row_no | plus: 1 %}
+                      <tr>
+                        <td>{{ row_no }}</td>
+                        <td>{{ rest | escape }}</td>
+                        {% if ot_shown == 1 %}
+                          <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                          <td rowspan="{{ ot_count }}">{{ a.al_assignedcontactid.name | default: 'Unassigned' | escape }}</td>
+                          <td rowspan="{{ ot_count }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+                          <td rowspan="{{ ot_count }}">
+                            {% if latest %}
+                              {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
+                            {% elsif a.al_completedon %}
+                              Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}
+                            {% else %}
+                              {% include 'OT Status Badge' status: a.al_actionstatus.label %}
+                            {% endif %}
+                          </td>
+                        {% endif %}
+                      </tr>
                     {% endif %}
-                  </td>
-                </tr>
+                  {% endfor %}
+                  {% if ot_note != '' %}
+                    <tr class="ot-issue-note"><td colspan="6">{{ ot_note | escape }}</td></tr>
+                  {% endif %}
+                {% else %}
+                  {% assign row_no = row_no | plus: 1 %}
+                  <tr>
+                    <td>{{ row_no }}</td>
+                    <td>{{ a.al_description | escape | newline_to_br }}</td>
+                    <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                    <td>{{ a.al_assignedcontactid.name | default: 'Unassigned' | escape }}</td>
+                    <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+                    <td>
+                      {% if latest %}
+                        {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
+                      {% elsif a.al_completedon %}
+                        Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}
+                      {% else %}
+                        {% include 'OT Status Badge' status: a.al_actionstatus.label %}
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endif %}
               {% endfor %}
             </tbody>
           </table>
