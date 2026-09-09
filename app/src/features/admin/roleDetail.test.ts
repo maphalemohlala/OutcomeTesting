@@ -40,7 +40,7 @@ describe('buildRoleGrants', () => {
     expect(grants.every((grant) => grant.level !== 'None')).toBe(true);
   });
 
-  it('shows an administrator override in place of the default it replaces', () => {
+  it('resolves from the stored rules alone once any exist, as the server gate does', () => {
     const grants = buildRoleGrants(TAX, [rule({ resource: 'page.cases', level: 'Manage' })]);
 
     expect(levelOf(grants, 'page.cases')).toMatchObject({
@@ -48,8 +48,10 @@ describe('buildRoleGrants', () => {
       source: 'Set by administrator',
       overrideId: 'perm-1',
     });
-    // The defaults it did not touch are untouched.
-    expect(levelOf(grants, 'page.reviews')).toMatchObject({ level: 'Edit', source: 'Default' });
+    // No default survives alongside a stored rule: PermissionHelpers.MaxLevel reads only
+    // al_pagepermission, so showing the default Edit here would promise a page the server
+    // refuses.
+    expect(levelOf(grants, 'page.reviews')).toBeUndefined();
   });
 
   it('keeps a revoked resource visible rather than dropping it off the list', () => {
@@ -65,13 +67,27 @@ describe('buildRoleGrants', () => {
     });
   });
 
-  it('falls back to the default when the override has been withdrawn', () => {
+  it('falls back to the defaults only while no rule at all is stored', () => {
+    // The bootstrap case: every rule withdrawn is the same as none ever stored, and the
+    // seed matrix is what the first administrator resolves against.
     const grants = buildRoleGrants(TAX, [
       rule({ resource: 'page.reviews', level: 'None', active: false }),
     ]);
 
     expect(levelOf(grants, 'page.reviews')).toMatchObject({ level: 'Edit', source: 'Default' });
     expect(levelOf(grants, 'page.reviews')?.overrideId).toBeNull();
+  });
+
+  it('treats a withdrawn rule as no access once other rules are stored', () => {
+    // This is the withdrawal the server sees: no active rule for (role, resource) is None.
+    // The client used to fall back to the coded default here and offer the page anyway.
+    const grants = buildRoleGrants(TAX, [
+      rule({ id: 'perm-1', resource: 'page.reviews', level: 'Edit', active: false }),
+      rule({ id: 'perm-2', resource: 'page.cases', level: 'View' }),
+    ]);
+
+    expect(levelOf(grants, 'page.reviews')).toBeUndefined();
+    expect(levelOf(grants, 'page.cases')).toMatchObject({ level: 'View', source: 'Set by administrator' });
   });
 
   it('grants a custom role only what its rules say, since no default mentions it', () => {
@@ -87,12 +103,15 @@ describe('buildRoleGrants', () => {
     });
   });
 
-  it('ignores rules written against a different role', () => {
+  it('does not lend another role\'s rule to this one, nor a default beside it', () => {
     const grants = buildRoleGrants(TAX, [
       rule({ id: 'perm-2', role: 'AL Portal - Planner', resource: 'page.cases', level: 'Manage' }),
     ]);
 
-    expect(levelOf(grants, 'page.cases')).toMatchObject({ level: 'View', source: 'Default' });
+    // A rule for the Planner is a stored rule, so the environment is past bootstrap and
+    // the Tax Reviewer, with no rule of its own, holds nothing — which is what the server
+    // would answer.
+    expect(grants).toHaveLength(0);
   });
 
   it('ignores a row whose resource or level the app does not recognise', () => {

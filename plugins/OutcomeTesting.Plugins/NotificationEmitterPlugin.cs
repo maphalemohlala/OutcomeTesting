@@ -64,7 +64,7 @@ namespace OutcomeTesting.Plugins
 
             if (string.Equals(record.LogicalName, ActionEntity, StringComparison.OrdinalIgnoreCase))
             {
-                QueueRemediationAssigned(service, context, record.Id);
+                QueueRemediationAssigned(service, context.CorrelationId, record.Id);
             }
         }
 
@@ -107,7 +107,13 @@ namespace OutcomeTesting.Plugins
                 body);
         }
 
-        private static void QueueRemediationAssigned(IOrganizationService service, IPluginExecutionContext context, Guid actionId)
+        /// <summary>
+        /// Tells the assigned adviser a remediation action is theirs. Called on the create,
+        /// and again by <see cref="Remediation.AssignUnassignedActions"/> when an action
+        /// raised unassigned is later assigned — the adviser hears about it either way, and
+        /// the wording lives once.
+        /// </summary>
+        internal static void QueueRemediationAssigned(IOrganizationService service, Guid correlationId, Guid actionId)
         {
             var action = service.Retrieve(ActionEntity, actionId,
                 new ColumnSet("al_assignedcontactid", CaseLookup, "al_name", "al_duedate"));
@@ -123,7 +129,7 @@ namespace OutcomeTesting.Plugins
 
             NotificationOutbox.Queue(
                 service,
-                context,
+                correlationId,
                 NotificationOutbox.EventRemediationAssigned,
                 ActionEntity,
                 actionId,

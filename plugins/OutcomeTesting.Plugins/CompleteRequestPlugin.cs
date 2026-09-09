@@ -60,26 +60,57 @@ namespace OutcomeTesting.Plugins
 
             var actionId = entity.Id;
 
-            // One intent per action; a retry replays rather than writing a second Audit Event.
-            var idempotencyKey = "portal-complete-" + actionId.ToString("N");
+            var action = service.Retrieve(ActionEntity, actionId, new ColumnSet(AssignedContactAttr, ClockStartedOnAttr));
+            var contact = action.GetAttributeValue<EntityReference>(AssignedContactAttr);
 
-            var details = "Completed from the portal by contact " + DescribeAssignedContact(service, actionId) + ".";
+            var idempotencyKey = CompletionKey(actionId, action.GetAttributeValue<DateTime?>(ClockStartedOnAttr));
+
+            var details = "Completed from the portal by contact " + Describe(contact) + ".";
 
             CompleteRemediationPlugin.Complete(
                 service,
                 actionId,
                 idempotencyKey,
                 expectedRowVersion: null,
-                actorId: context.InitiatingUserId,
+                // The adviser, not the caller: a Power Pages write reaches Dataverse as the
+                // site's application user (AD-053), the same reason SubmitRequestPlugin names
+                // the assigned contact as the actor of a portal submit.
+                actorId: contact == null ? context.InitiatingUserId : contact.Id,
                 correlationId: context.CorrelationId,
                 requireCallerOwnsAction: false,
                 details: details);
         }
 
-        private static string DescribeAssignedContact(IOrganizationService service, Guid actionId)
+        private const string ClockStartedOnAttr = "al_clockstartedon";
+
+        /// <summary>
+        /// One intent per completion ROUND, so a retry after a dropped response replays the
+        /// original completion instead of writing a second Audit Event (NFR-REL-01) — and a
+        /// second round is a new intent.
+        ///
+        /// The key used to be the action id alone. That made the adviser's completion after a
+        /// rejected sign-off replay the FIRST completion: <c>Complete</c> found the earlier
+        /// audit event under the same key and answered success without writing anything, so
+        /// the action stayed In progress, the case stayed at Awaiting Remediation, and the
+        /// BR-008 rework loop could not be closed from the portal. A rejection restarts the
+        /// clock by writing al_clockstartedon (OD-018, SignoffProgressPlugin.ReopenedAction),
+        /// so that timestamp is what distinguishes the rounds. The first round keeps the
+        /// original key shape, so completions already recorded in an environment still
+        /// replay as the completions they were.
+        /// </summary>
+        public static string CompletionKey(Guid actionId, DateTime? clockStartedOn)
         {
-            var action = service.Retrieve(ActionEntity, actionId, new ColumnSet(AssignedContactAttr));
-            var contact = action.GetAttributeValue<EntityReference>(AssignedContactAttr);
+            var key = "portal-complete-" + actionId.ToString("N");
+            if (clockStartedOn.HasValue)
+            {
+                key += "-" + clockStartedOn.Value.ToUniversalTime().ToString("yyyyMMddHHmmssfff");
+            }
+
+            return key;
+        }
+
+        private static string Describe(EntityReference contact)
+        {
             if (contact == null)
             {
                 return "(none recorded)";

@@ -125,16 +125,21 @@
               The adviser's half of the BR-008 loop (PP-12, FR-020, FR-021), inline rather
               than on a page of its own so the worklist and the response live together.
 
-              Rendered only for an action assigned to the signed-in contact and not yet
-              completed. That is presentation, not a boundary: the Contact-scoped table
-              permission is what actually decides whose action can be written (AD-069), and
-              CompleteRemediationPlugin re-checks the status and the response server-side.
+              Rendered only for an action assigned to the signed-in contact that is still
+              Open or In progress. Keyed on the status, not on al_completedon: a rejected
+              sign-off reopens the action to In progress but deliberately keeps the earlier
+              al_completedon (OD-018, SignoffProgressPlugin.ReopenedAction), so a test on the
+              completion date hid this panel on every action sent back for rework and the
+              adviser had nowhere to respond. That is presentation, not a boundary: the
+              Contact-scoped table permission is what actually decides whose action can be
+              written (AD-069), and CompleteRemediationPlugin re-checks the status and the
+              response server-side.
             {% endcomment %}
-            {% if user and a.al_assignedcontactid.id == user.id and a.al_completedon == null %}
+            {% if user and a.al_assignedcontactid.id == user.id and a.al_actionstatus.value != 120910602 %}
               <tr class="ot-response-row">
                 <td colspan="9">
                   <details class="ot-response" data-ot-response data-action-id="{{ a.al_remediationactionid }}">
-                    <summary>Record your response</summary>
+                    <summary>{% if a.al_completedon %}Rework and resubmit your response{% else %}Record your response{% endif %}</summary>
 
                     <div class="ot-response__field">
                       <label for="ot-response-{{ a.al_remediationactionid }}">What did you do?</label>

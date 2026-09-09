@@ -235,6 +235,51 @@ namespace OutcomeTesting.Plugins
             return matches.Count == 1 ? matches[0].ToEntityReference() : null;
         }
 
+        /// <summary>
+        /// Assigns the case's open, unassigned remediation actions to the adviser now named
+        /// on the case, and tells them (PP-15 "Remediation assigned"). Returns how many.
+        ///
+        /// <see cref="Raise"/> leaves an action unassigned when <c>al_advisername</c> matches
+        /// no contact or two, and nothing could assign it afterwards: the portal's response
+        /// panel opens only for the assigned contact, so such an action sat on the worklist
+        /// with nobody able to answer it. Correcting the adviser's name on the case
+        /// (al_UpdateCaseDetails) is the natural repair — the name was the problem — and this
+        /// is what makes the correction reach the action. Only open actions with no assignee
+        /// are touched: an action already assigned, or already completed, is not moved to a
+        /// different person by a header edit.
+        /// </summary>
+        public static int AssignUnassignedActions(IOrganizationService service, EntityReference caseRef, Guid correlationId)
+        {
+            var adviser = AdviserContact(service, caseRef);
+            if (adviser == null)
+            {
+                return 0;
+            }
+
+            var query = new QueryExpression(ActionEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseRef.Id);
+            query.Criteria.AddCondition("al_assignedcontactid", ConditionOperator.Null);
+            query.Criteria.AddCondition("al_actionstatus", ConditionOperator.NotEqual, StatusCompleted);
+
+            var assigned = 0;
+            foreach (var action in CommandHelpers.RetrieveAll(service, query))
+            {
+                service.Update(new Entity(ActionEntity, action.Id)
+                {
+                    ["al_assignedcontactid"] = adviser,
+                });
+
+                NotificationEmitterPlugin.QueueRemediationAssigned(service, correlationId, action.Id);
+                assigned++;
+            }
+
+            return assigned;
+        }
+
         private static Guid FindByCode(IOrganizationService service, string code)
         {
             var query = new QueryExpression(ActionEntity)

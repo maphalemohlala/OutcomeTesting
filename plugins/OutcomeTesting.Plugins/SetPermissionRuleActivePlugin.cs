@@ -7,9 +7,12 @@ namespace OutcomeTesting.Plugins
     /// <summary>
     /// Server-side command SetPermissionRuleActive (AD-003, AD-041). Registered against the
     /// Custom API message <c>al_SetPermissionRuleActive</c>. An administrator withdraws (or
-    /// restores) an al_pagepermission override rule. Withdrawing a rule does not deny the
-    /// resource -- it drops the override so the role falls back to the code default in
-    /// DEFAULT_PERMISSIONS. To deny explicitly, set the rule's level to None instead.
+    /// restores) an al_pagepermission rule. Withdrawing a rule takes the access away: the
+    /// gate (<see cref="PermissionHelpers"/>) resolves from active rules alone, so a (role,
+    /// resource) with no active rule is None. The client reads the same way once any rule
+    /// is stored (app/src/types/permissions.ts, rulesInForce); its coded defaults are the
+    /// seed matrix and apply only to an environment holding no rule at all. This summary
+    /// used to promise a fall-back to those defaults that the server never had.
     ///
     /// Deactivation preserves the row and its history (AD-037/OD-010). Enforces the AD-041
     /// <c>permission.manage</c> Manage permission and writes an immutable Audit Event
@@ -49,14 +52,18 @@ namespace OutcomeTesting.Plugins
             var active = CommandHelpers.GetRequiredBool(context, InActive);
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
 
+            // Permission check before the idempotency lookup (matching AssignUserRolePlugin
+            // and SetRoleAssignmentActivePlugin): otherwise an unauthorised caller could probe
+            // whether a key exists and receive a real audit id back for work they were never
+            // allowed to trigger.
+            PermissionHelpers.EnsureAppPermission(systemService, context, "permission.manage", PermissionHelpers.AccessManage);
+
             var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandSetPermissionRuleActive);
             if (existingAudit != null)
             {
                 SetResponse(context, permissionId.ToString("D"), active, existingAudit.Id);
                 return;
             }
-
-            PermissionHelpers.EnsureAppPermission(systemService, context, "permission.manage", PermissionHelpers.AccessManage);
 
             Entity before;
             try

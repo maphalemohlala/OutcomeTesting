@@ -148,6 +148,15 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void Returns_a_case_to_the_queue_after_signoff_when_the_aqs_check_is_still_owed()
+        {
+            // OD-038: a Tax check that raised remediation holds the case until the
+            // remediation is approved; the AQS check then follows. Through remediation, not
+            // instead of it.
+            Assert.True(CaseLifecycle.IsAllowed(CaseLifecycle.AwaitingSignoff, CaseLifecycle.Queued));
+        }
+
+        [Fact]
         public void Names_both_states_in_its_refusal_message()
         {
             var message = CaseLifecycle.DescribeRefusal(CaseLifecycle.Imported, CaseLifecycle.Closed);

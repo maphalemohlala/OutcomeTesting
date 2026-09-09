@@ -299,8 +299,9 @@ namespace OutcomeTesting.Plugins.Tests
         public void Holds_a_flagged_tax_pass_for_remediation_before_aqs()
         {
             // Direction 2026-09-09, and the same reasoning OD-027 applies to a Tax
-            // non-pass: AQS must not review a file with something unaddressed on it. The
-            // case returns to the queue for its AQS check once the action is signed off.
+            // non-pass: AQS must not review a file with something unaddressed on it.
+            // Once the action is approved the case returns to the queue for its AQS check
+            // (OD-038): SignoffProgressPlugin.MoveCase, via Awaiting Sign-off -> Queued.
             Assert.Equal(
                 CaseLifecycle.AwaitingRemediation,
                 OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, true, true));

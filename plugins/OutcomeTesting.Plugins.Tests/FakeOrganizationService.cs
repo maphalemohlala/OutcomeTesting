@@ -115,6 +115,9 @@ namespace OutcomeTesting.Plugins.Tests
             }
 
             var projected = new Entity(entityName, id);
+            // The platform returns RowVersion on every Retrieve; a test seeds it to drive an
+            // optimistic-concurrency check that compares against what was read.
+            projected.RowVersion = row.RowVersion;
             foreach (var column in columnSet.Columns)
             {
                 if (row.Contains(column))

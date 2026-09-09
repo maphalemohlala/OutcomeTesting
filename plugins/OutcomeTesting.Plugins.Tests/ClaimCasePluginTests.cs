@@ -104,6 +104,111 @@ namespace OutcomeTesting.Plugins.Tests
                 ClaimCasePlugin.NextDiscipline(Route(false, true), Case(CaseLifecycle.Queued, RouteId)));
         }
 
+        private static void SeedSubmittedReview(FakeOrganizationService svc, int reviewType)
+        {
+            svc.Seed(
+                "al_reviewinstance",
+                Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_reviewtype", new OptionSetValue(reviewType),
+                "al_reviewstatus", new OptionSetValue(ResponseRules.StatusSubmitted),
+                "al_submittedon", new DateTime(2026, 9, 8, 9, 0, 0, DateTimeKind.Utc),
+                "statecode", new OptionSetValue(0));
+        }
+
+        [Fact]
+        public void Opens_the_aqs_check_once_the_tax_check_has_been_submitted()
+        {
+            // The BR-004 handoff. A passed Tax submit returns the case to Queued with its Tax
+            // review submitted and no AQS instance yet. Reading the route alone would open Tax
+            // again, and the deterministic al_reviewinstancecode then collides on the
+            // alternate key - so the AQS leg could never be picked up from the queue.
+            var svc = Route(true, true);
+            SeedSubmittedReview(svc, ResponseRules.ReviewTypeTax);
+
+            Assert.Equal(
+                ResponseRules.ReviewTypeAqs,
+                ClaimCasePlugin.NextDiscipline(svc, Case(CaseLifecycle.Queued, RouteId)));
+        }
+
+        [Fact]
+        public void Refuses_a_case_whose_every_required_check_has_been_submitted()
+        {
+            var svc = Route(true, true);
+            SeedSubmittedReview(svc, ResponseRules.ReviewTypeTax);
+            SeedSubmittedReview(svc, ResponseRules.ReviewTypeAqs);
+
+            var ex = Assert.Throws<InvalidPluginExecutionException>(
+                () => ClaimCasePlugin.NextDiscipline(svc, Case(CaseLifecycle.Queued, RouteId)));
+
+            Assert.Contains("already been submitted", ex.Message);
+        }
+
+        [Fact]
+        public void An_inactive_submitted_review_does_not_count_as_the_check_being_done()
+        {
+            var svc = Route(true, true);
+            svc.Seed(
+                "al_reviewinstance",
+                Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_reviewtype", new OptionSetValue(ResponseRules.ReviewTypeTax),
+                "al_submittedon", new DateTime(2026, 9, 8, 9, 0, 0, DateTimeKind.Utc),
+                "statecode", new OptionSetValue(1));
+
+            Assert.Equal(
+                ResponseRules.ReviewTypeTax,
+                ClaimCasePlugin.NextDiscipline(svc, Case(CaseLifecycle.Queued, RouteId)));
+        }
+
+        private static readonly Guid ContactId = Guid.Parse("eeeeeeee-5555-4555-8555-555555555555");
+
+        private static FakeOrganizationService Holding(params string[] roleNames)
+        {
+            var svc = new FakeOrganizationService();
+            var rows = new System.Collections.Generic.List<Entity>();
+            foreach (var name in roleNames)
+            {
+                var row = new Entity("contact", ContactId);
+                row["role.name"] = new AliasedValue("powerpagecomponent", "name", name);
+                rows.Add(row);
+            }
+
+            svc.FetchResults.Enqueue(new EntityCollection(rows));
+            return svc;
+        }
+
+        [Fact]
+        public void A_tax_reviewer_may_pick_up_a_tax_check()
+        {
+            ClaimCasePlugin.EnsureDisciplineRole(Holding(WebRoleRegistry.TaxReviewerRole), ContactId, ResponseRules.ReviewTypeTax);
+        }
+
+        [Fact]
+        public void An_aqs_reviewer_may_not_pick_up_a_tax_check()
+        {
+            // The queue pages filter by discipline, but a page is presentation: both reviewer
+            // roles are bound to the same claim permission.
+            var ex = Assert.Throws<InvalidPluginExecutionException>(
+                () => ClaimCasePlugin.EnsureDisciplineRole(Holding(WebRoleRegistry.AqsReviewerRole), ContactId, ResponseRules.ReviewTypeTax));
+
+            Assert.Contains(WebRoleRegistry.TaxReviewerRole, ex.Message);
+        }
+
+        [Fact]
+        public void A_checker_holding_both_roles_may_pick_up_either()
+        {
+            ClaimCasePlugin.EnsureDisciplineRole(
+                Holding(WebRoleRegistry.TaxReviewerRole, WebRoleRegistry.AqsReviewerRole), ContactId, ResponseRules.ReviewTypeAqs);
+        }
+
+        [Fact]
+        public void A_contact_with_no_reviewer_role_is_refused()
+        {
+            Assert.Throws<InvalidPluginExecutionException>(
+                () => ClaimCasePlugin.EnsureDisciplineRole(Holding("AL Portal - Planner"), ContactId, ResponseRules.ReviewTypeAqs));
+        }
+
         [Fact]
         public void Refuses_a_case_carrying_no_route()
         {

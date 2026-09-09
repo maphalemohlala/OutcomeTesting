@@ -221,6 +221,11 @@ export function RoleFormModal(props: RoleFormModalProps) {
             onChange={(e) => props.onNameChange(e.target.value)}
             placeholder="e.g. Senior Checker"
             autoComplete="off"
+            // A web role's name IS its code (AD-087): every assignment and permission rule
+            // references it by name, so al_UpdateRole refuses a rename. Read-only here so
+            // the form does not offer an edit the server will refuse.
+            readOnly={Boolean(editing)}
+            aria-readonly={editing ? true : undefined}
           />
         </label>
         <label className="security__field">
@@ -234,8 +239,9 @@ export function RoleFormModal(props: RoleFormModalProps) {
         </label>
         {editing ? (
           <p className="security__hint">
-            The role code <strong>{editing.code}</strong> stays the same, so existing assignments
-            and permission rules keep working.
+            The role name <strong>{editing.code}</strong> is its code and cannot be changed: existing
+            assignments and permission rules reference it by name. To rename, create a new role and
+            move the assignments across.
           </p>
         ) : null}
         <div className="security__form-actions">

@@ -86,6 +86,11 @@ namespace OutcomeTesting.Plugins
         /// handoff (BR-004). Allocation is manual (BR-003, AD-040), so the case goes back
         /// to the shared queue for a manager to assign the AQS checker rather than moving
         /// straight to a named person. This is a handoff, not a backwards step.
+        ///
+        /// Awaiting Sign-off also returns to Queued (OD-038, project owner direction
+        /// 2026-09-09): a Tax check that raised remediation holds the case until that
+        /// remediation is approved, and the AQS check then follows. The case has to go
+        /// through remediation before it can reach AQS, not instead of it.
         /// </summary>
         private static readonly Dictionary<int, int[]> Allowed = new Dictionary<int, int[]>
         {
@@ -98,7 +103,7 @@ namespace OutcomeTesting.Plugins
             { Submitted, new[] { AwaitingRemediation, Closed } },
             { AwaitingRemediation, new[] { RemediationInProgress } },
             { RemediationInProgress, new[] { AwaitingSignoff } },
-            { AwaitingSignoff, new[] { AwaitingRecheck, AwaitingRemediation } },
+            { AwaitingSignoff, new[] { AwaitingRecheck, AwaitingRemediation, Queued } },
             { AwaitingRecheck, new[] { Closed } },
             { Closed, new int[0] },
             { NoCheckRequired, new int[0] },

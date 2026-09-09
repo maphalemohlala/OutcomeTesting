@@ -101,7 +101,7 @@ namespace OutcomeTesting.Plugins
             PermissionHelpers.EnsureAppPermission(systemService, context, "command.assign", PermissionHelpers.AccessEdit);
 
             // Retrieved through the caller's service so read privilege on the case is part of the gate.
-            var outcomeCase = userService.Retrieve(CaseEntity, caseId, new ColumnSet(CaseRefAttr));
+            var outcomeCase = userService.Retrieve(CaseEntity, caseId, new ColumnSet(CaseRefAttr, "al_reviewrouteid"));
             var caseReference = outcomeCase.GetAttributeValue<string>(CaseRefAttr);
 
             // Identity resolution happens before anything is written: a half-assigned case -
@@ -109,7 +109,7 @@ namespace OutcomeTesting.Plugins
             // reviewer unable to open it.
             var assignee = ResolveAssignee(systemService, assigneeEmail);
 
-            var review = ResolveReviewInstance(userService, caseId, requestedReviewId);
+            var review = ResolveReviewInstance(userService, systemService, outcomeCase, requestedReviewId, assignee);
             var reviewId = review.Id;
 
             ReleasePriorAssignments(userService, caseId);
@@ -226,9 +226,27 @@ namespace OutcomeTesting.Plugins
         /// <summary>
         /// The review instance this allocation is for. An explicit id wins; otherwise the
         /// earliest unsubmitted check by sequence, which is the Tax leg on a Tax-then-AQS
-        /// route and the AQS leg once Tax has been submitted (BR-004).
+        /// route and the AQS leg once Tax has been submitted (BR-004); and where the case
+        /// carries no open check at all, the one the route says it owes next, opened here.
+        ///
+        /// Opening it is what makes manager allocation reach a fresh case. Only the portal
+        /// self-claim (AD-076) created review instances, so a queued case nobody had claimed
+        /// — and every Tax-then-AQS case returning to the queue for its AQS leg — refused
+        /// allocation with "no unsubmitted check", leaving BR-003's named allocation
+        /// reachable only after a checker had first taken the case themselves. The instance
+        /// is opened with <see cref="ClaimCasePlugin.OpenNextReview"/>, the same shape the
+        /// self-claim writes, and as the plug-in user for the same reason that path does:
+        /// the row is owned by the assignee, and assigning on create is not a privilege the
+        /// allocating manager needs to hold.
+        ///
+        /// Public and static so the three outcomes are testable without a plug-in context.
         /// </summary>
-        private static Entity ResolveReviewInstance(IOrganizationService service, Guid caseId, Guid? requestedReviewId)
+        public static Entity ResolveReviewInstance(
+            IOrganizationService userService,
+            IOrganizationService systemService,
+            Entity outcomeCase,
+            Guid? requestedReviewId,
+            Assignee assignee)
         {
             var query = new QueryExpression(ReviewEntity)
             {
@@ -237,7 +255,7 @@ namespace OutcomeTesting.Plugins
                 {
                     Conditions =
                     {
-                        new ConditionExpression("al_outcomecaseid", ConditionOperator.Equal, caseId),
+                        new ConditionExpression("al_outcomecaseid", ConditionOperator.Equal, outcomeCase.Id),
                         new ConditionExpression(SubmittedOnAttr, ConditionOperator.Null),
                     },
                 },
@@ -250,16 +268,19 @@ namespace OutcomeTesting.Plugins
                     "al_reviewinstanceid", ConditionOperator.Equal, requestedReviewId.Value);
             }
 
-            var matches = service.RetrieveMultiple(query).Entities;
-            if (matches.Count == 0)
+            var matches = userService.RetrieveMultiple(query).Entities;
+            if (matches.Count > 0)
             {
-                throw new InvalidPluginExecutionException(
-                    CommandHelpers.PreconditionPrefix + (requestedReviewId.HasValue
-                        ? "That check is already submitted, or does not belong to this case."
-                        : "This case has no unsubmitted check to allocate."));
+                return matches[0];
             }
 
-            return matches[0];
+            if (requestedReviewId.HasValue)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + "That check is already submitted, or does not belong to this case.");
+            }
+
+            return ClaimCasePlugin.OpenNextReview(systemService, outcomeCase, assignee);
         }
 
         /// <summary>

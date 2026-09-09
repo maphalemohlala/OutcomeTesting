@@ -442,9 +442,11 @@ namespace OutcomeTesting.Plugins
                 }
             }
 
-            // OD-027: only a passed Tax check may proceed to AQS. A failed Tax check sends
-            // the case to remediation, so an AQS review on that case would grade advice
-            // whose tax position is still unresolved. No submitted Tax review, or one with
+            // OD-027, as OD-038 now completes it: a Tax check that did not pass sends the
+            // case to remediation, and the AQS review follows once that remediation has been
+            // APPROVED — through remediation, not instead of it. So an AQS submit is refused
+            // while the Tax non-pass is unremediated, and allowed once the action the Tax
+            // check raised carries an approved sign-off. No submitted Tax review, or one with
             // no answer recorded, is not refused here — the checks above already cover the
             // cases that matter, and refusing on absent data would break AQS-only and
             // legacy routes.
@@ -470,13 +472,53 @@ namespace OutcomeTesting.Plugins
             var submittedTaxEntities = service.RetrieveMultiple(submittedTax).Entities;
             if (submittedTaxEntities.Count > 0)
             {
-                var taxAnswer = AnswerChoiceFor(service, submittedTaxEntities[0].Id, TaxOutcomeQuestionCode);
-                if (taxAnswer.HasValue && OutcomeRules.TaxResultRequiresRemediation(taxAnswer.Value))
+                var taxReviewId = submittedTaxEntities[0].Id;
+                var taxAnswer = AnswerChoiceFor(service, taxReviewId, TaxOutcomeQuestionCode);
+                if (taxAnswer.HasValue
+                    && OutcomeRules.TaxResultRequiresRemediation(taxAnswer.Value)
+                    && !RemediationApproved(service, taxReviewId))
                 {
                     throw new InvalidPluginExecutionException(
-                        PreconditionPrefix + "The tax check on this case did not pass, so the case is in remediation and cannot proceed to an AQS review (OD-027).");
+                        PreconditionPrefix + "The tax check on this case did not pass and its remediation has not been signed off, so the case cannot proceed to an AQS review yet (OD-027, OD-038).");
                 }
             }
+        }
+
+        /// <summary>
+        /// Whether the remediation action a review raised carries an approved sign-off. This
+        /// is what lets an AQS review follow a Tax non-pass (OD-038): the case went through
+        /// remediation, the T&amp;C Manager approved it, and only then did it return to the
+        /// queue. An action that was never raised, is still open, or was only ever rejected
+        /// does not count.
+        /// </summary>
+        public static bool RemediationApproved(IOrganizationService service, Guid reviewId)
+        {
+            var actions = new QueryExpression("al_remediationaction")
+            {
+                ColumnSet = new ColumnSet(false),
+                Criteria = new FilterExpression(),
+            };
+            actions.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
+
+            foreach (var action in service.RetrieveMultiple(actions).Entities)
+            {
+                var signoffs = new QueryExpression("al_signoff")
+                {
+                    ColumnSet = new ColumnSet(false),
+                    TopCount = 1,
+                    Criteria = new FilterExpression(),
+                };
+                signoffs.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+                signoffs.Criteria.AddCondition("al_remediationactionid", ConditionOperator.Equal, action.Id);
+                signoffs.Criteria.AddCondition("al_signoffdecision", ConditionOperator.Equal, SignoffProgressPlugin.DecisionApprovedValue);
+
+                if (service.RetrieveMultiple(signoffs).Entities.Count > 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -556,17 +598,31 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         private static bool AqsStillToCome(IOrganizationService service, Guid caseId)
         {
+            return AqsStillOwed(service, caseId);
+        }
+
+        /// <summary>
+        /// Whether the case still owes an AQS review: the route requires one and none has
+        /// been submitted. Where the case carries no route — every case created before the
+        /// route seed existed — an unsubmitted AQS instance is the only evidence, so that is
+        /// what decides.
+        ///
+        /// Asked at a Tax submit (does the case go to the queue or finalise?) and at an
+        /// approved sign-off (does the case go back to the queue for AQS, or on to recheck?
+        /// — OD-038). The second caller is why "no unsubmitted instance" is not read as
+        /// "still to come": at sign-off the AQS review may already be in, and sending the
+        /// case back to the queue then would offer a finished check for a second checker.
+        /// </summary>
+        public static bool AqsStillOwed(IOrganizationService service, Guid caseId)
+        {
             bool aqsRequired;
             var hasRoute = TryRouteRequires(service, caseId, RouteRequiresAqs, out aqsRequired);
 
-            // A route that explicitly does not require AQS settles it: this is Tax-only.
-            if (hasRoute && !aqsRequired)
+            if (hasRoute)
             {
-                return false;
+                return aqsRequired && !HasSubmittedReview(service, caseId, ResponseRules.ReviewTypeAqs);
             }
 
-            // Either the route requires AQS, or there is no route to ask. Both are
-            // answered the same way: is there an AQS instance that has not been submitted?
             var query = new QueryExpression(ReviewEntity)
             {
                 ColumnSet = new ColumnSet(false),
@@ -578,14 +634,40 @@ namespace OutcomeTesting.Plugins
             query.Criteria.AddCondition(ReviewType, ConditionOperator.Equal, ResponseRules.ReviewTypeAqs);
             query.Criteria.AddCondition(ReviewStatus, ConditionOperator.NotEqual, StatusSubmitted);
 
-            if (service.RetrieveMultiple(query).Entities.Count > 0)
-            {
-                return true;
-            }
+            return service.RetrieveMultiple(query).Entities.Count > 0;
+        }
 
-            // No unsubmitted AQS instance. If the route demanded one it has not been
-            // created yet, so it is still to come; with no route, this is Tax-only.
-            return hasRoute;
+        private static bool HasSubmittedReview(IOrganizationService service, Guid caseId, int reviewType)
+        {
+            var query = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition(ReviewOutcomeCase, ConditionOperator.Equal, caseId);
+            query.Criteria.AddCondition(ReviewType, ConditionOperator.Equal, reviewType);
+            query.Criteria.AddCondition(ReviewStatus, ConditionOperator.Equal, StatusSubmitted);
+
+            return service.RetrieveMultiple(query).Entities.Count > 0;
+        }
+
+        /// <summary>
+        /// Whether the case carries an Outcome at all. A Tax check records none (AD-055), so a
+        /// remediated Tax-only case has no final outcome to set at recheck.
+        /// </summary>
+        public static bool HasOutcome(IOrganizationService service, Guid caseId)
+        {
+            var query = new QueryExpression(OutcomeEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+
+            return service.RetrieveMultiple(query).Entities.Count > 0;
         }
 
         /// <summary>

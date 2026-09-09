@@ -247,10 +247,72 @@ namespace OutcomeTesting.Plugins
                         "Another checker has already started checks on this case.");
                 }
 
+                var existingType = existing[0].GetAttributeValue<OptionSetValue>(ReviewTypeAttr);
+                EnsureDisciplineRole(service, assignee.ContactId, existingType == null ? 0 : existingType.Value);
                 return existing[0];
             }
 
-            var reviewType = NextDiscipline(service, outcomeCase);
+            var next = NextDiscipline(service, outcomeCase);
+            EnsureDisciplineRole(service, assignee.ContactId, next);
+            return OpenNextReview(service, outcomeCase, assignee, next);
+        }
+
+        /// <summary>
+        /// A checker may only pick up the discipline they hold the web role for: a Tax check
+        /// needs the Tax Reviewer role, an AQS check the AQS Reviewer role. The queue pages
+        /// already filter by discipline, but a page is presentation; both reviewer roles are
+        /// bound to the same claim permission, so without this a reviewer who reached the
+        /// other discipline's page could take its work. Read from the contact's web role
+        /// associations, which is the same source the permission gate resolves from.
+        /// </summary>
+        public static void EnsureDisciplineRole(IOrganizationService service, Guid contactId, int reviewType)
+        {
+            string required;
+            switch (reviewType)
+            {
+                case ResponseRules.ReviewTypeTax:
+                    required = WebRoleRegistry.TaxReviewerRole;
+                    break;
+                case ResponseRules.ReviewTypeAqs:
+                    required = WebRoleRegistry.AqsReviewerRole;
+                    break;
+                default:
+                    throw new InvalidPluginExecutionException(
+                        CommandHelpers.PreconditionPrefix +
+                        "This check has no recognised discipline, so it cannot be picked up.");
+            }
+
+            foreach (var role in WebRoleRegistry.RolesForContact(service, contactId))
+            {
+                if (string.Equals(role, required, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+
+            throw new InvalidPluginExecutionException(
+                CommandHelpers.PreconditionPrefix +
+                "This case owes " + (reviewType == ResponseRules.ReviewTypeTax ? "a Tax" : "an AQS")
+                + " check, and picking it up needs the " + required + " role.");
+        }
+
+        /// <summary>
+        /// Opens the review instance for the discipline the case owes next, stamped with the
+        /// checklist version in force (BR-013) and pointed at the assignee in both identity
+        /// systems. Shared with <c>al_AssignCase</c>: a manager allocating a case nobody has
+        /// claimed yet needs the same instance a self-claim would open, and two writers of
+        /// the same row is two places for its shape to drift. <paramref name="outcomeCase"/>
+        /// must carry <c>al_reviewrouteid</c>.
+        /// </summary>
+        public static Entity OpenNextReview(
+            IOrganizationService service, Entity outcomeCase, AssignCasePlugin.Assignee assignee)
+        {
+            return OpenNextReview(service, outcomeCase, assignee, NextDiscipline(service, outcomeCase));
+        }
+
+        private static Entity OpenNextReview(
+            IOrganizationService service, Entity outcomeCase, AssignCasePlugin.Assignee assignee, int reviewType)
+        {
             var isTax = reviewType == ResponseRules.ReviewTypeTax;
             var label = isTax ? "Tax" : "AQS";
 
@@ -313,10 +375,18 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Which discipline a case with no review instance yet owes. Tax first where the
-        /// route requires it (BR-004); AQS where the route requires only that. A case whose
-        /// route requires neither, or that carries no route at all, is refused rather than
-        /// guessed at — routing is <c>UpdateCaseDetailsPlugin.DeriveRoute</c>'s job.
+        /// Which discipline a case with no open review instance owes. Tax first where the
+        /// route requires it (BR-004); AQS where the route requires only that, or once the
+        /// Tax check has been submitted. A case whose route requires neither, or that
+        /// carries no route at all, is refused rather than guessed at — routing is
+        /// <c>UpdateCaseDetailsPlugin.DeriveRoute</c>'s job.
+        ///
+        /// The submitted checks are consulted, not just the route, because of the BR-004
+        /// handoff: a passed Tax submit returns the case to Queued with its Tax review
+        /// submitted and no AQS instance yet. Read from the route alone, that case owed Tax
+        /// again, and the deterministic review code then collided on the
+        /// al_reviewinstancecode alternate key — so the AQS leg of a Tax-then-AQS route could
+        /// never be picked up from the queue at all.
         /// </summary>
         public static int NextDiscipline(IOrganizationService service, Entity outcomeCase)
         {
@@ -331,19 +401,62 @@ namespace OutcomeTesting.Plugins
             var route = service.Retrieve(
                 RouteEntity, routeRef.Id, new ColumnSet(RouteRequiresTaxAttr, RouteRequiresAqsAttr));
 
-            if (route.GetAttributeValue<bool?>(RouteRequiresTaxAttr) ?? false)
+            var requiresTax = route.GetAttributeValue<bool?>(RouteRequiresTaxAttr) ?? false;
+            var requiresAqs = route.GetAttributeValue<bool?>(RouteRequiresAqsAttr) ?? false;
+
+            if (!requiresTax && !requiresAqs)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "This case's review route requires no check, so there is nothing to pick up.");
+            }
+
+            var submitted = SubmittedDisciplines(service, outcomeCase.Id);
+
+            if (requiresTax && !submitted.Contains(ResponseRules.ReviewTypeTax))
             {
                 return ResponseRules.ReviewTypeTax;
             }
 
-            if (route.GetAttributeValue<bool?>(RouteRequiresAqsAttr) ?? false)
+            if (requiresAqs && !submitted.Contains(ResponseRules.ReviewTypeAqs))
             {
                 return ResponseRules.ReviewTypeAqs;
             }
 
             throw new InvalidPluginExecutionException(
                 CommandHelpers.PreconditionPrefix +
-                "This case's review route requires no check, so there is nothing to pick up.");
+                "Every check this case's route requires has already been submitted, so there is nothing to pick up.");
+        }
+
+        /// <summary>The disciplines whose review on this case has been submitted (active rows only).</summary>
+        private static System.Collections.Generic.HashSet<int> SubmittedDisciplines(
+            IOrganizationService service, Guid caseId)
+        {
+            var query = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet(ReviewTypeAttr),
+                Criteria = new FilterExpression
+                {
+                    Conditions =
+                    {
+                        new ConditionExpression("statecode", ConditionOperator.Equal, 0),
+                        new ConditionExpression(CaseLookup, ConditionOperator.Equal, caseId),
+                        new ConditionExpression(SubmittedOnAttr, ConditionOperator.NotNull),
+                    },
+                },
+            };
+
+            var disciplines = new System.Collections.Generic.HashSet<int>();
+            foreach (var review in service.RetrieveMultiple(query).Entities)
+            {
+                var type = review.GetAttributeValue<OptionSetValue>(ReviewTypeAttr);
+                if (type != null)
+                {
+                    disciplines.Add(type.Value);
+                }
+            }
+
+            return disciplines;
         }
 
         /// <summary>

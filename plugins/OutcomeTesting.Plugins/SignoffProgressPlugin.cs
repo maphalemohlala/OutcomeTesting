@@ -29,8 +29,8 @@ namespace OutcomeTesting.Plugins
         private const string CaseLookup = "al_outcomecaseid";
 
         private const int StatusInProgress = Remediation.StatusInProgress;
-        private const int DecisionApprovedValue = 120910720;
-        private const int DecisionRejectedValue = 120910721;
+        public const int DecisionApprovedValue = 120910720;
+        public const int DecisionRejectedValue = 120910721;
 
         private const int CommandSignOffRemediation = 120910757;
 
@@ -80,21 +80,31 @@ namespace OutcomeTesting.Plugins
             {
                 service.Update(ReopenedAction(actionRef.Id, DateTime.UtcNow));
             }
-            else if (decision.Value == DecisionApprovedValue)
+
+            var caseId = ResolveCase(service, signoff, actionRef);
+            if (caseId.HasValue)
             {
-                AdvanceCase(service, signoff, actionRef);
+                MoveCase(service, caseId.Value, decision.Value);
             }
 
-            CommandHelpers.WriteAuditEvent(
-                service,
-                CommandSignOffRemediation,
-                "SignOffRemediation " + actionRef.Id.ToString("D"),
-                ActionEntity,
-                actionRef.Id,
-                signoff.GetAttributeValue<string>(NotesAttr),
-                "Signed off from the portal: " + DescribeDecision(decision.Value) + ". Sign-off " + signoff.Id.ToString("D"),
-                idempotencyKey,
-                context);
+            // One Audit Event per decision. A create raised by the al_SignOffRemediation
+            // command is audited by that command, under the caller's own idempotency key;
+            // writing a second event here recorded the same decision twice (BR-012 wants an
+            // immutable record, not a duplicated one). The consequences above still run for
+            // both doors — that is the point of them living here.
+            if (!CommandHelpers.IsWithinMessage(context, SignOffRemediationPlugin.MessageName))
+            {
+                CommandHelpers.WriteAuditEvent(
+                    service,
+                    CommandSignOffRemediation,
+                    "SignOffRemediation " + actionRef.Id.ToString("D"),
+                    ActionEntity,
+                    actionRef.Id,
+                    signoff.GetAttributeValue<string>(NotesAttr),
+                    "Signed off from the portal: " + DescribeDecision(decision.Value) + ". Sign-off " + signoff.Id.ToString("D"),
+                    idempotencyKey,
+                    context);
+            }
 
             QueueSignoffNotification(service, context, signoff, actionRef, decision.Value);
         }
@@ -167,12 +177,8 @@ namespace OutcomeTesting.Plugins
             };
         }
 
-        /// <summary>
-        /// An approved remediation sends the case on to recheck. The hop is checked against
-        /// AD-057 rather than assumed, so a case that is not where the lifecycle expects is
-        /// refused instead of jumping.
-        /// </summary>
-        private static void AdvanceCase(IOrganizationService service, Entity signoff, EntityReference actionRef)
+        /// <summary>The case the sign-off is about: from the sign-off itself, else from its action.</summary>
+        private static Guid? ResolveCase(IOrganizationService service, Entity signoff, EntityReference actionRef)
         {
             var caseRef = signoff.GetAttributeValue<EntityReference>(CaseLookup);
             if (caseRef == null)
@@ -181,15 +187,60 @@ namespace OutcomeTesting.Plugins
                 caseRef = action.GetAttributeValue<EntityReference>(CaseLookup);
             }
 
-            if (caseRef == null)
+            return caseRef == null ? (Guid?)null : caseRef.Id;
+        }
+
+        /// <summary>
+        /// Where the decision leaves the case (AD-057, BR-008). A rejection returns it to
+        /// Awaiting Remediation alongside the reopened action — the "returns with notes"
+        /// step, which used to move the action and leave the case reading as though the
+        /// T&amp;C Manager still held it. An approval goes one of three ways:
+        ///
+        /// - back to <b>Queued</b> when the route still owes an AQS review (OD-038, project
+        ///   owner direction 2026-09-09: the case has to go through remediation before it can
+        ///   reach AQS). The AQS checker then picks it up from the shared queue, and the AQS
+        ///   submit accepts it because the Tax remediation is approved;
+        /// - on to <b>Awaiting Recheck</b> where the case carries an Outcome, so the T&amp;C
+        ///   Manager can set the final outcome (al_RegradeCase), which closes it;
+        /// - through recheck to <b>Closed</b> where the case carries no Outcome at all — a
+        ///   remediated Tax-only case (AD-055) has no final outcome to set, so a recheck
+        ///   would wait for a decision nothing can record.
+        ///
+        /// Only a case AT Awaiting Sign-off is moved. The hops are checked against the
+        /// lifecycle rather than assumed, so a case that is not where it expects is left
+        /// alone instead of jumping.
+        /// </summary>
+        public static void MoveCase(IOrganizationService service, Guid caseId, int decision)
+        {
+            var current = CaseTransitions.CurrentStatus(service, caseId);
+            if (!current.HasValue || current.Value != CaseLifecycle.AwaitingSignoff)
             {
                 return;
             }
 
-            var current = CaseTransitions.CurrentStatus(service, caseRef.Id);
-            if (current.HasValue && current.Value == CaseLifecycle.AwaitingSignoff)
+            switch (decision)
             {
-                CaseTransitions.MoveThrough(service, caseRef.Id, CaseLifecycle.AwaitingRecheck);
+                case DecisionRejectedValue:
+                    CaseTransitions.MoveThrough(service, caseId, CaseLifecycle.AwaitingRemediation);
+                    return;
+
+                case DecisionApprovedValue:
+                    if (SubmitReviewPlugin.AqsStillOwed(service, caseId))
+                    {
+                        CaseTransitions.MoveThrough(service, caseId, CaseLifecycle.Queued);
+                        return;
+                    }
+
+                    CaseTransitions.MoveThrough(service, caseId, CaseLifecycle.AwaitingRecheck);
+                    if (!SubmitReviewPlugin.HasOutcome(service, caseId))
+                    {
+                        CaseTransitions.MoveThrough(service, caseId, CaseLifecycle.Closed);
+                    }
+
+                    return;
+
+                default:
+                    return;
             }
         }
 

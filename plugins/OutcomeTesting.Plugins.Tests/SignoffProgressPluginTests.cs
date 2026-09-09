@@ -51,6 +51,134 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal(ActionId, update.Id);
         }
 
+        private static readonly Guid CaseId = Guid.Parse("bbbbbbbb-2222-4222-8222-222222222222");
+        private const int Approved = 120910720;
+        private const int Rejected = 120910721;
+
+        private static FakeOrganizationService CaseAt(int status)
+        {
+            var svc = new FakeOrganizationService();
+            svc.Seed("al_outcomecase", CaseId, "al_casestatus", new OptionSetValue(status));
+            return svc;
+        }
+
+        private static int CaseStatus(FakeOrganizationService svc)
+        {
+            return svc.Row("al_outcomecase", CaseId).GetAttributeValue<OptionSetValue>("al_casestatus").Value;
+        }
+
+        private static readonly Guid RouteId = Guid.Parse("cccccccc-3333-4333-8333-cccccccccccc");
+
+        private static void Route(FakeOrganizationService svc, bool tax, bool aqs)
+        {
+            svc.Seed("al_reviewroute", RouteId, "al_requirestaxreview", tax, "al_requiresaqsreview", aqs);
+            svc.Row("al_outcomecase", CaseId)["al_reviewrouteid"] = new EntityReference("al_reviewroute", RouteId);
+        }
+
+        private static void SubmittedReview(FakeOrganizationService svc, int reviewType)
+        {
+            svc.Seed(
+                "al_reviewinstance",
+                Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_reviewtype", new OptionSetValue(reviewType),
+                "al_reviewstatus", new OptionSetValue(ResponseRules.StatusSubmitted),
+                "al_submittedon", new DateTime(2026, 9, 8, 9, 0, 0, DateTimeKind.Utc),
+                "statecode", new OptionSetValue(0));
+        }
+
+        private static void Outcome(FakeOrganizationService svc)
+        {
+            svc.Seed(
+                "al_outcome",
+                Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_initialoutcome", new OptionSetValue(OutcomeRules.OutcomePassWithIssues));
+        }
+
+        [Fact]
+        public void An_approval_returns_a_case_that_still_owes_aqs_to_the_queue()
+        {
+            // OD-038: the Tax check raised remediation; approved, the case goes through to
+            // its AQS check rather than closing without one.
+            var svc = CaseAt(CaseLifecycle.AwaitingSignoff);
+            Route(svc, tax: true, aqs: true);
+            SubmittedReview(svc, ResponseRules.ReviewTypeTax);
+
+            SignoffProgressPlugin.MoveCase(svc, CaseId, Approved);
+
+            Assert.Equal(CaseLifecycle.Queued, CaseStatus(svc));
+        }
+
+        [Fact]
+        public void An_approval_sends_a_graded_case_on_to_recheck()
+        {
+            // The AQS leg's remediation: the AQS review is in and the Outcome exists, so the
+            // T&C Manager sets the final outcome next (al_RegradeCase closes it).
+            var svc = CaseAt(CaseLifecycle.AwaitingSignoff);
+            Route(svc, tax: true, aqs: true);
+            SubmittedReview(svc, ResponseRules.ReviewTypeTax);
+            SubmittedReview(svc, ResponseRules.ReviewTypeAqs);
+            Outcome(svc);
+
+            SignoffProgressPlugin.MoveCase(svc, CaseId, Approved);
+
+            Assert.Equal(CaseLifecycle.AwaitingRecheck, CaseStatus(svc));
+        }
+
+        [Fact]
+        public void An_approval_closes_a_tax_only_case_that_has_nothing_to_regrade()
+        {
+            // A Tax check records no Outcome (AD-055), so a remediated Tax-only case has no
+            // final outcome to set at recheck; waiting there would wait forever.
+            var svc = CaseAt(CaseLifecycle.AwaitingSignoff);
+            Route(svc, tax: true, aqs: false);
+            SubmittedReview(svc, ResponseRules.ReviewTypeTax);
+
+            SignoffProgressPlugin.MoveCase(svc, CaseId, Approved);
+
+            Assert.Equal(CaseLifecycle.Closed, CaseStatus(svc));
+            var hops = svc.Updates.ConvertAll(u => u.GetAttributeValue<OptionSetValue>("al_casestatus").Value);
+            Assert.Equal(new[] { CaseLifecycle.AwaitingRecheck, CaseLifecycle.Closed }, hops);
+        }
+
+        [Fact]
+        public void An_approval_on_a_case_with_no_route_falls_back_to_recheck()
+        {
+            var svc = CaseAt(CaseLifecycle.AwaitingSignoff);
+            Outcome(svc);
+
+            SignoffProgressPlugin.MoveCase(svc, CaseId, Approved);
+
+            Assert.Equal(CaseLifecycle.AwaitingRecheck, CaseStatus(svc));
+        }
+
+        [Fact]
+        public void A_rejection_returns_the_case_to_awaiting_remediation()
+        {
+            // AD-057: "a rejected sign-off returns Awaiting Sign-off to Awaiting Remediation"
+            // (BR-008). The action was reopened, but the case stayed at Awaiting Sign-off, so
+            // the worklists said the T&C Manager still held a case the adviser was reworking.
+            var svc = CaseAt(CaseLifecycle.AwaitingSignoff);
+
+            SignoffProgressPlugin.MoveCase(svc, CaseId, Rejected);
+
+            Assert.Equal(CaseLifecycle.AwaitingRemediation, CaseStatus(svc));
+        }
+
+        [Theory]
+        [InlineData(Approved)]
+        [InlineData(Rejected)]
+        public void Leaves_a_case_that_is_not_awaiting_signoff_where_it_is(int decision)
+        {
+            var svc = CaseAt(CaseLifecycle.Closed);
+
+            SignoffProgressPlugin.MoveCase(svc, CaseId, decision);
+
+            Assert.Equal(CaseLifecycle.Closed, CaseStatus(svc));
+            Assert.Empty(svc.Updates);
+        }
+
         [Fact]
         public void Does_not_touch_completion_so_the_earlier_completion_is_not_erased()
         {

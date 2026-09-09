@@ -102,6 +102,87 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.False(result.Conflict);
         }
 
+        private static readonly Guid CaseId = Guid.Parse("44444444-dddd-4ddd-8ddd-444444444444");
+
+        private static FakeOrganizationService ActionOnCase(int caseStatus)
+        {
+            var svc = Action("Rebuilt the suitability report.");
+            svc.Row("al_remediationaction", ActionId)["al_outcomecaseid"] =
+                new EntityReference("al_outcomecase", CaseId);
+            svc.Seed("al_outcomecase", CaseId, "al_casestatus", new OptionSetValue(caseStatus));
+            return svc;
+        }
+
+        private static int CaseStatus(FakeOrganizationService svc)
+        {
+            return svc.Row("al_outcomecase", CaseId).GetAttributeValue<OptionSetValue>("al_casestatus").Value;
+        }
+
+        /// <summary>
+        /// The AD-057 lifecycle: Awaiting Remediation -> Remediation In Progress -> Awaiting
+        /// Sign-off. Nothing moved the case off Awaiting Remediation once the adviser had
+        /// completed, so SignoffProgressPlugin - which advances only a case AT Awaiting
+        /// Sign-off - never found one there, and every approved remediation left its case
+        /// parked forever (PP-12: "an approval advances the case").
+        /// </summary>
+        [Fact]
+        public void Completing_the_action_moves_the_case_to_awaiting_signoff()
+        {
+            var svc = ActionOnCase(CaseLifecycle.AwaitingRemediation);
+
+            Complete(svc, OwnerId, true);
+
+            Assert.Equal(CaseLifecycle.AwaitingSignoff, CaseStatus(svc));
+        }
+
+        [Fact]
+        public void Walks_the_case_through_remediation_in_progress_rather_than_skipping_it()
+        {
+            var svc = ActionOnCase(CaseLifecycle.AwaitingRemediation);
+
+            Complete(svc, OwnerId, true);
+
+            var hops = svc.Updates
+                .FindAll(u => u.LogicalName == "al_outcomecase")
+                .ConvertAll(u => u.GetAttributeValue<OptionSetValue>("al_casestatus").Value);
+            Assert.Equal(new[] { CaseLifecycle.RemediationInProgress, CaseLifecycle.AwaitingSignoff }, hops);
+        }
+
+        [Fact]
+        public void A_reworked_action_moves_the_case_forward_again_after_a_rejection()
+        {
+            // A rejected sign-off returns the case to Awaiting Remediation (BR-008, AD-057);
+            // the adviser's second completion has to bring it back to Awaiting Sign-off.
+            var svc = ActionOnCase(CaseLifecycle.RemediationInProgress);
+
+            Complete(svc, OwnerId, true);
+
+            Assert.Equal(CaseLifecycle.AwaitingSignoff, CaseStatus(svc));
+        }
+
+        [Theory]
+        [InlineData(CaseLifecycle.AwaitingSignoff)]
+        [InlineData(CaseLifecycle.Closed)]
+        public void Leaves_a_case_that_is_not_awaiting_remediation_where_it_is(int status)
+        {
+            // Mirrors SignoffProgressPlugin: a case that is not where the lifecycle expects
+            // is left alone rather than forced, and the completion still succeeds.
+            var svc = ActionOnCase(status);
+
+            var result = Complete(svc, OwnerId, true);
+
+            Assert.Equal("Completed", result.Status);
+            Assert.Equal(status, CaseStatus(svc));
+        }
+
+        [Fact]
+        public void An_action_with_no_case_still_completes()
+        {
+            var result = Complete(Action("Rebuilt the suitability report."), OwnerId, true);
+
+            Assert.Equal("Completed", result.Status);
+        }
+
         /// <summary>BR-007: a completed action is not written a second time.</summary>
         [Fact]
         public void An_already_completed_action_is_an_idempotent_success()

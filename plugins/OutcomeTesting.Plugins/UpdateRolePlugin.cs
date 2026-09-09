@@ -71,14 +71,17 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.ValidationPrefix + "Change the role name, description or active state.");
             }
 
+            // Permission check before the idempotency lookup (matching AssignUserRolePlugin):
+            // otherwise an unauthorised caller could probe whether a key exists and receive a
+            // real audit id back for work they were never allowed to trigger.
+            PermissionHelpers.EnsureAppPermission(systemService, context, "permission.manage", PermissionHelpers.AccessManage);
+
             var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandUpdateRole);
             if (existingAudit != null)
             {
                 SetResponse(context, roleId.ToString("D"), existingAudit.Id, false);
                 return;
             }
-
-            PermissionHelpers.EnsureAppPermission(systemService, context, "permission.manage", PermissionHelpers.AccessManage);
 
             Entity before;
             try
@@ -95,33 +98,12 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.NotFoundPrefix + "That role no longer exists. Refresh and try again.");
             }
 
-            var previousName = before.GetAttributeValue<string>(WebRoleRegistry.NameAttr);
-            var previousDescription = before.GetAttributeValue<string>("al_description");
-            var wasActive = CommandHelpers.IsActive(before);
             // A web role has no separate business key: its name is what al_rolecode carries
             // on every assignment and permission rule that references it.
-            var roleCode = previousName;
+            var roleCode = before.GetAttributeValue<string>(WebRoleRegistry.NameAttr);
 
-            var update = new Entity(WebRoleRegistry.RoleEntity, roleId);
             var details = new StringBuilder();
-
-            if (!string.IsNullOrWhiteSpace(roleName) && roleName.Trim() != previousName)
-            {
-                update[WebRoleRegistry.NameAttr] = roleName.Trim();
-                Append(details, "Name " + (previousName ?? string.Empty) + " -> " + roleName.Trim());
-            }
-
-            if (description != null && description.Trim() != (previousDescription ?? string.Empty))
-            {
-                update["al_description"] = description.Trim().Length == 0 ? null : description.Trim();
-                Append(details, "Description changed");
-            }
-
-            if (active.HasValue && active.Value != wasActive)
-            {
-                update["al_isactive"] = active.Value;
-                Append(details, "Active " + wasActive + " -> " + active.Value);
-            }
+            var update = BuildUpdate(before, roleName, description, active, details);
 
             if (update.Attributes.Count > 0)
             {
@@ -141,6 +123,57 @@ namespace OutcomeTesting.Plugins
                 WebRoleRegistry.RoleEntity, roleId, null, details.ToString(), idempotencyKey, context);
 
             SetResponse(context, roleId.ToString("D"), auditId, false);
+        }
+
+        /// <summary>
+        /// The columns this change writes onto the web role, and the audit line describing
+        /// it. Public and static so the shape of the write is testable without a plug-in
+        /// context.
+        ///
+        /// The registry moved from al_role to mspp_webrole under AD-087 and this kept writing
+        /// al_description and al_isactive — columns mspp_webrole does not have — so every
+        /// re-describe and every retire faulted at the platform. The description now goes to
+        /// mspp_description and the active state to statecode/statuscode, which are what the
+        /// app reads back (useRoles.ts) and what CommandHelpers.SetState writes elsewhere.
+        ///
+        /// A rename is refused. For a web role the name IS the code (CreateRolePlugin): every
+        /// al_userrolemapping and al_pagepermission row references it by al_rolecode, and
+        /// PermissionHelpers resolves the caller's web-role associations by name. Renaming
+        /// would leave every assignment and rule pointing at a name that no longer exists,
+        /// and this command's own retire cascade would then miss them all. A role that needs
+        /// a new name is a new role, with its assignments moved across.
+        /// </summary>
+        public static Entity BuildUpdate(
+            Entity before, string roleName, string description, bool? active, StringBuilder details)
+        {
+            var previousName = (before.GetAttributeValue<string>(WebRoleRegistry.NameAttr) ?? string.Empty).Trim();
+            var previousDescription = before.GetAttributeValue<string>(WebRoleRegistry.DescriptionAttr);
+            var wasActive = CommandHelpers.IsActive(before);
+
+            var update = new Entity(WebRoleRegistry.RoleEntity, before.Id);
+
+            if (!string.IsNullOrWhiteSpace(roleName)
+                && !string.Equals(roleName.Trim(), previousName, StringComparison.Ordinal))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.ValidationPrefix +
+                    "A web role cannot be renamed: its name is the code every role assignment and permission rule references (AD-087). Create a new role and move the assignments instead.");
+            }
+
+            if (description != null && description.Trim() != (previousDescription ?? string.Empty))
+            {
+                update[WebRoleRegistry.DescriptionAttr] = description.Trim().Length == 0 ? null : description.Trim();
+                Append(details, "Description changed");
+            }
+
+            if (active.HasValue && active.Value != wasActive)
+            {
+                update["statecode"] = new OptionSetValue(active.Value ? 0 : 1);
+                update["statuscode"] = new OptionSetValue(active.Value ? 1 : 2);
+                Append(details, "Active " + wasActive + " -> " + active.Value);
+            }
+
+            return update;
         }
 
         private void ApplyUpdate(

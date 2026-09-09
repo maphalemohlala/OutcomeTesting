@@ -1,10 +1,9 @@
 import {
   ACCESS_LEVELS,
-  DEFAULT_PERMISSIONS,
   levelFor,
-  overlayRules,
   RESOURCE_KEYS,
   resolvePermissions,
+  rulesInForce,
   type AccessLevel,
   type PermissionRule,
   type ResourceKey,
@@ -58,16 +57,19 @@ function isResourceKey(value: string): value is ResourceKey {
 /**
  * What one role grants, resolved exactly the way the app enforces it.
  *
- * This runs the same `overlayRules` → `resolvePermissions` pair that PermissionProvider
+ * This runs the same `rulesInForce` → `resolvePermissions` pair that PermissionProvider
  * uses at sign-in, against this one role, so the screen cannot drift from what a person
  * holding the role would actually get. Writing a second resolution here would be the one
  * way to make this page confidently wrong.
  *
- * Withdrawn rules are left out for the same reason the provider filters on `statecode eq 0`:
- * they are kept for the audit trail but no longer apply, so the resource falls back to its
- * default. A row that no map recognises is dropped rather than shown as a grant — the
- * security page already surfaces those as unrecognised, and guessing at one here would put
- * an access level on screen that nothing enforces.
+ * The whole table is what decides, not just this role's rows: once ANY active rule is
+ * stored the code defaults no longer apply to anyone, which is how the server gate reads
+ * it. A withdrawn rule is therefore not a fallback to the default — it is no access, unless
+ * the environment holds no rule at all. Withdrawn rules are left out for the same reason
+ * the provider filters on `statecode eq 0`: kept for the audit trail, no longer applied.
+ * A row that no map recognises is dropped rather than shown as a grant — the security page
+ * already surfaces those as unrecognised, and guessing at one here would put an access
+ * level on screen that nothing enforces.
  */
 export function buildRoleGrants(
   roleCode: string,
@@ -75,27 +77,28 @@ export function buildRoleGrants(
 ): RoleGrant[] {
   // Keyed by resource, so two active rules for the same (role, resource) leave this holding
   // only the LAST one's id — withdrawing the override would then withdraw one rule while the
-  // row stays and does not fall back to the default. setPagePermission upserts on
-  // (role, resource), so two simultaneous active rules for the same pair should not occur in
-  // practice; recorded here rather than guarded against, since this is a read path with no
-  // behaviour change to make.
+  // other stays in force. setPagePermission upserts on (role, resource), so two simultaneous
+  // active rules for the same pair should not occur in practice; recorded here rather than
+  // guarded against, since this is a read path with no behaviour change to make.
   const overrideById = new Map<ResourceKey, string>();
-  const overrides: PermissionRule[] = [];
+  const stored: PermissionRule[] = [];
 
   for (const row of permissions) {
-    if (!row.active || !sameRoleCode(row.role, roleCode)) continue;
+    if (!row.active) continue;
     if (!isResourceKey(row.resource) || !isAccessLevel(row.level)) continue;
-    overrides.push({ role: roleCode, resource: row.resource, level: row.level });
-    overrideById.set(row.resource, row.id);
+    stored.push({ role: row.role, resource: row.resource, level: row.level });
+    if (sameRoleCode(row.role, roleCode)) {
+      overrideById.set(row.resource, row.id);
+    }
   }
 
-  // resolvePermissions matches the role name exactly, so the defaults are re-keyed to the
-  // code as written. That matters for a role whose web role name differs from the default
-  // matrix only in casing: it should still show the defaults it will be granted.
-  const defaults = DEFAULT_PERMISSIONS.filter((rule) => sameRoleCode(rule.role, roleCode)).map(
-    (rule) => ({ ...rule, role: roleCode }),
-  );
-  const set = resolvePermissions([roleCode], overlayRules(defaults, overrides));
+  // resolvePermissions matches the role name exactly, so the rules are re-keyed to the code
+  // as written. That matters for a role whose web role name differs from a stored rule or
+  // from the default matrix only in casing: it should still show what it will be granted.
+  const rules = rulesInForce(stored)
+    .filter((rule) => sameRoleCode(rule.role, roleCode))
+    .map((rule) => ({ ...rule, role: roleCode }));
+  const set = resolvePermissions([roleCode], rules);
 
   return RESOURCE_KEYS.map((resource) => {
     const overrideId = overrideById.get(resource) ?? null;

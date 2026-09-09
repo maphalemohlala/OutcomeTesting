@@ -186,6 +186,19 @@ namespace OutcomeTesting.Plugins
                 }
             }
 
+            // A corrected adviser name reaches the remediation actions raised while the old
+            // one matched no contact (BR-006): they were on the worklist with nobody able to
+            // answer them, and the name was the fault. Only open, unassigned actions move.
+            if (update.Contains("al_advisername"))
+            {
+                var assigned = Remediation.AssignUnassignedActions(
+                    systemService, new EntityReference(CaseEntity, targetId), context.CorrelationId);
+                if (assigned > 0)
+                {
+                    changes.Add("Assigned " + assigned + " open remediation action(s) to the adviser now named");
+                }
+            }
+
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService,
                 CommandUpdateCaseDetails,

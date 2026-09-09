@@ -157,6 +157,28 @@ namespace OutcomeTesting.Plugins
             });
         }
 
+        /// <summary>
+        /// True when this plug-in is running inside the pipeline of <paramref name="messageName"/>
+        /// — a Create issued from within a Custom API, say — found by walking the parent
+        /// contexts. Bounded so a malformed chain cannot loop.
+        /// </summary>
+        public static bool IsWithinMessage(IPluginExecutionContext context, string messageName)
+        {
+            var parent = context == null ? null : context.ParentContext;
+            var depth = 0;
+            while (parent != null && depth++ < 16)
+            {
+                if (string.Equals(parent.MessageName, messageName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                parent = parent.ParentContext;
+            }
+
+            return false;
+        }
+
         public static bool IsConcurrencyFault(FaultException<OrganizationServiceFault> fault)
         {
             // ConcurrencyVersionMismatch (0x80060892); fall back to message text in case

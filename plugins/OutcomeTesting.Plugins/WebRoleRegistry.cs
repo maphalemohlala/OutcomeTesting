@@ -30,6 +30,14 @@ namespace OutcomeTesting.Plugins
         public const string ContactRelationship = "powerpagecomponent_mspp_webrole_contact";
 
         /// <summary>
+        /// The two reviewer web roles (powerpages/.../webrole.yml), which the queue claim
+        /// checks against the discipline a case owes. Named here rather than looked up by
+        /// id, because the name is what al_rolecode and the permission rules carry.
+        /// </summary>
+        public const string TaxReviewerRole = "AL Portal - Tax Reviewer";
+        public const string AqsReviewerRole = "AL Portal - AQS Reviewer";
+
+        /// <summary>
         /// Roles that exist to make Power Pages work rather than to describe a job. Offering
         /// them as application roles would invite granting business access to "everyone who
         /// is signed in", which is not a decision any requirement makes.

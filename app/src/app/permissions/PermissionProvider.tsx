@@ -5,10 +5,9 @@ import {
   APP_ROLE_BY_VALUE,
   ACCESS_LEVEL_BY_VALUE,
   can as canAccess,
-  DEFAULT_PERMISSIONS,
   levelFor,
-  overlayRules,
   resolvePermissions,
+  rulesInForce,
   type PermissionRule,
   type PermissionSet,
   type ResourceKey,
@@ -29,9 +28,11 @@ interface Resolved {
 /**
  * Resolves the effective permissions for the signed-in user (AD-041). Roles come from
  * `al_GetMyRoles` (AD-089, AD-090), which asks the server what the caller holds rather than
- * having the client re-derive it: admin-maintained rules in al_pagepermission overlay the
- * code defaults. Fail-open for view (permissive when the API call fails outright) is safe
- * because every write is enforced server-side by the Custom API commands.
+ * having the client re-derive it. Rules come from al_pagepermission alone once any are
+ * stored, exactly as the server gate reads them; the code defaults apply only to an
+ * environment with no stored rule (`rulesInForce`). Fail-open for view (permissive when the
+ * API call fails outright) is safe because every write is enforced server-side by the
+ * Custom API commands.
  */
 async function loadPermissions(email: string): Promise<Resolved> {
   const [rolesResult, permResult, userResult] = await Promise.all([
@@ -82,9 +83,7 @@ async function loadPermissions(email: string): Promise<Resolved> {
     })
     .filter((rule): rule is PermissionRule => Boolean(rule));
 
-  const rules = overlayRules(DEFAULT_PERMISSIONS, dataRules);
-
-  return { roles, permissions: resolvePermissions(roles, rules) };
+  return { roles, permissions: resolvePermissions(roles, rulesInForce(dataRules)) };
 }
 
 export function PermissionProvider({ children }: { children: React.ReactNode }) {

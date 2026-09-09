@@ -178,7 +178,7 @@ export function RoleDetailPage() {
       intent.release(token);
       setRowNotice({
         tone: 'ok',
-        message: `Override withdrawn; ${role?.name} falls back to the default for ${grant.resource}.`,
+        message: `Rule withdrawn; ${role?.name} no longer has access to ${grant.resource}.`,
       });
       reloadConfig();
     } else {
@@ -378,9 +378,10 @@ export function RoleDetailPage() {
             ) : null}
           </div>
           <p className="security__hint">
-            The access this role resolves to, page by page and capability by capability. A
-            default comes from the built-in matrix; an administrator&rsquo;s rule replaces the
-            default for that resource, including one set to None to take access away.
+            The access this role resolves to, page by page and capability by capability. Only
+            stored rules grant access, which is how the server enforces it; withdrawing a rule
+            takes that access away. The built-in defaults apply only while no rule has been
+            stored for any role.
           </p>
           {permNotice && !permOpen ? (
             <p className={`security__notice security__notice--${permNotice.tone}`} role="status">
@@ -392,8 +393,8 @@ export function RoleDetailPage() {
             <p role="status">Loading permissions…</p>
           ) : grants.length === 0 ? (
             <p>
-              This role grants nothing. No default in the built-in matrix names it, and no
-              permission rule has been set for it.
+              This role grants nothing. No permission rule is stored for it, and the built-in
+              defaults do not apply once any rule exists.
             </p>
           ) : (
             <table className="security__table">

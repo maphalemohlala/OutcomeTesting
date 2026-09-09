@@ -144,6 +144,11 @@ describe('case lifecycle (BR-002, BR-008, AD-031, AD-036)', () => {
     expect(canTransition('Awaiting Sign-off', 'Awaiting Remediation')).toBe(true);
   });
 
+  it('returns an approved sign-off to the queue when the AQS check is still owed', () => {
+    // OD-038: the case goes through remediation before it can reach AQS, not instead of it.
+    expect(canTransition('Awaiting Sign-off', 'Queued')).toBe(true);
+  });
+
   it('lets a corrected validation failure back into allocation', () => {
     expect(canTransition('Validation Failed', 'Ready for Allocation')).toBe(true);
   });

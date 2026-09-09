@@ -164,9 +164,12 @@ namespace OutcomeTesting.Plugins
         /// A flagged Tax pass is held for remediation before AQS rather than handed off
         /// (project owner direction, 2026-09-09). That is the reasoning OD-027 already
         /// applies to a Tax non-pass, for the same reason: AQS must not review a file with
-        /// something on it still unaddressed. The case returns to the queue for its AQS
-        /// check once the action is signed off, which is the transition
-        /// <see cref="CaseLifecycle"/> already permits out of Awaiting Sign-off.
+        /// something on it still unaddressed.
+        ///
+        /// Once that remediation is approved the case returns to the queue for its AQS
+        /// check (OD-038, resolved 2026-09-09: the case has to go through remediation before
+        /// it can reach AQS). <see cref="SignoffProgressPlugin.MoveCase"/> makes that hop,
+        /// which <see cref="CaseLifecycle"/> permits out of Awaiting Sign-off.
         /// </summary>
         public static int NextCaseStatusForTax(int answerChoice, bool aqsStillToCome, bool remedialActionFlagged)
         {

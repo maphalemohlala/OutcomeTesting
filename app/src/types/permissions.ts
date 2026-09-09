@@ -138,9 +138,9 @@ export interface PermissionRule {
 export type PermissionSet = Partial<Record<ResourceKey, AccessLevel>>;
 
 /**
- * Seed matrix (AD-041). This is the default an Administrator can then edit in the
- * app via al_PagePermission; it also lets the client degrade safely to a sane
- * baseline before the Dataverse rows load. Levels trace to role ownership in
+ * Seed matrix (AD-041): the rules an environment starts with, and the only rules the
+ * client applies while al_pagepermission holds none (see `rulesInForce`). Once any rule
+ * is stored the table alone decides, on both tiers. Levels trace to role ownership in
  * AD-020 (section ownership), AD-031 (outcome corrections) and AD-040 (allocation).
  */
 export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
@@ -218,21 +218,22 @@ export function resolvePermissions(
 }
 
 /**
- * Overlays admin-maintained rules on the code defaults (AD-041). A stored rule
- * replaces the default for its exact (role, resource), so an Administrator can
- * both grant and revoke without the al_pagepermission table having to be fully
- * seeded. This keeps the app safe before any rule is stored.
+ * The rules the client resolves against, given the active rows al_pagepermission holds.
+ *
+ * The server gate (PermissionHelpers.MaxLevel) resolves from active al_pagepermission rows
+ * and nothing else: a (role, resource) with no active rule is None. The client used to
+ * overlay stored rules on DEFAULT_PERMISSIONS instead, so withdrawing a rule made the app
+ * fall back to a coded default the server never had — the UI offered work the command then
+ * refused as UNAUTHORIZED. Resolving from the stored rules alone, once any exist, keeps the
+ * two tiers reading the same rules.
+ *
+ * DEFAULT_PERMISSIONS remains the seed and the bootstrap: an environment with no stored
+ * rule at all resolves against it, so the first administrator can reach the security page
+ * and seed the table. That is the one state in which the client is more permissive than
+ * the server, and the server still gates every write.
  */
-export function overlayRules(
-  base: readonly PermissionRule[],
-  overrides: readonly PermissionRule[],
-): PermissionRule[] {
-  const key = (rule: PermissionRule) => `${rule.role}|${rule.resource}`;
-  const merged = new Map<string, PermissionRule>(base.map((rule) => [key(rule), rule]));
-  for (const override of overrides) {
-    merged.set(key(override), override);
-  }
-  return [...merged.values()];
+export function rulesInForce(stored: readonly PermissionRule[]): readonly PermissionRule[] {
+  return stored.length > 0 ? stored : DEFAULT_PERMISSIONS;
 }
 
 /** The access level a permission set grants on a resource (None when absent). */

@@ -7,7 +7,9 @@ import {
   levelFor,
   pageResourceForPath,
   resolvePermissions,
+  rulesInForce,
   type AppRole,
+  type PermissionRule,
 } from './permissions';
 
 describe('accessMeets', () => {
@@ -131,5 +133,35 @@ describe('DEFAULT_PERMISSIONS integrity', () => {
     for (const role of ['AL Portal - Adviser Remediation', 'AL Portal - T&C Supervisor'] as AppRole[]) {
       expect(can(resolvePermissions([role]), 'page.remediation', 'Edit')).toBe(true);
     }
+  });
+});
+
+describe('rulesInForce', () => {
+  const stored: PermissionRule[] = [
+    { role: 'AL Portal - Tax Reviewer', resource: 'page.cases', level: 'View' },
+  ];
+
+  it('resolves against the stored rules alone once any exist, as the server gate does', () => {
+    // PermissionHelpers.MaxLevel reads active al_pagepermission rows and nothing else, so a
+    // (role, resource) with no active rule is None there. Overlaying the coded defaults
+    // made the client offer a page the server then refused.
+    const rules = rulesInForce(stored);
+    expect(rules).toBe(stored);
+    expect(can(resolvePermissions(['AL Portal - Tax Reviewer'], rules), 'page.reviews')).toBe(false);
+  });
+
+  it('falls back to the seed matrix only when nothing is stored', () => {
+    expect(rulesInForce([])).toBe(DEFAULT_PERMISSIONS);
+  });
+
+  it('means a withdrawn rule is no access, not the default', () => {
+    // Withdrawing removes the row from the active set; with another rule still stored the
+    // resource resolves to None on both tiers.
+    const afterWithdrawal: PermissionRule[] = stored
+      .filter((rule) => rule.resource !== 'page.cases')
+      .concat([{ role: 'AL Portal - Tax Reviewer', resource: 'page.reviews', level: 'Edit' }]);
+    const set = resolvePermissions(['AL Portal - Tax Reviewer'], rulesInForce(afterWithdrawal));
+    expect(can(set, 'page.cases')).toBe(false);
+    expect(can(set, 'page.reviews', 'Edit')).toBe(true);
   });
 });

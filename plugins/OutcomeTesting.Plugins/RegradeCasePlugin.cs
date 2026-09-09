@@ -68,7 +68,7 @@ namespace OutcomeTesting.Plugins
             }
 
             // Confirm the outcome exists (and the caller can read it) before writing.
-            var outcome = userService.Retrieve(OutcomeEntity, targetId, new ColumnSet(InitialOutcomeAttr));
+            var outcome = userService.Retrieve(OutcomeEntity, targetId, new ColumnSet(InitialOutcomeAttr, "al_outcomecaseid"));
 
             // A regrade overrides a grade that was already given, so there has to BE one.
             // Without this, a final outcome can be written against an ungraded record: BR-007
@@ -117,6 +117,8 @@ namespace OutcomeTesting.Plugins
                 }
             }
 
+            CloseAfterRecheck(systemService, outcome.GetAttributeValue<EntityReference>("al_outcomecaseid"));
+
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService,
                 CommandRegradeCase,
@@ -129,6 +131,36 @@ namespace OutcomeTesting.Plugins
                 context);
 
             SetResponse(context, targetId.ToString("D"), canonicalLabel, auditId, false);
+        }
+
+        /// <summary>
+        /// The recheck step of the lifecycle: "Awaiting Recheck/Regrade -> Closed"
+        /// (project-context "Canonical lifecycle", AD-057). Setting the final outcome IS the
+        /// recheck — the separate Recheck table is deferred and the final outcome is carried
+        /// on al_Outcome — so a case waiting on it closes here. Nothing else moved a case off
+        /// Awaiting Recheck: the export collects Closed cases only, so a remediated case
+        /// never reached Trail Light until someone edited its status by hand.
+        ///
+        /// Only a case AT Awaiting Recheck is moved. A regrade of a Closed case is the AD-031
+        /// privileged correction and leaves the status alone; a regrade anywhere else in the
+        /// lifecycle is left where it is rather than forced, matching every other
+        /// consequence writer. Public and static so the cases are testable without a
+        /// plug-in context.
+        /// </summary>
+        public static void CloseAfterRecheck(IOrganizationService service, EntityReference caseRef)
+        {
+            if (caseRef == null)
+            {
+                return;
+            }
+
+            var current = CaseTransitions.CurrentStatus(service, caseRef.Id);
+            if (current != CaseLifecycle.AwaitingRecheck)
+            {
+                return;
+            }
+
+            CaseTransitions.MoveThrough(service, caseRef.Id, CaseLifecycle.Closed);
         }
 
         private static int ParseOutcome(string label)

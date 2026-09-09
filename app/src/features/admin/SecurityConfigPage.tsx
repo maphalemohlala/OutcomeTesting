@@ -325,8 +325,8 @@ export function SecurityConfigPage() {
       setRowNotice({
         tone: 'ok',
         message: row.active
-          ? `Override withdrawn; ${row.role} falls back to the default for ${row.resource}.`
-          : `Override restored for ${row.role} on ${row.resource}.`,
+          ? `Rule withdrawn; ${row.role} no longer has access to ${row.resource}.`
+          : `Rule restored for ${row.role} on ${row.resource}.`,
       });
       reloadConfig();
     } else {
@@ -584,7 +584,7 @@ export function SecurityConfigPage() {
                     : 'Permission rules cannot be shown.'}
                 </p>
               ) : state.permissions.length === 0 ? (
-                <p>No overrides set. The built-in role defaults apply.</p>
+                <p>No rules stored. The built-in role defaults apply until the first rule is set.</p>
               ) : (
                 <table className="security__table">
                   <thead>

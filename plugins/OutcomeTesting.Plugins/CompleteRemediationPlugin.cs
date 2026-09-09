@@ -123,7 +123,7 @@ namespace OutcomeTesting.Plugins
             var action = service.Retrieve(
                 ActionEntity,
                 targetId,
-                new ColumnSet(ActionStatus, "ownerid", ActionAdviserResponse));
+                new ColumnSet(ActionStatus, "ownerid", ActionAdviserResponse, "al_outcomecaseid"));
 
             if (requireCallerOwnsAction)
             {
@@ -193,6 +193,8 @@ namespace OutcomeTesting.Plugins
                 service.Update(update);
             }
 
+            AdvanceCase(service, action.GetAttributeValue<EntityReference>("al_outcomecaseid"));
+
             var auditId = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details);
 
             return new CompleteResult
@@ -201,6 +203,43 @@ namespace OutcomeTesting.Plugins
                 AuditEventId = auditId,
                 Conflict = false,
             };
+        }
+
+        /// <summary>
+        /// A completed remediation puts the case in front of the T&amp;C Manager: Awaiting
+        /// Remediation -> Remediation In Progress -> Awaiting Sign-off, the AD-057 spine
+        /// (project-context "Canonical lifecycle", BR-008). Hopped one state at a time, the
+        /// way <see cref="OutcomeRules.HopsFor"/> passes through Submitted, so a skipped
+        /// state is refused rather than jumped.
+        ///
+        /// Before this existed nothing moved the case off Awaiting Remediation. The
+        /// sign-off's own consequence (<see cref="SignoffProgressPlugin"/>) advances only a
+        /// case that is AT Awaiting Sign-off, so an approval found the case one state short
+        /// and did nothing — every remediated case stayed parked at Awaiting Remediation with
+        /// an approved action against it, and PP-12's "an approval advances the case" never
+        /// happened.
+        ///
+        /// A case that is not at either remediation state is left where it is, matching the
+        /// sign-off's guard: the completion is still recorded, and a case a manager has moved
+        /// by hand is not dragged back onto the spine.
+        /// </summary>
+        private static void AdvanceCase(IOrganizationService service, EntityReference caseRef)
+        {
+            if (caseRef == null)
+            {
+                return;
+            }
+
+            var current = CaseTransitions.CurrentStatus(service, caseRef.Id);
+            if (current != CaseLifecycle.AwaitingRemediation && current != CaseLifecycle.RemediationInProgress)
+            {
+                return;
+            }
+
+            CaseTransitions.MoveThrough(
+                service,
+                caseRef.Id,
+                new[] { CaseLifecycle.RemediationInProgress, CaseLifecycle.AwaitingSignoff });
         }
 
         private static bool IsConcurrencyFault(System.ServiceModel.FaultException<OrganizationServiceFault> fault)
