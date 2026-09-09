@@ -46,7 +46,15 @@
   </fetch>
   {% endfetchxml %}
 
-  {% assign c = case.results.entities[0] %}
+  {% comment %}
+    Read with a loop rather than `entities[0]`, here and in the two reads below. An index
+    past the end of an empty result is one of the shapes this Liquid is unhappy with, and
+    both the sign-off and the outcome reads are routinely empty - a case with no decision
+    yet, and a remediated Tax-only case (AD-055) that has no outcome row at all. The loop
+    leaves the variable null, which every branch below already handles.
+  {% endcomment %}
+  {% assign c = null %}
+  {% for row in case.results.entities %}{% if c == null %}{% assign c = row %}{% endif %}{% endfor %}
 
   {% if c == null %}
     {% include 'OT Empty State' title: 'Case not available' message: 'This case does not exist, or you do not have permission to view it.' %}
@@ -251,7 +259,8 @@
       {% if case_actions.size > 0 %}
         {% assign all_approved = true %}
         {% assign any_rejected = false %}
-        {% assign latest_supervisor = case_signoffs.results.entities[0] %}
+        {% assign latest_supervisor = null %}
+        {% for row in case_signoffs.results.entities %}{% if latest_supervisor == null %}{% assign latest_supervisor = row %}{% endif %}{% endfor %}
         {% assign latest_adviser = null %}
         {% assign form_source = null %}
         <div class="ot-table-wrap">
@@ -364,8 +373,9 @@
           {% endif %}
         {% endfor %}
 
-        {% if form_source == null %}{% assign form_source = case_actions[0] %}{% endif %}
-        {% assign outcome = case_outcomes.results.entities[0] %}
+        {% if form_source == null %}{% for row in case_actions %}{% if form_source == null %}{% assign form_source = row %}{% endif %}{% endfor %}{% endif %}
+        {% assign outcome = null %}
+        {% for row in case_outcomes.results.entities %}{% if outcome == null %}{% assign outcome = row %}{% endif %}{% endfor %}
         <dl class="ot-remedial-form__block">
           <div><dt>Client contact required?</dt><dd>{{ form_source.al_clientcontactrequired.label | default: '—' | escape }}</dd></div>
           <div><dt>Recheck required?</dt><dd>{{ form_source.al_recheckrequired.label | default: '—' | escape }}</dd></div>

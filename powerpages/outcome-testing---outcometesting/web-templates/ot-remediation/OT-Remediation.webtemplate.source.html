@@ -263,6 +263,26 @@
     {% endfetchxml %}
   {% endif %}
 
+  {% comment %}
+    The regraded outcome the form's last block reports. Read for the case rather than for
+    an action: a regrade is the case's, and a Tax-only remediated case (AD-055) has no
+    outcome row at all, which is why the read below tolerates an empty result.
+  {% endcomment %}
+  {% fetchxml caseoutcomes %}
+  <fetch top="1">
+    <entity name="al_outcome">
+      <attribute name="al_initialoutcome" />
+      <attribute name="al_finaloutcome" />
+      <attribute name="al_finalisedon" />
+      <attribute name="al_regradedon" />
+      <filter type="and">
+        <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_param | xml_escape }}" />
+      </filter>
+      <order attribute="createdon" descending="true" />
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+
   <p class="ot-back"><a href="?">&laquo; All cases in remediation</a></p>
 
   {% if c == null %}
@@ -304,9 +324,37 @@
             </thead>
             <tbody>
               {% assign row_no = 0 %}
+              {% comment %}
+                The form's last two blocks are read off the same pass that draws the rows,
+                so they cannot disagree with them: `all_approved` is every action's latest
+                decision being Approved, `form_source` is the first action carrying the
+                adviser's three answers, and `latest_adviser` is the most recently completed
+                action. They are rendered under the table, once for the case.
+              {% endcomment %}
+              {% assign all_approved = true %}
+              {% assign any_rejected = false %}
+              {% assign form_source = null %}
+              {% assign latest_adviser = null %}
+              {% comment %}
+                The case's most recent supervisor decision. The sign-off read is ordered by
+                al_signedoffon descending, so this is its first row - taken here rather than
+                from inside the row loop, which would give whichever action came first in
+                target-date order and not the latest decision.
+              {% endcomment %}
+              {% assign latest_supervisor = null %}
+              {% if signoffs %}{% for s in signoffs.results.entities %}{% if latest_supervisor == null %}{% assign latest_supervisor = s %}{% endif %}{% endfor %}{% endif %}
               {% for a in rows %}
                 {% assign latest = null %}
                 {% if signoffs %}{% for s in signoffs.results.entities %}{% if latest == null and s.al_remediationactionid.id == a.al_remediationactionid %}{% assign latest = s %}{% endif %}{% endfor %}{% endif %}
+                {% if latest %}
+                  {% if latest.al_signoffdecision.value == 120910721 %}{% assign any_rejected = true %}{% assign all_approved = false %}{% endif %}
+                {% else %}
+                  {% assign all_approved = false %}
+                {% endif %}
+                {% if form_source == null and a.al_clientcontactrequired %}{% assign form_source = a %}{% endif %}
+                {% if a.al_completedon %}
+                  {% if latest_adviser == null or a.al_completedon > latest_adviser.al_completedon %}{% assign latest_adviser = a %}{% endif %}
+                {% endif %}
                 {% comment %}
                   al_description carries the whole list Remediation.Describe built: a heading,
                   one "- item" line per thing the checker marked down, then the checker's
@@ -544,6 +592,35 @@
             </tbody>
           </table>
         </div>
+
+        {% comment %}
+          The rest of the paper form, read-only. The three answers are the adviser's, written
+          in their own panel above; the sign-offs are the supervisor's and the adviser's,
+          written through their own commands. Rendering them as inputs here would put a second
+          write path on the same columns, so they are reported rather than collected.
+
+          `form_source` falls back to the first action when none carries an answer yet, so the
+          block shows dashes rather than disappearing. Read with a loop, never entities[0].
+        {% endcomment %}
+        {% if form_source == null %}{% for a in rows %}{% if form_source == null %}{% assign form_source = a %}{% endif %}{% endfor %}{% endif %}
+        {% assign outcome = null %}
+        {% for o in caseoutcomes.results.entities %}{% if outcome == null %}{% assign outcome = o %}{% endif %}{% endfor %}
+
+        <dl class="ot-remedial-form__block">
+          <div><dt>Client contact required?</dt><dd>{{ form_source.al_clientcontactrequired.label | default: '—' | escape }}</dd></div>
+          <div><dt>Recheck required?</dt><dd>{{ form_source.al_recheckrequired.label | default: '—' | escape }}</dd></div>
+          <div><dt>Do the remedial actions change the advice?</dt><dd>{{ form_source.al_changesadvice.label | default: '—' | escape }}</dd></div>
+          <div><dt>All remedial actions checked and approved?</dt><dd>{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</dd></div>
+          <div><dt>Regraded outcome</dt><dd>{% if outcome and outcome.al_finaloutcome %}{{ outcome.al_finaloutcome.label | escape }}{% else %}—{% endif %}</dd></div>
+          <div><dt>Date</dt><dd>{% if outcome and outcome.al_regradedon %}{{ outcome.al_regradedon | date: 'dd MMM yyyy' }}{% elsif outcome and outcome.al_finalisedon %}{{ outcome.al_finalisedon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
+          <div><dt>Supervisor sign-off</dt><dd>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
+          <div><dt>Adviser sign-off</dt><dd>{% if latest_adviser %}{{ latest_adviser.al_assignedcontactid.name | default: c.al_advisername | escape }}, {{ latest_adviser.al_completedon | date: 'dd MMM yyyy' }}{% if latest_adviser.al_evidencereference %} (IO {{ latest_adviser.al_evidencereference | escape }}){% endif %}{% else %}—{% endif %}</dd></div>
+        </dl>
+        <p class="ot-response__hint">
+          The three answers are the adviser's, recorded on the remediation action{% if rows.size > 1 %} (the first action carrying an answer){% endif %}.
+          "All remedial actions checked and approved" reads Yes when every action's latest
+          supervisor decision is Approved.
+        </p>
       {% else %}
         {% include 'OT Empty State' title: 'No remediation actions' message: 'Nothing has been raised against this case.' %}
       {% endif %}
