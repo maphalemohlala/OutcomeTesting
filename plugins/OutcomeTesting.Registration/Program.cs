@@ -372,6 +372,11 @@ if (args.Length >= 2 && args[0].Equals("queueroutedcases", StringComparison.Ordi
     return QueueRoutedCases(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
 }
 
+if (args.Length >= 2 && args[0].Equals("splitremediation", StringComparison.OrdinalIgnoreCase))
+{
+    return SplitRemediation(args[1], ConfirmedFor(args, args[1]));
+}
+
 if (args.Length >= 2 && args[0].Equals("migratetocontacts", StringComparison.OrdinalIgnoreCase))
 {
     return MigrateToContacts(args);
@@ -589,6 +594,146 @@ int SetChangeTracking(string orgUrl, string[] tables)
         ? $"Done: change tracking on for all {names.Count} table(s)."
         : $"{failed} of {names.Count} table(s) not enabled.");
     return failed == 0 ? 0 : 2;
+}
+
+// Splitting the remediation actions raised before a review raised one per item
+// (2026-09-10) into the per-item rows the agreed form needs. Read-only without --confirm.
+//
+// The first item stays on the action that already exists, so the adviser's response, its
+// status and any sign-off against it survive; the rest are created Open beside it. The
+// original is re-coded with its item number, which is what makes a replayed submit find
+// these rows rather than raise the set a second time.
+int SplitRemediation(string orgUrl, bool confirm)
+{
+    using var svc = Connect(orgUrl);
+
+    var actions = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_remediationaction\">" +
+        "<attribute name=\"al_remediationactionid\"/><attribute name=\"al_name\"/>" +
+        "<attribute name=\"al_remediationactioncode\"/><attribute name=\"al_description\"/>" +
+        "<attribute name=\"al_outcomecaseid\"/><attribute name=\"al_reviewinstanceid\"/>" +
+        "<attribute name=\"al_actionstatus\"/><attribute name=\"al_duedate\"/>" +
+        "<attribute name=\"al_assignedcontactid\"/>" +
+        "<order attribute=\"al_remediationactioncode\"/></entity></fetch>")).Entities;
+
+    var work = new List<(Entity Action, List<string> Items, string Context)>();
+    foreach (var a in actions)
+    {
+        // More than one item is the whole criterion, and it is what makes a re-run a no-op:
+        // every row this leaves behind carries exactly one. Reading the code instead does
+        // not work - a case reference ends in digits of its own ("IO-SEED-TAX-01"), so
+        // "REM-IO-SEED-TAX-01-1" looks like it already carries an item number and does not.
+        //
+        // An action that yields exactly one item is left completely alone, old code and all.
+        // A replayed submit for that review would then raise a "-1" beside it rather than
+        // recognising it; that is rare enough to accept and visible when it happens, and
+        // re-coding rows on a guess is the worse trade.
+        var parsed = SplitDescription(a.GetAttributeValue<string>("al_description"));
+        if (parsed.Items.Count < 2)
+        {
+            continue;
+        }
+
+        work.Add((a, parsed.Items, parsed.Context));
+    }
+
+    Console.WriteLine($"{work.Count} action(s) to split, of {actions.Count} read.");
+    foreach (var (a, items, _) in work)
+    {
+        Console.WriteLine($"   {a.GetAttributeValue<string>("al_remediationactioncode")}  ->  {items.Count} item(s)");
+        foreach (var item in items)
+        {
+            Console.WriteLine($"      - {item}");
+        }
+    }
+
+    if (!confirm)
+    {
+        Console.WriteLine("Dry run. Re-run with --confirm <orgUrl> to write them.");
+        return 0;
+    }
+
+    var created = 0;
+    var recoded = 0;
+    foreach (var (a, items, context) in work)
+    {
+        var code = a.GetAttributeValue<string>("al_remediationactioncode") ?? string.Empty;
+
+        // The first item keeps the row, and the row keeps everything the adviser has done
+        // to it. Only its description narrows to the one item, and its code gains "-1".
+        svc.Update(new Entity("al_remediationaction", a.Id)
+        {
+            ["al_remediationactioncode"] = code + "-1",
+            ["al_description"] = DescribeOne(items[0], context),
+        });
+        recoded++;
+
+        for (var i = 1; i < items.Count; i++)
+        {
+            var row = new Entity("al_remediationaction")
+            {
+                ["al_name"] = a.GetAttributeValue<string>("al_name"),
+                ["al_remediationactioncode"] = code + "-" + (i + 1),
+                ["al_description"] = DescribeOne(items[i], context),
+                ["al_actionstatus"] = new OptionSetValue(120910600),
+            };
+
+            if (a.Contains("al_outcomecaseid")) { row["al_outcomecaseid"] = a.GetAttributeValue<EntityReference>("al_outcomecaseid"); }
+            if (a.Contains("al_reviewinstanceid")) { row["al_reviewinstanceid"] = a.GetAttributeValue<EntityReference>("al_reviewinstanceid"); }
+            if (a.Contains("al_duedate")) { row["al_duedate"] = a.GetAttributeValue<DateTime>("al_duedate"); }
+            if (a.Contains("al_assignedcontactid")) { row["al_assignedcontactid"] = a.GetAttributeValue<EntityReference>("al_assignedcontactid"); }
+
+            svc.Create(row);
+            created++;
+        }
+
+        Console.WriteLine($"   {code}: kept item 1, created {items.Count - 1} more.");
+    }
+
+    Console.WriteLine($"Done. {recoded} action(s) re-coded, {created} created.");
+    return 0;
+}
+
+// The item list and the context behind it, read back out of a description
+// Remediation.Describe wrote. Mirrors app/src/features/remediation/remediationIssues.ts.
+(List<string> Items, string Context) SplitDescription(string description)
+{
+    var items = new List<string>();
+    var rest = new List<string>();
+
+    foreach (var raw in (description ?? string.Empty).Split('\n'))
+    {
+        var line = raw.Trim();
+
+        if (line.StartsWith("- ", StringComparison.Ordinal))
+        {
+            var item = line.Substring(2).Trim();
+            if (item.Length > 0) { items.Add(item); }
+            continue;
+        }
+
+        if (line == "Issues found on the check:") { continue; }
+
+        rest.Add(line);
+    }
+
+    var context = System.Text.RegularExpressions.Regex
+        .Replace(string.Join("\n", rest), "\n{3,}", "\n\n").Trim();
+
+    return (items, context);
+}
+
+// One item written back in the shape Remediation.DescribeItem writes, so the split rows
+// and the ones raised from now on read the same to every renderer.
+string DescribeOne(string item, string context)
+{
+    var text = "Issues found on the check:\n- " + item;
+    if (!string.IsNullOrWhiteSpace(context))
+    {
+        text += "\n\n" + context;
+    }
+
+    return text.Length <= 2000 ? text : text.Substring(0, 2000);
 }
 
 int QueueRoutedCases(string orgUrl, bool confirm)
