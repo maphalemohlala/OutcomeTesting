@@ -452,42 +452,59 @@
           {% assign grid_rt = 0 %}
           {% assign grid_col = 'Check' %}
           {% assign subsections = false %}
-          {% case scode %}
-            {% when 'S-TAX' %}
-              {% assign block_title = 'File Quality - Tax check section' %}
-            {% when 'S-AMLCRA' %}
-              {% assign block_title = 'File Quality - AML and CRA checking points' %}
-              {% assign layout = 'grid' %}{% assign grid_rt = 120910008 %}
-            {% when 'S-FQOUT' or 'S-FQTAX' %}
-              {% assign block = 'S-FQ' %}
-              {% assign block_title = 'File Quality Outcome' %}
-            {% when 'S-E1' or 'S-E2' or 'S-E3' or 'S-E4' or 'S-E5' %}
-              {% assign block = 'S-E' %}
-              {% assign block_title = 'Suitability core checks' %}
-              {% assign block_intro = 'Suitability core checks are shown in a consistent Pass/Fail format against each test point.' %}
-              {% assign layout = 'grid' %}{% assign grid_rt = 120910006 %}{% assign grid_col = 'Suitability test point' %}
-              {% assign subsections = true %}
-            {% when 'S-CRP' %}
-              {% assign block_title = 'Centralised Retirement Proposition' %}
-              {% assign block_intro = 'Complete this section where retirement income planning or decumulation advice is in scope.' %}
-              {% assign layout = 'grid' %}{% assign grid_rt = 120910006 %}{% assign grid_col = 'Centralised Retirement Proposition test point' %}
-            {% when 'S-CD' %}
-              {% assign block_title = 'Consumer Duty overlay' %}
-              {% assign layout = 'grid' %}{% assign grid_rt = 120910009 %}{% assign grid_col = 'Outcome' %}
-            {% when 'S-GRADE' %}
-              {% assign block_title = 'Checker judgement and grading' %}
-          {% endcase %}
-          {% case grid_rt %}
-            {% when 120910006 %}
-              {% assign gvalues = '120910300,120910301,120910302' | split: ',' %}
-              {% assign glabels = 'Pass,Fail,Insufficient evidence' | split: ',' %}
-            {% when 120910008 %}
-              {% assign gvalues = '120910305,120910306,120910307' | split: ',' %}
-              {% assign glabels = 'Yes,No,N/A' | split: ',' %}
-            {% when 120910009 %}
-              {% assign gvalues = '120910305,120910306,120910302' | split: ',' %}
-              {% assign glabels = 'Yes,No,Insufficient evidence' | split: ',' %}
-          {% endcase %}
+          {% comment %}
+            Written as if / elsif on one value at a time, deliberately.
+
+            This was a {% case scode %} with two multi-value whens - "S-FQOUT or S-FQTAX" and
+            "S-E1 or S-E2 or S-E3 or S-E4 or S-E5". Multi-value `when` is an extension, not
+            core Liquid, and when it does not match there is no error: the case simply falls
+            through, every E section keeps its own name and inline layout, and the document's
+            "Suitability core checks" / "Suitability test point" table never appears at all.
+            That is precisely the symptom the project owner reported twice (AD-098, and again
+            2026-09-09), so the construct is gone rather than trusted. One test per code.
+          {% endcomment %}
+          {% if scode == 'S-TAX' %}
+            {% assign block_title = 'File Quality - Tax check section' %}
+          {% elsif scode == 'S-AMLCRA' %}
+            {% assign block_title = 'File Quality - AML and CRA checking points' %}
+            {% assign layout = 'grid' %}{% assign grid_rt = 120910008 %}
+          {% elsif scode == 'S-FQOUT' %}
+            {% assign block = 'S-FQ' %}
+            {% assign block_title = 'File Quality Outcome' %}
+          {% elsif scode == 'S-FQTAX' %}
+            {% assign block = 'S-FQ' %}
+            {% assign block_title = 'File Quality Outcome' %}
+          {% elsif scode == 'S-E1' or scode == 'S-E2' or scode == 'S-E3' or scode == 'S-E4' or scode == 'S-E5' %}
+            {% assign block = 'S-E' %}
+            {% assign block_title = 'Suitability core checks' %}
+            {% assign block_intro = 'Suitability core checks are shown in a consistent Pass/Fail format against each test point.' %}
+            {% assign layout = 'grid' %}{% assign grid_rt = 120910006 %}{% assign grid_col = 'Suitability test point' %}
+            {% assign subsections = true %}
+          {% elsif scode == 'S-CRP' %}
+            {% assign block_title = 'Centralised Retirement Proposition' %}
+            {% assign block_intro = 'Complete this section where retirement income planning or decumulation advice is in scope.' %}
+            {% assign layout = 'grid' %}{% assign grid_rt = 120910006 %}{% assign grid_col = 'Centralised Retirement Proposition test point' %}
+          {% elsif scode == 'S-CD' %}
+            {% assign block_title = 'Consumer Duty overlay' %}
+            {% assign layout = 'grid' %}{% assign grid_rt = 120910009 %}{% assign grid_col = 'Outcome' %}
+          {% elsif scode == 'S-GRADE' %}
+            {% assign block_title = 'Checker judgement and grading' %}
+          {% endif %}
+
+          {% comment %}
+            The tick columns for whichever scale this block is headed by. A `case` on an
+            integer is the same gamble as the one above, so this is an if chain too.
+          {% endcomment %}
+          {% if grid_rt == 120910006 %}
+            {% assign gvalues = '120910300,120910301,120910302' | split: ',' %}
+            {% assign glabels = 'Pass,Fail,Insufficient evidence' | split: ',' %}
+          {% elsif grid_rt == 120910008 %}
+            {% assign gvalues = '120910305,120910306,120910307' | split: ',' %}
+            {% assign glabels = 'Yes,No,N/A' | split: ',' %}
+          {% elsif grid_rt == 120910009 %}
+            {% assign gvalues = '120910305,120910306,120910302' | split: ',' %}
+            {% assign glabels = 'Yes,No,Insufficient evidence' | split: ',' %}
+          {% endif %}
 
           {% if block != current_block %}
             {% unless forloop.first %}
