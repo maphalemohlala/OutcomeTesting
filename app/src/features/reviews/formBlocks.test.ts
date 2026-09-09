@@ -8,12 +8,17 @@ import type { FormRow, ReviewSection } from './reviewSections';
  * are their own block before File Quality Outcome, and each block carries the document's
  * title and intro. The section model has no grouping level, so this is where it is read.
  */
-const row = (key: string, responseTypeValue: number): FormRow => ({
+const row = (
+  key: string,
+  responseTypeValue: number,
+  code: string | null = null,
+): FormRow => ({
   key,
   question: key,
   responseTypeValue,
   responseType: '',
   mandatory: true,
+  code,
   response: null,
 });
 
@@ -128,3 +133,48 @@ describe('formBlocks', () => {
     expect(block?.kind === 'failpoints' && block.points).toEqual(points);
   });
 });
+
+describe('the outcome lens tick', () => {
+  it("lifts E2's lens tick out of the test points and onto the lens row", () => {
+    const blocks = formBlocks(
+      [
+        section(
+          'S-E2',
+          'Risk, Capacity & Loss (COBS 9.2 / FG)',
+          [
+            row('e2-1', 120910006, 'Q-E2-01'),
+            row('e2-2', 120910006, 'Q-E2-02'),
+            row('e2-lens', 120910007, 'Q-E2-LENS'),
+          ],
+          'Would a reasonable third party conclude the client was not exposed to foreseeable harm?',
+        ),
+      ],
+      [],
+    );
+    const block = blocks.find((b) => b.kind === 'section');
+    const group = block && block.kind === 'section' ? block.groups[0] : null;
+
+    // It is not a test point, so it does not take a row in the grid.
+    expect(group?.rows.map((r) => r.key)).toEqual(['e2-1', 'e2-2']);
+    expect(group?.lensTick?.key).toBe('e2-lens');
+  });
+
+  it('leaves every other lens row without a tick', () => {
+    const blocks = formBlocks(
+      [
+        section(
+          'S-E3',
+          'Research & Recommendation Rationale (COBS 9.3)',
+          [row('e3-1', 120910006, 'Q-E3-01')],
+          'Is the recommendation clearly suitable, not just technically admissible?',
+        ),
+      ],
+      [],
+    );
+    const block = blocks.find((b) => b.kind === 'section');
+    const group = block && block.kind === 'section' ? block.groups[0] : null;
+    expect(group?.rows).toHaveLength(1);
+    expect(group?.lensTick).toBeNull();
+  });
+});
+

@@ -251,6 +251,23 @@
         <field name="al_displayorder" value="3" />
         <field name="al_sectionid" lookupentity="al_section" value="33330000-0000-4c00-8000-000000000005" />
       </record>
+      <!--
+        Q-E2-LENS is the single tick box the document draws on E2's outcome lens row, and on
+        no other section's (knowledge/checklist-v8.md). A code ending -LENS is how both review
+        pages know to put its box in the lens row rather than give it a row of its own, and it
+        is one box rather than a Yes / No pair because that is what the document draws: ticked
+        records Yes, untouched records nothing.
+
+        Not mandatory. AD-019 makes every displayed answerable question mandatory, and this is
+        the deliberate exception: a lone attestation box that had to be ticked before the
+        section could be submitted would not be a judgement, it would be a toll gate.
+      -->
+      <record id="44440000-0000-4c00-8000-000000000094">
+        <field name="al_name" value="Would a reasonable third party conclude the client was not exposed to foreseeable harm?" />
+        <field name="al_questioncode" value="Q-E2-LENS" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_sectionid" lookupentity="al_section" value="33330000-0000-4c00-8000-000000000005" />
+      </record>
       <record id="44440000-0000-4c00-8000-000000000019">
         <field name="al_name" value="Recommended solution aligns to objectives and constraints" />
         <field name="al_questioncode" value="Q-E3-01" />
@@ -615,6 +632,17 @@
         <field name="al_responsetype" value="120910006" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000018" />
       </record>
+      <record id="55550000-0000-4c00-8000-000000000094">
+        <field name="al_name" value="Q-E2-LENS v1" />
+        <field name="al_questionversioncode" value="Q-E2-LENS-V1" />
+        <field name="al_questiontext" value="Would a reasonable third party conclude the client was not exposed to foreseeable harm?" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
+        <field name="al_ismandatory" value="False" />
+        <field name="al_responsetype" value="120910007" />
+        <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000094" />
+      </record>
       <record id="55550000-0000-4c00-8000-000000000019">
         <field name="al_name" value="Q-E3-01 v1" />
         <field name="al_questionversioncode" value="Q-E3-01-V1" />
@@ -917,121 +945,121 @@
   <entity name="al_failreason" displayname="Fail Reason">
     <records>
       <record id="66660000-0000-4c00-8000-000000000001">
-        <field name="al_name" value="ID verification issue" />
+        <field name="al_name" value="AML - ID verification issue" />
         <field name="al_failreasoncode" value="FR-AML-01" />
         <field name="al_displayorder" value="1" />
         <field name="al_category" value="120910400" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000002">
-        <field name="al_name" value="No CRA completed or missing data fields" />
+        <field name="al_name" value="AML - No CRA completed or missing data fields" />
         <field name="al_failreasoncode" value="FR-AML-02" />
         <field name="al_displayorder" value="2" />
         <field name="al_category" value="120910400" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000003">
-        <field name="al_name" value="CRA information not recorded on FactFind" />
+        <field name="al_name" value="AML - CRA information not recorded on FactFind" />
         <field name="al_failreasoncode" value="FR-AML-03" />
         <field name="al_displayorder" value="3" />
         <field name="al_category" value="120910400" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000004">
-        <field name="al_name" value="CDD not completed in line with standards" />
+        <field name="al_name" value="AML - CDD not completed in line with standards" />
         <field name="al_failreasoncode" value="FR-AML-04" />
         <field name="al_displayorder" value="4" />
         <field name="al_category" value="120910400" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000005">
-        <field name="al_name" value="CRA highlighted a High Risk, with no supporting form completed" />
+        <field name="al_name" value="AML - CRA highlighted a High Risk, with no supporting form completed" />
         <field name="al_failreasoncode" value="FR-AML-05" />
         <field name="al_displayorder" value="5" />
         <field name="al_category" value="120910400" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000006">
-        <field name="al_name" value="Any other process breach has been identified" />
+        <field name="al_name" value="Breach - Any other process breach has been identified" />
         <field name="al_failreasoncode" value="FR-BRE-01" />
         <field name="al_displayorder" value="6" />
         <field name="al_category" value="120910401" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000007">
-        <field name="al_name" value="Any other regulatory breach has been identified" />
+        <field name="al_name" value="Breach - Any other regulatory breach has been identified" />
         <field name="al_failreasoncode" value="FR-BRE-02" />
         <field name="al_displayorder" value="7" />
         <field name="al_category" value="120910401" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000008">
-        <field name="al_name" value="Client consent not evident on file" />
+        <field name="al_name" value="Record Keeping - Client consent not evident on file" />
         <field name="al_failreasoncode" value="FR-REC-01" />
         <field name="al_displayorder" value="8" />
         <field name="al_category" value="120910402" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000009">
-        <field name="al_name" value="Concession required but not on file" />
+        <field name="al_name" value="Record Keeping - Concession required but not on file" />
         <field name="al_failreasoncode" value="FR-REC-02" />
         <field name="al_displayorder" value="9" />
         <field name="al_category" value="120910402" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000010">
-        <field name="al_name" value="Standard of file quality" />
+        <field name="al_name" value="Record Keeping - Standard of file quality" />
         <field name="al_failreasoncode" value="FR-REC-03" />
         <field name="al_displayorder" value="10" />
         <field name="al_category" value="120910402" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000011">
-        <field name="al_name" value="File chronology does not align with the advice process" />
+        <field name="al_name" value="Record Keeping - File chronology does not align with the advice process" />
         <field name="al_failreasoncode" value="FR-REC-04" />
         <field name="al_displayorder" value="11" />
         <field name="al_category" value="120910402" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000012">
-        <field name="al_name" value="Information given relating to the recommendation/advice is incorrect" />
+        <field name="al_name" value="Record Keeping - Information given relating to the recommendation/advice is incorrect" />
         <field name="al_failreasoncode" value="FR-REC-05" />
         <field name="al_displayorder" value="12" />
         <field name="al_category" value="120910402" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000013">
-        <field name="al_name" value="LPA/EPA not on file or has not been registered" />
+        <field name="al_name" value="Record Keeping - LPA/EPA not on file or has not been registered" />
         <field name="al_failreasoncode" value="FR-REC-06" />
         <field name="al_displayorder" value="13" />
         <field name="al_category" value="120910402" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000014">
-        <field name="al_name" value="Missing documents (provided when requested)" />
+        <field name="al_name" value="Record Keeping - Missing documents (provided when requested)" />
         <field name="al_failreasoncode" value="FR-REC-07" />
         <field name="al_displayorder" value="14" />
         <field name="al_category" value="120910402" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000015">
-        <field name="al_name" value="Missing documents (unable to provide)" />
+        <field name="al_name" value="Record Keeping - Missing documents (unable to provide)" />
         <field name="al_failreasoncode" value="FR-REC-08" />
         <field name="al_displayorder" value="15" />
         <field name="al_category" value="120910402" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000016">
-        <field name="al_name" value="No client agreement or client acceptance in place" />
+        <field name="al_name" value="Record Keeping - No client agreement or client acceptance in place" />
         <field name="al_failreasoncode" value="FR-REC-09" />
         <field name="al_displayorder" value="16" />
         <field name="al_category" value="120910402" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000017">
-        <field name="al_name" value="Service &amp; Charges brochure not issued or out of date" />
+        <field name="al_name" value="Record Keeping - Service &amp; Charges brochure not issued or out of date" />
         <field name="al_failreasoncode" value="FR-REC-10" />
         <field name="al_displayorder" value="17" />
         <field name="al_category" value="120910402" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000018">
-        <field name="al_name" value="TOB not provided or out of date" />
+        <field name="al_name" value="Record Keeping - TOB not provided or out of date" />
         <field name="al_failreasoncode" value="FR-REC-11" />
         <field name="al_displayorder" value="18" />
         <field name="al_category" value="120910402" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000019">
-        <field name="al_name" value="Not completed when this should have been" />
+        <field name="al_name" value="Tax check - not completed when this should have been" />
         <field name="al_failreasoncode" value="FR-TAX-01" />
         <field name="al_displayorder" value="19" />
         <field name="al_category" value="120910403" />
       </record>
       <record id="66660000-0000-4c00-8000-000000000020">
-        <field name="al_name" value="Insufficient evidence to complete the check or to pass" />
+        <field name="al_name" value="Tax check – insufficient evidence to complete the check or to pass" />
         <field name="al_failreasoncode" value="FR-TAX-02" />
         <field name="al_displayorder" value="20" />
         <field name="al_category" value="120910403" />

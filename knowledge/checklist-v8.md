@@ -152,10 +152,20 @@ Outcome lens: Does the evidence support that the advice was built around the cli
 | Q-E2-01 | Attitude to risk recorded and internally consistent |
 | Q-E2-02 | Capacity for loss assessed and referenced in recommendation |
 | Q-E2-03 | Any mismatch clearly explained and justified |
+| Q-E2-LENS | Would a reasonable third party conclude the client was not exposed to foreseeable harm? (the lens row's own tick box; `YesNo`, not mandatory) |
 
 Outcome lens: Would a reasonable third party conclude the client was not exposed to foreseeable harm?
 
-The E2 outcome lens row carries a single stray tick box in the source document. Treated as a formatting artefact, consistent with every other outcome lens row.
+The E2 outcome lens row carries a single tick box that no other outcome lens row has. Read as
+a formatting artefact until 2026-09-09, when the project owner directed that it be built. It is
+seeded as `Q-E2-LENS`, a `YesNo` question at display order 4, and both review pages render it
+as **one** box on the lens row itself rather than as a test point of its own or a Yes / No
+pair - which is what the document draws. Ticked records Yes; untouched records nothing.
+
+It is the one **non-mandatory** answerable question in the checklist, against AD-019. A lone
+attestation box that had to be ticked before the section could be submitted would not be a
+judgement, it would be a toll gate. Both pages recognise it by the `-LENS` code suffix rather
+than by its section, so a second one could be seeded without a code change.
 
 ### S-E3 — Research & Recommendation Rationale (COBS 9.3)
 | Code | Question |
@@ -268,28 +278,36 @@ ticks are stored on the File quality outcome answer - Q-FQ-01 for AQS, Q-FQTAX-0
 through the same response-keyed intersect. The app shows a reason ticked if it is linked to
 any answer on the review, so reasons recorded under AD-054 remain visible.
 
-| Code | Category | Reason |
+`al_Name` holds **the document's whole row**, category prefix included ("AML - ID verification
+issue"), and both review pages and `Remediation.NonPassItems` render it as stored. The prefix is
+not built from `al_Category` and a separator, because the document does not punctuate the rows
+consistently: rows 1-19 take a hyphen, **row 20 takes an en-dash**, and the two Tax check rows
+run on in lower case. Reproducing that from a category label would need a per-reason separator
+column; storing the row as written needs none. `al_Category` remains the grouping, for MI and
+ordering.
+
+| Code | Category | Reason (as `al_Name` holds it) |
 |---|---|---|
-| FR-AML-01 | AML | ID verification issue |
-| FR-AML-02 | AML | No CRA completed or missing data fields |
-| FR-AML-03 | AML | CRA information not recorded on FactFind |
-| FR-AML-04 | AML | CDD not completed in line with standards |
-| FR-AML-05 | AML | CRA highlighted a High Risk, with no supporting form completed |
-| FR-BRE-01 | Breach | Any other process breach has been identified |
-| FR-BRE-02 | Breach | Any other regulatory breach has been identified |
-| FR-REC-01 | Record Keeping | Client consent not evident on file |
-| FR-REC-02 | Record Keeping | Concession required but not on file |
-| FR-REC-03 | Record Keeping | Standard of file quality |
-| FR-REC-04 | Record Keeping | File chronology does not align with the advice process |
-| FR-REC-05 | Record Keeping | Information given relating to the recommendation/advice is incorrect |
-| FR-REC-06 | Record Keeping | LPA/EPA not on file or has not been registered |
-| FR-REC-07 | Record Keeping | Missing documents (provided when requested) |
-| FR-REC-08 | Record Keeping | Missing documents (unable to provide) |
-| FR-REC-09 | Record Keeping | No client agreement or client acceptance in place |
-| FR-REC-10 | Record Keeping | Service & Charges brochure not issued or out of date |
-| FR-REC-11 | Record Keeping | TOB not provided or out of date |
-| FR-TAX-01 | Tax check | Not completed when this should have been |
-| FR-TAX-02 | Tax check | Insufficient evidence to complete the check or to pass |
+| FR-AML-01 | AML | AML - ID verification issue |
+| FR-AML-02 | AML | AML - No CRA completed or missing data fields |
+| FR-AML-03 | AML | AML - CRA information not recorded on FactFind |
+| FR-AML-04 | AML | AML - CDD not completed in line with standards |
+| FR-AML-05 | AML | AML - CRA highlighted a High Risk, with no supporting form completed |
+| FR-BRE-01 | Breach | Breach - Any other process breach has been identified |
+| FR-BRE-02 | Breach | Breach - Any other regulatory breach has been identified |
+| FR-REC-01 | Record Keeping | Record Keeping - Client consent not evident on file |
+| FR-REC-02 | Record Keeping | Record Keeping - Concession required but not on file |
+| FR-REC-03 | Record Keeping | Record Keeping - Standard of file quality |
+| FR-REC-04 | Record Keeping | Record Keeping - File chronology does not align with the advice process |
+| FR-REC-05 | Record Keeping | Record Keeping - Information given relating to the recommendation/advice is incorrect |
+| FR-REC-06 | Record Keeping | Record Keeping - LPA/EPA not on file or has not been registered |
+| FR-REC-07 | Record Keeping | Record Keeping - Missing documents (provided when requested) |
+| FR-REC-08 | Record Keeping | Record Keeping - Missing documents (unable to provide) |
+| FR-REC-09 | Record Keeping | Record Keeping - No client agreement or client acceptance in place |
+| FR-REC-10 | Record Keeping | Record Keeping - Service & Charges brochure not issued or out of date |
+| FR-REC-11 | Record Keeping | Record Keeping - TOB not provided or out of date |
+| FR-TAX-01 | Tax check | Tax check - not completed when this should have been |
+| FR-TAX-02 | Tax check | Tax check – insufficient evidence to complete the check or to pass |
 
 ## No free-text box beside a tick
 

@@ -221,9 +221,13 @@ namespace OutcomeTesting.Plugins.Tests
 
             var tob = Guid.NewGuid();
             var idIssue = Guid.NewGuid();
-            service.Seed("al_failreason", tob, "al_name", "TOB not provided or out of date",
+            // al_name holds the document's whole row, category prefix included, because the
+            // document does not punctuate the twenty rows consistently and a label built from
+            // al_category plus a separator could not reproduce that. The prefix is therefore
+            // not added again when the item is written.
+            service.Seed("al_failreason", tob, "al_name", "Record Keeping - TOB not provided or out of date",
                 "al_category", new OptionSetValue(120910402), "al_displayorder", 18);
-            service.Seed("al_failreason", idIssue, "al_name", "ID verification issue",
+            service.Seed("al_failreason", idIssue, "al_name", "AML - ID verification issue",
                 "al_category", new OptionSetValue(120910400), "al_displayorder", 1);
             // The same reason ticked on two answers is listed once; a tick on another
             // review's answer is not this review's.

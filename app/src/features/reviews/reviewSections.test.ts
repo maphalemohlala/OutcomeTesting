@@ -25,11 +25,11 @@ describe('buildSections', () => {
     },
   ];
   const questions: QuestionRef[] = [
-    { id: 'Q-TAX-01', sectionId: 'S-TAX', order: 1 },
-    { id: 'Q-TAX-02', sectionId: 'S-TAX', order: 2 },
-    { id: 'Q-E1-01', sectionId: 'S-E1', order: 1 },
-    { id: 'Q-E1-02', sectionId: 'S-E1', order: 2 },
-    { id: 'Q-GR-01', sectionId: 'S-GRADE', order: 1 },
+    { id: 'Q-TAX-01', sectionId: 'S-TAX', order: 1, code: 'Q-TAX-01' },
+    { id: 'Q-TAX-02', sectionId: 'S-TAX', order: 2, code: 'Q-TAX-02' },
+    { id: 'Q-E1-01', sectionId: 'S-E1', order: 1, code: 'Q-E1-01' },
+    { id: 'Q-E1-02', sectionId: 'S-E1', order: 2, code: 'Q-E1-02' },
+    { id: 'Q-GR-01', sectionId: 'S-GRADE', order: 1, code: 'Q-GR-01' },
   ];
   const version = (id: string, questionId: string, order: number): VersionRef => ({
     id: `${id}-v`,
@@ -133,8 +133,8 @@ describe('buildSections', () => {
     const built = buildSections(
       tied,
       [
-        { id: 'q-b', sectionId: 'b', order: 1 },
-        { id: 'q-a', sectionId: 'a', order: 1 },
+        { id: 'q-b', sectionId: 'b', order: 1, code: 'q-b' },
+        { id: 'q-a', sectionId: 'a', order: 1, code: 'q-a' },
       ],
       [version('q-b', 'q-b', 1), version('q-a', 'q-a', 1)],
       [],

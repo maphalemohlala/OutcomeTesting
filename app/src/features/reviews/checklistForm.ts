@@ -161,6 +161,18 @@ export function isOutcomeLens(section: ReviewSection): boolean {
   return /^S-E\d/.test(section.code ?? '');
 }
 
+/**
+ * Whether the row is a section's outcome-lens tick rather than a test point of its own.
+ *
+ * The document draws a single tick box on E2's outcome lens row and on no other lens row.
+ * It is seeded as a question (Q-E2-LENS) so the tick is a recorded answer like any other,
+ * and recognised by the -LENS code suffix rather than by the section, so a second one could
+ * be added to the seed without touching either page.
+ */
+export function isLensTick(row: FormRow<SectionedAnswer>): boolean {
+  return /-LENS$/.test(row.code ?? '');
+}
+
 // ---------------------------------------------------------------------------------------
 // Case header block
 // ---------------------------------------------------------------------------------------
@@ -263,7 +275,15 @@ export interface FailReasonRef {
 
 export interface FailPoint {
   id: string;
-  /** "Category - reason", as the document lists it. */
+  /**
+   * The document's row text, verbatim, straight off al_FailReason.al_Name - which holds the
+   * whole row ("AML - ID verification issue"), category prefix included. The prefix is not
+   * built here from al_Category, because the document does not punctuate the twenty rows
+   * consistently: nineteen take a hyphen and the last an en-dash, and the two Tax check rows
+   * run on in lower case. Reproducing that from a category label plus a separator would need
+   * a per-reason separator column; storing the row as written needs none. al_Category stays
+   * as the grouping it is, for MI and ordering.
+   */
   label: string;
   ticked: boolean;
 }
@@ -286,7 +306,7 @@ export function failPoints(reasons: FailReasonRef[], ticked: ReadonlySet<string>
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))
     .map((reason) => ({
       id: reason.id,
-      label: reason.category ? `${reason.category} - ${reason.name}` : reason.name,
+      label: reason.name,
       ticked: ticked.has(reason.id),
     }));
 }
@@ -489,6 +509,12 @@ export interface FormGroup<T extends SectionedAnswer = SectionedAnswer> {
   rows: FormRow<T>[];
   /** The document's "Outcome lens" line under the subsection; null when it has none. */
   lens: string | null;
+  /**
+   * The tick box the document draws on the lens row itself, which E2 has and no other
+   * section does. Held apart from `rows` so it renders in the lens row's last cell rather
+   * than taking a row of its own; null everywhere else.
+   */
+  lensTick: FormRow<T> | null;
 }
 
 export type FormBlock<T extends SectionedAnswer = SectionedAnswer> =
@@ -531,14 +557,16 @@ export function formBlocks<T extends SectionedAnswer>(
       placed = true;
     }
 
+    const lensTick = section.rows.find((row) => isLensTick(row)) ?? null;
     const group: FormGroup<T> = {
       id: section.id,
       heading:
         spec?.subsections && section.code
           ? `${section.code.replace(/^S-/, '')}. ${section.name}`
           : null,
-      rows: section.rows,
+      rows: lensTick ? section.rows.filter((row) => row !== lensTick) : section.rows,
       lens: spec?.subsections ? section.helpText : null,
+      lensTick,
     };
 
     const last = blocks[blocks.length - 1];

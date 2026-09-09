@@ -303,6 +303,7 @@ export function useReviewDetail(
                     id: question.al_questionid,
                     sectionId: question._al_sectionid_value ?? null,
                     order: question.al_displayorder ?? 0,
+                    code: question.al_questioncode ?? null,
                   }))
                 : [],
               effective.map((version) => ({

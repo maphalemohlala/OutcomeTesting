@@ -223,18 +223,20 @@ namespace OutcomeTesting.Plugins
                     continue;
                 }
 
+                // al_name holds the document's whole row, category prefix included ("AML - ID
+                // verification issue"), because the document does not punctuate the twenty
+                // rows consistently and a label built from al_category plus a separator
+                // cannot reproduce that. So the name is used as written and nothing is
+                // prefixed here; al_category is still read, for ordering within a category.
                 var reason = service.Retrieve(
-                    "al_failreason", reasonId, new ColumnSet("al_name", "al_category", "al_displayorder"));
-                var category = reason.GetAttributeValue<OptionSetValue>("al_category");
+                    "al_failreason", reasonId, new ColumnSet("al_name", "al_displayorder"));
                 var name = reason.GetAttributeValue<string>("al_name") ?? string.Empty;
 
                 points.Add(new RankedItem
                 {
                     Section = 0,
                     Order = reason.GetAttributeValue<int?>("al_displayorder") ?? 0,
-                    Text = "Fail point: "
-                        + (category == null ? string.Empty : labels.Label("al_failreason", "al_category", category.Value) + " - ")
-                        + name.Trim(),
+                    Text = "Fail point: " + name.Trim(),
                 });
             }
 

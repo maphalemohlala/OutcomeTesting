@@ -19,12 +19,14 @@ const row = (
   key: string,
   responseTypeValue: number | null,
   response: Partial<TickedAnswer> | null = null,
+  code: string | null = null,
 ): FormRow<TickedAnswer> => ({
   key,
   question: key,
   responseTypeValue,
   responseType: '',
   mandatory: true,
+  code,
   response: response
     ? {
         id: `r-${key}`,
@@ -199,11 +201,14 @@ describe('caseHeaderFields', () => {
 });
 
 describe('failPoints', () => {
+  // al_Name holds the document's whole row, category prefix included; al_Category is the
+  // grouping beside it, not a piece the label is built from.
   const reasons: FailReasonRef[] = [
-    { id: 'rec-1', name: 'Client consent not evident on file', category: 'Record Keeping', categoryValue: 120910402, order: 8 },
-    { id: 'aml-1', name: 'ID verification issue', category: 'AML', categoryValue: 120910400, order: 1 },
-    { id: 'tax-1', name: 'Not completed when this should have been', category: 'Tax check', categoryValue: 120910403, order: 19 },
-    { id: 'bre-1', name: 'Any other process breach has been identified', category: 'Breach', categoryValue: 120910401, order: 6 },
+    { id: 'rec-1', name: 'Record Keeping - Client consent not evident on file', category: 'Record Keeping', categoryValue: 120910402, order: 8 },
+    { id: 'aml-1', name: 'AML - ID verification issue', category: 'AML', categoryValue: 120910400, order: 1 },
+    { id: 'tax-2', name: 'Tax check – insufficient evidence to complete the check or to pass', category: 'Tax check', categoryValue: 120910403, order: 20 },
+    { id: 'tax-1', name: 'Tax check - not completed when this should have been', category: 'Tax check', categoryValue: 120910403, order: 19 },
+    { id: 'bre-1', name: 'Breach - Any other process breach has been identified', category: 'Breach', categoryValue: 120910401, order: 6 },
   ];
 
   it('offers every reason, whatever its category, in display order', () => {
@@ -214,6 +219,7 @@ describe('failPoints', () => {
       'bre-1',
       'rec-1',
       'tax-1',
+      'tax-2',
     ]);
   });
 
@@ -221,7 +227,7 @@ describe('failPoints', () => {
     expect(failPoints(reasons, new Set()).map((p) => p.id)).toContain('tax-1');
   });
 
-  it('ticks a reason recorded on the review and labels it with its category', () => {
+  it('ticks a reason recorded on the review and labels it with the document row', () => {
     const points = failPoints(reasons, new Set(['bre-1']));
     expect(points.find((p) => p.id === 'bre-1')).toEqual({
       id: 'bre-1',
@@ -229,6 +235,14 @@ describe('failPoints', () => {
       ticked: true,
     });
     expect(points.find((p) => p.id === 'aml-1')?.ticked).toBe(false);
+  });
+
+  it("keeps the last row's en-dash, which the other nineteen rows do not use", () => {
+    // The document punctuates row 20 differently from rows 1-19. The label is the stored row,
+    // not a category plus a separator, so the inconsistency survives instead of being tidied.
+    const labels = failPoints(reasons, new Set()).map((p) => p.label);
+    expect(labels).toContain('Tax check – insufficient evidence to complete the check or to pass');
+    expect(labels).toContain('Tax check - not completed when this should have been');
   });
 
   it('keeps a reason with no category rather than dropping it', () => {

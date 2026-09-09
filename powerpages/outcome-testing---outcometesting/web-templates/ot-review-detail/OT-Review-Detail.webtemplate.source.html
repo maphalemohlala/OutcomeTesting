@@ -311,6 +311,7 @@
           </filter>
           <link-entity name="al_question" from="al_questionid" to="al_questionid" alias="q">
             <attribute name="al_displayorder" />
+            <attribute name="al_questioncode" />
             <link-entity name="al_section" from="al_sectionid" to="al_sectionid" alias="s">
               <attribute name="al_sectionid" />
               <attribute name="al_name" />
@@ -428,6 +429,16 @@
         {% assign block_layout = 'inline' %}
         {% assign prev_help = '' %}
         {% assign ncols = 2 %}
+        {% comment %}
+          The tick box the document draws on E2's outcome lens row, and on no other. It is a
+          question of its own (Q-E2-LENS, display order last in its section), so it is picked
+          up here as the loop passes it and held until the lens row is written - which happens
+          once the section is finished, so the capture is always ready in time. Recognised by
+          the -LENS code rather than by the section, matching checklistForm.ts isLensTick.
+        {% endcomment %}
+        {% assign lens_tick_id = '' %}
+        {% assign lens_tick_cell = '' %}
+        {% assign lens_tick_span = 0 %}
         {% for qv in qrows %}
           {% assign sid = qv['s.al_sectionid'] %}
           {% assign scode = qv['s.al_sectioncode'] %}
@@ -482,7 +493,7 @@
             {% unless forloop.first %}
               {% if block_layout == 'grid' %}
                 {% if block_subsections and prev_help != blank %}
-                  <tr class="ot-lens"><td colspan="{{ ncols }}"><em class="ot-lens__label">Outcome lens:</em> {{ prev_help | escape }}</td></tr>
+                  <tr class="ot-lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em class="ot-lens__label">Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
                 {% endif %}
                   </tbody>
                 </table>
@@ -534,7 +545,7 @@
                       {% for fr in failreasons.results.entities %}
                         <tr>
                           <th scope="row" class="ot-col-q">
-                            <label for="fr-{{ fr.al_failreasonid }}">{{ fr.al_category.label | escape }} - {{ fr.al_name | escape }}</label>
+                            <label for="fr-{{ fr.al_failreasonid }}">{{ fr.al_name | escape }}</label>
                           </th>
                           <td class="ot-col-tick">
                             {% capture pairkey %}|{{ fq_existing.al_responseid }}~{{ fr.al_failreasonid }}{% endcapture %}<input type="checkbox" id="fr-{{ fr.al_failreasonid }}" data-ot-reason value="{{ fr.al_failreasonid }}"{% unless editable %} disabled{% endunless %}{% if fq_existing.al_responseid and selected_reason_pairs contains pairkey %} checked{% endif %} />
@@ -576,7 +587,7 @@
           {% if sid != current_section %}
             {% if block_subsections %}
               {% if current_section != '' and prev_help != blank %}
-                <tr class="ot-lens"><td colspan="{{ ncols }}"><em class="ot-lens__label">Outcome lens:</em> {{ prev_help | escape }}</td></tr>
+                <tr class="ot-lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em class="ot-lens__label">Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
               {% endif %}
               <tr class="ot-subsection"><th scope="colgroup" colspan="{{ ncols }}">{{ scode | remove_first: 'S-' }}. {{ sname | escape }}</th></tr>
             {% endif %}
@@ -611,7 +622,18 @@
           {% endcomment %}
           {% capture chosen_value %}{{ existing.al_answerchoice.value }}{% endcapture %}
 
-          {% if block_layout == 'grid' and rt == block_rt %}
+          {% assign qcode = qv['q.al_questioncode'] %}
+          {% if qcode contains '-LENS' %}
+            {% comment %}
+              One box, not a Yes / No pair, because that is what the document draws: ticked
+              records Yes (120910305), untouched records nothing. The lens row itself becomes
+              the autosave root, so bind() finds this input and saves it like any other answer
+              - there is no status line on that row, and show() already tolerates its absence.
+            {% endcomment %}
+            {% assign lens_tick_id = qv_id %}
+            {% assign lens_tick_span = 1 %}
+            {% capture lens_tick_cell %}<td class="ot-col-tick"><input type="checkbox" value="120910305" data-ot-input aria-label="{{ qv.al_questiontext | escape }}"{% unless editable %} disabled{% endunless %}{% if chosen_value == '120910305' %} checked{% endif %} /></td>{% endcapture %}
+          {% elsif block_layout == 'grid' and rt == block_rt %}
             <tr class="ot-answer ot-answer--row"
                 data-ot-answer
                 data-question-version="{{ qv_id }}"
@@ -702,7 +724,7 @@
           {% if forloop.last %}
             {% if block_layout == 'grid' %}
               {% if block_subsections and prev_help != blank %}
-                <tr class="ot-lens"><td colspan="{{ ncols }}"><em class="ot-lens__label">Outcome lens:</em> {{ prev_help | escape }}</td></tr>
+                <tr class="ot-lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em class="ot-lens__label">Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
               {% endif %}
                   </tbody>
                 </table>

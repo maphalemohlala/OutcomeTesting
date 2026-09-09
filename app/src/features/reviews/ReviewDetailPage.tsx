@@ -23,6 +23,9 @@ interface ReviewDetailPageProps {
   reviewType: ReviewType;
 }
 
+/** Yes, the value a ticked outcome-lens box records (checklistForm.ts, Q-E2-LENS). */
+const YES_VALUE = 120910305;
+
 const INTRO: Record<ReviewType, string> = {
   Tax: 'The Tax-owned part of the Checker Checklist as recorded so far (FR-015). Grading is a permissioned write path and is not yet available here (OD-007).',
   AQS: 'The Checker Checklist as recorded so far (FR-011, BR-005). Grading is a permissioned write path and is not yet available here (OD-007).',
@@ -145,9 +148,24 @@ function GroupRows({ group, block }: { group: FormGroup<ReviewResponse>; block: 
       ))}
       {group.lens ? (
         <tr>
-          <td colSpan={columns} className="checklist__lens">
+          {/*
+            * E2's lens row carries a single tick box in the last column and no other section's
+            * does, so the caption gives up a column only where there is one to give it to.
+            */}
+          <td
+            colSpan={group.lensTick ? columns - 1 : columns}
+            className="checklist__lens"
+          >
             <em className="checklist__lens-label">Outcome lens:</em> {group.lens}
           </td>
+          {group.lensTick ? (
+            <td className="checklist__tick-col">
+              <Tick
+                ticked={group.lensTick.response?.answerChoice === YES_VALUE}
+                label={group.lens}
+              />
+            </td>
+          ) : null}
         </tr>
       ) : null}
     </tbody>

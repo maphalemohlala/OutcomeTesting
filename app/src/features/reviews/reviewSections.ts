@@ -23,6 +23,8 @@ export interface QuestionRef {
   id: string;
   sectionId: string | null;
   order: number;
+  /** The seed code (Q-E1-01, Q-E2-LENS ...); how the page recognises the outcome-lens tick. */
+  code: string | null;
 }
 
 /** A question version in force on the review's reference day. */
@@ -51,6 +53,8 @@ export interface FormRow<T extends SectionedAnswer = SectionedAnswer> {
   responseTypeValue: number | null;
   responseType: string;
   mandatory: boolean;
+  /** The question's seed code, where it could be read; null for an unplaced answer. */
+  code: string | null;
   /** Null when nothing has been recorded against the question yet. */
   response: T | null;
 }
@@ -111,6 +115,7 @@ export function buildSections<T extends SectionedAnswer>(
               responseTypeValue: version.responseTypeValue,
               responseType: version.responseType,
               mandatory: version.mandatory,
+              code: question.code,
               response,
             },
           });
@@ -141,6 +146,7 @@ export function buildSections<T extends SectionedAnswer>(
         responseTypeValue: response.responseTypeValue,
         responseType: response.responseType,
         mandatory: false,
+        code: null,
         response,
       })),
     });
