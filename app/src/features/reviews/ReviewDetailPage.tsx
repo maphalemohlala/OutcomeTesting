@@ -1,16 +1,13 @@
 import { Link, useParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import type { ReviewType } from '../../types/domain';
-import { useRemediation } from '../remediation/useRemediation';
 import { useReviewDetail, type ReviewResponse } from './useReviewDetail';
 import type { FormRow } from './reviewSections';
 import {
   formBlocks,
   inlineOptionsFor,
   isTicked,
-  optionGridColumns,
   optionsFor,
-  remediationSummary,
   type ChoiceOption,
   type FailPoint,
   type FormBlock,
@@ -26,75 +23,56 @@ interface ReviewDetailPageProps {
 /** Yes, the value a ticked outcome-lens box records (checklistForm.ts, Q-E2-LENS). */
 const YES_VALUE = 120910305;
 
+/** Primary root cause, the one list the document lays out as a grid rather than a run. */
+const ROOT_CAUSE = 120910003;
+
 const INTRO: Record<ReviewType, string> = {
   Tax: 'The Tax-owned part of the Checker Checklist as recorded so far (FR-015). Grading is a permissioned write path and is not yet available here (OD-007).',
   AQS: 'The Checker Checklist as recorded so far (FR-011, BR-005). Grading is a permissioned write path and is not yet available here (OD-007).',
 };
 
-/** A tick box as the document draws it: ticked or empty, never a word. */
-function Tick({ ticked, label }: { ticked: boolean; label: string }) {
+/**
+ * A tick box as the document draws it: a square, ticked or empty, never a word. The portal
+ * draws the same box with a restyled input; this page is read-only, so it is a span.
+ */
+function Box({ ticked, label }: { ticked: boolean; label: string }) {
   return (
     <span
-      className="checklist__tick"
+      className="cc-box"
       data-ticked={ticked ? 'true' : undefined}
       role="img"
       aria-label={`${label}: ${ticked ? 'ticked' : 'not ticked'}`}
-    >
-      {ticked ? '☑' : '☐'}
-    </span>
+    />
   );
 }
 
-/**
- * The options of one row laid inline, as the document does for a mixed section: the
- * document's own casing and order (inlineOptionsFor), and its 3x3 layout where it grids the
- * list rather than running it along one line (Primary root cause).
- */
-function InlineOptions({
-  row,
-  options,
-}: {
-  row: FormRow<ReviewResponse>;
-  options: ChoiceOption[];
-}) {
-  const columns = optionGridColumns(row.responseTypeValue);
+/** A run of boxes with their labels beside them, as the document sets an inline scale. */
+function Options({ row, options }: { row: FormRow<ReviewResponse>; options: ChoiceOption[] }) {
   return (
-    <span
-      className="checklist__options"
-      data-columns={columns ?? undefined}
-      style={columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}
-    >
+    <div className="opts">
       {options.map((option) => (
-        <span key={option.value} className="checklist__option">
-          <Tick ticked={isTicked(row, option)} label={option.label} />
-          {option.label}
+        <span key={option.value} className="opt">
+          <Box ticked={isTicked(row, option)} label={option.label} /> {option.label}
         </span>
       ))}
-    </span>
+    </div>
   );
 }
 
-/** A free-text or date answer; the empty box the document leaves for it when unanswered. */
-function ValueCell({ row }: { row: FormRow<ReviewResponse> }) {
+/** A free-text or date answer; the empty cell the document leaves for it when unanswered. */
+function Value({ row }: { row: FormRow<ReviewResponse> }) {
   const answer = row.response?.answer ?? null;
   return (
-    <span className="checklist__value" data-empty={answer === null ? 'true' : undefined}>
+    <span className="value" data-empty={answer === null ? 'true' : undefined}>
       {answer ?? ''}
     </span>
   );
 }
 
-function FieldList({ fields }: { fields: HeaderField[] }) {
-  return (
-    <dl className="checklist__fields">
-      {fields.map((field) => (
-        <div key={field.label} className="checklist__field">
-          <dt>{field.label}</dt>
-          <dd data-empty={field.value === null ? 'true' : undefined}>{field.value ?? ''}</dd>
-        </div>
-      ))}
-    </dl>
-  );
+/** Whatever control the row's response type calls for, inside a value cell. */
+function Control({ row }: { row: FormRow<ReviewResponse> }) {
+  const options = inlineOptionsFor(row.responseTypeValue);
+  return options.length > 0 ? <Options row={row} options={options} /> : <Value row={row} />;
 }
 
 type SectionBlock = Extract<FormBlock<ReviewResponse>, { kind: 'section' }>;
@@ -110,57 +88,106 @@ function onScale(row: FormRow<ReviewResponse>, block: SectionBlock): boolean {
 }
 
 /**
- * One subsection of a block: its heading row where the block has subsections (E1 to E5),
- * its question rows, and the document's "Outcome lens" line beneath. A row that is not on
- * the grid's scale spans the tick columns with its own ticks or value, so a question of a
- * different type in a grid block still renders rather than being forced onto the wrong scale.
+ * The case header: the document's opening block, its eighteen fields two to a row. Outcome
+ * Case columns captured at intake, not checklist questions (checklist-v8.md).
  */
-function GroupRows({ group, block }: { group: FormGroup<ReviewResponse>; block: SectionBlock }) {
-  const columns = block.layout === 'grid' ? block.options.length + 1 : 2;
+function HeaderTable({ fields }: { fields: HeaderField[] | null }) {
+  if (fields === null) {
+    return <p className="intro">The case header could not be read, so it is not shown here.</p>;
+  }
+
+  const pairs: HeaderField[][] = [];
+  for (let i = 0; i < fields.length; i += 2) pairs.push(fields.slice(i, i + 2));
+
+  return (
+    <table className="meta">
+      <tbody>
+        {pairs.map((pair) => (
+          <tr key={pair[0].label}>
+            {pair.map((field) => [
+              <td key={`${field.label}-l`} className="lbl">
+                {field.label}
+              </td>,
+              <td key={`${field.label}-v`} className="val">
+                {field.value ?? ''}
+              </td>,
+            ])}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/**
+ * Primary root cause, in the 3x3 the document lays it out in, under its own heading rather
+ * than in a value cell of the block's table.
+ */
+function RootCause({ row }: { row: FormRow<ReviewResponse> }) {
+  const options = inlineOptionsFor(row.responseTypeValue);
+  const groups: ChoiceOption[][] = [];
+  for (let i = 0; i < options.length; i += 3) groups.push(options.slice(i, i + 3));
+
+  return (
+    <table className="rootcause">
+      <tbody>
+        <tr>
+          <th colSpan={3}>{row.question}</th>
+        </tr>
+        {groups.map((group) => (
+          <tr key={group[0].value}>
+            {group.map((option) => (
+              <td key={option.value}>
+                <span className="opt wrap">
+                  <Box ticked={isTicked(row, option)} label={option.label} /> {option.label}
+                </span>
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/**
+ * One subsection inside a grid block: its heading row where the block has subsections
+ * (E1 to E5), its test points, and the document's "Outcome lens" line beneath - which on E2,
+ * and on no other section, carries a tick box of its own in the last column.
+ */
+function GridGroup({ group, block }: { group: FormGroup<ReviewResponse>; block: SectionBlock }) {
+  const columns = block.options.length + 1;
   return (
     <tbody>
       {group.heading ? (
-        <tr className="checklist__subsection">
-          <th scope="colgroup" colSpan={columns}>
-            {group.heading}
-          </th>
+        <tr className="section">
+          <td colSpan={columns}>{group.heading}</td>
         </tr>
       ) : null}
       {group.rows.map((row) => (
         <tr key={row.key}>
-          <th scope="row">{row.question}</th>
+          <td className="label">{row.question}</td>
           {onScale(row, block) ? (
             block.options.map((option) => (
-              <td key={option.value} className="checklist__tick-col">
-                <Tick ticked={isTicked(row, option)} label={option.label} />
+              <td key={option.value} className="optcell">
+                <Box ticked={isTicked(row, option)} label={option.label} />
               </td>
             ))
           ) : (
             <td colSpan={columns - 1}>
-              {inlineOptionsFor(row.responseTypeValue).length > 0 ? (
-                <InlineOptions row={row} options={inlineOptionsFor(row.responseTypeValue)} />
-              ) : (
-                <ValueCell row={row} />
-              )}
+              <Control row={row} />
             </td>
           )}
         </tr>
       ))}
       {group.lens ? (
-        <tr>
-          {/*
-            * E2's lens row carries a single tick box in the last column and no other section's
-            * does, so the caption gives up a column only where there is one to give it to.
-            */}
-          <td
-            colSpan={group.lensTick ? columns - 1 : columns}
-            className="checklist__lens"
-          >
-            <em className="checklist__lens-label">Outcome lens:</em> {group.lens}
+        <tr className="lens">
+          <td colSpan={group.lensTick ? columns - 1 : columns}>
+            <em>Outcome lens:</em> {group.lens}
           </td>
           {group.lensTick ? (
-            <td className="checklist__tick-col">
-              <Tick
+            <td className="optcell">
+              <Box
                 ticked={group.lensTick.response?.answerChoice === YES_VALUE}
                 label={group.lens}
               />
@@ -173,36 +200,75 @@ function GroupRows({ group, block }: { group: FormGroup<ReviewResponse>; block: 
 }
 
 /**
- * One block of the document: its title and intro, then either a tick grid headed the way
- * the document heads it ("Suitability test point", "Check", "Outcome") or a row per
- * question with its ticks or value inline.
+ * An inline block, as a label / value table. Primary root cause breaks out of it into a
+ * table of its own, so the rows either side are split into their own .meta tables around
+ * it - which is what the document does, and what the portal template does in Liquid.
  */
-function BlockCard({ block }: { block: SectionBlock }) {
-  const headingId = `review-block-${block.id}`;
+function InlineBlock({ block }: { block: SectionBlock }) {
+  const rows = block.groups.flatMap((group) => group.rows);
+  const chunks: { kind: 'meta' | 'rootcause'; rows: FormRow<ReviewResponse>[] }[] = [];
+
+  for (const row of rows) {
+    const kind = row.responseTypeValue === ROOT_CAUSE ? 'rootcause' : 'meta';
+    const last = chunks[chunks.length - 1];
+    if (kind === 'meta' && last && last.kind === 'meta') last.rows.push(row);
+    else chunks.push({ kind, rows: [row] });
+  }
+
   return (
-    <section className="checklist__card" aria-labelledby={headingId}>
-      <h2 id={headingId}>{block.title}</h2>
-      {block.intro ? <p className="checklist__help">{block.intro}</p> : null}
-      <table
-        className={`checklist__table ${block.layout === 'grid' ? 'checklist__table--grid' : 'checklist__table--inline'}`}
-      >
-        {block.layout === 'grid' ? (
+    <>
+      {chunks.map((chunk) =>
+        chunk.kind === 'rootcause' ? (
+          <RootCause key={chunk.rows[0].key} row={chunk.rows[0]} />
+        ) : (
+          <table className="meta" key={chunk.rows[0].key}>
+            <tbody>
+              {chunk.rows.map((row) => (
+                <tr key={row.key}>
+                  <td className="lbl">{row.question}</td>
+                  <td colSpan={3}>
+                    <Control row={row} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ),
+      )}
+    </>
+  );
+}
+
+/**
+ * One block of the document: its heading, its intro line where it has one, then its table -
+ * a tick grid headed the way the document heads it ("Suitability test point", "Check",
+ * "Outcome"), or a label / value table.
+ */
+function Block({ block }: { block: SectionBlock }) {
+  return (
+    <>
+      <h2>{block.title}</h2>
+      {block.intro ? <p className="intro">{block.intro}</p> : null}
+      {block.layout === 'grid' ? (
+        <table className="grid">
           <thead>
             <tr>
-              <th scope="col">{block.columnHeading}</th>
+              <th className="label">{block.columnHeading}</th>
               {block.options.map((option) => (
-                <th key={option.value} scope="col" className="checklist__tick-col">
+                <th key={option.value} className="opt">
                   {option.label}
                 </th>
               ))}
             </tr>
           </thead>
-        ) : null}
-        {block.groups.map((group) => (
-          <GroupRows key={group.id} group={group} block={block} />
-        ))}
-      </table>
-    </section>
+          {block.groups.map((group) => (
+            <GridGroup key={group.id} group={group} block={block} />
+          ))}
+        </table>
+      ) : (
+        <InlineBlock block={block} />
+      )}
+    </>
   );
 }
 
@@ -210,139 +276,35 @@ function BlockCard({ block }: { block: SectionBlock }) {
  * File Quality - Fail points: its own block on the document, between the checking points
  * and the File Quality outcome, listing every reason with a tick. Not a per-answer picker
  * (AD-096, which supersedes AD-054), and not split by team - the document draws one
- * undivided list and both disciplines pick from it.
+ * undivided list and both disciplines pick from it (AD-100).
  */
-function FailPointsCard({ title, points }: { title: string; points: FailPoint[] }) {
+function FailPoints({ title, points }: { title: string; points: FailPoint[] }) {
   return (
-    <section className="checklist__card" aria-labelledby="review-fail-points">
-      <h2 id="review-fail-points">{title}</h2>
+    <>
+      <h2>{title}</h2>
       {points.length === 0 ? (
-        <p className="checklist__help">No fail reasons are configured.</p>
+        <p className="intro">No fail reasons are configured.</p>
       ) : (
-        <table className="checklist__table checklist__table--grid">
+        <table className="fails">
           <thead>
             <tr>
-              <th scope="col">File Quality fail reason</th>
-              <th scope="col" className="checklist__tick-col">
-                Tick
-              </th>
+              <th className="label">File Quality fail reason</th>
+              <th className="tick">Tick</th>
             </tr>
           </thead>
           <tbody>
             {points.map((point) => (
               <tr key={point.id}>
-                <th scope="row">{point.label}</th>
-                <td className="checklist__tick-col">
-                  <Tick ticked={point.ticked} label={point.label} />
+                <td className="label">{point.label}</td>
+                <td className="tick">
+                  <Box ticked={point.ticked} label={point.label} />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
-    </section>
-  );
-}
-
-function HeaderCard({ fields }: { fields: HeaderField[] | null }) {
-  return (
-    <section className="checklist__card" aria-labelledby="review-form-header">
-      <h2 id="review-form-header">Outcome Testing – Checker Checklist</h2>
-      {fields === null ? (
-        <p className="checklist__help">
-          The case header could not be read, so the case details are not shown here.
-        </p>
-      ) : (
-        <FieldList fields={fields} />
-      )}
-    </section>
-  );
-}
-
-/**
- * Remediation and escalation, the document's closing block. Per case rather than per
- * review, as the remedial actions are (AD-095), so both the Tax and the AQS form of a
- * case show the same lines.
- */
-function RemediationCard({ caseId }: { caseId: string | null }) {
-  const remediation = useRemediation(caseId ?? undefined);
-  const summary =
-    remediation.status === 'ready'
-      ? remediationSummary(remediation.actions, remediation.signoffs, remediation.outcomes)
-      : null;
-
-  return (
-    <section className="checklist__card" aria-labelledby="review-remediation">
-      <h2 id="review-remediation">Remediation and escalation</h2>
-      {!caseId ? (
-        <p className="checklist__help">
-          This review is not linked to a case, so it has no remediation record.
-        </p>
-      ) : remediation.status === 'loading' ? (
-        <p className="checklist__help" role="status">
-          Loading remediation…
-        </p>
-      ) : remediation.status === 'unavailable' ? (
-        <p className="checklist__help">{remediation.reason}</p>
-      ) : summary ? (
-        <>
-          <table className="checklist__table checklist__table--grid">
-            <thead>
-              <tr>
-                <th scope="col" className="checklist__no-col">
-                  No.
-                </th>
-                <th scope="col">Issue / fail reason</th>
-                <th scope="col">Remedial action</th>
-                <th scope="col">Owner</th>
-                <th scope="col">Target date</th>
-                <th scope="col">Sign-off</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summary.lines.length === 0 ? (
-                <tr>
-                  <td className="checklist__no-col">1</td>
-                  <td colSpan={5}>
-                    <span className="checklist__value" data-empty="true">
-                      No remedial action has been raised.
-                    </span>
-                  </td>
-                </tr>
-              ) : (
-                summary.lines.map((line, index) => (
-                  <tr key={line.id}>
-                    <td className="checklist__no-col">{index + 1}</td>
-                    <td className="checklist__prose">{line.issue}</td>
-                    <td>{line.remedialAction ?? ''}</td>
-                    <td>{line.owner ?? ''}</td>
-                    <td>{line.targetDate ?? ''}</td>
-                    <td>{line.signOff ?? ''}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-          <FieldList
-            fields={[
-              { label: 'Client contact required?', value: summary.clientContactRequired },
-              { label: 'Recheck required?', value: summary.recheckRequired },
-              {
-                label: 'Do the remedial actions change the advice?',
-                value: summary.changesAdvice,
-              },
-              {
-                label: 'All remedial actions checked and approved?',
-                value: summary.allApproved,
-              },
-              { label: 'Regraded Outcome', value: summary.regradedOutcome },
-              { label: 'Supervisor sign off', value: summary.supervisorSignOff },
-              { label: 'Adviser sign off', value: summary.adviserSignOff },
-            ]}
-          />
-        </>
-      ) : null}
-    </section>
+    </>
   );
 }
 
@@ -376,8 +338,8 @@ export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
               /*
                * The browser's own print dialogue, which is where "Save as PDF" lives on
                * every platform. It renders what is on screen through the print rules in
-               * base.css, so the exported checklist cannot drift from the one being read -
-               * which a separately generated PDF would.
+               * ReviewDetailPage.css, so the exported checklist cannot drift from the one
+               * being read - which a separately generated PDF would.
                */
               <button
                 type="button"
@@ -444,32 +406,38 @@ export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
           </section>
 
           {/*
-            * The Checker Checklist document, block for block and in its order: the case
-            * header; then the team's sections folded into the document's blocks - Tax check,
-            * AML and CRA, the standalone fail points, File Quality Outcome, Suitability core
-            * checks (E1 to E5 as one table), CRP, Consumer Duty, grading - then remediation
-            * and escalation.
+            * The Checker Checklist, drawn as the document draws it and in its order: the
+            * "V5 Draft" footer line, the title, the case header, then the blocks - Tax check
+            * or AML and CRA, the standalone fail points, File Quality Outcome, Suitability
+            * core checks (E1 to E5 as one table), CRP, Consumer Duty, grading.
+            *
+            * Remediation and escalation is not here. The document marks it "PICKED UP ON
+            * ANOTHER FORM" and that is how it is built: it is worked on the remediation page,
+            * per case rather than per review (AD-095).
             */}
-          <HeaderCard fields={state.detail.caseHeader} />
+          <div className="checklist-doc">
+            <div className="doc-footer">Outcome Testing Checker Checklist | V5 Draft</div>
+            <h1>Outcome Testing - Checker Checklist</h1>
 
-          {state.detail.sections.length === 0 ? (
-            <section className="checklist__card" aria-labelledby="review-no-questions">
-              <h2 id="review-no-questions">No questions in this version</h2>
-              <p className="checklist__help">
-                The checklist version issued to this review has no sections for this team.
-              </p>
-            </section>
-          ) : null}
+            <HeaderTable fields={state.detail.caseHeader} />
 
-          {formBlocks(state.detail.sections, state.detail.failPoints).map((block) =>
-            block.kind === 'failpoints' ? (
-              <FailPointsCard key={block.id} title={block.title} points={block.points} />
-            ) : (
-              <BlockCard key={block.id} block={block} />
-            ),
-          )}
+            {state.detail.sections.length === 0 ? (
+              <>
+                <h2>No questions in this version</h2>
+                <p className="intro">
+                  The checklist version issued to this review has no sections for this team.
+                </p>
+              </>
+            ) : null}
 
-          <RemediationCard caseId={state.detail.header.caseId} />
+            {formBlocks(state.detail.sections, state.detail.failPoints).map((block) =>
+              block.kind === 'failpoints' ? (
+                <FailPoints key={block.id} title={block.title} points={block.points} />
+              ) : (
+                <Block key={block.id} block={block} />
+              ),
+            )}
+          </div>
         </>
       ) : null}
     </>

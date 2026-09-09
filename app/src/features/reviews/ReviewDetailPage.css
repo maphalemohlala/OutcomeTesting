@@ -60,187 +60,156 @@
   text-decoration: underline;
 }
 
-/*
- * The Checker Checklist as a form. One card per block of the document, in the document's
- * order, each with the document's own layout: a definition grid for the case header, a
- * tick grid where every row shares one scale, a row per question with its ticks or value
- * inline where the block mixes them. A card does not break across a printed page, so
- * "Save as PDF" pages the way the document does.
- */
-.checklist__card {
-  padding: var(--space-4);
-  background: var(--colour-surface);
+/* =========================================================================================
+   The Checker Checklist, drawn as the document
+
+   The same design the portal's review page uses, scoped to .checklist-doc: Calibri on white,
+   every cell ruled in black, grey label and header bands, square tick boxes. The page's own
+   chrome above it - the back link, the summary strip - keeps the app's styling; the checklist
+   itself is the V8 document, so the two surfaces read as the same form.
+
+   Read-only here, so a tick is a span rather than a restyled input; the box is drawn the
+   same either way.
+   ========================================================================================= */
+
+.checklist-doc {
+  --line: #000;
+  --band: #d9d9d9;
+  --subband: #f2f2f2;
+
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 32px 40px 48px;
+  background: #fff;
   border: 1px solid var(--colour-border);
+  font-family: Calibri, "Segoe UI", Arial, sans-serif;
+  font-size: 11pt;
+  color: #000;
 }
 
-.checklist__card + .checklist__card {
-  margin-top: var(--space-4);
+.checklist-doc .doc-footer {
+  font-size: 9pt;
+  color: #444;
+  border-bottom: 1px solid #bbb;
+  padding-bottom: 4px;
+  margin-bottom: 20px;
 }
+
+.checklist-doc h1 {
+  font-family: Calibri, "Segoe UI", Arial, sans-serif;
+  font-size: 16pt;
+  font-weight: 700;
+  color: #000;
+  margin: 0 0 18px;
+  letter-spacing: normal;
+}
+
+.checklist-doc h2 {
+  font-family: Calibri, "Segoe UI", Arial, sans-serif;
+  font-size: 12pt;
+  font-weight: 700;
+  color: #000;
+  margin: 26px 0 8px;
+  letter-spacing: normal;
+}
+
+.checklist-doc .intro {
+  font-size: 10.5pt;
+  color: #000;
+  margin: 0 0 8px;
+}
+
+.checklist-doc table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 6px;
+  font-size: 10.5pt;
+}
+
+.checklist-doc th,
+.checklist-doc td {
+  border: 1px solid var(--line);
+  padding: 5px 7px;
+  vertical-align: top;
+  font-size: 10.5pt;
+  text-align: left;
+  font-weight: 400;
+  color: #000;
+}
+
+/* The document's header cells: a grey band, bold, upright - not the app's small-caps
+   data-table headings, which is what made these read as deformed against the document. */
+.checklist-doc th {
+  background: var(--band);
+  font-weight: 700;
+  font-size: 10.5pt;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* ---- the tick box ---- */
+.checklist-doc .cc-box {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 1px solid #333;
+  background: #fff;
+  vertical-align: -2px;
+  flex: none;
+}
+
+.checklist-doc .cc-box[data-ticked='true']::after {
+  content: "\2713";
+  display: block;
+  font-size: 11px;
+  line-height: 11px;
+  text-align: center;
+  color: #000;
+}
+
+.checklist-doc .opts { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.checklist-doc .opt { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.checklist-doc .opt.wrap { white-space: normal; }
+
+.checklist-doc .value { display: block; min-height: 1.2em; white-space: pre-wrap; }
+.checklist-doc .value[data-empty='true'] { min-height: 1.2em; }
+
+/* ---- header metadata grid ---- */
+.checklist-doc .meta td.lbl { width: 17%; font-weight: 700; background: var(--subband); }
+.checklist-doc .meta td.val { width: 33%; }
+
+/* ---- assessment grids ---- */
+.checklist-doc .grid td.label,
+.checklist-doc .grid th.label { width: 55%; }
+.checklist-doc .grid th.opt,
+.checklist-doc .grid td.optcell { width: 15%; text-align: center; }
+.checklist-doc .grid tr.section td { background: var(--band); font-weight: 700; }
+.checklist-doc .grid tr.lens td { background: var(--subband); font-size: 10pt; }
+.checklist-doc .grid tr.lens em { font-style: italic; font-weight: 700; }
+
+/* ---- fail points ---- */
+.checklist-doc .fails td.label,
+.checklist-doc .fails th.label { width: 90%; }
+.checklist-doc .fails th.tick,
+.checklist-doc .fails td.tick { width: 10%; text-align: center; }
+
+/* ---- root cause 3x3 ---- */
+.checklist-doc .rootcause td { width: 33.33%; }
 
 @media print {
-  .checklist__card {
-    break-inside: avoid;
+  .checklist-doc {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
+
+  .checklist-doc h2 { break-after: avoid; }
+  .checklist-doc tr { break-inside: avoid; }
 }
 
-.checklist__card h2 {
-  margin-bottom: var(--space-3);
-  padding-bottom: var(--space-2);
-  font-size: var(--text-lg);
-  border-bottom: 1px solid var(--colour-border);
-}
-
-.checklist__help {
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-sm);
-  font-style: italic;
-  color: var(--colour-text-muted);
-}
-
-/* Case header and remediation judgements: label beside value, two across where room allows. */
-.checklist__fields {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
-  gap: var(--space-2) var(--space-5);
-  margin: 0;
-}
-
-.checklist__field {
-  display: grid;
-  grid-template-columns: minmax(10rem, 45%) 1fr;
-  gap: var(--space-3);
-  align-items: baseline;
-  padding: var(--space-1) 0;
-  font-size: var(--text-sm);
-  border-bottom: 1px solid var(--colour-border);
-}
-
-.checklist__field dt {
-  font-weight: 600;
-}
-
-.checklist__field dd {
-  margin: 0;
-}
-
-.checklist__field dd[data-empty='true'] {
-  min-height: 1.2em;
-}
-
-.checklist__table {
-  width: 100%;
-  font-size: var(--text-sm);
-  border-collapse: collapse;
-}
-
-/* The document rules every cell, not just the row below, so the grids read as its tables. */
-.checklist__table th,
-.checklist__table td {
-  padding: var(--space-2) var(--space-3);
-  text-align: left;
-  vertical-align: top;
-  border: 1px solid var(--colour-border);
-}
-
-.checklist__table thead th {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--colour-text-muted);
-}
-
-.checklist__table tbody th {
-  font-weight: 500;
-}
-
-.checklist__table--inline tbody th {
-  width: 40%;
-  font-weight: 600;
-}
-
-/* The tick columns take only the room the tick needs; the question keeps the rest. */
-.checklist__tick-col {
-  width: 1%;
-  white-space: nowrap;
-  text-align: center;
-}
-
-.checklist__table th.checklist__tick-col,
-.checklist__table td.checklist__tick-col {
-  text-align: center;
-}
-
-.checklist__no-col {
-  width: 1%;
-  white-space: nowrap;
-}
-
-.checklist__tick {
-  font-size: var(--text-lg);
-  line-height: 1;
-  color: var(--colour-text-muted);
-}
-
-.checklist__tick[data-ticked='true'] {
-  color: var(--colour-text);
-}
-
-.checklist__options {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-}
-
-/* Primary root cause is a 3x3 grid on the document, read left to right, not one long run. */
-.checklist__options[data-columns] {
-  display: grid;
-  width: 100%;
-  max-width: 46rem;
-}
-
-.checklist__option {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  white-space: nowrap;
-}
-
-.checklist__value {
-  display: block;
-  min-height: 1.2em;
-  white-space: pre-wrap;
-}
-
-.checklist__value[data-empty='true'] {
-  font-style: italic;
-  color: var(--colour-text-muted);
-}
-
-/* A multi-line value, such as the issue list on a remediation line, keeps its line breaks. */
-.checklist__prose {
-  white-space: pre-line;
-}
-
-/* A subsection heading row inside a block: E1 to E5 within Suitability core checks. */
-.checklist__subsection th {
-  padding-top: var(--space-3);
-  font-weight: 600;
-  color: var(--colour-text);
-  background: var(--colour-surface);
-  border-bottom: 2px solid var(--colour-border-strong);
-}
-
-/* The document's "Outcome lens" footer line on each suitability block. Only the "Outcome
-   lens:" label is emphasised there; the question after it is set plainly. */
-.checklist__lens {
-  font-size: var(--text-xs);
-  color: var(--colour-text-muted);
-}
-
-.checklist__lens-label {
-  font-style: italic;
-  font-weight: 600;
-}
 
 .review__unavailable {
   max-width: 60ch;
