@@ -37,6 +37,9 @@ namespace OutcomeTesting.Plugins
         public const string TaxReviewerRole = "AL Portal - Tax Reviewer";
         public const string AqsReviewerRole = "AL Portal - AQS Reviewer";
 
+        /// <summary>The attesting role (BR-008), which the portal sign-off checks server-side (AD-099).</summary>
+        public const string TcSupervisorRole = "AL Portal - T&C Supervisor";
+
         /// <summary>
         /// Roles that exist to make Power Pages work rather than to describe a job. Offering
         /// them as application roles would invite granting business access to "everyone who

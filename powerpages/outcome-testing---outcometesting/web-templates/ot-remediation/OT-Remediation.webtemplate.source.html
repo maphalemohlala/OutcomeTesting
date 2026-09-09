@@ -547,12 +547,17 @@
   /*
    * T&C attestation (PP-12, FR-023, BR-008).
    *
-   * Path: this page -> POST al_signoff -> SignoffGuardPlugin / SignoffProgressPlugin.
+   * Path: this page -> PATCH contact.al_signoffrequest -> SignoffRequestPlugin -> al_signoff
+   *       -> SignoffGuardPlugin / SignoffProgressPlugin.
    *
-   * A create, not an update, so this needs no trigger column: the portals Web API supports
-   * create. The page sends the decision, the notes and the action; everything identifying
-   * is stamped server-side. Whether the signed-in user may do this at all is decided by
-   * the create permission on al_signoff, not by anything here (NFR-SEC-01).
+   * This used to POST al_signoff with an @odata.bind to the action (AD-074). No sign-off was
+   * ever recorded that way: Power Pages refused the association before any plug-in ran, as
+   * it refused the answer create (AD-053) and the claim (AD-076), and the page read the 403
+   * as a missing role. So the page now writes one JSON column on the signed-in user's own
+   * contact row - the Self-scoped contact permission makes that the only row it can reach -
+   * and SignoffRequestPlugin creates the al_signoff server-side after checking the contact
+   * holds the T&C Supervisor web role (AD-099). Everything identifying is still stamped by
+   * SignoffGuardPlugin; nothing here is a security boundary (NFR-SEC-01).
    */
   (function () {
     'use strict';
@@ -561,6 +566,7 @@
     if (!panels.length) { return; }
 
     var REJECTED = '120910721';
+    var contactId = '{{ user.id }}';
 
     function friendlyError(raw, httpStatus) {
       var text = String(raw || '');
@@ -572,11 +578,26 @@
         var v = text.indexOf('VALIDATION:');
         return text.substring(v + 'VALIDATION:'.length).trim();
       }
-      // A user without the T&C Supervisor role lands here: the platform refuses the
-      // create before any of our code runs, so there is no prefix to branch on.
+      /*
+       * Nothing our code raised, so the platform refused before SignoffRequestPlugin ran.
+       * Say what the platform said rather than guessing at a role: a 400 is never a
+       * permission problem, an association code names the missing grant, and a 403 on this
+       * write is the contact permission, which is bound to the reviewer and supervisor
+       * roles - the role check itself now answers with a PRECONDITION above.
+       */
+      if (httpStatus === 400) {
+        return 'The portal rejected the request before checking any permission, so nothing was '
+          + 'recorded. This is a fault in the page rather than in your account - please report it.';
+      }
+      var code = /9004010[0-9]/.exec(text);
+      if (code) {
+        return 'The site refused this write (error ' + code[0] + '), so nothing was recorded. '
+          + 'Your role is not the problem - please report it.';
+      }
       if (httpStatus === 403) {
-        return 'Your account is not allowed to sign off remediation, so nothing was recorded. Signing off needs the '
-          + 'T&C Supervisor role on your portal account. Ask an administrator rather than retrying.';
+        return 'Your portal account is not allowed to write a sign-off request, so nothing was recorded. '
+          + 'The contact permission is bound to the reviewer and T&C Supervisor roles; ask an administrator '
+          + 'to check your account rather than retrying.';
       }
       if (httpStatus === 401) {
         return 'Your session was not accepted, so nothing was recorded. Reload the page and sign in again.';
@@ -619,17 +640,20 @@
         save.disabled = true;
         show('Recording...', 'info');
 
+        // One JSON column on the signatory's own contact row. SignoffRequestPlugin parses
+        // it and creates the al_signoff; the browser no longer names a navigation property
+        // at all, which is what Power Pages kept refusing.
         var payload = {
-          al_signoffdecision: Number(decision.value),
-          al_notes: notes.value
+          al_signoffrequest: JSON.stringify({
+            actionId: actionId,
+            decision: Number(decision.value),
+            notes: notes.value
+          })
         };
-        // Navigation property name, not the lookup's logical name. See the same correction
-        // on the claim and the answer create; `relationships <orgUrl> al_signoff` prints it.
-        payload['al_remediationaction_signoff@odata.bind'] = '/al_remediationactions(' + actionId + ')';
 
         window.shell.getTokenDeferred().done(function (token) {
           var request = new XMLHttpRequest();
-          request.open('POST', '/_api/al_signoffs', true);
+          request.open('PATCH', '/_api/contacts(' + contactId + ')', true);
           request.setRequestHeader('Content-Type', 'application/json');
           request.setRequestHeader('__RequestVerificationToken', token);
 

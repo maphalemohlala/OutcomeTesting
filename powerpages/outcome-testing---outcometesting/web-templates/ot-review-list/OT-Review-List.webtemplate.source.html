@@ -419,57 +419,22 @@
      * The checklist this claim just created, opened straight away.
      *
      * A checker picks a case up in order to check it, so landing them back on the queue
-     * costs a second hunt for the row they were already looking at. The PATCH cannot
-     * carry the answer: the page wrote a contact, and the review instance is created
-     * downstream by ClaimCasePlugin. It exists by the time the write returns, though -
-     * the plug-in is a synchronous step in that transaction - so the id is read back here
-     * rather than guessed.
+     * costs a second hunt for the row they were already looking at. The review instance is
+     * created downstream by ClaimCasePlugin, synchronously in the same write, so it exists
+     * by the time the PATCH returns.
      *
-     * Narrowed to this discipline and to an open review, because a Tax-then-AQS case can
-     * carry two instances and the one just created is the unsubmitted one for the queue
-     * this page renders.
-     *
-     * A failed lookup is not a failed claim. The case IS assigned by this point, so the
-     * fallback is the refreshed list - never an error message about work that was done.
+     * This used to look the instance up over the Web API and reload the queue when that
+     * failed. It always failed: the lookup selected and filtered columns that are not in the
+     * Webapi/al_reviewinstance/fields allowlist - which governs reads as well as writes -
+     * so every claim ended on a reloaded queue with "Opening the checklist..." never kept.
+     * Widening that allowlist would let the assigned reviewer PATCH the review's status and
+     * submitted-on, which the plug-ins are meant to own. So the page hands the case to the
+     * review page instead, which resolves the open instance server-side in Liquid, where no
+     * allowlist applies.
      */
     function openChecklist(caseId) {
-      var filter = '_al_outcomecaseid_value eq ' + caseId
-        + ' and _al_assignedcontactid_value eq ' + contactId
-        + ' and al_reviewtype eq ' + reviewType
-        + ' and al_submittedon eq null';
-
-      var url = '/_api/al_reviewinstances?$select=al_reviewinstanceid'
-        + '&$filter=' + encodeURIComponent(filter)
-        + '&$orderby=' + encodeURIComponent('createdon desc')
-        + '&$top=1';
-
-      function fallback() {
-        window.setTimeout(function () { window.location.reload(); }, 800);
-      }
-
-      var lookup = new XMLHttpRequest();
-      lookup.open('GET', url, true);
-      lookup.setRequestHeader('Accept', 'application/json');
-
-      lookup.onreadystatechange = function () {
-        if (lookup.readyState !== 4) { return; }
-        if (lookup.status < 200 || lookup.status >= 300) { fallback(); return; }
-
-        var id = null;
-        try {
-          var body = JSON.parse(lookup.responseText);
-          if (body && body.value && body.value.length > 0) {
-            id = body.value[0].al_reviewinstanceid;
-          }
-        } catch (error) {
-          id = null;
-        }
-
-        if (!id) { fallback(); return; }
-        window.location.href = '/review?id=' + encodeURIComponent(id);
-      };
-
-      lookup.send();
+      window.location.href = '/review?case=' + encodeURIComponent(caseId)
+        + '&type=' + encodeURIComponent(reviewType);
     }
 
     function claim(button) {

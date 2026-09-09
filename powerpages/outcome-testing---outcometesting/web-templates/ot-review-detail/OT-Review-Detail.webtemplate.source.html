@@ -30,6 +30,41 @@
 
 {% assign review_id = request.params['id'] %}
 
+{% comment %}
+  A claim lands here by case rather than by review id: the queue page cannot read the new
+  instance's id over the Web API (the al_reviewinstance allowlist carries only the two
+  trigger columns, and widening it would hand the reviewer the status column), but Liquid
+  can, with no allowlist in the way. The open instance of that discipline assigned to the
+  signed-in user is the one just created; if none is found the page reads as "no review
+  selected", which is what a stale link should say.
+{% endcomment %}
+{% if review_id == null or review_id == empty %}
+  {% assign case_param = request.params['case'] %}
+  {% assign type_param = request.params['type'] %}
+  {% if user and case_param and case_param != empty %}
+    {% fetchxml by_case %}
+    <fetch top="1">
+      <entity name="al_reviewinstance">
+        <attribute name="al_reviewinstanceid" />
+        <filter type="and">
+          <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_param | xml_escape }}" />
+          <condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id }}" />
+          <condition attribute="al_submittedon" operator="null" />
+          {% if type_param and type_param != empty %}
+          <condition attribute="al_reviewtype" operator="eq" value="{{ type_param | xml_escape }}" />
+          {% endif %}
+        </filter>
+        <order attribute="createdon" descending="true" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+    {% assign by_case_row = by_case.results.entities[0] %}
+    {% if by_case_row %}
+      {% assign review_id = by_case_row.al_reviewinstanceid %}
+    {% endif %}
+  {% endif %}
+{% endif %}
+
 {% if review_id == null or review_id == empty %}
   {% include 'OT Empty State' title: 'No review selected' message: 'Open a review from a worklist to see its questionnaire.' %}
 {% else %}

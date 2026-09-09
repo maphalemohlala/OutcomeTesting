@@ -133,10 +133,10 @@
   adx_name: Webapi/contact/enabled
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000ac
   adx_value: 'true'
-- adx_description: "Allowlist of columns the browser may write on contact. One trigger column, al_claimrequest, which carries the id of the case being claimed. Everything a contact record actually holds - name, email, the web roles - stays off this list, so exposing contact to the Web API grants the page exactly one write and nothing else."
+- adx_description: "Allowlist of columns the browser may write on contact. Two trigger columns: al_claimrequest, which carries the id of the case being claimed (AD-076), and al_signoffrequest, which carries the T&C attestation as JSON (AD-099). Each is acted on by its own plug-in, which checks the contact's web role server-side. Everything a contact record actually holds - name, email, the web roles - stays off this list, so exposing contact to the Web API grants the page these two writes and nothing else."
   adx_name: Webapi/contact/fields
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000ad
-  adx_value: al_claimrequest
+  adx_value: al_claimrequest,al_signoffrequest
 - adx_description: "Exposes al_caseassignment to the portal Web API so a checker can pick a case up out of the shared queue (AD-076). A create, like the sign-off, so it needs no trigger column and can carry its own Contact-scoped permission - which is what ties the claim to the signed-in contact, since a portal write reaches Dataverse as the site's application user and cannot be attributed to a caller (AD-053)."
   adx_name: Webapi/al_caseassignment/enabled
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a9
