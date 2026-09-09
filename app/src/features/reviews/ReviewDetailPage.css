@@ -222,6 +222,15 @@
   white-space: pre-line;
 }
 
+/* A subsection heading row inside a block: E1 to E5 within Suitability core checks. */
+.checklist__subsection th {
+  padding-top: var(--space-3);
+  font-weight: 600;
+  color: var(--colour-text);
+  background: var(--colour-surface);
+  border-bottom: 2px solid var(--colour-border-strong);
+}
+
 /* The document's "Outcome lens" footer line on each suitability block. */
 .checklist__lens {
   font-size: var(--text-xs);

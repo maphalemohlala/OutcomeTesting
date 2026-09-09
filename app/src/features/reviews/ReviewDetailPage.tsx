@@ -1,19 +1,18 @@
-import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import type { ReviewType } from '../../types/domain';
 import { useRemediation } from '../remediation/useRemediation';
 import { useReviewDetail, type ReviewResponse } from './useReviewDetail';
-import type { FormRow, ReviewSection } from './reviewSections';
+import type { FormRow } from './reviewSections';
 import {
-  FILE_QUALITY_OUTCOME_CODES,
-  isOutcomeLens,
+  formBlocks,
   isTicked,
   optionsFor,
   remediationSummary,
-  sectionLayout,
   type ChoiceOption,
   type FailPoint,
+  type FormBlock,
+  type FormGroup,
   type HeaderField,
 } from './checklistForm';
 import './ReviewDetailPage.css';
@@ -93,25 +92,87 @@ function FieldList({ fields }: { fields: HeaderField[] }) {
   );
 }
 
-function SectionCard({ section }: { section: ReviewSection<ReviewResponse> }) {
-  const layout = sectionLayout(section);
-  const lens = isOutcomeLens(section);
-  const headingId = `review-section-${section.id}`;
-  const columns = layout.kind === 'grid' ? layout.options.length + 1 : 2;
+type SectionBlock = Extract<FormBlock<ReviewResponse>, { kind: 'section' }>;
 
+/** Whether a row answers on exactly the block's scale, and so takes the grid's tick columns. */
+function onScale(row: FormRow<ReviewResponse>, block: SectionBlock): boolean {
+  const options = optionsFor(row.responseTypeValue);
+  return (
+    block.layout === 'grid' &&
+    options.length === block.options.length &&
+    options.every((option, i) => option.value === block.options[i].value)
+  );
+}
+
+/**
+ * One subsection of a block: its heading row where the block has subsections (E1 to E5),
+ * its question rows, and the document's "Outcome lens" line beneath. A row that is not on
+ * the grid's scale spans the tick columns with its own ticks or value, so a question of a
+ * different type in a grid block still renders rather than being forced onto the wrong scale.
+ */
+function GroupRows({ group, block }: { group: FormGroup<ReviewResponse>; block: SectionBlock }) {
+  const columns = block.layout === 'grid' ? block.options.length + 1 : 2;
+  return (
+    <tbody>
+      {group.heading ? (
+        <tr className="checklist__subsection">
+          <th scope="colgroup" colSpan={columns}>
+            {group.heading}
+          </th>
+        </tr>
+      ) : null}
+      {group.rows.map((row) => (
+        <tr key={row.key}>
+          <th scope="row">
+            <QuestionCell row={row} />
+          </th>
+          {onScale(row, block) ? (
+            block.options.map((option) => (
+              <td key={option.value} className="checklist__tick-col">
+                <Tick ticked={isTicked(row, option)} label={option.label} />
+              </td>
+            ))
+          ) : (
+            <td colSpan={columns - 1}>
+              {optionsFor(row.responseTypeValue).length > 0 ? (
+                <InlineOptions row={row} options={optionsFor(row.responseTypeValue)} />
+              ) : (
+                <ValueCell row={row} />
+              )}
+            </td>
+          )}
+        </tr>
+      ))}
+      {group.lens ? (
+        <tr>
+          <td colSpan={columns} className="checklist__lens">
+            Outcome lens: {group.lens}
+          </td>
+        </tr>
+      ) : null}
+    </tbody>
+  );
+}
+
+/**
+ * One block of the document: its title and intro, then either a tick grid headed the way
+ * the document heads it ("Suitability test point", "Check", "Outcome") or a row per
+ * question with its ticks or value inline.
+ */
+function BlockCard({ block }: { block: SectionBlock }) {
+  const headingId = `review-block-${block.id}`;
   return (
     <section className="checklist__card" aria-labelledby={headingId}>
-      <h2 id={headingId}>{section.name}</h2>
-      {section.helpText && !lens ? <p className="checklist__help">{section.helpText}</p> : null}
-
+      <h2 id={headingId}>{block.title}</h2>
+      {block.intro ? <p className="checklist__help">{block.intro}</p> : null}
       <table
-        className={`checklist__table ${layout.kind === 'grid' ? 'checklist__table--grid' : 'checklist__table--inline'}`}
+        className={`checklist__table ${block.layout === 'grid' ? 'checklist__table--grid' : 'checklist__table--inline'}`}
       >
-        {layout.kind === 'grid' ? (
+        {block.layout === 'grid' ? (
           <thead>
             <tr>
-              <th scope="col">{lens ? 'Suitability test point' : 'Check'}</th>
-              {layout.options.map((option) => (
+              <th scope="col">{block.columnHeading}</th>
+              {block.options.map((option) => (
                 <th key={option.value} scope="col" className="checklist__tick-col">
                   {option.label}
                 </th>
@@ -119,39 +180,9 @@ function SectionCard({ section }: { section: ReviewSection<ReviewResponse> }) {
             </tr>
           </thead>
         ) : null}
-        <tbody>
-          {section.rows.map((row) => (
-            <tr key={row.key}>
-              <th scope="row">
-                <QuestionCell row={row} />
-              </th>
-              {layout.kind === 'grid' ? (
-                layout.options.map((option) => (
-                  <td key={option.value} className="checklist__tick-col">
-                    <Tick ticked={isTicked(row, option)} label={option.label} />
-                  </td>
-                ))
-              ) : (
-                <td>
-                  {optionsFor(row.responseTypeValue).length > 0 ? (
-                    <InlineOptions row={row} options={optionsFor(row.responseTypeValue)} />
-                  ) : (
-                    <ValueCell row={row} />
-                  )}
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-        {section.helpText && lens ? (
-          <tfoot>
-            <tr>
-              <td colSpan={columns} className="checklist__lens">
-                Outcome lens: {section.helpText}
-              </td>
-            </tr>
-          </tfoot>
-        ) : null}
+        {block.groups.map((group) => (
+          <GroupRows key={group.id} group={group} block={block} />
+        ))}
       </table>
     </section>
   );
@@ -162,10 +193,10 @@ function SectionCard({ section }: { section: ReviewSection<ReviewResponse> }) {
  * and the File Quality outcome, listing every reason with a tick. Not a per-answer picker
  * (AD-096, which supersedes AD-054).
  */
-function FailPointsCard({ points }: { points: FailPoint[] }) {
+function FailPointsCard({ title, points }: { title: string; points: FailPoint[] }) {
   return (
     <section className="checklist__card" aria-labelledby="review-fail-points">
-      <h2 id="review-fail-points">File Quality – Fail points</h2>
+      <h2 id="review-fail-points">{title}</h2>
       {points.length === 0 ? (
         <p className="checklist__help">No fail reasons are configured for this team.</p>
       ) : (
@@ -296,26 +327,6 @@ function RemediationCard({ caseId }: { caseId: string | null }) {
   );
 }
 
-/**
- * The team's sections in their display order, with the standalone fail points placed
- * where the document puts them: directly before the File Quality outcome. A form with no
- * File Quality outcome section (the sections read failed) still shows what was ticked,
- * after whatever else could be shown.
- */
-function formCards(sections: ReviewSection<ReviewResponse>[], points: FailPoint[]): ReactNode[] {
-  const cards: ReactNode[] = [];
-  let placed = false;
-  for (const section of sections) {
-    if (!placed && FILE_QUALITY_OUTCOME_CODES.has(section.code ?? '')) {
-      cards.push(<FailPointsCard key="fail-points" points={points} />);
-      placed = true;
-    }
-    cards.push(<SectionCard key={section.id} section={section} />);
-  }
-  if (!placed) cards.push(<FailPointsCard key="fail-points" points={points} />);
-  return cards;
-}
-
 export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
   const { reviewId } = useParams<{ reviewId: string }>();
   const state = useReviewDetail(reviewId, reviewType);
@@ -415,10 +426,10 @@ export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
 
           {/*
             * The Checker Checklist document, block for block and in its order: the case
-            * header; then the team's sections in their display order - Tax check, File
-            * Quality, AML and CRA, E1 to E5, CRP, Consumer Duty, grading - with the
-            * standalone File Quality fail points directly before the File Quality outcome;
-            * then remediation and escalation.
+            * header; then the team's sections folded into the document's blocks - Tax check,
+            * AML and CRA, the standalone fail points, File Quality Outcome, Suitability core
+            * checks (E1 to E5 as one table), CRP, Consumer Duty, grading - then remediation
+            * and escalation.
             */}
           <HeaderCard fields={state.detail.caseHeader} />
 
@@ -431,7 +442,13 @@ export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
             </section>
           ) : null}
 
-          {formCards(state.detail.sections, state.detail.failPoints)}
+          {formBlocks(state.detail.sections, state.detail.failPoints).map((block) =>
+            block.kind === 'failpoints' ? (
+              <FailPointsCard key={block.id} title={block.title} points={block.points} />
+            ) : (
+              <BlockCard key={block.id} block={block} />
+            ),
+          )}
 
           <RemediationCard caseId={state.detail.header.caseId} />
         </>

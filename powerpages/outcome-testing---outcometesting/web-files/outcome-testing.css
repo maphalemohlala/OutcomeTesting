@@ -685,6 +685,49 @@ footer a:focus-visible, .footer a:focus-visible {
   font-variant-numeric: normal;
 }
 
+/* The checklist as the document lays it out (AD-098): a tick grid per block, so the
+   table is part of the page and never scrolls inside its card; the tick columns take
+   only the room a radio needs; a subsection row (E1 to E5) and the outcome lens row
+   read as headings and footnotes rather than as questions. */
+.ot-questions-wrap { max-height: none; overflow: visible; }
+.ot-questions th.ot-col-q {
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--colour-text);
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.ot-questions thead th.ot-col-q {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--colour-text-muted);
+}
+.ot-questions .ot-col-tick { width: 1%; text-align: center; white-space: nowrap; }
+.ot-questions td.ot-col-tick input[type="radio"] { width: 1.15rem; height: 1.15rem; margin: 0; cursor: pointer; }
+.ot-questions td.ot-col-tick input[type="radio"]:focus-visible { outline: 3px solid var(--portalThemeColor1, #005a9e); outline-offset: 2px; }
+.ot-questions tr.ot-subsection th {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--colour-text);
+  background: var(--colour-surface-header);
+  border-bottom: 1px solid var(--colour-border-strong);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.ot-questions tr.ot-lens td {
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--colour-text-muted);
+  font-variant-numeric: normal;
+}
+.ot-questions tbody tr.ot-subsection:hover,
+.ot-questions tbody tr.ot-lens:hover { background: transparent; }
+.ot-answer--row .ot-answer__note { margin-top: 0.5rem; font-weight: 400; }
+.ot-answer--row .ot-answer__status { font-weight: 400; }
+
 .ot-required {
   display: inline-block;
   margin-left: var(--space-2);

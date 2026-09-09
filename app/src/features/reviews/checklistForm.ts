@@ -368,3 +368,168 @@ export function remediationSummary(
         : null,
   };
 }
+
+// ---------------------------------------------------------------------------------------
+// The document's blocks
+// ---------------------------------------------------------------------------------------
+
+/**
+ * The Checker Checklist lays its sections out under its own headings, which are not the
+ * section names: E1 to E5 sit together under "Suitability core checks" as one table headed
+ * "Suitability test point", the Tax check is "File Quality - Tax check section", and so on.
+ * The checklist model holds Section then Question with no grouping level, so the grouping
+ * is a reading of the section code here, in one place, and the portal's review page makes
+ * the same reading (AD-098).
+ */
+interface BlockSpec {
+  id: string;
+  title: string;
+  intro?: string;
+  layout: 'grid' | 'inline';
+  columnHeading?: string;
+  scale?: number;
+  /** Each section in the block is a subsection with its own heading row and outcome lens. */
+  subsections?: boolean;
+}
+
+const SUITABILITY: BlockSpec = {
+  id: 'suitability',
+  title: 'Suitability core checks',
+  intro: 'Suitability core checks are shown in a consistent Pass/Fail format against each test point.',
+  layout: 'grid',
+  columnHeading: 'Suitability test point',
+  scale: 120910006,
+  subsections: true,
+};
+
+const FILE_QUALITY_OUTCOME: BlockSpec = { id: 'fq', title: 'File Quality Outcome', layout: 'inline' };
+
+const BLOCKS: Record<string, BlockSpec> = {
+  'S-TAX': { id: 'tax', title: 'File Quality - Tax check section', layout: 'inline' },
+  'S-AMLCRA': {
+    id: 'amlcra',
+    title: 'File Quality - AML and CRA checking points',
+    layout: 'grid',
+    columnHeading: 'Check',
+    scale: 120910008,
+  },
+  'S-FQOUT': FILE_QUALITY_OUTCOME,
+  'S-FQTAX': FILE_QUALITY_OUTCOME,
+  'S-E1': SUITABILITY,
+  'S-E2': SUITABILITY,
+  'S-E3': SUITABILITY,
+  'S-E4': SUITABILITY,
+  'S-E5': SUITABILITY,
+  'S-CRP': {
+    id: 'crp',
+    title: 'Centralised Retirement Proposition',
+    intro: 'Complete this section where retirement income planning or decumulation advice is in scope.',
+    layout: 'grid',
+    columnHeading: 'Centralised Retirement Proposition test point',
+    scale: 120910006,
+  },
+  'S-CD': {
+    id: 'cd',
+    title: 'Consumer Duty overlay',
+    layout: 'grid',
+    columnHeading: 'Outcome',
+    scale: 120910009,
+  },
+  'S-GRADE': { id: 'grade', title: 'Checker judgement and grading', layout: 'inline' },
+};
+
+export interface FormGroup<T extends SectionedAnswer = SectionedAnswer> {
+  id: string;
+  /** The subsection heading, e.g. "E1. Client Objectives & Information (COBS 9.2)"; null when the block has none. */
+  heading: string | null;
+  rows: FormRow<T>[];
+  /** The document's "Outcome lens" line under the subsection; null when it has none. */
+  lens: string | null;
+}
+
+export type FormBlock<T extends SectionedAnswer = SectionedAnswer> =
+  | {
+      kind: 'section';
+      id: string;
+      title: string;
+      intro: string | null;
+      layout: 'grid' | 'inline';
+      columnHeading: string;
+      options: ChoiceOption[];
+      groups: FormGroup<T>[];
+    }
+  | { kind: 'failpoints'; id: 'failpoints'; title: string; points: FailPoint[] };
+
+/**
+ * The form as the document lays it out: the sections folded into the document's blocks, in
+ * section order, with the standalone fail points placed directly before File Quality
+ * Outcome. A section whose code the document does not know keeps its own name and lays out
+ * by its rows, so a section added later still renders.
+ */
+export function formBlocks<T extends SectionedAnswer>(
+  sections: ReviewSection<T>[],
+  points: FailPoint[],
+): FormBlock<T>[] {
+  const blocks: FormBlock<T>[] = [];
+  const failPoints: FormBlock<T> = {
+    kind: 'failpoints',
+    id: 'failpoints',
+    title: 'File Quality – Fail points',
+    points,
+  };
+  let placed = false;
+
+  for (const section of sections) {
+    const spec = section.code ? BLOCKS[section.code] : undefined;
+
+    if (spec === FILE_QUALITY_OUTCOME && !placed) {
+      blocks.push(failPoints);
+      placed = true;
+    }
+
+    const group: FormGroup<T> = {
+      id: section.id,
+      heading:
+        spec?.subsections && section.code
+          ? `${section.code.replace(/^S-/, '')}. ${section.name}`
+          : null,
+      rows: section.rows,
+      lens: spec?.subsections ? section.helpText : null,
+    };
+
+    const last = blocks[blocks.length - 1];
+    if (spec && last && last.kind === 'section' && last.id === spec.id) {
+      last.groups.push(group);
+      continue;
+    }
+
+    if (spec) {
+      blocks.push({
+        kind: 'section',
+        id: spec.id,
+        title: spec.title,
+        intro: spec.intro ?? (spec.subsections ? null : section.helpText),
+        layout: spec.layout,
+        columnHeading: spec.columnHeading ?? 'Check',
+        options: spec.scale == null ? [] : optionsFor(spec.scale),
+        groups: [group],
+      });
+      continue;
+    }
+
+    const layout = sectionLayout(section);
+    blocks.push({
+      kind: 'section',
+      id: section.id,
+      title: section.name,
+      intro: section.helpText,
+      layout: layout.kind,
+      columnHeading: 'Check',
+      options: layout.kind === 'grid' ? layout.options : [],
+      groups: [group],
+    });
+  }
+
+  if (!placed) blocks.push(failPoints);
+  return blocks;
+}

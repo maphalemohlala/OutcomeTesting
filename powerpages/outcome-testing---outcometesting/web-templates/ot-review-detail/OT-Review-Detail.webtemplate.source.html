@@ -54,6 +54,21 @@
         <attribute name="al_casereference" />
         <attribute name="al_clientname" />
         <attribute name="al_advisername" />
+        <attribute name="al_adviserstatus" />
+        <attribute name="al_advisercode" />
+        <attribute name="al_paraplanner" />
+        <attribute name="al_paraplannercode" />
+        <attribute name="al_products" />
+        <attribute name="al_casetype" />
+        <attribute name="al_advicedate" />
+        <attribute name="al_productsolutiontype" />
+        <attribute name="al_samplesource" />
+        <attribute name="al_checkername" />
+        <attribute name="al_checkdate" />
+        <attribute name="al_preorpostcheck" />
+        <attribute name="al_vulnerableclient" />
+        <attribute name="al_taxcheckrequired" />
+        <attribute name="al_taxteamdisposition" />
       </link-entity>
     </entity>
   </fetch>
@@ -185,6 +200,44 @@
         You can read it, but only the assigned reviewer can record or change answers on it.
       </div>
     {% endif %}
+
+    {% comment %}
+      The document's header block (AD-098): the case fields in the order the Checker
+      Checklist lays them out. Outcome Case columns captured at intake, not questions; read
+      only here, as on the checklist itself. Choice columns come through the alias as
+      option objects, so their label is read rather than their value.
+    {% endcomment %}
+    {% assign h_adviserstatus = rv['case.al_adviserstatus'] %}
+    {% assign h_casetype = rv['case.al_casetype'] %}
+    {% assign h_producttype = rv['case.al_productsolutiontype'] %}
+    {% assign h_samplesource = rv['case.al_samplesource'] %}
+    {% assign h_prepost = rv['case.al_preorpostcheck'] %}
+    {% assign h_vulnerable = rv['case.al_vulnerableclient'] %}
+    {% assign h_taxrequired = rv['case.al_taxcheckrequired'] %}
+    {% assign h_taxdisposition = rv['case.al_taxteamdisposition'] %}
+    <section class="ot-card" aria-labelledby="ot-form-header">
+      <h2 class="ot-card__title" id="ot-form-header">Outcome Testing &ndash; Checker Checklist</h2>
+      <dl class="ot-dl">
+        <div><dt>Adviser name</dt><dd>{{ rv['case.al_advisername'] | default: '—' | escape }}</dd></div>
+        <div><dt>Adviser status</dt><dd>{{ h_adviserstatus.label | default: '—' | escape }}</dd></div>
+        <div><dt>Adviser code</dt><dd>{{ rv['case.al_advisercode'] | default: '—' | escape }}</dd></div>
+        <div><dt>Paraplanner</dt><dd>{{ rv['case.al_paraplanner'] | default: '—' | escape }}</dd></div>
+        <div><dt>Paraplanner code</dt><dd>{{ rv['case.al_paraplannercode'] | default: '—' | escape }}</dd></div>
+        <div><dt>Product(s)</dt><dd>{{ rv['case.al_products'] | default: '—' | escape }}</dd></div>
+        <div><dt>Case type</dt><dd>{{ h_casetype.label | default: '—' | escape }}</dd></div>
+        <div><dt>Advice date</dt><dd>{{ rv['case.al_advicedate'] | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
+        <div><dt>Product / solution type</dt><dd>{{ h_producttype.label | default: '—' | escape }}</dd></div>
+        <div><dt>Sample source</dt><dd>{{ h_samplesource.label | default: '—' | escape }}</dd></div>
+        <div><dt>Checker name</dt><dd>{{ rv['case.al_checkername'] | default: '—' | escape }}</dd></div>
+        <div><dt>Check date</dt><dd>{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
+        <div><dt>Client name / initials</dt><dd>{{ rv['case.al_clientname'] | default: '—' | escape }}</dd></div>
+        <div><dt>IO reference</dt><dd>{{ rv['case.al_casereference'] | default: '—' | escape }}</dd></div>
+        <div><dt>Pre or post check</dt><dd>{{ h_prepost.label | default: '—' | escape }}</dd></div>
+        <div><dt>Vulnerable client?</dt><dd>{{ h_vulnerable.label | default: '—' | escape }}</dd></div>
+        <div><dt>Tax check required</dt><dd>{{ h_taxrequired.label | default: '—' | escape }}</dd></div>
+        <div><dt>For Tax team usage</dt><dd>{{ h_taxdisposition.label | default: '—' | escape }}</dd></div>
+      </dl>
+    </section>
 
     {% if cv_id == null %}
       {% include 'OT Empty State' title: 'No checklist version issued' message: 'This review has no checklist version, so no questions can be rendered.' %}
@@ -326,30 +379,114 @@
           the autosave script does not have to re-parse the query string.
         {% endcomment %}
         <div data-ot-questionnaire data-review-id="{{ rv.al_reviewinstanceid }}">
+        {% comment %}
+          The document's blocks (AD-098). The checklist model holds Section then Question
+          with no grouping level, but the Checker Checklist lays its sections out under its
+          own headings: E1 to E5 together under "Suitability core checks" as one table headed
+          "Suitability test point", the Tax check as "File Quality - Tax check section", and
+          so on. So each section is read into the document's block by its code, here and in
+          the app (checklistForm.ts, formBlocks), and a card opens per block rather than per
+          section. A section the document does not know keeps its own name.
+
+          A grid block renders its questions as rows of one table with a radio per tick
+          column, which is the document's layout. The row itself is the autosave root
+          (data-ot-answer): the radios sit in the tick cells, the evidence note and the
+          status line in the question cell, so bind() finds everything it needs inside the
+          row exactly as it did inside the old div. A question whose response type is not the
+          block's scale spans the tick columns with its usual control.
+        {% endcomment %}
+        {% assign current_block = '' %}
         {% assign current_section = '' %}
+        {% assign block_layout = 'inline' %}
+        {% assign prev_help = '' %}
+        {% assign ncols = 2 %}
         {% for qv in qrows %}
           {% assign sid = qv['s.al_sectionid'] %}
+          {% assign scode = qv['s.al_sectioncode'] %}
+          {% assign sname = qv['s.al_name'] %}
+          {% assign shelp = qv['s.al_helptext'] %}
 
-          {% if sid != current_section %}
+          {% assign block = scode | default: sid %}
+          {% assign block_title = sname %}
+          {% assign block_intro = shelp %}
+          {% assign layout = 'inline' %}
+          {% assign grid_rt = 0 %}
+          {% assign grid_col = 'Check' %}
+          {% assign subsections = false %}
+          {% case scode %}
+            {% when 'S-TAX' %}
+              {% assign block_title = 'File Quality - Tax check section' %}
+            {% when 'S-AMLCRA' %}
+              {% assign block_title = 'File Quality - AML and CRA checking points' %}
+              {% assign layout = 'grid' %}{% assign grid_rt = 120910008 %}
+            {% when 'S-FQOUT' or 'S-FQTAX' %}
+              {% assign block = 'S-FQ' %}
+              {% assign block_title = 'File Quality Outcome' %}
+            {% when 'S-E1' or 'S-E2' or 'S-E3' or 'S-E4' or 'S-E5' %}
+              {% assign block = 'S-E' %}
+              {% assign block_title = 'Suitability core checks' %}
+              {% assign block_intro = 'Suitability core checks are shown in a consistent Pass/Fail format against each test point.' %}
+              {% assign layout = 'grid' %}{% assign grid_rt = 120910006 %}{% assign grid_col = 'Suitability test point' %}
+              {% assign subsections = true %}
+            {% when 'S-CRP' %}
+              {% assign block_title = 'Centralised Retirement Proposition' %}
+              {% assign block_intro = 'Complete this section where retirement income planning or decumulation advice is in scope.' %}
+              {% assign layout = 'grid' %}{% assign grid_rt = 120910006 %}{% assign grid_col = 'Centralised Retirement Proposition test point' %}
+            {% when 'S-CD' %}
+              {% assign block_title = 'Consumer Duty overlay' %}
+              {% assign layout = 'grid' %}{% assign grid_rt = 120910009 %}{% assign grid_col = 'Outcome' %}
+            {% when 'S-GRADE' %}
+              {% assign block_title = 'Checker judgement and grading' %}
+          {% endcase %}
+          {% case grid_rt %}
+            {% when 120910006 %}
+              {% assign gvalues = '120910300,120910301,120910302' | split: ',' %}
+              {% assign glabels = 'Pass,Fail,Insufficient evidence' | split: ',' %}
+            {% when 120910008 %}
+              {% assign gvalues = '120910305,120910306,120910307' | split: ',' %}
+              {% assign glabels = 'Yes,No,N/A' | split: ',' %}
+            {% when 120910009 %}
+              {% assign gvalues = '120910305,120910306,120910302' | split: ',' %}
+              {% assign glabels = 'Yes,No,Insufficient evidence' | split: ',' %}
+          {% endcase %}
+
+          {% if block != current_block %}
             {% unless forloop.first %}
+              {% if block_layout == 'grid' %}
+                {% if block_subsections and prev_help != blank %}
+                  <tr class="ot-lens"><td colspan="{{ ncols }}">Outcome lens: {{ prev_help | escape }}</td></tr>
+                {% endif %}
+                  </tbody>
+                </table>
               </div>
+              {% else %}
+              </div>
+              {% endif %}
             </section>
             {% endunless %}
-            {% assign current_section = sid %}
+            {% assign current_block = block %}
+            {% assign current_section = '' %}
+            {% assign block_layout = layout %}
+            {% assign block_subsections = subsections %}
+            {% assign block_rt = grid_rt %}
+            {% if layout == 'grid' %}
+              {% assign ncols = gvalues.size | plus: 1 %}
+            {% else %}
+              {% assign ncols = 2 %}
+            {% endif %}
 
             {% comment %}
               File Quality - Fail points (AD-096, superseding AD-054). On the document this
               is its own block, between the checking points and the File Quality outcome,
               and it is rendered as one here: a single tick list, not a picker under every
               non-pass answer. The ticks are recorded against the File quality outcome
-              answer - the first question of the outcome section, which is what qv is at
+              answer - the first question of the outcome block, which is what qv is at
               this boundary - because the intersect is response-keyed (AD-025) and that is
               the answer these reasons explain. The outcome question's autosave binds the
               list through data-ot-failpoints-for, so a tick saves like any other change to
               that answer.
             {% endcomment %}
-            {% assign scode = qv['s.al_sectioncode'] %}
-            {% if scode == 'S-FQOUT' or scode == 'S-FQTAX' %}
+            {% if block == 'S-FQ' %}
               {% assign fq_existing = null %}
               {% for a in arows %}
                 {% if a.al_questionversionid.id == qv.al_questionversionid %}{% assign fq_existing = a %}{% endif %}
@@ -370,18 +507,41 @@
               </section>
             {% endif %}
 
-            <section class="ot-card" aria-labelledby="sec-{{ sid }}">
-              <h2 class="ot-card__title" id="sec-{{ sid }}">
-                {{ qv['s.al_name'] | escape }}
+            <section class="ot-card" aria-labelledby="blk-{{ block | replace: ' ', '-' }}">
+              <h2 class="ot-card__title" id="blk-{{ block | replace: ' ', '-' }}">
+                {{ block_title | escape }}
                 {% assign owner = qv['s.al_ownerrole'] %}
                 {% if owner and owner.label %}
                   <span class="ot-badge ot-badge--waiting">{{ owner.label | escape }}</span>
                 {% endif %}
               </h2>
-              {% if qv['s.al_helptext'] %}
-                <p class="ot-section-help">{{ qv['s.al_helptext'] | escape }}</p>
+              {% if block_intro != blank %}
+                <p class="ot-section-help">{{ block_intro | escape }}</p>
               {% endif %}
+              {% if layout == 'grid' %}
+              <div class="ot-table-wrap ot-questions-wrap">
+                <table class="ot-table ot-questions">
+                  <thead>
+                    <tr>
+                      <th scope="col" class="ot-col-q">{{ grid_col }}</th>
+                      {% for l in glabels %}<th scope="col" class="ot-col-tick">{{ l }}</th>{% endfor %}
+                    </tr>
+                  </thead>
+                  <tbody>
+              {% else %}
               <div class="ot-answers">
+              {% endif %}
+          {% endif %}
+
+          {% if sid != current_section %}
+            {% if block_subsections %}
+              {% if current_section != '' and prev_help != blank %}
+                <tr class="ot-lens"><td colspan="{{ ncols }}">Outcome lens: {{ prev_help | escape }}</td></tr>
+              {% endif %}
+              <tr class="ot-subsection"><th scope="colgroup" colspan="{{ ncols }}">{{ scode | remove_first: 'S-' }}. {{ sname | escape }}</th></tr>
+            {% endif %}
+            {% assign current_section = sid %}
+            {% assign prev_help = shelp %}
           {% endif %}
 
           {% assign qv_id = qv.al_questionversionid %}
@@ -398,6 +558,61 @@
           {% else %}{% assign column = 'choice' %}
           {% endif %}
 
+          {% comment %}
+            al_answertext doubles as the evidence note held with a structured answer, which
+            is how the Code App already reads the record (useReviewDetail.ts, noteOf). It
+            stays optional under AD-019.
+
+            Whether the evidence note starts open is decided here, from the record, and the
+            client only takes over once someone changes the answer: open when the answer is
+            a non-pass, or when a note has already been written - because a person who wrote
+            something must be able to see it, on a submitted review too, where the autosave
+            script that used to reveal it is not emitted at all. The non-pass set matches
+            revealConditional's, including "No".
+
+            The fail reasons used to sit here too, under every non-pass answer (AD-054).
+            They are one standalone block now (AD-096).
+          {% endcomment %}
+          {% assign nonpass_values = '120910301,120910302,120910303,120910304,120910306' | split: ',' %}
+          {% capture chosen_value %}{{ existing.al_answerchoice.value }}{% endcapture %}
+          {% assign is_nonpass = false %}
+          {% for v in nonpass_values %}{% if v == chosen_value %}{% assign is_nonpass = true %}{% endif %}{% endfor %}
+
+          {% assign has_note = false %}
+          {% if existing.al_answertext and existing.al_answertext != empty %}{% assign has_note = true %}{% endif %}
+
+          {% capture note_block %}
+            <div class="ot-answer__note" data-ot-note{% unless is_nonpass or has_note %} hidden{% endunless %}>
+              <label class="ot-answer__note-label" for="note-{{ qv_id }}">
+                Evidence or observation (optional)
+              </label>
+              <textarea id="note-{{ qv_id }}" class="ot-answer__input" rows="3"
+                        data-ot-note-input{% unless editable %} disabled{% endunless %}>{{ existing.al_answertext | escape }}</textarea>
+            </div>
+          {% endcapture %}
+
+          {% if block_layout == 'grid' and rt == block_rt %}
+            <tr class="ot-answer ot-answer--row"
+                data-ot-answer
+                data-question-version="{{ qv_id }}"
+                data-response-id="{{ existing.al_responseid }}"
+                data-response-type="{{ rt }}"
+                data-column="choice">
+              <th scope="row" class="ot-col-q">
+                {{ qv.al_questiontext | escape }}
+                {% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}
+                {{ note_block }}
+                <p class="ot-answer__status" data-ot-status aria-live="polite"></p>
+              </th>
+              {% for v in gvalues %}
+                <td class="ot-col-tick">
+                  <input type="radio" name="q-{{ qv_id }}" value="{{ v }}" data-ot-input
+                         aria-label="{{ qv.al_questiontext | escape }}: {{ glabels[forloop.index0] }}"{% unless editable %} disabled{% endunless %}{% if chosen_value == v %} checked{% endif %} />
+                </td>
+              {% endfor %}
+            </tr>
+          {% else %}
+          {% if block_layout == 'grid' %}<tr><td colspan="{{ ncols }}">{% endif %}
           <div class="ot-answer"
                data-ot-answer
                data-question-version="{{ qv_id }}"
@@ -459,54 +674,27 @@
                 {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id editable: editable %}
               {% endif %}
 
-              {% comment %}
-                al_answertext doubles as the evidence note held with a structured answer,
-                which is how the Code App already reads the record
-                (app/src/features/reviews/useReviewDetail.ts, noteOf). It stays optional
-                under AD-019.
-
-                Whether the evidence note starts open.
-
-                It used to be emitted hidden always, and revealed by the autosave script's
-                revealConditional() on load. That script is only emitted for an editable
-                review - so on a submitted review, or one belonging to another reviewer, a
-                note a checker had written was never shown to anyone reading it, which is
-                the one thing a read-only view of a completed check must not do.
-
-                So the decision is made here, from the record, and the client only takes over
-                once someone changes the answer. Open when the answer is a non-pass, or when
-                a note has already been written - because a person who wrote something must
-                be able to see it. The non-pass set matches revealConditional's, including
-                "No".
-
-                The fail reasons used to sit here too, under every non-pass answer (AD-054).
-                They are one standalone block now, rendered before the File Quality outcome
-                section (AD-096).
-              {% endcomment %}
-              {% assign nonpass_values = '120910301,120910302,120910303,120910304,120910306' | split: ',' %}
-              {% capture chosen_value %}{{ existing.al_answerchoice.value }}{% endcapture %}
-              {% assign is_nonpass = false %}
-              {% for v in nonpass_values %}{% if v == chosen_value %}{% assign is_nonpass = true %}{% endif %}{% endfor %}
-
-              {% assign has_note = false %}
-              {% if existing.al_answertext and existing.al_answertext != empty %}{% assign has_note = true %}{% endif %}
-
               {% if column == 'choice' or column == 'choices' %}
-                <div class="ot-answer__note" data-ot-note{% unless is_nonpass or has_note %} hidden{% endunless %}>
-                  <label class="ot-answer__note-label" for="note-{{ qv_id }}">
-                    Evidence or observation (optional)
-                  </label>
-                  <textarea id="note-{{ qv_id }}" class="ot-answer__input" rows="3"
-                            data-ot-note-input{% unless editable %} disabled{% endunless %}>{{ existing.al_answertext | escape }}</textarea>
-                </div>
+                {{ note_block }}
               {% endif %}
             </fieldset>
 
             <p class="ot-answer__status" data-ot-status aria-live="polite"></p>
           </div>
+          {% if block_layout == 'grid' %}</td></tr>{% endif %}
+          {% endif %}
 
           {% if forloop.last %}
+            {% if block_layout == 'grid' %}
+              {% if block_subsections and prev_help != blank %}
+                <tr class="ot-lens"><td colspan="{{ ncols }}">Outcome lens: {{ prev_help | escape }}</td></tr>
+              {% endif %}
+                  </tbody>
+                </table>
               </div>
+            {% else %}
+              </div>
+            {% endif %}
             </section>
           {% endif %}
         {% endfor %}
@@ -862,6 +1050,138 @@
         {% endif %}
 
       {% endif %}
+    {% endif %}
+
+    {% comment %}
+      Remediation and escalation (AD-098): the document's closing block, read-only here as
+      the case page renders it. Per case rather than per review, as the actions are
+      (AD-095). The adviser's response and the supervisor's decision are recorded on the
+      remediation page and the sign-off, not here.
+    {% endcomment %}
+    {% assign rem_case_id = rv['case.al_outcomecaseid'] %}
+    {% if rem_case_id %}
+      {% fetchxml rem_actions %}
+      <fetch>
+        <entity name="al_remediationaction">
+          <attribute name="al_remediationactionid" />
+          <attribute name="al_name" />
+          <attribute name="al_description" />
+          <attribute name="al_actionstatus" />
+          <attribute name="al_duedate" />
+          <attribute name="al_completedon" />
+          <attribute name="al_adviserresponse" />
+          <attribute name="al_evidencereference" />
+          <attribute name="al_assignedcontactid" />
+          <attribute name="al_clientcontactrequired" />
+          <attribute name="al_recheckrequired" />
+          <attribute name="al_changesadvice" />
+          <filter type="and">
+            <condition attribute="al_outcomecaseid" operator="eq" value="{{ rem_case_id | xml_escape }}" />
+          </filter>
+          <order attribute="al_duedate" descending="false" />
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+
+      {% fetchxml rem_signoffs %}
+      <fetch>
+        <entity name="al_signoff">
+          <attribute name="al_remediationactionid" />
+          <attribute name="al_signoffdecision" />
+          <attribute name="al_signedoffon" />
+          <attribute name="ownerid" />
+          <filter type="and">
+            <condition attribute="al_outcomecaseid" operator="eq" value="{{ rem_case_id | xml_escape }}" />
+          </filter>
+          <order attribute="al_signedoffon" descending="true" />
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+
+      {% fetchxml rem_outcomes %}
+      <fetch top="1">
+        <entity name="al_outcome">
+          <attribute name="al_finaloutcome" />
+          <attribute name="al_finalisedon" />
+          <attribute name="al_regradedon" />
+          <filter type="and">
+            <condition attribute="al_outcomecaseid" operator="eq" value="{{ rem_case_id | xml_escape }}" />
+          </filter>
+          <order attribute="createdon" descending="true" />
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+
+      <section class="ot-card" aria-labelledby="ot-form-remediation">
+        <h2 class="ot-card__title" id="ot-form-remediation">Remediation and escalation</h2>
+        {% assign rem_rows = rem_actions.results.entities %}
+        {% if rem_rows.size > 0 %}
+          {% assign rem_all_approved = true %}
+          {% assign rem_any_rejected = false %}
+          {% assign rem_supervisor = rem_signoffs.results.entities[0] %}
+          {% assign rem_adviser = null %}
+          {% assign rem_form = null %}
+          <div class="ot-table-wrap ot-questions-wrap">
+            <table class="ot-table">
+              <thead>
+                <tr>
+                  <th scope="col">No.</th>
+                  <th scope="col">Issue / fail reason</th>
+                  <th scope="col">Remedial action</th>
+                  <th scope="col">Owner</th>
+                  <th scope="col">Target date</th>
+                  <th scope="col">Sign-off</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for a in rem_rows %}
+                  {% assign rem_latest = null %}
+                  {% for so in rem_signoffs.results.entities %}{% if rem_latest == null and so.al_remediationactionid.id == a.al_remediationactionid %}{% assign rem_latest = so %}{% endif %}{% endfor %}
+                  {% if rem_latest %}
+                    {% if rem_latest.al_signoffdecision.value == 120910721 %}{% assign rem_any_rejected = true %}{% assign rem_all_approved = false %}{% endif %}
+                  {% else %}
+                    {% assign rem_all_approved = false %}
+                  {% endif %}
+                  {% if rem_form == null and a.al_clientcontactrequired %}{% assign rem_form = a %}{% endif %}
+                  {% if a.al_completedon %}
+                    {% if rem_adviser == null or a.al_completedon > rem_adviser.al_completedon %}{% assign rem_adviser = a %}{% endif %}
+                  {% endif %}
+                  <tr>
+                    <td>{{ forloop.index }}</td>
+                    <td>{{ a.al_description | escape | newline_to_br }}</td>
+                    <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                    <td>{{ a.al_assignedcontactid.name | default: 'Unassigned' | escape }}</td>
+                    <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+                    <td>
+                      {% if rem_latest %}
+                        {{ rem_latest.al_signoffdecision.label | escape }} {{ rem_latest.al_signedoffon | date: 'dd MMM yyyy' }}
+                      {% elsif a.al_completedon %}
+                        Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}
+                      {% else %}
+                        {% include 'OT Status Badge' status: a.al_actionstatus.label %}
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if rem_form == null %}{% assign rem_form = rem_rows[0] %}{% endif %}
+          {% assign rem_outcome = rem_outcomes.results.entities[0] %}
+          <dl class="ot-dl">
+            <div><dt>Client contact required?</dt><dd>{{ rem_form.al_clientcontactrequired.label | default: '—' | escape }}</dd></div>
+            <div><dt>Recheck required?</dt><dd>{{ rem_form.al_recheckrequired.label | default: '—' | escape }}</dd></div>
+            <div><dt>Do the remedial actions change the advice?</dt><dd>{{ rem_form.al_changesadvice.label | default: '—' | escape }}</dd></div>
+            <div><dt>All remedial actions checked and approved?</dt><dd>{% if rem_all_approved %}Yes{% elsif rem_any_rejected %}No{% else %}—{% endif %}</dd></div>
+            <div><dt>Regraded outcome</dt><dd>{% if rem_outcome and rem_outcome.al_finaloutcome %}{{ rem_outcome.al_finaloutcome.label | escape }}{% else %}—{% endif %}</dd></div>
+            <div><dt>Date</dt><dd>{% if rem_outcome and rem_outcome.al_regradedon %}{{ rem_outcome.al_regradedon | date: 'dd MMM yyyy' }}{% elsif rem_outcome and rem_outcome.al_finalisedon %}{{ rem_outcome.al_finalisedon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
+            <div><dt>Supervisor sign off</dt><dd>{% if rem_supervisor %}{{ rem_supervisor.al_signoffdecision.label | escape }}, {{ rem_supervisor.ownerid.name | escape }}, {{ rem_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
+            <div><dt>Adviser sign off</dt><dd>{% if rem_adviser %}{{ rem_adviser.al_assignedcontactid.name | escape }}, {{ rem_adviser.al_completedon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
+          </dl>
+        {% else %}
+          <p class="ot-section-help">No remedial action has been raised on this case. Actions appear here for a non-pass outcome or a flagged file, once the review is submitted.</p>
+        {% endif %}
+      </section>
     {% endif %}
 
     {% comment %}
