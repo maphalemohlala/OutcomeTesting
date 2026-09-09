@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outcome Testing - Checker Checklist</title>
+<style>
+  :root {
+    --line: #000;
+    --band: #d9d9d9;
+    --subband: #f2f2f2;
+    --ink: #000;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 24px 12px 60px;
+    background: #e8e8e8;
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+    font-size: 11pt;
+    color: var(--ink);
+  }
+
+  .page {
+    max-width: 1000px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 32px 40px 48px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.25);
+  }
+
+  .doc-footer {
+    font-size: 9pt;
+    color: #444;
+    border-bottom: 1px solid #bbb;
+    padding-bottom: 4px;
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-size: 16pt;
+    font-weight: 700;
+    margin: 0 0 18px;
+  }
+
+  h2 {
+    font-size: 12pt;
+    font-weight: 700;
+    margin: 26px 0 8px;
+  }
+
+  .intro {
+    font-size: 10.5pt;
+    margin: 0 0 8px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 6px;
+  }
+
+  th, td {
+    border: 1px solid var(--line);
+    padding: 5px 7px;
+    vertical-align: top;
+    font-size: 10.5pt;
+    text-align: left;
+  }
+
+  th {
+    background: var(--band);
+    font-weight: 700;
+  }
+
+  /* ---- square boxes: radios and checkboxes both render as squares ---- */
+  .cc-box {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 13px;
+    height: 13px;
+    border: 1px solid #333;
+    border-radius: 0;
+    background: #fff;
+    display: inline-block;
+    vertical-align: -2px;
+    cursor: pointer;
+    margin: 0;
+    flex: none;
+  }
+  .cc-box:checked::after {
+    content: "\2713";
+    display: block;
+    font-size: 11px;
+    line-height: 11px;
+    text-align: center;
+  }
+  .cc-box:focus-visible {
+    outline: 2px solid #005a9e;
+    outline-offset: 1px;
+  }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .opt  { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .opt.wrap { white-space: normal; }
+
+  input[type="text"], input[type="date"], textarea {
+    width: 100%;
+    border: 0;
+    font: inherit;
+    background: transparent;
+    padding: 1px 0;
+    resize: vertical;
+  }
+  input[type="text"]:focus, input[type="date"]:focus, textarea:focus {
+    outline: 2px solid #005a9e;
+    outline-offset: 1px;
+  }
+  textarea { min-height: 68px; }
+
+  /* ---- header metadata grid ---- */
+  .meta td.lbl { width: 17%; font-weight: 700; background: var(--subband); }
+  .meta td.val { width: 33%; }
+
+  /* ---- assessment grids ---- */
+  .grid td.label { width: 55%; }
+  .grid th.opt, .grid td.optcell { width: 15%; text-align: center; }
+  .grid td.optcell { text-align: center; }
+  .grid tr.section td {
+    background: var(--band);
+    font-weight: 700;
+  }
+  .grid tr.lens td {
+    background: var(--subband);
+    font-size: 10pt;
+  }
+  .grid tr.lens em { font-style: italic; font-weight: 700; }
+
+  /* ---- fail points ---- */
+  .fails td.label { width: 90%; }
+  .fails th.tick, .fails td.tick { width: 10%; text-align: center; }
+
+  /* ---- root cause 3x3 ---- */
+  .rootcause td { width: 33.33%; }
+
+  .note {
+    font-size: 9.5pt;
+    color: #a33;
+    font-style: italic;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media print {
+    body { background: #fff; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { box-shadow: none; max-width: none; padding: 0; }
+    h2 { break-after: avoid; }
+    tr { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="doc-footer">Outcome Testing Checker Checklist | V5 Draft</div>
+
+  <h1>Outcome Testing - Checker Checklist</h1>
+
+
+
+  <!-- ============ TAX CHECK ============ -->
+  <h2>File Quality - Tax check section</h2>
+  <table class="meta">
+    <tr>
+      <td class="lbl">Tax check reason</td>
+      <td colspan="3">
+        <div class="opts">
+          <label class="opt"><input type="checkbox" class="cc-box" name="cc_taxcheckreason" value="100000000"> LSA/LSDBA/TTFAC</label>
+          <label class="opt"><input type="checkbox" class="cc-box" name="cc_taxcheckreason" value="100000001"> Trust</label>
+          <label class="opt"><input type="checkbox" class="cc-box" name="cc_taxcheckreason" value="100000002"> IHT</label>
+          <label class="opt"><input type="checkbox" class="cc-box" name="cc_taxcheckreason" value="100000003"> Tax calculation</label>
+          <label class="opt"><input type="checkbox" class="cc-box" name="cc_taxcheckreason" value="100000004"> Other</label>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td class="lbl">Tax check outcome</td>
+      <td colspan="3">
+        <div class="opts">
+          <label class="opt"><input type="radio" class="cc-box" name="cc_taxcheckoutcome" value="100000000"> PASS</label>
+          <label class="opt"><input type="radio" class="cc-box" name="cc_taxcheckoutcome" value="100000001"> INSUFFICIENT EVIDENCE</label>
+          <label class="opt"><input type="radio" class="cc-box" name="cc_taxcheckoutcome" value="100000002"> FAIL</label>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td class="lbl">Case notes</td>
+      <td colspan="3"><textarea name="cc_taxcasenotes"></textarea></td>
+    </tr>
+  </table>
+
+  <!-- ============ AML AND CRA ============ -->
+  <h2>File Quality - AML and CRA checking points</h2>
+  <table class="grid">
+    <thead>
+      <tr>
+        <th class="label">Check</th>
+        <th class="opt">Yes</th>
+        <th class="opt">No</th>
+        <th class="opt">N/A</th>
+      </tr>
+    </thead>
+    <tbody id="aml-rows"></tbody>
+  </table>
+
+  <!-- ============ FAIL POINTS ============ -->
+  <h2>File Quality &ndash; Fail points</h2>
+  <table class="fails">
+    <thead>
+      <tr>
+        <th class="label">File Quality fail reason</th>
+        <th class="tick">Tick</th>
+      </tr>
+    </thead>
+    <tbody id="fail-rows"></tbody>
+  </table>
+
+  <!-- ============ FILE QUALITY OUTCOME ============ -->
+  <h2>File Quality Outcome</h2>
+  <table class="meta">
+    <tr>
+      <td class="lbl">File quality outcome</td>
+      <td colspan="3">
+        <div class="opts">
+          <label class="opt"><input type="radio" class="cc-box" name="cc_filequalityoutcome" value="100000000"> PASS</label>
+          <label class="opt"><input type="radio" class="cc-box" name="cc_filequalityoutcome" value="100000001"> FAIL</label>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td class="lbl">Fail observation</td>
+      <td colspan="3"><textarea name="cc_failobservation"></textarea></td>
+    </tr>
+    <tr>
+      <td class="lbl">Remedial action required?</td>
+      <td colspan="3">
+        <div class="opts">
+          <label class="opt"><input type="radio" class="cc-box" name="cc_remedialactionrequired" value="100000000"> YES</label>
+          <label class="opt"><input type="radio" class="cc-box" name="cc_remedialactionrequired" value="100000001"> NO</label>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- ============ SUITABILITY ============ -->
+  <h2>Suitability core checks</h2>
+  <p class="intro">Suitability core checks are shown in a consistent Pass/Fail format against each test point.</p>
+  <table class="grid">
+    <thead>
+      <tr>
+        <th class="label">Suitability test point</th>
+        <th class="opt">Pass</th>
+        <th class="opt">Fail</th>
+        <th class="opt">Insufficient evidence</th>
+      </tr>
+    </thead>
+    <tbody id="suit-rows"></tbody>
+  </table>
+
+  <!-- ============ CRP ============ -->
+  <h2>Centralised Retirement Proposition</h2>
+  <p class="intro">Complete this section where retirement income planning or decumulation advice is in scope.</p>
+  <table class="grid">
+    <thead>
+      <tr>
+        <th class="label">Centralised Retirement Proposition test point</th>
+        <th class="opt">Pass</th>
+        <th class="opt">Fail</th>
+        <th class="opt">Insufficient evidence</th>
+      </tr>
+    </thead>
+    <tbody id="crp-rows"></tbody>
+  </table>
+
+  <!-- ============ CONSUMER DUTY ============ -->
+  <h2>Consumer Duty overlay</h2>
+  <p class="intro">Short yes/no judgements only. Record any detail once in section H.</p>
+  <table class="grid">
+    <thead>
+      <tr>
+        <th class="label">Outcome</th>
+        <th class="opt">Yes</th>
+        <th class="opt">No</th>
+        <th class="opt">Insufficient evidence</th>
+      </tr>
+    </thead>
+    <tbody id="cd-rows"></tbody>
+  </table>
+
+  <!-- ============ GRADING ============ -->
+  <h2>Checker judgement and grading</h2>
+  <table class="meta">
+    <tr>
+      <td class="lbl">Advice Quality Grade</td>
+      <td colspan="3">
+        <div class="opts">
+          <label class="opt"><input type="radio" class="cc-box" name="cc_advicequalitygrade" value="100000000"> PASS</label>
+          <label class="opt"><input type="radio" class="cc-box" name="cc_advicequalitygrade" value="100000001"> PASS WITH ISSUES</label>
+          <label class="opt"><input type="radio" class="cc-box" name="cc_advicequalitygrade" value="100000002"> INSUFFICIENT EVIDENCE</label>
+          <label class="opt"><input type="radio" class="cc-box" name="cc_advicequalitygrade" value="100000003"> POTENTIAL HARM</label>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="rootcause">
+    <tr><th colspan="3">Primary root cause</th></tr>
+    <tr>
+      <td><label class="opt wrap"><input type="radio" class="cc-box" name="cc_primaryrootcause" value="100000000"> FactFind quality</label></td>
+      <td><label class="opt wrap"><input type="radio" class="cc-box" name="cc_primaryrootcause" value="100000001"> Risk / capacity mismatch</label></td>
+      <td><label class="opt wrap"><input type="radio" class="cc-box" name="cc_primaryrootcause" value="100000002"> Research / rationale</label></td>
+    </tr>
+    <tr>
+      <td><label class="opt wrap"><input type="radio" class="cc-box" name="cc_primaryrootcause" value="100000003"> Charges / value</label></td>
+      <td><label class="opt wrap"><input type="radio" class="cc-box" name="cc_primaryrootcause" value="100000004"> Client communication</label></td>
+      <td><label class="opt wrap"><input type="radio" class="cc-box" name="cc_primaryrootcause" value="100000005"> Process / documentation</label></td>
+    </tr>
+    <tr>
+      <td><label class="opt wrap"><input type="radio" class="cc-box" name="cc_primaryrootcause" value="100000006"> AML / CRA</label></td>
+      <td><label class="opt wrap"><input type="radio" class="cc-box" name="cc_primaryrootcause" value="100000007"> Retirement Proposition</label></td>
+      <td><label class="opt wrap"><input type="radio" class="cc-box" name="cc_primaryrootcause" value="100000008"> Adviser judgement</label></td>
+    </tr>
+  </table>
+
+  <table class="meta">
+    <tr>
+      <td class="lbl">Case Notes</td>
+      <td colspan="3"><textarea name="cc_casenotes"></textarea></td>
+    </tr>
+    <tr>
+      <td class="lbl">Even Better If...</td>
+      <td colspan="3"><textarea name="cc_evenbetterif"></textarea></td>
+    </tr>
+  </table>
+
+  <!-- ============ REMEDIATION ============ -->
+  <h2>Remediation and escalation</h2>
+  <table class="remediation">
+    <thead>
+      <tr>
+        <th style="width:5%">No.</th>
+        <th style="width:25%">Issue / fail reason</th>
+        <th style="width:25%">Remedial action</th>
+        <th style="width:15%">Owner</th>
+        <th style="width:15%">Target date</th>
+        <th style="width:15%">Sign-off</th>
+      </tr>
+    </thead>
+    <tbody id="rem-rows"></tbody>
+  </table>
+
+  <table class="meta">
+    <tr>
+      <td class="lbl">Client contact required?</td>
+      <td class="val">
+        <div class="opts">
+          <label class="opt"><input type="radio" class="cc-box" name="cc_clientcontactrequired" value="100000000"> Yes</label>
+          <label class="opt"><input type="radio" class="cc-box" name="cc_clientcontactrequired" value="100000001"> No</label>
+          <label class="opt"><input type="radio" class="cc-box" name="cc_clientcontactrequired" value="100000002"> Potentially</label>
+        </div>
+      </td>
+      <td class="lbl">Recheck required?</td>
+      <td class="val">
+        <div class="opts">
+          <label class="opt"><input type="radio" class="cc-box" name="cc_recheckrequired" value="100000000"> Yes</label>
+          <label class="opt"><input type="radio" class="cc-box" name="cc_recheckrequired" value="100000001"> No</label>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td class="lbl">Do the remedial actions change the advice?</td>
+      <td class="val">
+        <div class="opts">
+          <label class="opt"><input type="radio" class="cc-box" name="cc_actionschangeadvice" value="100000000"> Yes</label>
+          <label class="opt"><input type="radio" class="cc-box" name="cc_actionschangeadvice" value="100000001"> No</label>
+        </div>
+      </td>
+      <td class="lbl">All remedial actions checked and approved?</td>
+      <td class="val">
+        <div class="opts">
+          <label class="opt"><input type="radio" class="cc-box" name="cc_actionsapproved" value="100000000"> Yes</label>
+          <label class="opt"><input type="radio" class="cc-box" name="cc_actionsapproved" value="100000001"> No</label>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td class="lbl">Regraded Outcome<br>(for potential harms/insufficient evidence &ndash; supervisor signs this off)</td>
+      <td colspan="3">
+        <div class="opts">
+          <label class="opt"><input type="radio" class="cc-box" name="cc_regradedoutcome" value="100000000"> PASS</label>
+          <label class="opt"><input type="radio" class="cc-box" name="cc_regradedoutcome" value="100000001"> POTENTIAL HARM</label>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="signoff">
+    <tr>
+      <th style="width:50%">&nbsp;</th>
+      <th style="width:50%">Date</th>
+    </tr>
+    <tr>
+      <td>Supervisor Sign off<br>(complete remedial task in IO)<br><input type="text" name="cc_supervisorsignoff"></td>
+      <td><input type="date" name="cc_supervisorsignoffdate"></td>
+    </tr>
+    <tr>
+      <td>Adviser sign off<br>(complete remedial task in IO)<br><input type="text" name="cc_advisersignoff"></td>
+      <td><input type="date" name="cc_advisersignoffdate"></td>
+    </tr>
+  </table>
+
+</div>
+
+<script>
+/* ------------------------------------------------------------------
+   All repeating rows are generated from data, not hand-written.
+   This mirrors the pattern the Power Pages Liquid template should use.
+   ------------------------------------------------------------------ */
+
+var PFI = ["Pass", "Fail", "Insufficient evidence"];
+var YNN = ["Yes", "No", "N/A"];
+var YNI = ["Yes", "No", "Insufficient evidence"];
+
+function optionCell(field, label, index) {
+  return '<td class="optcell">' +
+           '<input type="radio" class="cc-box" name="' + field + '"' +
+           ' id="' + field + '_' + index + '" value="' + (100000000 + index) + '">' +
+           '<label class="sr-only" for="' + field + '_' + index + '">' + label + '</label>' +
+         '</td>';
+}
+
+function renderGrid(tbodyId, rows, optionLabels) {
+  var html = "";
+  rows.forEach(function (row) {
+    if (row.type === "section") {
+      html += '<tr class="section"><td colspan="4">' + row.label + '</td></tr>';
+    } else if (row.type === "lens") {
+      var span = row.tickbox ? 3 : 4;
+      html += '<tr class="lens"><td colspan="' + span + '"><em>Outcome lens:</em> ' + row.label + '</td>';
+      if (row.tickbox) {
+        html += '<td class="optcell"><input type="checkbox" class="cc-box" name="' + row.field + '">' +
+                '<label class="sr-only">' + row.label + '</label></td>';
+      }
+      html += '</tr>';
+    } else {
+      html += '<tr><td class="label">' + row.label + '</td>';
+      optionLabels.forEach(function (opt, i) {
+        html += optionCell(row.field, opt, i);
+      });
+      html += '</tr>';
+    }
+  });
+  document.getElementById(tbodyId).innerHTML = html;
+}
+
+/* ---- AML and CRA ---- */
+renderGrid("aml-rows", [
+  { label: "ID verification completed and retained for all relevant clients/parties.", field: "cc_aml_idverification" },
+  { label: "CRA completed with mandatory fields and risk rating recorded.", field: "cc_aml_cracompleted" },
+  { label: "CRA outcome recorded on FactFind/KYC and aligns to the file.", field: "cc_aml_craoutcomerecorded" },
+  { label: "CDD, source of funds/wealth and ongoing monitoring requirements met where applicable.", field: "cc_aml_cddmet" },
+  { label: "High Risk CRA cases have supporting form, approval and rationale on file.", field: "cc_aml_highriskform" }
+], YNN);
+
+/* ---- Fail points (20, source order and punctuation preserved) ---- */
+var FAIL_REASONS = [
+  "AML - ID verification issue",
+  "AML - No CRA completed or missing data fields",
+  "AML - CRA information not recorded on FactFind",
+  "AML - CDD not completed in line with standards",
+  "AML - CRA highlighted a High Risk, with no supporting form completed",
+  "Breach - Any other process breach has been identified",
+  "Breach - Any other regulatory breach has been identified",
+  "Record Keeping - Client consent not evident on file",
+  "Record Keeping - Concession required but not on file",
+  "Record Keeping - Standard of file quality",
+  "Record Keeping - File chronology does not align with the advice process",
+  "Record Keeping - Information given relating to the recommendation/advice is incorrect",
+  "Record Keeping - LPA/EPA not on file or has not been registered",
+  "Record Keeping - Missing documents (provided when requested)",
+  "Record Keeping - Missing documents (unable to provide)",
+  "Record Keeping - No client agreement or client acceptance in place",
+  "Record Keeping - Service &amp; Charges brochure not issued or out of date",
+  "Record Keeping - TOB not provided or out of date",
+  "Tax check - not completed when this should have been",
+  "Tax check – insufficient evidence to complete the check or to pass"
+];
+
+document.getElementById("fail-rows").innerHTML = FAIL_REASONS.map(function (label, i) {
+  return '<tr><td class="label"><label for="fail_' + i + '">' + label + '</label></td>' +
+         '<td class="tick"><input type="checkbox" class="cc-box" id="fail_' + i + '"' +
+         ' name="cc_filequalityfailreasons" value="' + (100000000 + i) + '"></td></tr>';
+}).join("");
+
+/* ---- Suitability E1-E5 ---- */
+renderGrid("suit-rows", [
+  { type: "section", label: "E1. Client Objectives &amp; Information (COBS 9.2)" },
+  { label: "Client objectives clearly evidenced and specific", field: "cc_e1_objectivesevidenced" },
+  { label: "Financial situation and needs sufficiently captured", field: "cc_e1_financialsituation" },
+  { label: "Inconsistencies or gaps identified and resolved", field: "cc_e1_inconsistenciesresolved" },
+  { label: "Vulnerability indicators identified and considered (if applicable)", field: "cc_e1_vulnerabilityindicators" },
+  { type: "lens", label: "Does the evidence support that the advice was built around the client’s actual needs and circumstances?" },
+
+  { type: "section", label: "E2. Risk, Capacity &amp; Loss (COBS 9.2 / FG)" },
+  { label: "Attitude to risk recorded and internally consistent", field: "cc_e2_attitudetorisk" },
+  { label: "Capacity for loss assessed and referenced in recommendation", field: "cc_e2_capacityforloss" },
+  { label: "Any mismatch clearly explained and justified", field: "cc_e2_mismatchexplained" },
+  { type: "lens", label: "Would a reasonable third party conclude the client was not exposed to foreseeable harm?", tickbox: true, field: "cc_e2_outcomelens" },
+
+  { type: "section", label: "E3. Research &amp; Recommendation Rationale (COBS 9.3)" },
+  { label: "Recommended solution aligns to objectives and constraints", field: "cc_e3_solutionaligns" },
+  { label: "Reasonable alternatives considered or explained", field: "cc_e3_alternativesconsidered" },
+  { label: "Product / portfolio risks explicitly addressed", field: "cc_e3_risksaddressed" },
+  { label: "Switches / transfers justified (where applicable)", field: "cc_e3_switchesjustified" },
+  { type: "lens", label: "Is the recommendation clearly suitable, not just technically admissible?" },
+
+  { type: "section", label: "E4. Costs, Charges &amp; Value (COBS / Consumer Duty - Price &amp; Value)" },
+  { label: "Adviser charges clearly disclosed and evidenced", field: "cc_e4_chargesdisclosed" },
+  { label: "Ongoing charges justified relative to service provided", field: "cc_e4_ongoingchargesjustified" },
+  { label: "Any concessions / off-tariff pricing approved and recorded", field: "cc_e4_concessionsapproved" },
+  { label: "Overall value conclusion coherent", field: "cc_e4_valueconclusion" },
+  { type: "lens", label: "Is there credible evidence the client received fair value?" },
+
+  { type: "section", label: "E5. Suitability Report &amp; Client Communication (COBS 9.4 / CD Understanding)" },
+  { label: "Report explains why the recommendation is suitable", field: "cc_e5_reportexplains" },
+  { label: "Key risks and trade-offs are clear and balanced", field: "cc_e5_risksbalanced" },
+  { label: "Language is clear, fair and not misleading", field: "cc_e5_languageclear" },
+  { label: "Material disadvantages explicitly highlighted", field: "cc_e5_disadvantageshighlighted" },
+  { type: "lens", label: "Could a reasonable client understand what they were agreeing to and why?" }
+], PFI);
+
+/* ---- Centralised Retirement Proposition ---- */
+renderGrid("crp-rows", [
+  { label: "Cashflow model stress tests on file", field: "cc_crp_cashflowstresstests" },
+  { label: "Sequencing risk discussed with client", field: "cc_crp_sequencingrisk" },
+  { label: "Derisking discussed / discounted", field: "cc_crp_derisking" },
+  { label: "Annuity / drawdown discussion completed, including the option of securing required/basic income needs through an annuity", field: "cc_crp_annuitydrawdown" }
+], PFI);
+
+/* ---- Consumer Duty overlay ---- */
+renderGrid("cd-rows", [
+  { label: "Products &amp; Services outcome", field: "cc_cd_productsservices" },
+  { label: "Price &amp; Value outcome", field: "cc_cd_pricevalue" },
+  { label: "Consumer Understanding outcome", field: "cc_cd_understanding" },
+  { label: "Consumer Support outcome", field: "cc_cd_support" }
+], YNI);
+
+/* ---- Remediation rows 1-7 ---- */
+var rem = "";
+for (var r = 1; r <= 7; r++) {
+  rem += '<tr>' +
+         '<td>' + r + '</td>' +
+         '<td><input type="text" name="cc_issuereason_' + r + '"></td>' +
+         '<td><input type="text" name="cc_remedialaction_' + r + '"></td>' +
+         '<td><input type="text" name="cc_owner_' + r + '"></td>' +
+         '<td><input type="date" name="cc_targetdate_' + r + '"></td>' +
+         '<td><input type="text" name="cc_signoff_' + r + '"></td>' +
+         '</tr>';
+}
+document.getElementById("rem-rows").innerHTML = rem;
+</script>
+</body>
+</html>

@@ -51,7 +51,7 @@
         <field name="al_displayorder" value="4" />
         <field name="al_ownerrole" value="120910101" />
         <field name="al_isconditional" value="False" />
-        <field name="al_helptext" value="Does the evidence support that the advice was built around the client's actual needs and circumstances?" />
+        <field name="al_helptext" value="Does the evidence support that the advice was built around the client’s actual needs and circumstances?" />
         <field name="al_checklistversionid" lookupentity="al_checklistversion" value="22220000-0000-4c00-8000-000000000008" />
       </record>
       <record id="33330000-0000-4c00-8000-000000000005">
