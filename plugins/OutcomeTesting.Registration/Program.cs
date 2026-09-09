@@ -8,6 +8,7 @@ using Microsoft.Xrm.Sdk.Query;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 // Registers OR verifies the CompleteRemediation server-side command (AD-003) using the
 // supported IOrganizationService API — the same calls the Plugin Registration Tool makes.
@@ -162,6 +163,8 @@ const string CommandAttribute = "al_command";
 // assembly targets net462 (AD-062); every one of them is asserted against the environment on
 // each run, so drift shows up as a FAIL rather than a wrong answer.
 const int CaseStatusQueued = 120910583;
+const int CaseStatusImported = 120910580;
+const int CaseStatusReadyForAllocation = 120910582;
 const int EventAllocation = 120910800;
 const int StatusPending = 120910810;
 const int StatusSent = 120910811;
@@ -329,6 +332,26 @@ if (args.Length >= 3 && args[0].Equals("fetch", StringComparison.OrdinalIgnoreCa
     return Fetch(args[1], args[2]);
 }
 
+if (args.Length >= 3 && args[0].Equals("setstepstate", StringComparison.OrdinalIgnoreCase))
+{
+    return SetStepState(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("pushassembly", StringComparison.OrdinalIgnoreCase))
+{
+    return PushAssembly(args[1], args.Length > 2 ? args[2] : null);
+}
+
+if (args.Length >= 4 && args[0].Equals("pushwebtemplate", StringComparison.OrdinalIgnoreCase))
+{
+    return PushWebTemplate(args[1], args[2], args[3]);
+}
+
+if (args.Length >= 2 && args[0].Equals("queueroutedcases", StringComparison.OrdinalIgnoreCase))
+{
+    return QueueRoutedCases(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+}
+
 if (args.Length >= 2 && args[0].Equals("migratetocontacts", StringComparison.OrdinalIgnoreCase))
 {
     return MigrateToContacts(args);
@@ -463,6 +486,224 @@ int Fetch(string orgUrl, string fetchXmlOrFile)
     Console.WriteLine(JsonSerializer.Serialize(
         new { count = rows.Count, moreRecords = results.MoreRecords, rows },
         new JsonSerializerOptions { WriteIndented = true }));
+    return 0;
+}
+
+// AD-093 backfill. Cases created before the rule sit at Imported or Ready for Allocation with
+// a route and no way into the queue except a hand edit. Each one is re-saved through
+// al_UpdateCaseDetails with its own route, which the plug-in turns into the Queued hops and an
+// audit event, so the trail is the command's, not this tool's. Idempotent: the key is the case
+// id, so a re-run replays the original result.
+int QueueRoutedCases(string orgUrl, bool confirm)
+{
+    using var svc = Connect(orgUrl);
+
+    var candidates = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_outcomecase\">" +
+        "<attribute name=\"al_outcomecaseid\"/><attribute name=\"al_casereference\"/>" +
+        "<attribute name=\"al_casestatus\"/><attribute name=\"al_reviewrouteid\"/>" +
+        "<filter type=\"and\">" +
+        "<condition attribute=\"statecode\" operator=\"eq\" value=\"0\"/>" +
+        "<condition attribute=\"al_reviewrouteid\" operator=\"not-null\"/>" +
+        "<condition attribute=\"al_casestatus\" operator=\"in\">" +
+        "<value>" + CaseStatusImported + "</value><value>" + CaseStatusReadyForAllocation + "</value>" +
+        "</condition></filter><order attribute=\"al_casereference\"/></entity></fetch>")).Entities;
+
+    Console.WriteLine($"{candidates.Count} routed case(s) short of the queue.");
+    foreach (var c in candidates)
+    {
+        var route = c.GetAttributeValue<EntityReference>("al_reviewrouteid");
+        Console.WriteLine($"   {c.GetAttributeValue<string>("al_casereference")}  status {c.GetAttributeValue<OptionSetValue>("al_casestatus").Value}  route {route.Name}");
+    }
+
+    if (!confirm)
+    {
+        Console.WriteLine("Dry run. Re-run with --confirm to queue them.");
+        return 0;
+    }
+
+    var queued = 0;
+    foreach (var c in candidates)
+    {
+        var reference = c.GetAttributeValue<string>("al_casereference") ?? c.Id.ToString("D");
+        try
+        {
+            svc.Execute(new OrganizationRequest("al_UpdateCaseDetails")
+            {
+                ["TargetId"] = c.Id.ToString("D"),
+                ["IdempotencyKey"] = "QUEUE-ROUTED-" + c.Id.ToString("N"),
+                ["RouteId"] = c.GetAttributeValue<EntityReference>("al_reviewrouteid").Id.ToString("D"),
+                ["Reason"] = "Queued automatically: route already set (AD-093 backfill)",
+            });
+
+            var after = svc.Retrieve("al_outcomecase", c.Id, new ColumnSet("al_casestatus"))
+                .GetAttributeValue<OptionSetValue>("al_casestatus");
+            var isQueued = after != null && after.Value == CaseStatusQueued;
+            Console.WriteLine($"   {reference}: {(isQueued ? "Queued" : "NOT queued, status " + (after?.Value.ToString() ?? "(none)"))}");
+            if (isQueued) queued++;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"   {reference} FAILED: {ex.Message}");
+        }
+    }
+
+    Console.WriteLine($"Done: {queued} of {candidates.Count} queued.");
+    return queued == candidates.Count ? 0 : 1;
+}
+
+// Enables or disables plug-in steps by name:
+//   setstepstate <orgUrl> enable|disable "<step name>" ["<step name>" ...]
+//
+// This exists because a solution import whose package carries SdkMessageProcessingSteps/
+// leaves every step in it Disabled unless `pac solution import --activate-plugins` is
+// passed. That is how the six al_response steps (ResponseGuard x4, ResponseProgress x2)
+// went dark at 08:52 UTC on 2026-09-02: import job 9bdfe47f processed exactly those six
+// rows, and nothing recorded it because step audits counted rows without reading state.
+// pac has no verb for step state and nothing else in this tool writes it, so this is the
+// one sanctioned way to change it - and it reads the state back rather than trusting the
+// update returned.
+int SetStepState(string[] a)
+{
+    const string usage = "Usage: setstepstate <orgUrl> enable|disable \"<step name>\" [\"<step name>\" ...]";
+
+    var enable = a[2].Equals("enable", StringComparison.OrdinalIgnoreCase);
+    if ((!enable && !a[2].Equals("disable", StringComparison.OrdinalIgnoreCase)) || a.Length < 4)
+    {
+        Console.Error.WriteLine(usage);
+        return 1;
+    }
+
+    using var svc = Connect(a[1]);
+
+    var failures = 0;
+    foreach (var stepName in a.Skip(3))
+    {
+        var stepId = FindId(svc, "sdkmessageprocessingstep", ("name", stepName));
+        if (stepId == Guid.Empty)
+        {
+            Console.Error.WriteLine($"No step named '{stepName}'.");
+            failures++;
+            continue;
+        }
+
+        svc.Update(new Entity("sdkmessageprocessingstep", stepId)
+        {
+            ["statecode"] = new OptionSetValue(enable ? 0 : 1),
+            ["statuscode"] = new OptionSetValue(enable ? 1 : 2),
+        });
+
+        var after = svc.Retrieve("sdkmessageprocessingstep", stepId, new ColumnSet("statecode"))
+            .GetAttributeValue<OptionSetValue>("statecode")?.Value;
+        var isEnabled = after == 0;
+        if (isEnabled == enable)
+        {
+            Console.WriteLine($"{(enable ? "enabled" : "disabled")} {stepName} ({stepId:D})");
+        }
+        else
+        {
+            Console.Error.WriteLine($"FAILED {stepName} ({stepId:D}): statecode read back as {after}.");
+            failures++;
+        }
+    }
+
+    return failures == 0 ? 0 : 1;
+}
+
+// Uploads a new build of the plug-in assembly and nothing else - the equivalent of
+// `pac plugin push --type Assembly` (AD-061) for when pac has no valid token. Plug-in types
+// and steps are untouched, which is the point: `registerall` also re-upserts every Custom
+// API, and a code fix should not have to. Reads the Release build by default.
+int PushAssembly(string orgUrl, string? dllPathArg)
+{
+    var dllPath = Path.GetFullPath(dllPathArg ?? Path.Combine(System.AppContext.BaseDirectory, "..", "..", "..", "..",
+        "OutcomeTesting.Plugins", "bin", "Release", "net462", "OutcomeTesting.Plugins.dll"));
+    if (!File.Exists(dllPath))
+    {
+        Console.Error.WriteLine($"Plug-in assembly not found: {dllPath}");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var assemblyId = FindId(svc, "pluginassembly", ("name", AssemblyName));
+    if (assemblyId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No plug-in assembly named '{AssemblyName}'. Run 'registerall' first.");
+        return 1;
+    }
+
+    var bytes = File.ReadAllBytes(dllPath);
+    svc.Update(new Entity("pluginassembly", assemblyId)
+    {
+        ["content"] = Convert.ToBase64String(bytes),
+    });
+
+    var after = svc.Retrieve("pluginassembly", assemblyId, new ColumnSet("modifiedon", "version"));
+    Console.WriteLine(
+        $"pushed {AssemblyName} ({assemblyId:D}): {bytes.Length} bytes from {dllPath}, "
+        + $"modified {after.GetAttributeValue<DateTime>("modifiedon"):yyyy-MM-dd HH:mm:ss}Z, version {after.GetAttributeValue<string>("version")}");
+    return 0;
+}
+
+// Writes one web template's source into its Enhanced-data-model component row - the part
+// of `pac pages upload` a template fix needs, for when pac has no valid token. The row's
+// `content` is JSON whose `source` key holds the Liquid; every other key is preserved by a
+// parse-set-serialize round trip rather than rebuilt. The component id is the
+// adx_webtemplateid in the template's .webtemplate.yml. CRLF is folded to LF and a BOM
+// dropped so the stored source matches what the CLI writes.
+int PushWebTemplate(string orgUrl, string componentIdArg, string sourcePath)
+{
+    if (!Guid.TryParse(componentIdArg, out var componentId))
+    {
+        Console.Error.WriteLine("Usage: pushwebtemplate <orgUrl> <powerpagecomponentid> <path to .webtemplate.source.html>");
+        return 1;
+    }
+
+    if (!File.Exists(sourcePath))
+    {
+        Console.Error.WriteLine($"Source file not found: {sourcePath}");
+        return 1;
+    }
+
+    var source = File.ReadAllText(sourcePath, Encoding.UTF8).Replace("\r\n", "\n");
+
+    using var svc = Connect(orgUrl);
+
+    var row = svc.Retrieve("powerpagecomponent", componentId, new ColumnSet("name", "powerpagecomponenttype", "content"));
+    var type = row.GetAttributeValue<OptionSetValue>("powerpagecomponenttype")?.Value;
+    if (type != 8)
+    {
+        Console.Error.WriteLine($"Component {componentId:D} is type {type}, not a Web Template (8).");
+        return 1;
+    }
+
+    var content = JsonNode.Parse(row.GetAttributeValue<string>("content") ?? "{}") as JsonObject;
+    if (content == null)
+    {
+        Console.Error.WriteLine("The component's content is not a JSON object.");
+        return 1;
+    }
+
+    var before = content["source"]?.GetValue<string>() ?? string.Empty;
+    content["source"] = source;
+
+    svc.Update(new Entity("powerpagecomponent", componentId)
+    {
+        ["content"] = content.ToJsonString(new JsonSerializerOptions { WriteIndented = true }),
+    });
+
+    var after = svc.Retrieve("powerpagecomponent", componentId, new ColumnSet("content", "modifiedon"));
+    var stored = (JsonNode.Parse(after.GetAttributeValue<string>("content") ?? "{}") as JsonObject)?["source"]?.GetValue<string>();
+    if (stored != source)
+    {
+        Console.Error.WriteLine("FAILED: the source read back does not match the file.");
+        return 1;
+    }
+
+    Console.WriteLine(
+        $"pushed web template '{row.GetAttributeValue<string>("name")}' ({componentId:D}): "
+        + $"{before.Length} -> {source.Length} chars, modified {after.GetAttributeValue<DateTime>("modifiedon"):yyyy-MM-dd HH:mm:ss}Z");
     return 0;
 }
 
