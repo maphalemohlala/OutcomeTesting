@@ -38,15 +38,22 @@ still to be done.
 | 3 | `dotnet $T pushwebtemplate $U a1000000-0000-4000-8000-000000000019 "powerpages/outcome-testing---outcometesting/web-templates/ot-remediation/OT-Remediation.webtemplate.source.html"` | pushed web template 'OT Remediation' (a1000000-0000-4000-8000-000000000019): 25279 -> 29639 chars, modified 2026-09-09 13:02:29Z |
 | 3 | `dotnet $T pushwebtemplate $U a1000000-0000-4000-8000-000000000015 "powerpages/outcome-testing---outcometesting/web-templates/ot-case-detail/OT-Case-Detail.webtemplate.source.html"` | pushed web template 'OT Case Detail' (a1000000-0000-4000-8000-000000000015): 10636 -> 15844 chars, modified 2026-09-09 13:02:36Z |
 | 4 | `npx pa app push` (from `app/`) | App pushed successfully, 2026-09-09 ~13:02:50Z |
+| 5 | Final review fix wave (commits 211acb9, 3216c4d): `pushwebtemplate` both templates again | OT Remediation 29639 -> 30199 chars, modified 2026-09-09 13:21:17Z; OT Case Detail 15844 -> 15923 chars, modified 2026-09-09 13:21:26Z |
+| 5 | `dotnet $T pushwebfile $U a1000000-0000-4000-8000-000000000050 "powerpages/outcome-testing---outcometesting/web-files/outcome-testing.css"` (new verb, commit 2f5ce12: block upload into the component's `filecontent` File column) | pushed web file 'outcome-testing.css': 33229 bytes, modified 2026-09-09 13:21:34Z |
+| 5 | `npx pa app add data-source --connector dataverse --table al_remediationaction --non-interactive` then `npx pa app push` | data source regenerated (model and schema now carry the three answers, commit 6462efa); app pushed 2026-09-09 ~13:21Z |
 
-## Left for the project owner
+## Left for the project owner (css now deployed)
 
-The css web file `powerpages/outcome-testing---outcometesting/web-files/outcome-testing.css`
-carries new `.ot-response__grid` and `.ot-remedial-form__block` rules and is **not deployed**.
-The registration tool has no web-file verb, and `pac pages upload` — the mechanism earlier
-notes used for this same file — is unavailable while `pac` is token-revoked. Push the css web
-file when `pac` is back (`pac pages upload`), or accept the unstyled layout until then: the
-form renders and works without it — the block stacks vertically and the radios sit inline.
+The css web file was pushed at 13:21:34Z through a new `pushwebfile` verb, so nothing here is
+undeployed. What remains is yours:
+
+- **Retest** as an adviser and a supervisor (section below).
+- **Sign-off visibility (parked, your decision):** `al_signoff` is readable on the portal by the
+  T&C Supervisor role only, so advisers, reviewers, managers and Administrators see a dash for
+  "All remedial actions checked and approved?", "Supervisor sign-off" and the per-row sign-off
+  on the case page and worklist, even when a sign-off exists. Granting portal read on
+  `al_signoff` to the roles that can open a case (AD-056/AD-069 territory) would fill them in;
+  it is a security decision and has not been made here.
 
 ## Retest
 
@@ -65,7 +72,7 @@ form (read-only) to confirm all five fields show correctly.
 | DEV assembly (`OutcomeTesting.Plugins`) | Delivery (automated) | Pass — 172544 bytes, modified 2026-09-09 13:02:05Z |
 | DEV guard step (`RemediationResponseGuardPlugin: Update of al_remediationaction`) | Delivery (automated) | Pass — filteringattributes widened 2026-09-09 |
 | DEV site setting (`Webapi/al_remediationaction/fields`) | Delivery (automated) | Pass — allowlist widened 2026-09-09 |
-| DEV web templates (OT Remediation, OT Case Detail) | Delivery (automated) | Pass — OT Remediation modified 2026-09-09 13:02:29Z, OT Case Detail modified 2026-09-09 13:02:36Z |
-| App push | Delivery (automated) | Pass — pushed 2026-09-09 ~13:02:50Z |
-| css web file (`outcome-testing.css`) | Project owner | Pending |
+| DEV web templates (OT Remediation, OT Case Detail) | Delivery (automated) | Pass — re-pushed after the review fix wave, 13:21:17Z and 13:21:26Z |
+| App push | Delivery (automated) | Pass — re-pushed with the regenerated data source, ~13:21Z |
+| css web file (`outcome-testing.css`) | Delivery (automated) | Pass — `pushwebfile`, 13:21:34Z |
 | Retest | Project owner | Pending |
