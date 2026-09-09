@@ -6,7 +6,9 @@ import { useReviewDetail, type ReviewResponse } from './useReviewDetail';
 import type { FormRow } from './reviewSections';
 import {
   formBlocks,
+  inlineOptionsFor,
   isTicked,
+  optionGridColumns,
   optionsFor,
   remediationSummary,
   type ChoiceOption,
@@ -40,7 +42,11 @@ function Tick({ ticked, label }: { ticked: boolean; label: string }) {
   );
 }
 
-/** The options of one row laid inline, as the document does for a mixed section. */
+/**
+ * The options of one row laid inline, as the document does for a mixed section: the
+ * document's own casing and order (inlineOptionsFor), and its 3x3 layout where it grids the
+ * list rather than running it along one line (Primary root cause).
+ */
 function InlineOptions({
   row,
   options,
@@ -48,8 +54,13 @@ function InlineOptions({
   row: FormRow<ReviewResponse>;
   options: ChoiceOption[];
 }) {
+  const columns = optionGridColumns(row.responseTypeValue);
   return (
-    <span className="checklist__options">
+    <span
+      className="checklist__options"
+      data-columns={columns ?? undefined}
+      style={columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}
+    >
       {options.map((option) => (
         <span key={option.value} className="checklist__option">
           <Tick ticked={isTicked(row, option)} label={option.label} />
@@ -67,15 +78,6 @@ function ValueCell({ row }: { row: FormRow<ReviewResponse> }) {
     <span className="checklist__value" data-empty={answer === null ? 'true' : undefined}>
       {answer ?? ''}
     </span>
-  );
-}
-
-function QuestionCell({ row }: { row: FormRow<ReviewResponse> }) {
-  return (
-    <>
-      {row.question}
-      {row.response?.note ? <span className="checklist__note">{row.response.note}</span> : null}
-    </>
   );
 }
 
@@ -123,9 +125,7 @@ function GroupRows({ group, block }: { group: FormGroup<ReviewResponse>; block: 
       ) : null}
       {group.rows.map((row) => (
         <tr key={row.key}>
-          <th scope="row">
-            <QuestionCell row={row} />
-          </th>
+          <th scope="row">{row.question}</th>
           {onScale(row, block) ? (
             block.options.map((option) => (
               <td key={option.value} className="checklist__tick-col">
@@ -134,8 +134,8 @@ function GroupRows({ group, block }: { group: FormGroup<ReviewResponse>; block: 
             ))
           ) : (
             <td colSpan={columns - 1}>
-              {optionsFor(row.responseTypeValue).length > 0 ? (
-                <InlineOptions row={row} options={optionsFor(row.responseTypeValue)} />
+              {inlineOptionsFor(row.responseTypeValue).length > 0 ? (
+                <InlineOptions row={row} options={inlineOptionsFor(row.responseTypeValue)} />
               ) : (
                 <ValueCell row={row} />
               )}
@@ -146,7 +146,7 @@ function GroupRows({ group, block }: { group: FormGroup<ReviewResponse>; block: 
       {group.lens ? (
         <tr>
           <td colSpan={columns} className="checklist__lens">
-            Outcome lens: {group.lens}
+            <em className="checklist__lens-label">Outcome lens:</em> {group.lens}
           </td>
         </tr>
       ) : null}
@@ -191,14 +191,15 @@ function BlockCard({ block }: { block: SectionBlock }) {
 /**
  * File Quality - Fail points: its own block on the document, between the checking points
  * and the File Quality outcome, listing every reason with a tick. Not a per-answer picker
- * (AD-096, which supersedes AD-054).
+ * (AD-096, which supersedes AD-054), and not split by team - the document draws one
+ * undivided list and both disciplines pick from it.
  */
 function FailPointsCard({ title, points }: { title: string; points: FailPoint[] }) {
   return (
     <section className="checklist__card" aria-labelledby="review-fail-points">
       <h2 id="review-fail-points">{title}</h2>
       {points.length === 0 ? (
-        <p className="checklist__help">No fail reasons are configured for this team.</p>
+        <p className="checklist__help">No fail reasons are configured.</p>
       ) : (
         <table className="checklist__table checklist__table--grid">
           <thead>

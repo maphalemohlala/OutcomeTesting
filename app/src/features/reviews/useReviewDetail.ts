@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { isVersionEffective } from './versionEffective';
-import { answerOf, date, noteOf, text } from './reviewAnswer';
+import { answerOf, date, text } from './reviewAnswer';
 import { buildSections, type ReviewSection } from './reviewSections';
 import {
   caseHeaderFields,
@@ -39,7 +39,6 @@ import { choiceLabel } from '../../lib/choiceLabel';
 
 export interface ReviewResponse extends TickedAnswer {
   answer: string | null;
-  note: string | null;
   answeredOn: string | null;
 }
 
@@ -142,7 +141,6 @@ function toResponse(
     answerChoice: record.al_answerchoice ?? null,
     answerChoices: record.al_answerchoices ?? [],
     answer: answerOf(record),
-    note: noteOf(record),
     answeredOn: date(record.al_answerdate) ?? date(record.modifiedon),
   };
 }
@@ -324,7 +322,6 @@ export function useReviewDetail(
             failPoints: failPoints(
               reasons.success ? reasons.data.map(toFailReason) : [],
               linked,
-              header.type,
             ),
           },
         });

@@ -72,6 +72,56 @@ export function optionsFor(responseTypeValue: number | null): ChoiceOption[] {
 }
 
 /**
+ * The outcome scales the document writes in upper case wherever it draws them inline:
+ * "PASS / INSUFFICIENT EVIDENCE / FAIL" on the tax check outcome, "PASS / FAIL" on the file
+ * quality outcome, "YES / NO" on remedial action required, and the four-value grade. The
+ * same values are headed in title case where a tick grid heads a column with them (Pass,
+ * Fail, Insufficient evidence), so the case belongs to the inline rendering rather than to
+ * the option, and only this path applies it. The root cause list is title case in the
+ * document and is deliberately absent.
+ */
+const UPPER_CASE_INLINE = new Set([120910005, 120910006, 120910007, 120910010]);
+
+/**
+ * The tax check outcome as the document orders it: PASS, INSUFFICIENT EVIDENCE, FAIL. The
+ * suitability grid heads the same scale Pass, Fail, Insufficient evidence, so the order is
+ * the inline rendering's too. Only S-TAX answers this scale off a grid.
+ */
+const INLINE_ORDER: Record<number, number[]> = {
+  120910006: [120910300, 120910302, 120910301],
+};
+
+/**
+ * The options of a row as the document draws them inline - a row of tick boxes beside the
+ * question rather than a column of a grid. Same options, same values; the document's own
+ * casing and order.
+ */
+export function inlineOptionsFor(responseTypeValue: number | null): ChoiceOption[] {
+  const options = optionsFor(responseTypeValue);
+  if (responseTypeValue == null || options.length === 0) return options;
+
+  const order = INLINE_ORDER[responseTypeValue];
+  const ordered = order
+    ? order
+        .map((value) => options.find((option) => option.value === value))
+        .filter((option): option is ChoiceOption => option !== undefined)
+    : options;
+
+  return UPPER_CASE_INLINE.has(responseTypeValue)
+    ? ordered.map((option) => ({ ...option, label: option.label.toUpperCase() }))
+    : ordered;
+}
+
+/**
+ * The number of columns the document lays an inline option list out in, or null for a
+ * single row. Primary root cause is the one list it grids: nine causes in three rows of
+ * three, read left to right.
+ */
+export function optionGridColumns(responseTypeValue: number | null): number | null {
+  return responseTypeValue === 120910003 ? 3 : null;
+}
+
+/**
  * How a section lays out on the form. A section whose rows all share one tick scale is a
  * grid - one column per option, as E1 to E5, AML and CRA, CRP and Consumer Duty are on
  * the document. Anything else (Tax check, File Quality outcome, grading) is a row per
@@ -218,27 +268,21 @@ export interface FailPoint {
   ticked: boolean;
 }
 
-/** The al_failreason category value that belongs to the Tax team (checklist-v8.md). */
-const TAX_CHECK_CATEGORY = 120910403;
-
 /**
- * The standalone File Quality fail points block: the team's own reasons, every one of them,
- * ticked where it is recorded against any answer on the review. The category is the team
- * split - Tax check is the Tax team's, everything else the AQS checker's, so a category
- * added later lands with AQS rather than vanishing from both.
+ * The standalone File Quality fail points block: every reason on the list, ticked where it
+ * is recorded against any answer on the review.
+ *
+ * Both teams get the whole list. The document draws one undivided twenty-row table, and the
+ * category is a grouping of the reasons, not a split of who may pick them (project owner,
+ * 2026-09-09). Filtering by category - Tax check to the Tax team, the rest to AQS, which is
+ * what this did until now - was an inference from the prefixes, and it left a Tax reviewer
+ * who found a record-keeping failure with nowhere to record it. Each team still records its
+ * own ticks: they hang off that team's File quality outcome answer (Q-FQ-01 for AQS,
+ * Q-FQTAX-01 for Tax) through the response-keyed intersect, so the two sets never collide.
  */
-export function failPoints(
-  reasons: FailReasonRef[],
-  ticked: ReadonlySet<string>,
-  reviewType: string,
-): FailPoint[] {
-  const isTax = reviewType === 'Tax';
+export function failPoints(reasons: FailReasonRef[], ticked: ReadonlySet<string>): FailPoint[] {
   return reasons
-    .filter((reason) =>
-      isTax
-        ? reason.categoryValue === TAX_CHECK_CATEGORY
-        : reason.categoryValue !== TAX_CHECK_CATEGORY,
-    )
+    .slice()
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))
     .map((reason) => ({
       id: reason.id,

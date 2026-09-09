@@ -73,7 +73,7 @@
         <field name="al_checklistversionid" lookupentity="al_checklistversion" value="22220000-0000-4c00-8000-000000000008" />
       </record>
       <record id="33330000-0000-4c00-8000-000000000007">
-        <field name="al_name" value="Costs, Charges &amp; Value (COBS / Consumer Duty — Price &amp; Value)" />
+        <field name="al_name" value="Costs, Charges &amp; Value (COBS / Consumer Duty - Price &amp; Value)" />
         <field name="al_sectioncode" value="S-E4" />
         <field name="al_displayorder" value="7" />
         <field name="al_ownerrole" value="120910101" />
@@ -96,6 +96,7 @@
         <field name="al_displayorder" value="9" />
         <field name="al_ownerrole" value="120910101" />
         <field name="al_isconditional" value="True" />
+        <field name="al_helptext" value="Complete this section where retirement income planning or decumulation advice is in scope." />
         <field name="al_checklistversionid" lookupentity="al_checklistversion" value="22220000-0000-4c00-8000-000000000008" />
       </record>
       <record id="33330000-0000-4c00-8000-000000000010">
@@ -104,7 +105,7 @@
         <field name="al_displayorder" value="10" />
         <field name="al_ownerrole" value="120910101" />
         <field name="al_isconditional" value="False" />
-        <field name="al_helptext" value="Short yes/no judgements only." />
+        <field name="al_helptext" value="Short yes/no judgements only. Record any detail once in section H." />
         <field name="al_checklistversionid" lookupentity="al_checklistversion" value="22220000-0000-4c00-8000-000000000008" />
       </record>
       <record id="33330000-0000-4c00-8000-000000000011">
@@ -341,7 +342,7 @@
         <field name="al_sectionid" lookupentity="al_section" value="33330000-0000-4c00-8000-000000000009" />
       </record>
       <record id="44440000-0000-4c00-8000-000000000034">
-        <field name="al_name" value="Annuity / drawdown discussion completed" />
+        <field name="al_name" value="Annuity / drawdown discussion completed, including the option of securing required/basic income needs through an annuity" />
         <field name="al_questioncode" value="Q-CRP-04" />
         <field name="al_displayorder" value="4" />
         <field name="al_sectionid" lookupentity="al_section" value="33330000-0000-4c00-8000-000000000009" />

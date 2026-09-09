@@ -39,9 +39,3 @@ export function answerOf(record: Al_responses): string | null {
   if (text(record.al_answertext)) return text(record.al_answertext);
   return date(record.al_answerdate);
 }
-
-/** A free-text note kept alongside a structured answer (e.g. evidence for a Fail). */
-export function noteOf(record: Al_responses): string | null {
-  const structured = record.al_answerchoice != null || !!record.al_answerchoices?.length;
-  return structured ? text(record.al_answertext) : null;
-}

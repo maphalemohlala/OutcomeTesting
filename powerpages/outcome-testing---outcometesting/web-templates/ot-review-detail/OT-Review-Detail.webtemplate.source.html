@@ -350,15 +350,15 @@
         Fail reasons (FR-013, AD-096). Reference data, fetched once, for the standalone
         File Quality fail points block rendered before the File Quality outcome section.
 
-        Scoped to the reviewing team, as the sections are. The category IS the team split in
-        the V8 catalogue - "Tax check" reasons are the Tax team's, and AML, Breach and Record
-        Keeping are the AQS checker's - so a Tax reviewer offered all twenty is being asked to
-        pick from another team's vocabulary, and an AQS reviewer offered the tax ones can
-        record a tax failure the tax team never found.
+        Both teams get the whole list. The document draws one undivided twenty-row table, and
+        the category is a grouping of the reasons rather than a split of who may pick them
+        (project owner, 2026-09-09). This used to filter by category - Tax check to the Tax
+        team, the other three to AQS - which was an inference from the prefixes, and it left a
+        Tax reviewer who found a record-keeping failure with nowhere to record it.
 
-        AQS is expressed as "not Tax check" rather than as a list of the three. A category
-        added later then lands with AQS, which is where the catalogue's own categories all
-        sit; an explicit list would silently drop it and nobody would see the picker shrink.
+        The two teams' ticks still cannot collide: each hangs off that team's own File quality
+        outcome answer (Q-FQ-01 for AQS, Q-FQTAX-01 for Tax) through the response-keyed
+        intersect, and ReconcileFailReasons only ever touches ids this page rendered.
       {% endcomment %}
       {% fetchxml failreasons %}
       <fetch>
@@ -367,13 +367,6 @@
           <attribute name="al_name" />
           <attribute name="al_category" />
           <attribute name="al_displayorder" />
-          <filter type="and">
-            {% if owner_role == 120910100 %}
-              <condition attribute="al_category" operator="eq" value="120910403" />
-            {% else %}
-              <condition attribute="al_category" operator="ne" value="120910403" />
-            {% endif %}
-          </filter>
           <order attribute="al_displayorder" />
         </entity>
       </fetch>
@@ -425,10 +418,10 @@
 
           A grid block renders its questions as rows of one table with a radio per tick
           column, which is the document's layout. The row itself is the autosave root
-          (data-ot-answer): the radios sit in the tick cells, the evidence note and the
-          status line in the question cell, so bind() finds everything it needs inside the
-          row exactly as it did inside the old div. A question whose response type is not the
-          block's scale spans the tick columns with its usual control.
+          (data-ot-answer): the radios sit in the tick cells and the status line in the
+          question cell, so bind() finds everything it needs inside the row exactly as it
+          did inside the old div. A question whose response type is not the block's scale
+          spans the tick columns with its usual control.
         {% endcomment %}
         {% assign current_block = '' %}
         {% assign current_section = '' %}
@@ -489,7 +482,7 @@
             {% unless forloop.first %}
               {% if block_layout == 'grid' %}
                 {% if block_subsections and prev_help != blank %}
-                  <tr class="ot-lens"><td colspan="{{ ncols }}">Outcome lens: {{ prev_help | escape }}</td></tr>
+                  <tr class="ot-lens"><td colspan="{{ ncols }}"><em class="ot-lens__label">Outcome lens:</em> {{ prev_help | escape }}</td></tr>
                 {% endif %}
                   </tbody>
                 </table>
@@ -513,11 +506,12 @@
             {% comment %}
               File Quality - Fail points (AD-096, superseding AD-054). On the document this
               is its own block, between the checking points and the File Quality outcome,
-              and it is rendered as one here: a single tick list, not a picker under every
-              non-pass answer. The ticks are recorded against the File quality outcome
-              answer - the first question of the outcome block, which is what qv is at
-              this boundary - because the intersect is response-keyed (AD-025) and that is
-              the answer these reasons explain. The outcome question's autosave binds the
+              and it is rendered as one here: the document's two-column table of every
+              reason against a Tick box, the same table the app draws (checklistForm.ts,
+              failPoints), not a picker under every non-pass answer. The ticks are recorded
+              against the File quality outcome answer - the first question of the outcome
+              block, which is what qv is at this boundary - because the intersect is
+              response-keyed (AD-025) and that is the answer these reasons explain. The outcome question's autosave binds the
               list through data-ot-failpoints-for, so a tick saves like any other change to
               that answer.
             {% endcomment %}
@@ -528,16 +522,27 @@
               {% endfor %}
               <section class="ot-card" aria-labelledby="sec-failpoints">
                 <h2 class="ot-card__title" id="sec-failpoints">File Quality &ndash; Fail points</h2>
-                <p class="ot-section-help">Tick every reason that applies. Recorded with the File quality outcome below.</p>
-                <div class="ot-answers">
-                  <div class="ot-answer__reasons" data-ot-failpoints-for="{{ qv.al_questionversionid }}">
-                    {% for fr in failreasons.results.entities %}
-                      <label class="ot-answer__option">
-                        {% capture pairkey %}|{{ fq_existing.al_responseid }}~{{ fr.al_failreasonid }}{% endcapture %}<input type="checkbox" data-ot-reason value="{{ fr.al_failreasonid }}"{% unless editable %} disabled{% endunless %}{% if fq_existing.al_responseid and selected_reason_pairs contains pairkey %} checked{% endif %} />
-                        <span>{{ fr.al_category.label | escape }} &mdash; {{ fr.al_name | escape }}</span>
-                      </label>
-                    {% endfor %}
-                  </div>
+                <div class="ot-table-wrap ot-questions-wrap">
+                  <table class="ot-table ot-questions" data-ot-failpoints-for="{{ qv.al_questionversionid }}">
+                    <thead>
+                      <tr>
+                        <th scope="col" class="ot-col-q">File Quality fail reason</th>
+                        <th scope="col" class="ot-col-tick">Tick</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for fr in failreasons.results.entities %}
+                        <tr>
+                          <th scope="row" class="ot-col-q">
+                            <label for="fr-{{ fr.al_failreasonid }}">{{ fr.al_category.label | escape }} - {{ fr.al_name | escape }}</label>
+                          </th>
+                          <td class="ot-col-tick">
+                            {% capture pairkey %}|{{ fq_existing.al_responseid }}~{{ fr.al_failreasonid }}{% endcapture %}<input type="checkbox" id="fr-{{ fr.al_failreasonid }}" data-ot-reason value="{{ fr.al_failreasonid }}"{% unless editable %} disabled{% endunless %}{% if fq_existing.al_responseid and selected_reason_pairs contains pairkey %} checked{% endif %} />
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
                 </div>
               </section>
             {% endif %}
@@ -571,7 +576,7 @@
           {% if sid != current_section %}
             {% if block_subsections %}
               {% if current_section != '' and prev_help != blank %}
-                <tr class="ot-lens"><td colspan="{{ ncols }}">Outcome lens: {{ prev_help | escape }}</td></tr>
+                <tr class="ot-lens"><td colspan="{{ ncols }}"><em class="ot-lens__label">Outcome lens:</em> {{ prev_help | escape }}</td></tr>
               {% endif %}
               <tr class="ot-subsection"><th scope="colgroup" colspan="{{ ncols }}">{{ scode | remove_first: 'S-' }}. {{ sname | escape }}</th></tr>
             {% endif %}
@@ -594,37 +599,17 @@
           {% endif %}
 
           {% comment %}
-            al_answertext doubles as the evidence note held with a structured answer, which
-            is how the Code App already reads the record (useReviewDetail.ts, noteOf). It
-            stays optional under AD-019.
-
-            Whether the evidence note starts open is decided here, from the record, and the
-            client only takes over once someone changes the answer: open when the answer is
-            a non-pass, or when a note has already been written - because a person who wrote
-            something must be able to see it, on a submitted review too, where the autosave
-            script that used to reveal it is not emitted at all. The non-pass set matches
-            revealConditional's, including "No".
+            A ticked answer carries no free-text box. The Checker Checklist gives a tick
+            column and nothing else against each test point, and the only free text the
+            document asks for is its own questions - Case notes, Fail observation, Even
+            Better If... - which render as multiline questions in their own right. The
+            "Evidence or observation" box that used to sit under every non-pass answer was
+            never on the form, so it is gone, and the reveal rule that opened it with it.
 
             The fail reasons used to sit here too, under every non-pass answer (AD-054).
             They are one standalone block now (AD-096).
           {% endcomment %}
-          {% assign nonpass_values = '120910301,120910302,120910303,120910304,120910306' | split: ',' %}
           {% capture chosen_value %}{{ existing.al_answerchoice.value }}{% endcapture %}
-          {% assign is_nonpass = false %}
-          {% for v in nonpass_values %}{% if v == chosen_value %}{% assign is_nonpass = true %}{% endif %}{% endfor %}
-
-          {% assign has_note = false %}
-          {% if existing.al_answertext and existing.al_answertext != empty %}{% assign has_note = true %}{% endif %}
-
-          {% capture note_block %}
-            <div class="ot-answer__note" data-ot-note{% unless is_nonpass or has_note %} hidden{% endunless %}>
-              <label class="ot-answer__note-label" for="note-{{ qv_id }}">
-                Evidence or observation (optional)
-              </label>
-              <textarea id="note-{{ qv_id }}" class="ot-answer__input" rows="3"
-                        data-ot-note-input{% unless editable %} disabled{% endunless %}>{{ existing.al_answertext | escape }}</textarea>
-            </div>
-          {% endcapture %}
 
           {% if block_layout == 'grid' and rt == block_rt %}
             <tr class="ot-answer ot-answer--row"
@@ -636,7 +621,6 @@
               <th scope="row" class="ot-col-q">
                 {{ qv.al_questiontext | escape }}
                 {% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}
-                {{ note_block }}
                 <p class="ot-answer__status" data-ot-status aria-live="polite"></p>
               </th>
               {% for v in gvalues %}
@@ -708,10 +692,6 @@
               {% else %}
                 {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id editable: editable %}
               {% endif %}
-
-              {% if column == 'choice' or column == 'choices' %}
-                {{ note_block }}
-              {% endif %}
             </fieldset>
 
             <p class="ot-answer__status" data-ot-status aria-live="polite"></p>
@@ -722,7 +702,7 @@
           {% if forloop.last %}
             {% if block_layout == 'grid' %}
               {% if block_subsections and prev_help != blank %}
-                <tr class="ot-lens"><td colspan="{{ ncols }}">Outcome lens: {{ prev_help | escape }}</td></tr>
+                <tr class="ot-lens"><td colspan="{{ ncols }}"><em class="ot-lens__label">Outcome lens:</em> {{ prev_help | escape }}</td></tr>
               {% endif %}
                   </tbody>
                 </table>
@@ -766,15 +746,6 @@
             'use strict';
 
             var DEBOUNCE_MS = 800;
-            /*
-             * Fail, Insufficient evidence, Pass with issues, Potential harm, and No.
-             *
-             * "No" and "Pass with issues" were missing, so an AML or CRA question answered No
-             * offered no way to attach the FR-AML reason written for exactly that answer, and
-             * a Pass-with-issues grade offered none either. Kept in step with the same list in
-             * the markup above.
-             */
-            var NON_PASS = [120910301, 120910302, 120910303, 120910304, 120910306];
 
             var shell = document.querySelector('[data-ot-questionnaire]');
             if (!shell) { return; }
@@ -905,8 +876,6 @@
               var questionVersion = root.getAttribute('data-question-version');
               var column = root.getAttribute('data-column');
               var status = root.querySelector('[data-ot-status]');
-              var note = root.querySelector('[data-ot-note]');
-              var noteInput = root.querySelector('[data-ot-note-input]');
               // The standalone fail points list (AD-096) belongs to the File quality outcome
               // answer, so only that answer's bind() finds one; every other answer has none.
               var reasons = document.querySelector('[data-ot-failpoints-for="' + questionVersion + '"]');
@@ -936,7 +905,6 @@
                   body.al_answerdate = inputs[0].value || null;
                 } else if (column === 'choice') {
                   body.al_answerchoice = chosenChoice();
-                  body.al_answertext = noteInput && noteInput.value ? noteInput.value : null;
                 } else {
                   var picked = [];
                   for (i = 0; i < inputs.length; i++) {
@@ -947,7 +915,6 @@
                   // that format was for the OData multiselect column this page no longer
                   // writes directly. currentRequest() below sends this array through as-is.
                   body.al_answerchoices = picked.length ? picked : null;
-                  body.al_answertext = noteInput && noteInput.value ? noteInput.value : null;
                 }
 
                 return body;
@@ -998,26 +965,10 @@
                 return ids;
               }
 
-              /*
-               * BR-006: a non-pass outcome requires remediation, so it is the point at
-               * which an evidence note becomes useful. It stays optional under AD-019. The
-               * fail points block is always on screen (AD-096), so nothing folds it away.
-               */
-              function revealConditional() {
-                var chosen = null;
-                for (var i = 0; i < inputs.length; i++) {
-                  if (inputs[i].checked) { chosen = parseInt(inputs[i].value, 10); }
-                }
-                var isNonPass = NON_PASS.indexOf(chosen) !== -1;
-
-                // Never hide what has something in it. Switching a Fail back to a Pass used
-                // to fold the note away still written, leaving a person unable to see - let
-                // alone clear - what they had recorded. The server makes the same judgement
-                // when it renders the page.
-                var keptNote = !!(noteInput && noteInput.value);
-
-                if (note) { note.hidden = !(isNonPass || keptNote); }
-              }
+              // Nothing on an answer is revealed conditionally any more. The evidence note
+              // that revealConditional() used to open on a non-pass is not a field on the
+              // Checker Checklist and has been removed, and the fail points block is always
+              // on screen (AD-096), so every control an answer has is visible from the start.
 
               /*
                * One PATCH replaces the create/update pair that used to target al_response
@@ -1046,7 +997,6 @@
               }
 
               function queue() {
-                revealConditional();
                 if (timer) { window.clearTimeout(timer); }
                 timer = window.setTimeout(save, DEBOUNCE_MS);
               }
@@ -1066,7 +1016,6 @@
                   inputs[i].addEventListener('input', queue);
                 }
               }
-              if (noteInput) { noteInput.addEventListener('input', queue); }
 
               // No closure over the box is needed any more: toggleReason() no longer takes
               // one, since a tick is just another field feeding queue() -> save().
@@ -1074,8 +1023,6 @@
               for (var r = 0; r < reasonBoxes.length; r++) {
                 reasonBoxes[r].addEventListener('change', toggleReason);
               }
-
-              revealConditional();
             }
 
             var answers = document.querySelectorAll('[data-ot-answer]');

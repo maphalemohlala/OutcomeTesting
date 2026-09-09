@@ -133,12 +133,13 @@
   border-collapse: collapse;
 }
 
+/* The document rules every cell, not just the row below, so the grids read as its tables. */
 .checklist__table th,
 .checklist__table td {
   padding: var(--space-2) var(--space-3);
   text-align: left;
   vertical-align: top;
-  border-bottom: 1px solid var(--colour-border);
+  border: 1px solid var(--colour-border);
 }
 
 .checklist__table thead th {
@@ -190,6 +191,13 @@
   gap: var(--space-2) var(--space-4);
 }
 
+/* Primary root cause is a 3x3 grid on the document, read left to right, not one long run. */
+.checklist__options[data-columns] {
+  display: grid;
+  width: 100%;
+  max-width: 46rem;
+}
+
 .checklist__option {
   display: inline-flex;
   align-items: center;
@@ -208,15 +216,6 @@
   color: var(--colour-text-muted);
 }
 
-/* The evidence note kept with a structured answer sits under its question, as supporting detail. */
-.checklist__note {
-  display: block;
-  margin-top: var(--space-1);
-  font-size: var(--text-xs);
-  font-weight: 400;
-  color: var(--colour-text-muted);
-}
-
 /* A multi-line value, such as the issue list on a remediation line, keeps its line breaks. */
 .checklist__prose {
   white-space: pre-line;
@@ -231,12 +230,16 @@
   border-bottom: 2px solid var(--colour-border-strong);
 }
 
-/* The document's "Outcome lens" footer line on each suitability block. */
+/* The document's "Outcome lens" footer line on each suitability block. Only the "Outcome
+   lens:" label is emphasised there; the question after it is set plainly. */
 .checklist__lens {
   font-size: var(--text-xs);
-  font-style: italic;
   color: var(--colour-text-muted);
-  border-bottom: 0;
+}
+
+.checklist__lens-label {
+  font-style: italic;
+  font-weight: 600;
 }
 
 .review__unavailable {

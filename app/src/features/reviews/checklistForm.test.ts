@@ -3,8 +3,10 @@ import type { Al_outcomecases } from '../../generated/models/Al_outcomecasesMode
 import {
   caseHeaderFields,
   failPoints,
+  inlineOptionsFor,
   isOutcomeLens,
   isTicked,
+  optionGridColumns,
   optionsFor,
   remediationSummary,
   sectionLayout,
@@ -204,20 +206,23 @@ describe('failPoints', () => {
     { id: 'bre-1', name: 'Any other process breach has been identified', category: 'Breach', categoryValue: 120910401, order: 6 },
   ];
 
-  it('offers the AQS checker every reason that is not the Tax team’s, in display order', () => {
-    expect(failPoints(reasons, new Set(), 'AQS').map((p) => p.id)).toEqual([
+  it('offers every reason, whatever its category, in display order', () => {
+    // One undivided list on the document, and one here: the category groups the reasons, it
+    // does not decide who may tick them.
+    expect(failPoints(reasons, new Set()).map((p) => p.id)).toEqual([
       'aml-1',
       'bre-1',
       'rec-1',
+      'tax-1',
     ]);
   });
 
-  it('offers the Tax team only the Tax check reasons', () => {
-    expect(failPoints(reasons, new Set(), 'Tax').map((p) => p.id)).toEqual(['tax-1']);
+  it('offers the Tax check reasons to whoever is looking, not only the Tax team', () => {
+    expect(failPoints(reasons, new Set()).map((p) => p.id)).toContain('tax-1');
   });
 
   it('ticks a reason recorded on the review and labels it with its category', () => {
-    const points = failPoints(reasons, new Set(['bre-1']), 'AQS');
+    const points = failPoints(reasons, new Set(['bre-1']));
     expect(points.find((p) => p.id === 'bre-1')).toEqual({
       id: 'bre-1',
       label: 'Breach - Any other process breach has been identified',
@@ -226,11 +231,10 @@ describe('failPoints', () => {
     expect(points.find((p) => p.id === 'aml-1')?.ticked).toBe(false);
   });
 
-  it('keeps a reason with no category with the AQS checker rather than dropping it', () => {
+  it('keeps a reason with no category rather than dropping it', () => {
     const points = failPoints(
       [{ id: 'x', name: 'New reason', category: null, categoryValue: null, order: 99 }],
       new Set(),
-      'AQS',
     );
     expect(points).toEqual([{ id: 'x', label: 'New reason', ticked: false }]);
   });
@@ -329,5 +333,59 @@ describe('remediationSummary', () => {
     expect(summary.regradedOutcome).toBe('Pass - 27 Sep 2026');
     expect(summary.supervisorSignOff).toBe('T. Manager, 26 Sep 2026');
     expect(summary.adviserSignOff).toBe('A. Adviser, 25 Sep 2026');
+  });
+});
+
+describe('inlineOptionsFor', () => {
+  it('upper-cases the outcome scales the document draws inline', () => {
+    expect(inlineOptionsFor(120910005).map((o) => o.label)).toEqual(['PASS', 'FAIL']);
+    expect(inlineOptionsFor(120910007).map((o) => o.label)).toEqual(['YES', 'NO']);
+    expect(inlineOptionsFor(120910010).map((o) => o.label)).toEqual([
+      'PASS',
+      'PASS WITH ISSUES',
+      'INSUFFICIENT EVIDENCE',
+      'POTENTIAL HARM',
+    ]);
+  });
+
+  it('orders the tax check outcome PASS, INSUFFICIENT EVIDENCE, FAIL as the document does', () => {
+    expect(inlineOptionsFor(120910006)).toEqual([
+      { value: 120910300, label: 'PASS' },
+      { value: 120910302, label: 'INSUFFICIENT EVIDENCE' },
+      { value: 120910301, label: 'FAIL' },
+    ]);
+  });
+
+  it('leaves the grid scales alone, so a tick column stays titled Pass, Fail, N/A', () => {
+    // The same values head a grid column in title case; only the inline path re-cases them.
+    expect(optionsFor(120910006).map((o) => o.label)).toEqual([
+      'Pass',
+      'Fail',
+      'Insufficient evidence',
+    ]);
+    expect(optionsFor(120910008).map((o) => o.label)).toEqual(['Yes', 'No', 'N/A']);
+  });
+
+  it('leaves the root cause list in the title case the document sets it in', () => {
+    const labels = inlineOptionsFor(120910003).map((o) => o.label);
+    expect(labels[0]).toBe('FactFind quality');
+    expect(labels).toHaveLength(9);
+  });
+
+  it('reports nothing for a response type with no options', () => {
+    expect(inlineOptionsFor(null)).toEqual([]);
+    expect(inlineOptionsFor(120910001)).toEqual([]);
+  });
+});
+
+describe('optionGridColumns', () => {
+  it('grids the nine root causes three to a row, as the document lays them out', () => {
+    expect(optionGridColumns(120910003)).toBe(3);
+  });
+
+  it('leaves every other list on one row', () => {
+    expect(optionGridColumns(120910010)).toBeNull();
+    expect(optionGridColumns(120910004)).toBeNull();
+    expect(optionGridColumns(null)).toBeNull();
   });
 });

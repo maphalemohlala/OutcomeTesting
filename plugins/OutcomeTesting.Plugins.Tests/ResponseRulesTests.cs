@@ -70,10 +70,10 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void ValidateAnswer_allows_a_note_alongside_a_choice()
+        public void ValidateAnswer_allows_text_left_alongside_a_choice()
         {
-            // al_answertext doubles as evidence held with a structured answer.
-            // useReviewDetail.ts noteOf() already reads the record this way.
+            // Nothing writes this pair now that the per-answer evidence box is gone, but a
+            // record that already holds one has to stay saveable.
             Assert.Null(ResponseRules.ValidateAnswer(120910005, true, false, 120910301, new int[0]));
         }
 

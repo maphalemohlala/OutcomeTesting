@@ -186,9 +186,11 @@ namespace OutcomeTesting.Plugins
         /// An entirely empty answer is valid: clearing a field is a legitimate draft edit,
         /// and SubmitReview is what refuses to submit an unanswered mandatory question.
         ///
-        /// Text alongside a choice or choices is valid and deliberate: al_answertext doubles
-        /// as the evidence note held with a structured answer, which is how
-        /// app/src/features/reviews/useReviewDetail.ts noteOf() already reads the record.
+        /// Text alongside a choice or choices is still accepted. No page writes that pair
+        /// any more - the "Evidence or observation" box that used to sit under a ticked
+        /// answer was never on the Checker Checklist and has been removed - but rejecting it
+        /// here would make a review that recorded one under the old page impossible to
+        /// re-save. Validation stays a shape check, not a migration.
         /// </summary>
         public static string ValidateAnswer(
             int responseType,

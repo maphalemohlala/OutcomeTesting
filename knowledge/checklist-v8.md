@@ -14,6 +14,7 @@ Every displayed answerable question is mandatory before its section can be submi
 |---|---|
 | `S-TAX`, `S-FQTAX` | Tax team |
 | `S-AMLCRA`, `S-FQOUT` | AQS checker |
+| File Quality fail points (not a section) | Both — each team ticks against its own File Quality outcome |
 | `S-E1` to `S-E5`, `S-CRP`, `S-CD`, `S-GRADE` | AQS checker |
 | Remediation (separate form) | Adviser |
 | Remediation validation, and sign-off for Insufficient evidence and Potential harm | T&C Manager |
@@ -166,7 +167,7 @@ The E2 outcome lens row carries a single stray tick box in the source document. 
 
 Outcome lens: Is the recommendation clearly suitable, not just technically admissible?
 
-### S-E4 — Costs, Charges & Value (COBS / Consumer Duty — Price & Value)
+### S-E4 — Costs, Charges & Value (COBS / Consumer Duty - Price & Value)
 | Code | Question |
 |---|---|
 | Q-E4-01 | Adviser charges clearly disclosed and evidenced |
@@ -190,6 +191,11 @@ Outcome lens: Could a reasonable client understand what they were agreeing to an
 
 Owner: AQS checker. Response type `PassFailInsufficient`, all mandatory when the section applies.
 
+Section help text carries the document's own line under the heading: "Complete this section
+where retirement income planning or decumulation advice is in scope." It was rendered from a
+literal in both review pages and is now seeded on `al_Section.al_helptext`, as E1 to E5 and
+S-CD already were.
+
 Applicability is derived by the system from the case product/solution type (AD-021). The checker gets no manual applicability control, and the "Mark N/A" branch at step 4.6 of the flow is a system outcome, not a checker decision. Where CRP does not apply, the four responses are written as N/A rather than omitted, so the response set stays complete for MI. Whether ad hoc investment withdrawals trigger CRP is unresolved and tracked as OD-016.
 
 | Code | Question |
@@ -201,7 +207,9 @@ Applicability is derived by the system from the case product/solution type (AD-0
 
 ## S-CD — Consumer Duty overlay
 
-Owner: AQS checker. "Short yes/no judgements only." Response type `YesNoInsufficient`, all mandatory.
+Owner: AQS checker. Section help text carries the document's intro in full: "Short yes/no
+judgements only. Record any detail once in section H." Response type `YesNoInsufficient`, all
+mandatory.
 
 | Code | Question |
 |---|---|
@@ -210,7 +218,10 @@ Owner: AQS checker. "Short yes/no judgements only." Response type `YesNoInsuffic
 | Q-CD-03 | Consumer Understanding outcome |
 | Q-CD-04 | Consumer Support outcome |
 
-The instruction "Record any detail once in section H" refers to a section letter that does not appear in V8. Read as the Case Notes field in S-GRADE.
+The instruction "Record any detail once in section H" refers to a section letter that does not
+appear in V8. It is reproduced verbatim rather than repaired or dropped — the cross-reference is
+broken upstream, and silently editing a control document's wording hides that from the business
+owner. Read it as the Case Notes field in S-GRADE, and raise the wording with the owner.
 
 ## S-GRADE — Checker judgement and grading
 
@@ -229,15 +240,25 @@ Q-GR-01 matches the four BR-005 outcomes and the AD-008 colour tokens exactly. Q
 
 Two-part codes preserve the document's category prefix.
 
-**The category is the team split.** `Tax check` reasons belong to the Tax team; `AML`,
-`Breach` and `Record Keeping` belong to the AQS checker, and the review page offers each team
-only its own. AQS is expressed as "not Tax check" rather than as a list of three, so a
-category added later lands with AQS rather than disappearing from both pickers unnoticed.
+**The category groups the reasons; it does not split them by team.** Both the Tax team and
+the AQS checker are offered all twenty. The document draws one undivided twenty-row table,
+and the prefixes (`AML`, `Breach`, `Record Keeping`, `Tax check`) are how it groups the rows,
+not a statement about who may tick them.
 
-This is a scoping rule in the page, not a boundary: `ResponseGuardPlugin` enforces the
-submission lock on a fail-reason association but does not check the team. AD-020 section
-ownership, which IS enforced server-side, is what stops a reviewer answering another
-discipline's questions in the first place.
+Until 2026-09-09 the review pages filtered by category — Tax check to the Tax team, the other
+three to AQS. That was an inference from the prefixes, not something the document says, and it
+was wrong in a way that lost data: a Tax reviewer who found a record-keeping failure had
+nowhere to record it. Corrected on the project owner's direction, 2026-09-09.
+
+The two teams' ticks still cannot collide. Each set hangs off that team's own File quality
+outcome answer — Q-FQ-01 for AQS, Q-FQTAX-01 for Tax — through the response-keyed intersect
+(AD-025), and `AnswerWriter.ReconcileFailReasons` only ever disassociates an id the calling
+page rendered.
+
+This was, and remains, a page-level rule rather than a boundary: `ResponseGuardPlugin`
+enforces the submission lock on a fail-reason association but does not check the team. AD-020
+section ownership, which IS enforced server-side, is what stops a reviewer answering another
+discipline's questions.
 
 **The block is standalone (AD-096).** On the document "File Quality – Fail points" is its own
 block between the AML and CRA checking points and the File Quality outcome, and both the
@@ -269,6 +290,106 @@ any answer on the review, so reasons recorded under AD-054 remain visible.
 | FR-REC-11 | Record Keeping | TOB not provided or out of date |
 | FR-TAX-01 | Tax check | Not completed when this should have been |
 | FR-TAX-02 | Tax check | Insufficient evidence to complete the check or to pass |
+
+## No free-text box beside a tick
+
+The document gives each test point a tick column and nothing else. Free text appears only as
+questions of its own - Q-TAX-03 Case notes, Q-FQ-02 / Q-FQTAX-02 Fail observation, Q-GR-03
+Case Notes, Q-GR-04 Even Better If... - each a `MultilineText` question in the section that
+owns it.
+
+An "Evidence or observation (optional)" box used to open under every non-pass answer on the
+portal review page, writing `al_answertext` alongside the choice, and the app rendered
+whatever it held beneath the question. It was not on the form and was not asked for, so it is
+removed from both pages, along with the reveal rule that opened it on a non-pass. The four
+free-text questions above are unaffected: they are the document's own, and
+`SubmitReviewPlugin` still reads Fail observation to describe the remedial action it raises.
+
+`ResponseRules.ValidateAnswer` still accepts text alongside a choice. Nothing writes that
+pair now, but a review answered before this change may hold one, and rejecting it would make
+that review impossible to re-save. Validation is a shape check, not a migration.
+
+## Fail points render as the document's table
+
+Both review pages draw the standalone fail points block as the document draws it: a
+two-column table, "File Quality fail reason" against "Tick", one row per reason of the
+reviewing team's categories. The portal rendered it as a flat checkbox list until 2026-09-09;
+the app already used the table.
+
+## Column audit against the document, 2026-09-09
+
+Every column the form writes was checked against the document, not just the seeded rows.
+
+**Case header — all 18 fields present on `al_OutcomeCase`**, with every choice list matching
+the document value for value: Adviser status (PreCAS, CAS, Enhanced, Watchlist), Case type
+(New advice, Ongoing, Review, Switch/Transfer), Product / solution type (five), Sample source
+(Random, Mandatory, High Risk, Thematic), Pre or post check (Pre, Post), Vulnerable client
+(Yes, No, Potentially vulnerable, N/A), Tax team disposition (Submit to AQS, Return to
+paraplanner). Text lengths are at or above the document's need.
+
+**Answer vocabulary — `al_Response.al_AnswerChoice`** holds all eight scale values plus the
+nine root causes, and `al_AnswerChoices` the five tax check reasons, verbatim.
+`al_QuestionVersion.al_ResponseType` carries all eleven types. `ResponseRules.PermittedChoices`
+is the authority on which values a type admits, and both pages mirror it.
+
+**Ownership and categories** — `al_Section.al_OwnerRole` (Tax team, AQS checker, Adviser, T&C
+Manager, Manager / Admin) matches AD-020; `al_FailReason.al_Category` (AML, Breach, Record
+Keeping, Tax check) matches the document's four prefixes.
+
+**Remediation** — `al_RemediationAction` carries Client contact required (Yes, No,
+Potentially), Recheck required (Yes, No) and Do the remedial actions change the advice
+(Yes, No) exactly as the document offers them. "All remedial actions checked and approved"
+has no column of its own: it is derived from every action's latest `al_Signoff` decision, so
+it cannot disagree with them. `al_Outcome.al_FinalOutcome` carries the four BR-005 grades,
+a superset of the two the document offers on the Regraded Outcome row.
+
+Three fields did not match the document and were corrected:
+
+| Field | Was | Now |
+|---|---|---|
+| `al_Section.al_Name` (S-E4) | `... Consumer Duty — Price & Value` (em dash) | `... Consumer Duty - Price & Value` (hyphen, as the document sets it) |
+| `al_Section.al_HelpText` (S-CD) | `Short yes/no judgements only.` | the sentence in full, section H reference included |
+| `al_Question.al_Name` (Q-CRP-04) | truncated at 39 characters | the document's full 120-character wording |
+
+Q-CRP-04's truncation never reached the form — both pages render
+`al_QuestionVersion.al_QuestionText`, which always held the full wording — but it was what an
+administrator saw in the Question list, and `al_Name` holds 200 characters, so nothing forced
+the cut.
+
+## Presentation rules taken from the document
+
+These are rendering rules, not schema. Both review pages follow them; they are recorded here
+because each looks like an inconsistency to tidy up and is not.
+
+**Option casing is contextual.** Where the document heads a tick column with a scale it uses
+title case — `Pass | Fail | Insufficient evidence`, `Yes | No | N/A`. Where it draws the same
+scale inline beside its question it uses upper case — `PASS  INSUFFICIENT EVIDENCE  FAIL`,
+`PASS  FAIL`, `YES  NO`, `PASS  PASS WITH ISSUES  INSUFFICIENT EVIDENCE  POTENTIAL HARM`. The
+casing belongs to the rendering, not to the option, so only the inline path applies it:
+`OT Answer Options` in the portal, `inlineOptionsFor()` in the app. Primary root cause is
+title case in the document and is excluded.
+
+**The tax check outcome is ordered PASS, INSUFFICIENT EVIDENCE, FAIL** where the document
+draws it, which is not the Pass / Fail / Insufficient evidence order the suitability grid
+heads its columns with. Same three values, same response type; the inline path reorders.
+
+**Primary root cause is a 3x3 grid**, nine causes three to a row read left to right, not one
+run of boxes.
+
+**Every option box is a square**, single-select included. Single-select groups stay
+`<input type="radio">` so the browser enforces one-of, restyled square; a round radio reads as
+a different control from the one the document draws.
+
+**Every cell of a checklist grid is ruled**, not just the row below it, which is how the
+document draws its tables and is not how the site's other data tables are styled.
+
+**Only "Outcome lens:" is emphasised** on a lens row; the question after it is set plainly.
+
+**Print** is the browser's own dialogue behind "Save as PDF", so what prints is what is on
+screen. `outcome-testing.css` carries an `@media print` block that drops site chrome, page
+actions and the per-answer save status, and sets `print-color-adjust: exact` so the ticks —
+drawn with a border and a pseudo-element — survive. Bump the `?v=` on the stylesheet link in
+`OT Layout` whenever that file changes materially.
 
 ## Not answered by the document
 
