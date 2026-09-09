@@ -28,13 +28,13 @@ A routed case at Imported or Ready for Allocation is queued, hop by hop through
 | `UpdateCaseDetailsPlugin.QueueAfterEdit` | after every save, queues a routed case still short of the queue; a status set by the caller wins |
 | `queueroutedcases` verb | one-off: re-saves pre-existing routed cases through `al_UpdateCaseDetails` so the plug-in queues them and writes the audit event |
 
-Tests: plug-ins 534 passed, 0 failed.
+Tests: plug-ins 537 passed, 0 failed.
 
 ## What ran
 
 | Step | Command | Result |
 |---|---|---|
-| Assembly push | `pushassembly https://org0b075da8.crm11.dynamics.com` | 170496 bytes, modified 2026-09-09 11:44:34Z |
+| Assembly push | `pushassembly https://org0b075da8.crm11.dynamics.com` | 172032 bytes, modified 2026-09-09 12:06:46Z (re-pushed after the review fix wave; the 12:06:46Z push at 172032 bytes carried the pre-fix build) |
 | Backfill dry run | `queueroutedcases https://org0b075da8.crm11.dynamics.com` | IO-000124, IO-000125, IO-000126 listed |
 | Backfill | `queueroutedcases https://org0b075da8.crm11.dynamics.com --confirm` | Refused by the session permission gate — to be run by the project owner |
 | Queue check | portal AQS queue FetchXML | Pending — after the backfill |
@@ -97,6 +97,6 @@ Portal queue query, app worklist and its status filter, `CaseLifecycle` and the 
 
 | Step | Run by | Date | Outcome |
 |---|---|---|---|
-| Rule, import and edit changes, tests | Delivery (automated) | 2026-09-09 | Pass — 534 tests |
+| Rule, import and edit changes, tests | Delivery (automated) | 2026-09-09 | Pass — 537 tests |
 | Assembly push | Delivery (automated) | 2026-09-09 | Pass |
 | Backfill of IO-000124, IO-000125 and IO-000126 | Delivery (automated) | 2026-09-09 | Pending — project owner |
