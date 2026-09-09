@@ -30,377 +30,527 @@
 {% assign page_size = 25 %}
 {% assign page_number = request.params['page'] | integer | default: 1 %}
 {% if page_number < 1 %}{% assign page_number = 1 %}{% endif %}
-{% assign page_offset = page_number | minus: 1 | times: page_size %}
-
-{% fetchxml actions %}
-<fetch count="{{ page_size }}" page="{{ page_number }}" returntotalrecordcount="true">
-  <entity name="al_remediationaction">
-    <attribute name="al_remediationactionid" />
-    <attribute name="al_name" />
-    <attribute name="al_description" />
-    <attribute name="al_actionstatus" />
-    <attribute name="al_duedate" />
-    <attribute name="al_completedon" />
-    <attribute name="al_adviserresponse" />
-    <attribute name="al_evidencereference" />
-    <attribute name="al_assignedcontactid" />
-    <attribute name="al_clientcontactrequired" />
-    <attribute name="al_recheckrequired" />
-    <attribute name="al_changesadvice" />
-    <attribute name="al_clockstartedon" />
-    <attribute name="createdon" />
-    <order attribute="al_duedate" descending="false" />
-    <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
-      <attribute name="al_outcomecaseid" />
-      <attribute name="al_casereference" />
-      <attribute name="al_advisername" />
-    </link-entity>
-  </entity>
-</fetch>
-{% endfetchxml %}
-
-{% assign rows = actions.results.entities %}
 
 {% comment %}
-  The Sign-off column (AD-095): the latest T&C decision per action, or the adviser's
-  completion where none has been made yet. Fetched for the page's actions only. Each
-  row does a nested loop over `signoffs.results.entities`, taking the first entity whose
-  `al_remediationactionid` matches the row's action (see line ~146 below) - an O(rows x
-  signoffs) scan rather than a single indexed lookup. That is fine here: the page is
-  capped at page_size = 25 actions, and each carries at most a handful of sign-offs, so
-  the worst case is a few hundred cheap comparisons per page load.
+  Two views on one page (project owner, 2026-09-10). Without `case` this lists the cases
+  that have remediation on them; with it, that case's remediation form.
+
+  One page rather than two because a second web page would need its own page template,
+  component id and Restrict Read rule, and this site's deploys are exactly where that has
+  gone wrong before (see Deploy-Portal.ps1). `case` is read the way OT Case Detail reads
+  `id`, and it is only ever used as a fetch filter value, escaped.
 {% endcomment %}
-{% if rows.size > 0 %}
-  {% fetchxml signoffs %}
-  <fetch>
-    <entity name="al_signoff">
-      <attribute name="al_remediationactionid" />
-      <attribute name="al_signoffdecision" />
-      <attribute name="al_signedoffon" />
-      <filter type="and">
-        <condition attribute="al_remediationactionid" operator="in">
-          {% for a in rows %}<value>{{ a.al_remediationactionid }}</value>{% endfor %}
-        </condition>
-      </filter>
-      <order attribute="al_signedoffon" descending="true" />
+{% assign case_param = request.params['case'] %}
+
+{% if case_param == null or case_param == empty %}
+
+  {% comment %}
+    The list. Cases carrying at least one remediation action, one row each - an inner link
+    to al_remediationaction with distinct, so the row count is cases and the paging is
+    cases, not actions. Membership is "has an action", not a lifecycle status: an action
+    that is finished still belongs to the case that had to do it, and a case whose status
+    has moved on would otherwise drop out of the list with its history.
+  {% endcomment %}
+  {% fetchxml remcases %}
+  <fetch count="{{ page_size }}" page="{{ page_number }}" returntotalrecordcount="true" distinct="true">
+    <entity name="al_outcomecase">
+      <attribute name="al_outcomecaseid" />
+      <attribute name="al_casereference" />
+      <attribute name="al_clientname" />
+      <attribute name="al_advisername" />
+      <attribute name="al_casestatus" />
+      <order attribute="al_casereference" descending="false" />
+      <link-entity name="al_remediationaction" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="rem" />
     </entity>
   </fetch>
   {% endfetchxml %}
-{% endif %}
 
-<div class="ot-notice" role="status">
-  <strong>All remediation actions.</strong> You can record a response on the ones assigned
-  to you; the rest are read-only. Age counts working days, Monday to Friday, from the day
-  the action opened; bank holidays are not deducted, so an age spanning one reads a day high.
-</div>
+  {% assign case_rows = remcases.results.entities %}
 
-<section class="ot-card" aria-labelledby="ot-remediation-heading">
-  <h2 class="ot-card__title" id="ot-remediation-heading">Remediation actions</h2>
+  {% comment %}
+    The actions behind the cases on this page, in one read. Ordered by target date, so the
+    first action a case matches below is its earliest - which is what the list shows, and
+    what its age is measured from. Scoped to the page's cases with `in`, the same device
+    the sign-off read below uses, so the scan each row does stays over a handful of rows.
+  {% endcomment %}
+  {% if case_rows.size > 0 %}
+    {% fetchxml caseactions %}
+    <fetch>
+      <entity name="al_remediationaction">
+        <attribute name="al_remediationactionid" />
+        <attribute name="al_outcomecaseid" />
+        <attribute name="al_actionstatus" />
+        <attribute name="al_duedate" />
+        <attribute name="al_completedon" />
+        <attribute name="al_clockstartedon" />
+        <attribute name="createdon" />
+        <filter type="and">
+          <condition attribute="al_outcomecaseid" operator="in">
+            {% for c in case_rows %}<value>{{ c.al_outcomecaseid }}</value>{% endfor %}
+          </condition>
+        </filter>
+        <order attribute="al_duedate" descending="false" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+  {% endif %}
 
-  {% if rows.size > 0 %}
-    <div class="ot-table-wrap">
-      <table class="ot-table">
-        <caption>
-          Showing {{ rows.size }} of {{ actions.results.total_record_count }} actions,
-          page {{ page_number }}.
-        </caption>
-        <thead>
-          <tr>
-            <th scope="col">No.</th>
-            <th scope="col">Case</th>
-            <th scope="col">Issue / fail reason</th>
-            <th scope="col">Remedial action</th>
-            <th scope="col">Owner</th>
-            <th scope="col">Target date</th>
-            <th scope="col">Status</th>
-            <th scope="col">Age</th>
-            <th scope="col">Sign-off</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% comment %}
-            The No. column counts rows, and a row is now an item rather than an action, so
-            the count runs across the actions on the page. page_offset counts actions, not
-            items, so a later page starts a little low - the number is a position in the
-            list, not an identifier, and paging cannot know how many items the earlier
-            pages drew.
-          {% endcomment %}
-          {% assign row_no = page_offset %}
-          {% for a in rows %}
-            {% assign latest = null %}
-            {% if signoffs %}{% for s in signoffs.results.entities %}{% if latest == null and s.al_remediationactionid.id == a.al_remediationactionid %}{% assign latest = s %}{% endif %}{% endfor %}{% endif %}
-            {% comment %}
-              al_description carries the whole list Remediation.Describe built: a heading,
-              one "- item" line per thing the checker marked down, then the checker's
-              observation and the standing sentence. The agreed form numbers those items one
-              to a row, so they are split back out here and the rest is shown once, under
-              them.
+  <div class="ot-notice" role="status">
+    <strong>Cases in remediation.</strong> Open a case to see what has to be put right and
+    to record your response. Age counts working days, Monday to Friday, from the day the
+    earliest action opened; bank holidays are not deducted, so an age spanning one reads a
+    day high.
+  </div>
 
-              Every filter used is one this site already relies on elsewhere, and the
-              arguments are the shapes it already passes: no two-argument truncate and no
-              multi-character split, both of which this Liquid rejects. The line break is
-              turned into a single character first (newline_to_br writes a tag this Liquid
-              understands whatever the stored line endings are) so the split is on one
-              character. A line is an item when putting "- " back in front of it with its
-              first "- " removed reproduces it - true only when the "- " was at the front,
-              so "AML - No CRA" is an item's text, not a bullet.
+  <section class="ot-card" aria-labelledby="ot-remediation-heading">
+    <h2 class="ot-card__title" id="ot-remediation-heading">Remediation</h2>
 
-              If any of that does not take, ot_count stays 0 and the action falls back to
-              the single row it drew before. Inline rather than in a snippet of its own: an
-              included template gets its own scope, so these assigns would not come back.
-              The same block is in OT Case Detail.
-            {% endcomment %}
-            {% assign ot_flat = a.al_description | newline_to_br | replace: '<br />', '|' | replace: '<br>', '|' %}
-            {% assign ot_lines = ot_flat | split: '|' %}
-            {% assign ot_count = 0 %}
-            {% capture ot_note %}{% for l in ot_lines %}{% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}{% if rebuilt == line %}{% assign ot_count = ot_count | plus: 1 %}{% elsif line != '' and line != 'Issues found on the check:' %}{{ line }} {% endif %}{% endfor %}{% endcapture %}
-            {% assign ot_note = ot_note | strip %}
-            {% if ot_count > 0 %}
-              {% assign ot_shown = 0 %}
-              {% for l in ot_lines %}
-                {% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}
-                {% if rebuilt == line %}
-                  {% assign ot_shown = ot_shown | plus: 1 %}
-                  {% assign row_no = row_no | plus: 1 %}
-                  <tr>
-                    <td>{{ row_no }}</td>
-                    {% if ot_shown == 1 %}
-                      <td rowspan="{{ ot_count }}">
-                        {% assign cid = a['case.al_outcomecaseid'] %}
-                        {% if cid %}
-                          <a href="/case-details?id={{ cid }}">
-                            {{ a['case.al_casereference'] | default: 'Untitled case' | escape }}
-                          </a>
-                        {% else %}
-                          {{ a['case.al_casereference'] | default: '—' | escape }}
-                        {% endif %}
-                      </td>
-                    {% endif %}
-                    <td>{{ rest | escape }}</td>
-                    {% if ot_shown == 1 %}
-                      <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
-                      <td rowspan="{{ ot_count }}">{{ a.al_assignedcontactid.name | default: a['case.al_advisername'] | default: 'Unassigned' | escape }}</td>
-                      <td rowspan="{{ ot_count }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
-                      <td rowspan="{{ ot_count }}">{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
-                      <td rowspan="{{ ot_count }}">
-                        {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
-                        <span class="ot-age"
-                              data-ot-age
-                              data-opened="{{ clock_start | date: 'yyyy-MM-dd' }}"
-                              data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
-                              data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
-                      </td>
-                      <td rowspan="{{ ot_count }}">
-                        {% if latest %}
-                          {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
-                        {% elsif a.al_completedon %}
-                          Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor
-                        {% else %}
-                          —
-                        {% endif %}
-                      </td>
-                    {% endif %}
-                  </tr>
+    {% if case_rows.size > 0 %}
+      <div class="ot-table-wrap">
+        <table class="ot-table">
+          <caption>
+            Showing {{ case_rows.size }} of {{ remcases.results.total_record_count }} cases,
+            page {{ page_number }}.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Case</th>
+              <th scope="col">Client</th>
+              <th scope="col">Adviser</th>
+              <th scope="col">Outstanding</th>
+              <th scope="col">Earliest target date</th>
+              <th scope="col">Case status</th>
+              <th scope="col">Age</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in case_rows %}
+              {% assign c_total = 0 %}
+              {% assign c_open = 0 %}
+              {% assign c_first = null %}
+              {% for a in caseactions.results.entities %}
+                {% if a.al_outcomecaseid.id == c.al_outcomecaseid %}
+                  {% assign c_total = c_total | plus: 1 %}
+                  {% if a.al_actionstatus.value != 120910602 %}{% assign c_open = c_open | plus: 1 %}{% endif %}
+                  {% if c_first == null %}{% assign c_first = a %}{% endif %}
                 {% endif %}
               {% endfor %}
-              {% if ot_note != '' %}
-                <tr class="ot-issue-note"><td colspan="9">{{ ot_note | escape }}</td></tr>
-              {% endif %}
-            {% else %}
-              {% assign row_no = row_no | plus: 1 %}
               <tr>
-                <td>{{ row_no }}</td>
+                <th scope="row">
+                  <a href="?case={{ c.al_outcomecaseid }}">
+                    {{ c.al_casereference | default: 'Untitled case' | escape }}
+                  </a>
+                </th>
+                <td>{{ c.al_clientname | default: '—' | escape }}</td>
+                <td>{{ c.al_advisername | default: '—' | escape }}</td>
                 <td>
-                  {% assign cid = a['case.al_outcomecaseid'] %}
-                  {% if cid %}
-                    <a href="/case-details?id={{ cid }}">
-                      {{ a['case.al_casereference'] | default: 'Untitled case' | escape }}
-                    </a>
+                  {% if c_open > 0 %}
+                    {{ c_open }} of {{ c_total }} outstanding
                   {% else %}
-                    {{ a['case.al_casereference'] | default: '—' | escape }}
+                    All {{ c_total }} complete
                   {% endif %}
                 </td>
-                <td>{{ a.al_description | escape | newline_to_br }}</td>
-                <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
-                <td>{{ a.al_assignedcontactid.name | default: a['case.al_advisername'] | default: 'Unassigned' | escape }}</td>
-                <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
-                <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
+                <td>{{ c_first.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+                <td>{% include 'OT Status Badge' status: c.al_casestatus.label %}</td>
                 <td>
-                  {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
+                  {% assign clock_start = c_first.al_clockstartedon | default: c_first.createdon %}
                   <span class="ot-age"
                         data-ot-age
                         data-opened="{{ clock_start | date: 'yyyy-MM-dd' }}"
-                        data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
-                        data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
-                </td>
-                <td>
-                  {% if latest %}
-                    {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
-                  {% elsif a.al_completedon %}
-                    Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor
-                  {% else %}
-                    —
-                  {% endif %}
+                        data-created="{{ c_first.createdon | date: 'yyyy-MM-dd' }}"
+                        data-completed="{% if c_open == 0 %}{{ c_first.al_completedon | date: 'yyyy-MM-dd' }}{% endif %}">—</span>
                 </td>
               </tr>
-            {% endif %}
-            {% comment %}
-              The adviser's half of the BR-008 loop (PP-12, FR-020, FR-021), inline rather
-              than on a page of its own so the worklist and the response live together.
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
 
-              Rendered only for an action assigned to the signed-in contact that is still
-              Open or In progress. Keyed on the status, not on al_completedon: a rejected
-              sign-off reopens the action to In progress but deliberately keeps the earlier
-              al_completedon (OD-018, SignoffProgressPlugin.ReopenedAction), so a test on the
-              completion date hid this panel on every action sent back for rework and the
-              adviser had nowhere to respond. That is presentation, not a boundary: the
-              Contact-scoped table permission is what actually decides whose action can be
-              written (AD-069), and CompleteRemediationPlugin re-checks the status and the
-              response server-side.
-            {% endcomment %}
-            {% if user and a.al_assignedcontactid.id == user.id and a.al_actionstatus.value != 120910602 %}
-              <tr class="ot-response-row">
-                <td colspan="9">
-                  <details class="ot-response" data-ot-response data-action-id="{{ a.al_remediationactionid }}">
-                    <summary>{% if a.al_completedon %}Rework and resubmit your response{% else %}Complete the remediation form{% endif %}</summary>
+      <nav aria-label="Pagination" style="margin-top: 1rem;">
+        {% if page_number > 1 %}
+          <a href="?page={{ page_number | minus: 1 }}">&laquo; Previous</a>
+        {% endif %}
+        {% if case_rows.size == page_size %}
+          <a href="?page={{ page_number | plus: 1 }}" style="margin-left: 1rem;">Next &raquo;</a>
+        {% endif %}
+      </nav>
+    {% else %}
+      {% include 'OT Empty State' title: 'No remediation actions' message: 'A pass outcome requires no remediation. Cases appear here for any non-pass outcome.' %}
+    {% endif %}
+  </section>
 
-                    <div class="ot-response__field">
-                      <label for="ot-response-{{ a.al_remediationactionid }}">Remedial action</label>
-                      <textarea id="ot-response-{{ a.al_remediationactionid }}"
-                                rows="4"
-                                data-ot-response-text>{{ a.al_adviserresponse | escape }}</textarea>
-                      <p class="ot-response__hint">What you did, or will do, to put this right.</p>
-                    </div>
+{% else %}
 
-                    <div class="ot-response__grid">
-                      <div class="ot-response__field">
-                        <span class="ot-response__label">Owner</span>
-                        <p>{{ a.al_assignedcontactid.name | default: a['case.al_advisername'] | escape }}</p>
-                      </div>
-                      <div class="ot-response__field">
-                        <span class="ot-response__label">Target date</span>
-                        <p>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</p>
-                      </div>
-                    </div>
+  {% fetchxml remcase %}
+  <fetch top="1">
+    <entity name="al_outcomecase">
+      <attribute name="al_outcomecaseid" />
+      <attribute name="al_casereference" />
+      <attribute name="al_clientname" />
+      <attribute name="al_advisername" />
+      <attribute name="al_casestatus" />
+      <filter type="and">
+        <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_param | xml_escape }}" />
+      </filter>
+    </entity>
+  </fetch>
+  {% endfetchxml %}
 
-                    <fieldset class="ot-response__field">
-                      <legend>Client contact required?</legend>
-                      <label><input type="radio" name="ot-cc-{{ a.al_remediationactionid }}" value="120910793" data-ot-q="clientcontact"{% if a.al_clientcontactrequired.value == 120910793 %} checked{% endif %} /> Yes</label>
-                      <label><input type="radio" name="ot-cc-{{ a.al_remediationactionid }}" value="120910794" data-ot-q="clientcontact"{% if a.al_clientcontactrequired.value == 120910794 %} checked{% endif %} /> No</label>
-                      <label><input type="radio" name="ot-cc-{{ a.al_remediationactionid }}" value="120910795" data-ot-q="clientcontact"{% if a.al_clientcontactrequired.value == 120910795 %} checked{% endif %} /> Potentially</label>
-                    </fieldset>
+  {% comment %}
+    Read with a loop rather than `entities[0]`: an index past the end of an empty result is
+    one of the shapes this Liquid raises "Index was outside the bounds of the array" for,
+    and an unreadable or mistyped case id is exactly how that would be reached. The loop
+    leaves `c` null instead, which the branch below already handles.
+  {% endcomment %}
+  {% assign c = null %}
+  {% for row in remcase.results.entities %}{% if c == null %}{% assign c = row %}{% endif %}{% endfor %}
 
-                    <fieldset class="ot-response__field">
-                      <legend>Recheck required?</legend>
-                      <label><input type="radio" name="ot-rc-{{ a.al_remediationactionid }}" value="120910796" data-ot-q="recheck"{% if a.al_recheckrequired.value == 120910796 %} checked{% endif %} /> Yes</label>
-                      <label><input type="radio" name="ot-rc-{{ a.al_remediationactionid }}" value="120910797" data-ot-q="recheck"{% if a.al_recheckrequired.value == 120910797 %} checked{% endif %} /> No</label>
-                    </fieldset>
+  {% comment %}
+    Every action on this case, not a page of them: the form is the case's remediation in
+    full, and a numbered row that continues onto a second page is not the form the project
+    owner signed off.
+  {% endcomment %}
+  {% fetchxml actions %}
+  <fetch>
+    <entity name="al_remediationaction">
+      <attribute name="al_remediationactionid" />
+      <attribute name="al_name" />
+      <attribute name="al_description" />
+      <attribute name="al_actionstatus" />
+      <attribute name="al_duedate" />
+      <attribute name="al_completedon" />
+      <attribute name="al_adviserresponse" />
+      <attribute name="al_evidencereference" />
+      <attribute name="al_assignedcontactid" />
+      <attribute name="al_clientcontactrequired" />
+      <attribute name="al_recheckrequired" />
+      <attribute name="al_changesadvice" />
+      <attribute name="al_clockstartedon" />
+      <attribute name="createdon" />
+      <filter type="and">
+        <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_param | xml_escape }}" />
+      </filter>
+      <order attribute="al_duedate" descending="false" />
+    </entity>
+  </fetch>
+  {% endfetchxml %}
 
-                    <fieldset class="ot-response__field">
-                      <legend>Do the remedial actions change the advice?</legend>
-                      <label><input type="radio" name="ot-ca-{{ a.al_remediationactionid }}" value="120910798" data-ot-q="changesadvice"{% if a.al_changesadvice.value == 120910798 %} checked{% endif %} /> Yes</label>
-                      <label><input type="radio" name="ot-ca-{{ a.al_remediationactionid }}" value="120910799" data-ot-q="changesadvice"{% if a.al_changesadvice.value == 120910799 %} checked{% endif %} /> No</label>
-                    </fieldset>
+  {% assign rows = actions.results.entities %}
 
-                    <div class="ot-response__field">
-                      <label for="ot-evidence-{{ a.al_remediationactionid }}">
-                        Intelligent Office reference
-                      </label>
-                      <input type="text"
-                             id="ot-evidence-{{ a.al_remediationactionid }}"
-                             value="{{ a.al_evidencereference | escape }}"
-                             data-ot-response-evidence />
-                      <p class="ot-response__hint">
-                        The remedial task you completed in Intelligent Office. Nothing is uploaded
-                        here and no file is stored by this site.
-                      </p>
-                    </div>
+  {% comment %}
+    The Sign-off column (AD-095): the latest T&C decision per action, or the adviser's
+    completion where none has been made yet. Each row does a nested loop over
+    `signoffs.results.entities`, taking the first entity whose `al_remediationactionid`
+    matches the row's action - an O(actions x signoffs) scan rather than a single indexed
+    lookup. That is fine here: this is one case's actions, and each carries at most a
+    handful of sign-offs.
+  {% endcomment %}
+  {% if rows.size > 0 %}
+    {% fetchxml signoffs %}
+    <fetch>
+      <entity name="al_signoff">
+        <attribute name="al_remediationactionid" />
+        <attribute name="al_signoffdecision" />
+        <attribute name="al_signedoffon" />
+        <filter type="and">
+          <condition attribute="al_remediationactionid" operator="in">
+            {% for a in rows %}<value>{{ a.al_remediationactionid }}</value>{% endfor %}
+          </condition>
+        </filter>
+        <order attribute="al_signedoffon" descending="true" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+  {% endif %}
 
-                    <p class="ot-response__actions">
-                      <button type="button" class="ot-btn" data-ot-response-save>Save response</button>
-                      <button type="button" class="ot-btn ot-btn--primary" data-ot-response-complete>
-                        Save and sign off as adviser
-                      </button>
-                    </p>
-                    <p class="ot-response__status" data-ot-response-status aria-live="polite"></p>
-                  </details>
-                </td>
-              </tr>
-            {% endif %}
-            {% comment %}
-              The T&C Manager's half of the loop (PP-12, FR-023, BR-008). Offered on a
-              completed action that has not been signed off yet.
+  <p class="ot-back"><a href="?">&laquo; All cases in remediation</a></p>
 
-              Whether the signed-in user may actually attest is decided by the create
-              permission on al_signoff, which binds the T&C Supervisor role alone — this
-              renders the panel for anyone, and a user without the role is refused on save.
-              Showing it is a worse experience than hiding it, but hiding it by role in
-              Liquid would look like access control and enforce nothing (NFR-SEC-01).
-            {% endcomment %}
-            {% if a.al_completedon and a.al_actionstatus.value == 120910602 %}
-              <tr class="ot-response-row">
-                <td colspan="9">
-                  <details class="ot-response" data-ot-signoff data-action-id="{{ a.al_remediationactionid }}">
-                    <summary>Sign off this remediation</summary>
-
-                    <div class="ot-response__field">
-                      <span class="ot-response__label">Remedial action</span>
-                      <p>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</p>
-                      <p class="ot-response__hint">
-                        Client contact required: {{ a.al_clientcontactrequired.label | default: '—' }} ·
-                        Recheck required: {{ a.al_recheckrequired.label | default: '—' }} ·
-                        Changes the advice: {{ a.al_changesadvice.label | default: '—' }}
-                        {% if a.al_evidencereference %} · Intelligent Office reference: {{ a.al_evidencereference | escape }}{% endif %}
-                      </p>
-                    </div>
-
-                    <div class="ot-response__field">
-                      <label for="ot-decision-{{ a.al_remediationactionid }}">All remedial actions checked and approved?</label>
-                      <select id="ot-decision-{{ a.al_remediationactionid }}" data-ot-signoff-decision>
-                        <option value="">Choose…</option>
-                        <option value="120910720">Approved</option>
-                        <option value="120910721">Rejected</option>
-                      </select>
-                    </div>
-
-                    <div class="ot-response__field">
-                      <label for="ot-notes-{{ a.al_remediationactionid }}">Notes</label>
-                      <textarea id="ot-notes-{{ a.al_remediationactionid }}"
-                                rows="3"
-                                data-ot-signoff-notes></textarea>
-                      <p class="ot-response__hint">
-                        Required when rejecting: the adviser needs to know what to put right
-                        (BR-008). A rejection returns the action to them.
-                      </p>
-                    </div>
-
-                    <p class="ot-response__actions">
-                      <button type="button" class="ot-btn ot-btn--primary" data-ot-signoff-save>
-                        Record supervisor sign-off
-                      </button>
-                    </p>
-                    <p class="ot-response__status" data-ot-signoff-status aria-live="polite"></p>
-                  </details>
-                </td>
-              </tr>
-            {% endif %}
-          {% endfor %}
-        </tbody>
-      </table>
+  {% if c == null %}
+    {% include 'OT Empty State' title: 'Case not available' message: 'This case does not exist, or you do not have permission to view it.' %}
+  {% else %}
+    <div class="ot-notice" role="status">
+      <strong>Remediation for {{ c.al_casereference | default: 'this case' | escape }}.</strong>
+      You can record a response on the actions assigned to you; the rest are read-only. Age
+      counts working days, Monday to Friday, from the day the action opened; bank holidays
+      are not deducted, so an age spanning one reads a day high.
     </div>
 
-    <nav aria-label="Pagination" style="margin-top: 1rem;">
-      {% if page_number > 1 %}
-        <a href="?page={{ page_number | minus: 1 }}">&laquo; Previous</a>
+    <section class="ot-card" aria-labelledby="ot-remediation-heading">
+      <h2 class="ot-card__title" id="ot-remediation-heading">
+        {{ c.al_casereference | default: 'Case' | escape }}
+        {% include 'OT Status Badge' status: c.al_casestatus.label %}
+      </h2>
+      <dl class="ot-dl">
+        <div><dt>Client</dt><dd>{{ c.al_clientname | default: '—' | escape }}</dd></div>
+        <div><dt>Adviser</dt><dd>{{ c.al_advisername | default: '—' | escape }}</dd></div>
+        <div><dt>Case</dt><dd><a href="/case-details?id={{ c.al_outcomecaseid }}">Open the full case record</a></dd></div>
+      </dl>
+
+      {% if rows.size > 0 %}
+        <div class="ot-table-wrap">
+          <table class="ot-table">
+            <caption>Remediation and escalation</caption>
+            <thead>
+              <tr>
+                <th scope="col">No.</th>
+                <th scope="col">Issue / fail reason</th>
+                <th scope="col">Remedial action</th>
+                <th scope="col">Owner</th>
+                <th scope="col">Target date</th>
+                <th scope="col">Status</th>
+                <th scope="col">Age</th>
+                <th scope="col">Sign-off</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% assign row_no = 0 %}
+              {% for a in rows %}
+                {% assign latest = null %}
+                {% if signoffs %}{% for s in signoffs.results.entities %}{% if latest == null and s.al_remediationactionid.id == a.al_remediationactionid %}{% assign latest = s %}{% endif %}{% endfor %}{% endif %}
+                {% comment %}
+                  al_description carries the whole list Remediation.Describe built: a heading,
+                  one "- item" line per thing the checker marked down, then the checker's
+                  observation and the standing sentence. The agreed form numbers those items one
+                  to a row, so they are split back out here and the rest is shown once, under
+                  them.
+
+                  Every filter used is one this site already relies on elsewhere, and the
+                  arguments are the shapes it already passes: no two-argument truncate and no
+                  multi-character split, both of which this Liquid rejects. The line break is
+                  turned into a single character first (newline_to_br writes a tag this Liquid
+                  understands whatever the stored line endings are) so the split is on one
+                  character. A line is an item when putting "- " back in front of it with its
+                  first "- " removed reproduces it - true only when the "- " was at the front,
+                  so "AML - No CRA" is an item's text, not a bullet.
+
+                  If any of that does not take, ot_count stays 0 and the action falls back to
+                  the single row it drew before. Inline rather than in a snippet of its own: an
+                  included template gets its own scope, so these assigns would not come back.
+                  The same block is in OT Case Detail.
+                {% endcomment %}
+                {% assign ot_flat = a.al_description | newline_to_br | replace: '<br />', '|' | replace: '<br>', '|' %}
+                {% assign ot_lines = ot_flat | split: '|' %}
+                {% assign ot_count = 0 %}
+                {% capture ot_note %}{% for l in ot_lines %}{% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}{% if rebuilt == line %}{% assign ot_count = ot_count | plus: 1 %}{% elsif line != '' and line != 'Issues found on the check:' %}{{ line }} {% endif %}{% endfor %}{% endcapture %}
+                {% assign ot_note = ot_note | strip %}
+                {% if ot_count > 0 %}
+                  {% assign ot_shown = 0 %}
+                  {% for l in ot_lines %}
+                    {% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}
+                    {% if rebuilt == line %}
+                      {% assign ot_shown = ot_shown | plus: 1 %}
+                      {% assign row_no = row_no | plus: 1 %}
+                      <tr>
+                        <td>{{ row_no }}</td>
+                        <td>{{ rest | escape }}</td>
+                        {% if ot_shown == 1 %}
+                          <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                          <td rowspan="{{ ot_count }}">{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
+                          <td rowspan="{{ ot_count }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+                          <td rowspan="{{ ot_count }}">{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
+                          <td rowspan="{{ ot_count }}">
+                            {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
+                            <span class="ot-age"
+                                  data-ot-age
+                                  data-opened="{{ clock_start | date: 'yyyy-MM-dd' }}"
+                                  data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
+                                  data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
+                          </td>
+                          <td rowspan="{{ ot_count }}">
+                            {% if latest %}
+                              {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
+                            {% elsif a.al_completedon %}
+                              Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor
+                            {% else %}
+                              —
+                            {% endif %}
+                          </td>
+                        {% endif %}
+                      </tr>
+                    {% endif %}
+                  {% endfor %}
+                  {% if ot_note != '' %}
+                    <tr class="ot-issue-note"><td colspan="8">{{ ot_note | escape }}</td></tr>
+                  {% endif %}
+                {% else %}
+                  {% assign row_no = row_no | plus: 1 %}
+                  <tr>
+                    <td>{{ row_no }}</td>
+                    <td>{{ a.al_description | escape | newline_to_br }}</td>
+                    <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                    <td>{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
+                    <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+                    <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
+                    <td>
+                      {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
+                      <span class="ot-age"
+                            data-ot-age
+                            data-opened="{{ clock_start | date: 'yyyy-MM-dd' }}"
+                            data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
+                            data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
+                    </td>
+                    <td>
+                      {% if latest %}
+                        {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
+                      {% elsif a.al_completedon %}
+                        Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor
+                      {% else %}
+                        —
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endif %}
+                {% comment %}
+                  The adviser's half of the BR-008 loop (PP-12, FR-020, FR-021), inline rather
+                  than on a page of its own so the form and the response live together.
+
+                  Rendered only for an action assigned to the signed-in contact that is still
+                  Open or In progress. Keyed on the status, not on al_completedon: a rejected
+                  sign-off reopens the action to In progress but deliberately keeps the earlier
+                  al_completedon (OD-018, SignoffProgressPlugin.ReopenedAction), so a test on the
+                  completion date hid this panel on every action sent back for rework and the
+                  adviser had nowhere to respond. That is presentation, not a boundary: the
+                  Contact-scoped table permission is what actually decides whose action can be
+                  written (AD-069), and CompleteRemediationPlugin re-checks the status and the
+                  response server-side.
+                {% endcomment %}
+                {% if user and a.al_assignedcontactid.id == user.id and a.al_actionstatus.value != 120910602 %}
+                  <tr class="ot-response-row">
+                    <td colspan="8">
+                      <details class="ot-response" data-ot-response data-action-id="{{ a.al_remediationactionid }}">
+                        <summary>{% if a.al_completedon %}Rework and resubmit your response{% else %}Complete the remediation form{% endif %}</summary>
+
+                        <div class="ot-response__field">
+                          <label for="ot-response-{{ a.al_remediationactionid }}">Remedial action</label>
+                          <textarea id="ot-response-{{ a.al_remediationactionid }}"
+                                    rows="4"
+                                    data-ot-response-text>{{ a.al_adviserresponse | escape }}</textarea>
+                          <p class="ot-response__hint">What you did, or will do, to put this right.</p>
+                        </div>
+
+                        <div class="ot-response__grid">
+                          <div class="ot-response__field">
+                            <span class="ot-response__label">Owner</span>
+                            <p>{{ a.al_assignedcontactid.name | default: c.al_advisername | escape }}</p>
+                          </div>
+                          <div class="ot-response__field">
+                            <span class="ot-response__label">Target date</span>
+                            <p>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</p>
+                          </div>
+                        </div>
+
+                        <fieldset class="ot-response__field">
+                          <legend>Client contact required?</legend>
+                          <label><input type="radio" name="ot-cc-{{ a.al_remediationactionid }}" value="120910793" data-ot-q="clientcontact"{% if a.al_clientcontactrequired.value == 120910793 %} checked{% endif %} /> Yes</label>
+                          <label><input type="radio" name="ot-cc-{{ a.al_remediationactionid }}" value="120910794" data-ot-q="clientcontact"{% if a.al_clientcontactrequired.value == 120910794 %} checked{% endif %} /> No</label>
+                          <label><input type="radio" name="ot-cc-{{ a.al_remediationactionid }}" value="120910795" data-ot-q="clientcontact"{% if a.al_clientcontactrequired.value == 120910795 %} checked{% endif %} /> Potentially</label>
+                        </fieldset>
+
+                        <fieldset class="ot-response__field">
+                          <legend>Recheck required?</legend>
+                          <label><input type="radio" name="ot-rc-{{ a.al_remediationactionid }}" value="120910796" data-ot-q="recheck"{% if a.al_recheckrequired.value == 120910796 %} checked{% endif %} /> Yes</label>
+                          <label><input type="radio" name="ot-rc-{{ a.al_remediationactionid }}" value="120910797" data-ot-q="recheck"{% if a.al_recheckrequired.value == 120910797 %} checked{% endif %} /> No</label>
+                        </fieldset>
+
+                        <fieldset class="ot-response__field">
+                          <legend>Do the remedial actions change the advice?</legend>
+                          <label><input type="radio" name="ot-ca-{{ a.al_remediationactionid }}" value="120910798" data-ot-q="changesadvice"{% if a.al_changesadvice.value == 120910798 %} checked{% endif %} /> Yes</label>
+                          <label><input type="radio" name="ot-ca-{{ a.al_remediationactionid }}" value="120910799" data-ot-q="changesadvice"{% if a.al_changesadvice.value == 120910799 %} checked{% endif %} /> No</label>
+                        </fieldset>
+
+                        <div class="ot-response__field">
+                          <label for="ot-evidence-{{ a.al_remediationactionid }}">
+                            Intelligent Office reference
+                          </label>
+                          <input type="text"
+                                 id="ot-evidence-{{ a.al_remediationactionid }}"
+                                 value="{{ a.al_evidencereference | escape }}"
+                                 data-ot-response-evidence />
+                          <p class="ot-response__hint">
+                            The remedial task you completed in Intelligent Office. Nothing is uploaded
+                            here and no file is stored by this site.
+                          </p>
+                        </div>
+
+                        <p class="ot-response__actions">
+                          <button type="button" class="ot-btn" data-ot-response-save>Save response</button>
+                          <button type="button" class="ot-btn ot-btn--primary" data-ot-response-complete>
+                            Save and sign off as adviser
+                          </button>
+                        </p>
+                        <p class="ot-response__status" data-ot-response-status aria-live="polite"></p>
+                      </details>
+                    </td>
+                  </tr>
+                {% endif %}
+                {% comment %}
+                  The T&C Manager's half of the loop (PP-12, FR-023, BR-008). Offered on a
+                  completed action that has not been signed off yet.
+
+                  Whether the signed-in user may actually attest is decided by the create
+                  permission on al_signoff, which binds the T&C Supervisor role alone — this
+                  renders the panel for anyone, and a user without the role is refused on save.
+                  Showing it is a worse experience than hiding it, but hiding it by role in
+                  Liquid would look like access control and enforce nothing (NFR-SEC-01).
+                {% endcomment %}
+                {% if a.al_completedon and a.al_actionstatus.value == 120910602 %}
+                  <tr class="ot-response-row">
+                    <td colspan="8">
+                      <details class="ot-response" data-ot-signoff data-action-id="{{ a.al_remediationactionid }}">
+                        <summary>Sign off this remediation</summary>
+
+                        <div class="ot-response__field">
+                          <span class="ot-response__label">Remedial action</span>
+                          <p>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</p>
+                          <p class="ot-response__hint">
+                            Client contact required: {{ a.al_clientcontactrequired.label | default: '—' }} ·
+                            Recheck required: {{ a.al_recheckrequired.label | default: '—' }} ·
+                            Changes the advice: {{ a.al_changesadvice.label | default: '—' }}
+                            {% if a.al_evidencereference %} · Intelligent Office reference: {{ a.al_evidencereference | escape }}{% endif %}
+                          </p>
+                        </div>
+
+                        <div class="ot-response__field">
+                          <label for="ot-decision-{{ a.al_remediationactionid }}">All remedial actions checked and approved?</label>
+                          <select id="ot-decision-{{ a.al_remediationactionid }}" data-ot-signoff-decision>
+                            <option value="">Choose…</option>
+                            <option value="120910720">Approved</option>
+                            <option value="120910721">Rejected</option>
+                          </select>
+                        </div>
+
+                        <div class="ot-response__field">
+                          <label for="ot-notes-{{ a.al_remediationactionid }}">Notes</label>
+                          <textarea id="ot-notes-{{ a.al_remediationactionid }}"
+                                    rows="3"
+                                    data-ot-signoff-notes></textarea>
+                          <p class="ot-response__hint">
+                            Required when rejecting: the adviser needs to know what to put right
+                            (BR-008). A rejection returns the action to them.
+                          </p>
+                        </div>
+
+                        <p class="ot-response__actions">
+                          <button type="button" class="ot-btn ot-btn--primary" data-ot-signoff-save>
+                            Record supervisor sign-off
+                          </button>
+                        </p>
+                        <p class="ot-response__status" data-ot-signoff-status aria-live="polite"></p>
+                      </details>
+                    </td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        {% include 'OT Empty State' title: 'No remediation actions' message: 'Nothing has been raised against this case.' %}
       {% endif %}
-      {% if rows.size == page_size %}
-        <a href="?page={{ page_number | plus: 1 }}" style="margin-left: 1rem;">Next &raquo;</a>
-      {% endif %}
-    </nav>
-  {% else %}
-    {% include 'OT Empty State' title: 'No remediation actions' message: 'A pass outcome requires no remediation. Actions appear here for any non-pass outcome.' %}
+    </section>
   {% endif %}
-</section>
+
+{% endif %}
 
 <script>
   /*

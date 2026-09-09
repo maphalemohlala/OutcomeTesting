@@ -24,7 +24,8 @@ function canComplete(status: string): boolean {
   return status === 'Open' || status === 'In progress';
 }
 
-function ActionsTable({
+/** Exported for remediationRender.test.tsx, which reads the drawn rows back out. */
+export function ActionsTable({
   actions,
   busyId,
   onComplete,
