@@ -347,6 +347,11 @@ if (args.Length >= 4 && args[0].Equals("pushwebtemplate", StringComparison.Ordin
     return PushWebTemplate(args[1], args[2], args[3]);
 }
 
+if (args.Length >= 3 && args[0].Equals("setchangetracking", StringComparison.OrdinalIgnoreCase))
+{
+    return SetChangeTracking(args[1], args.Skip(2).ToArray());
+}
+
 if (args.Length >= 2 && args[0].Equals("queueroutedcases", StringComparison.OrdinalIgnoreCase))
 {
     return QueueRoutedCases(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
@@ -494,6 +499,78 @@ int Fetch(string orgUrl, string fetchXmlOrFile)
 // al_UpdateCaseDetails with its own route, which the plug-in turns into the Queued hops and an
 // audit event, so the trail is the command's, not this tool's. Idempotent: the key is the case
 // id, so a re-run replays the original result.
+// AD-094. Power Pages renders from a server-side cache and learns of a change made outside
+// the website - SubmitRequestPlugin stamping al_submittedon, AnswerWriter creating al_response
+// rows, the app moving a case - only through Dataverse change tracking. With it off, a
+// submitted review reloaded as still editable with no answers until the 15-minute cache SLA
+// ran out. Idempotent: a table already enabled is reported and left alone.
+int SetChangeTracking(string orgUrl, string[] tables)
+{
+    using var svc = Connect(orgUrl);
+
+    var names = tables.Select(t => t.Trim().ToLowerInvariant()).Where(t => t.Length > 0).Distinct().ToList();
+    var changed = new List<string>();
+    foreach (var logicalName in names)
+    {
+        EntityMetadata metadata;
+        try
+        {
+            metadata = ((RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+            {
+                LogicalName = logicalName,
+                EntityFilters = EntityFilters.Entity,
+            })).EntityMetadata;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"No table named '{logicalName}': {ex.Message}");
+            return 1;
+        }
+
+        if (metadata.ChangeTrackingEnabled == true)
+        {
+            Console.WriteLine($"{logicalName}: change tracking already enabled.");
+            continue;
+        }
+
+        metadata.ChangeTrackingEnabled = true;
+        svc.Execute(new UpdateEntityRequest { Entity = metadata });
+        changed.Add(logicalName);
+        Console.WriteLine($"{logicalName}: change tracking enabled.");
+    }
+
+    if (changed.Count > 0)
+    {
+        svc.Execute(new PublishXmlRequest
+        {
+            ParameterXml = "<importexportxml><entities>"
+                + string.Concat(changed.Select(t => $"<entity>{t}</entity>"))
+                + "</entities></importexportxml>",
+        });
+        Console.WriteLine($"Published {changed.Count} table(s).");
+    }
+
+    var failed = 0;
+    foreach (var logicalName in names)
+    {
+        var after = ((RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+        {
+            LogicalName = logicalName,
+            EntityFilters = EntityFilters.Entity,
+        })).EntityMetadata;
+        if (after.ChangeTrackingEnabled != true)
+        {
+            Console.Error.WriteLine($"{logicalName}: metadata does not read back change tracking enabled.");
+            failed++;
+        }
+    }
+
+    Console.WriteLine(failed == 0
+        ? $"Done: change tracking on for all {names.Count} table(s)."
+        : $"{failed} of {names.Count} table(s) not enabled.");
+    return failed == 0 ? 0 : 2;
+}
+
 int QueueRoutedCases(string orgUrl, bool confirm)
 {
     using var svc = Connect(orgUrl);

@@ -5,10 +5,14 @@
   (PP-07, PP-08, PP-09).
 
   The chain is Checklist Version -> Section -> Question -> Question Version.
-  Questions are read from the version stamped on the review instance, never
-  from the current editable question record, so a historic review always
-  renders the wording, order and response type that applied when it was
-  answered (BR-013, FR-030, FR-031).
+  Questions are read from the checklist version stamped on the review instance,
+  and of each question's versions only the one in force on the review's
+  reference day renders: the submission day once submitted, otherwise today
+  (AD-015, BR-013, FR-030, FR-031). A retired version keeps its effective-to
+  date and stays Active, so without that filter every version of a question
+  rendered at once - which is how a submitted Tax review came to show Tax check
+  reason three times and hold an answer on each. The server applies the same
+  rule (ResponseRules.IsVersionEffective) to the submit gate and the outcome.
 
   Answerable by the assigned checker (AD-053). Both writes on this page go through an
   allowlisted trigger column and a synchronous plug-in rather than the Web API's own
@@ -186,6 +190,18 @@
       {% include 'OT Empty State' title: 'No checklist version issued' message: 'This review has no checklist version, so no questions can be rendered.' %}
     {% else %}
 
+      {% comment %}
+        The day this review's questions are read against. Effective-from and
+        effective-to are date-only columns, and RetireAndSucceedQuestion stamps the old
+        version's effective-to and the successor's effective-from with the same date, so
+        "in force" is from <= day < to.
+      {% endcomment %}
+      {% if rv.al_submittedon %}
+        {% assign as_of = rv.al_submittedon | date: 'yyyy-MM-dd' %}
+      {% else %}
+        {% assign as_of = now | date: 'yyyy-MM-dd' %}
+      {% endif %}
+
       {% fetchxml questions %}
       <fetch>
         <entity name="al_questionversion">
@@ -195,6 +211,16 @@
           <attribute name="al_ismandatory" />
           <attribute name="al_versionnumber" />
           <attribute name="al_displayorder" />
+          <filter type="and">
+            <filter type="or">
+              <condition attribute="al_effectivefrom" operator="null" />
+              <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ as_of }}" />
+            </filter>
+            <filter type="or">
+              <condition attribute="al_effectiveto" operator="null" />
+              <condition attribute="al_effectiveto" operator="gt" value="{{ as_of }}" />
+            </filter>
+          </filter>
           <link-entity name="al_question" from="al_questionid" to="al_questionid" alias="q">
             <attribute name="al_displayorder" />
             <link-entity name="al_section" from="al_sectionid" to="al_sectionid" alias="s">
@@ -371,17 +397,25 @@
 
               {% elsif column == 'choices' %}
                 {% comment %}
-                  Tax check reason (Q-TAX-01), the only multi-select in V8. FetchXML returns
-                  a multi-select picklist as its comma-separated labels, so the checked test
-                  is a label match. None of the five labels is a substring of another.
+                  Tax check reason (Q-TAX-01), the only multi-select in V8. The shape Liquid
+                  gives a multi-select choice column is not documented (the Liquid objects
+                  page covers single picklists only), and the label match this used to rely
+                  on rendered no selection on a submitted review that held two values. So
+                  the checked test accepts every shape the runtime could plausibly return:
+                  a collection of option set value objects (folded into a |value| list), a
+                  string of comma-separated values, or a string of labels. None of the five
+                  values or labels is a substring of another.
                 {% endcomment %}
                 {% assign mvalues = '120910340,120910341,120910342,120910343,120910344' | split: ',' %}
                 {% assign mlabels = 'LSA/LSDBA/TTFAC,Trust,IHT,Tax calculation,Other' | split: ',' %}
+                {% assign chosen = '' %}
+                {% for c in existing.al_answerchoices %}{% assign chosen = chosen | append: '|' | append: c.value | append: '|' %}{% endfor %}
                 <div class="ot-answer__options">
                   {% for opt in mvalues %}
+                    {% assign optkey = '|' | append: opt | append: '|' %}
                     <label class="ot-answer__option">
                       <input type="checkbox" data-ot-input value="{{ opt }}"{% unless editable %} disabled{% endunless %}
-                             {% if existing.al_answerchoices contains mlabels[forloop.index0] %}checked{% endif %} />
+                             {% if chosen contains optkey or existing.al_answerchoices contains opt or existing.al_answerchoices contains mlabels[forloop.index0] %}checked{% endif %} />
                       <span>{{ mlabels[forloop.index0] }}</span>
                     </label>
                   {% endfor %}
@@ -958,6 +992,21 @@
             button.textContent = busy ? 'Submitting...' : 'Submit review';
           }
 
+          /*
+           * What the server render does for a submitted review, done to the page in hand:
+           * every control the questionnaire owns is disabled and the submit button stays
+           * disabled, leaving the status line so the confirmation stays readable. The
+           * autosave script sees disabled controls as nothing to save.
+           */
+          function lockPage() {
+            var controls = document.querySelectorAll(
+              '[data-ot-questionnaire] input, [data-ot-questionnaire] textarea, [data-ot-questionnaire] select, [data-ot-questionnaire] button');
+            for (var i = 0; i < controls.length; i++) { controls[i].disabled = true; }
+            button.disabled = true;
+            button.textContent = 'Submitted';
+            button.setAttribute('aria-busy', 'false');
+          }
+
           button.addEventListener('click', function () {
             if (button.disabled) { return; }
 
@@ -991,8 +1040,18 @@
 
               request.onload = function () {
                 if (request.status >= 200 && request.status < 300) {
-                  show('Review submitted. Reloading...', 'success');
-                  window.setTimeout(function () { window.location.reload(); }, 800);
+                  /*
+                   * Locked here, in the page already on screen, rather than by reloading.
+                   * Power Pages renders from a server-side cache that a website write clears
+                   * only for the record it wrote; al_submittedon is stamped by
+                   * SubmitRequestPlugin and every answer row was created by AnswerWriter, so
+                   * a reload straight after the PATCH could render the pre-submit review as
+                   * still editable with no answers on it (AD-094). Change tracking on the
+                   * portal tables is what makes the next visit right; not reloading is what
+                   * makes this one right.
+                   */
+                  lockPage();
+                  show('Review submitted. This review is now locked; reopening or regrading is a T&C Manager action.', 'success');
                   return;
                 }
 

@@ -79,7 +79,10 @@ namespace OutcomeTesting.Plugins
                 return false;
             }
 
-            CaseTransitions.MoveThrough(service, caseId, HopsToQueue(status));
+            // The status was read by the caller moments ago (the case-edit command reads it
+            // fresh; the import knows what it just created), so the walk trusts it for the
+            // first hop and its own write for the next rather than re-reading the row twice.
+            CaseTransitions.MoveThrough(service, caseId, status, HopsToQueue(status));
 
             changes.Add("Status " + CaseLifecycle.NameOf(status.Value) + " -> " + CaseLifecycle.NameOf(CaseLifecycle.Queued)
                 + " (queued automatically: route set, AD-093)");

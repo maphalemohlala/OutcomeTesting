@@ -73,6 +73,9 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.True(moved);
             Assert.Equal(CaseLifecycle.Queued, StatusOf(service));
             Assert.Equal(2, service.Updates.Count);
+            // The caller has just read the status it passes in; the walk trusts it for the
+            // first hop and its own write for the next, so no hop re-reads the row.
+            Assert.Equal(0, service.RetrieveCount);
             Assert.Equal("Status Imported -> Queued (queued automatically: route set, AD-093)", Assert.Single(changes));
         }
 

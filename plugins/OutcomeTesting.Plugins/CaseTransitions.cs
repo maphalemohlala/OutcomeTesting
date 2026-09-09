@@ -80,5 +80,42 @@ namespace OutcomeTesting.Plugins
                 MoveThrough(service, caseId, hop);
             }
         }
+
+        /// <summary>
+        /// The same walk for a caller that has just read the status itself: the first hop is
+        /// checked against <paramref name="from"/> and each later hop against the status the
+        /// previous hop wrote, so AD-057 is enforced hop by hop without a Retrieve per hop.
+        /// A hop already satisfied is skipped, as in the single-hop form.
+        /// </summary>
+        public static void MoveThrough(IOrganizationService service, Guid caseId, int? from, IEnumerable<int> hops)
+        {
+            if (service == null)
+            {
+                throw new ArgumentNullException(nameof(service));
+            }
+
+            if (hops == null)
+            {
+                throw new ArgumentNullException(nameof(hops));
+            }
+
+            var current = from;
+            foreach (var hop in hops)
+            {
+                if (current.HasValue && current.Value == hop)
+                {
+                    continue;
+                }
+
+                EnsureAllowed(current, hop);
+
+                service.Update(new Entity(CaseEntity, caseId)
+                {
+                    [CaseStatus] = new OptionSetValue(hop),
+                });
+
+                current = hop;
+            }
+        }
     }
 }
