@@ -78,5 +78,55 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Null(RemediationResponseGuardPlugin.Refusal(Action(Remediation.StatusCompleted), update));
         }
+
+        private static Entity ActionWithAnswers(int status)
+        {
+            var action = Action(status);
+            action["al_clientcontactrequired"] = new OptionSetValue(120910794);
+            action["al_recheckrequired"] = new OptionSetValue(120910797);
+            action["al_changesadvice"] = new OptionSetValue(120910799);
+            return action;
+        }
+
+        [Fact]
+        public void The_form_answers_are_editable_until_the_action_is_submitted()
+        {
+            var update = new Entity("al_remediationaction", ActionId);
+            update["al_clientcontactrequired"] = new OptionSetValue(120910795);
+
+            Assert.Null(RemediationResponseGuardPlugin.Refusal(ActionWithAnswers(Remediation.StatusInProgress), update));
+        }
+
+        [Fact]
+        public void A_submitted_form_answer_cannot_be_changed()
+        {
+            // AD-095: the three answers travel with the response and lock with it, otherwise
+            // the T&C Manager attests to a form the adviser can still rewrite underneath.
+            var update = new Entity("al_remediationaction", ActionId);
+            update["al_recheckrequired"] = new OptionSetValue(120910796);
+
+            var refusal = RemediationResponseGuardPlugin.Refusal(ActionWithAnswers(Remediation.StatusCompleted), update);
+
+            Assert.NotNull(refusal);
+            Assert.StartsWith("CONFLICT:", refusal);
+        }
+
+        [Fact]
+        public void Re_sending_the_same_answer_after_submission_is_not_a_change()
+        {
+            var update = new Entity("al_remediationaction", ActionId);
+            update["al_changesadvice"] = new OptionSetValue(120910799);
+
+            Assert.Null(RemediationResponseGuardPlugin.Refusal(ActionWithAnswers(Remediation.StatusCompleted), update));
+        }
+
+        [Fact]
+        public void Clearing_a_submitted_answer_is_a_change()
+        {
+            var update = new Entity("al_remediationaction", ActionId);
+            update["al_clientcontactrequired"] = null;
+
+            Assert.NotNull(RemediationResponseGuardPlugin.Refusal(ActionWithAnswers(Remediation.StatusCompleted), update));
+        }
     }
 }

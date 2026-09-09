@@ -28,8 +28,19 @@ namespace OutcomeTesting.Plugins
         private const string ActionEntity = "al_remediationaction";
         private const string ActionStatus = "al_actionstatus";
 
-        /// <summary>The columns that carry the adviser's submission.</summary>
-        public static readonly string[] ResponseColumns = { "al_adviserresponse", "al_evidencereference" };
+        /// <summary>
+        /// The columns that carry the adviser's submission: the remedial action text, the
+        /// Intelligent Office reference, and the three remediation-form answers (AD-095).
+        /// The registered step's filtering attributes list the same five.
+        /// </summary>
+        public static readonly string[] ResponseColumns =
+        {
+            "al_adviserresponse",
+            "al_evidencereference",
+            "al_clientcontactrequired",
+            "al_recheckrequired",
+            "al_changesadvice",
+        };
 
         public RemediationResponseGuardPlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(RemediationResponseGuardPlugin))
@@ -99,8 +110,8 @@ namespace OutcomeTesting.Plugins
                     continue;
                 }
 
-                var incoming = Normalise(update.GetAttributeValue<string>(column));
-                var stored = Normalise(current.GetAttributeValue<string>(column));
+                var incoming = Describe(update.Contains(column) ? update[column] : null);
+                var stored = Describe(current.Contains(column) ? current[column] : null);
                 if (!string.Equals(incoming, stored, StringComparison.Ordinal))
                 {
                     return CommandHelpers.ConflictPrefix +
@@ -136,6 +147,21 @@ namespace OutcomeTesting.Plugins
         private static string Normalise(string value)
         {
             return (value ?? string.Empty).Trim();
+        }
+
+        /// <summary>
+        /// One comparable form for a text or choice column: the option value for a choice,
+        /// the normalised text otherwise, and the empty string for nothing.
+        /// </summary>
+        private static string Describe(object value)
+        {
+            var option = value as OptionSetValue;
+            if (option != null)
+            {
+                return option.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            return Normalise(value as string);
         }
     }
 }
