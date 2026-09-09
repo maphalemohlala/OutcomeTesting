@@ -45,12 +45,148 @@
           "x-ms-schema-name": "al_actionstatusName",
           "x-ms-read-only": true
         },
+        "al_adviserresponse": {
+          "type": "string",
+          "title": "Adviser response",
+          "x-ms-dataverse-attribute": "al_adviserresponse",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "al_adviserresponse",
+          "maxLength": 2000
+        },
+        "al_assignedcontactid": {
+          "type": "string",
+          "title": "Assigned contact",
+          "x-ms-dataverse-attribute": "al_assignedcontactid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_assignedcontactid"
+        },
+        "al_assignedcontactidname": {
+          "type": "string",
+          "title": "al_assignedcontactidname",
+          "x-ms-dataverse-attribute": "al_assignedcontactidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_assignedcontactidName",
+          "x-ms-read-only": true,
+          "maxLength": 160
+        },
+        "al_assignedcontactidyominame": {
+          "type": "string",
+          "title": "al_assignedcontactidyominame",
+          "x-ms-dataverse-attribute": "al_assignedcontactidyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_assignedcontactidYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 450
+        },
+        "al_changesadvice": {
+          "type": "string",
+          "title": "Remedial actions change the advice?",
+          "x-ms-dataverse-attribute": "al_changesadvice",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "al_ChangesAdvice",
+          "enum": [
+            "Yes",
+            "No"
+          ],
+          "x-ms-enum-values": [
+            120910798,
+            120910799
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "1bee6f91-4eac-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Remedial actions change the advice?",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "al_changesadvicename": {
+          "type": "string",
+          "title": "al_changesadvicename",
+          "x-ms-dataverse-attribute": "al_changesadvicename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_changesadviceName",
+          "x-ms-read-only": true
+        },
+        "al_clientcontactrequired": {
+          "type": "string",
+          "title": "Client contact required?",
+          "x-ms-dataverse-attribute": "al_clientcontactrequired",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "al_ClientContactRequired",
+          "enum": [
+            "Yes",
+            "No",
+            "Potentially"
+          ],
+          "x-ms-enum-values": [
+            120910793,
+            120910794,
+            120910795
+          ],
+          "Color": [
+            null,
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "f26dda7a-4eac-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Client contact required?",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "al_clientcontactrequiredname": {
+          "type": "string",
+          "title": "al_clientcontactrequiredname",
+          "x-ms-dataverse-attribute": "al_clientcontactrequiredname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_clientcontactrequiredName",
+          "x-ms-read-only": true
+        },
+        "al_clockstartedon": {
+          "type": "string",
+          "title": "Clock started on",
+          "x-ms-dataverse-attribute": "al_clockstartedon",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "al_ClockStartedOn"
+        },
         "al_completedon": {
           "type": "string",
           "title": "Completed on",
           "x-ms-dataverse-attribute": "al_completedon",
           "x-ms-dataverse-type": "DateTimeType",
           "x-ms-schema-name": "al_CompletedOn"
+        },
+        "al_completerequested": {
+          "type": "string",
+          "title": "Complete requested",
+          "x-ms-dataverse-attribute": "al_completerequested",
+          "x-ms-dataverse-type": "BooleanType",
+          "x-ms-schema-name": "al_completerequested",
+          "enum": [
+            "No",
+            "Yes"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "87a9b7df-c0a6-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Complete requested",
+          "x-ms-optionSetType": "Boolean"
+        },
+        "al_completerequestedname": {
+          "type": "string",
+          "title": "al_completerequestedname",
+          "x-ms-dataverse-attribute": "al_completerequestedname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_completerequestedName",
+          "x-ms-read-only": true
         },
         "al_description": {
           "type": "string",
@@ -67,6 +203,14 @@
           "x-ms-dataverse-attribute": "al_duedate",
           "x-ms-dataverse-type": "DateTimeType",
           "x-ms-schema-name": "al_DueDate"
+        },
+        "al_evidencereference": {
+          "type": "string",
+          "title": "Evidence reference",
+          "x-ms-dataverse-attribute": "al_evidencereference",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_evidencereference",
+          "maxLength": 400
         },
         "al_name": {
           "type": "string",
@@ -94,6 +238,37 @@
           "x-ms-schema-name": "al_outcomecaseidName",
           "x-ms-read-only": true,
           "maxLength": 100
+        },
+        "al_recheckrequired": {
+          "type": "string",
+          "title": "Recheck required?",
+          "x-ms-dataverse-attribute": "al_recheckrequired",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "al_RecheckRequired",
+          "enum": [
+            "Yes",
+            "No"
+          ],
+          "x-ms-enum-values": [
+            120910796,
+            120910797
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "44400b85-4eac-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Recheck required?",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "al_recheckrequiredname": {
+          "type": "string",
+          "title": "al_recheckrequiredname",
+          "x-ms-dataverse-attribute": "al_recheckrequiredname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_recheckrequiredName",
+          "x-ms-read-only": true
         },
         "al_remediationactioncode": {
           "type": "string",

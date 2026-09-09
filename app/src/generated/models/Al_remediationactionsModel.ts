@@ -8,6 +8,22 @@ export const Al_remediationactionsal_actionstatus = {
   120910602: 'Completed'
 } as const;
 export type Al_remediationactionsal_actionstatus = keyof typeof Al_remediationactionsal_actionstatus;
+export const Al_remediationactionsal_changesadvice = {
+  120910798: 'Yes',
+  120910799: 'No'
+} as const;
+export type Al_remediationactionsal_changesadvice = keyof typeof Al_remediationactionsal_changesadvice;
+export const Al_remediationactionsal_clientcontactrequired = {
+  120910793: 'Yes',
+  120910794: 'No',
+  120910795: 'Potentially'
+} as const;
+export type Al_remediationactionsal_clientcontactrequired = keyof typeof Al_remediationactionsal_clientcontactrequired;
+export const Al_remediationactionsal_recheckrequired = {
+  120910796: 'Yes',
+  120910797: 'No'
+} as const;
+export type Al_remediationactionsal_recheckrequired = keyof typeof Al_remediationactionsal_recheckrequired;
 export const Al_remediationactionsstatecode = {
   0: 'Active',
   1: 'Inactive'
@@ -21,12 +37,19 @@ export type Al_remediationactionsstatuscode = keyof typeof Al_remediationactions
 
 export interface Al_remediationactionsBase {
   al_actionstatus: Al_remediationactionsal_actionstatus;
+  al_adviserresponse?: string;
+  "al_assignedcontactid@odata.bind"?: string;
+  al_changesadvice?: Al_remediationactionsal_changesadvice;
+  al_clientcontactrequired?: Al_remediationactionsal_clientcontactrequired;
   al_clockstartedon?: string;
   al_completedon?: string;
+  al_completerequested?: boolean;
   al_description: string;
   al_duedate?: string;
+  al_evidencereference?: string;
   al_name: string;
   "al_outcomecaseid@odata.bind": string;
+  al_recheckrequired?: Al_remediationactionsal_recheckrequired;
   al_remediationactioncode: string;
   al_remediationactionid: string;
   "al_reviewinstanceid@odata.bind"?: string;
@@ -40,7 +63,13 @@ export interface Al_remediationactionsBase {
 
 export interface Al_remediationactions extends Al_remediationactionsBase {
   al_actionstatusname?: string;
+  al_assignedcontactidname?: string;
+  al_assignedcontactidyominame?: string;
+  al_changesadvicename?: string;
+  al_clientcontactrequiredname?: string;
+  al_completerequestedname?: string;
   al_outcomecaseidname?: string;
+  al_recheckrequiredname?: string;
   al_reviewinstanceidname?: string;
   createdbyname?: string;
   createdbyyominame: string;
@@ -60,6 +89,8 @@ export interface Al_remediationactions extends Al_remediationactionsBase {
   statecodename?: string;
   statuscodename?: string;
   versionnumber?: number;
+  al_assignedcontactid?: object;
+  _al_assignedcontactid_value?: string;
   al_outcomecaseid?: object;
   _al_outcomecaseid_value?: string;
   al_reviewinstanceid?: object;
