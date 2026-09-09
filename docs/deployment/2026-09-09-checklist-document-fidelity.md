@@ -69,30 +69,31 @@ Site cache clear (`/_services/about`, Clear cache) is the project owner's step. 
 is a web file and its `?v=` moved, so a hard refresh should not be needed, but the cache clear
 is.
 
-## Not deployed - owner action required
+## Seed import - run by the project owner
 
-**The checklist seed is still the old one in DEV.** `importseed` is a `--confirm` data write
-and the session's permission gate refuses those, as it did for `queueroutedcases`. Verified by
-`fetch` at 17:46Z that DEV still holds the pre-change values:
-
-| Record | DEV holds now | After the import |
-|---|---|---|
-| `al_section` S-E4 `al_name` | `Costs, Charges & Value (COBS / Consumer Duty [em dash] Price & Value)` | the same with a hyphen |
-| `al_section` S-CD `al_helptext` | `Short yes/no judgements only.` | `Short yes/no judgements only. Record any detail once in section H.` |
-| `al_section` S-CRP `al_helptext` | *(empty)* | `Complete this section where retirement income planning or decumulation advice is in scope.` |
-| `al_question` Q-CRP-04 `al_name` | `Annuity / drawdown discussion completed` | the document's full 120-character wording |
-
-Run from the repository root:
+`importseed` is a `--confirm` data write and this session's permission gate refuses those, as
+it did for `queueroutedcases`, so the command was handed over. The project owner ran it:
 
 ```powershell
 $env:DOTNET_ROLL_FORWARD='Major'; dotnet plugins\OutcomeTesting.Registration\bin\Debug\net8.0\OutcomeTesting.Registration.dll importseed https://org0b075da8.crm11.dynamics.com data\v8-seed --confirm https://org0b075da8.crm11.dynamics.com
 ```
 
-The import is keyed on the code alternate keys, so it updates the existing rows rather than
-creating duplicates. None of the four fields is an alternate key, so nothing is orphaned.
+Result: **0 created, 124 updated** - the shape expected of a seed keyed on the code alternate
+keys, which updates in place rather than adding rows.
 
-Until it runs the pages are correct, but three labels on screen still read the old wording and
-the CRP intro line comes from the template literal rather than from the section.
+Confirmed live by `fetch` afterwards. Every record kept its GUID, so these were updates and not
+replacements:
+
+| Record | Before | Now | |
+|---|---|---|---|
+| `al_section` S-E4 `al_name` | `... Consumer Duty [em dash] Price & Value` | `... Consumer Duty - Price & Value` | ok |
+| `al_section` S-CD `al_helptext` | `Short yes/no judgements only.` | `Short yes/no judgements only. Record any detail once in section H.` | ok |
+| `al_section` S-CRP `al_helptext` | *(empty)* | `Complete this section where retirement income planning or decumulation advice is in scope.` | ok |
+| `al_question` Q-CRP-04 `al_name` | `Annuity / drawdown discussion completed` | the document's full 120-character wording | ok |
+
+No duplicates: active `al_section` count is 12 and active `al_question` count is 45, unchanged.
+
+DEV now matches the repository. Every part of this change is live.
 
 ## Retest
 
