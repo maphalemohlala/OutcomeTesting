@@ -79,6 +79,191 @@
             <Description description="Progress of the action: Open, In progress or Completed. The adviser drives it to Completed (BR-008); T&amp;C Manager validation and sign-off are recorded on al_Signoff (AD-031)." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_ClientContactRequired">
+          <Type>picklist</Type>
+          <Name>al_clientcontactrequired</Name>
+          <LogicalName>al_clientcontactrequired</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>1</IsSearchable>
+          <IsFilterable>1</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <optionset Name="al_remediationaction_clientcontactrequired">
+            <OptionSetType>picklist</OptionSetType>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Client contact required?" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="Adviser's answer on the remediation form (AD-095)." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="120910793" IsHidden="0">
+                <labels>
+                  <label description="Yes" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910794" IsHidden="0">
+                <labels>
+                  <label description="No" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910795" IsHidden="0">
+                <labels>
+                  <label description="Potentially" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Client contact required?" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Whether the client must be contacted as part of remediation: Yes, No or Potentially. Answered by the adviser on the remediation form (AD-095); locked with the response once the action is Completed." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_RecheckRequired">
+          <Type>picklist</Type>
+          <Name>al_recheckrequired</Name>
+          <LogicalName>al_recheckrequired</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>1</IsSearchable>
+          <IsFilterable>1</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <optionset Name="al_remediationaction_recheckrequired">
+            <OptionSetType>picklist</OptionSetType>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Recheck required?" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="Adviser's answer on the remediation form (AD-095)." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="120910796" IsHidden="0">
+                <labels>
+                  <label description="Yes" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910797" IsHidden="0">
+                <labels>
+                  <label description="No" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Recheck required?" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Whether the adviser believes the case needs a recheck after remediation. Answered on the remediation form (AD-095); the recheck itself is the T&amp;C Manager's decision at sign-off." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_ChangesAdvice">
+          <Type>picklist</Type>
+          <Name>al_changesadvice</Name>
+          <LogicalName>al_changesadvice</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>1</IsSearchable>
+          <IsFilterable>1</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <optionset Name="al_remediationaction_changesadvice">
+            <OptionSetType>picklist</OptionSetType>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Remedial actions change the advice?" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="Adviser's answer on the remediation form (AD-095)." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="120910798" IsHidden="0">
+                <labels>
+                  <label description="Yes" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910799" IsHidden="0">
+                <labels>
+                  <label description="No" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Remedial actions change the advice?" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Whether the remedial actions change the advice given. Answered by the adviser on the remediation form (AD-095); locked with the response once the action is Completed." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_adviserresponse">
           <Type>ntext</Type>
           <Name>al_adviserresponse</Name>
