@@ -30,6 +30,8 @@ interface FieldDef {
   label: string;
   kind: FieldKind;
   options?: Record<number, string>;
+  /** A line under the control for a field whose name reads as more than it does. */
+  help?: string;
 }
 
 interface Section {
@@ -79,7 +81,15 @@ const SECTIONS: Section[] = [
   {
     heading: 'Check and tax',
     fields: [
-      { attr: 'al_checkername', label: 'Checker', kind: 'user' },
+      {
+        attr: 'al_checkername',
+        label: 'Checker',
+        kind: 'user',
+        // The name on the checklist header, nothing more. Allocation is the assign command
+        // (Allocate on the case), which creates the review the checker works and puts it
+        // on their portal My Work; editing this name was mistaken for that on 2026-09-09.
+        help: 'The checker’s name as printed on the checklist. Changing it does not allocate the check: use Allocate for that.',
+      },
       { attr: 'al_checkdate', label: 'Check date', kind: 'date' },
       { attr: 'al_taxcheckrequired', label: 'Tax check required', kind: 'choice', options: Al_outcomecasesal_taxcheckrequired },
       { attr: 'al_taxteamdisposition', label: 'Tax team disposition', kind: 'choice', options: Al_outcomecasesal_taxteamdisposition },
@@ -275,6 +285,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
                             onChange={(e) => setField(field.attr, field.kind, e.target.value)}
                           />
                         )}
+                        {field.help ? <small className="case-edit__help">{field.help}</small> : null}
                       </label>
                     );
                   })}

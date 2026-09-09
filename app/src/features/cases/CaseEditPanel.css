@@ -136,3 +136,9 @@
   font-weight: 400;
   color: var(--colour-text-muted);
 }
+
+.case-edit__help {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--colour-text-muted);
+}
