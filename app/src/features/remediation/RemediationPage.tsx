@@ -67,7 +67,7 @@ function ActionsTable({
                 <span className="remediation__note"> IO {action.evidenceReference}</span>
               ) : null}
             </td>
-            <td>{action.assignedTo ?? action.owner ?? 'Unassigned'}</td>
+            <td>{action.assignedTo ?? 'Unassigned'}</td>
             <td>{action.dueOn ?? '—'}</td>
             <td>{action.status}</td>
             <td>{action.clientContactRequired ?? '—'}</td>

@@ -63,9 +63,12 @@
 
 {% comment %}
   The Sign-off column (AD-095): the latest T&C decision per action, or the adviser's
-  completion where none has been made yet. Fetched for the page's actions only and
-  flattened to a delimited key list, so the per-row test is a string match rather than a
-  nested loop over every sign-off for every action.
+  completion where none has been made yet. Fetched for the page's actions only. Each
+  row does a nested loop over `signoffs.results.entities`, taking the first entity whose
+  `al_remediationactionid` matches the row's action (see line ~146 below) - an O(rows x
+  signoffs) scan rather than a single indexed lookup. That is fine here: the page is
+  capped at page_size = 25 actions, and each carries at most a handful of sign-offs, so
+  the worst case is a few hundred cheap comparisons per page load.
 {% endcomment %}
 {% if rows.size > 0 %}
   {% fetchxml signoffs %}
@@ -475,11 +478,14 @@
 
         var payload = {
           al_adviserresponse: response.value,
-          al_evidencereference: evidence.value,
-          al_clientcontactrequired: answer('clientcontact'),
-          al_recheckrequired: answer('recheck'),
-          al_changesadvice: answer('changesadvice')
+          al_evidencereference: evidence.value
         };
+        var clientContactAnswer = answer('clientcontact');
+        var recheckAnswer = answer('recheck');
+        var changesAdviceAnswer = answer('changesadvice');
+        if (clientContactAnswer !== null) { payload.al_clientcontactrequired = clientContactAnswer; }
+        if (recheckAnswer !== null) { payload.al_recheckrequired = recheckAnswer; }
+        if (changesAdviceAnswer !== null) { payload.al_changesadvice = changesAdviceAnswer; }
         if (markComplete) { payload.al_completerequested = true; }
 
         window.shell.getTokenDeferred().done(function (token) {

@@ -251,11 +251,11 @@
       {% if case_actions.size > 0 %}
         {% assign all_approved = true %}
         {% assign any_rejected = false %}
-        {% assign latest_supervisor = null %}
+        {% assign latest_supervisor = case_signoffs.results.entities[0] %}
         {% assign latest_adviser = null %}
         {% assign form_source = null %}
         <div class="ot-table-wrap">
-          <table class="ot-table ot-remedial-form">
+          <table class="ot-table">
             <caption>Remediation and escalation</caption>
             <thead>
               <tr>
@@ -273,11 +273,9 @@
                 {% for s in case_signoffs.results.entities %}{% if latest == null and s.al_remediationactionid.id == a.al_remediationactionid %}{% assign latest = s %}{% endif %}{% endfor %}
                 {% if latest %}
                   {% if latest.al_signoffdecision.value == 120910721 %}{% assign any_rejected = true %}{% assign all_approved = false %}{% endif %}
-                  {% if latest_supervisor == null %}{% assign latest_supervisor = latest %}{% endif %}
                 {% else %}
                   {% assign all_approved = false %}
                 {% endif %}
-                {% if a.al_completedon and latest_adviser == null %}{% assign latest_adviser = a %}{% endif %}
                 {% if form_source == null and a.al_clientcontactrequired %}{% assign form_source = a %}{% endif %}
                 <tr>
                   <td>{{ forloop.index }}</td>
@@ -300,12 +298,18 @@
           </table>
         </div>
 
+        {% for a in case_actions %}
+          {% if a.al_completedon %}
+            {% if latest_adviser == null or a.al_completedon > latest_adviser.al_completedon %}{% assign latest_adviser = a %}{% endif %}
+          {% endif %}
+        {% endfor %}
+
         {% if form_source == null %}{% assign form_source = case_actions[0] %}{% endif %}
         {% assign outcome = case_outcomes.results.entities[0] %}
         <dl class="ot-remedial-form__block">
-          <div><dt>Client contact required?</dt><dd>{{ form_source.al_clientcontactrequired.label | default: '—' }}</dd></div>
-          <div><dt>Recheck required?</dt><dd>{{ form_source.al_recheckrequired.label | default: '—' }}</dd></div>
-          <div><dt>Do the remedial actions change the advice?</dt><dd>{{ form_source.al_changesadvice.label | default: '—' }}</dd></div>
+          <div><dt>Client contact required?</dt><dd>{{ form_source.al_clientcontactrequired.label | default: '—' | escape }}</dd></div>
+          <div><dt>Recheck required?</dt><dd>{{ form_source.al_recheckrequired.label | default: '—' | escape }}</dd></div>
+          <div><dt>Do the remedial actions change the advice?</dt><dd>{{ form_source.al_changesadvice.label | default: '—' | escape }}</dd></div>
           <div><dt>All remedial actions checked and approved?</dt><dd>{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</dd></div>
           <div><dt>Regraded outcome</dt><dd>{% if outcome and outcome.al_finaloutcome %}{{ outcome.al_finaloutcome.label | escape }}{% else %}—{% endif %}</dd></div>
           <div><dt>Date</dt><dd>{% if outcome and outcome.al_regradedon %}{{ outcome.al_regradedon | date: 'dd MMM yyyy' }}{% elsif outcome and outcome.al_finalisedon %}{{ outcome.al_finalisedon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
