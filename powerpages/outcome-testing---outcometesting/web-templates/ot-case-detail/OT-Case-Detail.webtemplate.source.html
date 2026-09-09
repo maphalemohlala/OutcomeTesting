@@ -79,10 +79,47 @@
         <attribute name="al_actionstatus" />
         <attribute name="al_duedate" />
         <attribute name="al_completedon" />
+        <attribute name="al_adviserresponse" />
+        <attribute name="al_evidencereference" />
+        <attribute name="al_assignedcontactid" />
+        <attribute name="al_clientcontactrequired" />
+        <attribute name="al_recheckrequired" />
+        <attribute name="al_changesadvice" />
+        <attribute name="createdon" />
         <filter type="and">
           <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
         </filter>
         <order attribute="al_duedate" descending="false" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+
+    {% fetchxml case_signoffs %}
+    <fetch>
+      <entity name="al_signoff">
+        <attribute name="al_remediationactionid" />
+        <attribute name="al_signoffdecision" />
+        <attribute name="al_signedoffon" />
+        <attribute name="ownerid" />
+        <filter type="and">
+          <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
+        </filter>
+        <order attribute="al_signedoffon" descending="true" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+
+    {% fetchxml case_outcomes %}
+    <fetch top="1">
+      <entity name="al_outcome">
+        <attribute name="al_initialoutcome" />
+        <attribute name="al_finaloutcome" />
+        <attribute name="al_finalisedon" />
+        <attribute name="al_regradedon" />
+        <filter type="and">
+          <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
+        </filter>
+        <order attribute="createdon" descending="true" />
       </entity>
     </fetch>
     {% endfetchxml %}
@@ -210,31 +247,75 @@
 
     <section class="ot-card" aria-labelledby="ot-case-remediation">
       <h2 class="ot-card__title" id="ot-case-remediation">Remediation</h2>
-      {% if actions.results.entities.size > 0 %}
+      {% assign case_actions = actions.results.entities %}
+      {% if case_actions.size > 0 %}
+        {% assign all_approved = true %}
+        {% assign any_rejected = false %}
+        {% assign latest_supervisor = null %}
+        {% assign latest_adviser = null %}
+        {% assign form_source = null %}
         <div class="ot-table-wrap">
-          <table class="ot-table">
+          <table class="ot-table ot-remedial-form">
+            <caption>Remediation and escalation</caption>
             <thead>
               <tr>
-                <th scope="col">Action</th>
-                <th scope="col">Description</th>
-                <th scope="col">Status</th>
-                <th scope="col">Due</th>
-                <th scope="col">Completed</th>
+                <th scope="col">No.</th>
+                <th scope="col">Issue / fail reason</th>
+                <th scope="col">Remedial action</th>
+                <th scope="col">Owner</th>
+                <th scope="col">Target date</th>
+                <th scope="col">Sign-off</th>
               </tr>
             </thead>
             <tbody>
-              {% for a in actions.results.entities %}
+              {% for a in case_actions %}
+                {% assign latest = null %}
+                {% for s in case_signoffs.results.entities %}{% if latest == null and s.al_remediationactionid.id == a.al_remediationactionid %}{% assign latest = s %}{% endif %}{% endfor %}
+                {% if latest %}
+                  {% if latest.al_signoffdecision.value == 120910721 %}{% assign any_rejected = true %}{% assign all_approved = false %}{% endif %}
+                  {% if latest_supervisor == null %}{% assign latest_supervisor = latest %}{% endif %}
+                {% else %}
+                  {% assign all_approved = false %}
+                {% endif %}
+                {% if a.al_completedon and latest_adviser == null %}{% assign latest_adviser = a %}{% endif %}
+                {% if form_source == null and a.al_clientcontactrequired %}{% assign form_source = a %}{% endif %}
                 <tr>
-                  <td>{{ a.al_name | escape }}</td>
+                  <td>{{ forloop.index }}</td>
                   <td>{{ a.al_description | escape }}</td>
-                  <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
+                  <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                  <td>{{ a.al_assignedcontactid.name | default: 'Unassigned' | escape }}</td>
                   <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
-                  <td>{{ a.al_completedon | date: 'dd MMM yyyy' | default: '—' }}</td>
+                  <td>
+                    {% if latest %}
+                      {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
+                    {% elsif a.al_completedon %}
+                      Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}
+                    {% else %}
+                      {% include 'OT Status Badge' status: a.al_actionstatus.label %}
+                    {% endif %}
+                  </td>
                 </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
+
+        {% if form_source == null %}{% assign form_source = case_actions[0] %}{% endif %}
+        {% assign outcome = case_outcomes.results.entities[0] %}
+        <dl class="ot-remedial-form__block">
+          <div><dt>Client contact required?</dt><dd>{{ form_source.al_clientcontactrequired.label | default: '—' }}</dd></div>
+          <div><dt>Recheck required?</dt><dd>{{ form_source.al_recheckrequired.label | default: '—' }}</dd></div>
+          <div><dt>Do the remedial actions change the advice?</dt><dd>{{ form_source.al_changesadvice.label | default: '—' }}</dd></div>
+          <div><dt>All remedial actions checked and approved?</dt><dd>{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</dd></div>
+          <div><dt>Regraded outcome</dt><dd>{% if outcome and outcome.al_finaloutcome %}{{ outcome.al_finaloutcome.label | escape }}{% else %}—{% endif %}</dd></div>
+          <div><dt>Date</dt><dd>{% if outcome and outcome.al_regradedon %}{{ outcome.al_regradedon | date: 'dd MMM yyyy' }}{% elsif outcome and outcome.al_finalisedon %}{{ outcome.al_finalisedon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
+          <div><dt>Supervisor sign-off</dt><dd>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}, {{ latest_supervisor.ownerid.name | escape }}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
+          <div><dt>Adviser sign-off</dt><dd>{% if latest_adviser %}{{ latest_adviser.al_assignedcontactid.name | escape }}, {{ latest_adviser.al_completedon | date: 'dd MMM yyyy' }}{% if latest_adviser.al_evidencereference %} (IO {{ latest_adviser.al_evidencereference | escape }}){% endif %}{% else %}—{% endif %}</dd></div>
+        </dl>
+        <p class="ot-response__hint">
+          The three answers are the adviser's, recorded on the remediation action{% if case_actions.size > 1 %} (the first action carrying an answer){% endif %}.
+          "All remedial actions checked and approved" reads Yes when every action's latest supervisor decision is Approved.
+        </p>
       {% else %}
         {% include 'OT Empty State' title: 'No remediation' message: 'A pass outcome requires no remediation. Actions appear here for any non-pass outcome.' %}
       {% endif %}
