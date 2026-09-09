@@ -30,6 +30,7 @@
 {% assign page_size = 25 %}
 {% assign page_number = request.params['page'] | integer | default: 1 %}
 {% if page_number < 1 %}{% assign page_number = 1 %}{% endif %}
+{% assign page_offset = page_number | minus: 1 | times: page_size %}
 
 {% fetchxml actions %}
 <fetch count="{{ page_size }}" page="{{ page_number }}" returntotalrecordcount="true">
@@ -43,6 +44,9 @@
     <attribute name="al_adviserresponse" />
     <attribute name="al_evidencereference" />
     <attribute name="al_assignedcontactid" />
+    <attribute name="al_clientcontactrequired" />
+    <attribute name="al_recheckrequired" />
+    <attribute name="al_changesadvice" />
     <attribute name="al_clockstartedon" />
     <attribute name="createdon" />
     <order attribute="al_duedate" descending="false" />
@@ -56,6 +60,30 @@
 {% endfetchxml %}
 
 {% assign rows = actions.results.entities %}
+
+{% comment %}
+  The Sign-off column (AD-095): the latest T&C decision per action, or the adviser's
+  completion where none has been made yet. Fetched for the page's actions only and
+  flattened to a delimited key list, so the per-row test is a string match rather than a
+  nested loop over every sign-off for every action.
+{% endcomment %}
+{% if rows.size > 0 %}
+  {% fetchxml signoffs %}
+  <fetch>
+    <entity name="al_signoff">
+      <attribute name="al_remediationactionid" />
+      <attribute name="al_signoffdecision" />
+      <attribute name="al_signedoffon" />
+      <filter type="and">
+        <condition attribute="al_remediationactionid" operator="in">
+          {% for a in rows %}<value>{{ a.al_remediationactionid }}</value>{% endfor %}
+        </condition>
+      </filter>
+      <order attribute="al_signedoffon" descending="true" />
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+{% endif %}
 
 <div class="ot-notice" role="status">
   <strong>All remediation actions.</strong> You can record a response on the ones assigned
@@ -75,20 +103,21 @@
         </caption>
         <thead>
           <tr>
-            <th scope="col">Case reference</th>
-            <th scope="col">Adviser</th>
-            <th scope="col">Action</th>
-            <th scope="col">Description</th>
+            <th scope="col">No.</th>
+            <th scope="col">Case</th>
+            <th scope="col">Issue / fail reason</th>
+            <th scope="col">Remedial action</th>
+            <th scope="col">Owner</th>
+            <th scope="col">Target date</th>
             <th scope="col">Status</th>
-            <th scope="col">Opened</th>
             <th scope="col">Age</th>
-            <th scope="col">Due</th>
-            <th scope="col">Completed</th>
+            <th scope="col">Sign-off</th>
           </tr>
         </thead>
         <tbody>
           {% for a in rows %}
             <tr>
+              <td>{{ forloop.index | plus: page_offset }}</td>
               <td>
                 {% assign cid = a['case.al_outcomecaseid'] %}
                 {% if cid %}
@@ -99,18 +128,12 @@
                   {{ a['case.al_casereference'] | default: '—' | escape }}
                 {% endif %}
               </td>
-              <td>{{ a['case.al_advisername'] | escape }}</td>
-              <td>{{ a.al_name | escape }}</td>
               <td>{{ a.al_description | escape }}</td>
+              <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+              <td>{{ a.al_assignedcontactid.name | default: a['case.al_advisername'] | default: 'Unassigned' | escape }}</td>
+              <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
               <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
-              <td>{{ a.createdon | date: 'dd MMM yyyy' | default: '—' }}</td>
               <td>
-                {% comment %}
-                  data-opened is the start of the CURRENT period: al_clockstartedon once a
-                  rejected sign-off has reset it, and createdon until then. data-created is
-                  passed alongside so the script can show the period the reset ended
-                  (OD-018) instead of one merged age.
-                {% endcomment %}
                 {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
                 <span class="ot-age"
                       data-ot-age
@@ -118,8 +141,17 @@
                       data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
                       data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
               </td>
-              <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
-              <td>{{ a.al_completedon | date: 'dd MMM yyyy' | default: '—' }}</td>
+              <td>
+                {% assign latest = null %}
+                {% if signoffs %}{% for s in signoffs.results.entities %}{% if latest == null and s.al_remediationactionid.id == a.al_remediationactionid %}{% assign latest = s %}{% endif %}{% endfor %}{% endif %}
+                {% if latest %}
+                  {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
+                {% elsif a.al_completedon %}
+                  Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor
+                {% else %}
+                  —
+                {% endif %}
+              </td>
             </tr>
             {% comment %}
               The adviser's half of the BR-008 loop (PP-12, FR-020, FR-021), inline rather
@@ -139,14 +171,45 @@
               <tr class="ot-response-row">
                 <td colspan="9">
                   <details class="ot-response" data-ot-response data-action-id="{{ a.al_remediationactionid }}">
-                    <summary>{% if a.al_completedon %}Rework and resubmit your response{% else %}Record your response{% endif %}</summary>
+                    <summary>{% if a.al_completedon %}Rework and resubmit your response{% else %}Complete the remediation form{% endif %}</summary>
 
                     <div class="ot-response__field">
-                      <label for="ot-response-{{ a.al_remediationactionid }}">What did you do?</label>
+                      <label for="ot-response-{{ a.al_remediationactionid }}">Remedial action</label>
                       <textarea id="ot-response-{{ a.al_remediationactionid }}"
                                 rows="4"
                                 data-ot-response-text>{{ a.al_adviserresponse | escape }}</textarea>
+                      <p class="ot-response__hint">What you did, or will do, to put this right.</p>
                     </div>
+
+                    <div class="ot-response__grid">
+                      <div class="ot-response__field">
+                        <span class="ot-response__label">Owner</span>
+                        <p>{{ a.al_assignedcontactid.name | default: a['case.al_advisername'] | escape }}</p>
+                      </div>
+                      <div class="ot-response__field">
+                        <span class="ot-response__label">Target date</span>
+                        <p>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</p>
+                      </div>
+                    </div>
+
+                    <fieldset class="ot-response__field">
+                      <legend>Client contact required?</legend>
+                      <label><input type="radio" name="ot-cc-{{ a.al_remediationactionid }}" value="120910793" data-ot-q="clientcontact"{% if a.al_clientcontactrequired.value == 120910793 %} checked{% endif %} /> Yes</label>
+                      <label><input type="radio" name="ot-cc-{{ a.al_remediationactionid }}" value="120910794" data-ot-q="clientcontact"{% if a.al_clientcontactrequired.value == 120910794 %} checked{% endif %} /> No</label>
+                      <label><input type="radio" name="ot-cc-{{ a.al_remediationactionid }}" value="120910795" data-ot-q="clientcontact"{% if a.al_clientcontactrequired.value == 120910795 %} checked{% endif %} /> Potentially</label>
+                    </fieldset>
+
+                    <fieldset class="ot-response__field">
+                      <legend>Recheck required?</legend>
+                      <label><input type="radio" name="ot-rc-{{ a.al_remediationactionid }}" value="120910796" data-ot-q="recheck"{% if a.al_recheckrequired.value == 120910796 %} checked{% endif %} /> Yes</label>
+                      <label><input type="radio" name="ot-rc-{{ a.al_remediationactionid }}" value="120910797" data-ot-q="recheck"{% if a.al_recheckrequired.value == 120910797 %} checked{% endif %} /> No</label>
+                    </fieldset>
+
+                    <fieldset class="ot-response__field">
+                      <legend>Do the remedial actions change the advice?</legend>
+                      <label><input type="radio" name="ot-ca-{{ a.al_remediationactionid }}" value="120910798" data-ot-q="changesadvice"{% if a.al_changesadvice.value == 120910798 %} checked{% endif %} /> Yes</label>
+                      <label><input type="radio" name="ot-ca-{{ a.al_remediationactionid }}" value="120910799" data-ot-q="changesadvice"{% if a.al_changesadvice.value == 120910799 %} checked{% endif %} /> No</label>
+                    </fieldset>
 
                     <div class="ot-response__field">
                       <label for="ot-evidence-{{ a.al_remediationactionid }}">
@@ -157,7 +220,7 @@
                              value="{{ a.al_evidencereference | escape }}"
                              data-ot-response-evidence />
                       <p class="ot-response__hint">
-                        A reference to the document in Intelligent Office. Nothing is uploaded
+                        The remedial task you completed in Intelligent Office. Nothing is uploaded
                         here and no file is stored by this site.
                       </p>
                     </div>
@@ -165,7 +228,7 @@
                     <p class="ot-response__actions">
                       <button type="button" class="ot-btn" data-ot-response-save>Save response</button>
                       <button type="button" class="ot-btn ot-btn--primary" data-ot-response-complete>
-                        Save and mark complete
+                        Save and sign off as adviser
                       </button>
                     </p>
                     <p class="ot-response__status" data-ot-response-status aria-live="polite"></p>
@@ -189,20 +252,19 @@
                   <details class="ot-response" data-ot-signoff data-action-id="{{ a.al_remediationactionid }}">
                     <summary>Sign off this remediation</summary>
 
-                    {% if a.al_adviserresponse %}
-                      <div class="ot-response__field">
-                        <span class="ot-response__label">The adviser recorded</span>
-                        <p>{{ a.al_adviserresponse | escape | newline_to_br }}</p>
-                        {% if a.al_evidencereference %}
-                          <p class="ot-response__hint">
-                            Intelligent Office reference: {{ a.al_evidencereference | escape }}
-                          </p>
-                        {% endif %}
-                      </div>
-                    {% endif %}
+                    <div class="ot-response__field">
+                      <span class="ot-response__label">Remedial action</span>
+                      <p>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</p>
+                      <p class="ot-response__hint">
+                        Client contact required: {{ a.al_clientcontactrequired.label | default: '—' }} ·
+                        Recheck required: {{ a.al_recheckrequired.label | default: '—' }} ·
+                        Changes the advice: {{ a.al_changesadvice.label | default: '—' }}
+                        {% if a.al_evidencereference %} · Intelligent Office reference: {{ a.al_evidencereference | escape }}{% endif %}
+                      </p>
+                    </div>
 
                     <div class="ot-response__field">
-                      <label for="ot-decision-{{ a.al_remediationactionid }}">Decision</label>
+                      <label for="ot-decision-{{ a.al_remediationactionid }}">All remedial actions checked and approved?</label>
                       <select id="ot-decision-{{ a.al_remediationactionid }}" data-ot-signoff-decision>
                         <option value="">Choose…</option>
                         <option value="120910720">Approved</option>
@@ -223,7 +285,7 @@
 
                     <p class="ot-response__actions">
                       <button type="button" class="ot-btn ot-btn--primary" data-ot-signoff-save>
-                        Record sign-off
+                        Record supervisor sign-off
                       </button>
                     </p>
                     <p class="ot-response__status" data-ot-signoff-status aria-live="polite"></p>
@@ -370,6 +432,11 @@
       var actionId = panel.getAttribute('data-action-id');
       var response = panel.querySelector('[data-ot-response-text]');
       var evidence = panel.querySelector('[data-ot-response-evidence]');
+
+      function answer(name) {
+        var picked = panel.querySelector('[data-ot-q="' + name + '"]:checked');
+        return picked ? Number(picked.value) : null;
+      }
       var save = panel.querySelector('[data-ot-response-save]');
       var complete = panel.querySelector('[data-ot-response-complete]');
       var status = panel.querySelector('[data-ot-response-status]');
@@ -398,12 +465,20 @@
           return;
         }
 
+        if (markComplete && (answer('clientcontact') === null || answer('recheck') === null || answer('changesadvice') === null)) {
+          show('Answer all three questions on the form before signing off.', 'error');
+          return;
+        }
+
         busy(true);
         show(markComplete ? 'Completing...' : 'Saving...', 'info');
 
         var payload = {
           al_adviserresponse: response.value,
-          al_evidencereference: evidence.value
+          al_evidencereference: evidence.value,
+          al_clientcontactrequired: answer('clientcontact'),
+          al_recheckrequired: answer('recheck'),
+          al_changesadvice: answer('changesadvice')
         };
         if (markComplete) { payload.al_completerequested = true; }
 
@@ -418,7 +493,7 @@
 
             if (request.status >= 200 && request.status < 300) {
               if (markComplete) {
-                show('Completed. Reloading...', 'success');
+                show('Signed off as adviser. Reloading...', 'success');
                 window.setTimeout(function () { window.location.reload(); }, 800);
                 return;
               }

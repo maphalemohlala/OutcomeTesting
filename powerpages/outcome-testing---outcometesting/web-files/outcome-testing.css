@@ -860,6 +860,11 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-response__status--success { color: var(--colour-outcome-pass); font-weight: 600; }
 .ot-response__status--error   { color: var(--colour-outcome-harm); font-weight: 600; }
 
+.ot-response__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1.5rem; }
+.ot-response__field fieldset, fieldset.ot-response__field { border: 0; padding: 0; margin: 0 0 1rem; }
+fieldset.ot-response__field legend { font-weight: 600; margin-bottom: .25rem; }
+fieldset.ot-response__field label { margin-right: 1.25rem; }
+
 /* ------------------------------------------------------------------
    Accessibility
    ------------------------------------------------------------------ */
