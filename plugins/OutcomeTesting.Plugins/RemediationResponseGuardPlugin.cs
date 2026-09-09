@@ -14,7 +14,9 @@ namespace OutcomeTesting.Plugins
     ///
     /// Register with:
     /// <c>registerstep &lt;orgUrl&gt; OutcomeTesting.Plugins.RemediationResponseGuardPlugin
-    /// Update al_remediationaction 20 al_adviserresponse,al_evidencereference</c>.
+    /// Update al_remediationaction 20 al_adviserresponse,al_evidencereference,al_clientcontactrequired,al_recheckrequired,al_changesadvice</c>.
+    /// The live DEV step was widened to all five filtering attributes with <c>setstepfilter</c>
+    /// on 2026-09-09 (AD-095), so the registerstep example above matches what is deployed.
     ///
     /// Who may write the response at all is not decided here, for the reason AD-053 gives:
     /// a Power Pages write reaches Dataverse as the site's application user, so the caller
