@@ -97,13 +97,26 @@ namespace OutcomeTesting.Plugins
             var questionVersion = service.Retrieve(
                 "al_questionversion",
                 questionVersionRef.Id,
-                new ColumnSet("al_responsetype", "al_questionid"));
+                new ColumnSet("al_responsetype", "al_questionid", "al_effectivefrom", "al_effectiveto"));
 
             var responseType = questionVersion.GetAttributeValue<OptionSetValue>("al_responsetype");
             if (responseType == null)
             {
                 throw new InvalidPluginExecutionException(
                     PreconditionPrefix + "This question has no response type, so it cannot be answered.");
+            }
+
+            // A retired version keeps the answers it already holds (BR-013) but takes no new
+            // ones: the page renders the version in force, and an answer written against a
+            // superseded one would be a second answer to the same question that nothing
+            // reads back consistently.
+            if (!ResponseRules.IsVersionEffective(
+                questionVersion.GetAttributeValue<DateTime?>("al_effectivefrom"),
+                questionVersion.GetAttributeValue<DateTime?>("al_effectiveto"),
+                DateTime.UtcNow))
+            {
+                throw new InvalidPluginExecutionException(
+                    PreconditionPrefix + "This question has been replaced by a newer version, so this version can no longer be answered.");
             }
 
             EnsureSectionBelongsToReview(service, questionVersion, review);

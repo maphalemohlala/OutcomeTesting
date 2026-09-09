@@ -60,7 +60,7 @@ function ActionsTable({
         {actions.map((action, index) => (
           <tr key={action.id}>
             <th scope="row">{index + 1}</th>
-            <td>{action.description}</td>
+            <td className="remediation__issue">{action.description}</td>
             <td>
               {action.remedialAction ?? '—'}
               {action.evidenceReference ? (

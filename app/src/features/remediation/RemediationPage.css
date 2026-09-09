@@ -102,6 +102,11 @@
   font-weight: 600;
 }
 
+/* The issue is a list, one non-pass item per line, so its line breaks are kept. */
+.remediation__issue {
+  white-space: pre-line;
+}
+
 .remediation__table td[data-empty='true'] {
   font-style: italic;
   color: var(--colour-text-muted);

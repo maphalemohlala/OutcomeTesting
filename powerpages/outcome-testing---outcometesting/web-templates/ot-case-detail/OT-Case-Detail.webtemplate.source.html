@@ -279,7 +279,7 @@
                 {% if form_source == null and a.al_clientcontactrequired %}{% assign form_source = a %}{% endif %}
                 <tr>
                   <td>{{ forloop.index }}</td>
-                  <td>{{ a.al_description | escape }}</td>
+                  <td>{{ a.al_description | escape | newline_to_br }}</td>
                   <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
                   <td>{{ a.al_assignedcontactid.name | default: 'Unassigned' | escape }}</td>
                   <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>

@@ -141,6 +141,35 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// AD-015, BR-013: a question version is in force from the start of its effective-from
+        /// day until the start of its effective-to day. RetireAndSucceedQuestion stamps the
+        /// old version's effective-to and the successor's effective-from with the same date,
+        /// so on that day the successor alone is current. Both columns are date-only, so only
+        /// the date part of <paramref name="asOf"/> takes part.
+        ///
+        /// Statecode is deliberately not consulted: a retired version stays Active so the
+        /// answers a submitted review holds against it keep resolving. Until 2026-09-09
+        /// nothing read these dates, so every version of a question rendered, the submit
+        /// gate demanded an answer on each, and the outcome was read from whichever answer
+        /// had been saved last.
+        /// </summary>
+        public static bool IsVersionEffective(DateTime? effectiveFrom, DateTime? effectiveTo, DateTime asOf)
+        {
+            var day = asOf.Date;
+            if (effectiveFrom.HasValue && effectiveFrom.Value.Date > day)
+            {
+                return false;
+            }
+
+            if (effectiveTo.HasValue && effectiveTo.Value.Date <= day)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// The al_ResponseCodeKey value for one answer. Stable, so a replayed create collides
         /// on the alternate key instead of producing two rival answers to the same question.
         /// Two GUIDs and a separator is 73 characters, inside the AD-026 MaxLength of 100.

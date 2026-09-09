@@ -217,6 +217,11 @@
   color: var(--colour-text-muted);
 }
 
+/* A multi-line value, such as the issue list on a remediation line, keeps its line breaks. */
+.checklist__prose {
+  white-space: pre-line;
+}
+
 /* The document's "Outcome lens" footer line on each suitability block. */
 .checklist__lens {
   font-size: var(--text-xs);

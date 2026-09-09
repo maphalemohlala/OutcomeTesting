@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using OutcomeTesting.Plugins;
 using Xunit;
@@ -112,6 +113,170 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void Leads_the_description_with_the_non_pass_items()
+        {
+            // The adviser's "Issue / fail reason" is the list of what the checker marked
+            // down, not a sentence pointing them back at the checklist (project owner,
+            // 2026-09-09). The items come first, then the observation, then the standing
+            // instruction.
+            var description = Remediation.Describe(
+                "Potential harm",
+                "Charges were not evidenced.",
+                new List<string>
+                {
+                    "Adviser charges clearly disclosed and evidenced: Fail",
+                    "Fail point: Record Keeping - TOB not provided or out of date",
+                });
+
+            var issues = description.IndexOf("- Adviser charges clearly disclosed and evidenced: Fail", StringComparison.Ordinal);
+            var point = description.IndexOf("- Fail point: Record Keeping - TOB not provided or out of date", StringComparison.Ordinal);
+            var observation = description.IndexOf("The checker recorded: Charges were not evidenced.", StringComparison.Ordinal);
+            var instruction = description.IndexOf("Raised automatically", StringComparison.Ordinal);
+
+            Assert.True(issues >= 0 && point > issues && observation > point && instruction > observation, description);
+        }
+
+        [Fact]
+        public void Describes_without_a_list_when_nothing_was_marked_down()
+        {
+            // A flagged Pass raises an action with no non-pass item behind it; the
+            // description must not carry an empty "Issues found" heading.
+            var description = Remediation.Describe("Pass", null, new List<string>());
+            Assert.DoesNotContain("Issues found", description);
+            Assert.Equal(Remediation.Describe("Pass", null), description);
+        }
+
+        [Fact]
+        public void Reads_the_non_pass_answers_in_checklist_order_and_the_ticked_fail_points()
+        {
+            var service = new FakeOrganizationService();
+            service.SeedOptionSet("al_response", "al_answerchoice",
+                ResponseRules.ChoicePass, "Pass",
+                ResponseRules.ChoiceFail, "Fail",
+                ResponseRules.ChoiceInsufficient, "Insufficient evidence",
+                ResponseRules.ChoiceNo, "No",
+                ResponseRules.ChoiceNa, "N/A");
+            service.SeedOptionSet("al_failreason", "al_category", 120910402, "Record Keeping", 120910400, "AML");
+
+            var reviewId = Guid.NewGuid();
+            var otherReview = Guid.NewGuid();
+
+            var amlSection = Guid.NewGuid();
+            var e4Section = Guid.NewGuid();
+            service.Seed("al_section", amlSection, "al_displayorder", 2);
+            service.Seed("al_section", e4Section, "al_displayorder", 7);
+
+            var amlQuestion = Guid.NewGuid();
+            var e4Question = Guid.NewGuid();
+            var e4Question2 = Guid.NewGuid();
+            service.Seed("al_question", amlQuestion, "al_sectionid", new EntityReference("al_section", amlSection));
+            service.Seed("al_question", e4Question, "al_sectionid", new EntityReference("al_section", e4Section));
+            service.Seed("al_question", e4Question2, "al_sectionid", new EntityReference("al_section", e4Section));
+
+            var amlVersion = Guid.NewGuid();
+            var e4Version = Guid.NewGuid();
+            var e4Version2 = Guid.NewGuid();
+            var retiredVersion = Guid.NewGuid();
+            service.Seed("al_questionversion", amlVersion,
+                "al_questiontext", "ID verification completed and retained for all relevant clients/parties.",
+                "al_displayorder", 1,
+                "al_questionid", new EntityReference("al_question", amlQuestion));
+            service.Seed("al_questionversion", e4Version,
+                "al_questiontext", "Adviser charges clearly disclosed and evidenced",
+                "al_displayorder", 1,
+                "al_questionid", new EntityReference("al_question", e4Question));
+            service.Seed("al_questionversion", e4Version2,
+                "al_questiontext", "Ongoing charges justified relative to service provided",
+                "al_displayorder", 2,
+                "al_questionid", new EntityReference("al_question", e4Question2));
+            service.Seed("al_questionversion", retiredVersion,
+                "al_questiontext", "Retired wording",
+                "al_displayorder", 3,
+                "al_effectiveto", new DateTime(2026, 9, 1),
+                "al_questionid", new EntityReference("al_question", e4Question2));
+
+            // Seeded out of checklist order, and with answers the list must leave out: a
+            // Pass, an N/A, a non-pass on a retired version, and another review's Fail.
+            var e4Fail2 = Guid.NewGuid();
+            var amlNo = Guid.NewGuid();
+            var e4Fail = Guid.NewGuid();
+            service.Seed("al_response", e4Fail2, "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
+                "al_questionversionid", new EntityReference("al_questionversion", e4Version2),
+                "al_answerchoice", new OptionSetValue(ResponseRules.ChoiceInsufficient));
+            service.Seed("al_response", Guid.NewGuid(), "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
+                "al_questionversionid", new EntityReference("al_questionversion", e4Version),
+                "al_answerchoice", new OptionSetValue(ResponseRules.ChoiceNa));
+            service.Seed("al_response", amlNo, "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
+                "al_questionversionid", new EntityReference("al_questionversion", amlVersion),
+                "al_answerchoice", new OptionSetValue(ResponseRules.ChoiceNo));
+            service.Seed("al_response", e4Fail, "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
+                "al_questionversionid", new EntityReference("al_questionversion", e4Version),
+                "al_answerchoice", new OptionSetValue(ResponseRules.ChoiceFail));
+            service.Seed("al_response", Guid.NewGuid(), "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
+                "al_questionversionid", new EntityReference("al_questionversion", retiredVersion),
+                "al_answerchoice", new OptionSetValue(ResponseRules.ChoiceFail));
+            service.Seed("al_response", Guid.NewGuid(), "al_reviewinstanceid", new EntityReference("al_reviewinstance", otherReview),
+                "al_questionversionid", new EntityReference("al_questionversion", e4Version),
+                "al_answerchoice", new OptionSetValue(ResponseRules.ChoiceFail));
+
+            var tob = Guid.NewGuid();
+            var idIssue = Guid.NewGuid();
+            service.Seed("al_failreason", tob, "al_name", "TOB not provided or out of date",
+                "al_category", new OptionSetValue(120910402), "al_displayorder", 18);
+            service.Seed("al_failreason", idIssue, "al_name", "ID verification issue",
+                "al_category", new OptionSetValue(120910400), "al_displayorder", 1);
+            // The same reason ticked on two answers is listed once; a tick on another
+            // review's answer is not this review's.
+            service.Seed("al_al_failreason_al_response", Guid.NewGuid(), "al_responseid", e4Fail, "al_failreasonid", tob);
+            service.Seed("al_al_failreason_al_response", Guid.NewGuid(), "al_responseid", amlNo, "al_failreasonid", tob);
+            service.Seed("al_al_failreason_al_response", Guid.NewGuid(), "al_responseid", amlNo, "al_failreasonid", idIssue);
+            service.Seed("al_al_failreason_al_response", Guid.NewGuid(), "al_responseid", Guid.NewGuid(), "al_failreasonid", idIssue);
+
+            var items = Remediation.NonPassItems(service, reviewId, new DateTime(2026, 9, 9, 12, 0, 0, DateTimeKind.Utc));
+
+            Assert.Equal(
+                new[]
+                {
+                    "ID verification completed and retained for all relevant clients/parties.: No",
+                    "Adviser charges clearly disclosed and evidenced: Fail",
+                    "Ongoing charges justified relative to service provided: Insufficient evidence",
+                    "Fail point: AML - ID verification issue",
+                    "Fail point: Record Keeping - TOB not provided or out of date",
+                },
+                items);
+        }
+
+        [Fact]
+        public void Lists_nothing_for_a_review_with_no_answers()
+        {
+            var service = new FakeOrganizationService();
+            Assert.Empty(Remediation.NonPassItems(service, Guid.NewGuid(), DateTime.UtcNow));
+        }
+
+        [Fact]
+        public void Writes_the_non_pass_items_into_the_raised_action()
+        {
+            var service = new FakeOrganizationService();
+
+            Remediation.Raise(
+                service,
+                new EntityReference("al_outcomecase", Guid.NewGuid()),
+                "IO-003",
+                Guid.NewGuid(),
+                1,
+                "Fail",
+                null,
+                new List<string> { "Attitude to risk recorded and internally consistent: Fail" },
+                null,
+                Monday);
+
+            var created = Assert.Single(service.Creates);
+            Assert.Contains(
+                "- Attitude to risk recorded and internally consistent: Fail",
+                created.GetAttributeValue<string>("al_description"));
+        }
+
+        [Fact]
         public void Raises_one_open_action_against_the_case_and_the_review()
         {
             var service = new FakeOrganizationService();
@@ -126,6 +291,7 @@ namespace OutcomeTesting.Plugins.Tests
                 1,
                 "Pass with issues",
                 "Charges were not evidenced.",
+                null,
                 null,
                 Monday);
 
@@ -155,6 +321,7 @@ namespace OutcomeTesting.Plugins.Tests
                 1,
                 "Fail",
                 null,
+                null,
                 adviser,
                 Monday);
 
@@ -178,6 +345,7 @@ namespace OutcomeTesting.Plugins.Tests
                 Guid.NewGuid(),
                 1,
                 "Insufficient evidence",
+                null,
                 null,
                 null,
                 Monday);
@@ -207,6 +375,7 @@ namespace OutcomeTesting.Plugins.Tests
                 Guid.NewGuid(),
                 1,
                 "Fail",
+                null,
                 null,
                 null,
                 Monday);

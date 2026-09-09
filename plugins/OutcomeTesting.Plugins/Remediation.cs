@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -73,6 +74,18 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string Describe(string reason, string observation)
         {
+            return Describe(reason, observation, null);
+        }
+
+        /// <summary>
+        /// As <see cref="Describe(string, string)"/>, led by the issues themselves: one line
+        /// per non-pass item from <see cref="NonPassItems"/>, so the "Issue / fail reason"
+        /// the adviser reads is prepopulated with what the checker actually marked down
+        /// (project owner, 2026-09-09) rather than a sentence that sends them back to the
+        /// checklist to find out.
+        /// </summary>
+        public static string Describe(string reason, string observation, IList<string> items)
+        {
             var text = "Raised automatically when the review was submitted"
                 + (string.IsNullOrWhiteSpace(reason) ? string.Empty : " (" + reason.Trim() + ")")
                 + ". Review the file and record what you have put right.";
@@ -82,7 +95,194 @@ namespace OutcomeTesting.Plugins
                 text = "The checker recorded: " + observation.Trim() + Environment.NewLine + Environment.NewLine + text;
             }
 
+            if (items != null && items.Count > 0)
+            {
+                var issues = "Issues found on the check:";
+                foreach (var item in items)
+                {
+                    if (!string.IsNullOrWhiteSpace(item))
+                    {
+                        issues += Environment.NewLine + "- " + item.Trim();
+                    }
+                }
+
+                text = issues + Environment.NewLine + Environment.NewLine + text;
+            }
+
             return text.Length <= DescriptionMaxLength ? text : text.Substring(0, DescriptionMaxLength);
+        }
+
+        /// <summary>
+        /// A non-pass answer for BR-006's purposes: the outcomes that require remediation
+        /// (<see cref="ResponseRules.IsNonPass"/>) and No, which is what a check on the AML
+        /// and CRA and Consumer Duty scales fails as.
+        /// </summary>
+        public static bool IsNonPassAnswer(int choice)
+        {
+            return ResponseRules.IsNonPass(choice) || choice == ResponseRules.ChoiceNo;
+        }
+
+        /// <summary>
+        /// One line per thing the checker marked down, in the order the checklist lays them
+        /// out: every answer of Fail, Insufficient evidence, Potential harm or No on a
+        /// question version in force on <paramref name="asOf"/>, each as "question: answer",
+        /// followed by every File Quality fail point ticked on the review as
+        /// "Fail point: category - reason". This is what the remediation action's
+        /// "Issue / fail reason" is prepopulated with.
+        ///
+        /// Read from the responses rather than from a fixed list of questions so a
+        /// checklist change (FR-030) reaches here without a code change. A retired version's
+        /// answer is left out for the reason SubmitReviewPlugin.AnswerFor records: it is not
+        /// the answer the review gave.
+        /// </summary>
+        public static List<string> NonPassItems(IOrganizationService service, Guid reviewId, DateTime asOf)
+        {
+            var labels = new OptionLabels(service);
+            var answers = new List<RankedItem>();
+            var responseIds = new List<object>();
+
+            var responses = new QueryExpression("al_response")
+            {
+                ColumnSet = new ColumnSet("al_answerchoice", "al_questionversionid"),
+                Criteria = new FilterExpression(),
+            };
+            responses.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
+
+            foreach (var response in CommandHelpers.RetrieveAll(service, responses))
+            {
+                responseIds.Add(response.Id);
+
+                var choice = response.GetAttributeValue<OptionSetValue>("al_answerchoice");
+                if (choice == null || !IsNonPassAnswer(choice.Value))
+                {
+                    continue;
+                }
+
+                var versionRef = response.GetAttributeValue<EntityReference>("al_questionversionid");
+                if (versionRef == null)
+                {
+                    continue;
+                }
+
+                var version = service.Retrieve(
+                    "al_questionversion",
+                    versionRef.Id,
+                    new ColumnSet("al_questiontext", "al_effectivefrom", "al_effectiveto", "al_displayorder", "al_questionid"));
+
+                if (!ResponseRules.IsVersionEffective(
+                    version.GetAttributeValue<DateTime?>("al_effectivefrom"),
+                    version.GetAttributeValue<DateTime?>("al_effectiveto"),
+                    asOf))
+                {
+                    continue;
+                }
+
+                var text = version.GetAttributeValue<string>("al_questiontext");
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    continue;
+                }
+
+                answers.Add(new RankedItem
+                {
+                    Section = SectionOrder(service, version.GetAttributeValue<EntityReference>("al_questionid")),
+                    Order = version.GetAttributeValue<int?>("al_displayorder") ?? 0,
+                    Text = text.Trim() + ": " + labels.Label("al_response", "al_answerchoice", choice.Value),
+                });
+            }
+
+            answers.Sort(RankedItem.Compare);
+            var items = new List<string>();
+            foreach (var answer in answers)
+            {
+                items.Add(answer.Text);
+            }
+
+            if (responseIds.Count == 0)
+            {
+                return items;
+            }
+
+            // The fail points are keyed by response (AD-025) but are one block of the
+            // checklist (AD-096), so they are read across every answer on the review and
+            // listed once each.
+            var links = new QueryExpression("al_al_failreason_al_response")
+            {
+                ColumnSet = new ColumnSet("al_failreasonid"),
+                Criteria = new FilterExpression(),
+            };
+            links.Criteria.AddCondition("al_responseid", ConditionOperator.In, responseIds.ToArray());
+
+            var seen = new HashSet<Guid>();
+            var points = new List<RankedItem>();
+            foreach (var link in service.RetrieveMultiple(links).Entities)
+            {
+                var reasonId = link.GetAttributeValue<Guid>("al_failreasonid");
+                if (reasonId == Guid.Empty || !seen.Add(reasonId))
+                {
+                    continue;
+                }
+
+                var reason = service.Retrieve(
+                    "al_failreason", reasonId, new ColumnSet("al_name", "al_category", "al_displayorder"));
+                var category = reason.GetAttributeValue<OptionSetValue>("al_category");
+                var name = reason.GetAttributeValue<string>("al_name") ?? string.Empty;
+
+                points.Add(new RankedItem
+                {
+                    Section = 0,
+                    Order = reason.GetAttributeValue<int?>("al_displayorder") ?? 0,
+                    Text = "Fail point: "
+                        + (category == null ? string.Empty : labels.Label("al_failreason", "al_category", category.Value) + " - ")
+                        + name.Trim(),
+                });
+            }
+
+            points.Sort(RankedItem.Compare);
+            foreach (var point in points)
+            {
+                items.Add(point.Text);
+            }
+
+            return items;
+        }
+
+        /// <summary>The display order of the section a question sits in; 0 when unknown.</summary>
+        private static int SectionOrder(IOrganizationService service, EntityReference questionRef)
+        {
+            if (questionRef == null)
+            {
+                return 0;
+            }
+
+            var question = service.Retrieve("al_question", questionRef.Id, new ColumnSet("al_sectionid"));
+            var sectionRef = question.GetAttributeValue<EntityReference>("al_sectionid");
+            if (sectionRef == null)
+            {
+                return 0;
+            }
+
+            var section = service.Retrieve("al_section", sectionRef.Id, new ColumnSet("al_displayorder"));
+            return section.GetAttributeValue<int?>("al_displayorder") ?? 0;
+        }
+
+        private sealed class RankedItem
+        {
+            public int Section;
+            public int Order;
+            public string Text;
+
+            public static int Compare(RankedItem a, RankedItem b)
+            {
+                var bySection = a.Section.CompareTo(b.Section);
+                if (bySection != 0)
+                {
+                    return bySection;
+                }
+
+                var byOrder = a.Order.CompareTo(b.Order);
+                return byOrder != 0 ? byOrder : string.CompareOrdinal(a.Text, b.Text);
+            }
         }
 
         /// <summary>Monday to Friday. Bank holidays are not deducted (OD-018).</summary>
@@ -141,6 +341,12 @@ namespace OutcomeTesting.Plugins
         /// ten days. The id of the existing row is returned so the caller can still report
         /// what the submission produced.
         ///
+        /// <paramref name="items"/> is the <see cref="NonPassItems"/> list and may be null
+        /// or empty; the description then reads as it did before the list existed.
+        ///
+        /// <paramref name="items"/> is the <see cref="NonPassItems"/> list and may be null
+        /// or empty; the description then reads as it did before the list existed.
+        ///
         /// <paramref name="adviserContact"/> may be null: the case carries the adviser as
         /// text (AD-029), so the name can match no contact or two.
         /// <see cref="AdviserContact"/> refuses to guess, and an unassigned action is far
@@ -155,6 +361,7 @@ namespace OutcomeTesting.Plugins
             int sequence,
             string reason,
             string observation,
+            IList<string> items,
             EntityReference adviserContact,
             DateTime raisedOn)
         {
@@ -176,7 +383,7 @@ namespace OutcomeTesting.Plugins
             {
                 ["al_name"] = name,
                 [ActionCodeAttr] = code,
-                ["al_description"] = Describe(reason, observation),
+                ["al_description"] = Describe(reason, observation, items),
                 ["al_outcomecaseid"] = caseRef,
                 ["al_reviewinstanceid"] = new EntityReference("al_reviewinstance", reviewId),
                 ["al_actionstatus"] = new OptionSetValue(StatusOpen),

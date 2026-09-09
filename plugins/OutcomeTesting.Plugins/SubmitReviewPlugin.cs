@@ -311,7 +311,7 @@ namespace OutcomeTesting.Plugins
             // through Question -> Section, which is the single-parent chain in the model.
             var mandatoryQuery = new QueryExpression(QuestionVersionEntity)
             {
-                ColumnSet = new ColumnSet("al_questionversionid"),
+                ColumnSet = new ColumnSet("al_questionversionid", "al_effectivefrom", "al_effectiveto"),
                 Criteria = new FilterExpression(),
             };
             mandatoryQuery.Criteria.AddCondition("al_ismandatory", ConditionOperator.Equal, true);
@@ -325,8 +325,24 @@ namespace OutcomeTesting.Plugins
             sectionLink.LinkCriteria.AddCondition(
                 "al_ownerrole", ConditionOperator.Equal, ownerRole);
 
-            var mandatory = service.RetrieveMultiple(mandatoryQuery);
-            if (mandatory.Entities.Count == 0)
+            // Only the versions in force today are owed an answer (AD-015, BR-013). A
+            // retired version stays Active so the answers it holds keep resolving, but
+            // demanding a fresh answer on it is how one Tax review came to carry two answers
+            // to the same question, one of which then decided the case.
+            var now = DateTime.UtcNow;
+            var required = new List<Entity>();
+            foreach (var version in service.RetrieveMultiple(mandatoryQuery).Entities)
+            {
+                if (ResponseRules.IsVersionEffective(
+                    version.GetAttributeValue<DateTime?>("al_effectivefrom"),
+                    version.GetAttributeValue<DateTime?>("al_effectiveto"),
+                    now))
+                {
+                    required.Add(version);
+                }
+            }
+
+            if (required.Count == 0)
             {
                 return;
             }
@@ -359,7 +375,7 @@ namespace OutcomeTesting.Plugins
             }
 
             var missing = 0;
-            foreach (var questionVersion in mandatory.Entities)
+            foreach (var questionVersion in required)
             {
                 if (!answered.Contains(questionVersion.Id))
                 {
@@ -371,7 +387,7 @@ namespace OutcomeTesting.Plugins
             {
                 throw new InvalidPluginExecutionException(
                     PreconditionPrefix + "Complete all questions marked Required before submitting. "
-                    + missing + " of " + mandatory.Entities.Count + " required questions are unanswered.");
+                    + missing + " of " + required.Count + " required questions are unanswered.");
             }
         }
 
@@ -553,9 +569,75 @@ namespace OutcomeTesting.Plugins
         /// the same question. The latest answer is the one that grades the review; without
         /// an order Dataverse could return the superseded one.
         /// </summary>
+        /// <summary>
+        /// The answer this review recorded for a question, by business code. A question may
+        /// hold several versions (AD-015); the answer is read from the version in force on
+        /// the review's reference day - its submission day once submitted, otherwise today
+        /// (BR-013) - and from any other version, newest first, only when no such answer
+        /// exists. Before 2026-09-09 this was "whichever answer was modified last", which on
+        /// the one Tax review submitted in DEV was the retired version's answer.
+        /// </summary>
         private static Entity AnswerFor(
             IOrganizationService service, Guid reviewId, string questionCode, params string[] columns)
         {
+            var versions = new QueryExpression(QuestionVersionEntity)
+            {
+                ColumnSet = new ColumnSet("al_effectivefrom", "al_effectiveto"),
+                Criteria = new FilterExpression(),
+            };
+            var question = versions.AddLink("al_question", "al_questionid", "al_questionid");
+            question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.Equal, questionCode);
+
+            var all = service.RetrieveMultiple(versions).Entities;
+            if (all.Count == 0)
+            {
+                return null;
+            }
+
+            var asOf = ReferenceDay(service, reviewId);
+            var effective = new List<Guid>();
+            var any = new List<Guid>();
+            foreach (var version in all)
+            {
+                any.Add(version.Id);
+                if (ResponseRules.IsVersionEffective(
+                    version.GetAttributeValue<DateTime?>("al_effectivefrom"),
+                    version.GetAttributeValue<DateTime?>("al_effectiveto"),
+                    asOf))
+                {
+                    effective.Add(version.Id);
+                }
+            }
+
+            return LatestAnswerOn(service, reviewId, effective, columns)
+                ?? LatestAnswerOn(service, reviewId, any, columns);
+        }
+
+        /// <summary>
+        /// The day a review's answers are read against: its submission day once submitted,
+        /// so a question retired afterwards does not change what the review said (BR-013),
+        /// otherwise today.
+        /// </summary>
+        private static DateTime ReferenceDay(IOrganizationService service, Guid reviewId)
+        {
+            var review = service.Retrieve(ReviewEntity, reviewId, new ColumnSet("al_submittedon"));
+            return review.GetAttributeValue<DateTime?>("al_submittedon") ?? DateTime.UtcNow;
+        }
+
+        private static Entity LatestAnswerOn(
+            IOrganizationService service, Guid reviewId, List<Guid> versionIds, string[] columns)
+        {
+            if (versionIds.Count == 0)
+            {
+                return null;
+            }
+
+            var values = new object[versionIds.Count];
+            for (var i = 0; i < versionIds.Count; i++)
+            {
+                values[i] = versionIds[i];
+            }
+
             var query = new QueryExpression(ResponseEntity)
             {
                 ColumnSet = new ColumnSet(columns),
@@ -563,10 +645,7 @@ namespace OutcomeTesting.Plugins
                 Criteria = new FilterExpression(),
             };
             query.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
-
-            var version = query.AddLink(QuestionVersionEntity, "al_questionversionid", "al_questionversionid");
-            var question = version.AddLink("al_question", "al_questionid", "al_questionid");
-            question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.Equal, questionCode);
+            query.Criteria.AddCondition("al_questionversionid", ConditionOperator.In, values);
             query.AddOrder("modifiedon", OrderType.Descending);
 
             var found = service.RetrieveMultiple(query).Entities;
@@ -820,7 +899,10 @@ namespace OutcomeTesting.Plugins
         ///
         /// The observation is the checker's own words from the discipline's fail
         /// observation question, which AD-019 leaves optional - so the description
-        /// <see cref="Remediation.Describe"/> builds has to stand without it.
+        /// <see cref="Remediation.Describe(string, string, IList{string})"/> builds has to
+        /// stand without it. The description is led by the non-pass items themselves
+        /// (<see cref="Remediation.NonPassItems"/>), read against today because the review
+        /// is being submitted now.
         ///
         /// The action is keyed on the case reference and the review's sequence, so a
         /// replayed submit finds the row it already raised instead of raising a second one,
@@ -843,6 +925,7 @@ namespace OutcomeTesting.Plugins
                 sequence,
                 reason,
                 AnswerTextFor(service, reviewId, observationQuestionCode),
+                Remediation.NonPassItems(service, reviewId, DateTime.UtcNow),
                 Remediation.AdviserContact(service, caseRef),
                 DateTime.UtcNow);
         }

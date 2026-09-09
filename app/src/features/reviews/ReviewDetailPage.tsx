@@ -263,7 +263,7 @@ function RemediationCard({ caseId }: { caseId: string | null }) {
                 summary.lines.map((line, index) => (
                   <tr key={line.id}>
                     <td className="checklist__no-col">{index + 1}</td>
-                    <td>{line.issue}</td>
+                    <td className="checklist__prose">{line.issue}</td>
                     <td>{line.remedialAction ?? ''}</td>
                     <td>{line.owner ?? ''}</td>
                     <td>{line.targetDate ?? ''}</td>

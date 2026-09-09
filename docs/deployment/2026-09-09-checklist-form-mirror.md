@@ -47,14 +47,15 @@ and `ot-answer__option` rules already in `outcome-testing.css`.
 
 ## Deployment
 
-Not pushed in this session. To deploy the portal change:
+Committed as 7ff3fdb and pushed to `fix/portal-signin-identity-username`; deployed the same
+afternoon:
 
-```
-plugins/OutcomeTesting.Registration: pushwebtemplate https://org0b075da8.crm11.dynamics.com a1000000-0000-4000-8000-00000000001b "powerpages/outcome-testing---outcometesting/web-templates/ot-review-detail/OT-Review-Detail.webtemplate.source.html"
-```
+| Step | Command | Result |
+|---|---|---|
+| 1 | `dotnet $T pushwebtemplate $U a1000000-0000-4000-8000-00000000001b ".../ot-review-detail/OT-Review-Detail.webtemplate.source.html"` | 56042 -> 57262 chars, modified 2026-09-09 15:36:23Z (after rebuilding the Release registration tool, whose binary predated the verb) |
+| 2 | `npm run build` then `npx pa app push` (app) | built clean, pushed successfully |
 
-then clear the site cache from `/_services/about` as before. The app change ships with the
-next Code App push.
+The site cache clear from `/_services/about` remains the project owner's step.
 
 ## Retest
 
