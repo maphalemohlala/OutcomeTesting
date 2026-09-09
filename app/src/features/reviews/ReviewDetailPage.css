@@ -167,9 +167,14 @@
   color: #000;
 }
 
+/* The option run. Scoped to where options actually live, because the grid's column headers
+   are <th class="opt"> too: an unscoped .opt rule makes inline-flex boxes of them and the
+   header row collapses - which is exactly how the headers came to look deformed. The
+   reference HTML carries the same collision; it is fixed here rather than reproduced. */
 .checklist-doc .opts { display: flex; flex-wrap: wrap; gap: 4px 14px; }
-.checklist-doc .opt { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-.checklist-doc .opt.wrap { white-space: normal; }
+.checklist-doc .opts .opt,
+.checklist-doc .rootcause .opt { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.checklist-doc .rootcause .opt.wrap { white-space: normal; }
 
 .checklist-doc .value { display: block; min-height: 1.2em; white-space: pre-wrap; }
 .checklist-doc .value[data-empty='true'] { min-height: 1.2em; }

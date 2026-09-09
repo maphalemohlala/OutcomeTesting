@@ -457,13 +457,18 @@
           {% comment %}
             Written as if / elsif on one value at a time, deliberately.
 
-            This was a {% case scode %} with two multi-value whens - "S-FQOUT or S-FQTAX" and
-            "S-E1 or S-E2 or S-E3 or S-E4 or S-E5". Multi-value `when` is an extension, not
-            core Liquid, and when it does not match there is no error: the case simply falls
-            through, every E section keeps its own name and inline layout, and the document's
-            "Suitability core checks" / "Suitability test point" table never appears at all.
-            That is precisely the symptom the project owner reported twice (AD-098, and again
+            This was a case block on scode with two multi-value whens - S-FQOUT or S-FQTAX,
+            and S-E1 through S-E5. Multi-value "when" is an extension, not core Liquid, and
+            when it does not match there is no error: the case simply falls through, every E
+            section keeps its own name and inline layout, and the document's "Suitability
+            core checks" / "Suitability test point" table never appears at all. That is
+            precisely the symptom the project owner reported twice (AD-098, and again
             2026-09-09), so the construct is gone rather than trusted. One test per code.
+
+            NOTE FOR ANY COMMENT IN THIS FILE: never write Liquid tag delimiters inside one.
+            This engine parses the contents of a comment block, so a tag named in passing is
+            opened for real - and an unclosed one turns the endcomment into "Unknown tag
+            'endcomment'" and takes the whole page down. Name tags in prose, without braces.
           {% endcomment %}
           {% if scode == 'S-TAX' %}
             {% assign block_title = 'File Quality - Tax check section' %}
