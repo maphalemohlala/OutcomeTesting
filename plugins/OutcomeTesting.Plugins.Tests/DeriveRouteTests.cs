@@ -152,5 +152,21 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Contains("ROUTE-TAX-AQS", error.Message);
         }
+
+        [Fact]
+        public void Derives_a_route_for_a_new_record_with_no_before_values()
+        {
+            // The import creates cases with the file's "Tax check required" answer already on
+            // the record and nothing before it. An empty before entity must read as "the
+            // answer changed", or every imported case would stay unrouted (AD-093).
+            var svc = Routes();
+            var record = Case(No, null);
+            var changes = new List<string>();
+
+            UpdateCaseDetailsPlugin.DeriveRoute(svc, new Entity("al_outcomecase"), record, changes);
+
+            Assert.Equal(AqsOnly, record.GetAttributeValue<EntityReference>("al_reviewrouteid").Id);
+            Assert.Single(changes);
+        }
     }
 }

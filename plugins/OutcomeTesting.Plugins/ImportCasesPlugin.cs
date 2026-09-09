@@ -160,7 +160,7 @@ namespace OutcomeTesting.Plugins
 
                 try
                 {
-                    userService.Create(record);
+                    CreateRoutedCase(userService, systemService, record);
                     imported++;
 
                     // Two rows in the same file naming the same reference are already caught
@@ -212,6 +212,49 @@ namespace OutcomeTesting.Plugins
 
             SetResponse(context, batchId, batchCode, parsed.Total, imported, duplicates, failed,
                 "[" + string.Join(",", report.ToArray()) + "]", auditId);
+        }
+
+        /// <summary>
+        /// Creates one imported case and, when the file answered "Tax check required",
+        /// derives its route (BR-004) and queues it (AD-093). The route is stamped before the
+        /// create so the row never exists unrouted; the hops run after it because the
+        /// lifecycle walker needs a row to move. A file that gives no answer leaves the case
+        /// at Imported, where the dashboard shows it as awaiting a route.
+        ///
+        /// Inside the caller's per-row try: a missing route configuration surfaces as that
+        /// row failing with the precondition message DeriveRoute already writes, not as a
+        /// case created in a state the queue will never offer.
+        /// </summary>
+        public static Guid CreateRoutedCase(IOrganizationService userService, IOrganizationService systemService, Entity record)
+        {
+            if (userService == null)
+            {
+                throw new ArgumentNullException(nameof(userService));
+            }
+
+            if (systemService == null)
+            {
+                throw new ArgumentNullException(nameof(systemService));
+            }
+
+            if (record == null)
+            {
+                throw new ArgumentNullException(nameof(record));
+            }
+
+            var changes = new List<string>();
+            UpdateCaseDetailsPlugin.DeriveRoute(systemService, new Entity(CaseEntity), record, changes);
+
+            var caseId = userService.Create(record);
+
+            CaseQueueing.QueueIfRouted(
+                userService,
+                caseId,
+                ImportRules.CaseStatusImported,
+                record.Contains("al_reviewrouteid"),
+                changes);
+
+            return caseId;
         }
 
         /// <summary>

@@ -148,5 +148,58 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Contains("\"caseReference\":null", json);
         }
+
+        private static readonly Guid AqsOnlyRoute = Guid.Parse("22222222-2222-4222-8222-222222222222");
+        private const int TaxCheckRequiredNo = 120910561;
+
+        private static FakeOrganizationService WithRoutes()
+        {
+            var service = new FakeOrganizationService();
+            service.Seed("al_reviewroute", AqsOnlyRoute, "al_routecode", "ROUTE-AQS");
+            service.Seed("al_reviewroute", Guid.Parse("11111111-1111-4111-8111-111111111111"), "al_routecode", "ROUTE-TAX-AQS");
+            return service;
+        }
+
+        private static Entity ImportedRecord(int? taxCheckRequired)
+        {
+            var record = new Entity("al_outcomecase");
+            record["al_casereference"] = "IO-1";
+            record["al_casestatus"] = new OptionSetValue(ImportRules.CaseStatusImported);
+            if (taxCheckRequired.HasValue)
+            {
+                record["al_taxcheckrequired"] = new OptionSetValue(taxCheckRequired.Value);
+            }
+
+            return record;
+        }
+
+        [Fact]
+        public void A_row_that_answers_tax_check_required_lands_in_the_queue_with_its_route()
+        {
+            // AD-093: the queue is the landing place for routed work, so an import that
+            // carries the answer needs no edit before a checker can pick the case up.
+            var service = WithRoutes();
+
+            var caseId = ImportCasesPlugin.CreateRoutedCase(service, service, ImportedRecord(TaxCheckRequiredNo));
+
+            var row = service.Row("al_outcomecase", caseId);
+            Assert.Equal(AqsOnlyRoute, row.GetAttributeValue<EntityReference>("al_reviewrouteid").Id);
+            Assert.Equal(CaseLifecycle.Queued, row.GetAttributeValue<OptionSetValue>("al_casestatus").Value);
+        }
+
+        [Fact]
+        public void A_row_without_the_answer_stays_imported_and_unrouted()
+        {
+            // It shows on the dashboard as "Awaiting a route" until someone answers, and the
+            // case-edit command queues it then.
+            var service = WithRoutes();
+
+            var caseId = ImportCasesPlugin.CreateRoutedCase(service, service, ImportedRecord(null));
+
+            var row = service.Row("al_outcomecase", caseId);
+            Assert.False(row.Contains("al_reviewrouteid"));
+            Assert.Equal(CaseLifecycle.Imported, row.GetAttributeValue<OptionSetValue>("al_casestatus").Value);
+            Assert.Empty(service.Updates);
+        }
     }
 }
