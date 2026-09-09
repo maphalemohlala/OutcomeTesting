@@ -60,82 +60,169 @@
   text-decoration: underline;
 }
 
-.review__answers {
+/*
+ * The Checker Checklist as a form. One card per block of the document, in the document's
+ * order, each with the document's own layout: a definition grid for the case header, a
+ * tick grid where every row shares one scale, a row per question with its ticks or value
+ * inline where the block mixes them. A card does not break across a printed page, so
+ * "Save as PDF" pages the way the document does.
+ */
+.checklist__card {
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
 }
 
-.review__answers h2 {
+.checklist__card + .checklist__card {
+  margin-top: var(--space-4);
+}
+
+@media print {
+  .checklist__card {
+    break-inside: avoid;
+  }
+}
+
+.checklist__card h2 {
   margin-bottom: var(--space-3);
   padding-bottom: var(--space-2);
   font-size: var(--text-lg);
   border-bottom: 1px solid var(--colour-border);
 }
 
-.review__answers-note {
+.checklist__help {
+  margin: 0 0 var(--space-3);
   font-size: var(--text-sm);
+  font-style: italic;
   color: var(--colour-text-muted);
 }
 
-.review__table {
+/* Case header and remediation judgements: label beside value, two across where room allows. */
+.checklist__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+}
+
+.checklist__field {
+  display: grid;
+  grid-template-columns: minmax(10rem, 45%) 1fr;
+  gap: var(--space-3);
+  align-items: baseline;
+  padding: var(--space-1) 0;
+  font-size: var(--text-sm);
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.checklist__field dt {
+  font-weight: 600;
+}
+
+.checklist__field dd {
+  margin: 0;
+}
+
+.checklist__field dd[data-empty='true'] {
+  min-height: 1.2em;
+}
+
+.checklist__table {
   width: 100%;
   font-size: var(--text-sm);
   border-collapse: collapse;
 }
 
-.review__table th,
-.review__table td {
+.checklist__table th,
+.checklist__table td {
   padding: var(--space-2) var(--space-3);
   text-align: left;
   vertical-align: top;
   border-bottom: 1px solid var(--colour-border);
 }
 
-.review__table thead th {
+.checklist__table thead th {
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--colour-text-muted);
 }
 
-.review__table tbody th {
-  font-weight: 600;
-}
-
-.review__answer-value {
-  display: block;
+.checklist__table tbody th {
   font-weight: 500;
 }
 
-.review__answer-value[data-empty='true'] {
-  font-weight: 400;
+.checklist__table--inline tbody th {
+  width: 40%;
+  font-weight: 600;
+}
+
+/* The tick columns take only the room the tick needs; the question keeps the rest. */
+.checklist__tick-col {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.checklist__table th.checklist__tick-col,
+.checklist__table td.checklist__tick-col {
+  text-align: center;
+}
+
+.checklist__no-col {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.checklist__tick {
+  font-size: var(--text-lg);
+  line-height: 1;
+  color: var(--colour-text-muted);
+}
+
+.checklist__tick[data-ticked='true'] {
+  color: var(--colour-text);
+}
+
+.checklist__options {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.checklist__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.checklist__value {
+  display: block;
+  min-height: 1.2em;
+  white-space: pre-wrap;
+}
+
+.checklist__value[data-empty='true'] {
   font-style: italic;
   color: var(--colour-text-muted);
 }
 
-.review__answer-note {
+/* The evidence note kept with a structured answer sits under its question, as supporting detail. */
+.checklist__note {
   display: block;
   margin-top: var(--space-1);
   font-size: var(--text-xs);
+  font-weight: 400;
   color: var(--colour-text-muted);
 }
 
-/*
- * Fail reasons sit under the answer they belong to, as a list rather than a joined
- * sentence: they are discrete recorded selections (AD-023) and a comma-separated run reads
- * as one prose reason. Marked with the same muted treatment as the note, since both are
- * supporting detail for the answer above them.
- */
-.review__answer-reasons {
-  margin: var(--space-1) 0 0;
-  padding-left: var(--space-4);
+/* The document's "Outcome lens" footer line on each suitability block. */
+.checklist__lens {
   font-size: var(--text-xs);
+  font-style: italic;
   color: var(--colour-text-muted);
-}
-
-.review__answer-reasons li {
-  margin-top: 2px;
+  border-bottom: 0;
 }
 
 .review__unavailable {

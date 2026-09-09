@@ -229,6 +229,7 @@
               <attribute name="al_displayorder" />
               <attribute name="al_helptext" />
               <attribute name="al_ownerrole" />
+              <attribute name="al_sectioncode" />
               <filter type="and">
                 <condition attribute="al_checklistversionid" operator="eq" value="{{ cv_id }}" />
                 <condition attribute="al_ownerrole" operator="eq" value="{{ owner_role }}" />
@@ -258,8 +259,8 @@
       {% endfetchxml %}
 
       {% comment %}
-        Fail reasons (FR-013, AD-054). Reference data, fetched once and reused by every
-        answer rather than per question.
+        Fail reasons (FR-013, AD-096). Reference data, fetched once, for the standalone
+        File Quality fail points block rendered before the File Quality outcome section.
 
         Scoped to the reviewing team, as the sections are. The category IS the team split in
         the V8 catalogue - "Tax check" reasons are the Tax team's, and AML, Breach and Record
@@ -335,6 +336,39 @@
             </section>
             {% endunless %}
             {% assign current_section = sid %}
+
+            {% comment %}
+              File Quality - Fail points (AD-096, superseding AD-054). On the document this
+              is its own block, between the checking points and the File Quality outcome,
+              and it is rendered as one here: a single tick list, not a picker under every
+              non-pass answer. The ticks are recorded against the File quality outcome
+              answer - the first question of the outcome section, which is what qv is at
+              this boundary - because the intersect is response-keyed (AD-025) and that is
+              the answer these reasons explain. The outcome question's autosave binds the
+              list through data-ot-failpoints-for, so a tick saves like any other change to
+              that answer.
+            {% endcomment %}
+            {% assign scode = qv['s.al_sectioncode'] %}
+            {% if scode == 'S-FQOUT' or scode == 'S-FQTAX' %}
+              {% assign fq_existing = null %}
+              {% for a in arows %}
+                {% if a.al_questionversionid.id == qv.al_questionversionid %}{% assign fq_existing = a %}{% endif %}
+              {% endfor %}
+              <section class="ot-card" aria-labelledby="sec-failpoints">
+                <h2 class="ot-card__title" id="sec-failpoints">File Quality &ndash; Fail points</h2>
+                <p class="ot-section-help">Tick every reason that applies. Recorded with the File quality outcome below.</p>
+                <div class="ot-answers">
+                  <div class="ot-answer__reasons" data-ot-failpoints-for="{{ qv.al_questionversionid }}">
+                    {% for fr in failreasons.results.entities %}
+                      <label class="ot-answer__option">
+                        {% capture pairkey %}|{{ fq_existing.al_responseid }}~{{ fr.al_failreasonid }}{% endcapture %}<input type="checkbox" data-ot-reason value="{{ fr.al_failreasonid }}"{% unless editable %} disabled{% endunless %}{% if fq_existing.al_responseid and selected_reason_pairs contains pairkey %} checked{% endif %} />
+                        <span>{{ fr.al_category.label | escape }} &mdash; {{ fr.al_name | escape }}</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+                </div>
+              </section>
+            {% endif %}
 
             <section class="ot-card" aria-labelledby="sec-{{ sid }}">
               <h2 class="ot-card__title" id="sec-{{ sid }}">
@@ -431,45 +465,33 @@
                 (app/src/features/reviews/useReviewDetail.ts, noteOf). It stays optional
                 under AD-019.
 
-                Whether the fail reasons and the evidence note start open.
+                Whether the evidence note starts open.
 
-                They used to be emitted hidden always, and revealed by the autosave script's
+                It used to be emitted hidden always, and revealed by the autosave script's
                 revealConditional() on load. That script is only emitted for an editable
-                review - so on a submitted review, or one belonging to another reviewer, the
-                reasons a checker had recorded were never shown to anyone reading it. The
-                answer was there and its reasons were invisible, which is the one thing a
-                read-only view of a completed check must not do.
+                review - so on a submitted review, or one belonging to another reviewer, a
+                note a checker had written was never shown to anyone reading it, which is
+                the one thing a read-only view of a completed check must not do.
 
                 So the decision is made here, from the record, and the client only takes over
                 once someone changes the answer. Open when the answer is a non-pass, or when
-                anything has already been recorded against it - reasons attached or a note
-                written - because a person who wrote something must be able to see it.
+                a note has already been written - because a person who wrote something must
+                be able to see it. The non-pass set matches revealConditional's, including
+                "No".
 
-                The non-pass set matches revealConditional's, including "No": an AML or CRA
-                question answered No is exactly what the FR-AML reasons exist to describe.
+                The fail reasons used to sit here too, under every non-pass answer (AD-054).
+                They are one standalone block now, rendered before the File Quality outcome
+                section (AD-096).
               {% endcomment %}
               {% assign nonpass_values = '120910301,120910302,120910303,120910304,120910306' | split: ',' %}
               {% capture chosen_value %}{{ existing.al_answerchoice.value }}{% endcapture %}
               {% assign is_nonpass = false %}
               {% for v in nonpass_values %}{% if v == chosen_value %}{% assign is_nonpass = true %}{% endif %}{% endfor %}
 
-              {% capture reason_prefix %}|{{ existing.al_responseid }}~{% endcapture %}
-              {% assign has_reasons = false %}
-              {% if existing.al_responseid and selected_reason_pairs contains reason_prefix %}{% assign has_reasons = true %}{% endif %}
-
               {% assign has_note = false %}
               {% if existing.al_answertext and existing.al_answertext != empty %}{% assign has_note = true %}{% endif %}
 
               {% if column == 'choice' or column == 'choices' %}
-                <div class="ot-answer__reasons" data-ot-reasons{% unless is_nonpass or has_reasons %} hidden{% endunless %}>
-                  <p class="ot-answer__note-label">Fail reasons — select all that apply</p>
-                  {% for fr in failreasons.results.entities %}
-                    <label class="ot-answer__option">
-                      {% capture pairkey %}|{{ existing.al_responseid }}~{{ fr.al_failreasonid }}{% endcapture %}<input type="checkbox" data-ot-reason value="{{ fr.al_failreasonid }}"{% unless editable %} disabled{% endunless %}{% if existing.al_responseid and selected_reason_pairs contains pairkey %} checked{% endif %} />
-                      <span>{{ fr.al_category.label | escape }} — {{ fr.al_name | escape }}</span>
-                    </label>
-                  {% endfor %}
-                </div>
                 <div class="ot-answer__note" data-ot-note{% unless is_nonpass or has_note %} hidden{% endunless %}>
                   <label class="ot-answer__note-label" for="note-{{ qv_id }}">
                     Evidence or observation (optional)
@@ -492,7 +514,7 @@
         {% if editable %}
         <script>
           /*
-           * Answer autosave and fail reasons (PP-07, PP-08, FR-013, AD-053, AD-054).
+           * Answer autosave and fail points (PP-07, PP-08, FR-013, AD-053, AD-096).
            *
            * Path: page -> Portals Web API PATCH al_reviewinstance.al_answerrequest ->
            * AnswerRequestPlugin -> AnswerWriter -> al_response -> ResponseGuardPlugin.
@@ -662,7 +684,9 @@
               var status = root.querySelector('[data-ot-status]');
               var note = root.querySelector('[data-ot-note]');
               var noteInput = root.querySelector('[data-ot-note-input]');
-              var reasons = root.querySelector('[data-ot-reasons]');
+              // The standalone fail points list (AD-096) belongs to the File quality outcome
+              // answer, so only that answer's bind() finds one; every other answer has none.
+              var reasons = document.querySelector('[data-ot-failpoints-for="' + questionVersion + '"]');
               var inputs = root.querySelectorAll('[data-ot-input]');
               var timer = null;
 
@@ -727,7 +751,7 @@
               }
 
               function selectedReasonIds() {
-                var boxes = root.querySelectorAll('[data-ot-reason]');
+                var boxes = reasons ? reasons.querySelectorAll('[data-ot-reason]') : [];
                 var ids = [];
                 for (var i = 0; i < boxes.length; i++) {
                   if (boxes[i].checked) { ids.push(boxes[i].value); }
@@ -736,8 +760,8 @@
               }
 
               /*
-               * Every reason checkbox this answer put on screen, ticked or not - the
-               * category-filtered failreasons fetch (template ~line 217), not the full
+               * Every reason checkbox the fail points block put on screen, ticked or not -
+               * the category-filtered failreasons fetch (template ~line 264), not the full
                * catalogue. AnswerWriter.ReconcileFailReasons only ever disassociates an id
                * that is both in this list and missing from selectedReasonIds(); a reason
                * linked to the answer but outside this list (the other team's category) is
@@ -745,7 +769,7 @@
                * untick it (finding 2, 2026-09-08 review).
                */
               function renderedReasonIds() {
-                var boxes = root.querySelectorAll('[data-ot-reason]');
+                var boxes = reasons ? reasons.querySelectorAll('[data-ot-reason]') : [];
                 var ids = [];
                 for (var i = 0; i < boxes.length; i++) { ids.push(boxes[i].value); }
                 return ids;
@@ -753,8 +777,8 @@
 
               /*
                * BR-006: a non-pass outcome requires remediation, so it is the point at
-               * which an evidence note and a fail reason become useful. Both stay optional
-               * under AD-019.
+               * which an evidence note becomes useful. It stays optional under AD-019. The
+               * fail points block is always on screen (AD-096), so nothing folds it away.
                */
               function revealConditional() {
                 var chosen = null;
@@ -764,18 +788,12 @@
                 var isNonPass = NON_PASS.indexOf(chosen) !== -1;
 
                 // Never hide what has something in it. Switching a Fail back to a Pass used
-                // to fold the reasons away with the reasons still attached and the note still
-                // written, leaving a person unable to see - let alone clear - what they had
-                // recorded. The server makes the same judgement when it renders the page.
-                var keptReason = false;
-                var boxes = reasons ? reasons.querySelectorAll('[data-ot-reason]') : [];
-                for (var r = 0; r < boxes.length; r++) {
-                  if (boxes[r].checked) { keptReason = true; }
-                }
+                // to fold the note away still written, leaving a person unable to see - let
+                // alone clear - what they had recorded. The server makes the same judgement
+                // when it renders the page.
                 var keptNote = !!(noteInput && noteInput.value);
 
                 if (note) { note.hidden = !(isNonPass || keptNote); }
-                if (reasons) { reasons.hidden = !(isNonPass || keptReason); }
               }
 
               /*
@@ -829,7 +847,7 @@
 
               // No closure over the box is needed any more: toggleReason() no longer takes
               // one, since a tick is just another field feeding queue() -> save().
-              var reasonBoxes = root.querySelectorAll('[data-ot-reason]');
+              var reasonBoxes = reasons ? reasons.querySelectorAll('[data-ot-reason]') : [];
               for (var r = 0; r < reasonBoxes.length; r++) {
                 reasonBoxes[r].addEventListener('change', toggleReason);
               }

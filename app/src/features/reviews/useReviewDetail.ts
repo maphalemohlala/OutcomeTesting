@@ -1,11 +1,24 @@
 import { useEffect, useState } from 'react';
+import { isVersionEffective } from './versionEffective';
+import { answerOf, date, noteOf, text } from './reviewAnswer';
+import { buildSections, type ReviewSection } from './reviewSections';
+import {
+  caseHeaderFields,
+  failPoints,
+  type FailPoint,
+  type HeaderField,
+  type TickedAnswer,
+} from './checklistForm';
 import type { ReviewType } from '../../types/domain';
 import { isRecordId } from '../../services/odata';
 import {
   Al_reviewinstancesService,
   Al_responsesService,
   Al_questionversionsService,
+  Al_questionsService,
+  Al_sectionsService,
   Al_failreasonsService,
+  Al_outcomecasesService,
   Al_al_failreason_al_responsesetService,
 } from '../../generated';
 import {
@@ -13,26 +26,21 @@ import {
   Al_reviewinstancesal_reviewtype,
   type Al_reviewinstances,
 } from '../../generated/models/Al_reviewinstancesModel';
-import {
-  Al_responsesal_answerchoice,
-  Al_responsesal_answerchoices,
-  type Al_responses,
-} from '../../generated/models/Al_responsesModel';
+import type { Al_responses } from '../../generated/models/Al_responsesModel';
 import {
   Al_questionversionsal_responsetype,
   type Al_questionversions,
 } from '../../generated/models/Al_questionversionsModel';
+import {
+  Al_failreasonsal_category,
+  type Al_failreasons,
+} from '../../generated/models/Al_failreasonsModel';
+import { choiceLabel } from '../../lib/choiceLabel';
 
-export interface ReviewResponse {
-  id: string;
-  order: number;
-  question: string;
-  responseType: string;
+export interface ReviewResponse extends TickedAnswer {
   answer: string | null;
   note: string | null;
   answeredOn: string | null;
-  /** The AD-023 fail reasons recorded against this answer, by name. Empty when none are. */
-  failReasons: string[];
 }
 
 export interface ReviewHeader {
@@ -42,6 +50,7 @@ export interface ReviewHeader {
   status: string;
   sequence: number;
   checklistVersion: string | null;
+  checklistVersionId: string | null;
   caseId: string | null;
   caseName: string | null;
   owner: string | null;
@@ -53,7 +62,15 @@ export interface ReviewHeader {
 
 export interface ReviewDetail {
   header: ReviewHeader;
-  responses: ReviewResponse[];
+  /** The document's case header block; null when the case could not be read. */
+  caseHeader: HeaderField[] | null;
+  /**
+   * The team's sections with every question in force, in the sections' display order -
+   * which is the order of the Checker Checklist document - each with its answer or none.
+   */
+  sections: ReviewSection<ReviewResponse>[];
+  /** The standalone File Quality fail points block: the team's reasons, ticked where recorded. */
+  failPoints: FailPoint[];
 }
 
 export type ReviewDetailState =
@@ -61,43 +78,8 @@ export type ReviewDetailState =
   | { status: 'loading' }
   | { status: 'ready'; detail: ReviewDetail };
 
-function text(value: string | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}
-
-function date(value: string | undefined): string | null {
-  if (!value) return null;
-  const time = new Date(value).getTime();
-  if (Number.isNaN(time)) return null;
-  return new Date(time).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-/** The reviewer's answer, whichever response field the question type populated. */
-function answerOf(record: Al_responses): string | null {
-  if (record.al_answerchoice !== undefined) {
-    return (
-      record.al_answerchoicename ?? Al_responsesal_answerchoice[record.al_answerchoice] ?? null
-    );
-  }
-  if (record.al_answerchoices?.length) {
-    return record.al_answerchoices
-      .map((value) => Al_responsesal_answerchoices[value] ?? String(value))
-      .join(', ');
-  }
-  if (text(record.al_answertext)) return text(record.al_answertext);
-  return date(record.al_answerdate);
-}
-
-/** A free-text note kept alongside a structured answer (e.g. evidence for a Fail). */
-function noteOf(record: Al_responses): string | null {
-  const structured = record.al_answerchoice !== undefined || !!record.al_answerchoices?.length;
-  return structured ? text(record.al_answertext) : null;
-}
+/** The al_section owner role per review discipline (AD-020). */
+const OWNER_ROLE: Record<string, number> = { Tax: 120910100, AQS: 120910101 };
 
 /**
  * Fail reasons are a many-to-many between al_response and al_failreason through
@@ -111,75 +93,57 @@ function noteOf(record: Al_responses): string | null {
  */
 const LINK_CHUNK = 20;
 
-async function failReasonsByResponse(
-  responseIds: string[],
-): Promise<Map<string, string[]>> {
-  const byResponse = new Map<string, string[]>();
-  if (responseIds.length === 0) return byResponse;
+async function linkedFailReasons(responseIds: string[]): Promise<Set<string>> {
+  const linked = new Set<string>();
+  if (responseIds.length === 0) return linked;
 
   const chunks: string[][] = [];
   for (let i = 0; i < responseIds.length; i += LINK_CHUNK) {
     chunks.push(responseIds.slice(i, i + LINK_CHUNK));
   }
 
-  const [reasons, ...linkResults] = await Promise.all([
-    Al_failreasonsService.getAll({ select: ['al_failreasonid', 'al_name'], top: 500 }),
-    ...chunks.map((chunk) =>
+  const linkResults = await Promise.all(
+    chunks.map((chunk) =>
       Al_al_failreason_al_responsesetService.getAll({
         filter: chunk.map((id) => `al_responseid eq ${id}`).join(' or '),
         top: 1000,
       }),
     ),
-  ]);
-
-  // A reason whose row cannot be read still counts as recorded, so the id is shown rather
-  // than the link being dropped - a missing reason on a Fail reads as "no reason given",
-  // which is a materially different claim about the review.
-  const nameById = new Map<string, string>();
-  if (reasons.success) {
-    for (const reason of reasons.data) {
-      nameById.set(reason.al_failreasonid, reason.al_name);
-    }
-  }
+  );
 
   for (const result of linkResults) {
     if (!result.success) continue;
     for (const link of result.data) {
-      const list = byResponse.get(link.al_responseid) ?? [];
-      list.push(nameById.get(link.al_failreasonid) ?? link.al_failreasonid);
-      byResponse.set(link.al_responseid, list);
+      linked.add(link.al_failreasonid);
     }
   }
 
-  for (const list of byResponse.values()) {
-    list.sort((a, b) => a.localeCompare(b));
-  }
-
-  return byResponse;
+  return linked;
 }
 
 function toResponse(
   record: Al_responses,
   versions: Map<string, Al_questionversions>,
-  failReasons: Map<string, string[]>,
 ): ReviewResponse {
   const version = record._al_questionversionid_value
     ? versions.get(record._al_questionversionid_value)
     : undefined;
   return {
     id: record.al_responseid,
-    order: version?.al_displayorder ?? 0,
+    versionId: record._al_questionversionid_value ?? null,
     question:
       text(version?.al_questiontext) ?? text(record.al_questionversionidname) ?? record.al_name,
+    responseTypeValue: version?.al_responsetype ?? null,
     responseType: version
       ? version.al_responsetypename ??
         Al_questionversionsal_responsetype[version.al_responsetype] ??
         '—'
       : '—',
+    answerChoice: record.al_answerchoice ?? null,
+    answerChoices: record.al_answerchoices ?? [],
     answer: answerOf(record),
     note: noteOf(record),
     answeredOn: date(record.al_answerdate) ?? date(record.modifiedon),
-    failReasons: failReasons.get(record.al_responseid) ?? [],
   };
 }
 
@@ -196,6 +160,7 @@ function toHeader(record: Al_reviewinstances, expected: ReviewType): ReviewHeade
     status,
     sequence: record.al_sequence ?? 0,
     checklistVersion: text(record.al_checklistversionidname),
+    checklistVersionId: record._al_checklistversionid_value ?? null,
     caseId: record._al_outcomecaseid_value ?? null,
     caseName: text(record.al_outcomecaseidname),
     owner: text(record.owneridname),
@@ -206,11 +171,21 @@ function toHeader(record: Al_reviewinstances, expected: ReviewType): ReviewHeade
   };
 }
 
+function toFailReason(record: Al_failreasons) {
+  return {
+    id: record.al_failreasonid,
+    name: record.al_name,
+    category: choiceLabel(Al_failreasonsal_category, record.al_category, record.al_categoryname),
+    categoryValue: record.al_category ?? null,
+    order: record.al_displayorder ?? 0,
+  };
+}
+
 /**
- * Reads one review instance and the answers captured against it (BR-004). Read-only:
- * grading is a permissioned write path deferred under OD-007, so this view records
- * nothing. Row visibility is enforced by Dataverse security (BR-012); a review the
- * user may not see returns as unavailable rather than showing partial data.
+ * Reads one review instance and lays it out as the Checker Checklist form (BR-004).
+ * Read-only: grading is a permissioned write path deferred under OD-007, so this view
+ * records nothing. Row visibility is enforced by Dataverse security (BR-012); a review
+ * the user may not see returns as unavailable rather than showing partial data.
  */
 export function useReviewDetail(
   reviewId: string | undefined,
@@ -239,8 +214,10 @@ export function useReviewDetail(
         top: 200,
       }),
       Al_questionversionsService.getAll({ top: 500 }),
+      Al_questionsService.getAll({ top: 500 }),
+      Al_failreasonsService.getAll({ top: 500 }),
     ])
-      .then(async ([review, responses, versions]) => {
+      .then(async ([review, responses, versions, questions, reasons]) => {
         if (cancelled) return;
         if (!review.success || !review.data) {
           setState({
@@ -251,35 +228,104 @@ export function useReviewDetail(
           return;
         }
 
-        const versionById = new Map<string, Al_questionversions>();
-        if (versions.success) {
-          for (const version of versions.data) {
-            versionById.set(version.al_questionversionid, version);
-          }
-        }
+        const header = toHeader(review.data, expectedType);
 
-        // Read after the responses because the intersect is keyed by response id. A
-        // failure here leaves every list empty rather than failing the page: the answers
-        // are the substance and are already in hand.
-        const reasonsByResponse = responses.success
-          ? await failReasonsByResponse(responses.data.map((r) => r.al_responseid)).catch(
-              () => new Map<string, string[]>(),
-            )
-          : new Map<string, string[]>();
+        // The form is the team's: the sections this discipline owns (AD-020) on the
+        // checklist version issued to the review. Read after the review because both keys
+        // come off it. The case is the document's header block; either read failing leaves
+        // its block absent rather than failing the page.
+        const ownerRole = OWNER_ROLE[header.type] ?? OWNER_ROLE[expectedType];
+        const sectionFilter = [
+          `al_ownerrole eq ${ownerRole}`,
+          header.checklistVersionId
+            ? `_al_checklistversionid_value eq ${header.checklistVersionId}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' and ');
+
+        const responseIds = responses.success
+          ? responses.data.map((response) => response.al_responseid)
+          : [];
+
+        const [sections, outcomeCase, linked] = await Promise.all([
+          Al_sectionsService.getAll({ filter: sectionFilter, top: 100 }),
+          header.caseId
+            ? Al_outcomecasesService.get(header.caseId).catch(() => null)
+            : Promise.resolve(null),
+          linkedFailReasons(responseIds).catch(() => new Set<string>()),
+        ]);
 
         if (cancelled) return;
 
+        // Answers are read against the versions in force on the review's reference day: its
+        // submission day once submitted, otherwise today (AD-015, BR-013). A retired version
+        // keeps the answers written against it, but showing them beside the current
+        // version's is how one review came to list Tax check reason three times. An answer
+        // whose version is unknown (the versions read failed) is kept rather than hidden.
+        const asOf = review.data.al_submittedon ? new Date(review.data.al_submittedon) : new Date();
+        const versionById = new Map<string, Al_questionversions>();
+        const effective: Al_questionversions[] = [];
+        if (versions.success) {
+          for (const version of versions.data) {
+            versionById.set(version.al_questionversionid, version);
+            if (isVersionEffective(version, asOf)) effective.push(version);
+          }
+        }
+
         const rows = responses.success
           ? responses.data
-              .map((response) => toResponse(response, versionById, reasonsByResponse))
-              .sort((a, b) => a.order - b.order)
+              .filter((response) => {
+                const version = response._al_questionversionid_value
+                  ? versionById.get(response._al_questionversionid_value)
+                  : undefined;
+                return !version || isVersionEffective(version, asOf);
+              })
+              .map((response) => toResponse(response, versionById))
           : [];
 
         setState({
           status: 'ready',
           detail: {
-            header: toHeader(review.data, expectedType),
-            responses: rows,
+            header,
+            caseHeader:
+              outcomeCase?.success && outcomeCase.data ? caseHeaderFields(outcomeCase.data) : null,
+            sections: buildSections(
+              sections.success
+                ? sections.data.map((section) => ({
+                    id: section.al_sectionid,
+                    code: text(section.al_sectioncode),
+                    name: section.al_name,
+                    order: section.al_displayorder ?? 0,
+                    helpText: text(section.al_helptext),
+                  }))
+                : [],
+              questions.success
+                ? questions.data.map((question) => ({
+                    id: question.al_questionid,
+                    sectionId: question._al_sectionid_value ?? null,
+                    order: question.al_displayorder ?? 0,
+                  }))
+                : [],
+              effective.map((version) => ({
+                id: version.al_questionversionid,
+                questionId: version._al_questionid_value ?? null,
+                order: version.al_displayorder ?? 0,
+                text: text(version.al_questiontext) ?? version.al_name,
+                responseTypeValue: version.al_responsetype ?? null,
+                responseType:
+                  version.al_responsetypename ??
+                  Al_questionversionsal_responsetype[version.al_responsetype] ??
+                  '—',
+                mandatory: version.al_ismandatory,
+              })),
+              rows,
+            ),
+            failPoints: failPoints(
+              reasons.success ? reasons.data.map(toFailReason) : [],
+              linked,
+              header.type,
+            ),
           },
         });
       })

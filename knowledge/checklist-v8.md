@@ -26,7 +26,7 @@ Every displayed answerable question is mandatory before its section can be submi
 | Case header | `Outcome Case` columns, captured at intake. Not versioned questions. |
 | Tax check section | Section `S-TAX`, owned by the Tax reviewer |
 | AML and CRA checking points | Section `S-AMLCRA` |
-| File Quality fail points | `al_FailReason` seed rows, attached to `Response`. Not questions. Scoped per team by category — see below. |
+| File Quality fail points | `al_FailReason` seed rows, one standalone block placed before the File Quality outcome and recorded on the File quality outcome `Response` (AD-096). Not questions. Scoped per team by category — see below. |
 | File Quality outcome | Two sections, one per team: `S-FQTAX` and `S-FQOUT` |
 | Suitability core checks E1–E5 | Sections `S-E1` to `S-E5` |
 | Centralised Retirement Proposition | Section `S-CRP`, conditional |
@@ -238,6 +238,14 @@ This is a scoping rule in the page, not a boundary: `ResponseGuardPlugin` enforc
 submission lock on a fail-reason association but does not check the team. AD-020 section
 ownership, which IS enforced server-side, is what stops a reviewer answering another
 discipline's questions in the first place.
+
+**The block is standalone (AD-096).** On the document "File Quality – Fail points" is its own
+block between the AML and CRA checking points and the File Quality outcome, and both the
+portal review page and the app's review detail render it as one: a single tick list, always
+on screen, not a picker under each non-pass answer (which is what AD-054 had made it). The
+ticks are stored on the File quality outcome answer - Q-FQ-01 for AQS, Q-FQTAX-01 for Tax -
+through the same response-keyed intersect. The app shows a reason ticked if it is linked to
+any answer on the review, so reasons recorded under AD-054 remain visible.
 
 | Code | Category | Reason |
 |---|---|---|
