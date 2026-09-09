@@ -416,7 +416,7 @@
     var panels = document.querySelectorAll('[data-ot-response]');
     if (!panels.length) { return; }
 
-    function friendlyError(raw) {
+    function friendlyError(raw, httpStatus) {
       var text = String(raw || '');
       if (text.indexOf('CONFLICT:') !== -1) {
         return 'This action changed since you opened it. Reload the page and try again.';
@@ -428,7 +428,21 @@
         var idx = text.indexOf('PRECONDITION:');
         return text.substring(idx + 'PRECONDITION:'.length).trim();
       }
-      return 'We could not save that. Nothing has been changed. Please try again.';
+      /*
+       * A 403 is the permission chain, not a transient fault: the write on al_remediationaction
+       * is Contact-scoped and bound to the Adviser Remediation and Planner roles (AD-069), so an
+       * account without one of them is refused on every save and "try again" cannot help. The
+       * generic line below hid exactly that on 2026-09-09.
+       */
+      if (httpStatus === 403) {
+        return 'Your account is not allowed to change this action, so nothing was saved. Responding needs the '
+          + 'Adviser Remediation or Planner role on your portal account, and the action has to be assigned to you. '
+          + 'Ask an administrator to check both rather than retrying.';
+      }
+      if (httpStatus === 401) {
+        return 'Your session was not accepted, so nothing was saved. Reload the page and sign in again.';
+      }
+      return 'We could not save that (status ' + (httpStatus || 'unknown') + '). Nothing has been changed. Please try again.';
     }
 
     function wire(panel) {
@@ -508,7 +522,7 @@
               return;
             }
 
-            show(friendlyError(request.responseText), 'error');
+            show(friendlyError(request.responseText, request.status), 'error');
             busy(false);
           };
 
@@ -548,7 +562,7 @@
 
     var REJECTED = '120910721';
 
-    function friendlyError(raw) {
+    function friendlyError(raw, httpStatus) {
       var text = String(raw || '');
       if (text.indexOf('PRECONDITION:') !== -1) {
         var idx = text.indexOf('PRECONDITION:');
@@ -560,7 +574,14 @@
       }
       // A user without the T&C Supervisor role lands here: the platform refuses the
       // create before any of our code runs, so there is no prefix to branch on.
-      return 'We could not record that sign-off. You may not have permission to sign off remediation.';
+      if (httpStatus === 403) {
+        return 'Your account is not allowed to sign off remediation, so nothing was recorded. Signing off needs the '
+          + 'T&C Supervisor role on your portal account. Ask an administrator rather than retrying.';
+      }
+      if (httpStatus === 401) {
+        return 'Your session was not accepted, so nothing was recorded. Reload the page and sign in again.';
+      }
+      return 'We could not record that sign-off (status ' + (httpStatus || 'unknown') + '). Nothing has been changed.';
     }
 
     function wire(panel) {
@@ -621,7 +642,7 @@
               return;
             }
 
-            show(friendlyError(request.responseText), 'error');
+            show(friendlyError(request.responseText, request.status), 'error');
             save.disabled = false;
           };
 
