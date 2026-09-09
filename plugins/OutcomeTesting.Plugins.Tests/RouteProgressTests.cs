@@ -131,6 +131,24 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void One_approved_action_of_several_does_not_open_the_aqs_gate()
+        {
+            // A review raises one action per thing the checker marked down (2026-09-10), so
+            // approving the first would otherwise let the AQS review start with the rest of
+            // the file still unremediated.
+            var svc = Case(routeTax: true, routeAqs: true);
+            Review(svc, ResponseRules.ReviewTypeTax, submitted: true, id: TaxReviewId);
+            var first = Action(svc, TaxReviewId);
+            var second = Action(svc, TaxReviewId);
+
+            Signoff(svc, first, SignoffProgressPlugin.DecisionApprovedValue);
+            Assert.False(SubmitReviewPlugin.RemediationApproved(svc, TaxReviewId));
+
+            Signoff(svc, second, SignoffProgressPlugin.DecisionApprovedValue);
+            Assert.True(SubmitReviewPlugin.RemediationApproved(svc, TaxReviewId));
+        }
+
+        [Fact]
         public void An_inactive_signoff_does_not_count()
         {
             var svc = Case(routeTax: true, routeAqs: true);

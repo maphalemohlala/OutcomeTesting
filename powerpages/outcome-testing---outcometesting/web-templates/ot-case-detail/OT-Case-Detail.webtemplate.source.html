@@ -278,6 +278,13 @@
             </thead>
             <tbody>
               {% assign row_no = 0 %}
+              {% comment %}
+                A review raises one action per thing the checker marked down (2026-09-10),
+                and every one carries the same provenance in its own description. Each
+                record keeps it so it stands alone in Dataverse; the table shows it once
+                per run of actions that share it, rather than under every row.
+              {% endcomment %}
+              {% assign ot_shown_note = '' %}
               {% for a in case_actions %}
                 {% assign latest = null %}
                 {% for s in case_signoffs.results.entities %}{% if latest == null and s.al_remediationactionid.id == a.al_remediationactionid %}{% assign latest = s %}{% endif %}{% endfor %}
@@ -340,9 +347,10 @@
                       </tr>
                     {% endif %}
                   {% endfor %}
-                  {% if ot_note != '' %}
+                  {% if ot_note != '' and ot_note != ot_shown_note %}
                     <tr class="ot-issue-note"><td colspan="6">{{ ot_note | escape }}</td></tr>
                   {% endif %}
+                  {% if ot_note != '' %}{% assign ot_shown_note = ot_note %}{% endif %}
                 {% else %}
                   {% assign row_no = row_no | plus: 1 %}
                   <tr>

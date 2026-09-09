@@ -65,6 +65,32 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// The business code for the action raised against one item on the review, numbered
+        /// from 1 in the order <see cref="NonPassItems"/> lists them.
+        ///
+        /// A review now raises one action per thing the checker marked down (project owner,
+        /// 2026-09-10), because the agreed form carries a remedial action, an owner, a target
+        /// date and a sign-off against every numbered row - and one action cannot hold four
+        /// answers per issue. The index is what keeps a replayed submit resolving to the rows
+        /// it already raised rather than raising the set a second time.
+        ///
+        /// The index is appended to the truncated stem rather than to the full code, so a
+        /// long case reference cannot push the number off the end and collide two items.
+        /// </summary>
+        public static string ActionCode(string caseReference, int sequence, int index)
+        {
+            var suffix = "-" + index;
+            var stem = "REM-" + (caseReference ?? string.Empty) + "-" + sequence;
+            var room = CodeMaxLength - suffix.Length;
+            if (stem.Length > room)
+            {
+                stem = stem.Substring(0, room);
+            }
+
+            return stem + suffix;
+        }
+
+        /// <summary>
         /// What the adviser is told they have to put right.
         ///
         /// <paramref name="reason"/> is the grade or result that triggered this, as a label
@@ -78,12 +104,37 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// The heading the item list is written under.
+        ///
+        /// Public because it is a format, not a label: the Code App
+        /// (app/src/features/remediation/remediationIssues.ts) and the two portal templates
+        /// split a description back into its items to number them one to a row, and this
+        /// line is the marker they drop. Changing the wording here changes what they parse.
+        /// </summary>
+        public const string IssuesHeading = "Issues found on the check:";
+
+        /// <summary>
         /// As <see cref="Describe(string, string)"/>, led by the issues themselves: one line
         /// per non-pass item from <see cref="NonPassItems"/>, so the "Issue / fail reason"
         /// the adviser reads is prepopulated with what the checker actually marked down
         /// (project owner, 2026-09-09) rather than a sentence that sends them back to the
         /// checklist to find out.
+        ///
+        /// Written as one description rather than one action per item: the action is the
+        /// unit the BR-010 clock, the adviser's response and the T&amp;C sign-off hang off,
+        /// and an action per item would move the case to Awaiting Sign-off on the first
+        /// completion. The renderers do the numbering.
         /// </summary>
+        /// <summary>
+        /// The description for the action raised against one item. The item is written in
+        /// the same "- item" shape the list used, so the renderers that number the rows read
+        /// a one-item action and a legacy many-item one through the same path.
+        /// </summary>
+        public static string DescribeItem(string reason, string observation, string item)
+        {
+            return Describe(reason, observation, new List<string> { item });
+        }
+
         public static string Describe(string reason, string observation, IList<string> items)
         {
             var text = "Raised automatically when the review was submitted"
@@ -97,7 +148,7 @@ namespace OutcomeTesting.Plugins
 
             if (items != null && items.Count > 0)
             {
-                var issues = "Issues found on the check:";
+                var issues = IssuesHeading;
                 foreach (var item in items)
                 {
                     if (!string.IsNullOrWhiteSpace(item))
@@ -113,22 +164,47 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// A non-pass answer for BR-006's purposes: the outcomes that require remediation
-        /// (<see cref="ResponseRules.IsNonPass"/>) and No, which is what a check on the AML
-        /// and CRA and Consumer Duty scales fails as.
+        /// The scales whose answers prepopulate a remediation action: Pass / Fail and
+        /// Pass / Fail / Insufficient evidence, and no others (project owner, 2026-09-09).
+        ///
+        /// The yes/no scales are deliberately out. A No on an AML and CRA checking point or
+        /// on a Consumer Duty outcome used to be listed as something the adviser had to put
+        /// right, and so did an Insufficient evidence on Consumer Duty, which answers
+        /// Yes / No / Insufficient evidence - the same option value the suitability scale
+        /// uses, which is why the answer alone cannot decide this and the scale has to.
+        ///
+        /// The grade scale is out too. The grade is already the reason the action gives
+        /// (<see cref="Describe(string, string, IList{string})"/>), so listing it again as
+        /// an issue only says the same thing twice.
         /// </summary>
-        public static bool IsNonPassAnswer(int choice)
+        public static bool IsRemediableScale(int responseType)
         {
-            return ResponseRules.IsNonPass(choice) || choice == ResponseRules.ChoiceNo;
+            return responseType == ResponseRules.TypePassFail
+                || responseType == ResponseRules.TypePassFailInsufficient;
+        }
+
+        /// <summary>
+        /// An answer that belongs on the remediation action's issue list: a Fail or an
+        /// Insufficient evidence recorded on one of the pass/fail scales
+        /// (<see cref="IsRemediableScale"/>). Potential harm cannot reach here, being only
+        /// on the grade scale, and neither can a No.
+        /// </summary>
+        public static bool IsNonPassAnswer(int responseType, int choice)
+        {
+            return IsRemediableScale(responseType) && ResponseRules.IsNonPass(choice);
         }
 
         /// <summary>
         /// One line per thing the checker marked down, in the order the checklist lays them
-        /// out: every answer of Fail, Insufficient evidence, Potential harm or No on a
-        /// question version in force on <paramref name="asOf"/>, each as "question: answer",
-        /// followed by every File Quality fail point ticked on the review as
-        /// "Fail point: category - reason". This is what the remediation action's
-        /// "Issue / fail reason" is prepopulated with.
+        /// out: every Fail or Insufficient evidence recorded on a pass/fail test point
+        /// (<see cref="IsRemediableScale"/>) whose question version is in force on
+        /// <paramref name="asOf"/>, each as "question: answer", followed by every File
+        /// Quality fail point ticked on the review as "Fail point: reason". This is what the
+        /// remediation action's "Issue / fail reason" is prepopulated with.
+        ///
+        /// The yes/no answers are not here and are not an omission: remediation is raised
+        /// against the pass/fail test points, and the fail points below carry the AML, Breach
+        /// and Record Keeping failures in their own right (project owner, 2026-09-09).
         ///
         /// Read from the responses rather than from a fixed list of questions so a
         /// checklist change (FR-030) reaches here without a code change. A retired version's
@@ -153,7 +229,7 @@ namespace OutcomeTesting.Plugins
                 responseIds.Add(response.Id);
 
                 var choice = response.GetAttributeValue<OptionSetValue>("al_answerchoice");
-                if (choice == null || !IsNonPassAnswer(choice.Value))
+                if (choice == null || !ResponseRules.IsNonPass(choice.Value))
                 {
                     continue;
                 }
@@ -167,7 +243,17 @@ namespace OutcomeTesting.Plugins
                 var version = service.Retrieve(
                     "al_questionversion",
                     versionRef.Id,
-                    new ColumnSet("al_questiontext", "al_effectivefrom", "al_effectiveto", "al_displayorder", "al_questionid"));
+                    new ColumnSet("al_questiontext", "al_responsetype", "al_effectivefrom", "al_effectiveto", "al_displayorder", "al_questionid"));
+
+                // The scale decides this, not the answer on its own: Insufficient evidence is
+                // one option value shared by the suitability scale and the Consumer Duty one,
+                // and only the first of those is a remediable test point. The cheap check on
+                // the answer above runs first so a Pass never costs a Retrieve.
+                var responseType = version.GetAttributeValue<OptionSetValue>("al_responsetype");
+                if (responseType == null || !IsNonPassAnswer(responseType.Value, choice.Value))
+                {
+                    continue;
+                }
 
                 if (!ResponseRules.IsVersionEffective(
                     version.GetAttributeValue<DateTime?>("al_effectivefrom"),
@@ -335,16 +421,14 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Raises the action, or returns the one already raised.
+        /// Raises one action per item the checker marked down, and returns their ids in the
+        /// order they were raised. An item already raised is returned rather than written
+        /// again, so a replayed submit produces the same set.
         ///
-        /// An existing code is a reason to do nothing at all, not to write again. An upsert
-        /// would put the status back to Open and overwrite <c>al_adviserresponse</c>, so a
-        /// replay would silently undo work the adviser had already done and restart their
-        /// ten days. The id of the existing row is returned so the caller can still report
-        /// what the submission produced.
-        ///
-        /// <paramref name="items"/> is the <see cref="NonPassItems"/> list and may be null
-        /// or empty; the description then reads as it did before the list existed.
+        /// One action per item because the agreed form (project owner, 2026-09-10) carries a
+        /// remedial action, an owner, a target date and a sign-off against every numbered
+        /// row, and those are single-valued on the action - a shared action can show the
+        /// issues as rows but cannot answer them one at a time.
         ///
         /// <paramref name="items"/> is the <see cref="NonPassItems"/> list and may be null
         /// or empty; the description then reads as it did before the list existed.
@@ -355,7 +439,7 @@ namespace OutcomeTesting.Plugins
         /// better than no action - the remediation is on the worklist for a manager to
         /// route, rather than lost to a directory gap.
         /// </summary>
-        public static Guid Raise(
+        public static IList<Guid> Raise(
             IOrganizationService service,
             EntityReference caseRef,
             string caseReference,
@@ -367,8 +451,81 @@ namespace OutcomeTesting.Plugins
             EntityReference adviserContact,
             DateTime raisedOn)
         {
-            var code = ActionCode(caseReference, sequence);
+            var raised = new List<Guid>();
 
+            // No item list is not a reason to raise nothing: a grade can require remediation
+            // with no pass/fail test point behind it, and that case keeps the un-indexed code
+            // it has always had, so a replay still finds the row it raised.
+            if (items == null || items.Count == 0)
+            {
+                raised.Add(RaiseOne(
+                    service,
+                    caseRef,
+                    caseReference,
+                    reviewId,
+                    ActionCode(caseReference, sequence),
+                    Describe(reason, observation, null),
+                    adviserContact,
+                    raisedOn));
+                return raised;
+            }
+
+            var index = 0;
+            foreach (var item in items)
+            {
+                if (string.IsNullOrWhiteSpace(item))
+                {
+                    continue;
+                }
+
+                index++;
+                raised.Add(RaiseOne(
+                    service,
+                    caseRef,
+                    caseReference,
+                    reviewId,
+                    ActionCode(caseReference, sequence, index),
+                    DescribeItem(reason, observation, item),
+                    adviserContact,
+                    raisedOn));
+            }
+
+            // Every item was blank, which the list should never carry - fall back to the one
+            // action rather than leaving the case in remediation with nothing to do.
+            if (raised.Count == 0)
+            {
+                raised.Add(RaiseOne(
+                    service,
+                    caseRef,
+                    caseReference,
+                    reviewId,
+                    ActionCode(caseReference, sequence),
+                    Describe(reason, observation, null),
+                    adviserContact,
+                    raisedOn));
+            }
+
+            return raised;
+        }
+
+        /// <summary>
+        /// One action, or the id of the one already carrying <paramref name="code"/>.
+        ///
+        /// An existing code is a reason to do nothing at all, not to write again. An upsert
+        /// would put the status back to Open and overwrite <c>al_adviserresponse</c>, so a
+        /// replay would silently undo work the adviser had already done and restart their
+        /// ten days.
+        /// </summary>
+        private static Guid RaiseOne(
+            IOrganizationService service,
+            EntityReference caseRef,
+            string caseReference,
+            Guid reviewId,
+            string code,
+            string description,
+            EntityReference adviserContact,
+            DateTime raisedOn)
+        {
             var existing = FindByCode(service, code);
             if (existing != Guid.Empty)
             {
@@ -385,7 +542,7 @@ namespace OutcomeTesting.Plugins
             {
                 ["al_name"] = name,
                 [ActionCodeAttr] = code,
-                ["al_description"] = Describe(reason, observation, items),
+                ["al_description"] = description,
                 ["al_outcomecaseid"] = caseRef,
                 ["al_reviewinstanceid"] = new EntityReference("al_reviewinstance", reviewId),
                 ["al_actionstatus"] = new OptionSetValue(StatusOpen),

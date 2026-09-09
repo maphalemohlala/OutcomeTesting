@@ -119,6 +119,26 @@ describe('groupIssues', () => {
     expect(group.note).toContain('Raised automatically');
   });
 
+  it('shows the shared context once across the actions a review raised together', () => {
+    // One action per item, each carrying the same provenance in its own description.
+    const item = (text: string) =>
+      ['Issues found on the check:', `- ${text}`, '', 'The checker recorded: passed'].join('\n');
+    const groups = groupIssues([action('a', item('One')), action('b', item('Two'))]);
+
+    expect(groups[0].note).toBe('The checker recorded: passed');
+    expect(groups[1].note).toBeNull();
+  });
+
+  it('shows the context again when the next action carries a different one', () => {
+    const groups = groupIssues([
+      action('a', ['Issues found on the check:', '- One', '', 'First context.'].join('\n')),
+      action('b', ['Issues found on the check:', '- Two', '', 'Second context.'].join('\n')),
+    ]);
+
+    expect(groups[0].note).toBe('First context.');
+    expect(groups[1].note).toBe('Second context.');
+  });
+
   it('shows an action with no item list as one row, and adds no note under it', () => {
     const plain = 'Raised automatically when the review was submitted. Review the file.';
     const [group] = groupIssues([action('a', plain)]);

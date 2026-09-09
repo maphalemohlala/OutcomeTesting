@@ -79,18 +79,31 @@ export interface ActionGroup {
  */
 export function groupIssues(actions: RemediationActionRow[]): ActionGroup[] {
   let number = 0;
+  let shownNote: string | null = null;
+
   return actions.map((action) => {
     const { issues, note } = splitIssues(action.description);
     // An action raised before the list existed, or one whose description is only the
     // standing sentence, still gets its row: the note is the issue it has to show.
     const lines = issues.length > 0 ? issues : [note ?? '—'];
+
+    // A review raises one action per item, and every one of them carries the same
+    // provenance - the checker's observation and why the remediation was raised. Each
+    // record keeps it so it stands alone in Dataverse; the table shows it once per run of
+    // actions that share it, rather than under every row.
+    const carried = issues.length > 0 ? note : null;
+    const repeated = carried !== null && carried === shownNote;
+    if (carried !== null) {
+      shownNote = carried;
+    }
+
     return {
       action,
       lines: lines.map((issue) => {
         number += 1;
         return { number, issue };
       }),
-      note: issues.length > 0 ? note : null,
+      note: repeated ? null : carried,
     };
   });
 }

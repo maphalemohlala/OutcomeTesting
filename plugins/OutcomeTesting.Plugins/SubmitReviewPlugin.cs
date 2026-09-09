@@ -501,11 +501,16 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Whether the remediation action a review raised carries an approved sign-off. This
-        /// is what lets an AQS review follow a Tax non-pass (OD-038): the case went through
-        /// remediation, the T&amp;C Manager approved it, and only then did it return to the
-        /// queue. An action that was never raised, is still open, or was only ever rejected
-        /// does not count.
+        /// Whether every remediation action the review raised carries an approved sign-off.
+        /// This is what lets an AQS review follow a Tax non-pass (OD-038): the case went
+        /// through remediation, the T&amp;C Manager approved it, and only then did it return
+        /// to the queue. An action that was never raised, is still open, or was only ever
+        /// rejected does not count.
+        ///
+        /// Every action, not any: a review raises one per thing the checker marked down
+        /// (2026-09-10), so approving the first would otherwise open the AQS gate with the
+        /// rest of the file still unremediated. A review that raised nothing has nothing
+        /// approved, which is the same refusal it has always given.
         /// </summary>
         public static bool RemediationApproved(IOrganizationService service, Guid reviewId)
         {
@@ -516,7 +521,13 @@ namespace OutcomeTesting.Plugins
             };
             actions.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
 
-            foreach (var action in service.RetrieveMultiple(actions).Entities)
+            var raised = service.RetrieveMultiple(actions).Entities;
+            if (raised.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var action in raised)
             {
                 var signoffs = new QueryExpression("al_signoff")
                 {
@@ -528,13 +539,13 @@ namespace OutcomeTesting.Plugins
                 signoffs.Criteria.AddCondition("al_remediationactionid", ConditionOperator.Equal, action.Id);
                 signoffs.Criteria.AddCondition("al_signoffdecision", ConditionOperator.Equal, SignoffProgressPlugin.DecisionApprovedValue);
 
-                if (service.RetrieveMultiple(signoffs).Entities.Count > 0)
+                if (service.RetrieveMultiple(signoffs).Entities.Count == 0)
                 {
-                    return true;
+                    return false;
                 }
             }
 
-            return false;
+            return true;
         }
 
         /// <summary>

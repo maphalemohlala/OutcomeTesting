@@ -116,7 +116,7 @@ namespace OutcomeTesting.Plugins
         internal static void QueueRemediationAssigned(IOrganizationService service, Guid correlationId, Guid actionId)
         {
             var action = service.Retrieve(ActionEntity, actionId,
-                new ColumnSet("al_assignedcontactid", CaseLookup, "al_name", "al_duedate"));
+                new ColumnSet("al_assignedcontactid", CaseLookup, "al_name", "al_duedate", "al_reviewinstanceid"));
 
             var caseRef = action.GetAttributeValue<EntityReference>(CaseLookup);
             var reference = NotificationOutbox.CaseReference(service, caseRef) ?? "a case";
@@ -127,17 +127,29 @@ namespace OutcomeTesting.Plugins
                 ? " It is due by " + due.Value.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) + "."
                 : string.Empty;
 
+            // Keyed on the review rather than on the action, so a submission that raises one
+            // action per thing the checker marked down (2026-09-10) sends one email and not
+            // one per item: the outbox code is derived from the target, and the second and
+            // later creates hit the alternate key and are treated as already queued. A later
+            // review on the same case is a different target, so it still tells the adviser.
+            //
+            // An action with no review behind it falls back to itself, which is the behaviour
+            // every action had before.
+            var reviewRef = action.GetAttributeValue<EntityReference>("al_reviewinstanceid");
+            var targetTable = reviewRef == null ? ActionEntity : reviewRef.LogicalName;
+            var targetId = reviewRef == null ? actionId : reviewRef.Id;
+
             NotificationOutbox.Queue(
                 service,
                 correlationId,
                 NotificationOutbox.EventRemediationAssigned,
-                ActionEntity,
-                actionId,
+                targetTable,
+                targetId,
                 email,
                 "Remediation required on case " + reference,
-                "A remediation action has been raised against case " + reference
+                "Remediation has been raised against case " + reference
                     + " and assigned to you (BR-006)." + dueText
-                    + " Record your response in the portal.");
+                    + " Record your response against each item in the portal.");
         }
     }
 }

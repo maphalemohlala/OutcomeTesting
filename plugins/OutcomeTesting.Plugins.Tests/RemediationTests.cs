@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using OutcomeTesting.Plugins;
 using Xunit;
@@ -180,19 +181,23 @@ namespace OutcomeTesting.Plugins.Tests
             service.Seed("al_questionversion", amlVersion,
                 "al_questiontext", "ID verification completed and retained for all relevant clients/parties.",
                 "al_displayorder", 1,
+                "al_responsetype", new OptionSetValue(ResponseRules.TypeYesNoNa),
                 "al_questionid", new EntityReference("al_question", amlQuestion));
             service.Seed("al_questionversion", e4Version,
                 "al_questiontext", "Adviser charges clearly disclosed and evidenced",
                 "al_displayorder", 1,
+                "al_responsetype", new OptionSetValue(ResponseRules.TypePassFailInsufficient),
                 "al_questionid", new EntityReference("al_question", e4Question));
             service.Seed("al_questionversion", e4Version2,
                 "al_questiontext", "Ongoing charges justified relative to service provided",
                 "al_displayorder", 2,
+                "al_responsetype", new OptionSetValue(ResponseRules.TypePassFailInsufficient),
                 "al_questionid", new EntityReference("al_question", e4Question2));
             service.Seed("al_questionversion", retiredVersion,
                 "al_questiontext", "Retired wording",
                 "al_displayorder", 3,
                 "al_effectiveto", new DateTime(2026, 9, 1),
+                "al_responsetype", new OptionSetValue(ResponseRules.TypePassFailInsufficient),
                 "al_questionid", new EntityReference("al_question", e4Question2));
 
             // Seeded out of checklist order, and with answers the list must leave out: a
@@ -238,10 +243,13 @@ namespace OutcomeTesting.Plugins.Tests
 
             var items = Remediation.NonPassItems(service, reviewId, new DateTime(2026, 9, 9, 12, 0, 0, DateTimeKind.Utc));
 
+            // The AML No is not an item: remediation is prepopulated from the pass/fail test
+            // points only (project owner, 2026-09-09). Its ticked fail points are still
+            // listed - those are the File Quality fail reasons, and they are read across
+            // every answer on the review whatever that answer was.
             Assert.Equal(
                 new[]
                 {
-                    "ID verification completed and retained for all relevant clients/parties.: No",
                     "Adviser charges clearly disclosed and evidenced: Fail",
                     "Ongoing charges justified relative to service provided: Insufficient evidence",
                     "Fail point: AML - ID verification issue",
@@ -251,10 +259,200 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void Leaves_out_the_yes_no_scales_and_the_grade()
+        {
+            // The subtle one: Insufficient evidence is a single option value shared by the
+            // suitability scale and the Consumer Duty Yes / No / Insufficient evidence scale,
+            // so the answer alone cannot tell them apart - only the scale can. Potential harm
+            // is on the grade, which the action already names as its reason.
+            var service = new FakeOrganizationService();
+            service.SeedOptionSet("al_response", "al_answerchoice",
+                ResponseRules.ChoiceFail, "Fail",
+                ResponseRules.ChoiceInsufficient, "Insufficient evidence",
+                ResponseRules.ChoiceNo, "No",
+                ResponseRules.ChoicePotentialHarm, "Potential harm");
+
+            var reviewId = Guid.NewGuid();
+            var section = Guid.NewGuid();
+            service.Seed("al_section", section, "al_displayorder", 1);
+
+            var scales = new[]
+            {
+                new { Type = ResponseRules.TypeYesNo, Choice = ResponseRules.ChoiceNo, Text = "Remedial action required?" },
+                new { Type = ResponseRules.TypeYesNoNa, Choice = ResponseRules.ChoiceNo, Text = "CRA completed with mandatory fields and risk rating recorded." },
+                new { Type = ResponseRules.TypeYesNoInsufficient, Choice = ResponseRules.ChoiceInsufficient, Text = "Price & Value outcome" },
+                new { Type = ResponseRules.TypeGrade, Choice = ResponseRules.ChoicePotentialHarm, Text = "Advice Quality Grade" },
+                new { Type = ResponseRules.TypePassFail, Choice = ResponseRules.ChoiceFail, Text = "File quality outcome" },
+            };
+
+            var order = 1;
+            foreach (var scale in scales)
+            {
+                var questionId = Guid.NewGuid();
+                var versionId = Guid.NewGuid();
+                service.Seed("al_question", questionId, "al_sectionid", new EntityReference("al_section", section));
+                service.Seed("al_questionversion", versionId,
+                    "al_questiontext", scale.Text,
+                    "al_displayorder", order++,
+                    "al_responsetype", new OptionSetValue(scale.Type),
+                    "al_questionid", new EntityReference("al_question", questionId));
+                service.Seed("al_response", Guid.NewGuid(),
+                    "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
+                    "al_questionversionid", new EntityReference("al_questionversion", versionId),
+                    "al_answerchoice", new OptionSetValue(scale.Choice));
+            }
+
+            var items = Remediation.NonPassItems(service, reviewId, new DateTime(2026, 9, 9, 12, 0, 0, DateTimeKind.Utc));
+
+            // Only the Pass / Fail one survives.
+            Assert.Equal(new[] { "File quality outcome: Fail" }, items);
+        }
+
+        [Theory]
+        [InlineData(ResponseRules.TypePassFail, ResponseRules.ChoiceFail, true)]
+        [InlineData(ResponseRules.TypePassFailInsufficient, ResponseRules.ChoiceFail, true)]
+        [InlineData(ResponseRules.TypePassFailInsufficient, ResponseRules.ChoiceInsufficient, true)]
+        [InlineData(ResponseRules.TypePassFailInsufficient, ResponseRules.ChoicePass, false)]
+        [InlineData(ResponseRules.TypeYesNo, ResponseRules.ChoiceNo, false)]
+        [InlineData(ResponseRules.TypeYesNoNa, ResponseRules.ChoiceNo, false)]
+        [InlineData(ResponseRules.TypeYesNoInsufficient, ResponseRules.ChoiceInsufficient, false)]
+        [InlineData(ResponseRules.TypeGrade, ResponseRules.ChoicePotentialHarm, false)]
+        public void Counts_only_a_non_pass_on_a_pass_fail_scale(int responseType, int choice, bool expected)
+        {
+            Assert.Equal(expected, Remediation.IsNonPassAnswer(responseType, choice));
+        }
+
+        [Fact]
         public void Lists_nothing_for_a_review_with_no_answers()
         {
             var service = new FakeOrganizationService();
             Assert.Empty(Remediation.NonPassItems(service, Guid.NewGuid(), DateTime.UtcNow));
+        }
+
+        [Fact]
+        public void Raises_one_action_per_item_the_checker_marked_down()
+        {
+            // The agreed form carries a remedial action, an owner, a target date and a
+            // sign-off against every numbered row (project owner, 2026-09-10), and those are
+            // single-valued on the action - so a row has to be an action.
+            var service = new FakeOrganizationService();
+
+            var raised = Remediation.Raise(
+                service,
+                new EntityReference("al_outcomecase", Guid.NewGuid()),
+                "IO-010",
+                Guid.NewGuid(),
+                1,
+                "Fail",
+                null,
+                new List<string>
+                {
+                    "Tax check outcome: Insufficient evidence",
+                    "Fail point: AML - No CRA completed or missing data fields",
+                    "Fail point: Record Keeping - Concession required but not on file",
+                },
+                null,
+                Monday);
+
+            Assert.Equal(3, raised.Count);
+            Assert.Equal(3, service.Creates.Count);
+
+            Assert.Equal(
+                new[] { "REM-IO-010-1-1", "REM-IO-010-1-2", "REM-IO-010-1-3" },
+                service.Creates.Select(c => c.GetAttributeValue<string>("al_remediationactioncode")).ToArray());
+        }
+
+        [Fact]
+        public void Gives_each_action_its_own_item_and_not_the_others()
+        {
+            var service = new FakeOrganizationService();
+
+            Remediation.Raise(
+                service,
+                new EntityReference("al_outcomecase", Guid.NewGuid()),
+                "IO-011",
+                Guid.NewGuid(),
+                1,
+                "Fail",
+                null,
+                new List<string> { "First issue", "Second issue" },
+                null,
+                Monday);
+
+            var first = service.Creates[0].GetAttributeValue<string>("al_description");
+            var second = service.Creates[1].GetAttributeValue<string>("al_description");
+
+            Assert.Contains("- First issue", first);
+            Assert.DoesNotContain("Second issue", first);
+            Assert.Contains("- Second issue", second);
+            Assert.DoesNotContain("First issue", second);
+        }
+
+        [Fact]
+        public void Leaves_the_items_it_has_already_raised_alone_on_a_replay()
+        {
+            var service = new FakeOrganizationService();
+            var existing = Guid.NewGuid();
+            service.Seed(
+                "al_remediationaction", existing,
+                "al_remediationactioncode", "REM-IO-012-1-2",
+                "al_actionstatus", new OptionSetValue(Remediation.StatusCompleted),
+                "al_adviserresponse", "Already put right.");
+
+            var raised = Remediation.Raise(
+                service,
+                new EntityReference("al_outcomecase", Guid.NewGuid()),
+                "IO-012",
+                Guid.NewGuid(),
+                1,
+                "Fail",
+                null,
+                new List<string> { "First issue", "Second issue" },
+                null,
+                Monday);
+
+            // The second item is the one already on file: it comes back as it stands, and
+            // only the first is written.
+            Assert.Equal(2, raised.Count);
+            Assert.Equal(existing, raised[1]);
+            Assert.Equal("REM-IO-012-1-1", Assert.Single(service.Creates).GetAttributeValue<string>("al_remediationactioncode"));
+            Assert.Empty(service.Updates);
+        }
+
+        [Fact]
+        public void Skips_a_blank_item_rather_than_raising_an_empty_action()
+        {
+            var service = new FakeOrganizationService();
+
+            var raised = Remediation.Raise(
+                service,
+                new EntityReference("al_outcomecase", Guid.NewGuid()),
+                "IO-013",
+                Guid.NewGuid(),
+                1,
+                "Fail",
+                null,
+                new List<string> { "Real issue", "   " },
+                null,
+                Monday);
+
+            Assert.Single(raised);
+            Assert.Contains("- Real issue", Assert.Single(service.Creates).GetAttributeValue<string>("al_description"));
+        }
+
+        [Fact]
+        public void Keeps_the_number_on_the_end_of_a_code_a_long_reference_would_overflow()
+        {
+            var reference = new string('X', 120);
+
+            var first = Remediation.ActionCode(reference, 1, 1);
+            var second = Remediation.ActionCode(reference, 1, 2);
+
+            Assert.True(first.Length <= 100);
+            Assert.True(second.Length <= 100);
+            Assert.EndsWith("-1", first);
+            Assert.EndsWith("-2", second);
+            Assert.NotEqual(first, second);
         }
 
         [Fact]
@@ -384,7 +582,7 @@ namespace OutcomeTesting.Plugins.Tests
                 null,
                 Monday);
 
-            Assert.Equal(existing, raised);
+            Assert.Equal(existing, Assert.Single(raised));
             Assert.Empty(service.Creates);
             Assert.Empty(service.Updates);
             Assert.Equal(

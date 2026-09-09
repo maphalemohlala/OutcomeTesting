@@ -236,10 +236,47 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            // A review raises one action per thing the checker marked down (2026-09-10), so
+            // completing one is no longer completing the remediation. The case moves to
+            // Awaiting Sign-off only when nothing on it is still outstanding; until then it
+            // sits at Remediation In Progress, which is what the state is for. Without this
+            // the first item finished would put the whole case in front of the T&C Manager
+            // with the rest untouched.
+            if (AnyOutstanding(service, caseRef.Id))
+            {
+                CaseTransitions.MoveThrough(
+                    service,
+                    caseRef.Id,
+                    new[] { CaseLifecycle.RemediationInProgress });
+                return;
+            }
+
             CaseTransitions.MoveThrough(
                 service,
                 caseRef.Id,
                 new[] { CaseLifecycle.RemediationInProgress, CaseLifecycle.AwaitingSignoff });
+        }
+
+        /// <summary>
+        /// Whether the case still carries a remediation action that is not Completed.
+        ///
+        /// Read from the actions rather than from a count held on the case: the set can grow
+        /// (a second review raises its own) and a rejected sign-off reopens one, so a stored
+        /// tally would drift out of step with the rows the adviser is actually looking at.
+        /// </summary>
+        private static bool AnyOutstanding(IOrganizationService service, Guid caseId)
+        {
+            var query = new QueryExpression(ActionEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+            query.Criteria.AddCondition(
+                "al_actionstatus", ConditionOperator.NotEqual, Remediation.StatusCompleted);
+
+            return service.RetrieveMultiple(query).Entities.Count > 0;
         }
 
         private static bool IsConcurrencyFault(System.ServiceModel.FaultException<OrganizationServiceFault> fault)

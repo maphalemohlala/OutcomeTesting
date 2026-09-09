@@ -136,6 +136,39 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void Holds_the_case_at_remediation_in_progress_while_a_sibling_is_outstanding()
+        {
+            // A review raises one action per thing the checker marked down (2026-09-10).
+            // Completing the first used to put the whole case in front of the T&C Manager
+            // with the rest untouched.
+            var svc = ActionOnCase(CaseLifecycle.AwaitingRemediation);
+            svc.Seed(
+                "al_remediationaction",
+                Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_actionstatus", new OptionSetValue(StatusOpen));
+
+            Complete(svc, OwnerId, true);
+
+            Assert.Equal(CaseLifecycle.RemediationInProgress, CaseStatus(svc));
+        }
+
+        [Fact]
+        public void Moves_the_case_on_once_the_last_outstanding_action_is_completed()
+        {
+            var svc = ActionOnCase(CaseLifecycle.AwaitingRemediation);
+            svc.Seed(
+                "al_remediationaction",
+                Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_actionstatus", new OptionSetValue(StatusCompleted));
+
+            Complete(svc, OwnerId, true);
+
+            Assert.Equal(CaseLifecycle.AwaitingSignoff, CaseStatus(svc));
+        }
+
+        [Fact]
         public void Walks_the_case_through_remediation_in_progress_rather_than_skipping_it()
         {
             var svc = ActionOnCase(CaseLifecycle.AwaitingRemediation);
