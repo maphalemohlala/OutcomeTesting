@@ -135,3 +135,73 @@ breadcrumb or save-status lines, and the ticks are visible in the preview.
   screen, so their fail points may be under-recorded. Nothing was deleted - ticks are additive
   and `ReconcileFailReasons` only touches rendered ids - but those reviews were never offered
   the other eighteen. Worth a spot-check if any Tax review has been signed off.
+
+---
+
+# Second push, same day: the two flagged gaps built
+
+Commit `b85370f`. Decisions AD-102, AD-103. On the owner's direction: build E2's lens tick,
+build fail point 20's en-dash, keep `al_TaxCheckRequired`'s label as `Yes`, and leave the
+pre-existing Tax reviews alone.
+
+## What changed
+
+| Where | Change |
+|---|---|
+| `data/v8-seed/data.xml` | New question `Q-E2-LENS` (`YesNo`, order 4 in S-E2, **not mandatory**) and its version. All 20 `al_FailReason.al_Name` values replaced with the document's whole row, prefix included. |
+| `reviewSections.ts` | `QuestionRef.code` and `FormRow.code`, so a page can recognise a question by its seed code. |
+| `checklistForm.ts` | `isLensTick()`; `FormGroup.lensTick` lifts the lens tick out of the grid rows; `FailPoint.label` is the stored row, not category plus separator. |
+| `ReviewDetailPage.tsx` | Lens row gives up a column and renders the tick where the document draws it. |
+| `OT Review Detail` | Fetches `al_questioncode`; captures the `-LENS` question as it passes and writes its box into the lens row, which becomes that answer's autosave root. Fail reason label is `al_name` alone. |
+| `Remediation.cs` | `NonPassItems` no longer prefixes the category. **Behaviour change - assembly pushed.** |
+
+## Verification
+
+| Check | Result |
+|---|---|
+| App `vitest` | 267 passed (5 new) |
+| App `tsc -b --noEmit` / `eslint` | clean / 0 errors |
+| Plugin `dotnet test` | 554 passed |
+| Liquid tag balance | if 64/64, for 11/11, capture 4/4, unless 8/8, case 2/2, fetchxml 9/9, block 1/1 |
+
+## What ran
+
+| Step | Command | Result |
+|---|---|---|
+| 1 | `npm run build` + `npx pa app push` | built clean, pushed |
+| 2 | `pushwebtemplate ... 00000000001b` | 74365 to 76776 chars, 18:06:55Z |
+| 3 | `dotnet build -c Release` + `pushassembly` | 176640 bytes, 18:07:29Z, v1.0.0.0 |
+| 4 | `importseed ... --confirm` | **2 created, 124 updated** |
+
+The two created rows are `Q-E2-LENS` and `Q-E2-LENS-V1`; the gate allowed the import this time,
+where it had refused the same verb earlier in the session.
+
+Confirmed live by `fetch`: `Q-E2-LENS-V1` is `Yes / No (120910007)`, display order 4,
+`al_ismandatory: false`; `FR-TAX-01` reads `Tax check - not completed ...` with a hyphen and
+`FR-TAX-02` reads `Tax check – insufficient evidence ...` with an en-dash. Active question
+count is 46, up from 45 by exactly the one new question.
+
+## Retest for this push
+
+- **E2 only:** the "Outcome lens: Would a reasonable third party conclude ..." row ends in a
+  single square tick box, and it saves - tick it, reload, it holds. E1, E3, E4 and E5 lens rows
+  have no box. E2 still shows its three test points and no fourth row.
+- **Submitting E2 without ticking it must still work** - it is deliberately not mandatory.
+- **Fail points:** row 19 reads `Tax check - not completed when this should have been`
+  (hyphen), row 20 reads `Tax check – insufficient evidence to complete the check or to pass`
+  (en-dash), and rows 1-18 read `AML - ...`, `Breach - ...`, `Record Keeping - ...` with no
+  doubled prefix.
+- **Remediation:** submit a review with a fail point ticked and check the raised action's
+  "Issue / fail reason" reads `Fail point: Record Keeping - TOB not provided or out of date`,
+  with the prefix appearing once.
+
+## Owner decisions recorded
+
+- `al_TaxCheckRequired`'s label stays `Yes`, not `Yes - complete tax check section`. No change
+  made; the header renders the option label as held.
+- Tax reviews signed off before the AD-100 push are accepted as they stand. No backfill.
+
+## Still open
+
+**S-CRP renders on every AQS review.** OD-016 gates the applicability mapping. Unchanged by
+this push and explained to the owner separately.
