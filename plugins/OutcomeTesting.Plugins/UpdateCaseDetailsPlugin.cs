@@ -186,6 +186,10 @@ namespace OutcomeTesting.Plugins
                 }
             }
 
+            // AD-093: a routed case still short of the queue is queued by the save. Runs after
+            // the update so the walk starts from the status the caller's own change left.
+            QueueAfterEdit(userService, before, update, changes);
+
             // A corrected adviser name reaches the remediation actions raised while the old
             // one matched no contact (BR-006): they were on the worklist with nobody able to
             // answer them, and the name was the fault. Only open, unassigned actions move.
@@ -491,6 +495,43 @@ namespace OutcomeTesting.Plugins
             int? from = current != null ? current.Value : (int?)null;
 
             CaseTransitions.EnsureAllowed(from, target.Value);
+        }
+
+        /// <summary>
+        /// AD-093 on the case-edit command. The rule reads the state the save leaves behind:
+        /// the route after this call (set explicitly, derived by DeriveRoute, or already on
+        /// the case) and the status before it. A status the caller set in the same call is
+        /// theirs: EnsureLifecycleTransition has already checked it, and a second move on top
+        /// of a deliberate one would make the history read as two decisions.
+        /// </summary>
+        public static bool QueueAfterEdit(IOrganizationService service, Entity before, Entity update, List<string> changes)
+        {
+            if (before == null)
+            {
+                throw new ArgumentNullException(nameof(before));
+            }
+
+            if (update == null)
+            {
+                throw new ArgumentNullException(nameof(update));
+            }
+
+            if (update.Contains(StatusAttr))
+            {
+                return false;
+            }
+
+            var routeAfter = update.Contains(RouteAttr)
+                ? update.GetAttributeValue<EntityReference>(RouteAttr)
+                : before.GetAttributeValue<EntityReference>(RouteAttr);
+            var status = before.GetAttributeValue<OptionSetValue>(StatusAttr);
+
+            return CaseQueueing.QueueIfRouted(
+                service,
+                before.Id,
+                status != null ? status.Value : (int?)null,
+                routeAfter != null,
+                changes);
         }
 
         private static void ApplyFields(
