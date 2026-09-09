@@ -36,11 +36,11 @@ Tests: plug-ins 537 passed, 0 failed.
 |---|---|---|
 | Assembly push | `pushassembly https://org0b075da8.crm11.dynamics.com` | 172032 bytes, modified 2026-09-09 12:06:46Z (re-pushed after the review fix wave; the 11:44:34Z push at 170496 bytes carried the pre-fix build) |
 | Backfill dry run | `queueroutedcases https://org0b075da8.crm11.dynamics.com` | IO-000124, IO-000125, IO-000126 listed |
-| Backfill | `queueroutedcases https://org0b075da8.crm11.dynamics.com --confirm` | Refused by the session permission gate — to be run by the project owner |
-| Queue check | portal AQS queue FetchXML | Pending — after the backfill |
-| Audit check | `al_auditevent` with details containing `AD-093` | Pending — after the backfill |
+| Backfill | `queueroutedcases https://org0b075da8.crm11.dynamics.com --confirm` | Run by the project owner at 2026-09-09 12:18Z: `Done: 3 of 3 queued.` |
+| Queue check | portal AQS queue FetchXML | Pass — IO-000124 and IO-000125 on the AQS queue, IO-000126 on the Tax queue (12:18Z); 3 `al_auditevent` rows carrying `AD-093` |
+| Audit check | `al_auditevent` with details containing `AD-093` | Pass — IO-000124 and IO-000125 on the AQS queue, IO-000126 on the Tax queue (12:18Z); 3 `al_auditevent` rows carrying `AD-093` |
 
-## Left for the project owner
+## Left for the project owner (done 2026-09-09 12:18Z)
 
 The backfill write (`--confirm`) was not run: the delivery session's permission gate refused it,
 twice. Run these from the repository root, each with `DOTNET_ROLL_FORWARD=Major` set:
@@ -99,4 +99,4 @@ Portal queue query, app worklist and its status filter, `CaseLifecycle` and the 
 |---|---|---|---|
 | Rule, import and edit changes, tests | Delivery (automated) | 2026-09-09 | Pass — 537 tests |
 | Assembly push | Delivery (automated) | 2026-09-09 | Pass |
-| Backfill of IO-000124, IO-000125 and IO-000126 | Delivery (automated) | 2026-09-09 | Pending — project owner |
+| Backfill of IO-000124, IO-000125 and IO-000126 | Delivery (automated) | 2026-09-09 | Pass — 12:18Z, 3 of 3 queued, verified 12:2xZ |
