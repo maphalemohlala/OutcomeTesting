@@ -239,6 +239,16 @@ if (args.Length >= 2 && args[0].Equals("addmemocolumn", StringComparison.Ordinal
     return AddMemoColumn(args);
 }
 
+if (args.Length >= 2 && args[0].Equals("addchoicecolumn", StringComparison.OrdinalIgnoreCase))
+{
+    return AddChoiceColumn(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("setstepfilter", StringComparison.OrdinalIgnoreCase))
+{
+    return SetStepFilter(args);
+}
+
 if (args.Length >= 3 && args[0].Equals("restoretablepermissions", StringComparison.OrdinalIgnoreCase))
 {
     return RestoreTablePermissions(args[1], args[2]);
@@ -1801,6 +1811,152 @@ int AddMemoColumn(string[] a)
     Console.WriteLine(
         $"Created {entity}.{created.LogicalName} (memo, max {created.MaxLength}) in solution {SolutionUniqueName}.");
     return 0;
+}
+
+// A picklist column with its own option set (AD-095). Options are given as
+// "value:label;value:label"; values are the project's own 1209107xx band, so a typo here
+// collides with nothing by accident but is still read back before being trusted.
+int AddChoiceColumn(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 6 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This writes metadata to a live environment. Re-run as: addchoicecolumn <orgUrl> " +
+            "<entityLogicalName> <SchemaName> <displayName> <value:label;value:label...> [<description>] --confirm <orgUrl>");
+        return 1;
+    }
+
+    var entity = a[2].Trim();
+    var schemaName = a[3].Trim();
+    var displayName = a[4];
+    var optionsArg = a[5];
+    var description = a.Length > 6 && !a[6].StartsWith("--", StringComparison.Ordinal) ? a[6] : string.Empty;
+    var logicalName = schemaName.ToLowerInvariant();
+
+    var options = new List<OptionMetadata>();
+    foreach (var pair in optionsArg.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+    {
+        var parts = pair.Split(new[] { ':' }, 2);
+        int value;
+        if (parts.Length != 2 || !int.TryParse(parts[0].Trim(), out value) || string.IsNullOrWhiteSpace(parts[1]))
+        {
+            Console.Error.WriteLine($"Option '{pair}' is not value:label.");
+            return 1;
+        }
+
+        options.Add(new OptionMetadata(NotificationTable.Text(parts[1].Trim()), value));
+    }
+
+    if (options.Count == 0)
+    {
+        Console.Error.WriteLine("At least one option is required.");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var existing = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    if (existing.EntityMetadata.Attributes.Any(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)))
+    {
+        Console.Error.WriteLine($"'{entity}' already has a column '{logicalName}'. Nothing was changed.");
+        return 1;
+    }
+
+    var optionSet = new OptionSetMetadata
+    {
+        IsGlobal = false,
+        OptionSetType = OptionSetType.Picklist,
+        DisplayName = NotificationTable.Text(displayName),
+    };
+    foreach (var option in options)
+    {
+        optionSet.Options.Add(option);
+    }
+
+    svc.Execute(new CreateAttributeRequest
+    {
+        SolutionUniqueName = SolutionUniqueName,
+        EntityName = entity,
+        Attribute = new PicklistAttributeMetadata
+        {
+            SchemaName = schemaName,
+            LogicalName = logicalName,
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+            DisplayName = NotificationTable.Text(displayName),
+            Description = NotificationTable.Text(description),
+            OptionSet = optionSet,
+        },
+    });
+
+    var after = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    var created = after.EntityMetadata.Attributes.FirstOrDefault(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)) as PicklistAttributeMetadata;
+
+    if (created == null)
+    {
+        Console.Error.WriteLine($"'{logicalName}' was not found on '{entity}' after the create returned. Investigate before relying on it.");
+        return 1;
+    }
+
+    var readBack = created.OptionSet.Options
+        .Select(o => $"{o.Value}={o.Label?.UserLocalizedLabel?.Label}")
+        .ToList();
+    Console.WriteLine($"{entity}.{logicalName} created with options {string.Join(", ", readBack)}.");
+    return 0;
+}
+
+// Updates the filtering attributes of an existing step by its exact name (AD-095): a guard
+// registered on two columns does not fire for a write that carries only a third, so a new
+// guarded column is a change to the step, not only to the plug-in.
+int SetStepFilter(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 4 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This changes a registered step. Re-run as: setstepfilter <orgUrl> \"<step name>\" <attr,attr,...> --confirm <orgUrl>");
+        return 1;
+    }
+
+    var stepName = a[2];
+    var attributes = a[3].Trim();
+
+    using var svc = Connect(orgUrl);
+
+    var query = new QueryExpression("sdkmessageprocessingstep")
+    {
+        ColumnSet = new ColumnSet("name", "filteringattributes"),
+    };
+    query.Criteria.AddCondition("name", ConditionOperator.Equal, stepName);
+    var found = svc.RetrieveMultiple(query).Entities;
+    if (found.Count != 1)
+    {
+        Console.Error.WriteLine($"Expected one step named '{stepName}', found {found.Count}.");
+        return 1;
+    }
+
+    var before = found[0].GetAttributeValue<string>("filteringattributes");
+    svc.Update(new Entity("sdkmessageprocessingstep", found[0].Id)
+    {
+        ["filteringattributes"] = attributes,
+    });
+
+    var after = svc.Retrieve("sdkmessageprocessingstep", found[0].Id, new ColumnSet("filteringattributes"))
+        .GetAttributeValue<string>("filteringattributes");
+    Console.WriteLine($"'{stepName}': filteringattributes '{before}' -> '{after}'.");
+    return string.Equals(after, attributes, StringComparison.Ordinal) ? 0 : 2;
 }
 
 int SetSiteSetting(string[] a)
