@@ -357,6 +357,11 @@ if (args.Length >= 4 && args[0].Equals("pushwebtemplate", StringComparison.Ordin
     return PushWebTemplate(args[1], args[2], args[3]);
 }
 
+if (args.Length >= 4 && args[0].Equals("pushwebfile", StringComparison.OrdinalIgnoreCase))
+{
+    return PushWebFile(args[1], args[2], args[3], args.Length > 4 ? args[4] : null);
+}
+
 if (args.Length >= 3 && args[0].Equals("setchangetracking", StringComparison.OrdinalIgnoreCase))
 {
     return SetChangeTracking(args[1], args.Skip(2).ToArray());
@@ -791,6 +796,108 @@ int PushWebTemplate(string orgUrl, string componentIdArg, string sourcePath)
     Console.WriteLine(
         $"pushed web template '{row.GetAttributeValue<string>("name")}' ({componentId:D}): "
         + $"{before.Length} -> {source.Length} chars, modified {after.GetAttributeValue<DateTime>("modifiedon"):yyyy-MM-dd HH:mm:ss}Z");
+    return 0;
+}
+
+// The site's css is a web file; `pac pages upload` is the normal path but pac is token-revoked
+// (2026-09-09), and the content is a File column so it needs the block upload (AD-095).
+int PushWebFile(string orgUrl, string componentIdArg, string path, string? mimeTypeArg)
+{
+    if (!Guid.TryParse(componentIdArg, out var componentId))
+    {
+        Console.Error.WriteLine("Usage: pushwebfile <orgUrl> <powerpagecomponentid> <path> [<mimeType>]");
+        return 1;
+    }
+
+    if (!File.Exists(path))
+    {
+        Console.Error.WriteLine($"Source file not found: {path}");
+        return 1;
+    }
+
+    var fileName = Path.GetFileName(path);
+    var mimeType = mimeTypeArg ?? Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".css" => "text/css",
+        ".js" => "application/javascript",
+        ".png" => "image/png",
+        _ => "application/octet-stream",
+    };
+
+    using var svc = Connect(orgUrl);
+
+    var row = svc.Retrieve("powerpagecomponent", componentId, new ColumnSet("name", "powerpagecomponenttype", "modifiedon"));
+    var type = row.GetAttributeValue<OptionSetValue>("powerpagecomponenttype")?.Value;
+    if (type != 3)
+    {
+        Console.Error.WriteLine($"Component {componentId:D} is type {type}, not a Web File (3).");
+        return 1;
+    }
+
+    var name = row.GetAttributeValue<string>("name");
+    var bytes = File.ReadAllBytes(path);
+    Console.WriteLine($"pushing web file '{name}' ({componentId:D}): {bytes.Length} bytes from {path}");
+
+    var target = new EntityReference("powerpagecomponent", componentId);
+    var init = (InitializeFileBlocksUploadResponse)svc.Execute(new InitializeFileBlocksUploadRequest
+    {
+        Target = target,
+        FileAttributeName = "filecontent",
+        FileName = fileName,
+    });
+
+    var blockIds = new List<string>();
+    const int blockSize = 4 * 1024 * 1024;
+    if (bytes.Length == 0)
+    {
+        var blockId = Convert.ToBase64String(Encoding.UTF8.GetBytes(Guid.NewGuid().ToString("N")));
+        blockIds.Add(blockId);
+        svc.Execute(new UploadBlockRequest
+        {
+            FileContinuationToken = init.FileContinuationToken,
+            BlockId = blockId,
+            BlockData = Array.Empty<byte>(),
+        });
+    }
+    else
+    {
+        for (var offset = 0; offset < bytes.Length; offset += blockSize)
+        {
+            var length = Math.Min(blockSize, bytes.Length - offset);
+            var block = new byte[length];
+            Array.Copy(bytes, offset, block, 0, length);
+            var blockId = Convert.ToBase64String(Encoding.UTF8.GetBytes(Guid.NewGuid().ToString("N")));
+            blockIds.Add(blockId);
+            svc.Execute(new UploadBlockRequest
+            {
+                FileContinuationToken = init.FileContinuationToken,
+                BlockId = blockId,
+                BlockData = block,
+            });
+        }
+    }
+
+    svc.Execute(new CommitFileBlocksUploadRequest
+    {
+        FileContinuationToken = init.FileContinuationToken,
+        FileName = fileName,
+        MimeType = mimeType,
+        BlockList = blockIds.ToArray(),
+    });
+
+    Entity after;
+    try
+    {
+        after = svc.Retrieve("powerpagecomponent", componentId, new ColumnSet("filecontent_name", "modifiedon"));
+    }
+    catch
+    {
+        after = svc.Retrieve("powerpagecomponent", componentId, new ColumnSet("modifiedon"));
+    }
+
+    Console.WriteLine(
+        $"pushed web file '{name}' ({componentId:D}): "
+        + $"{bytes.Length} bytes, modified {after.GetAttributeValue<DateTime>("modifiedon"):yyyy-MM-dd HH:mm:ss}Z");
     return 0;
 }
 
