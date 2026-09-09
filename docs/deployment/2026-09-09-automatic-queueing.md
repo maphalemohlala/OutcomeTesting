@@ -34,7 +34,7 @@ Tests: plug-ins 537 passed, 0 failed.
 
 | Step | Command | Result |
 |---|---|---|
-| Assembly push | `pushassembly https://org0b075da8.crm11.dynamics.com` | 172032 bytes, modified 2026-09-09 12:06:46Z (re-pushed after the review fix wave; the 12:06:46Z push at 172032 bytes carried the pre-fix build) |
+| Assembly push | `pushassembly https://org0b075da8.crm11.dynamics.com` | 172032 bytes, modified 2026-09-09 12:06:46Z (re-pushed after the review fix wave; the 11:44:34Z push at 170496 bytes carried the pre-fix build) |
 | Backfill dry run | `queueroutedcases https://org0b075da8.crm11.dynamics.com` | IO-000124, IO-000125, IO-000126 listed |
 | Backfill | `queueroutedcases https://org0b075da8.crm11.dynamics.com --confirm` | Refused by the session permission gate — to be run by the project owner |
 | Queue check | portal AQS queue FetchXML | Pending — after the backfill |
