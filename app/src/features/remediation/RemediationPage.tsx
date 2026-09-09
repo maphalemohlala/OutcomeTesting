@@ -41,27 +41,38 @@ function ActionsTable({
     <table className="remediation__table">
       <thead>
         <tr>
-          <th scope="col">Action</th>
-          <th scope="col">Description</th>
-          <th scope="col">Status</th>
-          <th scope="col">Triggered by</th>
+          <th scope="col">No.</th>
+          <th scope="col">Issue / fail reason</th>
+          <th scope="col">Remedial action</th>
           <th scope="col">Owner</th>
-          <th scope="col">Due</th>
-          <th scope="col">Completed</th>
+          <th scope="col">Target date</th>
+          <th scope="col">Status</th>
+          <th scope="col">Client contact</th>
+          <th scope="col">Recheck</th>
+          <th scope="col">Changes advice</th>
+          <th scope="col">Adviser sign-off</th>
           <th scope="col">
             <span className="remediation__sr-only">Complete</span>
           </th>
         </tr>
       </thead>
       <tbody>
-        {actions.map((action) => (
+        {actions.map((action, index) => (
           <tr key={action.id}>
-            <th scope="row">{action.reference}</th>
+            <th scope="row">{index + 1}</th>
             <td>{action.description}</td>
-            <td>{action.status}</td>
-            <td>{action.triggeredBy ?? '—'}</td>
-            <td>{action.owner ?? 'Unassigned'}</td>
+            <td>
+              {action.remedialAction ?? '—'}
+              {action.evidenceReference ? (
+                <span className="remediation__note"> IO {action.evidenceReference}</span>
+              ) : null}
+            </td>
+            <td>{action.assignedTo ?? action.owner ?? 'Unassigned'}</td>
             <td>{action.dueOn ?? '—'}</td>
+            <td>{action.status}</td>
+            <td>{action.clientContactRequired ?? '—'}</td>
+            <td>{action.recheckRequired ?? '—'}</td>
+            <td>{action.changesAdvice ?? '—'}</td>
             <td>{action.completedOn ?? '—'}</td>
             <td>
               {canComplete(action.status) ? (
