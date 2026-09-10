@@ -317,6 +317,17 @@ if (args.Length >= 4 && args[0].Equals("addcommandvalue", StringComparison.Ordin
     return AddCommandValue(args[1], commandValue, args[3]);
 }
 
+if (args.Length >= 6 && args[0].Equals("addoptionvalue", StringComparison.OrdinalIgnoreCase))
+{
+    if (!int.TryParse(args[4], out var optionValue))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- addoptionvalue <orgUrl> <entity> <attribute> <value> <label> [<description>]");
+        return 1;
+    }
+
+    return AddOptionValue(args[1], args[2], args[3], optionValue, args[5], args.Length >= 7 ? args[6] : null);
+}
+
 if (args.Length >= 2 && args[0].Equals("provepp15", StringComparison.OrdinalIgnoreCase))
 {
     return ProvePp15(args);
@@ -5854,6 +5865,83 @@ int AddCommandValue(string orgUrl, int value, string label)
         ? $"al_command {value} = '{label}' inserted and published ({after.Count} values)."
         : $"Insert returned success, but metadata does not read back {value} = '{label}'.");
     return ok ? 0 : 2;
+}
+
+// Adds one value to any local choice column, for the case `addcommandvalue` does not cover:
+// a value authored in `src/` that DEV does not yet carry.
+//
+// That case is a direction-of-travel problem rather than a metadata one. AD-013 makes DEV the
+// source and `src/` the copy, so the round trip overwrites `src/`. A value added to an
+// Entity.xml by hand is therefore live only until the next export, and deploying an assembly
+// that names it before DEV carries it fails at runtime — an OptionSetValue the column does
+// not define is refused, and inside a submit that takes the whole transaction down.
+//
+// Minting it here first puts the two in the supported order: DEV gains the value, the export
+// carries it back into `src/`, and the hand edit is confirmed rather than clobbered. The
+// table's rootcomponentbehavior decides whether it travels; `metadatamembership` reports it.
+//
+// Read back from metadata afterwards, for the reason AddCommandValue records: InsertOptionValue
+// reports success on the definition it changed, not on the publish that makes it usable.
+int AddOptionValue(string orgUrl, string entity, string attribute, int value, string label, string? description)
+{
+    using var svc = Connect(orgUrl);
+
+    var before = PicklistOptions(svc, entity, attribute);
+    if (before.TryGetValue(value, out var current))
+    {
+        Console.WriteLine($"{entity}.{attribute} already carries {value} = '{current}'.");
+        return string.Equals(current, label, StringComparison.Ordinal) ? 0 : 2;
+    }
+
+    var clash = before.FirstOrDefault(o => string.Equals(o.Value, label, StringComparison.OrdinalIgnoreCase));
+    if (clash.Value != null)
+    {
+        Console.Error.WriteLine($"'{label}' is already {clash.Key} on {entity}.{attribute}. Refusing to add a second value with the same label.");
+        return 1;
+    }
+
+    var request = new InsertOptionValueRequest
+    {
+        EntityLogicalName = entity,
+        AttributeLogicalName = attribute,
+        Value = value,
+        Label = new Label(label, 1033),
+    };
+
+    if (!string.IsNullOrWhiteSpace(description))
+    {
+        request.Description = new Label(description, 1033);
+    }
+
+    svc.Execute(request);
+
+    svc.Execute(new PublishXmlRequest
+    {
+        ParameterXml = $"<importexportxml><entities><entity>{entity}</entity></entities></importexportxml>",
+    });
+
+    var after = PicklistOptions(svc, entity, attribute);
+    var ok = after.TryGetValue(value, out var written) && written == label;
+    Console.WriteLine(ok
+        ? $"{entity}.{attribute} {value} = '{label}' inserted and published ({after.Count} values)."
+        : $"Insert returned success, but metadata does not read back {value} = '{label}'.");
+    return ok ? 0 : 2;
+}
+
+/// <summary>The values of any local picklist, by value, so a caller can assert rather than assume.</summary>
+static Dictionary<int, string> PicklistOptions(ServiceClient svc, string entity, string attribute)
+{
+    var response = (RetrieveAttributeResponse)svc.Execute(new RetrieveAttributeRequest
+    {
+        EntityLogicalName = entity,
+        LogicalName = attribute,
+        RetrieveAsIfPublished = false,
+    });
+
+    var options = ((PicklistAttributeMetadata)response.AttributeMetadata).OptionSet.Options;
+    return options
+        .Where(o => o.Value.HasValue)
+        .ToDictionary(o => o.Value!.Value, o => o.Label?.UserLocalizedLabel?.Label ?? string.Empty);
 }
 
 /// <summary>`al_command` values by value, so a caller can assert rather than assume.</summary>
