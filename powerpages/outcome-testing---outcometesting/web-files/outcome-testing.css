@@ -1030,8 +1030,14 @@ fieldset.ot-response__field label { margin-right: var(--space-5); }
   --subband: #f2f2f2;
   --ink: #000;
 
-  max-width: 1000px;
-  margin: 0 auto var(--space-6);
+  /* The form body is as wide as everything else on the page. .ot-card, .ot-submit and
+     .ot-page__header are all block children of .ot-page__inner and so take its 82rem;
+     a 1000px centred column here made the document float narrower than the summary card
+     above it and the submit card below it, and read as a different page rather than the
+     same one. Width is the page's to decide, not the document's - the print rule below
+     drops it to the sheet, and .ot-checklist table is already width: 100%. */
+  max-width: none;
+  margin: 0 0 var(--space-6);
   background: #fff;
   padding: 32px 40px 48px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, .25);
