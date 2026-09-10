@@ -330,6 +330,36 @@
       </fetch>
       {% endfetchxml %}
 
+      {% comment %}
+        The sections this team owns, in the document's order - fetched separately, and the
+        thing the questionnaire below actually iterates.
+
+        The questions fetch above asks for section-then-question order with two root-level
+        order elements carrying an entityname. The SDK honours that; this page's Liquid
+        fetch does not - it applied only the question order, so every section's question 1
+        came back before any section's question 2 and the whole form arrived interleaved
+        (project owner's Tax and AQS PDFs, 2026-09-09). The rows are grouped by section here
+        instead of relying on that ordering: this fetch's order is a plain root-entity order
+        on al_section, which is applied, and within one section the question order from the
+        fetch above is applied too. So the sequence no longer depends on cross-entity
+        ordering working. Leave the orders above in place - they cost nothing and they are
+        what the SDK and any future engine will use.
+      {% endcomment %}
+      {% fetchxml sections %}
+      <fetch>
+        <entity name="al_section">
+          <attribute name="al_sectionid" />
+          <attribute name="al_sectioncode" />
+          <attribute name="al_displayorder" />
+          <filter type="and">
+            <condition attribute="al_checklistversionid" operator="eq" value="{{ cv_id | xml_escape }}" />
+            <condition attribute="al_ownerrole" operator="eq" value="{{ owner_role }}" />
+          </filter>
+          <order attribute="al_displayorder" />
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+
       {% fetchxml responses %}
       <fetch>
         <entity name="al_response">
@@ -426,9 +456,9 @@
           did inside the old div. A question whose response type is not the block's scale
           spans the tick columns with its usual control.
         {% endcomment %}
-        {% assign current_block = '' %}
+        {% assign current_blk = '' %}
         {% assign current_section = '' %}
-        {% assign block_layout = 'inline' %}
+        {% assign blk_layout = 'inline' %}
         {% assign prev_help = '' %}
         {% assign ncols = 2 %}
         {% comment %}
@@ -441,15 +471,45 @@
         {% assign lens_tick_id = '' %}
         {% assign lens_tick_cell = '' %}
         {% assign lens_tick_span = 0 %}
+        {% comment %}
+          Sections outer, that section's questions inner. The rows are matched on the section
+          CODE rather than the section id, because the code is a plain string on both sides
+          while an aliased guid's type through Liquid is not something to bet the whole form
+          on - and the code is already what every block decision below is made from.
+
+          first_row replaces forloop.first: the loop that opens and closes the block tables is
+          no longer the outer one, so "have we opened a table yet" has to be state rather than
+          a loop position. The last block is closed after both loops for the same reason.
+        {% endcomment %}
+        {% assign first_row = true %}
+        {% for sec in sections.results.entities %}
         {% for qv in qrows %}
+          {% if qv['s.al_sectioncode'] == sec.al_sectioncode %}
           {% assign sid = qv['s.al_sectionid'] %}
           {% assign scode = qv['s.al_sectioncode'] %}
           {% assign sname = qv['s.al_name'] %}
           {% assign shelp = qv['s.al_helptext'] %}
 
-          {% assign block = scode | default: sid %}
-          {% assign block_title = sname %}
-          {% assign block_intro = shelp %}
+          {% comment %}
+            The block this section belongs to. Every section carries a code, so the fallback
+            is only there for one seeded without.
+
+            This was `scode | default: sid`, and it is an explicit if now only because the
+            variable it assigned used to be called `block` - a name this engine will not let
+            you assign, the page body being inside a block tag - so it never varied, the
+            boundary below fired once for the whole form, and the fail points block, which
+            hangs off `blk == 'S-FQ'`, never rendered at all. The rename to blk is the fix.
+            Nothing here proves the `default` filter was at fault: the summary card above uses
+            it half a dozen times and renders correctly. It is written out longhand because an
+            if cannot be misread, not because the filter was found guilty of anything.
+          {% endcomment %}
+          {% if scode != blank %}
+            {% assign blk = scode %}
+          {% else %}
+            {% assign blk = sid %}
+          {% endif %}
+          {% assign blk_title = sname %}
+          {% assign blk_intro = shelp %}
           {% assign layout = 'inline' %}
           {% assign grid_rt = 0 %}
           {% assign grid_col = 'Check' %}
@@ -471,31 +531,31 @@
             'endcomment'" and takes the whole page down. Name tags in prose, without braces.
           {% endcomment %}
           {% if scode == 'S-TAX' %}
-            {% assign block_title = 'File Quality - Tax check section' %}
+            {% assign blk_title = 'File Quality - Tax check section' %}
           {% elsif scode == 'S-AMLCRA' %}
-            {% assign block_title = 'File Quality - AML and CRA checking points' %}
+            {% assign blk_title = 'File Quality - AML and CRA checking points' %}
             {% assign layout = 'grid' %}{% assign grid_rt = 120910008 %}
           {% elsif scode == 'S-FQOUT' %}
-            {% assign block = 'S-FQ' %}
-            {% assign block_title = 'File Quality Outcome' %}
+            {% assign blk = 'S-FQ' %}
+            {% assign blk_title = 'File Quality Outcome' %}
           {% elsif scode == 'S-FQTAX' %}
-            {% assign block = 'S-FQ' %}
-            {% assign block_title = 'File Quality Outcome' %}
+            {% assign blk = 'S-FQ' %}
+            {% assign blk_title = 'File Quality Outcome' %}
           {% elsif scode == 'S-E1' or scode == 'S-E2' or scode == 'S-E3' or scode == 'S-E4' or scode == 'S-E5' %}
-            {% assign block = 'S-E' %}
-            {% assign block_title = 'Suitability core checks' %}
-            {% assign block_intro = 'Suitability core checks are shown in a consistent Pass/Fail format against each test point.' %}
+            {% assign blk = 'S-E' %}
+            {% assign blk_title = 'Suitability core checks' %}
+            {% assign blk_intro = 'Suitability core checks are shown in a consistent Pass/Fail format against each test point.' %}
             {% assign layout = 'grid' %}{% assign grid_rt = 120910006 %}{% assign grid_col = 'Suitability test point' %}
             {% assign subsections = true %}
           {% elsif scode == 'S-CRP' %}
-            {% assign block_title = 'Centralised Retirement Proposition' %}
-            {% assign block_intro = 'Complete this section where retirement income planning or decumulation advice is in scope.' %}
+            {% assign blk_title = 'Centralised Retirement Proposition' %}
+            {% assign blk_intro = 'Complete this section where retirement income planning or decumulation advice is in scope.' %}
             {% assign layout = 'grid' %}{% assign grid_rt = 120910006 %}{% assign grid_col = 'Centralised Retirement Proposition test point' %}
           {% elsif scode == 'S-CD' %}
-            {% assign block_title = 'Consumer Duty overlay' %}
+            {% assign blk_title = 'Consumer Duty overlay' %}
             {% assign layout = 'grid' %}{% assign grid_rt = 120910009 %}{% assign grid_col = 'Outcome' %}
           {% elsif scode == 'S-GRADE' %}
-            {% assign block_title = 'Checker judgement and grading' %}
+            {% assign blk_title = 'Checker judgement and grading' %}
           {% endif %}
 
           {% comment %}
@@ -523,19 +583,19 @@
               .meta  - a label / value table, 17% label plus the control across the rest
               .fails - the fail points table, 90% reason plus a 10% Tick column
           {% endcomment %}
-          {% if block != current_block %}
-            {% unless forloop.first %}
-              {% if block_subsections and prev_help != blank %}
+          {% if blk != current_blk %}
+            {% unless first_row %}
+              {% if blk_subsections and prev_help != blank %}
                 <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
               {% endif %}
               </tbody>
             </table>
             {% endunless %}
-            {% assign current_block = block %}
+            {% assign current_blk = blk %}
             {% assign current_section = '' %}
-            {% assign block_layout = layout %}
-            {% assign block_subsections = subsections %}
-            {% assign block_rt = grid_rt %}
+            {% assign blk_layout = layout %}
+            {% assign blk_subsections = subsections %}
+            {% assign blk_rt = grid_rt %}
             {% if layout == 'grid' %}
               {% assign ncols = gvalues.size | plus: 1 %}
             {% else %}
@@ -554,7 +614,7 @@
               outcome question's autosave binds the list through data-ot-failpoints-for, so
               a tick saves like any other change to that answer.
             {% endcomment %}
-            {% if block == 'S-FQ' %}
+            {% if blk == 'S-FQ' %}
               {% assign fq_existing = null %}
               {% for a in arows %}
                 {% if a.al_questionversionid.id == qv.al_questionversionid %}{% assign fq_existing = a %}{% endif %}
@@ -578,9 +638,9 @@
               </table>
             {% endif %}
 
-            <h2>{{ block_title | escape }}</h2>
-            {% if block_intro != blank %}
-              <p class="intro">{{ block_intro | escape }}</p>
+            <h2>{{ blk_title | escape }}</h2>
+            {% if blk_intro != blank %}
+              <p class="intro">{{ blk_intro | escape }}</p>
             {% endif %}
             {% if layout == 'grid' %}
             <table class="grid">
@@ -598,7 +658,7 @@
           {% endif %}
 
           {% if sid != current_section %}
-            {% if block_subsections %}
+            {% if blk_subsections %}
               {% if current_section != '' and prev_help != blank %}
                 <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
               {% endif %}
@@ -647,7 +707,7 @@
             {% assign lens_tick_span = 1 %}
             {% capture lens_tick_cell %}<td class="optcell"><input type="checkbox" class="cc-box" value="120910305" data-ot-input aria-label="{{ qv.al_questiontext | escape }}"{% unless editable %} disabled{% endunless %}{% if chosen_value == '120910305' %} checked{% endif %} /></td>{% endcapture %}
 
-          {% elsif block_layout == 'grid' and rt == block_rt %}
+          {% elsif blk_layout == 'grid' and rt == blk_rt %}
             <tr data-ot-answer
                 data-question-version="{{ qv_id }}"
                 data-response-id="{{ existing.al_responseid }}"
@@ -696,7 +756,7 @@
                 data-response-id="{{ existing.al_responseid }}"
                 data-response-type="{{ rt }}"
                 data-column="{{ column }}">
-              <td class="{% if block_layout == 'grid' %}label{% else %}lbl{% endif %}">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></td>
+              <td class="{% if blk_layout == 'grid' %}label{% else %}lbl{% endif %}">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></td>
               <td colspan="{{ ncols | minus: 1 }}">
               {% if column == 'text' %}
                 {% if rt == 120910001 %}
@@ -737,14 +797,24 @@
             </tr>
           {% endif %}
 
-          {% if forloop.last %}
-            {% if block_subsections and prev_help != blank %}
-              <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
-            {% endif %}
-              </tbody>
-            </table>
+          {% assign first_row = false %}
           {% endif %}
         {% endfor %}
+        {% endfor %}
+
+        {% comment %}
+          Close the last block. This used to hang off forloop.last of the single row loop;
+          with sections outer there is no one iteration that is reliably last, so it is done
+          once both loops have finished. first_row is still true only when the team's form
+          had no rows at all, in which case nothing was ever opened.
+        {% endcomment %}
+        {% unless first_row %}
+          {% if blk_subsections and prev_help != blank %}
+            <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
+          {% endif %}
+            </tbody>
+          </table>
+        {% endunless %}
         </div>
         {% if editable %}
         <script>
@@ -850,8 +920,42 @@
              * by the two checker web roles, so a 403 means one of exactly two things, and
              * both are worth naming rather than summarising as "permission".
              */
+            /*
+             * The server's own words, out of the response body.
+             *
+             * The body is an OData error object, so the message has to be read out of it rather than
+             * scanned for in the raw text: a prefix found by indexOf and taken to the end of the
+             * string carries the JSON tail with it, which is why the branches below used to cut at
+             * the next quote and why one of them did not and showed it.
+             *
+             * A body that will not parse is returned as it stands - it is still more than "something
+             * went wrong" - and it is collapsed onto one line and capped, because an error line is
+             * read on screen and the whole of a platform fault is not readable there.
+             */
+            function serverMessage(raw) {
+              var text = String(raw || '').trim();
+              if (!text) { return ''; }
+
+              var message = text;
+              try {
+                var body = JSON.parse(text);
+                var error = body && body.error ? body.error : body;
+                if (error && error.innererror && error.innererror.message) {
+                  message = error.innererror.message;
+                } else if (error && error.message) {
+                  message = error.message;
+                }
+              } catch (ignored) {
+                // Not JSON. Keep the raw text.
+              }
+
+              message = String(message || '').replace(/\s+/g, ' ').trim();
+              if (message.length > 300) { message = message.substring(0, 300) + '...'; }
+              return message;
+            }
+
             function friendlyError(raw, httpStatus) {
-              var text = String(raw || '');
+              var text = serverMessage(raw);
               if (text.indexOf('CONFLICT:') !== -1) {
                 return 'This review has been submitted and can no longer be changed. Reload the page.';
               }
@@ -859,18 +963,15 @@
                 return 'You do not have permission to change this answer.';
               }
               if (text.indexOf('PRECONDITION:') !== -1) {
-                // text is the raw response body, not the parsed message field, so it still
-                // carries whatever JSON follows the message inside it - a closing quote and
-                // then ,"errorCode":... or the like. Cutting at the first " after the prefix
-                // ends the message where the JSON string value itself ends, rather than
-                // showing that trailing JSON to the reviewer.
+                // serverMessage has already taken the message out of the JSON, so this is
+                // the message and nothing else. It used to be cut at the next quote to keep
+                // the trailing JSON off the screen; that is now unnecessary.
                 var idx = text.indexOf('PRECONDITION:');
-                var message = text.substring(idx + 'PRECONDITION:'.length);
-                var quoteIdx = message.indexOf('"');
-                if (quoteIdx !== -1) {
-                  message = message.substring(0, quoteIdx);
-                }
-                return message.trim();
+                return text.substring(idx + 'PRECONDITION:'.length).trim();
+              }
+              if (text.indexOf('UNEXPECTED:') !== -1) {
+                var unexpected = text.indexOf('UNEXPECTED:');
+                return 'That answer was not saved. ' + text.substring(unexpected + 'UNEXPECTED:'.length).trim();
               }
               /*
                * 401 and 403 are deliberately not the same message. They were, and that
@@ -892,8 +993,11 @@
               if (httpStatus === 0) {
                 return 'That answer did not reach the server. Check your connection; it will save when you next change it.';
               }
-              return 'Not saved - retry. Your other answers are unaffected.'
-                + (httpStatus ? ' If it keeps happening, contact support and quote status ' + httpStatus + '.' : '');
+              // The server's message rather than "retry": a refusal the page cannot
+              // classify is exactly the one whose detail the reader needs.
+              return 'Not saved. Your other answers are unaffected.'
+                + (text ? ' The server said: ' + text : '')
+                + (httpStatus ? ' (status ' + httpStatus + ')' : '');
             }
 
             // idFromHeader() used to read the new row's id back out of OData-EntityId
@@ -1175,8 +1279,42 @@
            * again" sends them round a loop that cannot terminate, which is what the single
            * generic message used to do for every non-2xx alike.
            */
+          /*
+           * The server's own words, out of the response body.
+           *
+           * The body is an OData error object, so the message has to be read out of it rather than
+           * scanned for in the raw text: a prefix found by indexOf and taken to the end of the
+           * string carries the JSON tail with it, which is how a PRECONDITION message came to be
+           * shown with '","innererror":{...}}' on the end of it.
+           *
+           * A body that will not parse is returned as it stands - it is still more than "something
+           * went wrong" - and it is collapsed onto one line and capped, because an error line is
+           * read on screen and the whole of a platform fault is not readable there.
+           */
+          function serverMessage(raw) {
+            var text = String(raw || '').trim();
+            if (!text) { return ''; }
+
+            var message = text;
+            try {
+              var body = JSON.parse(text);
+              var error = body && body.error ? body.error : body;
+              if (error && error.innererror && error.innererror.message) {
+                message = error.innererror.message;
+              } else if (error && error.message) {
+                message = error.message;
+              }
+            } catch (ignored) {
+              // Not JSON. Keep the raw text.
+            }
+
+            message = String(message || '').replace(/\s+/g, ' ').trim();
+            if (message.length > 300) { message = message.substring(0, 300) + '...'; }
+            return message;
+          }
+
           function friendlyError(raw, httpStatus) {
-            var text = String(raw || '');
+            var text = serverMessage(raw);
             if (text.indexOf('CONFLICT:') !== -1) {
               return 'This review changed since you opened it. Reload the page and try again - your answers are still saved.';
             }
@@ -1187,6 +1325,10 @@
               // Carries the actionable detail, e.g. how many required questions remain.
               var idx = text.indexOf('PRECONDITION:');
               return text.substring(idx + 'PRECONDITION:'.length).trim();
+            }
+            if (text.indexOf('UNEXPECTED:') !== -1) {
+              var unexpected = text.indexOf('UNEXPECTED:');
+              return 'This review was not submitted. ' + text.substring(unexpected + 'UNEXPECTED:'.length).trim();
             }
             if (httpStatus === 403) {
               /*
@@ -1214,8 +1356,16 @@
               return 'Your session was not accepted, so nothing was submitted. Reload the page and sign in again, '
                 + 'then check your answers are still on screen before submitting.';
             }
-            return 'We could not submit this review. Nothing has been changed. Please try again, and contact support if it keeps happening'
-              + (httpStatus ? ', quoting status ' + httpStatus + '.' : '.');
+            /*
+             * The server's message rather than an invented sentence. "We could not submit
+             * this review, please try again" was true of every refusal alike and told the
+             * reader nothing they could act on or quote - which is what was reported on
+             * 2026-09-10, against a refusal whose real cause the page had been handed and
+             * discarded.
+             */
+            return 'This review was not submitted, and nothing has been changed. '
+              + (text ? 'The server said: ' + text : 'The server gave no detail.')
+              + (httpStatus ? ' (status ' + httpStatus + ')' : '');
           }
 
           function setBusy(busy) {
