@@ -371,9 +371,42 @@
       status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
     }
 
+    /*
+     * The server's own words, out of the response body.
+     *
+     * The body is an OData error object, so the message has to be read out of it rather than
+     * scanned for in the raw text: a prefix found by indexOf and taken to the end of the
+     * string carries the JSON tail with it.
+     *
+     * A body that will not parse is returned as it stands - it is still more than "something
+     * went wrong" - and it is collapsed onto one line and capped, because an error line is
+     * read on screen and the whole of a platform fault is not readable there.
+     */
+    function serverMessage(raw) {
+      var text = String(raw || '').trim();
+      if (!text) { return ''; }
+
+      var message = text;
+      try {
+        var body = JSON.parse(text);
+        var error = body && body.error ? body.error : body;
+        if (error && error.innererror && error.innererror.message) {
+          message = error.innererror.message;
+        } else if (error && error.message) {
+          message = error.message;
+        }
+      } catch (ignored) {
+        // Not JSON. Keep the raw text.
+      }
+
+      message = String(message || '').replace(/\s+/g, ' ').trim();
+      if (message.length > 300) { message = message.substring(0, 300) + '...'; }
+      return message;
+    }
+
     function friendlyError(raw, status) {
-      var text = String(raw || '');
-      var markers = ['PRECONDITION:', 'VALIDATION:', 'CONFLICT:'];
+      var text = serverMessage(raw);
+      var markers = ['PRECONDITION:', 'VALIDATION:', 'CONFLICT:', 'UNEXPECTED:'];
       for (var i = 0; i < markers.length; i += 1) {
         var at = text.indexOf(markers[i]);
         if (at !== -1) {
@@ -393,7 +426,8 @@
       if (status === 400) {
         return 'The portal rejected the request before checking any permission, so nothing '
           + 'was assigned. This is a fault in the page rather than in your account - please '
-          + 'report it.';
+          + 'report it.'
+          + (text ? ' The server said: ' + text : '');
       }
 
       var code = /9004010[56]/.exec(text);
@@ -406,8 +440,9 @@
         return 'We could not pick that case up. You may not have permission to run checks.';
       }
 
-      return 'We could not pick that case up, and nothing was assigned. Please try again, and '
-        + 'report it if it keeps happening.';
+      return 'That case was not picked up, and nothing was assigned. '
+        + (text ? 'The server said: ' + text : 'The server gave no detail.')
+        + (status ? ' (status ' + status + ')' : '');
     }
 
     function close() {

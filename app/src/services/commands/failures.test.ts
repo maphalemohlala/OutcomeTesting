@@ -74,3 +74,41 @@ describe('classify', () => {
     expect(failure.message).not.toContain('10.0.0.1');
   });
 });
+
+/**
+ * The 2026-09-10 report: a portal submit refused, and every layer above the plug-in had
+ * only "something went wrong" to say, because the exception was not one PluginBase caught
+ * and so left the pipeline unclassifiable. PluginBase now wraps it; this is what the app
+ * makes of that wrapper.
+ */
+describe('an unexpected plug-in failure', () => {
+  const WRAPPED = {
+    error: {
+      code: '0x80040265',
+      message:
+        'UNEXPECTED: OutcomeTesting.Plugins.SubmitRequestPlugin could not complete. ' +
+        'NullReferenceException: Object reference not set to an instance of an object.',
+    },
+  };
+
+  it('is classified rather than falling through to the system-level default', () => {
+    const failure = classify(WRAPPED);
+    expect(failure.ok).toBe(false);
+    if (failure.ok) return;
+    expect(failure.kind).toBe('unexpected');
+    expect(failure.message).not.toBe(DEFAULT_FAILURE_MESSAGES.unavailable);
+  });
+
+  it('names the plug-in and the error, so the message says what happened', () => {
+    const failure = classify(WRAPPED);
+    if (failure.ok) return;
+    expect(failure.message).toContain('SubmitRequestPlugin');
+    expect(failure.message).toContain('NullReferenceException');
+  });
+
+  it('keeps the stack out of it - only what PluginBase chose to say', () => {
+    const failure = classify(WRAPPED);
+    if (failure.ok) return;
+    expect(failure.message).not.toContain('at OutcomeTesting');
+  });
+});

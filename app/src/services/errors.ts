@@ -15,6 +15,7 @@ export const DEFAULT_FAILURE_MESSAGES: Record<CommandFailureKind, string> = {
     'The selected record could not be found. It may have been removed, or you may not have access to it.',
   conflict: 'The record has been modified by another user. Please refresh and try again.',
   precondition: 'This action cannot be performed while the record is in its current state.',
+  unexpected: 'The action failed and the server gave no detail. Please report it.',
   unavailable: 'Something went wrong while processing your request. Please try again later.',
 };
 

@@ -11,12 +11,18 @@ import { DEFAULT_FAILURE_MESSAGES, logTechnical } from '../errors';
  */
 
 // The plug-in prefixes InvalidPluginExecutionException messages so the client can branch.
+//
+// UNEXPECTED is PluginBase's own, not a rule's: since 2026-09-10 it wraps every exception
+// a plug-in did not raise deliberately, naming the plug-in and the underlying error. Before
+// that those left the pipeline uncaught and arrived here as an unclassifiable fault, so the
+// user was told "something went wrong while processing your request" whatever had happened.
 const FAILURE_PREFIXES: Record<string, CommandFailureKind> = {
   'VALIDATION:': 'validation',
   'UNAUTHORIZED:': 'unauthorized',
   'NOTFOUND:': 'notFound',
   'CONFLICT:': 'conflict',
   'PRECONDITION:': 'precondition',
+  'UNEXPECTED:': 'unexpected',
 };
 
 export type CommandFailureKind =
@@ -25,6 +31,7 @@ export type CommandFailureKind =
   | 'notFound'
   | 'conflict'
   | 'precondition'
+  | 'unexpected'
   | 'unavailable';
 
 export interface CommandSuccess<T> {
@@ -98,7 +105,14 @@ export function classify(error: unknown): CommandFailure {
       // An empty sentence falls through to the friendly default in messageForFailure,
       // rather than back to the raw body — falling back to the body is what leaked the
       // diagnostics in the first place.
-      return { ok: false, kind: FAILURE_PREFIXES[prefix], message: sentenceAfterPrefix(message, prefix) };
+      const kind = FAILURE_PREFIXES[prefix];
+      if (kind === 'unexpected') {
+        // Shown to the user and logged. The other kinds are a rule speaking deliberately;
+        // this one is a fault, so support wants the raw body as well as the sentence -
+        // the trimmed sentence names the plug-in and the error but never the stack.
+        logTechnical('command failed', error);
+      }
+      return { ok: false, kind, message: sentenceAfterPrefix(message, prefix) };
     }
   }
 

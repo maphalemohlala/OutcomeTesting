@@ -20,7 +20,13 @@ namespace OutcomeTesting.Plugins
         /// Initializes a new instance of the <see cref="PluginBase"/> class.
         /// </summary>
         /// <param name="pluginClassName">The <see cref="Type"/> of the plugin class.</param>
-        internal PluginBase(Type pluginClassName)
+        /// <remarks>
+        /// Protected rather than internal so a plug-in can be derived - and therefore run -
+        /// from the test assembly, which is how PluginBaseTests exercises what this class
+        /// does with an exception. The assembly is signed, so InternalsVisibleTo would need
+        /// the tests signed with the same key to say the same thing less directly.
+        /// </remarks>
+        protected PluginBase(Type pluginClassName)
         {
             PluginClassName = pluginClassName.ToString();
         }
@@ -54,11 +60,45 @@ namespace OutcomeTesting.Plugins
                 // Now exit - if the derived plugin has incorrectly registered overlapping event registrations, guard against multiple executions.
                 return;
             }
+            catch (InvalidPluginExecutionException)
+            {
+                // Already the message a caller is meant to read - the prefixed refusals
+                // (PRECONDITION, CONFLICT, UNAUTHORIZED, VALIDATION) that every page branches
+                // on. Wrapping one would put another sentence in front of the prefix and
+                // break the clients that read it, so it goes out exactly as it was thrown.
+                throw;
+            }
             catch (FaultException<OrganizationServiceFault> orgServiceFault)
             {
                 localPluginContext.Trace($"Exception: {orgServiceFault.ToString()}");
 
-                throw new InvalidPluginExecutionException($"OrganizationServiceFault: {orgServiceFault.Message}", orgServiceFault);
+                throw new InvalidPluginExecutionException(
+                    $"UNEXPECTED: {PluginClassName} could not complete. OrganizationServiceFault: {orgServiceFault.Message}",
+                    orgServiceFault);
+            }
+            catch (Exception error)
+            {
+                /*
+                 * Everything else, which until 2026-09-10 left the pipeline uncaught.
+                 *
+                 * That is not a cosmetic difference. Power Pages returns an
+                 * InvalidPluginExecutionException's message to the browser and reports
+                 * anything else as "A Common Data Service error occurred", error code
+                 * 9004010D, carrying no detail whatsoever - so a NullReferenceException in
+                 * any plug-in on any write reached the user as a page saying nothing, and
+                 * the pages' careful prefix branching could never fire. A submit refused
+                 * exactly that way was reported on 2026-09-10.
+                 *
+                 * The type and the message are named because a message that does not say
+                 * what happened is the fault being fixed. The stack trace is deliberately
+                 * not included: it goes to the trace above and to InnerException, which the
+                 * platform logs, and PP-16 keeps it out of the browser.
+                 */
+                localPluginContext.Trace($"Exception: {error.ToString()}");
+
+                throw new InvalidPluginExecutionException(
+                    $"UNEXPECTED: {PluginClassName} could not complete. {error.GetType().Name}: {error.Message}",
+                    error);
             }
             finally
             {
