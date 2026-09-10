@@ -706,9 +706,16 @@ int SplitRemediation(string orgUrl, bool confirm)
 // before that rule still carry it as their one item, and no display change can remove
 // them: they are rows, and the portal's fetch does not filter by state.
 //
-// This deletes those rows, and only those: an action whose single item is an outcome
+// This clears those rows, and only those: an action whose single item is an outcome
 // answer. Deleted rather than deactivated because nothing that reads them filters on
 // statecode, so a deactivated one would still be numbered in the table it has to leave.
+//
+// Except when it is the case's only action. Deleting that one would leave the case in
+// Awaiting Remediation with an empty worklist - the state this solution was in before
+// anything raised an action at all - so its description is rewritten instead, to the
+// standing sentence alone. That is what Remediation.Raise writes today for a review whose
+// only non-pass answer was its outcome, so the row ends up in the shape it would have been
+// raised in, keeping its code, its clock and its assignment.
 //
 // Nothing an adviser has touched is deleted. An action carrying a response, a completion,
 // any of the three form answers or a sign-off is reported and left alone - the row is
@@ -753,8 +760,17 @@ int DropOutcomeActions(string orgUrl, bool confirm)
         "<attribute name=\"al_description\"/><attribute name=\"al_adviserresponse\"/>" +
         "<attribute name=\"al_completedon\"/><attribute name=\"al_evidencereference\"/>" +
         "<attribute name=\"al_clientcontactrequired\"/><attribute name=\"al_recheckrequired\"/>" +
-        "<attribute name=\"al_changesadvice\"/>" +
+        "<attribute name=\"al_changesadvice\"/><attribute name=\"al_outcomecaseid\"/>" +
         "<order attribute=\"al_remediationactioncode\"/></entity></fetch>")).Entities;
+
+    // How many actions each case holds, so the last one standing is never deleted.
+    var perCase = new Dictionary<Guid, int>();
+    foreach (var a in actions)
+    {
+        var caseRef = a.GetAttributeValue<EntityReference>("al_outcomecaseid");
+        if (caseRef == null) { continue; }
+        perCase[caseRef.Id] = perCase.TryGetValue(caseRef.Id, out var n) ? n + 1 : 1;
+    }
 
     var signedOff = new HashSet<Guid>();
     foreach (var signoff in svc.RetrieveMultiple(new FetchExpression(
@@ -765,6 +781,7 @@ int DropOutcomeActions(string orgUrl, bool confirm)
     }
 
     var doomed = new List<Entity>();
+    var stripped = new List<Entity>();
     var kept = new List<(Entity Action, string Why)>();
     foreach (var a in actions)
     {
@@ -778,24 +795,42 @@ int DropOutcomeActions(string orgUrl, bool confirm)
         }
 
         var why = WorkDoneOn(a, signedOff);
-        if (why != null) { kept.Add((a, why)); } else { doomed.Add(a); }
+        if (why != null)
+        {
+            kept.Add((a, why));
+            continue;
+        }
+
+        var owner = a.GetAttributeValue<EntityReference>("al_outcomecaseid");
+        var onlyOne = owner == null || (perCase.TryGetValue(owner.Id, out var count) && count <= 1);
+        if (onlyOne) { stripped.Add(a); } else { doomed.Add(a); }
     }
 
-    Console.WriteLine($"{doomed.Count} outcome action(s) to delete, of {actions.Count} read.");
+    Console.WriteLine(
+        $"{doomed.Count} outcome action(s) to delete and {stripped.Count} to strip, " +
+        $"of {actions.Count} read.");
+
     foreach (var a in doomed)
     {
-        Console.WriteLine($"   {a.GetAttributeValue<string>("al_remediationactioncode")}  " +
+        Console.WriteLine($"   DELETE {a.GetAttributeValue<string>("al_remediationactioncode")}  " +
             $"{SplitDescription(a.GetAttributeValue<string>("al_description")).Items[0]}");
+    }
+
+    foreach (var a in stripped)
+    {
+        Console.WriteLine($"   STRIP  {a.GetAttributeValue<string>("al_remediationactioncode")}  " +
+            $"{SplitDescription(a.GetAttributeValue<string>("al_description")).Items[0]}  " +
+            "(the case's only action, so the item goes and the row stays)");
     }
 
     foreach (var (a, why) in kept)
     {
-        Console.WriteLine($"   KEPT {a.GetAttributeValue<string>("al_remediationactioncode")}  {why}");
+        Console.WriteLine($"   KEPT   {a.GetAttributeValue<string>("al_remediationactioncode")}  {why}");
     }
 
     if (!confirm)
     {
-        Console.WriteLine("Dry run. Re-run with --confirm <orgUrl> to delete them.");
+        Console.WriteLine("Dry run. Re-run with --confirm <orgUrl> to write.");
         return 0;
     }
 
@@ -805,7 +840,17 @@ int DropOutcomeActions(string orgUrl, bool confirm)
         Console.WriteLine($"   deleted {a.GetAttributeValue<string>("al_remediationactioncode")}");
     }
 
-    Console.WriteLine($"Done. {doomed.Count} deleted, {kept.Count} left alone.");
+    foreach (var a in stripped)
+    {
+        // The context alone, which is the standing sentence and any checker observation -
+        // exactly what Remediation.Describe writes when it is given no items.
+        var context = SplitDescription(a.GetAttributeValue<string>("al_description")).Context;
+        svc.Update(new Entity("al_remediationaction", a.Id) { ["al_description"] = context });
+        Console.WriteLine($"   stripped {a.GetAttributeValue<string>("al_remediationactioncode")}");
+    }
+
+    Console.WriteLine(
+        $"Done. {doomed.Count} deleted, {stripped.Count} stripped, {kept.Count} left alone.");
     return 0;
 }
 
