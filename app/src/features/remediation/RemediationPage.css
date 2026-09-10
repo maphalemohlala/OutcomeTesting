@@ -170,3 +170,15 @@
 .checklist-doc .remediation__signoffs th {
   width: 50%;
 }
+
+/* The check a run of remediation rows belongs to, named once above them. A Tax-then-AQS
+   case remediates twice and the two are separate remediations (AD-114); a settled check is
+   not drawn at all, so this appears only for the legs still in hand. */
+.remediation__group th {
+  background: var(--surface-header, #eef2f2);
+  border-top: 1px solid var(--border, #d3dcdc);
+  border-bottom: 1px solid var(--border, #d3dcdc);
+  text-align: left;
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+}

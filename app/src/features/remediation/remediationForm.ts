@@ -130,6 +130,56 @@ export function latestSignoff(
 }
 
 /**
+ * Which checks this case has finished with (AD-114).
+ *
+ * A Tax-then-AQS case remediates twice and the two are separate remediations: its Tax check
+ * raises its own actions and its AQS check raises its own, each carrying the review it came
+ * from. A check whose every action has been approved is settled - approved as a whole, which
+ * is the rule SignoffProgressPlugin enforces server-side, so the case leaves Awaiting
+ * Sign-off only once every action on the check has been decided.
+ *
+ * Grouped by the review's name rather than its id because that is what the row carries
+ * (`triggeredBy`, from al_reviewinstanceidname) and a case has at most one review per
+ * discipline, so the name identifies it here.
+ *
+ * An action with no check of its own is never settled away. Rows written before the review
+ * link existed carry none, and collapsing those would lose work rather than tidy it.
+ */
+export function settledChecks(actions: RemediationActionRow[], signoffs: SignoffRow[]): string[] {
+  const order: string[] = [];
+  const live = new Set<string>();
+
+  for (const action of actions) {
+    const check = action.triggeredBy;
+    if (!check) continue;
+
+    if (!order.includes(check)) order.push(check);
+
+    const latest = latestSignoff(action, signoffs);
+    if (!latest || latest.decision !== APPROVED) live.add(check);
+  }
+
+  return order.filter((check) => !live.has(check));
+}
+
+/**
+ * The actions still worth drawing: everything except the checks that are settled.
+ *
+ * Collapsing rather than showing them read-only is the project owner's call (2026-09-10) -
+ * what stays on the form is the remediation in hand, and the case record keeps the rest.
+ * When every check is settled this is empty, which the table renders as its own state
+ * rather than as columns heading nothing.
+ */
+export function liveActions(
+  actions: RemediationActionRow[],
+  signoffs: SignoffRow[],
+): RemediationActionRow[] {
+  const settled = settledChecks(actions, signoffs);
+  if (settled.length === 0) return actions;
+  return actions.filter((action) => !action.triggeredBy || !settled.includes(action.triggeredBy));
+}
+
+/**
  * What the Sign-off column says for one action.
  *
  * Three states, as the portal draws them: the supervisor has decided; the adviser has

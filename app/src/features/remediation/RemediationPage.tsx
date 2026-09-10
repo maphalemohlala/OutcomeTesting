@@ -11,7 +11,13 @@ import {
   type SignoffRow,
 } from './useRemediation';
 import { groupIssues, outcomeOf } from './remediationIssues';
-import { remediationForm, remediationFormLayout, signoffCell } from './remediationForm';
+import {
+  liveActions,
+  remediationForm,
+  remediationFormLayout,
+  settledChecks,
+  signoffCell,
+} from './remediationForm';
 import { remediationClock } from '../../lib/workingDays';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { completeRemediation } from '../../services/commands/completeRemediation';
@@ -106,7 +112,36 @@ export function ActionsTable({
       <p className="remediation__note">No remediation action has been raised for this case yet.</p>
     );
   }
+
+  // A check whose every action is approved is settled, so its rows come off the table
+  // (AD-114, project owner 2026-09-10). A Tax-then-AQS case remediates twice; drawing both
+  // legs as one numbered list put the checker's finished work back in front of them every
+  // time the second leg opened. The case record keeps what is not drawn.
+  const settled = settledChecks(actions, signoffs);
+  const live = liveActions(actions, signoffs);
+
+  if (live.length === 0) {
+    return (
+      <p className="remediation__note">
+        Every issue raised on this case has been remediated and approved
+        {settled.length > 0 ? ` (${settled.join(', ')})` : ''}. The numbered rows are closed;
+        the case record keeps them in full.
+      </p>
+    );
+  }
+
+  // The check is named once above its run of rows rather than on every one. Worked out here
+  // because the map below cannot carry state across iterations without it.
+  let previous: string | null = null;
+  const groups = groupIssues(live).map((group) => {
+    const check = group.action.triggeredBy;
+    const heading = check && check !== previous ? check : null;
+    previous = check ?? previous;
+    return { ...group, heading };
+  });
+
   return (
+    <>
     <table className="remediation__table">
       <caption className="remediation__caption">Remediation and escalation</caption>
       <thead>
@@ -125,8 +160,15 @@ export function ActionsTable({
         </tr>
       </thead>
       <tbody>
-        {groupIssues(actions).map(({ action, lines }) => (
+        {groups.map(({ action, lines, heading }) => (
           <Fragment key={action.id}>
+            {heading ? (
+              <tr className="remediation__group">
+                <th scope="colgroup" colSpan={9}>
+                  {heading}
+                </th>
+              </tr>
+            ) : null}
             {lines.map(({ number, issue }, index) => (
               <tr key={number}>
                 <th scope="row">{number}</th>
@@ -168,6 +210,17 @@ export function ActionsTable({
         ))}
       </tbody>
     </table>
+    {settled.length > 0 ? (
+      // Said rather than left to be noticed: a checker who remembers approving five Tax
+      // actions needs to know they were settled, not that the page lost them.
+      <p className="remediation__note">
+        Settled and not shown: {settled.join(', ')}. Every action on
+        {settled.length > 1 ? ' those checks was' : ' that check was'} approved, so
+        {settled.length > 1 ? ' they are' : ' it is'} closed. The case record keeps them in
+        full.
+      </p>
+    ) : null}
+    </>
   );
 }
 

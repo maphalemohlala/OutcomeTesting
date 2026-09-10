@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { remediationForm, remediationFormLayout, signoffCell } from './remediationForm';
+import {
+  liveActions,
+  remediationForm,
+  remediationFormLayout,
+  settledChecks,
+  signoffCell,
+} from './remediationForm';
 import type { OutcomeRow, RemediationActionRow, SignoffRow } from './remediationMapping';
 
 function action(over: Partial<RemediationActionRow> = {}): RemediationActionRow {
@@ -218,3 +224,64 @@ describe('the paper form layout (project owner, 2026-09-10)', () => {
   });
 });
 
+describe('the checks a case has finished with (AD-114)', () => {
+  // A Tax-then-AQS case remediates twice and the two are separate remediations. Its Tax
+  // check raised five actions and its AQS check eighteen; drawing all twenty-three as one
+  // list put finished work back in front of the checker every time the second leg opened.
+  const tax = (id: string) => action({ id, triggeredBy: 'Tax check' });
+  const aqs = (id: string) => action({ id, triggeredBy: 'AQS check' });
+  const ok = (id: string) => signoff({ id: `s-${id}`, remediationActionId: id, decision: 'Approved' });
+
+  it('settles a check once every one of its actions is approved', () => {
+    const actions = [tax('t1'), tax('t2')];
+
+    expect(settledChecks(actions, [ok('t1'), ok('t2')])).toEqual(['Tax check']);
+  });
+
+  it('leaves a check live while one of its actions is undecided', () => {
+    const actions = [tax('t1'), tax('t2')];
+
+    expect(settledChecks(actions, [ok('t1')])).toEqual([]);
+  });
+
+  it('leaves a check live when one of its actions was sent back', () => {
+    const actions = [tax('t1'), tax('t2')];
+    const rejected = signoff({ id: 's-t2', remediationActionId: 't2', decision: 'Returned' });
+
+    expect(settledChecks(actions, [ok('t1'), rejected])).toEqual([]);
+  });
+
+  it('settles one check without settling the other', () => {
+    const actions = [tax('t1'), aqs('a1'), aqs('a2')];
+
+    expect(settledChecks(actions, [ok('t1'), ok('a1')])).toEqual(['Tax check']);
+  });
+
+  it('drops a settled check off the table and keeps the live one', () => {
+    const actions = [tax('t1'), aqs('a1')];
+
+    expect(liveActions(actions, [ok('t1')]).map((a) => a.id)).toEqual(['a1']);
+  });
+
+  it('shows everything while nothing is settled', () => {
+    const actions = [tax('t1'), aqs('a1')];
+
+    expect(liveActions(actions, []).map((a) => a.id)).toEqual(['t1', 'a1']);
+  });
+
+  it('shows nothing once every check is settled, which is what the empty state is for', () => {
+    // IO-300005 on 2026-09-10: both legs approved, so the whole numbered list collapses.
+    const actions = [tax('t1'), aqs('a1')];
+
+    expect(liveActions(actions, [ok('t1'), ok('a1')])).toEqual([]);
+  });
+
+  it('treats an action with no check of its own as its own group, never settled away', () => {
+    // Rows written before the review link existed carry none; dropping them silently would
+    // lose work rather than collapse it.
+    const actions = [action({ id: 'x', triggeredBy: null })];
+
+    expect(settledChecks(actions, [ok('x')])).toEqual([]);
+    expect(liveActions(actions, [ok('x')]).map((a) => a.id)).toEqual(['x']);
+  });
+});
