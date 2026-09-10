@@ -233,19 +233,21 @@ describe('the checks a case has finished with (AD-114)', () => {
   const ok = (id: string) => signoff({ id: `s-${id}`, remediationActionId: id, decision: 'Approved' });
 
   it('settles a check once every one of its actions is approved', () => {
-    const actions = [tax('t1'), tax('t2')];
+    // Two checks, because settling is only meaningful when there is another leg to be
+    // getting on with - see the single-check case below.
+    const actions = [tax('t1'), tax('t2'), aqs('a1')];
 
     expect(settledChecks(actions, [ok('t1'), ok('t2')])).toEqual(['Tax check']);
   });
 
   it('leaves a check live while one of its actions is undecided', () => {
-    const actions = [tax('t1'), tax('t2')];
+    const actions = [tax('t1'), tax('t2'), aqs('a1')];
 
     expect(settledChecks(actions, [ok('t1')])).toEqual([]);
   });
 
   it('leaves a check live when one of its actions was sent back', () => {
-    const actions = [tax('t1'), tax('t2')];
+    const actions = [tax('t1'), tax('t2'), aqs('a1')];
     const rejected = signoff({ id: 's-t2', remediationActionId: 't2', decision: 'Returned' });
 
     expect(settledChecks(actions, [ok('t1'), rejected])).toEqual([]);
@@ -274,6 +276,16 @@ describe('the checks a case has finished with (AD-114)', () => {
     const actions = [tax('t1'), aqs('a1')];
 
     expect(liveActions(actions, [ok('t1'), ok('a1')])).toEqual([]);
+  });
+
+  it('collapses nothing on a case that has only one check', () => {
+    // Project owner, 2026-09-10: a remediation with no second check keeps exactly the
+    // behaviour it had before collapsing existed. Hiding a single-leg case's only
+    // remediation is not tidying the other leg away, it is emptying the form.
+    const actions = [tax('t1'), tax('t2')];
+
+    expect(settledChecks(actions, [ok('t1'), ok('t2')])).toEqual([]);
+    expect(liveActions(actions, [ok('t1'), ok('t2')]).map((a) => a.id)).toEqual(['t1', 't2']);
   });
 
   it('treats an action with no check of its own as its own group, never settled away', () => {

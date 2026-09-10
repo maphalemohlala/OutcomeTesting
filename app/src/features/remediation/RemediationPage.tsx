@@ -1,8 +1,7 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { StageLabel } from '../../components/status/StageLabel';
-import { Notice } from '../../components/feedback/Notice';
 import {
   useRemediation,
   type RemediationCase,
@@ -19,22 +18,11 @@ import {
   signoffCell,
 } from './remediationForm';
 import { remediationClock } from '../../lib/workingDays';
-import { useIntentKeys } from '../../hooks/useIntentKey';
-import { completeRemediation } from '../../services/commands/completeRemediation';
-import { messageForFailure } from '../../services/errors';
 import type { CaseStatus } from '../../types/domain';
-import { classify } from '../../services/commands/failures';
 import '../../styles/document.css';
 import './RemediationPage.css';
 
-interface NoticeState {
-  tone: 'success' | 'error';
-  message: string;
-}
 
-function canComplete(status: string): boolean {
-  return status === 'Open' || status === 'In progress';
-}
 
 /** The BR-010 age, in the words the portal uses for it. */
 function ageOf(action: RemediationActionRow): string {
@@ -98,14 +86,10 @@ export function ActionsTable({
   actions,
   signoffs,
   adviserName,
-  busyId,
-  onComplete,
 }: {
   actions: RemediationActionRow[];
   signoffs: SignoffRow[];
   adviserName: string | null;
-  busyId: string | null;
-  onComplete: (action: RemediationActionRow) => void;
 }) {
   if (actions.length === 0) {
     return (
@@ -154,9 +138,6 @@ export function ActionsTable({
           <th scope="col">Status</th>
           <th scope="col">Age</th>
           <th scope="col">Sign-off</th>
-          <th scope="col">
-            <span className="remediation__sr-only">Complete</span>
-          </th>
         </tr>
       </thead>
       <tbody>
@@ -164,7 +145,7 @@ export function ActionsTable({
           <Fragment key={action.id}>
             {heading ? (
               <tr className="remediation__group">
-                <th scope="colgroup" colSpan={9}>
+                <th scope="colgroup" colSpan={8}>
                   {heading}
                 </th>
               </tr>
@@ -188,20 +169,6 @@ export function ActionsTable({
                     <td rowSpan={lines.length}>{action.status}</td>
                     <td rowSpan={lines.length}>{ageOf(action)}</td>
                     <td rowSpan={lines.length}>{signoffCell(action, signoffs)}</td>
-                    <td rowSpan={lines.length}>
-                      {canComplete(action.status) ? (
-                        <button
-                          type="button"
-                          className="remediation__action-btn"
-                          disabled={busyId !== null}
-                          onClick={() => onComplete(action)}
-                        >
-                          {busyId === action.id ? 'Completing…' : 'Mark complete'}
-                        </button>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
                   </>
                 ) : null}
               </tr>
@@ -304,44 +271,16 @@ export function RemediationFormBlock({
 
 export function RemediationPage() {
   const { caseId } = useParams<{ caseId: string }>();
-  const [reloadKey, setReloadKey] = useState(0);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<NoticeState | null>(null);
-  const state = useRemediation(caseId, reloadKey);
-  const intent = useIntentKeys();
+  // Read-only: every remediation action is completed and signed off on the portal
+  // (project owner, 2026-09-10), so this page reports and never writes. The reload key
+  // stays at zero because nothing here changes what it reads.
+  const state = useRemediation(caseId, 0);
 
   const allActions = state.status === 'ready' ? state.actions : [];
   // The outcome the remediation was raised for. Read across every action rather than the
   // filtered set: it is the case's, so narrowing the table by status must not change it.
   const outcome = useMemo(() => outcomeOf(allActions), [allActions]);
 
-  const handleComplete = (action: RemediationActionRow) => {
-    if (busyId !== null) return;
-    setBusyId(action.id);
-    setNotice(null);
-    completeRemediation({
-      actionId: action.id,
-      expectedRowVersion: action.rowVersion,
-      idempotencyKey: intent.keyFor(action.id),
-    })
-      .then((result) => {
-        setBusyId(null);
-        if (result.ok) {
-          intent.release(action.id);
-          setNotice({ tone: 'success', message: `${action.reference} marked complete.` });
-          setReloadKey((key) => key + 1);
-        } else {
-          setNotice({ tone: 'error', message: messageForFailure(result) });
-        }
-      })
-      .catch((error) => {
-        setBusyId(null);
-        setNotice({
-          tone: 'error',
-          message: messageForFailure(classify(error)),
-        });
-      });
-  };
 
   return (
     <>
@@ -364,8 +303,6 @@ export function RemediationPage() {
             title="Remediation and sign-off"
             purpose="Track the actions raised for a non-pass outcome (BR-006), the preserved initial and final outcomes (BR-007) and the T&C Manager sign-off (BR-008, FR-023). Completing, regrading and signing off are permissioned write paths handled server-side (AD-031)."
           />
-
-          {notice ? <Notice tone={notice.tone}>{notice.message}</Notice> : null}
 
           {/*
             Drawn as the document, the same way the Checker Checklist is (project owner,
@@ -391,8 +328,6 @@ export function RemediationPage() {
               actions={allActions}
               signoffs={state.signoffs}
               adviserName={state.outcomeCase?.adviserName ?? null}
-              busyId={busyId}
-              onComplete={handleComplete}
             />
             <RemediationFormBlock
               actions={allActions}

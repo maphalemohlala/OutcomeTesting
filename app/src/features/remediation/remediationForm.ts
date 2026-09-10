@@ -159,6 +159,12 @@ export function settledChecks(actions: RemediationActionRow[], signoffs: Signoff
     if (!latest || latest.decision !== APPROVED) live.add(check);
   }
 
+  // Nothing collapses on a case with only one check (project owner, 2026-09-10): such a
+  // remediation keeps exactly the behaviour it had before collapsing existed. What this
+  // hides is the OTHER leg's finished work, and a single-leg case has no other leg - so
+  // collapsing there would empty the form rather than tidy it.
+  if (order.length < 2) return [];
+
   return order.filter((check) => !live.has(check));
 }
 

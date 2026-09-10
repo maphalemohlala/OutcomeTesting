@@ -477,11 +477,13 @@
               {% assign ot_settled = '' %}
               {% assign ot_seen = '' %}
               {% assign ot_settled_note = '' %}
+              {% assign ot_checks = 0 %}
               {% for a in rows %}
                 {% assign rid = a.al_reviewinstanceid.id %}
                 {% capture rprobe %}|{{ rid }}|{% endcapture %}
                 {% unless ot_seen contains rprobe %}
                   {% capture ot_seen %}{{ ot_seen }}{{ rprobe }}{% endcapture %}
+                  {% assign ot_checks = ot_checks | plus: 1 %}
                   {% assign ot_all_ok = true %}
                   {% assign ot_when = null %}
                   {% for b in rows %}
@@ -501,6 +503,18 @@
                   {% endif %}
                 {% endunless %}
               {% endfor %}
+
+              {% comment %}
+                Nothing collapses on a case with only one check (project owner, 2026-09-10):
+                such a remediation keeps exactly the behaviour it had before collapsing
+                existed. What this hides is the OTHER leg's finished work, and a single-leg
+                case has no other leg - collapsing there would empty the form rather than
+                tidy it.
+              {% endcomment %}
+              {% if ot_checks < 2 %}
+                {% assign ot_settled = '' %}
+                {% assign ot_settled_note = '' %}
+              {% endif %}
 
               {% assign ot_group = '' %}
               {% assign ot_drawn = 0 %}

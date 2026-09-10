@@ -64,8 +64,6 @@ function draw(actions: RemediationActionRow[]): string {
       actions={actions}
       signoffs={[]}
       adviserName={null}
-      busyId={null}
-      onComplete={() => {}}
     />,
   );
 }
@@ -115,14 +113,15 @@ describe('the remediation actions table', () => {
 
   it('spans the action’s own columns across its items rather than repeating them', () => {
     const markup = draw([action('a1', DESCRIPTION)]);
-    // Seven columns follow the issue: remedial action, owner, target date, status, age,
-    // sign-off, and the complete button. The four that carried the adviser's answers are
-    // gone - they are the form block under the table now.
+    // Six columns follow the issue: remedial action, owner, target date, status, age and
+    // sign-off. The four that carried the adviser's answers are gone - they are the form
+    // block under the table now - and so is the complete button: every action is completed
+    // and signed off on the portal, so this table reports and never writes (2026-09-10).
     // React’s server renderer writes the attribute as rowSpan; HTML parses it either way.
-    expect([...markup.matchAll(/rowspan="4"/gi)]).toHaveLength(7);
+    expect([...markup.matchAll(/rowspan="4"/gi)]).toHaveLength(6);
 
     const body = rows(markup).slice(1);
-    expect(body[0]).toHaveLength(9);
+    expect(body[0]).toHaveLength(8);
     expect(body[1]).toHaveLength(2);
   });
 
