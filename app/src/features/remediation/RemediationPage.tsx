@@ -11,13 +11,14 @@ import {
   type SignoffRow,
 } from './useRemediation';
 import { groupIssues, outcomeOf } from './remediationIssues';
-import { remediationForm, signoffCell } from './remediationForm';
+import { remediationForm, remediationFormLayout, signoffCell } from './remediationForm';
 import { remediationClock } from '../../lib/workingDays';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { completeRemediation } from '../../services/commands/completeRemediation';
 import { messageForFailure } from '../../services/errors';
 import type { CaseStatus } from '../../types/domain';
 import { classify } from '../../services/commands/failures';
+import '../../styles/document.css';
 import './RemediationPage.css';
 
 interface NoticeState {
@@ -132,12 +133,7 @@ export function ActionsTable({
                 <td className="remediation__issue">{issue}</td>
                 {index === 0 ? (
                   <>
-                    <td rowSpan={lines.length}>
-                      {action.remedialAction ?? '—'}
-                      {action.evidenceReference ? (
-                        <span className="remediation__note"> IO {action.evidenceReference}</span>
-                      ) : null}
-                    </td>
+                    <td rowSpan={lines.length}>{action.remedialAction ?? '—'}</td>
                     {/*
                       An action nobody has been given still has an adviser: the case names
                       one, and the portal falls back to it rather than saying "Unassigned"
@@ -195,26 +191,61 @@ export function RemediationFormBlock({
   signoffs: SignoffRow[];
 }) {
   const block = remediationForm(actions, outcomes, signoffs);
-  const fields: Array<[string, string | null]> = [
-    ['Client contact required?', block.clientContactRequired],
-    ['Recheck required?', block.recheckRequired],
-    ['Do the remedial actions change the advice?', block.changesAdvice],
-    ['All remedial actions checked and approved?', block.allApproved],
-    ['Regraded outcome', block.regradedOutcome],
-    ['Date', block.regradedOn],
-    ['Supervisor sign-off', block.supervisorSignoff],
-    ['Adviser sign-off', block.adviserSignoff],
-  ];
+  const layout = remediationFormLayout(block);
 
   return (
-    <dl className="remediation__form">
-      {fields.map(([label, value]) => (
-        <div key={label} className="remediation__form-field">
-          <dt>{label}</dt>
-          <dd>{value ?? '—'}</dd>
-        </div>
-      ))}
-    </dl>
+    <>
+      {/* The paper form's answer grid: four answers, two to a row (AD-111). */}
+      <table className="remediation__form-grid">
+        <caption className="remediation__sr-only">
+          Questions for this remediation
+        </caption>
+        <tbody>
+          {layout.answers.map((row) => (
+            <tr key={row.map((cell) => cell.label).join('|')}>
+              {row.map((cell) => (
+                <Fragment key={cell.label}>
+                  <th scope="row">{cell.label}</th>
+                  <td>{cell.value ?? '—'}</td>
+                </Fragment>
+              ))}
+            </tr>
+          ))}
+          <tr>
+            <th scope="row">
+              {layout.regrade.label}
+              <span className="remediation__form-note"> ({layout.regrade.note})</span>
+            </th>
+            <td colSpan={3}>
+              {layout.regrade.outcome ?? '—'}
+              {layout.regrade.on ? <span className="remediation__form-note"> · {layout.regrade.on}</span> : null}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* The sign-off table the document draws under it: signatory and date. */}
+      <table className="remediation__signoffs">
+        <caption className="remediation__sr-only">Sign-off</caption>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {layout.signoffs.map((signoff) => (
+            <tr key={signoff.label}>
+              <th scope="row">
+                {signoff.label}
+                <span className="remediation__form-note"> ({signoff.note})</span>
+              </th>
+              <td>{signoff.on ?? signoff.by ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }
 
@@ -281,15 +312,28 @@ export function RemediationPage() {
             purpose="Track the actions raised for a non-pass outcome (BR-006), the preserved initial and final outcomes (BR-007) and the T&C Manager sign-off (BR-008, FR-023). Completing, regrading and signing off are permissioned write paths handled server-side (AD-031)."
           />
 
-          <section className="remediation__section" aria-labelledby="remediation-actions">
-            <h2 id="remediation-actions" className="remediation__heading">
-              {state.outcomeCase?.reference ?? 'Remediation actions'}
+          {notice ? <Notice tone={notice.tone}>{notice.message}</Notice> : null}
+
+          {/*
+            Drawn as the document, the same way the Checker Checklist is (project owner,
+            2026-09-10: a remediation should read like the review forms). The page's own
+            chrome - the back link, the intro, the notice - keeps the app's styling; the
+            form itself is the V8 sheet.
+
+            Read-only here. Every write path stays where it already was and stays
+            permissioned: Mark complete on a row is al_CompleteRemediation, the adviser's
+            response is the portal's, and the regrade and supervisor sign-off are their own
+            commands. Drawing the form does not add a write path to any of them.
+          */}
+          <section className="checklist-doc" aria-labelledby="remediation-actions">
+            <div className="doc-footer">Outcome Testing — Remediation and escalation | V8</div>
+            <h1 id="remediation-actions">
+              Remediation and escalation
               {state.outcomeCase?.status ? (
                 <StageLabel status={state.outcomeCase.status as CaseStatus} />
               ) : null}
-            </h2>
+            </h1>
             <RemediationDetails outcomeCase={state.outcomeCase} outcome={outcome} caseId={caseId} />
-            {notice ? <Notice tone={notice.tone}>{notice.message}</Notice> : null}
             <ActionsTable
               actions={allActions}
               signoffs={state.signoffs}

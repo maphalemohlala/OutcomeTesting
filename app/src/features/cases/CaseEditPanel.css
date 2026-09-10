@@ -142,3 +142,12 @@
   font-weight: 400;
   color: var(--colour-text-muted);
 }
+
+/* A check that is stated rather than chosen: a submitted one, which al_AssignCase refuses
+   to reallocate. Sized like the controls beside it so the row still reads as a field. */
+.case-edit__only-check {
+  margin: 0;
+  padding: var(--space-2) 0;
+  font-weight: 600;
+  color: var(--colour-text);
+}

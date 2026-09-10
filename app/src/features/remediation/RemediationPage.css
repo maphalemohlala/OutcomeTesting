@@ -109,31 +109,6 @@
   cursor: not-allowed;
 }
 
-.remediation__table {
-  width: 100%;
-  font-size: var(--text-sm);
-  border-collapse: collapse;
-}
-
-.remediation__table th,
-.remediation__table td {
-  padding: var(--space-2) var(--space-3);
-  text-align: left;
-  vertical-align: top;
-  border-bottom: 1px solid var(--colour-border);
-}
-
-.remediation__table thead th {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--colour-text-muted);
-}
-
-.remediation__table tbody th {
-  font-weight: 600;
-}
-
 /* One non-pass item to a cell; long ones wrap rather than stretching the table. */
 .remediation__issue {
   min-width: 22ch;
@@ -166,33 +141,32 @@
   font-size: var(--text-lg);
 }
 
-/* The form's last block, under the actions table: label and answer in two columns, as the
-   paper form and the portal both lay it out. Two pairs to a row where there is room. */
-.remediation__form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
-  gap: var(--space-2) var(--space-5);
-  margin-top: var(--space-4);
+/* =========================================================================================
+   Inside the document (.checklist-doc)
+
+   The actions table, the answer grid and the sign-off table are drawn by document.css -
+   every cell ruled, grey header band, Calibri. Only what the document does not already
+   say belongs here: the widths that keep the paper's proportions, and the parentheticals
+   the form prints beside a label.
+   ========================================================================================= */
+
+/* The paper prints these in brackets beside the label, lighter than the label itself. */
+.remediation__form-note {
+  font-weight: 400;
+  font-style: italic;
+  font-size: 9.5pt;
 }
 
-.remediation__form-field {
-  display: grid;
-  grid-template-columns: minmax(12rem, 60%) 1fr;
-  gap: var(--space-3);
-  align-items: baseline;
-  padding: var(--space-2) 0;
-  font-size: var(--text-sm);
-  border-bottom: 1px solid var(--colour-border);
+/* The answer grid: label, answer, label, answer - the paper's two pairs to a row. */
+.checklist-doc .remediation__form-grid th {
+  width: 22%;
 }
 
-.remediation__form-field dt {
-  font-weight: 600;
+.checklist-doc .remediation__form-grid td {
+  width: 28%;
 }
 
-.remediation__caption {
-  margin-bottom: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--colour-text-muted);
-  text-align: left;
+/* The sign-off table: a wide signatory column and a date, as the document draws it. */
+.checklist-doc .remediation__signoffs th {
+  width: 50%;
 }
-

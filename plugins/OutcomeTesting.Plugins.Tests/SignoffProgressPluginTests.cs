@@ -188,5 +188,139 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.False(update.Contains("al_completedon"));
         }
+
+        private static readonly Guid TaxReviewId = Guid.Parse("dddddddd-4444-4444-8444-dddddddddddd");
+        private static readonly Guid AqsReviewId = Guid.Parse("eeeeeeee-5555-4555-8555-eeeeeeeeeeee");
+
+        private static Guid ActionOn(FakeOrganizationService svc, Guid reviewId)
+        {
+            var id = Guid.NewGuid();
+            svc.Seed(
+                "al_remediationaction",
+                id,
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
+                "al_actionstatus", new OptionSetValue(Remediation.StatusCompleted));
+            return id;
+        }
+
+        private static void SignedOff(FakeOrganizationService svc, Guid actionId)
+        {
+            svc.Seed(
+                "al_signoff",
+                Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_remediationactionid", new EntityReference("al_remediationaction", actionId));
+        }
+
+        /// <summary>
+        /// The remediation of one check is signed off as a whole, not action by action.
+        ///
+        /// A review raises one action per thing the checker marked down, so an AQS check can
+        /// carry eighteen of them. Before this, the first approval moved the case out of
+        /// Awaiting Sign-off and the other seventeen sign-offs found it already moved and
+        /// changed nothing - the case reached recheck on one approval of eighteen. It looked
+        /// right only because the sign-offs were done in a batch seconds apart.
+        ///
+        /// The completion side already had this gate (CompleteRemediationPlugin.AnyOutstanding,
+        /// 2026-09-10); this is the same rule one step later, and scoped to the check rather
+        /// than the case so the two legs of a Tax-then-AQS route are separate remediations.
+        /// </summary>
+        [Fact]
+        public void An_approval_holds_the_case_while_the_same_check_has_actions_still_to_decide()
+        {
+            var svc = CaseAt(CaseLifecycle.AwaitingSignoff);
+            Route(svc, tax: false, aqs: true);
+            SubmittedReview(svc, ResponseRules.ReviewTypeAqs);
+            Outcome(svc);
+
+            var first = ActionOn(svc, AqsReviewId);
+            ActionOn(svc, AqsReviewId);
+            SignedOff(svc, first);
+
+            SignoffProgressPlugin.MoveCase(svc, CaseId, Approved, AqsReviewId);
+
+            Assert.Equal(CaseLifecycle.AwaitingSignoff, CaseStatus(svc));
+            Assert.Empty(svc.Updates);
+        }
+
+        [Fact]
+        public void An_approval_moves_the_case_once_every_action_on_that_check_is_decided()
+        {
+            var svc = CaseAt(CaseLifecycle.AwaitingSignoff);
+            Route(svc, tax: false, aqs: true);
+            SubmittedReview(svc, ResponseRules.ReviewTypeAqs);
+            Outcome(svc);
+
+            var first = ActionOn(svc, AqsReviewId);
+            var second = ActionOn(svc, AqsReviewId);
+            SignedOff(svc, first);
+            SignedOff(svc, second);
+
+            SignoffProgressPlugin.MoveCase(svc, CaseId, Approved, AqsReviewId);
+
+            Assert.Equal(CaseLifecycle.AwaitingRecheck, CaseStatus(svc));
+        }
+
+        [Fact]
+        public void Another_checks_undecided_actions_do_not_hold_this_one_back()
+        {
+            // The point of separating them: a Tax action left undecided - a rejection that
+            // reopened, say - is not the AQS check's remediation and must not stop it.
+            var svc = CaseAt(CaseLifecycle.AwaitingSignoff);
+            Route(svc, tax: true, aqs: true);
+            SubmittedReview(svc, ResponseRules.ReviewTypeTax);
+            SubmittedReview(svc, ResponseRules.ReviewTypeAqs);
+            Outcome(svc);
+
+            ActionOn(svc, TaxReviewId);
+
+            var aqs = ActionOn(svc, AqsReviewId);
+            SignedOff(svc, aqs);
+
+            SignoffProgressPlugin.MoveCase(svc, CaseId, Approved, AqsReviewId);
+
+            Assert.Equal(CaseLifecycle.AwaitingRecheck, CaseStatus(svc));
+        }
+
+        [Fact]
+        public void A_rejection_returns_the_case_without_waiting_for_the_rest()
+        {
+            // A rejection is the whole check going back: the adviser is reworking it, so the
+            // case belongs at Awaiting Remediation immediately rather than after the other
+            // actions have been decided.
+            var svc = CaseAt(CaseLifecycle.AwaitingSignoff);
+            Route(svc, tax: false, aqs: true);
+
+            var first = ActionOn(svc, AqsReviewId);
+            ActionOn(svc, AqsReviewId);
+            SignedOff(svc, first);
+
+            SignoffProgressPlugin.MoveCase(svc, CaseId, Rejected, AqsReviewId);
+
+            Assert.Equal(CaseLifecycle.AwaitingRemediation, CaseStatus(svc));
+        }
+
+        [Fact]
+        public void An_action_with_no_review_falls_back_to_the_whole_case()
+        {
+            // Rows written before the review link existed carry none. Gating on nothing would
+            // restore the first-approval-wins behaviour, so the case is the scope instead.
+            var svc = CaseAt(CaseLifecycle.AwaitingSignoff);
+            Route(svc, tax: false, aqs: true);
+            SubmittedReview(svc, ResponseRules.ReviewTypeAqs);
+            Outcome(svc);
+
+            var id = Guid.NewGuid();
+            svc.Seed(
+                "al_remediationaction",
+                id,
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_actionstatus", new OptionSetValue(Remediation.StatusCompleted));
+
+            SignoffProgressPlugin.MoveCase(svc, CaseId, Approved, null);
+
+            Assert.Equal(CaseLifecycle.AwaitingSignoff, CaseStatus(svc));
+        }
     }
 }

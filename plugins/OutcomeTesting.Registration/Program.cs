@@ -392,6 +392,16 @@ if (args.Length >= 2 && args[0].Equals("dropoutcomeactions", StringComparison.Or
     return DropOutcomeActions(args[1], ConfirmedFor(args, args[1]));
 }
 
+if (args.Length >= 2 && args[0].Equals("purgecasedata", StringComparison.OrdinalIgnoreCase))
+{
+    return PurgeCaseData(args[1], ConfirmedFor(args, args[1]));
+}
+
+if (args.Length >= 3 && args[0].Equals("importcases", StringComparison.OrdinalIgnoreCase))
+{
+    return ImportCasesFile(args[1], args[2], ConfirmedFor(args, args[1]));
+}
+
 if (args.Length >= 2 && args[0].Equals("migratetocontacts", StringComparison.OrdinalIgnoreCase))
 {
     return MigrateToContacts(args);
@@ -787,6 +797,380 @@ int SplitRemediation(string orgUrl, bool confirm)
     Console.WriteLine($"Done. {recoded} action(s) re-coded, {created} created.");
     return 0;
 }
+
+// Imports a CSV extract through the al_ImportCases command, the same command the Code App's
+// intake page calls.
+//
+// Through the command rather than by creating al_outcomecase rows directly, because the
+// command is where the behaviour lives: BR-002 validation, the al_importbatch and its
+// exceptions, the BR-001 skip of a reference already held, the route derived from the Tax
+// check answer and the Tax team disposition (BR-004), and the AD-093 walk that queues a
+// routed case on create. Rows written straight into the table would have none of it, which
+// is exactly how an environment ends up with data that no rule produced.
+//
+// The idempotency key is derived from the file's own content, so re-running the same file
+// returns the same batch instead of opening a second one. Changing a single character in
+// the file makes it a different import, which is what you want when correcting an extract.
+int ImportCasesFile(string orgUrl, string csvPath, bool confirm)
+{
+    if (!confirm)
+    {
+        Console.Error.WriteLine(
+            "This creates cases. Re-run as: importcases <orgUrl> <path to .csv> --confirm <orgUrl>");
+        return 1;
+    }
+
+    if (!File.Exists(csvPath))
+    {
+        Console.Error.WriteLine($"No such file: {csvPath}");
+        return 1;
+    }
+
+    var csv = File.ReadAllText(csvPath);
+    var fileName = Path.GetFileName(csvPath);
+
+    string key;
+    using (var sha = System.Security.Cryptography.SHA256.Create())
+    {
+        var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(fileName + "\n" + csv));
+        key = "import-" + BitConverter.ToString(hash, 0, 8).Replace("-", string.Empty).ToLowerInvariant();
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var request = new OrganizationRequest("al_ImportCases")
+    {
+        ["FileName"] = fileName,
+        ["Csv"] = csv,
+        ["IdempotencyKey"] = key,
+    };
+
+    Console.WriteLine($"Importing {fileName} ({csv.Length} chars), idempotency key {key}.");
+
+    OrganizationResponse response;
+    try
+    {
+        response = svc.Execute(request);
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine("The import was refused:");
+        Console.Error.WriteLine("  " + FirstLine(ex.Message));
+        return 1;
+    }
+
+    foreach (var pair in response.Results.OrderBy(p => p.Key, StringComparer.Ordinal))
+    {
+        // Report is a multi-line block; everything else is a scalar.
+        var text = pair.Value?.ToString() ?? string.Empty;
+        if (text.IndexOf('\n') >= 0)
+        {
+            Console.WriteLine($"  {pair.Key}:");
+            foreach (var line in text.Split('\n'))
+            {
+                Console.WriteLine("    " + line.TrimEnd('\r'));
+            }
+        }
+        else
+        {
+            Console.WriteLine($"  {pair.Key}: {text}");
+        }
+    }
+
+    return 0;
+}
+
+// Deletes every row of case data in the environment, and nothing else.
+//
+// A test environment accumulates cases whose history no longer matches the rules that
+// produced it - a route derived under a rule that has since changed, a review instance
+// opened for a discipline the route no longer owes - and reasoning about behaviour from
+// data like that is worse than having none. This empties the transactional tables so a
+// fresh import starts from the rules as they stand today.
+//
+// The table list is the whole of the safety and it is an allowlist, never a sweep of
+// everything beginning al_. What it deliberately leaves standing:
+//
+//   al_reviewroute                                  the three routes
+//   al_question, al_questionversion,
+//   al_checklistversion                             the checklist and its versions
+//   al_pagepermission, al_userrolemapping           the permission model
+//   contact, mspp_webrole, mspp_sitesetting         people, roles and site configuration
+//
+// Those are not incidental omissions. A case imported into an environment with no route
+// derives none (BR-004), and a claim against a case with no checklist version in force is
+// refused outright (BR-013), so a purge that took them would leave an environment that
+// cannot be re-seeded - the opposite of the point.
+//
+// The order is the delete order, children before parents: Dataverse refuses to delete a
+// row that another row's lookup still points at, so responses go before their review
+// instance, actions before their outcome, and the case itself goes last.
+//
+// Deleted rather than deactivated, unlike everything the commands do. AD-037/OD-010 keeps
+// history because history is evidence; there is no evidence here to keep, and a
+// deactivated row would still be counted by every query in the solution, none of which
+// filters on statecode.
+//
+// Dry run unless --confirm names the same org twice, which is the pattern every
+// destructive verb in this tool already uses.
+int PurgeCaseData(string orgUrl, bool confirm)
+{
+    var tables = new[]
+    {
+        "al_response",
+        "al_signoff",
+        "al_remediationaction",
+        "al_outcome",
+        "al_reviewinstance",
+        "al_caseassignment",
+        "al_importexception",
+        "al_importbatch",
+        "al_exportrecord",
+        "al_exportbatch",
+        "al_notification",
+        "al_auditevent",
+        "al_outcomecase",
+    };
+
+    using var svc = Connect(orgUrl);
+
+    Console.WriteLine(confirm ? "Purging case data." : "Dry run - counting case data.");
+    Console.WriteLine();
+
+    var found = new List<(string Table, List<Guid> Ids)>();
+    var total = 0;
+
+    foreach (var table in tables)
+    {
+        List<Guid> ids;
+        try
+        {
+            ids = AllRowIds(svc, table);
+        }
+        catch (Exception ex)
+        {
+            // A table the environment never had (al_notification is created by a verb of
+            // its own) is not a failure - it holds no case data either way.
+            Console.WriteLine($"  {table,-22}      - not present ({FirstLine(ex.Message)})");
+            continue;
+        }
+
+        found.Add((table, ids));
+        total += ids.Count;
+        Console.WriteLine($"  {table,-22} {ids.Count,6}");
+    }
+
+    Console.WriteLine($"  {"total",-22} {total,6}");
+
+    ReportOrphanRisks(svc, tables);
+    Console.WriteLine();
+
+    if (!confirm)
+    {
+        Console.WriteLine(
+            "Nothing was deleted. Re-run as: purgecasedata <orgUrl> --confirm <orgUrl>");
+        return 0;
+    }
+
+    if (total == 0)
+    {
+        Console.WriteLine("No case data to delete.");
+        return 0;
+    }
+
+    var deleted = 0;
+    var failures = new List<string>();
+
+    foreach (var (table, ids) in found)
+    {
+        if (ids.Count == 0) { continue; }
+
+        var before = deleted;
+        foreach (var id in ids)
+        {
+            try
+            {
+                svc.Delete(table, id);
+                deleted++;
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"{table} {id:D}: {FirstLine(ex.Message)}");
+            }
+        }
+
+        Console.WriteLine($"  {table,-22} {deleted - before,6} deleted");
+    }
+
+    Console.WriteLine();
+    Console.WriteLine($"Deleted {deleted} of {total} rows.");
+
+    if (failures.Count > 0)
+    {
+        // Reported rather than swallowed: a row that refused to go is usually one a table
+        // outside this list still points at, and that is worth seeing by name.
+        Console.Error.WriteLine($"{failures.Count} row(s) could not be deleted:");
+        foreach (var failure in failures.Take(20))
+        {
+            Console.Error.WriteLine($"  {failure}");
+        }
+
+        if (failures.Count > 20)
+        {
+            Console.Error.WriteLine($"  ... and {failures.Count - 20} more.");
+        }
+
+        return 1;
+    }
+
+    return 0;
+}
+
+// What still points at the rows about to go.
+//
+// "Leave no orphaned records" is a property to verify, not to assume. A lookup reaching
+// into this list from a table outside it is one of three things, and only the first is
+// safe on its own:
+//
+//   Cascade     the child is deleted with its parent, so nothing is left behind.
+//   Restrict    the parent's delete is refused, which the run reports as a failure.
+//   RemoveLink  the child survives with a null lookup - an orphan, and the only one of the
+//               three that leaves no trace in the run's own output.
+//
+// So RemoveLink and Restrict are counted here, before anything is deleted, and only where
+// rows actually exist. The platform's own bookkeeping tables are skipped by name: they
+// reference every table in the environment, they are maintained by the platform rather
+// than by this solution, and listing them would bury the rows that matter.
+void ReportOrphanRisks(IOrganizationService svc, IReadOnlyCollection<string> tables)
+{
+    var platform = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "asyncoperation", "bulkdeletefailure", "duplicaterecord", "mailboxtrackingfolder",
+        "principalobjectattributeaccess", "processsession", "syncerror",
+        "userentityinstancedata", "userentityuisettings", "workflowlog", "solutioncomponent",
+        "msdyn_federatedarticleincident", "expiredprocess", "processstageparameter",
+        "bulkoperationlog", "slakpiinstance", "elasticfileattachment", "fileattachment",
+    };
+
+    var purging = new HashSet<string>(tables, StringComparer.OrdinalIgnoreCase);
+    var risks = new List<string>();
+
+    foreach (var table in purging)
+    {
+        EntityMetadata metadata;
+        try
+        {
+            metadata = ((RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+            {
+                LogicalName = table,
+                EntityFilters = EntityFilters.Relationships,
+            })).EntityMetadata;
+        }
+        catch
+        {
+            // A table this environment does not have; the count pass already said so.
+            continue;
+        }
+
+        foreach (var relationship in metadata.OneToManyRelationships)
+        {
+            var child = relationship.ReferencingEntity;
+            if (child == null || purging.Contains(child) || platform.Contains(child))
+            {
+                continue;
+            }
+
+            var behaviour = relationship.CascadeConfiguration?.Delete;
+            if (behaviour == CascadeType.Cascade)
+            {
+                continue;
+            }
+
+            var count = CountReferencing(svc, child, relationship.ReferencingAttribute);
+            if (count == 0)
+            {
+                continue;
+            }
+
+            risks.Add(
+                $"  {child}.{relationship.ReferencingAttribute} -> {table}"
+                + $"   {count} row(s), on parent delete: {behaviour}");
+        }
+    }
+
+    Console.WriteLine();
+
+    if (risks.Count == 0)
+    {
+        Console.WriteLine("Orphan check: nothing outside the purge list points at these rows.");
+        return;
+    }
+
+    Console.WriteLine("Orphan check - these reference rows being deleted and are NOT in the list:");
+    foreach (var risk in risks.OrderBy(r => r, StringComparer.Ordinal))
+    {
+        Console.WriteLine(risk);
+    }
+}
+
+// How many rows of a table carry a value in one lookup. ReturnTotalRecordCount caps at
+// 5000, which is a signal rather than a census - enough to say whether anything is there.
+int CountReferencing(IOrganizationService svc, string table, string attribute)
+{
+    try
+    {
+        var query = new QueryExpression(table)
+        {
+            ColumnSet = new ColumnSet(false),
+            PageInfo = new PagingInfo { Count = 1, PageNumber = 1, ReturnTotalRecordCount = true },
+        };
+        query.Criteria.AddCondition(attribute, ConditionOperator.NotNull);
+        return svc.RetrieveMultiple(query).TotalRecordCount;
+    }
+    catch
+    {
+        // A table that cannot be queried (virtual surfaces, and anything this account has
+        // no read on) tells us nothing either way; it is not evidence of an orphan.
+        return 0;
+    }
+}
+
+// Every row id in a table, paged. ColumnSet(false) asks for no columns at all - the
+// primary key comes back on Entity.Id regardless, which is also what keeps this free of a
+// per-table primary key name.
+List<Guid> AllRowIds(IOrganizationService svc, string table)
+{
+    var ids = new List<Guid>();
+    var query = new QueryExpression(table)
+    {
+        ColumnSet = new ColumnSet(false),
+        PageInfo = new PagingInfo { Count = 500, PageNumber = 1 },
+    };
+
+    while (true)
+    {
+        var page = svc.RetrieveMultiple(query);
+        foreach (var row in page.Entities)
+        {
+            ids.Add(row.Id);
+        }
+
+        if (!page.MoreRecords) { break; }
+
+        query.PageInfo.PageNumber++;
+        query.PageInfo.PagingCookie = page.PagingCookie;
+    }
+
+    return ids;
+}
+
+string FirstLine(string message)
+{
+    if (string.IsNullOrEmpty(message)) { return string.Empty; }
+    var end = message.IndexOfAny(new[] { '\r', '\n' });
+    return end < 0 ? message : message.Substring(0, end);
+}
+
 
 // The 2026-09-10 backfill. Remediation.NonPassItems no longer lists the question that
 // records the review's own outcome - Q-TAX-02 (Tax check outcome), Q-FQ-01 and Q-FQTAX-01

@@ -25,6 +25,36 @@
 
 {% assign me = user.id %}
 
+{% comment %}
+  Search and filters (PP-03, project owner 2026-09-10). Three parameters: `ref` is a
+  contains-match on the case reference, `check` narrows to one discipline, and `state`
+  separates what you still owe from what you have already submitted.
+
+  Applied in the fetch, not over the rendered rows. The table takes the first 25 reviews,
+  so a filter in the browser would search the 25 that happened to load and silently miss
+  the review being looked for - the same reasoning the review list records for its own
+  search.
+
+  `check` and `state` are tested against the values they are allowed to be, which is what
+  the review list does with `mine`. An unrecognised value becomes no filter rather than a
+  condition, so nothing typed into the URL reaches the FetchXML. `ref` cannot be an
+  allowlist, so it is xml_escaped at the point it is used.
+
+  The counts above are deliberately not filtered. They answer "how much work do I have",
+  which does not change because the table below is being searched - a tile that moved with
+  the filter would be a second, quieter answer to a question the page already answers.
+{% endcomment %}
+{% assign f_ref = request.params['ref'] | default: '' %}
+
+{% assign f_check = request.params['check'] | default: '' %}
+{% if f_check != 'tax' and f_check != 'aqs' %}{% assign f_check = '' %}{% endif %}
+
+{% assign f_state = request.params['state'] | default: '' %}
+{% if f_state != 'open' and f_state != 'done' %}{% assign f_state = '' %}{% endif %}
+
+{% assign filtered = false %}
+{% if f_ref != '' or f_check != '' or f_state != '' %}{% assign filtered = true %}{% endif %}
+
 {% fetchxml case_count %}
 <fetch aggregate="true">
   <entity name="al_outcomecase">
@@ -109,6 +139,16 @@
     <attribute name="al_submittedon" />
     <filter type="and">
       <condition attribute="al_assignedcontactid" operator="eq" value="{{ me | xml_escape }}" />
+      {% if f_check == 'tax' %}<condition attribute="al_reviewtype" operator="eq" value="120910200" />{% endif %}
+      {% if f_check == 'aqs' %}<condition attribute="al_reviewtype" operator="eq" value="120910201" />{% endif %}
+      {% if f_state == 'open' %}<condition attribute="al_submittedon" operator="null" />{% endif %}
+      {% if f_state == 'done' %}<condition attribute="al_submittedon" operator="not-null" />{% endif %}
+      {% comment %}
+        The reference names the linked case by alias, which is what the case list already
+        does for its outcome filter - and the link below is an inner one, so a review whose
+        case is missing drops out of a search rather than surviving it as a blank row.
+      {% endcomment %}
+      {% if f_ref != '' %}<condition entityname="case" attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" />{% endif %}
     </filter>
     <order attribute="al_submittedon" descending="false" />
     <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="case">
@@ -175,8 +215,12 @@
       now lives - there is no review list page that filters to submitted, and a tile that
       opens the whole discipline would not be the set it counted. Every tile on this page
       goes somewhere; a card that only displays a number reads as broken.
+
+      It carries state=done, so the table it lands on holds exactly the reviews this tile
+      counted. Before the filter existed the link could only scroll to a table that also
+      held the outstanding ones, which is the gap the comment above describes.
     {% endcomment %}
-    <a class="ot-tile" href="#ot-recent-heading">
+    <a class="ot-tile" href="?state=done#ot-recent-heading">
       <span class="ot-tile__count">{{ total_submitted }}</span>
       <span class="ot-tile__label">Reviews you have submitted</span>
     </a>
@@ -189,8 +233,52 @@
   </li>
 </ul>
 
+{% comment %}
+  A GET form, so a search is a URL that can be bookmarked or sent to someone. No action
+  attribute: it posts back to whatever path this page is served at, which is what the
+  review list's own search does and what keeps this free of a hard-coded route.
+{% endcomment %}
+<form class="ot-filters" method="get" role="search" aria-label="Search the reviews assigned to you">
+  <div class="ot-filters__grid">
+    <div class="ot-field">
+      <label for="f-ref">Case reference</label>
+      <input type="search" id="f-ref" name="ref" value="{{ f_ref | escape }}" placeholder="Contains">
+    </div>
+    <div class="ot-field">
+      <label for="f-check">Check</label>
+      <select id="f-check" name="check">
+        <option value="">Any</option>
+        <option value="tax"{% if f_check == 'tax' %} selected{% endif %}>Tax</option>
+        <option value="aqs"{% if f_check == 'aqs' %} selected{% endif %}>AQS</option>
+      </select>
+    </div>
+    <div class="ot-field">
+      <label for="f-state">State</label>
+      <select id="f-state" name="state">
+        <option value="">Any</option>
+        <option value="open"{% if f_state == 'open' %} selected{% endif %}>Outstanding</option>
+        <option value="done"{% if f_state == 'done' %} selected{% endif %}>Submitted</option>
+      </select>
+    </div>
+  </div>
+  <div class="ot-filters__actions">
+    <button type="submit" class="ot-btn ot-btn--primary">Search</button>
+    {% if filtered %}<a class="ot-btn" href="?">Clear</a>{% endif %}
+  </div>
+</form>
+
 <section class="ot-card" aria-labelledby="ot-recent-heading">
   <h2 class="ot-card__title" id="ot-recent-heading">Reviews assigned to you</h2>
+
+  {% if filtered %}
+    <p class="ot-filters__summary">
+      Showing
+      {% if f_state == 'open' %}outstanding{% elsif f_state == 'done' %}submitted{% endif %}
+      {% if f_check == 'tax' %}Tax{% elsif f_check == 'aqs' %}AQS{% endif %}
+      reviews assigned to you{% if f_ref != '' %} whose case reference contains
+      &ldquo;{{ f_ref | escape }}&rdquo;{% endif %}. The counts above are unaffected.
+    </p>
+  {% endif %}
 
   {% if my_reviews.results.entities.size > 0 %}
     <div class="ot-table-wrap">
@@ -229,6 +317,12 @@
         </tbody>
       </table>
     </div>
+  {% elsif filtered %}
+    {% comment %}
+      A search that matched nothing is not the same as having no work, and saying "nothing
+      assigned to you" to someone holding twelve reviews would be a plain untruth.
+    {% endcomment %}
+    {% include 'OT Empty State' title: 'No review matches' message: 'No review assigned to you matches this search. Clear it to see everything assigned to you.' %}
   {% else %}
     {% include 'OT Empty State' title: 'Nothing assigned to you' message: 'Reviews appear here once a team lead allocates one to you.' %}
   {% endif %}

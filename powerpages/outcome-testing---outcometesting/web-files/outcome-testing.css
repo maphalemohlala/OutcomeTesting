@@ -441,6 +441,29 @@ footer a:focus-visible, .footer a:focus-visible {
    under the heading, and lose the standalone strip's bottom margin. */
 .ot-card .ot-tiles { margin-bottom: 0; }
 
+/* The check a run of remediation rows belongs to, named once above them. A
+   Tax-then-AQS case remediates twice and the two are separate remediations
+   (2026-09-10); a settled check is not drawn at all, so this heading appears
+   only when more than one is genuinely live. Styled as a band rather than a
+   caption so it reads as part of the grid it divides. */
+.ot-remedial-settled {
+  color: var(--colour-text-muted);
+  font-style: italic;
+  padding: var(--space-4) var(--space-3);
+}
+
+.ot-remedial-group th {
+  background: var(--colour-surface-header);
+  border-top: 1px solid var(--colour-border);
+  border-bottom: 1px solid var(--colour-border);
+  font-family: var(--font-heading);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  color: var(--colour-text);
+}
+
 /* ------------------------------------------------------------------
    Filters. A working control strip, not a search hero: compact fields,
    every one labelled, and a clear-filters action that only appears when

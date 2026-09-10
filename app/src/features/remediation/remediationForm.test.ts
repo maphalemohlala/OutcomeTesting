@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { remediationForm, signoffCell } from './remediationForm';
+import { remediationForm, remediationFormLayout, signoffCell } from './remediationForm';
 import type { OutcomeRow, RemediationActionRow, SignoffRow } from './remediationMapping';
 
 function action(over: Partial<RemediationActionRow> = {}): RemediationActionRow {
@@ -163,15 +163,58 @@ describe('remediationForm', () => {
       assignedTo: 'Seed Adviser 02',
       completedOn: '20 Sep 2026',
       completedOnRaw: '2026-09-20',
-      evidenceReference: 'IO-1234',
     });
 
     const block = remediationForm([early, late], [], []);
 
-    expect(block.adviserSignoff).toBe('Seed Adviser 02, 20 Sep 2026 (IO IO-1234)');
+    expect(block.adviserSignoff).toBe('Seed Adviser 02, 20 Sep 2026');
   });
 
   it('has no adviser sign-off while nothing is completed', () => {
     expect(remediationForm([action()], [], []).adviserSignoff).toBeNull();
   });
 });
+
+describe('the paper form layout (project owner, 2026-09-10)', () => {
+  const block = remediationForm([], [], []);
+
+  it('lays the four answers out two to a row, as the document draws them', () => {
+    const layout = remediationFormLayout(block);
+
+    expect(layout.answers.map((row) => row.map((cell) => cell.label))).toEqual([
+      ['Client contact required?', 'Recheck required?'],
+      ['Do the remedial actions change the advice?', 'All remedial actions checked and approved?'],
+    ]);
+  });
+
+  it('keeps the paper note that says who signs the regrade off', () => {
+    const layout = remediationFormLayout(block);
+
+    expect(layout.regrade.label).toBe('Regraded outcome');
+    expect(layout.regrade.note).toContain('supervisor');
+  });
+
+  it('draws the two sign-offs as signatory and date', () => {
+    const layout = remediationFormLayout(block);
+
+    expect(layout.signoffs.map((s) => s.label)).toEqual([
+      'Supervisor sign-off',
+      'Adviser sign-off',
+    ]);
+    for (const signoff of layout.signoffs) {
+      expect(signoff).toHaveProperty('by');
+      expect(signoff).toHaveProperty('on');
+    }
+  });
+
+  it('carries the sign-off dates as their own values, not folded into the name', () => {
+    const signed = remediationForm(
+      [action({ id: 'a', assignedTo: 'Adviser One', completedOn: '20 Sep 2026', completedOnRaw: '2026-09-20' })],
+      [],
+      [],
+    );
+
+    expect(remediationFormLayout(signed).signoffs[1].on).toBe('20 Sep 2026');
+  });
+});
+

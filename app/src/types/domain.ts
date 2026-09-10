@@ -64,7 +64,10 @@ export const CASE_STATUS_TRANSITIONS: Record<CaseStatus, readonly CaseStatus[]> 
   'Ready for Allocation': ['Queued', 'No Check Required'],
   Queued: ['Assigned', 'No Check Required'],
   Assigned: ['Review In Progress', 'Queued', 'No Check Required'],
-  'Review In Progress': ['Submitted', 'Queued', 'No Check Required'],
+  // Assigned: a manager reallocating a check the checker has already started (project
+  // owner direction, 2026-09-10). al_AssignCase stamps the review instance back to
+  // Assigned for whoever now holds it, and the case follows it there.
+  'Review In Progress': ['Submitted', 'Queued', 'Assigned', 'No Check Required'],
   Submitted: ['Awaiting Remediation', 'Closed'],
   'Awaiting Remediation': ['Remediation In Progress'],
   'Remediation In Progress': ['Awaiting Sign-off'],

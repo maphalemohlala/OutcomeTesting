@@ -19,6 +19,40 @@ import type { OutcomeRow, RemediationActionRow, SignoffRow } from './remediation
 const APPROVED = 'Approved';
 const REJECTED = 'Rejected';
 
+/** One labelled cell of the paper form's answer grid. */
+export interface FormCell {
+  label: string;
+  value: string | null;
+}
+
+/**
+ * The paper form below the table, in the shape the document draws it (project owner,
+ * 2026-09-10: a remediation should read like the review forms).
+ *
+ * Three blocks, not one flat list: the four answers laid out two to a row, the regraded
+ * outcome with the note the paper prints beside it, and the two sign-offs as a table of
+ * signatory and date. Grouped here rather than in either renderer so the portal and the
+ * Code App draw the same document, and a test fails if one of them drifts.
+ */
+export interface RemediationFormLayout {
+  /** The answer grid, as rows of two cells - the paper's own arrangement. */
+  answers: FormCell[][];
+  regrade: {
+    label: string;
+    /** The paper's parenthetical, which says whose signature this is. */
+    note: string;
+    outcome: string | null;
+    on: string | null;
+  };
+  signoffs: {
+    label: string;
+    /** The paper's "(complete remedial task in IO)" instruction. */
+    note: string;
+    by: string | null;
+    on: string | null;
+  }[];
+}
+
 export interface RemediationFormBlock {
   clientContactRequired: string | null;
   recheckRequired: string | null;
@@ -29,6 +63,48 @@ export interface RemediationFormBlock {
   regradedOn: string | null;
   supervisorSignoff: string | null;
   adviserSignoff: string | null;
+  /** The supervisor's decision and date, kept apart for the paper's sign-off table. */
+  supervisorSignoffOn: string | null;
+  adviserSignoffOn: string | null;
+}
+
+/**
+ * The block arranged as the paper form draws it. Derived from the same values the flat
+ * block carries, so there is one derivation and two arrangements of it.
+ */
+export function remediationFormLayout(block: RemediationFormBlock): RemediationFormLayout {
+  return {
+    answers: [
+      [
+        { label: 'Client contact required?', value: block.clientContactRequired },
+        { label: 'Recheck required?', value: block.recheckRequired },
+      ],
+      [
+        { label: 'Do the remedial actions change the advice?', value: block.changesAdvice },
+        { label: 'All remedial actions checked and approved?', value: block.allApproved },
+      ],
+    ],
+    regrade: {
+      label: 'Regraded outcome',
+      note: 'for potential harms / insufficient evidence — the supervisor signs this off',
+      outcome: block.regradedOutcome,
+      on: block.regradedOn,
+    },
+    signoffs: [
+      {
+        label: 'Supervisor sign-off',
+        note: 'complete remedial task in IO',
+        by: block.supervisorSignoff,
+        on: block.supervisorSignoffOn,
+      },
+      {
+        label: 'Adviser sign-off',
+        note: 'complete remedial task in IO',
+        by: block.adviserSignoff,
+        on: block.adviserSignoffOn,
+      },
+    ],
+  };
 }
 
 /**
@@ -143,11 +219,15 @@ export function remediationForm(
           .filter((part) => part !== null && part !== undefined && part !== '')
           .join(', ')
       : null,
+    supervisorSignoffOn: supervisor?.signedOffOn ?? null,
+    adviserSignoffOn: latestAdviser?.completedOn ?? null,
+    // No Intelligent Office reference: the agreed remediation form does not carry one, so
+    // it was removed from both platforms (project owner, 2026-09-10). The column and any
+    // value already in it are left alone; nothing collects or shows it.
     adviserSignoff: latestAdviser
       ? [latestAdviser.assignedTo, latestAdviser.completedOn]
           .filter((part) => part !== null && part !== '')
-          .join(', ') +
-        (latestAdviser.evidenceReference ? ` (IO ${latestAdviser.evidenceReference})` : '')
+          .join(', ')
       : null,
   };
 }

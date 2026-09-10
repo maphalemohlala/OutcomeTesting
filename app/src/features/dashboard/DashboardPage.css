@@ -1,3 +1,10 @@
+/*
+ * The dashboard is a ledger, not a wall of cards. One strip carries the four figures a
+ * person acts on; every other count sits in a panel beside a bar on that panel's shared
+ * scale, so a number reads as a share of the whole without arithmetic. Zeros stay on the
+ * page (an absence is an answer) but recede.
+ */
+
 .dashboard__link {
   color: var(--colour-action);
   text-decoration: none;
@@ -9,165 +16,243 @@
   text-decoration: underline;
 }
 
-.dashboard__stats {
+/* Work in hand: one bordered strip, cells divided by rules rather than boxed */
+
+.dashboard__strip {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
-}
-
-.dashboard__stat {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-4);
+  margin-bottom: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-stage-active);
-  color: inherit;
-  text-decoration: none;
 }
 
-a.dashboard__stat:hover,
-a.dashboard__outcome:hover {
-  background: var(--colour-surface-sunken);
-}
-
-.dashboard__stat[data-tone='blocked'] {
-  border-left-color: var(--colour-stage-blocked);
-}
-
-.dashboard__stat[data-tone='waiting'] {
-  border-left-color: var(--colour-stage-waiting);
-}
-
-.dashboard__section-heading {
-  margin-bottom: var(--space-1);
-  font-size: var(--text-lg);
-}
-
-.dashboard__section-note {
-  max-width: 80ch;
-  margin-bottom: var(--space-3);
-  font-size: var(--text-sm);
-  color: var(--colour-text-muted);
-}
-
-.dashboard__outcomes {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
-}
-
-.dashboard__outcome {
+.dashboard__figure {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-4);
-  background: var(--colour-surface);
-  border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-outcome-none);
+  padding: var(--space-4) var(--space-5) var(--space-4);
   color: inherit;
   text-decoration: none;
-  font-size: var(--text-sm);
 }
 
-.dashboard__outcome[data-variant='pass'] {
-  border-left-color: var(--colour-outcome-pass);
+.dashboard__figure + .dashboard__figure {
+  border-left: 1px solid var(--colour-border);
 }
 
-.dashboard__outcome[data-variant='issues'] {
-  border-left-color: var(--colour-outcome-issues);
+a.dashboard__figure:hover,
+a.dashboard__row:hover {
+  background: var(--colour-surface-sunken);
 }
 
-.dashboard__outcome[data-variant='insufficient'] {
-  border-left-color: var(--colour-outcome-insufficient);
-}
-
-.dashboard__outcome[data-variant='harm'] {
-  border-left-color: var(--colour-outcome-harm);
-}
-
-.dashboard__outcome-label {
-  color: var(--colour-text-muted);
-}
-
-.dashboard__stat-value {
+.dashboard__figure-value {
   font-family: var(--font-heading);
-  font-size: var(--text-2xl);
+  font-size: var(--text-3xl);
   font-weight: 600;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
-.dashboard__stat-label {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.dashboard__figure-value[data-zero] {
+  color: var(--colour-border-strong);
+}
+
+.dashboard__figure-unit {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 500;
   color: var(--colour-text-muted);
 }
+
+.dashboard__figure-label {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+/* Panels */
 
 .dashboard__panels {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
   gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+@media (min-width: 64rem) {
+  .dashboard__panels--weighted {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
 }
 
 .dashboard__panel {
-  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-3);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
 }
 
-.dashboard__panel h2 {
-  margin-bottom: var(--space-3);
+.dashboard__panel-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
   padding-bottom: var(--space-2);
-  font-size: var(--text-lg);
   border-bottom: 1px solid var(--colour-border);
 }
 
-.dashboard__status-list,
-.dashboard__ageing {
-  display: grid;
-  gap: var(--space-2);
+.dashboard__panel-heading h2 {
+  font-size: var(--text-lg);
 }
 
-.dashboard__status-list li,
-.dashboard__ageing li {
+.dashboard__panel-meta {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+  white-space: nowrap;
+}
+
+/* The proportion strip above the outcome ledger: segments on one scale, a surface gap between */
+
+.dashboard__stack {
   display: flex;
+  gap: 2px;
+  height: 10px;
+}
+
+.dashboard__stack-segment {
+  flex-grow: 0;
+  flex-shrink: 1;
+  background: var(--colour-outcome-none);
+}
+
+.dashboard__stack-segment[data-variant='none'] {
+  background: var(--colour-border);
+}
+
+/* Ledger rows */
+
+.dashboard__ledger {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard__row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr) 2rem;
+  gap: var(--space-4);
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--colour-border);
+  color: inherit;
+  text-decoration: none;
   font-size: var(--text-sm);
 }
 
-.dashboard__status-list li:last-child,
-.dashboard__ageing li:last-child {
+.dashboard__row--plain {
+  grid-template-columns: minmax(0, 1fr) 2rem;
+}
+
+.dashboard__ledger li:last-child .dashboard__row {
   border-bottom: none;
 }
 
-.dashboard__status-list a {
-  text-decoration: none;
-  color: inherit;
+.dashboard__ledger-label {
+  min-width: 0;
 }
 
-.dashboard__status-list a:hover {
-  text-decoration: underline;
+.dashboard__row[data-zero] .dashboard__ledger-label,
+.dashboard__row[data-zero] .dashboard__count {
+  color: var(--colour-border-strong);
+}
+
+.dashboard__track {
+  display: block;
+  height: 8px;
+  background: var(--colour-surface-sunken);
+}
+
+.dashboard__bar {
+  display: block;
+  height: 8px;
+  background: var(--colour-stage-active);
+}
+
+.dashboard__bar[data-tone='waiting'] {
+  background: var(--colour-stage-waiting);
+}
+
+.dashboard__bar[data-tone='blocked'] {
+  background: var(--colour-stage-blocked);
+}
+
+.dashboard__bar[data-tone='closed'] {
+  background: var(--colour-stage-closed);
+}
+
+.dashboard__bar[data-tone='pass'],
+.dashboard__stack-segment[data-variant='pass'] {
+  background: var(--colour-outcome-pass);
+}
+
+.dashboard__bar[data-tone='issues'],
+.dashboard__stack-segment[data-variant='issues'] {
+  background: var(--colour-outcome-issues);
+}
+
+.dashboard__bar[data-tone='insufficient'],
+.dashboard__stack-segment[data-variant='insufficient'] {
+  background: var(--colour-outcome-insufficient);
+}
+
+.dashboard__bar[data-tone='harm'],
+.dashboard__stack-segment[data-variant='harm'] {
+  background: var(--colour-outcome-harm);
+}
+
+.dashboard__bar[data-tone='none'] {
+  background: var(--colour-border);
 }
 
 .dashboard__count {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
-.dashboard__ageing-label {
+/* The remediation ledger's labels: the status spine, for lines that are not lifecycle stages */
+
+.dashboard__spine {
+  display: inline-block;
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--colour-stage-waiting);
+  white-space: nowrap;
+}
+
+.dashboard__spine[data-tone='active'] {
+  border-left-color: var(--colour-stage-active);
+  font-weight: 600;
+}
+
+.dashboard__spine[data-tone='blocked'] {
+  border-left-color: var(--colour-stage-blocked);
+  font-weight: 600;
+}
+
+.dashboard__spine[data-tone='closed'] {
+  border-left-color: var(--colour-stage-closed);
   color: var(--colour-text-muted);
 }
 
+.dashboard__muted {
+  color: var(--colour-text-muted);
+}
+
+.dashboard__footnote,
 .dashboard__empty {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--colour-text-muted);
 }
 
@@ -182,4 +267,11 @@ a.dashboard__outcome:hover {
 .dashboard__unavailable h2 {
   margin-bottom: var(--space-2);
   font-size: var(--text-lg);
+}
+
+@media (forced-colors: active) {
+  .dashboard__bar,
+  .dashboard__stack-segment {
+    background: CanvasText;
+  }
 }

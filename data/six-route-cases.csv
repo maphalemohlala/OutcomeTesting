@@ -1,0 +1,7 @@
+IO reference,Client name,Adviser name,Adviser code,Adviser status,Paraplanner,Paraplanner code,Products,Case type,Advice date,Product / solution type,Sample source,Checker name,Check date,Pre or post check,Vulnerable client,Tax check required,Tax team disposition
+IO-300001,Harriet Quill,Nadia Okonjo,ADV-11,CAS,Owen Brett,PP-11,ISA,New advice,03/08/2026,Accumulation investment,Random,,,Pre,No,No,
+IO-300002,Desmond Achebe,Nadia Okonjo,ADV-11,CAS,Priya Raman,PP-12,Pension,Review,11/08/2026,Accumulation Pension,Mandatory,,,Post,N/A,No,
+IO-300003,Marguerite Sowande,Tomas Lindqvist,ADV-12,PreCAS,Owen Brett,PP-11,Pension; ISA,Switch/Transfer,17/08/2026,Accumulation Pension,High Risk,,,Pre,No,Yes,Return to paraplanner
+IO-300004,Ivor Bassey,Tomas Lindqvist,ADV-12,PreCAS,Priya Raman,PP-12,IHT,Ongoing,20/08/2026,IHT,Thematic,,,Post,Potentially vulnerable,Yes,Return to paraplanner
+IO-300005,Rosalind Mbeki,Claire Fenwick,ADV-13,Enhanced,Sam Delacroix,PP-13,Pension,New advice,25/08/2026,Accumulation Pension,Random,,,Pre,No,Yes,
+IO-300006,Aurelio Santos,Claire Fenwick,ADV-13,Enhanced,Sam Delacroix,PP-13,Protection; ISA,Review,01/09/2026,Protection,Mandatory,,,Post,Yes,Yes,

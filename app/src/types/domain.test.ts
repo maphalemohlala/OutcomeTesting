@@ -149,6 +149,12 @@ describe('case lifecycle (BR-002, BR-008, AD-031, AD-036)', () => {
     expect(canTransition('Awaiting Sign-off', 'Queued')).toBe(true);
   });
 
+  it('reallocates a check the checker has already started', () => {
+    // Project owner direction, 2026-09-10: managers reassign checkers after a review has
+    // started. al_AssignCase stamps the review back to Assigned, so the case follows it.
+    expect(canTransition('Review In Progress', 'Assigned')).toBe(true);
+  });
+
   it('lets a corrected validation failure back into allocation', () => {
     expect(canTransition('Validation Failed', 'Ready for Allocation')).toBe(true);
   });

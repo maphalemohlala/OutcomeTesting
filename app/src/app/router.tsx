@@ -4,7 +4,6 @@ import { NotBuiltYet } from '../components/feedback/NotBuiltYet';
 import { RequirePermission } from './permissions/PermissionGate';
 import { CaseWorklistPage } from '../features/cases/CaseWorklistPage';
 import { CaseDetailPage } from '../features/cases/CaseDetailPage';
-import { AllocationPage } from '../features/cases/AllocationPage';
 import { RecheckPage } from '../features/cases/RecheckPage';
 import { CaseIntakePage } from '../features/imports/CaseIntakePage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
@@ -29,13 +28,14 @@ export function AppRoutes() {
         />
         <Route path="/cases" element={<RequirePermission resource="page.cases"><CaseWorklistPage /></RequirePermission>} />
         <Route path="/cases/:caseId" element={<RequirePermission resource="page.cases"><CaseDetailPage /></RequirePermission>} />
+        {/* Allocation moved into the case edit modal on 2026-09-10 (project owner
+            direction): one place to change who holds a case, rather than a screen for the
+            allocation and a dialog for everything else. Kept as a redirect so bookmarks
+            and any link still in the wild land on the case instead of the not-found page,
+            as /audit already does. */}
         <Route
           path="/cases/:caseId/allocation"
-          element={
-            <RequirePermission resource="page.cases">
-              <AllocationPage />
-            </RequirePermission>
-          }
+          element={<Navigate to=".." relative="path" replace />}
         />
         <Route
           path="/cases/:caseId/remediation"

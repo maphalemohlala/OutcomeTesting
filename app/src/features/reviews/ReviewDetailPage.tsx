@@ -14,6 +14,7 @@ import {
   type FormGroup,
   type HeaderField,
 } from './checklistForm';
+import '../../styles/document.css';
 import './ReviewDetailPage.css';
 
 interface ReviewDetailPageProps {

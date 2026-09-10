@@ -256,6 +256,7 @@
       <attribute name="al_recheckrequired" />
       <attribute name="al_changesadvice" />
       <attribute name="al_clockstartedon" />
+      <attribute name="al_reviewinstanceid" />
       <attribute name="createdon" />
       <filter type="and">
         <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_param | xml_escape }}" />
@@ -451,6 +452,58 @@
                 per run of actions that share it, rather than under every row.
               {% endcomment %}
               {% assign ot_shown_note = '' %}
+
+              {% comment %}
+                Which checks are done with, so their rows can come off the form (project
+                owner, 2026-09-10).
+
+                A Tax-then-AQS case remediates twice, and the two are separate remediations:
+                its Tax check raised five actions here and its AQS check eighteen, and drawing
+                all twenty-three as one numbered list put the checker's finished work back in
+                front of them every time the second leg opened. A check whose every action has
+                been approved is settled, so it collapses away; what is left is the
+                remediation actually in hand.
+
+                Approved as a whole, not action by action, which is the rule
+                SignoffProgressPlugin now enforces server-side: the case leaves Awaiting
+                Sign-off only once every action on the check has been decided.
+
+                Two passes over the same small set - one case's actions, each with at most a
+                handful of sign-offs - for the reason the Sign-off column already gives.
+                Membership is tested against a string of ids rather than a list, because this
+                Liquid has no set and `contains` on a delimited string is the shape the rest
+                of the site already uses.
+              {% endcomment %}
+              {% assign ot_settled = '' %}
+              {% assign ot_seen = '' %}
+              {% assign ot_settled_note = '' %}
+              {% for a in rows %}
+                {% assign rid = a.al_reviewinstanceid.id %}
+                {% capture rprobe %}|{{ rid }}|{% endcapture %}
+                {% unless ot_seen contains rprobe %}
+                  {% capture ot_seen %}{{ ot_seen }}{{ rprobe }}{% endcapture %}
+                  {% assign ot_all_ok = true %}
+                  {% assign ot_when = null %}
+                  {% for b in rows %}
+                    {% if b.al_reviewinstanceid.id == rid %}
+                      {% assign bl = null %}
+                      {% if signoffs %}{% for s in signoffs.results.entities %}{% if bl == null and s.al_remediationactionid.id == b.al_remediationactionid %}{% assign bl = s %}{% endif %}{% endfor %}{% endif %}
+                      {% if bl and bl.al_signoffdecision.value == 120910720 %}
+                        {% if ot_when == null %}{% assign ot_when = bl.al_signedoffon %}{% endif %}
+                      {% else %}
+                        {% assign ot_all_ok = false %}
+                      {% endif %}
+                    {% endif %}
+                  {% endfor %}
+                  {% if ot_all_ok %}
+                    {% capture ot_settled %}{{ ot_settled }}{{ rprobe }}{% endcapture %}
+                    {% capture ot_settled_note %}{{ ot_settled_note }}{% if ot_settled_note != '' %}; {% endif %}{{ a.al_reviewinstanceid.name | default: 'an earlier check' | escape }} approved{% if ot_when %} {{ ot_when | date: 'dd MMM yyyy' }}{% endif %}{% endcapture %}
+                  {% endif %}
+                {% endunless %}
+              {% endfor %}
+
+              {% assign ot_group = '' %}
+              {% assign ot_drawn = 0 %}
               {% for a in rows %}
                 {% assign latest = null %}
                 {% if signoffs %}{% for s in signoffs.results.entities %}{% if latest == null and s.al_remediationactionid.id == a.al_remediationactionid %}{% assign latest = s %}{% endif %}{% endfor %}{% endif %}
@@ -490,6 +543,30 @@
                   included template gets its own scope, so these assigns would not come back.
                   The same block is in OT Case Detail.
                 {% endcomment %}
+                {% comment %}
+                  The aggregates above are still read from every action, settled or not - they
+                  describe the case, and a check that is finished is still part of it. Only the
+                  drawing stops here, which is what "collapses away" means.
+                {% endcomment %}
+                {% capture rprobe %}|{{ a.al_reviewinstanceid.id }}|{% endcapture %}
+                {% assign hide = false %}
+                {% if ot_settled contains rprobe %}{% assign hide = true %}{% endif %}
+
+                {% unless hide %}
+                {% comment %}
+                  The check these rows belong to, named once above them. A Tax-then-AQS case
+                  can have both legs live at once only if one was sent back, so this is usually
+                  a single heading - but when it is not, the two remediations have to be
+                  telling apart on sight.
+                {% endcomment %}
+                {% assign ot_drawn = ot_drawn | plus: 1 %}
+                {% assign this_group = a.al_reviewinstanceid.name | default: 'This check' %}
+                {% if this_group != ot_group %}
+                  {% assign ot_group = this_group %}
+                  <tr class="ot-remedial-group">
+                    <th scope="colgroup" colspan="8">{{ ot_group | escape }}</th>
+                  </tr>
+                {% endif %}
                 {% assign ot_flat = a.al_description | newline_to_br | replace: '<br />', '|' | replace: '<br>', '|' %}
                 {% assign ot_lines = ot_flat | split: '|' %}
                 {% assign ot_count = 0 %}
@@ -602,7 +679,24 @@
                   written (AD-069), and CompleteRemediationPlugin re-checks the status and the
                   response server-side.
                 {% endcomment %}
+                {% endunless %}
               {% endfor %}
+
+              {% if ot_drawn == 0 %}
+                {% comment %}
+                  Every check settled, so every numbered row collapsed away and the columns
+                  would otherwise head an empty list. The questions below are still the
+                  remediation's and still belong on the form, so the table stays and says
+                  what happened to the rows instead of showing a gap.
+                {% endcomment %}
+                <tr>
+                  <td colspan="8" class="ot-remedial-settled">
+                    Every issue raised on this case has been remediated and approved. The
+                    numbered rows are closed; the case record keeps them in full.
+                  </td>
+                </tr>
+              {% endif %}
+
               {% comment %}
                 The questions for the remediation as a whole, drawn as the last rows of the
                 same table (project owner, 2026-09-10: they belong within the table). The
@@ -683,6 +777,20 @@
             </tbody>
           </table>
         </div>
+
+        {% if ot_settled_note != '' %}
+          {% comment %}
+            What is not on the form, said rather than left to be noticed. A checker who
+            remembers approving five Tax actions needs to know they were settled, not that
+            the page lost them.
+          {% endcomment %}
+          <p class="ot-filters__summary">
+            Settled and not shown: {{ ot_settled_note }}. Every action on
+            {% if ot_settled_note contains ';' %}those checks was{% else %}that check was{% endif %}
+            approved, so {% if ot_settled_note contains ';' %}they are{% else %}it is{% endif %}
+            closed. The case record keeps them in full.
+          </p>
+        {% endif %}
 
         {% comment %}
           The rest of the paper form, read-only. The three answers are the adviser's, written

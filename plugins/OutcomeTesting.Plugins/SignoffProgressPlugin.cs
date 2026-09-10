@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -27,6 +28,7 @@ namespace OutcomeTesting.Plugins
         private const string NotesAttr = "al_notes";
         private const string ActionLookup = "al_remediationactionid";
         private const string CaseLookup = "al_outcomecaseid";
+        private const string ReviewLookup = "al_reviewinstanceid";
 
         private const int StatusInProgress = Remediation.StatusInProgress;
         public const int DecisionApprovedValue = 120910720;
@@ -84,7 +86,7 @@ namespace OutcomeTesting.Plugins
             var caseId = ResolveCase(service, signoff, actionRef);
             if (caseId.HasValue)
             {
-                MoveCase(service, caseId.Value, decision.Value);
+                MoveCase(service, caseId.Value, decision.Value, ResolveReview(service, actionRef));
             }
 
             // One Audit Event per decision. A create raised by the al_SignOffRemediation
@@ -177,6 +179,77 @@ namespace OutcomeTesting.Plugins
             };
         }
 
+        /// <summary>
+        /// Whether an action on this check is still waiting for a decision.
+        ///
+        /// An action counts as decided once a sign-off row exists against it - approved or
+        /// rejected - because the guard refuses a second one, so the row is the decision. A
+        /// rejection never reaches this test: it returns the case to Awaiting Remediation
+        /// immediately, which is the whole check going back.
+        ///
+        /// Scoped to the review instance when the action carries one. Rows written before
+        /// that link existed carry none, and gating those on nothing would restore the
+        /// behaviour this exists to stop, so the case is the scope instead.
+        /// </summary>
+        public static bool AnyAwaitingSignoff(IOrganizationService service, Guid caseId, Guid? reviewId)
+        {
+            var actions = new QueryExpression(ActionEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                Criteria = new FilterExpression(),
+            };
+            actions.Criteria.AddCondition(CaseLookup, ConditionOperator.Equal, caseId);
+            if (reviewId.HasValue)
+            {
+                actions.Criteria.AddCondition(ReviewLookup, ConditionOperator.Equal, reviewId.Value);
+            }
+
+            var undecided = new HashSet<Guid>();
+            foreach (var action in service.RetrieveMultiple(actions).Entities)
+            {
+                undecided.Add(action.Id);
+            }
+
+            if (undecided.Count == 0)
+            {
+                return false;
+            }
+
+            // Matched on the actions themselves rather than on the case, because a sign-off
+            // does not always carry the case lookup - ResolveCase above exists for that.
+            var keys = new List<object>();
+            foreach (var id in undecided)
+            {
+                keys.Add(id);
+            }
+
+            var signoffs = new QueryExpression(SignoffEntity)
+            {
+                ColumnSet = new ColumnSet(ActionLookup),
+                Criteria = new FilterExpression(),
+            };
+            signoffs.Criteria.AddCondition(ActionLookup, ConditionOperator.In, keys.ToArray());
+
+            foreach (var signoff in service.RetrieveMultiple(signoffs).Entities)
+            {
+                var decided = signoff.GetAttributeValue<EntityReference>(ActionLookup);
+                if (decided != null)
+                {
+                    undecided.Remove(decided.Id);
+                }
+            }
+
+            return undecided.Count > 0;
+        }
+
+        /// <summary>The check the signed-off action belongs to, or null where it carries none.</summary>
+        private static Guid? ResolveReview(IOrganizationService service, EntityReference actionRef)
+        {
+            var action = service.Retrieve(ActionEntity, actionRef.Id, new ColumnSet(ReviewLookup));
+            var review = action.GetAttributeValue<EntityReference>(ReviewLookup);
+            return review == null ? (Guid?)null : review.Id;
+        }
+
         /// <summary>The case the sign-off is about: from the sign-off itself, else from its action.</summary>
         private static Guid? ResolveCase(IOrganizationService service, Entity signoff, EntityReference actionRef)
         {
@@ -210,7 +283,7 @@ namespace OutcomeTesting.Plugins
         /// lifecycle rather than assumed, so a case that is not where it expects is left
         /// alone instead of jumping.
         /// </summary>
-        public static void MoveCase(IOrganizationService service, Guid caseId, int decision)
+        public static void MoveCase(IOrganizationService service, Guid caseId, int decision, Guid? reviewId = null)
         {
             var current = CaseTransitions.CurrentStatus(service, caseId);
             if (!current.HasValue || current.Value != CaseLifecycle.AwaitingSignoff)
@@ -225,6 +298,20 @@ namespace OutcomeTesting.Plugins
                     return;
 
                 case DecisionApprovedValue:
+                    // The check's remediation is signed off as a whole, not action by action.
+                    // A review raises one action per thing the checker marked down, so an AQS
+                    // check can carry eighteen; without this the first approval moved the case
+                    // and the other seventeen sign-offs found it already moved and did nothing.
+                    // The completion side has the same gate one step earlier
+                    // (CompleteRemediationPlugin.AnyOutstanding).
+                    //
+                    // Scoped to the check, so the two legs of a Tax-then-AQS route are separate
+                    // remediations: a Tax action still to be decided is not this check's work.
+                    if (AnyAwaitingSignoff(service, caseId, reviewId))
+                    {
+                        return;
+                    }
+
                     if (SubmitReviewPlugin.AqsStillOwed(service, caseId))
                     {
                         CaseTransitions.MoveThrough(service, caseId, CaseLifecycle.Queued);

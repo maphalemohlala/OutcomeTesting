@@ -26,6 +26,7 @@ namespace OutcomeTesting.Plugins
         // al_remediationaction.
         private const string ActionEntity = "al_remediationaction";
         private const string ActionStatus = "al_actionstatus";
+        private const string ReviewLookup = "al_reviewinstanceid";
         private const string ActionCompletedOn = "al_completedon";
         private const string ActionAdviserResponse = "al_adviserresponse";
         // Values live on Remediation, which writes this column when an action is raised.
@@ -123,7 +124,7 @@ namespace OutcomeTesting.Plugins
             var action = service.Retrieve(
                 ActionEntity,
                 targetId,
-                new ColumnSet(ActionStatus, "ownerid", ActionAdviserResponse, "al_outcomecaseid"));
+                new ColumnSet(ActionStatus, "ownerid", ActionAdviserResponse, "al_outcomecaseid", ReviewLookup));
 
             if (requireCallerOwnsAction)
             {
@@ -193,7 +194,10 @@ namespace OutcomeTesting.Plugins
                 service.Update(update);
             }
 
-            AdvanceCase(service, action.GetAttributeValue<EntityReference>("al_outcomecaseid"));
+            AdvanceCase(
+                service,
+                action.GetAttributeValue<EntityReference>("al_outcomecaseid"),
+                action.GetAttributeValue<EntityReference>(ReviewLookup));
 
             var auditId = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details);
 
@@ -223,7 +227,8 @@ namespace OutcomeTesting.Plugins
         /// sign-off's guard: the completion is still recorded, and a case a manager has moved
         /// by hand is not dragged back onto the spine.
         /// </summary>
-        private static void AdvanceCase(IOrganizationService service, EntityReference caseRef)
+        private static void AdvanceCase(
+            IOrganizationService service, EntityReference caseRef, EntityReference reviewRef)
         {
             if (caseRef == null)
             {
@@ -238,11 +243,11 @@ namespace OutcomeTesting.Plugins
 
             // A review raises one action per thing the checker marked down (2026-09-10), so
             // completing one is no longer completing the remediation. The case moves to
-            // Awaiting Sign-off only when nothing on it is still outstanding; until then it
-            // sits at Remediation In Progress, which is what the state is for. Without this
-            // the first item finished would put the whole case in front of the T&C Manager
-            // with the rest untouched.
-            if (AnyOutstanding(service, caseRef.Id))
+            // Awaiting Sign-off only when nothing on THIS CHECK is still outstanding; until
+            // then it sits at Remediation In Progress, which is what the state is for. Without
+            // this the first item finished would put the whole case in front of the T&C
+            // Manager with the rest untouched.
+            if (AnyOutstanding(service, caseRef.Id, reviewRef == null ? (Guid?)null : reviewRef.Id))
             {
                 CaseTransitions.MoveThrough(
                     service,
@@ -264,7 +269,7 @@ namespace OutcomeTesting.Plugins
         /// (a second review raises its own) and a rejected sign-off reopens one, so a stored
         /// tally would drift out of step with the rows the adviser is actually looking at.
         /// </summary>
-        private static bool AnyOutstanding(IOrganizationService service, Guid caseId)
+        private static bool AnyOutstanding(IOrganizationService service, Guid caseId, Guid? reviewId)
         {
             var query = new QueryExpression(ActionEntity)
             {
@@ -275,6 +280,16 @@ namespace OutcomeTesting.Plugins
             query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
             query.Criteria.AddCondition(
                 "al_actionstatus", ConditionOperator.NotEqual, Remediation.StatusCompleted);
+
+            // Scoped to the check the finished action belongs to, so the two legs of a
+            // Tax-then-AQS route are separate remediations: an action still open on the other
+            // leg - a rejection that reopened one, say - is not this check's work and must not
+            // hold it at Remediation In Progress. Rows written before the review link existed
+            // carry none, and those fall back to the whole case.
+            if (reviewId.HasValue)
+            {
+                query.Criteria.AddCondition(ReviewLookup, ConditionOperator.Equal, reviewId.Value);
+            }
 
             return service.RetrieveMultiple(query).Entities.Count > 0;
         }
