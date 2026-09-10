@@ -307,13 +307,13 @@ export function RemediationPage() {
           {/*
             Drawn as the document, the same way the Checker Checklist is (project owner,
             2026-09-10: a remediation should read like the review forms). The page's own
-            chrome - the back link, the intro, the notice - keeps the app's styling; the
-            form itself is the V8 sheet.
+            chrome - the back link and the intro - keeps the app's styling; the form itself
+            is the V8 sheet.
 
-            Read-only here. Every write path stays where it already was and stays
-            permissioned: Mark complete on a row is al_CompleteRemediation, the adviser's
-            response is the portal's, and the regrade and supervisor sign-off are their own
-            commands. Drawing the form does not add a write path to any of them.
+            Read-only, and read-only everywhere: remediation is completed, responded to and
+            signed off on the portal (project owner, 2026-09-10), so this page has no write
+            path of its own at all. It used to offer Mark complete on a row, which was a
+            second door onto columns the portal already owns.
           */}
           <section className="checklist-doc" aria-labelledby="remediation-actions">
             <div className="doc-footer">Outcome Testing — Remediation and escalation | V8</div>

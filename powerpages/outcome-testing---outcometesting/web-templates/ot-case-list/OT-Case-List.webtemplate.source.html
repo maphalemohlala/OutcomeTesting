@@ -69,8 +69,35 @@
 {% endcase %}
 {% if f_outcome != '' and f_outcome != 'none' and o_final == '' %}{% assign f_outcome = '' %}{% endif %}
 
+{% comment %}
+  Review route filter (project owner, 2026-09-10). Read from the environment rather than
+  listed here: al_reviewroute's ids are the environment's own, so hard-coding them would
+  break anywhere but DEV - the same reason DeriveRoute looks a route up by its code.
+
+  Validated against the ids just fetched, which is this page's rule for every parameter that
+  reaches FetchXML: an unrecognised value becomes no filter rather than a condition.
+{% endcomment %}
+{% fetchxml routes %}
+<fetch>
+  <entity name="al_reviewroute">
+    <attribute name="al_reviewrouteid" />
+    <attribute name="al_name" />
+    <order attribute="al_name" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign f_route = request.params['route'] | default: '' %}
+{% assign route_ok = false %}
+{% if f_route != '' %}
+  {% for r in routes.results.entities %}
+    {% if r.al_reviewrouteid == f_route %}{% assign route_ok = true %}{% endif %}
+  {% endfor %}
+{% endif %}
+{% unless route_ok %}{% assign f_route = '' %}{% endunless %}
+
 {% assign has_filter = false %}
-{% if f_ref != '' or f_client != '' or f_adviser != '' or f_status != '' or f_priority != '' or f_type != '' or f_from != '' or f_to != '' or f_outcome != '' %}{% assign has_filter = true %}{% endif %}
+{% if f_ref != '' or f_client != '' or f_adviser != '' or f_status != '' or f_priority != '' or f_type != '' or f_from != '' or f_to != '' or f_outcome != '' or f_route != '' %}{% assign has_filter = true %}{% endif %}
 
 {% comment %}
   `integer` is the only safe coercion here. `times: 1` repeats a string rather than
@@ -81,7 +108,7 @@
 {% assign page_number = request.params['page'] | integer | default: 1 %}
 {% if page_number < 1 %}{% assign page_number = 1 %}{% endif %}
 
-{% capture qs %}mine={{ f_mine | url_escape }}&ref={{ f_ref | url_escape }}&client={{ f_client | url_escape }}&adviser={{ f_adviser | url_escape }}&status={{ f_status | url_escape }}&priority={{ f_priority | url_escape }}&type={{ f_type | url_escape }}&from={{ f_from | url_escape }}&to={{ f_to | url_escape }}&outcome={{ f_outcome | url_escape }}{% endcapture %}
+{% capture qs %}mine={{ f_mine | url_escape }}&ref={{ f_ref | url_escape }}&client={{ f_client | url_escape }}&adviser={{ f_adviser | url_escape }}&status={{ f_status | url_escape }}&priority={{ f_priority | url_escape }}&type={{ f_type | url_escape }}&from={{ f_from | url_escape }}&to={{ f_to | url_escape }}&outcome={{ f_outcome | url_escape }}&route={{ f_route | url_escape }}{% endcapture %}
 
 {% comment %}
   Case dashboard (PP-04).
@@ -289,6 +316,15 @@
       </select>
     </div>
     <div class="ot-field">
+      <label for="f-route">Route</label>
+      <select id="f-route" name="route">
+        <option value="">Any route</option>
+        {% for r in routes.results.entities %}
+          <option value="{{ r.al_reviewrouteid }}"{% if f_route == r.al_reviewrouteid %} selected{% endif %}>{{ r.al_name | escape }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="ot-field">
       <label for="f-from">Advice date from</label>
       <input type="date" id="f-from" name="from" value="{{ f_from | escape }}">
     </div>
@@ -330,7 +366,7 @@
     <attribute name="al_priority" />
     <attribute name="al_advicedate" />
     <attribute name="al_duedate" />
-    {% if has_filter %}<filter type="and">{% if f_ref != '' %}<condition attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" />{% endif %}{% if f_client != '' %}<condition attribute="al_clientname" operator="like" value="%{{ f_client | xml_escape }}%" />{% endif %}{% if f_adviser != '' %}<condition attribute="al_advisername" operator="like" value="%{{ f_adviser | xml_escape }}%" />{% endif %}{% if f_status != '' %}<condition attribute="al_casestatus" operator="eq" value="{{ f_status | xml_escape }}" />{% endif %}{% if f_priority != '' %}<condition attribute="al_priority" operator="eq" value="{{ f_priority | xml_escape }}" />{% endif %}{% if f_type != '' %}<condition attribute="al_casetype" operator="eq" value="{{ f_type | xml_escape }}" />{% endif %}{% if f_from != '' %}<condition attribute="al_advicedate" operator="on-or-after" value="{{ f_from | xml_escape }}" />{% endif %}{% if f_to != '' %}<condition attribute="al_advicedate" operator="on-or-before" value="{{ f_to | xml_escape }}" />{% endif %}{% if f_outcome == 'none' %}<condition entityname="oc" attribute="al_outcomeid" operator="null" />{% elsif f_outcome != '' %}<filter type="or"><condition entityname="oc" attribute="al_finaloutcome" operator="eq" value="{{ o_final }}" /><filter type="and"><condition entityname="oc" attribute="al_finaloutcome" operator="null" /><condition entityname="oc" attribute="al_initialoutcome" operator="eq" value="{{ o_initial }}" /></filter></filter>{% endif %}</filter>{% endif %}
+    {% if has_filter %}<filter type="and">{% if f_ref != '' %}<condition attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" />{% endif %}{% if f_client != '' %}<condition attribute="al_clientname" operator="like" value="%{{ f_client | xml_escape }}%" />{% endif %}{% if f_adviser != '' %}<condition attribute="al_advisername" operator="like" value="%{{ f_adviser | xml_escape }}%" />{% endif %}{% if f_status != '' %}<condition attribute="al_casestatus" operator="eq" value="{{ f_status | xml_escape }}" />{% endif %}{% if f_priority != '' %}<condition attribute="al_priority" operator="eq" value="{{ f_priority | xml_escape }}" />{% endif %}{% if f_type != '' %}<condition attribute="al_casetype" operator="eq" value="{{ f_type | xml_escape }}" />{% endif %}{% if f_from != '' %}<condition attribute="al_advicedate" operator="on-or-after" value="{{ f_from | xml_escape }}" />{% endif %}{% if f_to != '' %}<condition attribute="al_advicedate" operator="on-or-before" value="{{ f_to | xml_escape }}" />{% endif %}{% if f_route != '' %}<condition attribute="al_reviewrouteid" operator="eq" value="{{ f_route | xml_escape }}" />{% endif %}{% if f_outcome == 'none' %}<condition entityname="oc" attribute="al_outcomeid" operator="null" />{% elsif f_outcome != '' %}<filter type="or"><condition entityname="oc" attribute="al_finaloutcome" operator="eq" value="{{ o_final }}" /><filter type="and"><condition entityname="oc" attribute="al_finaloutcome" operator="null" /><condition entityname="oc" attribute="al_initialoutcome" operator="eq" value="{{ o_initial }}" /></filter></filter>{% endif %}</filter>{% endif %}
     <order attribute="al_casereference" descending="false" />
     {% comment %}
       The scope join (AD-047). Inner, because a case with no review assigned to this
@@ -361,6 +397,14 @@
       <attribute name="al_initialoutcome" />
       <attribute name="al_finaloutcome" />
     </link-entity>
+    {% comment %}
+      Outer, for the reason the outcome join above is: a case is routed by DeriveRoute from
+      the Tax check answer, and one that has not been answered yet carries no route at all.
+      An inner join would drop exactly those cases - the newly imported ones - off the list.
+    {% endcomment %}
+    <link-entity name="al_reviewroute" from="al_reviewrouteid" to="al_reviewrouteid" link-type="outer" alias="rt">
+      <attribute name="al_name" />
+    </link-entity>
   </entity>
 </fetch>
 {% endfetchxml %}
@@ -383,6 +427,7 @@
             <th scope="col">Case reference</th>
             <th scope="col">Client</th>
             <th scope="col">Adviser</th>
+            <th scope="col">Route</th>
             <th scope="col">Case type</th>
             <th scope="col">Status</th>
             <th scope="col">Outcome</th>
@@ -397,6 +442,7 @@
               <td><a href="/case-details?id={{ c.al_outcomecaseid }}">{{ c.al_casereference | default: 'Untitled case' | escape }}</a></td>
               <td>{{ c.al_clientname | escape }}</td>
               <td>{{ c.al_advisername | escape }}</td>
+              <td>{{ c['rt.al_name'] | default: 'Not routed' | escape }}</td>
               <td>{{ c.al_casetype.label | escape }}</td>
               <td>{% include 'OT Status Badge' status: c.al_casestatus.label %}</td>
               <td>{% capture grade %}{% include 'OT Outcome Label' final: c['oc.al_finaloutcome'] initial: c['oc.al_initialoutcome'] %}{% endcapture %}{% assign grade = grade | strip %}{% if grade != '' %}{% include 'OT Status Badge' status: grade %}{% else %}<span class="ot-badge ot-badge--none">Not yet graded</span>{% endif %}</td>

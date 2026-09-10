@@ -47,7 +47,36 @@
 {% endcomment %}
 {% assign f_ref = request.params['ref'] | default: '' %}
 
-{% capture scope_qs %}{% if f_mine == '1' %}mine=1&amp;{% endif %}{% if f_ref != '' %}ref={{ f_ref | url_escape }}&amp;{% endif %}{% endcapture %}
+{% comment %}
+  Review route filter (project owner, 2026-09-10). The routes are read from the environment
+  rather than listed here: al_reviewroute holds three rows whose ids are the environment's
+  own, so hard-coding them would break the moment this ran anywhere but DEV - the same
+  reason DeriveRoute looks a route up by its code instead of by id.
+
+  The parameter is validated against the ids just fetched, which is this site's rule for
+  anything that reaches FetchXML: an unrecognised value becomes no filter rather than a
+  condition, so nothing typed into the URL is interpolated into the query.
+{% endcomment %}
+{% fetchxml routes %}
+<fetch>
+  <entity name="al_reviewroute">
+    <attribute name="al_reviewrouteid" />
+    <attribute name="al_name" />
+    <order attribute="al_name" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign f_route = request.params['route'] | default: '' %}
+{% assign route_ok = false %}
+{% if f_route != '' %}
+  {% for r in routes.results.entities %}
+    {% if r.al_reviewrouteid == f_route %}{% assign route_ok = true %}{% endif %}
+  {% endfor %}
+{% endif %}
+{% unless route_ok %}{% assign f_route = '' %}{% endunless %}
+
+{% capture scope_qs %}{% if f_mine == '1' %}mine=1&amp;{% endif %}{% if f_ref != '' %}ref={{ f_ref | url_escape }}&amp;{% endif %}{% if f_route != '' %}route={{ f_route | url_escape }}&amp;{% endif %}{% endcapture %}
 
 {% fetchxml reviews %}
 <fetch count="{{ page_size }}" page="{{ page_number }}" returntotalrecordcount="true">
@@ -62,6 +91,7 @@
       <condition attribute="al_reviewtype" operator="eq" value="{{ reviewtype }}" />
       {% if f_mine == '1' %}<condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" />{% endif %}
       {% if f_ref != '' %}<condition entityname="case" attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" />{% endif %}
+      {% if f_route != '' %}<condition entityname="case" attribute="al_reviewrouteid" operator="eq" value="{{ f_route | xml_escape }}" />{% endif %}
     </filter>
     <order attribute="al_startedon" descending="true" />
     <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
@@ -70,6 +100,14 @@
       <attribute name="al_clientname" />
       <attribute name="al_advisername" />
       <attribute name="al_duedate" />
+      {% comment %}
+        The route is the case's, so it is read through the case rather than off the review.
+        Outer, because the link above is: a case with no route yet is still a case, and an
+        inner join here would drop its reviews off the list entirely.
+      {% endcomment %}
+      <link-entity name="al_reviewroute" from="al_reviewrouteid" to="al_reviewrouteid" link-type="outer" alias="route">
+        <attribute name="al_name" />
+      </link-entity>
     </link-entity>
   </entity>
 </fetch>
@@ -268,9 +306,9 @@
 {% if user %}
   <nav class="ot-scope" aria-label="Review scope">
     {% comment %} The scope links carry the search, so narrowing does not silently drop it. {% endcomment %}
-    <a class="ot-btn{% if f_mine == '1' %} ot-btn--primary{% endif %}" href="?mine=1{% if f_ref != '' %}&amp;ref={{ f_ref | url_escape }}{% endif %}"
+    <a class="ot-btn{% if f_mine == '1' %} ot-btn--primary{% endif %}" href="?mine=1{% if f_ref != '' %}&amp;ref={{ f_ref | url_escape }}{% endif %}{% if f_route != '' %}&amp;route={{ f_route | url_escape }}{% endif %}"
        {% if f_mine == '1' %}aria-current="page"{% endif %}>Assigned to me</a>
-    <a class="ot-btn{% if f_mine != '1' %} ot-btn--primary{% endif %}" href="?{% if f_ref != '' %}ref={{ f_ref | url_escape }}{% endif %}"
+    <a class="ot-btn{% if f_mine != '1' %} ot-btn--primary{% endif %}" href="?{% if f_ref != '' %}ref={{ f_ref | url_escape }}{% endif %}{% if f_route != '' %}{% if f_ref != '' %}&amp;{% endif %}route={{ f_route | url_escape }}{% endif %}"
        {% if f_mine != '1' %}aria-current="page"{% endif %}>All {{ heading | downcase }}</a>
   </nav>
 {% endif %}
@@ -287,10 +325,19 @@
       <label for="f-ref">Case reference</label>
       <input type="search" id="f-ref" name="ref" value="{{ f_ref | escape }}" placeholder="Contains">
     </div>
+    <div class="ot-field">
+      <label for="f-route">Route</label>
+      <select id="f-route" name="route">
+        <option value="">Any</option>
+        {% for r in routes.results.entities %}
+          <option value="{{ r.al_reviewrouteid }}"{% if f_route == r.al_reviewrouteid %} selected{% endif %}>{{ r.al_name | escape }}</option>
+        {% endfor %}
+      </select>
+    </div>
   </div>
   <div class="ot-filters__actions">
     <button type="submit" class="ot-btn ot-btn--primary">Search</button>
-    {% if f_ref != '' %}
+    {% if f_ref != '' or f_route != '' %}
       <a class="ot-btn" href="?{% if f_mine == '1' %}mine=1{% endif %}">Clear</a>
     {% endif %}
   </div>
@@ -301,10 +348,11 @@
     {% if f_mine == '1' %}{{ heading | escape }} assigned to me{% else %}{{ heading | escape }}{% endif %}
   </h2>
 
-  {% if f_ref != '' %}
+  {% if f_ref != '' or f_route != '' %}
     <p class="ot-filters__summary">
-      Showing {{ heading | downcase }} whose case reference contains
-      &ldquo;{{ f_ref | escape }}&rdquo;.
+      Showing {{ heading | downcase }}{% if f_ref != '' %} whose case reference contains
+      &ldquo;{{ f_ref | escape }}&rdquo;{% endif %}{% if f_route != '' %}{% if f_ref != '' %} and{% endif %}
+      on the {% for r in routes.results.entities %}{% if r.al_reviewrouteid == f_route %}{{ r.al_name | escape }}{% endif %}{% endfor %} route{% endif %}.
     </p>
   {% endif %}
 
@@ -320,6 +368,7 @@
             <th scope="col">Case reference</th>
             <th scope="col">Client</th>
             <th scope="col">Adviser</th>
+            <th scope="col">Route</th>
             <th scope="col">Review</th>
             <th scope="col">Sequence</th>
             <th scope="col">Status</th>
@@ -342,6 +391,7 @@
               </td>
               <td>{{ r['case.al_clientname'] | escape }}</td>
               <td>{{ r['case.al_advisername'] | escape }}</td>
+              <td>{{ r['route.al_name'] | default: '—' | escape }}</td>
               <td><a href="/review?id={{ r.al_reviewinstanceid }}">{{ r.al_name | default: 'Open review' | escape }}</a></td>
               <td>{{ r.al_sequence | default: '—' }}</td>
               <td>{% include 'OT Status Badge' status: r.al_reviewstatus.label %}</td>
