@@ -416,7 +416,7 @@ public static class ContactsMigration
 
         var query = new QueryExpression("al_questionversion")
         {
-            ColumnSet = new ColumnSet("al_questionversionid", "al_responsetype"),
+            ColumnSet = new ColumnSet("al_questionversionid", "al_responsetype", "al_effectivefrom", "al_effectiveto"),
             Criteria = new FilterExpression(),
         };
         query.Criteria.AddCondition("al_ismandatory", ConditionOperator.Equal, true);
@@ -427,10 +427,24 @@ public static class ContactsMigration
         sectionLink.LinkCriteria.AddCondition("al_ownerrole", ConditionOperator.Equal, ownerRole);
 
         var written = 0;
+        var now = DateTime.UtcNow;
         foreach (var version in svc.RetrieveMultiple(query).Entities)
         {
             var responseType = version.GetAttributeValue<OptionSetValue>("al_responsetype");
             if (responseType == null) continue;
+
+            // Only versions in force are owed an answer (AD-091); ResponseGuardPlugin refuses
+            // a retired one anyway, and the catch below would read that refusal as a replay.
+            // Same rule as ResponseRules.IsVersionEffective, duplicated because this project
+            // does not reference the plug-in assembly: in force from the start of the
+            // effective-from day until the start of the effective-to day.
+            var effectiveFrom = version.GetAttributeValue<DateTime?>("al_effectivefrom");
+            var effectiveTo = version.GetAttributeValue<DateTime?>("al_effectiveto");
+            if ((effectiveFrom.HasValue && effectiveFrom.Value.Date > now.Date)
+                || (effectiveTo.HasValue && effectiveTo.Value.Date <= now.Date))
+            {
+                continue;
+            }
 
             var code = "RSP-" + review.Id.ToString("N")[..12] + "-" + version.Id.ToString("N")[..12];
             var response = new Entity("al_response")

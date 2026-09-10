@@ -36,7 +36,18 @@
 {% assign f_mine = request.params['mine'] | default: '' %}
 {% if user == null %}{% assign f_mine = '' %}{% endif %}
 {% if f_mine != '' and f_mine != '1' %}{% assign f_mine = '' %}{% endif %}
-{% capture scope_qs %}{% if f_mine == '1' %}mine=1&amp;{% endif %}{% endcapture %}
+{% comment %}
+  Case reference search (project owner, 2026-09-10). Filtered in the query rather than over
+  the rendered rows: this list pages server-side, so a client-side filter would search the
+  page the checker happens to be on and quietly miss the case they were looking for.
+
+  The condition names the linked case by alias, which is what the case list already does
+  for its outcome filter - and it makes the join behave as an inner one, so a review whose
+  case is missing drops out of a search rather than surviving it as a blank row.
+{% endcomment %}
+{% assign f_ref = request.params['ref'] | default: '' %}
+
+{% capture scope_qs %}{% if f_mine == '1' %}mine=1&amp;{% endif %}{% if f_ref != '' %}ref={{ f_ref | url_escape }}&amp;{% endif %}{% endcapture %}
 
 {% fetchxml reviews %}
 <fetch count="{{ page_size }}" page="{{ page_number }}" returntotalrecordcount="true">
@@ -50,6 +61,7 @@
     <filter type="and">
       <condition attribute="al_reviewtype" operator="eq" value="{{ reviewtype }}" />
       {% if f_mine == '1' %}<condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" />{% endif %}
+      {% if f_ref != '' %}<condition entityname="case" attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" />{% endif %}
     </filter>
     <order attribute="al_startedon" descending="true" />
     <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
@@ -256,17 +268,46 @@
 
 {% if user %}
   <nav class="ot-scope" aria-label="Review scope">
-    <a class="ot-btn{% if f_mine == '1' %} ot-btn--primary{% endif %}" href="?mine=1"
+    {% comment %} The scope links carry the search, so narrowing does not silently drop it. {% endcomment %}
+    <a class="ot-btn{% if f_mine == '1' %} ot-btn--primary{% endif %}" href="?mine=1{% if f_ref != '' %}&amp;ref={{ f_ref | url_escape }}{% endif %}"
        {% if f_mine == '1' %}aria-current="page"{% endif %}>Assigned to me</a>
-    <a class="ot-btn{% if f_mine != '1' %} ot-btn--primary{% endif %}" href="?"
+    <a class="ot-btn{% if f_mine != '1' %} ot-btn--primary{% endif %}" href="?{% if f_ref != '' %}ref={{ f_ref | url_escape }}{% endif %}"
        {% if f_mine != '1' %}aria-current="page"{% endif %}>All {{ heading | downcase }}</a>
   </nav>
 {% endif %}
+
+{% comment %}
+  Case reference search. A GET form, so a search is a URL a checker can bookmark or send to
+  someone, and so paging keeps it. The scope is carried in a hidden field for the same
+  reason the links above carry the search.
+{% endcomment %}
+<form class="ot-filters" method="get" role="search" aria-label="Search {{ heading | downcase }} by case reference">
+  {% if f_mine == '1' %}<input type="hidden" name="mine" value="1">{% endif %}
+  <div class="ot-filters__grid">
+    <div class="ot-field">
+      <label for="f-ref">Case reference</label>
+      <input type="search" id="f-ref" name="ref" value="{{ f_ref | escape }}" placeholder="Contains">
+    </div>
+  </div>
+  <div class="ot-filters__actions">
+    <button type="submit" class="ot-btn ot-btn--primary">Search</button>
+    {% if f_ref != '' %}
+      <a class="ot-btn" href="?{% if f_mine == '1' %}mine=1{% endif %}">Clear</a>
+    {% endif %}
+  </div>
+</form>
 
 <section class="ot-card" aria-labelledby="ot-reviews-heading">
   <h2 class="ot-card__title" id="ot-reviews-heading">
     {% if f_mine == '1' %}{{ heading | escape }} assigned to me{% else %}{{ heading | escape }}{% endif %}
   </h2>
+
+  {% if f_ref != '' %}
+    <p class="ot-filters__summary">
+      Showing {{ heading | downcase }} whose case reference contains
+      &ldquo;{{ f_ref | escape }}&rdquo;.
+    </p>
+  {% endif %}
 
   {% if rows.size > 0 %}
     <div class="ot-table-wrap">

@@ -472,6 +472,27 @@ footer a:focus-visible, .footer a:focus-visible {
   margin-bottom: var(--space-1);
 }
 
+/* Says a field is required in words, not with a colour or a bare asterisk. */
+.ot-field__required {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/*
+   A heading inside a submit panel — the regrade carries one because it is a
+   second, differently-owned action sitting under the sign-off, and without it
+   the two run together as one form.
+*/
+.ot-form-submit__title {
+  flex-basis: 100%;
+  margin: 0;
+  text-align: left;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--colour-text);
+}
+
 .ot-field input,
 .ot-field select {
   font-family: var(--font-body);
@@ -662,6 +683,34 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-badge--blocked      { color: var(--colour-outcome-harm); }
 .ot-badge--closed       { color: var(--colour-stage-closed); }
 .ot-badge--none         { color: var(--colour-text-muted); }
+
+/* ------------------------------------------------------------------
+   A check the route requires that has not been created yet. Held back
+   from the rows carrying real work so the eye separates "owed" from
+   "under way", without colour being the only signal — the row says
+   Not started in words, and the note below the table says why.
+   ------------------------------------------------------------------ */
+
+.ot-row--owed {
+  background: var(--colour-surface-sunken);
+  color: var(--colour-text-muted);
+}
+
+.ot-row--owed td { font-style: italic; }
+
+.ot-note {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  max-width: 70ch;
+  color: var(--colour-text-muted);
+}
+
+.ot-note--blocked {
+  color: var(--colour-outcome-harm);
+  border-left: 3px solid var(--colour-outcome-harm);
+  padding-left: var(--space-3);
+  font-style: normal;
+}
 
 /* ------------------------------------------------------------------
    Questionnaire. Question text carries the weight; response type and
@@ -1007,10 +1056,17 @@ fieldset.ot-response__field label { margin-right: var(--space-5); }
   margin: var(--space-5) 0 0;
 }
 
-.ot-remedial-form__block { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-5); margin: var(--space-4) 0 0; }
-.ot-remedial-form__block div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 var(--space-3); padding: var(--space-1) 0; border-bottom: 1px solid var(--colour-border); }
-.ot-remedial-form__block dt { font-weight: 600; }
-.ot-remedial-form__block dd { margin: 0; }
+/* The paper form's blocks under the actions table, drawn inside .ot-checklist so the
+   document's own rules (Calibri, every cell ruled, grey header band) style the cells. Only
+   the proportions and the bracketed notes belong here (project owner, 2026-09-10 - a
+   remediation should read like the review forms). The Code App mirrors this from
+   remediationFormLayout. */
+.ot-checklist .ot-remedial-form__grid th { width: 22%; }
+.ot-checklist .ot-remedial-form__grid td { width: 28%; }
+.ot-checklist .ot-remedial-form__signoffs th { width: 50%; }
+
+/* The paper prints these in brackets beside the label, lighter than the label itself. */
+.ot-remedial-form__note { font-weight: 400; font-style: italic; font-size: 9.5pt; }
 
 /* =========================================================================================
    The Checker Checklist, drawn as the document
@@ -1290,4 +1346,89 @@ fieldset.ot-response__field label { margin-right: var(--space-5); }
 .ot-back {
   margin: 0 0 var(--space-3);
   font-size: var(--text-sm);
+}
+
+
+/* =========================================================================================
+   The remediation form's editable cells (project owner, 2026-09-10)
+
+   The adviser writes into the Remedial action cell itself and answers the remediation's
+   questions in the table's closing rows. The details/summary dropdown that used to hold
+   both is gone: the paper form is one grid written into, not a page of disclosures.
+   ========================================================================================= */
+
+.ot-response-cell__text {
+  width: 100%;
+  min-width: 18rem;
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--line, #000);
+  resize: vertical;
+}
+
+/* The answer rows that close the table. A lead rule separates them from the numbered
+   issues above without breaking the one grid. */
+.ot-checklist .ot-form-rows__lead th,
+.ot-checklist .ot-form-rows__lead td {
+  border-top: 2px solid var(--line, #000);
+}
+
+/* Yes / No / Potentially on one line, as the paper prints them. */
+.ot-opts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.ot-opts label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+/* Space between the case details and the table, and no sticky header inside the document -
+   the header band scrolls with the form, as a printed sheet does. */
+.ot-checklist .ot-dl {
+  padding-top: 0;
+  margin-bottom: var(--space-5);
+}
+
+.ot-checklist .ot-table-wrap {
+  margin-top: var(--space-5);
+}
+
+.ot-checklist thead th {
+  position: static;
+}
+
+/* The one button that signs the form off (project owner, 2026-09-10). Sits at the end of
+   the document the way the review form's submit card does, so the adviser fills the sheet
+   in and signs it once rather than a row at a time. */
+.ot-form-submit {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 2px solid var(--line, #000);
+  text-align: right;
+}
+
+/* The status and the hint sit under the buttons rather than beside them. */
+.ot-form-submit .ot-response__status,
+.ot-form-submit__hint {
+  flex-basis: 100%;
+}
+
+.ot-form-submit .ot-response__status {
+  margin: var(--space-2) 0 0;
+}
+
+.ot-form-submit__hint {
+  margin: var(--space-1) 0 0;
+  font-size: 9.5pt;
+  font-style: italic;
 }

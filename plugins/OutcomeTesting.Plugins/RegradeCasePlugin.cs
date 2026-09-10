@@ -54,17 +54,69 @@ namespace OutcomeTesting.Plugins
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
             var reason = CommandHelpers.GetRequiredString(context, InReason);
             var finalOutcomeLabel = CommandHelpers.GetRequiredString(context, InFinalOutcome);
+            var expectedRowVersion = CommandHelpers.GetOptionalString(context, InExpectedRowVersion);
+
+            var result = Regrade(
+                userService,
+                systemService,
+                targetId,
+                finalOutcomeLabel,
+                reason,
+                expectedRowVersion,
+                idempotencyKey,
+                context);
+
+            SetResponse(context, result.OutcomeId.ToString("D"), result.FinalOutcome, result.AuditEventId, result.Conflict);
+        }
+
+        /// <summary>
+        /// The regrade itself, with no Custom API context of its own, so the portal path can
+        /// reach the same rules the command enforces. <see cref="RegradeRequestPlugin"/>
+        /// calls this after checking the signing contact's web role; the Custom API calls it
+        /// above after the platform has checked the caller's privileges.
+        ///
+        /// Two services, for the reason the command already had them: the outcome write runs
+        /// as <paramref name="userService"/>, which is what makes authorization the
+        /// platform's job on the command path, while the audit event and the case close run
+        /// as <paramref name="systemService"/> so they are never the thing that fails. On
+        /// the portal path both are the application user — a Power Pages write arrives as
+        /// the site, so a privilege check there would enforce nothing (AD-053), and the web
+        /// role checked against the signing contact is the boundary instead.
+        /// </summary>
+        public static RegradeResult Regrade(
+            IOrganizationService userService,
+            IOrganizationService systemService,
+            Guid targetId,
+            string finalOutcomeLabel,
+            string reason,
+            string expectedRowVersion,
+            string idempotencyKey,
+            IPluginExecutionContext context,
+            Guid? actorId = null,
+            string actorName = null)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.ValidationPrefix + "A regrade must record why the outcome was changed (AD-031).");
+            }
+
+            reason = reason.Trim();
             var finalOutcomeValue = ParseOutcome(finalOutcomeLabel);
             var canonicalLabel = OutcomeLabel(finalOutcomeValue);
-            var expectedRowVersion = CommandHelpers.GetOptionalString(context, InExpectedRowVersion);
 
             // Idempotency: a replay with the same key returns the original regrade (NFR-REL-01).
             var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandRegradeCase);
             if (existingAudit != null)
             {
                 var priorLabel = existingAudit.GetAttributeValue<string>("al_details");
-                SetResponse(context, targetId.ToString("D"), string.IsNullOrEmpty(priorLabel) ? canonicalLabel : priorLabel, existingAudit.Id, false);
-                return;
+                return new RegradeResult
+                {
+                    OutcomeId = targetId,
+                    FinalOutcome = string.IsNullOrEmpty(priorLabel) ? canonicalLabel : priorLabel,
+                    AuditEventId = existingAudit.Id,
+                    Conflict = false,
+                };
             }
 
             // Confirm the outcome exists (and the caller can read it) before writing.
@@ -128,9 +180,17 @@ namespace OutcomeTesting.Plugins
                 reason,
                 canonicalLabel,
                 idempotencyKey,
-                context);
+                context,
+                actorId,
+                actorName);
 
-            SetResponse(context, targetId.ToString("D"), canonicalLabel, auditId, false);
+            return new RegradeResult
+            {
+                OutcomeId = targetId,
+                FinalOutcome = canonicalLabel,
+                AuditEventId = auditId,
+                Conflict = false,
+            };
         }
 
         /// <summary>
@@ -196,5 +256,17 @@ namespace OutcomeTesting.Plugins
             context.OutputParameters[OutAuditEventId] = auditEventId.ToString("D");
             context.OutputParameters[OutConflict] = conflict;
         }
+    }
+
+    /// <summary>What a regrade recorded, for whichever front end asked for it.</summary>
+    public sealed class RegradeResult
+    {
+        public Guid OutcomeId { get; set; }
+
+        public string FinalOutcome { get; set; }
+
+        public Guid AuditEventId { get; set; }
+
+        public bool Conflict { get; set; }
     }
 }

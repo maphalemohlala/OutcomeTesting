@@ -409,6 +409,75 @@ actions and the per-answer save status, and sets `print-color-adjust: exact` so 
 drawn with a border and a pseudo-element — survive. Bump the `?v=` on the stylesheet link in
 `OT Layout` whenever that file changes materially.
 
+## The reference build file, and the test that pins the form to it
+
+`docs/reference/checker-checklist.html` is the Power Pages build reference the project owner
+supplied for V8. It is checked in because it is the only machine-readable statement of how the
+form is laid out, as against this catalogue, which states what is in it. The two answer
+different questions and both are needed: this file is the authority on wording, response types
+and ownership; the reference file is the authority on headings, section splitting, column
+headings, option casing and row order.
+
+`app/src/features/reviews/checklistDocument.test.ts` reads the reference file and
+`data/v8-seed/data.xml` and asserts the form the app builds off the seed is the form the
+document draws (AD-104). It covers block titles and their order, intro lines, every grid's
+column heading and tick labels, the E1-E5 subsection headings, each outcome lens and which lens
+carries a tick of its own, every question's text, the inline option runs in the document's
+casing and order, and all twenty fail reasons verbatim.
+
+So a change to the seed's wording, to `formBlocks`, or to the document itself shows up as a
+failing test naming exactly what moved, rather than as a report that the form "still doesn't
+match the pdf". Update the reference file when the document changes, and let the test say what
+that costs.
+
+Two differences from the reference file are asserted as deliberate:
+
+1. **Remediation and escalation is not a block of this form.** The document carries it marked
+   "(PICKED UP ON ANOTHER FORM)" and it is built as one - `RemediationPage`, per case rather
+   than per review (AD-095), on the project owner's direction of 2026-09-09. Neither review
+   page renders it.
+2. **The case header opens the form.** Its eighteen fields are Outcome Case columns captured at
+   intake, not checklist questions, so the reference file leaves its place empty rather than
+   transcribing it. `caseHeaderFields()` and the portal's `case_header` draw it.
+
+The reference file also carries two defects of its own, which are fixed rather than reproduced:
+the closing tag of its last heading is written `/h2>`, and its unscoped `.opt` rule styles both
+an option label and a grid column header (`th class="opt"`), so the header row collapses into
+inline-flex boxes. That second one is what "deformed headers" was; both stylesheets scope the
+option rule to `.opts .opt` and `.rootcause .opt` instead.
+
+## Power Pages Liquid traps this form has already hit
+
+Both of these were live defects on the portal review page (AD-105) that the Code App never had,
+and neither reproduces in a non-portal Liquid renderer. Check for them before blaming a cache or
+a stale push.
+
+**`block` is a reserved word.** Every OT page body sits inside `block content` under
+`extends 'OT Layout'`, so a variable named `block` cannot be assigned - the assign does not
+stick and the variable never varies. The questionnaire's block key was called exactly that, and
+the symptom was one heading for the whole form and no File Quality fail points block at all,
+because that block is gated on the key's value. Names prefixed with it (`blk_title` and so on)
+are fine; the bare word is not. The same applies to any other tag name used as a variable.
+
+**`default` was not the culprit, though it looked like one.** The block key was written
+`scode | default: sid` and came out empty, which reads as a broken filter; it was the `block`
+name above. The same template's summary card uses `default` repeatedly and renders correctly,
+and so do the stock Microsoft templates. The questionnaire spells the fallback out as an `if`
+now because an `if` cannot be misread, not because the filter is unsafe.
+
+**Cross-entity ordering in a Liquid `fetchxml` is not applied.** The questions fetch orders by
+`s.al_displayorder` then `q.al_displayorder`, both as root-level `order` elements with an
+`entityname`. Through the SDK that returns section-then-question order; through the page's
+Liquid fetch only the question order was applied, so every section's question 1 came back before
+any section's question 2 and the whole form rendered interleaved. Do not rely on it: the page
+fetches `al_section` separately, ordered by a plain root-entity order on `al_displayorder`, and
+groups the rows against that list by section code. Within one section the question order from
+the questions fetch is applied, so only the cross-entity part needed replacing.
+
+A consequence worth keeping: because the rows are grouped rather than streamed in order, the
+questionnaire no longer depends on the fetch returning anything in any particular sequence. If a
+row order ever changes again, the form does not.
+
 ## Not answered by the document
 
 1. Display order across sections. The document order is assumed to be the display order.

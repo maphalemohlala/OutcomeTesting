@@ -244,22 +244,45 @@ namespace OutcomeTesting.Plugins
                 return null;
             }
 
-            return NameFrom(service, "systemuser", actorId)
-                ?? NameFrom(service, "contact", actorId);
+            return NameFrom(service, "systemuser", "systemuserid", actorId)
+                ?? NameFrom(service, "contact", "contactid", actorId);
         }
 
-        private static string NameFrom(IOrganizationService service, string table, Guid id)
+        /// <summary>
+        /// The name on one row of <paramref name="table"/>, or null when it holds no such
+        /// row. Asked as a query, and with no catch.
+        ///
+        /// An actor is a systemuser on a command and a Contact on a portal path (AD-053),
+        /// so one of the two probes above is always for a row that does not exist. Retrieve
+        /// faults on a missing row, and absorbing an OrganizationService fault is the one
+        /// thing a plug-in may not do: the platform aborts the whole transaction of a
+        /// plug-in that catches one and carries on - "ISV code reduced the open transaction
+        /// count" - the rule OptionLabels and NotificationOutbox both record. This method
+        /// used to Retrieve inside a broad catch, so every audit event written for a
+        /// Contact actor poisoned its own transaction and the command died on its next
+        /// write, which is what CompleteRequestPlugin's portal path did on 2026-09-10.
+        ///
+        /// A query answers "no such row" with an empty result and nothing to swallow, so
+        /// the missing half costs a read rather than the transaction.
+        /// </summary>
+        private static string NameFrom(IOrganizationService service, string table, string idAttribute, Guid id)
         {
-            try
+            var query = new QueryExpression(table)
             {
-                var row = service.Retrieve(table, id, new ColumnSet("fullname"));
-                var name = row == null ? null : row.GetAttributeValue<string>("fullname");
-                return string.IsNullOrWhiteSpace(name) ? null : name.Trim();
-            }
-            catch (Exception)
+                ColumnSet = new ColumnSet("fullname"),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition(idAttribute, ConditionOperator.Equal, id);
+
+            var rows = service.RetrieveMultiple(query).Entities;
+            if (rows.Count == 0)
             {
                 return null;
             }
+
+            var name = rows[0].GetAttributeValue<string>("fullname");
+            return string.IsNullOrWhiteSpace(name) ? null : name.Trim();
         }
 
         public static Guid WriteAuditEvent(

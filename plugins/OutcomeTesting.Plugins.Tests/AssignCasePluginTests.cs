@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Xunit;
 
@@ -25,6 +26,8 @@ namespace OutcomeTesting.Plugins.Tests
             var svc = new FakeOrganizationService();
             svc.Seed("systemuser", UserId, "internalemailaddress", Email, "fullname", "Ada Checker", "isdisabled", false);
             svc.Seed("contact", ContactId, "emailaddress1", Email, "fullname", "Ada Checker");
+            svc.Seed("systemuser", UserId, "internalemailaddress", Email, "fullname", "Ada Checker");
+            svc.Seed("systemuser", OtherUser, "internalemailaddress", "bo@example.com", "fullname", "Bo Checker");
             return svc;
         }
 
@@ -159,6 +162,152 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Equal(UserId, assignee.UserId);
             Assert.Equal(ContactId, assignee.ContactId);
+        }
+
+        [Fact]
+        public void Stamps_the_allocated_checker_onto_the_case()
+        {
+            // The checklist header and the case detail read al_checkername, not the
+            // assignment row. Before 2026-09-10 only the portal self-claim wrote it, so a
+            // case allocated from the app read as unchecked everywhere but the history.
+            var caseId = Guid.Parse("cccccccc-3333-4333-8333-333333333333");
+            var svc = new FakeOrganizationService();
+            svc.Seed("al_outcomecase", caseId, "al_casereference", "IO-TEST-010");
+
+            AssignCasePlugin.StampCheckerName(svc, caseId, "Ada Checker");
+
+            Assert.Equal(
+                "Ada Checker",
+                svc.Row("al_outcomecase", caseId).GetAttributeValue<string>("al_checkername"));
+        }
+
+        [Fact]
+        public void Replaces_the_checker_name_a_previous_allocation_left()
+        {
+            // Reallocation is the case this exists for: the header must name whoever holds
+            // the check now, including after a check has started.
+            var caseId = Guid.Parse("dddddddd-4444-4444-8444-444444444444");
+            var svc = new FakeOrganizationService();
+            svc.Seed("al_outcomecase", caseId, "al_checkername", "Prior Checker");
+
+            AssignCasePlugin.StampCheckerName(svc, caseId, "Ada Checker");
+
+            Assert.Equal(
+                "Ada Checker",
+                svc.Row("al_outcomecase", caseId).GetAttributeValue<string>("al_checkername"));
+        }
+
+        // --- Reallocating to someone who held the check before -------------------------
+
+        private static readonly Guid AllocCase = Guid.Parse("eeeeeeee-5555-4555-8555-555555555555");
+        private static readonly Guid AllocReview = Guid.Parse("ffffffff-6666-4666-8666-666666666666");
+        private static readonly Guid OtherUser = Guid.Parse("11111111-7777-4777-8777-777777777777");
+
+        private static AssignCasePlugin.Assignee Person(Guid userId, string name)
+        {
+            return new AssignCasePlugin.Assignee { UserId = userId, ContactId = ContactId, UserName = name };
+        }
+
+        /// <summary>A case and a contact, so the allocation notification can be built.</summary>
+        private static FakeOrganizationService AllocationWorld()
+        {
+            var svc = new FakeOrganizationService();
+            svc.Seed("al_outcomecase", AllocCase, "al_casereference", "IO-TEST-011");
+            svc.Seed("contact", ContactId, "emailaddress1", Email, "fullname", "Ada Checker");
+            svc.Seed("systemuser", UserId, "internalemailaddress", Email, "fullname", "Ada Checker");
+            svc.Seed("systemuser", OtherUser, "internalemailaddress", "bo@example.com", "fullname", "Bo Checker");
+            return svc;
+        }
+
+        private static int NotificationRows(FakeOrganizationService svc)
+        {
+            return svc.Creates.Where(c => c.LogicalName == "al_notification").Count();
+        }
+
+        private static int AssignmentRows(FakeOrganizationService svc)
+        {
+            return svc.RetrieveMultiple(new Microsoft.Xrm.Sdk.Query.QueryExpression("al_caseassignment"))
+                .Entities.Count;
+        }
+
+        [Fact]
+        public void Writes_an_assignment_row_for_a_first_allocation()
+        {
+            var svc = AllocationWorld();
+
+            var id = AssignCasePlugin.AllocateAssignment(
+                svc, AllocCase, AllocReview, Person(UserId, "Ada Checker"), "IO-TEST-011", null, null);
+
+            var row = svc.Row("al_caseassignment", id);
+            Assert.True(row.GetAttributeValue<bool>("al_isactive"));
+            Assert.Equal(
+                AssignCasePlugin.BuildAssignmentCode(AllocCase, AllocReview, UserId),
+                row.GetAttributeValue<string>("al_caseassignmentcode"));
+        }
+
+        [Fact]
+        public void Reallocating_to_a_previous_holder_reuses_their_row()
+        {
+            // The alternate key is unique per (case, review, person), so a second create
+            // for the same three faulted: "Assignment code key violated". Allocating back
+            // to someone who held the check before is ordinary - a manager moves work to
+            // cover an absence and moves it back - and it was impossible.
+            var svc = AllocationWorld();
+            var ada = Person(UserId, "Ada Checker");
+
+            var first = AssignCasePlugin.AllocateAssignment(
+                svc, AllocCase, AllocReview, ada, "IO-TEST-011", null, null);
+
+            // Moved to someone else, which releases Ada's row.
+            AssignCasePlugin.AllocateAssignment(
+                svc, AllocCase, AllocReview, Person(OtherUser, "Bo Checker"), "IO-TEST-011", null, null);
+            AssignCasePlugin.ReleasePriorAssignments(svc, AllocCase);
+
+            var again = AssignCasePlugin.AllocateAssignment(
+                svc, AllocCase, AllocReview, ada, "IO-TEST-011", null, "Cover ended");
+
+            Assert.Equal(first, again);
+            Assert.Equal(2, AssignmentRows(svc));
+
+            var row = svc.Row("al_caseassignment", again);
+            Assert.True(row.GetAttributeValue<bool>("al_isactive"));
+            Assert.Null(row.GetAttributeValue<DateTime?>("al_releasedon"));
+            Assert.Equal("Cover ended", row.GetAttributeValue<string>("al_assignmentreason"));
+        }
+
+        [Fact]
+        public void Tells_the_checker_again_when_the_check_comes_back_to_them()
+        {
+            // Project owner, 2026-09-10: "they need to get the email each time even if it's
+            // a reallocation". Reusing the row means no create fires, so the notification is
+            // queued explicitly - and the outbox code carries al_assignedon so the second
+            // allocation is a new notification rather than one already queued.
+            var svc = AllocationWorld();
+            var ada = Person(UserId, "Ada Checker");
+
+            AssignCasePlugin.AllocateAssignment(
+                svc, AllocCase, AllocReview, ada, "IO-TEST-011", null, null);
+            var afterFirst = NotificationRows(svc);
+
+            AssignCasePlugin.ReleasePriorAssignments(svc, AllocCase);
+            AssignCasePlugin.AllocateAssignment(
+                svc, AllocCase, AllocReview, ada, "IO-TEST-011", null, null, Guid.NewGuid());
+
+            Assert.Equal(afterFirst + 1, NotificationRows(svc));
+        }
+
+        [Fact]
+        public void A_different_person_gets_their_own_row()
+        {
+            var svc = AllocationWorld();
+
+            var ada = AssignCasePlugin.AllocateAssignment(
+                svc, AllocCase, AllocReview, Person(UserId, "Ada Checker"), "IO-TEST-011", null, null);
+            var bo = AssignCasePlugin.AllocateAssignment(
+                svc, AllocCase, AllocReview, Person(OtherUser, "Bo Checker"), "IO-TEST-011", null, null);
+
+            Assert.NotEqual(ada, bo);
+            Assert.Equal(2, AssignmentRows(svc));
         }
     }
 }

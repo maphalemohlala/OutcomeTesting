@@ -342,6 +342,11 @@ if (args.Length >= 3 && args[0].Equals("fetch", StringComparison.OrdinalIgnoreCa
     return Fetch(args[1], args[2]);
 }
 
+if (args.Length >= 3 && args[0].Equals("settracelog", StringComparison.OrdinalIgnoreCase))
+{
+    return SetTraceLog(args);
+}
+
 if (args.Length >= 3 && args[0].Equals("setstepstate", StringComparison.OrdinalIgnoreCase))
 {
     return SetStepState(args);
@@ -370,6 +375,11 @@ if (args.Length >= 3 && args[0].Equals("setchangetracking", StringComparison.Ord
 if (args.Length >= 2 && args[0].Equals("queueroutedcases", StringComparison.OrdinalIgnoreCase))
 {
     return QueueRoutedCases(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+}
+
+if (args.Length >= 3 && args[0].Equals("requeuecase", StringComparison.OrdinalIgnoreCase))
+{
+    return RequeueCase(args);
 }
 
 if (args.Length >= 2 && args[0].Equals("splitremediation", StringComparison.OrdinalIgnoreCase))
@@ -522,6 +532,85 @@ int Fetch(string orgUrl, string fetchXmlOrFile)
         new { count = rows.Count, moreRecords = results.MoreRecords, rows },
         new JsonSerializerOptions { WriteIndented = true }));
     return 0;
+}
+
+// Plug-in trace logging for the environment (organization.plugintracelogsetting).
+//
+// Off is the default and it is why a plug-in failure has to be diagnosed by reading code
+// rather than by reading a log: plugintracelog stays empty, so the ITracingService lines
+// PluginBase already writes go nowhere. Exception records a row only when a plug-in
+// throws, which is the setting a live environment can carry while something is being
+// chased; All records every trace and grows fast.
+//
+// Not gated behind --confirm: it writes no business data, changes no permission, and is
+// reversible by re-running with off.
+int SetTraceLog(string[] a)
+{
+    var orgUrl = a[1];
+    var wanted = a[2].Trim().ToLowerInvariant();
+
+    int level;
+    switch (wanted)
+    {
+        case "off": level = 0; break;
+        case "exception": level = 1; break;
+        case "all": level = 2; break;
+        default:
+            Console.Error.WriteLine("Usage: dotnet run -- settracelog <orgUrl> <off|exception|all>");
+            return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var org = svc.RetrieveMultiple(new QueryExpression("organization")
+    {
+        ColumnSet = new ColumnSet("name", "plugintracelogsetting"),
+        TopCount = 1,
+    }).Entities.FirstOrDefault();
+
+    if (org == null)
+    {
+        Console.Error.WriteLine("No organization row was readable.");
+        return 1;
+    }
+
+    var before = org.GetAttributeValue<OptionSetValue>("plugintracelogsetting");
+    var beforeValue = before?.Value ?? 0;
+    var name = org.GetAttributeValue<string>("name");
+
+    if (beforeValue == level)
+    {
+        Console.WriteLine($"{name}: plug-in trace log is already {Describe(level)}.");
+        return 0;
+    }
+
+    svc.Update(new Entity("organization", org.Id)
+    {
+        ["plugintracelogsetting"] = new OptionSetValue(level),
+    });
+
+    Console.WriteLine($"{name}: plug-in trace log {Describe(beforeValue)} -> {Describe(level)}.");
+    if (level != 0)
+    {
+        Console.WriteLine("   Reproduce the fault, then read it with:");
+        Console.WriteLine("   dotnet run -- fetch <orgUrl> \"<fetch top='5'><entity name='plugintracelog'>" +
+            "<attribute name='typename'/><attribute name='messagename'/>" +
+            "<attribute name='exceptiondetails'/><attribute name='createdon'/>" +
+            "<order attribute='createdon' descending='true'/></entity></fetch>\"");
+    }
+
+    return 0;
+
+    static string Describe(int value)
+    {
+        switch (value)
+        {
+            case 0: return "Off";
+            case 1: return "Exception";
+            case 2: return "All";
+            default: return value.ToString();
+        }
+    }
 }
 
 // AD-093 backfill. Cases created before the rule sit at Imported or Ready for Allocation with
@@ -2739,6 +2828,65 @@ int SeedCases(string[] a)
     Console.WriteLine(
         $"Done. {created} created, {allocated} allocated, {skipped} already existed, {stuck} left unallocated.");
     return stuck > 0 ? 2 : 0;
+}
+
+// Returns one case to the shared queue through al_UpdateCaseDetails, so the move is
+// lifecycle-checked (AD-057 allows Assigned -> Queued) and audited like any other status
+// change rather than being a silent direct write.
+//
+// For a case OD-048's rule cannot reach: that rule fires on the edit that CHANGES the route,
+// and a case whose route changed before the rule existed is already past it. The active
+// assignment is deliberately left as it is - a case returned to Queued for the BR-004
+// handoff carries one too, and ClaimCasePlugin releases it on the next claim.
+int RequeueCase(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 4 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This moves a real case back to the queue. Re-run as: " +
+            "requeuecase <orgUrl> <caseReference> --confirm <orgUrl>");
+        return 1;
+    }
+
+    var reference = a[2].Trim();
+
+    using var svc = Connect(orgUrl);
+
+    var caseId = FindId(svc, "al_outcomecase", ("al_casereference", reference));
+    if (caseId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No case has the reference {reference}.");
+        return 1;
+    }
+
+    var before = CaseStatus(svc, caseId);
+    if (before == CaseStatusQueued)
+    {
+        Console.WriteLine($"{reference}: already Queued, left alone.");
+        return 0;
+    }
+
+    try
+    {
+        svc.Execute(new OrganizationRequest("al_UpdateCaseDetails")
+        {
+            ["TargetId"] = caseId.ToString("D"),
+            ["IdempotencyKey"] = "REQUEUE-" + caseId.ToString("N"),
+            ["Status"] = CaseStatusQueued.ToString(CultureInfo.InvariantCulture),
+            ["Reason"] = "Returned to the queue: the route owes a check that was never opened (OD-048 repair)",
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"{reference}: refused: {ex.Message}");
+        return 1;
+    }
+
+    var after = CaseStatus(svc, caseId);
+    Console.WriteLine($"{reference}: {before} -> {after}"
+        + (after == CaseStatusQueued ? " (Queued)" : " NOT QUEUED"));
+    return after == CaseStatusQueued ? 0 : 2;
 }
 
 static int CaseStatus(ServiceClient svc, Guid caseId)

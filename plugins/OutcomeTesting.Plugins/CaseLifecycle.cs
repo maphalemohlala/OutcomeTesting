@@ -99,7 +99,12 @@ namespace OutcomeTesting.Plugins
             { ReadyForAllocation, new[] { Queued, NoCheckRequired } },
             { Queued, new[] { Assigned, NoCheckRequired } },
             { Assigned, new[] { ReviewInProgress, Queued, NoCheckRequired } },
-            { ReviewInProgress, new[] { Submitted, Queued, NoCheckRequired } },
+            // Assigned: a manager reallocating a check the checker has already started
+            // (project owner direction, 2026-09-10). AssignCasePlugin stamps the review
+            // instance back to Assigned for the person now holding it, and without this
+            // edge the case row could not follow, so al_AssignCase refused the whole
+            // reallocation on a case at Review In Progress.
+            { ReviewInProgress, new[] { Submitted, Queued, Assigned, NoCheckRequired } },
             { Submitted, new[] { AwaitingRemediation, Closed } },
             { AwaitingRemediation, new[] { RemediationInProgress } },
             { RemediationInProgress, new[] { AwaitingSignoff } },

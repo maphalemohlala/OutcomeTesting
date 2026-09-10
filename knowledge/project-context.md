@@ -97,6 +97,7 @@ Code App screens for cases, dashboard and reviews are management oversight views
 - `powerpages/` holds the Power Pages site metadata. It must stay outside `src/` and outside `app/`; the two front ends never share a directory (AD-048).
 - `brand/` holds the authoritative Ascot Lloyd visual resources. It must stay outside `src/` so brand assets are not packaged into the solution.
 - `knowledge/` holds domain context, the requirements index and the decision log.
+- `docs/reference/` holds material supplied by the business, checked in verbatim and treated as the authority over any transcription of it (AD-104): `checker-checklist.html` is the checklist the review pages are tested against, and `2026-09-08-solution-requirements.md` is the project owner's consolidated requirements pack, registered as MR-01 to MR-18.
 - `skills/` holds the phase skills; `.github/` holds Copilot instructions and prompts.
 
 ## Quality constraints

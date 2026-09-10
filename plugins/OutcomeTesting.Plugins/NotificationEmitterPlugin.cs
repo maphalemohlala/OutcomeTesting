@@ -58,7 +58,7 @@ namespace OutcomeTesting.Plugins
             // notification needs is read back rather than assumed present.
             if (string.Equals(record.LogicalName, AssignmentEntity, StringComparison.OrdinalIgnoreCase))
             {
-                QueueAllocation(service, context, record.Id);
+                QueueAllocation(service, context.CorrelationId, record.Id);
                 return;
             }
 
@@ -68,10 +68,19 @@ namespace OutcomeTesting.Plugins
             }
         }
 
-        private static void QueueAllocation(IOrganizationService service, IPluginExecutionContext context, Guid assignmentId)
+        /// <summary>
+        /// Tells the allocated checker the case is theirs. Called on the create, and again
+        /// by <see cref="AssignCasePlugin.AllocateAssignment"/> when a check is allocated
+        /// back to someone who held it before - that reuses their row rather than writing a
+        /// second one, so no create fires and the wording would otherwise live twice.
+        ///
+        /// The outbox code carries <c>al_assignedon</c>, so each allocation of the same row
+        /// is its own notification: a reallocation is told, a replay is not.
+        /// </summary>
+        internal static void QueueAllocation(IOrganizationService service, Guid correlationId, Guid assignmentId)
         {
             var assignment = service.Retrieve(AssignmentEntity, assignmentId,
-                new ColumnSet("al_assigneduserid", "al_assignedcontactid", CaseLookup, "al_isactive"));
+                new ColumnSet("al_assigneduserid", "al_assignedcontactid", CaseLookup, "al_isactive", "al_assignedon"));
 
             // A released or inactive row is history, not an allocation to tell anyone about.
             var active = assignment.GetAttributeValue<bool?>("al_isactive");
@@ -96,15 +105,20 @@ namespace OutcomeTesting.Plugins
                 ? "Case " + reference + " is now assigned to you for checking. Open it in the portal to start the review."
                 : "Case " + reference + " is now assigned to you for checking. Open it to start the review: " + link;
 
+            var assignedOn = assignment.GetAttributeValue<DateTime?>("al_assignedon");
+
             NotificationOutbox.Queue(
                 service,
-                context,
+                correlationId,
                 NotificationOutbox.EventAllocation,
                 AssignmentEntity,
                 assignmentId,
                 email,
                 "Case " + reference + " has been allocated to you",
-                body);
+                body,
+                assignedOn.HasValue
+                    ? assignedOn.Value.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture)
+                    : null);
         }
 
         /// <summary>

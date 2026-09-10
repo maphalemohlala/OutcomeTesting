@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
@@ -55,6 +55,7 @@ namespace OutcomeTesting.Plugins
         private const string IsActiveAttr = "al_isactive";
         private const string AssignmentReasonAttr = "al_assignmentreason";
         private const string AssignmentCodeAttr = "al_caseassignmentcode";
+        private const string CheckerNameAttr = "al_checkername";
         private const string CaseRefAttr = "al_casereference";
         private const string ReviewStatusAttr = "al_reviewstatus";
         private const string ReviewTypeAttr = "al_reviewtype";
@@ -114,30 +115,20 @@ namespace OutcomeTesting.Plugins
 
             ReleasePriorAssignments(userService, caseId);
 
-            var assignment = new Entity(AssignmentEntity)
-            {
-                ["al_name"] = BuildAssignmentName(caseReference, assignee.UserName),
-                [AssignmentCodeAttr] = BuildAssignmentCode(caseId, reviewId, assignee.UserId),
-                ["al_outcomecaseid"] = new EntityReference(CaseEntity, caseId),
-                [AssignedUserAttr] = new EntityReference(UserEntity, assignee.UserId),
-                [AssignedContactAttr] = new EntityReference(ContactEntity, assignee.ContactId),
-                [AssignedOnAttr] = DateTime.UtcNow,
-                [IsActiveAttr] = true,
-            };
-
-            if (!string.IsNullOrWhiteSpace(team))
-            {
-                assignment[AssignedTeamAttr] = team.Trim();
-            }
-
-            if (!string.IsNullOrWhiteSpace(reason))
-            {
-                assignment[AssignmentReasonAttr] = reason.Trim();
-            }
-
-            var assignmentId = userService.Create(assignment);
+            var assignmentId = AllocateAssignment(
+                userService, caseId, reviewId, assignee, caseReference, team, reason, context.CorrelationId);
 
             StampReviewInstance(userService, reviewId, assignee, expectedRowVersion);
+
+            // The checklist header and the case detail read this, not the assignment row,
+            // so an allocation that did not write it left the case reading as unchecked to
+            // everyone outside the assignment history. ClaimCasePlugin has always stamped
+            // it on the portal self-claim; the app's Allocate never did, which is why the
+            // case edit form carried a Checker field for a manager to type the same name in
+            // by hand - and why editing that name was mistaken for allocating the check
+            // (2026-09-09). The allocation is the one thing that knows who holds the check,
+            // so it is what says so. The field was removed from the form on 2026-09-10.
+            StampCheckerName(userService, caseId, assignee.UserName);
 
             // Queued -> Assigned, refused by AD-057 if the case is not somewhere the
             // lifecycle allows it from. Deliberately after the assignment row exists: a case
@@ -314,6 +305,20 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// Writes the allocated checker's name onto the case (<c>al_checkername</c>), the
+        /// name the checklist header and the case detail print. Mirrors what
+        /// ClaimCasePlugin does for a portal self-claim, so a check reads the same however
+        /// it was allocated.
+        /// </summary>
+        public static void StampCheckerName(IOrganizationService service, Guid caseId, string checkerName)
+        {
+            service.Update(new Entity(CaseEntity, caseId)
+            {
+                [CheckerNameAttr] = checkerName,
+            });
+        }
+
+        /// <summary>
         /// Points the review instance at the assignee in both identity systems and moves it
         /// to Assigned. Optimistic concurrency applies here rather than to the case, because
         /// this is the row a second allocator would be racing for.
@@ -357,6 +362,92 @@ namespace OutcomeTesting.Plugins
 
                 throw;
             }
+        }
+
+        /// <summary>
+        /// The active assignment row for this (case, review, person), created if they have
+        /// never held this check and brought back to active if they have.
+        ///
+        /// <c>al_caseassignmentcode</c> is an alternate key unique per those three, so a
+        /// second create for the same three faulted with "Assignment code key violated" -
+        /// which made allocating a check back to someone who held it before impossible.
+        /// That is ordinary work: a manager moves a check to cover an absence and moves it
+        /// back. The row is reused instead, so a person holds one row per check whose
+        /// active/released state says whether it is theirs now, and the history of who held
+        /// it when is the Audit Event trail, which records every allocation either way.
+        ///
+        /// Reassignment between two different people still leaves a row each, one released
+        /// and one active, which is what BR-003 asks for.
+        ///
+        /// Public and static so both outcomes are testable without a plug-in context.
+        /// </summary>
+        public static Guid AllocateAssignment(
+            IOrganizationService service,
+            Guid caseId,
+            Guid reviewId,
+            Assignee assignee,
+            string caseReference,
+            string team,
+            string reason,
+            Guid correlationId = default(Guid))
+        {
+            var code = BuildAssignmentCode(caseId, reviewId, assignee.UserId);
+
+            var assignment = new Entity(AssignmentEntity)
+            {
+                ["al_name"] = BuildAssignmentName(caseReference, assignee.UserName),
+                [AssignmentCodeAttr] = code,
+                ["al_outcomecaseid"] = new EntityReference(CaseEntity, caseId),
+                [AssignedUserAttr] = new EntityReference(UserEntity, assignee.UserId),
+                [AssignedContactAttr] = new EntityReference(ContactEntity, assignee.ContactId),
+                [AssignedOnAttr] = DateTime.UtcNow,
+                [IsActiveAttr] = true,
+            };
+
+            if (!string.IsNullOrWhiteSpace(team))
+            {
+                assignment[AssignedTeamAttr] = team.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                assignment[AssignmentReasonAttr] = reason.Trim();
+            }
+
+            var existing = FindAssignmentByCode(service, code);
+            if (existing == Guid.Empty)
+            {
+                return service.Create(assignment);
+            }
+
+            // Held before. Clearing al_releasedon is what makes the row current again
+            // rather than a released one that merely says it is active.
+            assignment.Id = existing;
+            assignment.Attributes.Remove(AssignmentCodeAttr);
+            assignment[ReleasedOnAttr] = null;
+            service.Update(assignment);
+
+            // NotificationEmitterPlugin hangs off the create, which this is not, and the
+            // checker is owed the same email either way (project owner, 2026-09-10). The
+            // outbox code carries al_assignedon, so this is a new notification rather than
+            // the earlier one being recognised as already queued.
+            NotificationEmitterPlugin.QueueAllocation(service, correlationId, existing);
+            return existing;
+        }
+
+        /// <summary>The assignment carrying this code, or empty when there is none.</summary>
+        public static Guid FindAssignmentByCode(IOrganizationService service, string code)
+        {
+            var query = new QueryExpression(AssignmentEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition(AssignmentCodeAttr, ConditionOperator.Equal, code);
+
+            var found = service.RetrieveMultiple(query).Entities;
+            return found.Count > 0 ? found[0].Id : Guid.Empty;
         }
 
         /// <summary>

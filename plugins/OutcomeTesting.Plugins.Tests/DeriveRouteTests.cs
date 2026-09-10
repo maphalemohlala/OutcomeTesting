@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using OutcomeTesting.Plugins;
@@ -167,6 +167,104 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Equal(AqsOnly, record.GetAttributeValue<EntityReference>("al_reviewrouteid").Id);
             Assert.Single(changes);
+        }
+
+        // --- Tax team disposition (project owner, 2026-09-10) --------------------------
+        //
+        // "Return to paraplanner means it's a tax only check and there's no need for AQS
+        // checks." The disposition is the Tax team's outcome, and it decides whether the
+        // case goes on to AQS at all - so it overrides the tax-check answer's derivation.
+
+        private const int SubmitToAqs = 120910570;
+        private const int ReturnToParaplanner = 120910571;
+
+        private static Entity CaseWith(int? taxRequired, int? disposition, Guid? route)
+        {
+            var e = Case(taxRequired, route);
+            if (disposition.HasValue) e["al_taxteamdisposition"] = new OptionSetValue(disposition.Value);
+            return e;
+        }
+
+        [Fact]
+        public void Returning_to_the_paraplanner_makes_it_a_tax_only_case()
+        {
+            var update = new Entity("al_outcomecase")
+            {
+                ["al_taxteamdisposition"] = new OptionSetValue(ReturnToParaplanner),
+            };
+            var changes = new List<string>();
+
+            UpdateCaseDetailsPlugin.DeriveRoute(
+                CaseWith(Yes, SubmitToAqs, TaxThenAqs), update, changes,
+                code => UpdateCaseDetailsPlugin.FindRouteByCode(Routes(), code));
+
+            Assert.Equal(TaxOnly, RouteOn(update));
+        }
+
+        [Fact]
+        public void Returning_to_the_paraplanner_overrides_the_tax_check_answer()
+        {
+            // Tax check required stays Yes - the Tax check did happen. What changed is that
+            // the case is not going on to AQS.
+            var update = new Entity("al_outcomecase")
+            {
+                ["al_taxcheckrequired"] = new OptionSetValue(Yes),
+                ["al_taxteamdisposition"] = new OptionSetValue(ReturnToParaplanner),
+            };
+            var changes = new List<string>();
+
+            UpdateCaseDetailsPlugin.DeriveRoute(
+                CaseWith(null, null, null), update, changes,
+                code => UpdateCaseDetailsPlugin.FindRouteByCode(Routes(), code));
+
+            Assert.Equal(TaxOnly, RouteOn(update));
+        }
+
+        [Fact]
+        public void Submitting_to_aqs_leaves_the_tax_check_answer_deciding()
+        {
+            var update = new Entity("al_outcomecase")
+            {
+                ["al_taxteamdisposition"] = new OptionSetValue(SubmitToAqs),
+            };
+            var changes = new List<string>();
+
+            UpdateCaseDetailsPlugin.DeriveRoute(
+                CaseWith(Yes, null, null), update, changes,
+                code => UpdateCaseDetailsPlugin.FindRouteByCode(Routes(), code));
+
+            Assert.Equal(TaxThenAqs, RouteOn(update));
+        }
+
+        [Fact]
+        public void Changing_the_disposition_back_restores_the_aqs_leg()
+        {
+            // The Tax team changed its mind: the case is going to AQS after all, so the
+            // route has to come back off Tax only rather than stay where it was put.
+            var update = new Entity("al_outcomecase")
+            {
+                ["al_taxteamdisposition"] = new OptionSetValue(SubmitToAqs),
+            };
+            var changes = new List<string>();
+
+            UpdateCaseDetailsPlugin.DeriveRoute(
+                CaseWith(Yes, ReturnToParaplanner, TaxOnly), update, changes,
+                code => UpdateCaseDetailsPlugin.FindRouteByCode(Routes(), code));
+
+            Assert.Equal(TaxThenAqs, RouteOn(update));
+        }
+
+        [Fact]
+        public void An_unchanged_disposition_does_not_re_derive_a_settled_route()
+        {
+            var update = new Entity("al_outcomecase") { ["al_priority"] = new OptionSetValue(1) };
+            var changes = new List<string>();
+
+            UpdateCaseDetailsPlugin.DeriveRoute(
+                CaseWith(Yes, ReturnToParaplanner, TaxOnly), update, changes,
+                code => UpdateCaseDetailsPlugin.FindRouteByCode(Routes(), code));
+
+            Assert.Null(RouteOn(update));
         }
     }
 }

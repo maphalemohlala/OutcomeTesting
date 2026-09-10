@@ -54,8 +54,28 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string CodeFor(int eventValue, Guid targetId)
         {
-            return EventName(eventValue).Replace(" ", string.Empty).ToUpperInvariant()
+            return CodeFor(eventValue, targetId, null);
+        }
+
+        /// <summary>
+        /// As <see cref="CodeFor(int, Guid)"/>, with an occurrence appended.
+        ///
+        /// Some events happen to the same target more than once and must be told each
+        /// time. An allocation is one: a check moved away from someone and back is a fresh
+        /// allocation to them, and the row it writes is the same row, so a code keyed on
+        /// the target alone would treat the second as already queued and say nothing
+        /// (project owner direction, 2026-09-10 - "they need to get the email each time
+        /// even if it's a reallocation"). Passing the moment it was allocated makes each
+        /// occurrence its own outbox row, while a replay of the same one still collides.
+        /// </summary>
+        public static string CodeFor(int eventValue, Guid targetId, string occurrence)
+        {
+            var code = EventName(eventValue).Replace(" ", string.Empty).ToUpperInvariant()
                 + "-" + targetId.ToString("N").ToUpperInvariant();
+
+            return string.IsNullOrWhiteSpace(occurrence)
+                ? code
+                : code + "-" + occurrence.Trim().ToUpperInvariant();
         }
 
         public static string EventName(int eventValue)
@@ -106,9 +126,10 @@ namespace OutcomeTesting.Plugins
             Guid targetId,
             string recipientEmail,
             string subject,
-            string body)
+            string body,
+            string occurrence = null)
         {
-            var code = CodeFor(eventValue, targetId);
+            var code = CodeFor(eventValue, targetId, occurrence);
             var row = new Entity(NotificationEntity)
             {
                 ["al_name"] = Truncate(EventName(eventValue) + ": " + subject, 200),

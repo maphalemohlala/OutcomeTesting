@@ -40,6 +40,13 @@
   gone wrong before (see Deploy-Portal.ps1). `case` is read the way OT Case Detail reads
   `id`, and it is only ever used as a fetch filter value, escaped.
 {% endcomment %}
+{% comment %}
+  Case reference search on the list (project owner, 2026-09-10). Filtered in the query, not
+  over the rendered rows: this list pages server-side, so a client-side filter would search
+  only the page the user happens to be on.
+{% endcomment %}
+{% assign f_ref = request.params['ref'] | default: '' %}
+
 {% assign case_param = request.params['case'] %}
 
 {% if case_param == null or case_param == empty %}
@@ -59,6 +66,7 @@
       <attribute name="al_clientname" />
       <attribute name="al_advisername" />
       <attribute name="al_casestatus" />
+      {% if f_ref != '' %}<filter type="and"><condition attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" /></filter>{% endif %}
       <order attribute="al_casereference" descending="false" />
       <link-entity name="al_remediationaction" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="rem" />
     </entity>
@@ -102,8 +110,31 @@
     day high.
   </div>
 
+  {% comment %}
+    A GET form, so a search is a URL that can be bookmarked or sent to someone, and so the
+    pager below keeps it.
+  {% endcomment %}
+  <form class="ot-filters" method="get" role="search" aria-label="Search remediation by case reference">
+    <div class="ot-filters__grid">
+      <div class="ot-field">
+        <label for="f-ref">Case reference</label>
+        <input type="search" id="f-ref" name="ref" value="{{ f_ref | escape }}" placeholder="Contains">
+      </div>
+    </div>
+    <div class="ot-filters__actions">
+      <button type="submit" class="ot-btn ot-btn--primary">Search</button>
+      {% if f_ref != '' %}<a class="ot-btn" href="?">Clear</a>{% endif %}
+    </div>
+  </form>
+
   <section class="ot-card" aria-labelledby="ot-remediation-heading">
     <h2 class="ot-card__title" id="ot-remediation-heading">Remediation</h2>
+
+    {% if f_ref != '' %}
+      <p class="ot-filters__summary">
+        Showing cases whose reference contains &ldquo;{{ f_ref | escape }}&rdquo;.
+      </p>
+    {% endif %}
 
     {% if case_rows.size > 0 %}
       <div class="ot-table-wrap">
@@ -168,10 +199,10 @@
 
       <nav aria-label="Pagination" style="margin-top: 1rem;">
         {% if page_number > 1 %}
-          <a href="?page={{ page_number | minus: 1 }}">&laquo; Previous</a>
+          <a href="?{% if f_ref != '' %}ref={{ f_ref | url_escape }}&amp;{% endif %}page={{ page_number | minus: 1 }}">&laquo; Previous</a>
         {% endif %}
         {% if case_rows.size == page_size %}
-          <a href="?page={{ page_number | plus: 1 }}" style="margin-left: 1rem;">Next &raquo;</a>
+          <a href="?{% if f_ref != '' %}ref={{ f_ref | url_escape }}&amp;{% endif %}page={{ page_number | plus: 1 }}" style="margin-left: 1rem;">Next &raquo;</a>
         {% endif %}
       </nav>
     {% else %}
@@ -220,7 +251,6 @@
       <attribute name="al_duedate" />
       <attribute name="al_completedon" />
       <attribute name="al_adviserresponse" />
-      <attribute name="al_evidencereference" />
       <attribute name="al_assignedcontactid" />
       <attribute name="al_clientcontactrequired" />
       <attribute name="al_recheckrequired" />
@@ -271,10 +301,19 @@
   {% fetchxml caseoutcomes %}
   <fetch top="1">
     <entity name="al_outcome">
+      <attribute name="al_outcomeid" />
       <attribute name="al_initialoutcome" />
       <attribute name="al_finaloutcome" />
       <attribute name="al_finalisedon" />
       <attribute name="al_regradedon" />
+      <attribute name="al_regradereason" />
+      {% comment %}
+        Carried into the regrade so a save against a stale read is refused rather than
+        overwriting another correction, which is the same ExpectedRowVersion the Code App
+        sends. Where it comes back empty the regrade simply runs without the check, exactly
+        as al_RegradeCase behaves when the parameter is omitted.
+      {% endcomment %}
+      <attribute name="versionnumber" />
       <filter type="and">
         <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_param | xml_escape }}" />
       </filter>
@@ -345,6 +384,22 @@
           {% endif %}
         {% endif %}
       {% endfor %}
+      {% comment %}
+        Drawn as the document, the same way the Checker Checklist is (project owner,
+        2026-09-10: a remediation should read like the review forms). .ot-checklist is the
+        V8 sheet - Calibri, every cell ruled, grey header bands - and is shared with the
+        review page so the two forms read as one family.
+
+        Nothing about who may write what changes here. The adviser's response panel is
+        still rendered only for their own open action and the Contact-scoped table
+        permission is still the boundary (AD-069); the supervisor's attestation is still
+        gated on the create permission for al_signoff. Drawing the form does not add a
+        write path to either.
+      {% endcomment %}
+      <div class="ot-checklist">
+      <div class="doc-footer">Outcome Testing — Remediation and escalation | V8</div>
+      <h1>Remediation and escalation</h1>
+
       <dl class="ot-dl">
         <div><dt>Client</dt><dd>{{ c.al_clientname | default: '—' | escape }}</dd></div>
         <div><dt>Adviser</dt><dd>{{ c.al_advisername | default: '—' | escape }}</dd></div>
@@ -354,8 +409,8 @@
 
       {% if rows.size > 0 %}
         <div class="ot-table-wrap">
-          <table class="ot-table">
-            <caption>Remediation and escalation</caption>
+          <table>
+            <caption class="ot-visually-hidden">Remediation and escalation</caption>
             <thead>
               <tr>
                 <th scope="col">No.</th>
@@ -451,7 +506,31 @@
                         <td>{{ row_no }}</td>
                         <td>{{ rest | escape }}</td>
                         {% if ot_shown == 1 %}
-                          <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                          {% comment %}
+                            The adviser answers in this cell. It used to be static text with
+                            the editor behind a details/summary dropdown in a row of its own
+                            (project owner, 2026-09-10: "the dropdown should be removed and
+                            users should be able to answer directly in the remedial action
+                            field"), which is also what the paper form draws - one cell per
+                            issue, written in.
+
+                            Rendered as a field only for an action assigned to the signed-in
+                            contact that is not Completed. Presentation only: the
+                            Contact-scoped table permission is what decides whose action can
+                            be written (AD-069) and CompleteRemediationPlugin re-checks the
+                            status and the response server-side.
+                          {% endcomment %}
+                          {% if user and a.al_assignedcontactid.id == user.id and a.al_actionstatus.value != 120910602 %}
+                            <td rowspan="{{ ot_count }}" class="ot-response-cell" data-ot-response data-action-id="{{ a.al_remediationactionid }}" data-row-no="{{ row_no }}">
+                              <label class="ot-visually-hidden" for="ot-response-{{ a.al_remediationactionid }}">Remedial action for issue {{ row_no }}</label>
+                              <textarea id="ot-response-{{ a.al_remediationactionid }}"
+                                        rows="4"
+                                        class="ot-response-cell__text"
+                                        data-ot-response-text>{{ a.al_adviserresponse | escape }}</textarea>
+                            </td>
+                          {% else %}
+                            <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                          {% endif %}
                           <td rowspan="{{ ot_count }}">{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
                           <td rowspan="{{ ot_count }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
                           <td rowspan="{{ ot_count }}">{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
@@ -523,133 +602,84 @@
                   written (AD-069), and CompleteRemediationPlugin re-checks the status and the
                   response server-side.
                 {% endcomment %}
+              {% endfor %}
+              {% comment %}
+                The questions for the remediation as a whole, drawn as the last rows of the
+                same table (project owner, 2026-09-10: they belong within the table). The
+                paper form prints them in a ruled block directly under the numbered rows,
+                and putting them in the table is what makes that one grid rather than two
+                that happen to sit near each other.
+
+                They are answered once, not per row, so they are written to every one of
+                this adviser's actions that is still open - see the script below. Completed
+                actions are excluded: RemediationResponseGuard refuses a response-column
+                change once an action is Completed, because that is what the supervisor
+                attested to (BR-008).
+              {% endcomment %}
+              {% assign answer_ids = '' %}
+              {% assign answers_source = null %}
+              {% comment %}
+                The actions awaiting the supervisor. Collected here so the attestation is
+                one button for the whole remediation rather than one per row (project owner,
+                2026-09-10) - the T&C Manager attests to the remediation, and the paper form
+                carries one supervisor signature, not one per numbered issue.
+              {% endcomment %}
+              {% assign signoff_ids = '' %}
+              {% for a in rows %}
                 {% if user and a.al_assignedcontactid.id == user.id and a.al_actionstatus.value != 120910602 %}
-                  <tr class="ot-response-row">
-                    <td colspan="8">
-                      <details class="ot-response" data-ot-response data-action-id="{{ a.al_remediationactionid }}">
-                        <summary>{% if a.al_completedon %}Rework and resubmit your response{% else %}Complete the remediation form{% endif %}</summary>
-
-                        <div class="ot-response__field">
-                          <label for="ot-response-{{ a.al_remediationactionid }}">Remedial action</label>
-                          <textarea id="ot-response-{{ a.al_remediationactionid }}"
-                                    rows="4"
-                                    data-ot-response-text>{{ a.al_adviserresponse | escape }}</textarea>
-                          <p class="ot-response__hint">What you did, or will do, to put this right.</p>
-                        </div>
-
-                        <div class="ot-response__grid">
-                          <div class="ot-response__field">
-                            <span class="ot-response__label">Owner</span>
-                            <p>{{ a.al_assignedcontactid.name | default: c.al_advisername | escape }}</p>
-                          </div>
-                          <div class="ot-response__field">
-                            <span class="ot-response__label">Target date</span>
-                            <p>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</p>
-                          </div>
-                        </div>
-
-                        <fieldset class="ot-response__field">
-                          <legend>Client contact required?</legend>
-                          <label><input type="radio" name="ot-cc-{{ a.al_remediationactionid }}" value="120910793" data-ot-q="clientcontact"{% if a.al_clientcontactrequired.value == 120910793 %} checked{% endif %} /> Yes</label>
-                          <label><input type="radio" name="ot-cc-{{ a.al_remediationactionid }}" value="120910794" data-ot-q="clientcontact"{% if a.al_clientcontactrequired.value == 120910794 %} checked{% endif %} /> No</label>
-                          <label><input type="radio" name="ot-cc-{{ a.al_remediationactionid }}" value="120910795" data-ot-q="clientcontact"{% if a.al_clientcontactrequired.value == 120910795 %} checked{% endif %} /> Potentially</label>
-                        </fieldset>
-
-                        <fieldset class="ot-response__field">
-                          <legend>Recheck required?</legend>
-                          <label><input type="radio" name="ot-rc-{{ a.al_remediationactionid }}" value="120910796" data-ot-q="recheck"{% if a.al_recheckrequired.value == 120910796 %} checked{% endif %} /> Yes</label>
-                          <label><input type="radio" name="ot-rc-{{ a.al_remediationactionid }}" value="120910797" data-ot-q="recheck"{% if a.al_recheckrequired.value == 120910797 %} checked{% endif %} /> No</label>
-                        </fieldset>
-
-                        <fieldset class="ot-response__field">
-                          <legend>Do the remedial actions change the advice?</legend>
-                          <label><input type="radio" name="ot-ca-{{ a.al_remediationactionid }}" value="120910798" data-ot-q="changesadvice"{% if a.al_changesadvice.value == 120910798 %} checked{% endif %} /> Yes</label>
-                          <label><input type="radio" name="ot-ca-{{ a.al_remediationactionid }}" value="120910799" data-ot-q="changesadvice"{% if a.al_changesadvice.value == 120910799 %} checked{% endif %} /> No</label>
-                        </fieldset>
-
-                        <div class="ot-response__field">
-                          <label for="ot-evidence-{{ a.al_remediationactionid }}">
-                            Intelligent Office reference
-                          </label>
-                          <input type="text"
-                                 id="ot-evidence-{{ a.al_remediationactionid }}"
-                                 value="{{ a.al_evidencereference | escape }}"
-                                 data-ot-response-evidence />
-                          <p class="ot-response__hint">
-                            The remedial task you completed in Intelligent Office. Nothing is uploaded
-                            here and no file is stored by this site.
-                          </p>
-                        </div>
-
-                        <p class="ot-response__actions">
-                          <button type="button" class="ot-btn" data-ot-response-save>Save response</button>
-                          <button type="button" class="ot-btn ot-btn--primary" data-ot-response-complete>
-                            Save and sign off as adviser
-                          </button>
-                        </p>
-                        <p class="ot-response__status" data-ot-response-status aria-live="polite"></p>
-                      </details>
-                    </td>
-                  </tr>
+                  {% if answer_ids == '' %}{% assign answer_ids = a.al_remediationactionid %}{% else %}{% assign answer_ids = answer_ids | append: ',' | append: a.al_remediationactionid %}{% endif %}
+                  {% if answers_source == null %}{% assign answers_source = a %}{% endif %}
                 {% endif %}
-                {% comment %}
-                  The T&C Manager's half of the loop (PP-12, FR-023, BR-008). Offered on a
-                  completed action that has not been signed off yet.
-
-                  Whether the signed-in user may actually attest is decided by the create
-                  permission on al_signoff, which binds the T&C Supervisor role alone — this
-                  renders the panel for anyone, and a user without the role is refused on save.
-                  Showing it is a worse experience than hiding it, but hiding it by role in
-                  Liquid would look like access control and enforce nothing (NFR-SEC-01).
-                {% endcomment %}
                 {% if a.al_completedon and a.al_actionstatus.value == 120910602 %}
-                  <tr class="ot-response-row">
-                    <td colspan="8">
-                      <details class="ot-response" data-ot-signoff data-action-id="{{ a.al_remediationactionid }}">
-                        <summary>Sign off this remediation</summary>
-
-                        <div class="ot-response__field">
-                          <span class="ot-response__label">Remedial action</span>
-                          <p>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</p>
-                          <p class="ot-response__hint">
-                            Client contact required: {{ a.al_clientcontactrequired.label | default: '—' }} ·
-                            Recheck required: {{ a.al_recheckrequired.label | default: '—' }} ·
-                            Changes the advice: {{ a.al_changesadvice.label | default: '—' }}
-                            {% if a.al_evidencereference %} · Intelligent Office reference: {{ a.al_evidencereference | escape }}{% endif %}
-                          </p>
-                        </div>
-
-                        <div class="ot-response__field">
-                          <label for="ot-decision-{{ a.al_remediationactionid }}">All remedial actions checked and approved?</label>
-                          <select id="ot-decision-{{ a.al_remediationactionid }}" data-ot-signoff-decision>
-                            <option value="">Choose…</option>
-                            <option value="120910720">Approved</option>
-                            <option value="120910721">Rejected</option>
-                          </select>
-                        </div>
-
-                        <div class="ot-response__field">
-                          <label for="ot-notes-{{ a.al_remediationactionid }}">Notes</label>
-                          <textarea id="ot-notes-{{ a.al_remediationactionid }}"
-                                    rows="3"
-                                    data-ot-signoff-notes></textarea>
-                          <p class="ot-response__hint">
-                            Required when rejecting: the adviser needs to know what to put right
-                            (BR-008). A rejection returns the action to them.
-                          </p>
-                        </div>
-
-                        <p class="ot-response__actions">
-                          <button type="button" class="ot-btn ot-btn--primary" data-ot-signoff-save>
-                            Record supervisor sign-off
-                          </button>
-                        </p>
-                        <p class="ot-response__status" data-ot-signoff-status aria-live="polite"></p>
-                      </details>
-                    </td>
-                  </tr>
+                  {% assign has_decision = false %}
+                  {% if signoffs %}{% for sg in signoffs.results.entities %}{% if sg.al_remediationactionid.id == a.al_remediationactionid %}{% assign has_decision = true %}{% endif %}{% endfor %}{% endif %}
+                  {% unless has_decision %}
+                    {% if signoff_ids == '' %}{% assign signoff_ids = a.al_remediationactionid %}{% else %}{% assign signoff_ids = signoff_ids | append: ',' | append: a.al_remediationactionid %}{% endif %}
+                  {% endunless %}
                 {% endif %}
               {% endfor %}
+              {% if answers_source == null %}{% assign answers_source = form_source %}{% endif %}
+
+              <tr class="ot-form-rows__lead">
+                <th scope="row" colspan="2">Client contact required?</th>
+                <td colspan="2">
+                  {% if answer_ids != '' %}
+                    <span class="ot-opts" data-ot-form-answers data-action-ids="{{ answer_ids }}">
+                      <label><input type="radio" name="ot-form-cc" value="120910793" data-ot-fq="clientcontact"{% if answers_source.al_clientcontactrequired.value == 120910793 %} checked{% endif %} /> Yes</label>
+                      <label><input type="radio" name="ot-form-cc" value="120910794" data-ot-fq="clientcontact"{% if answers_source.al_clientcontactrequired.value == 120910794 %} checked{% endif %} /> No</label>
+                      <label><input type="radio" name="ot-form-cc" value="120910795" data-ot-fq="clientcontact"{% if answers_source.al_clientcontactrequired.value == 120910795 %} checked{% endif %} /> Potentially</label>
+                    </span>
+                  {% else %}
+                    {{ form_source.al_clientcontactrequired.label | default: '—' | escape }}
+                  {% endif %}
+                </td>
+                <th scope="row" colspan="2">Recheck required?</th>
+                <td colspan="2">
+                  {% if answer_ids != '' %}
+                    <span class="ot-opts">
+                      <label><input type="radio" name="ot-form-rc" value="120910796" data-ot-fq="recheck"{% if answers_source.al_recheckrequired.value == 120910796 %} checked{% endif %} /> Yes</label>
+                      <label><input type="radio" name="ot-form-rc" value="120910797" data-ot-fq="recheck"{% if answers_source.al_recheckrequired.value == 120910797 %} checked{% endif %} /> No</label>
+                    </span>
+                  {% else %}
+                    {{ form_source.al_recheckrequired.label | default: '—' | escape }}
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <th scope="row" colspan="2">Do the remedial actions change the advice?</th>
+                <td colspan="2">
+                  {% if answer_ids != '' %}
+                    <span class="ot-opts">
+                      <label><input type="radio" name="ot-form-ca" value="120910798" data-ot-fq="changesadvice"{% if answers_source.al_changesadvice.value == 120910798 %} checked{% endif %} /> Yes</label>
+                      <label><input type="radio" name="ot-form-ca" value="120910799" data-ot-fq="changesadvice"{% if answers_source.al_changesadvice.value == 120910799 %} checked{% endif %} /> No</label>
+                    </span>
+                  {% else %}
+                    {{ form_source.al_changesadvice.label | default: '—' | escape }}
+                  {% endif %}
+                </td>
+                <th scope="row" colspan="2">All remedial actions checked and approved?</th>
+                <td colspan="2">{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -664,22 +694,218 @@
           block shows dashes rather than disappearing. Read with a loop, never entities[0].
         {% endcomment %}
         {% if form_source == null %}{% for a in rows %}{% if form_source == null %}{% assign form_source = a %}{% endif %}{% endfor %}{% endif %}
+
+        {% comment %}
+          The adviser's three answers and the Intelligent Office reference, asked ONCE for
+          the whole remediation (project owner, 2026-09-10: "they should be for the overall
+          remediation... the rows only need to record the remedial action for each issue").
+
+          AD-107 raises one action per fail item, and these five columns live on the action
+          row, so asking them in each row's panel asked an adviser with four issues the same
+          four questions four times. There is no case-level row to hold them, so the answers
+          are written to every one of this adviser's actions that is still open - which
+          keeps any action correct when read on its own, and survives an action being
+          deleted, as dropoutcomeactions does.
+
+          Completed actions are deliberately excluded from the list: RemediationResponseGuard
+          refuses a response-column change once an action is Completed, because that is what
+          the supervisor attested to (BR-008). So a later change reaches the actions still in
+          flight and leaves the attested ones as they were signed off.
+        {% endcomment %}
         {% assign outcome = null %}
         {% for o in caseoutcomes.results.entities %}{% if outcome == null %}{% assign outcome = o %}{% endif %}{% endfor %}
 
-        <dl class="ot-remedial-form__block">
-          <div><dt>Client contact required?</dt><dd>{{ form_source.al_clientcontactrequired.label | default: '—' | escape }}</dd></div>
-          <div><dt>Recheck required?</dt><dd>{{ form_source.al_recheckrequired.label | default: '—' | escape }}</dd></div>
-          <div><dt>Do the remedial actions change the advice?</dt><dd>{{ form_source.al_changesadvice.label | default: '—' | escape }}</dd></div>
-          <div><dt>All remedial actions checked and approved?</dt><dd>{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</dd></div>
-          <div><dt>Regraded outcome</dt><dd>{% if outcome and outcome.al_finaloutcome %}{{ outcome.al_finaloutcome.label | escape }}{% else %}—{% endif %}</dd></div>
-          <div><dt>Date</dt><dd>{% if outcome and outcome.al_regradedon %}{{ outcome.al_regradedon | date: 'dd MMM yyyy' }}{% elsif outcome and outcome.al_finalisedon %}{{ outcome.al_finalisedon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
-          <div><dt>Supervisor sign-off</dt><dd>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
-          <div><dt>Adviser sign-off</dt><dd>{% if latest_adviser %}{{ latest_adviser.al_assignedcontactid.name | default: c.al_advisername | escape }}, {{ latest_adviser.al_completedon | date: 'dd MMM yyyy' }}{% if latest_adviser.al_evidencereference %} (IO {{ latest_adviser.al_evidencereference | escape }}){% endif %}{% else %}—{% endif %}</dd></div>
-        </dl>
+        {% comment %}
+          The rest of the paper form, read-only, in the three blocks the document draws:
+          the four answers two to a row, the regraded outcome with the note that says whose
+          signature it is, and the two sign-offs as signatory and date. The Code App builds
+          the same three from remediationFormLayout, so the two platforms cannot drift.
+
+          Reported rather than collected. The three answers are written in the adviser's own
+          panel above, the regrade is al_RegradeCase and the supervisor's decision is a
+          create on al_signoff - rendering them as inputs here would put a second write path
+          on columns that already have a permissioned one.
+        {% endcomment %}
+        <table class="ot-remedial-form__grid">
+          <caption class="ot-visually-hidden">Questions for this remediation</caption>
+          <tbody>
+            <tr>
+              <th scope="row">Client contact required?</th>
+              <td>{{ form_source.al_clientcontactrequired.label | default: '—' | escape }}</td>
+              <th scope="row">Recheck required?</th>
+              <td>{{ form_source.al_recheckrequired.label | default: '—' | escape }}</td>
+            </tr>
+            <tr>
+              <th scope="row">Do the remedial actions change the advice?</th>
+              <td>{{ form_source.al_changesadvice.label | default: '—' | escape }}</td>
+              <th scope="row">All remedial actions checked and approved?</th>
+              <td>{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</td>
+            </tr>
+            <tr>
+              <th scope="row">
+                Regraded outcome
+                <span class="ot-remedial-form__note">(for potential harms / insufficient evidence — the supervisor signs this off)</span>
+              </th>
+              <td colspan="3">
+                {% if outcome and outcome.al_finaloutcome %}{{ outcome.al_finaloutcome.label | escape }}{% else %}—{% endif %}
+                {% if outcome and outcome.al_regradedon %}<span class="ot-remedial-form__note">· {{ outcome.al_regradedon | date: 'dd MMM yyyy' }}</span>{% elsif outcome and outcome.al_finalisedon %}<span class="ot-remedial-form__note">· {{ outcome.al_finalisedon | date: 'dd MMM yyyy' }}</span>{% endif %}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table class="ot-remedial-form__signoffs">
+          <caption class="ot-visually-hidden">Sign-off</caption>
+          <thead>
+            <tr><th scope="col"></th><th scope="col">Date</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">
+                Supervisor sign-off
+                <span class="ot-remedial-form__note">(complete remedial task in IO)</span>
+              </th>
+              <td>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</td>
+            </tr>
+            <tr>
+              <th scope="row">
+                Adviser sign-off
+                <span class="ot-remedial-form__note">(complete remedial task in IO)</span>
+              </th>
+              <td>{% if latest_adviser %}{{ latest_adviser.al_assignedcontactid.name | default: c.al_advisername | escape }}, {{ latest_adviser.al_completedon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</td>
+            </tr>
+          </tbody>
+        </table>
+        {% comment %}
+          One button for the whole form (project owner, 2026-09-10). Each open action this
+          adviser holds takes a single request carrying its own remedial action, the three
+          answers, and the completion - so the form is signed as a form, the way the paper
+          one is, rather than a row at a time.
+
+          Offered only to the adviser holding open actions. The permission that decides
+          whose action may be written is the Contact-scoped table permission (AD-069), and
+          CompleteRemediationPlugin re-checks the status and the response; this is the
+          affordance, not the boundary.
+        {% endcomment %}
+        {% comment %}
+          The T&C Manager's half of the loop (PP-12, FR-023, BR-008), as one decision for
+          the whole remediation. Every action still awaiting a supervisor takes the same
+          decision and notes in one pass.
+
+          Whether the signed-in user may actually attest is decided by the create permission
+          on al_signoff, which binds the T&C Supervisor role alone - this renders for anyone
+          and a user without the role is refused on save. Showing it is a worse experience
+          than hiding it, but hiding it by role in Liquid would look like access control and
+          enforce nothing (NFR-SEC-01).
+        {% endcomment %}
+        {% if signoff_ids != '' %}
+          <div class="ot-form-submit" data-ot-signoff data-action-ids="{{ signoff_ids }}">
+            <div class="ot-field">
+              <label for="ot-decision">All remedial actions checked and approved?</label>
+              <select id="ot-decision" data-ot-signoff-decision>
+                <option value="">Choose…</option>
+                <option value="120910720">Approved</option>
+                <option value="120910721">Rejected</option>
+              </select>
+            </div>
+            <div class="ot-field">
+              <label for="ot-notes">Notes</label>
+              <textarea id="ot-notes" rows="3" data-ot-signoff-notes></textarea>
+            </div>
+            <button type="button" class="ot-btn ot-btn--primary" data-ot-signoff-save>
+              Sign off this remediation
+            </button>
+            <p class="ot-response__status" data-ot-signoff-status aria-live="polite"></p>
+            <p class="ot-form-submit__hint">
+              Records your decision against every remedial action awaiting sign-off. Notes
+              are required when rejecting: the adviser needs to know what to put right
+              (BR-008), and a rejection returns the actions to them.
+            </p>
+          </div>
+        {% endif %}
+
+        {% comment %}
+          The regrade (OD-041, AD-031, BR-005, BR-007), beside the sign-off because that is
+          where the paper form puts it — the supervisor's own signature line, immediately
+          after the approval.
+
+          Signing off does not regrade: approving every action moves the case to Awaiting
+          Recheck, the state that exists precisely so the final outcome can then be set, and
+          setting it is what closes the case. Until this was here the only way to do that was
+          the Code App at /cases/:caseId/recheck, so a supervisor holding only the portal
+          could not finish the case they had just approved.
+
+          Offered when the case carries an outcome that has actually been graded: a regrade
+          overrides a grade, so there has to be one, and a remediated Tax-only case (AD-055)
+          has no outcome row at all. Whether the signed-in user may attest is decided
+          server-side by RegradeRequestPlugin against the contact's web roles - this renders
+          for anyone and a user without the T&C Supervisor role is refused on save, for the
+          same reason the sign-off above does not hide itself: hiding it by role in Liquid
+          would look like access control and enforce nothing (NFR-SEC-01).
+
+          The four options are BR-005's, in BR-005's order, and the reason is mandatory
+          (AD-031) - required in the page so the supervisor is told before the request goes,
+          and required again in the plug-in because a page is not a boundary.
+        {% endcomment %}
+        {% if outcome and outcome.al_initialoutcome %}
+          <div class="ot-form-submit" data-ot-regrade
+               data-outcome-id="{{ outcome.al_outcomeid }}"
+               data-row-version="{{ outcome.versionnumber }}">
+            <h3 class="ot-form-submit__title">Regraded outcome</h3>
+            <p class="ot-form-submit__hint">
+              The initial outcome was
+              <strong>{{ outcome.al_initialoutcome.label | escape }}</strong>{% if outcome.al_finaloutcome %},
+              regraded to <strong>{{ outcome.al_finaloutcome.label | escape }}</strong>{% if outcome.al_regradedon %}
+              on {{ outcome.al_regradedon | date: 'dd MMM yyyy' }}{% endif %}{% endif %}. Recording a final
+              outcome does not change it — both are kept (BR-007).
+            </p>
+            <div class="ot-field">
+              <label for="ot-regrade-outcome">Final outcome</label>
+              <select id="ot-regrade-outcome" data-ot-regrade-outcome>
+                <option value="">Choose…</option>
+                <option value="Pass">Pass</option>
+                <option value="Pass with issues">Pass with issues</option>
+                <option value="Insufficient evidence">Insufficient evidence</option>
+                <option value="Potential harm">Potential harm</option>
+              </select>
+            </div>
+            <div class="ot-field">
+              <label for="ot-regrade-reason">Reason <span class="ot-field__required">(required)</span></label>
+              <textarea id="ot-regrade-reason" rows="3" data-ot-regrade-reason></textarea>
+            </div>
+            <button type="button" class="ot-btn ot-btn--primary" data-ot-regrade-save>
+              Record the final outcome
+            </button>
+            <p class="ot-response__status" data-ot-regrade-status aria-live="polite"></p>
+            <p class="ot-form-submit__hint">
+              The initial outcome is kept whatever you record here (BR-007), and the reason
+              is written to the case's audit history (AD-031). A case waiting at Awaiting
+              Recheck is closed by this.
+            </p>
+          </div>
+        {% endif %}
+
+        {% if answer_ids != '' %}
+          <div class="ot-form-submit">
+            <button type="button" class="ot-btn" data-ot-form-draft>
+              Save draft
+            </button>
+            <button type="button" class="ot-btn ot-btn--primary" data-ot-form-submit>
+              Save and sign off this remediation
+            </button>
+            <p class="ot-response__status" data-ot-form-status aria-live="polite"></p>
+            <p class="ot-form-submit__hint">
+              Save draft keeps what you have written without signing anything off. Save and
+              sign off records every remedial action above, your three answers, and your
+              sign-off, and sends the remediation to your supervisor.
+            </p>
+          </div>
+        {% endif %}
+
       {% else %}
         {% include 'OT Empty State' title: 'No remediation actions' message: 'Nothing has been raised against this case.' %}
       {% endif %}
+      </div>
     </section>
   {% endif %}
 
@@ -768,15 +994,21 @@
 
 <script>
   /*
-   * Adviser response and completion (PP-12, FR-020, FR-021, BR-008).
+   * The adviser's half of the BR-008 loop, as one form (PP-12, FR-020, FR-021).
    *
    * Path: this page -> PATCH al_remediationaction -> CompleteRequestPlugin -> Dataverse.
+   * Same mechanic as the review submit (AD-073): the portal's Web API cannot call an
+   * action, so the page writes allowlisted columns and a synchronous plug-in does the work.
    *
-   * Same mechanic as the review submit (AD-073): the portals Web API cannot call an
-   * action, so the page writes allowlisted columns and a synchronous plug-in does the
-   * work. Saving writes the response alone; completing writes the response and the
-   * trigger in one request, so an adviser can never mark an action complete with a
-   * response that failed to save.
+   * One button for the whole form (project owner, 2026-09-10: "all the saves and sign offs
+   * need to be actioned by a single button at the end of the form"). Each of this adviser's
+   * open actions takes ONE request carrying its own remedial action, the three answers that
+   * belong to the remediation as a whole, and the completion trigger - so an action can
+   * never be marked complete with a response that failed to save, and the answers cannot
+   * land on some rows and not others because a later request failed.
+   *
+   * A failure on any row stops the rest: the button reports which one and nothing further
+   * is sent, so a half-signed form is something the adviser can see rather than discover.
    *
    * Progressive enhancement only. The status transition, the mandatory response and the
    * audit event are all enforced server-side (NFR-SEC-01).
@@ -784,8 +1016,12 @@
   (function () {
     'use strict';
 
-    var panels = document.querySelectorAll('[data-ot-response]');
-    if (!panels.length) { return; }
+    var submit = document.querySelector('[data-ot-form-submit]');
+    var draft = document.querySelector('[data-ot-form-draft]');
+    if (!submit) { return; }
+
+    var status = document.querySelector('[data-ot-form-status]');
+    var cells = document.querySelectorAll('[data-ot-response]');
 
     /*
      * The server's own words, out of the response body.
@@ -821,6 +1057,8 @@
       return message;
     }
 
+    // Shared with the form-answers script above, which is parsed first but only reads
+    // this inside a request callback. One wording for a refusal, wherever it surfaced.
     function friendlyError(raw, httpStatus) {
       var text = serverMessage(raw);
       if (text.indexOf('CONFLICT:') !== -1) {
@@ -856,66 +1094,94 @@
         + (httpStatus ? ' (status ' + httpStatus + ')' : '');
     }
 
-    function wire(panel) {
-      var actionId = panel.getAttribute('data-action-id');
-      var response = panel.querySelector('[data-ot-response-text]');
-      var evidence = panel.querySelector('[data-ot-response-evidence]');
+    window.otFriendlyError = friendlyError;
 
-      function answer(name) {
-        var picked = panel.querySelector('[data-ot-q="' + name + '"]:checked');
-        return picked ? Number(picked.value) : null;
+    function show(message, kind) {
+      if (!status) { return; }
+      status.textContent = message;
+      status.className = 'ot-response__status ot-response__status--' + (kind || 'info');
+      status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    }
+
+    function answer(name) {
+      var picked = document.querySelector('[data-ot-fq="' + name + '"]:checked');
+      return picked ? Number(picked.value) : null;
+    }
+
+    /* Every row this adviser owns, with what they wrote in it. */
+    function rows() {
+      var found = [];
+      for (var i = 0; i < cells.length; i += 1) {
+        var text = cells[i].querySelector('[data-ot-response-text]');
+        found.push({
+          id: cells[i].getAttribute('data-action-id'),
+          number: cells[i].getAttribute('data-row-no') || String(i + 1),
+          text: text ? text.value : ''
+        });
       }
-      var save = panel.querySelector('[data-ot-response-save]');
-      var complete = panel.querySelector('[data-ot-response-complete]');
-      var status = panel.querySelector('[data-ot-response-status]');
+      return found;
+    }
 
-      function show(message, kind) {
-        status.textContent = message;
-        status.className = 'ot-response__status ot-response__status--' + (kind || 'info');
-        status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    function busy(on) {
+      submit.disabled = on;
+      if (draft) { draft.disabled = on; }
+    }
+
+    /*
+     * markComplete false is a draft: it keeps what has been written and signs nothing off.
+     *
+     * A draft is deliberately not held to the completion rules - a half-filled form is the
+     * point of it - so blank rows pass, and a question not yet answered is left out of the
+     * payload rather than sent as null. Sending null would clear an answer the adviser had
+     * already given, which is the opposite of saving.
+     */
+    function send(markComplete) {
+      if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
+        show('This page did not load completely. Refresh and try again.', 'error');
+        return;
       }
 
-      function busy(on) {
-        save.disabled = on;
-        complete.disabled = on;
-      }
+      var pending = rows();
+      if (!pending.length) { return; }
 
-      function send(markComplete) {
-        if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
-          show('This page did not load completely. Refresh and try again.', 'error');
-          return;
+      if (markComplete) {
+        // Checked here only so the adviser is told before a round trip; the plug-in
+        // refuses a completion with no response regardless.
+        for (var i = 0; i < pending.length; i += 1) {
+          if (!pending[i].text.replace(/^\s+|\s+$/g, '')) {
+            show('Record the remedial action for issue ' + pending[i].number + ' before signing off.', 'error');
+            return;
+          }
         }
 
-        // Checked here only so the user is told before a round trip; the plug-in refuses
-        // a completion with no response regardless.
-        if (markComplete && !response.value.trim()) {
-          show('Record what you did before marking this complete.', 'error');
+        if (answer('clientcontact') === null || answer('recheck') === null || answer('changesadvice') === null) {
+          show('Answer the three questions for this remediation before signing off.', 'error');
           return;
         }
+      }
 
-        if (markComplete && (answer('clientcontact') === null || answer('recheck') === null || answer('changesadvice') === null)) {
-          show('Answer all three questions on the form before signing off.', 'error');
-          return;
-        }
+      busy(true);
+      show(markComplete ? 'Signing off...' : 'Saving draft...', 'info');
 
-        busy(true);
-        show(markComplete ? 'Completing...' : 'Saving...', 'info');
+      window.shell.getTokenDeferred().done(function (token) {
+        var index = 0;
 
-        var payload = {
-          al_adviserresponse: response.value,
-          al_evidencereference: evidence.value
-        };
-        var clientContactAnswer = answer('clientcontact');
-        var recheckAnswer = answer('recheck');
-        var changesAdviceAnswer = answer('changesadvice');
-        if (clientContactAnswer !== null) { payload.al_clientcontactrequired = clientContactAnswer; }
-        if (recheckAnswer !== null) { payload.al_recheckrequired = recheckAnswer; }
-        if (changesAdviceAnswer !== null) { payload.al_changesadvice = changesAdviceAnswer; }
-        if (markComplete) { payload.al_completerequested = true; }
+        function next() {
+          if (index >= pending.length) {
+            if (!markComplete) {
+              show('Draft saved.', 'success');
+              busy(false);
+              return;
+            }
 
-        window.shell.getTokenDeferred().done(function (token) {
+            show('Signed off. Reloading...', 'success');
+            window.setTimeout(function () { window.location.reload(); }, 800);
+            return;
+          }
+
+          var row = pending[index];
           var request = new XMLHttpRequest();
-          request.open('PATCH', '/_api/al_remediationactions(' + actionId + ')', true);
+          request.open('PATCH', '/_api/al_remediationactions(' + row.id + ')', true);
           request.setRequestHeader('Content-Type', 'application/json');
           request.setRequestHeader('__RequestVerificationToken', token);
 
@@ -923,34 +1189,36 @@
             if (request.readyState !== 4) { return; }
 
             if (request.status >= 200 && request.status < 300) {
-              if (markComplete) {
-                show('Signed off as adviser. Reloading...', 'success');
-                window.setTimeout(function () { window.location.reload(); }, 800);
-                return;
-              }
-              show('Saved.', 'success');
-              busy(false);
+              index += 1;
+              next();
               return;
             }
 
-            show(friendlyError(request.responseText, request.status), 'error');
+            show('Issue ' + row.number + ': ' + friendlyError(request.responseText, request.status), 'error');
             busy(false);
           };
 
+          var payload = { al_adviserresponse: row.text };
+          var cc = answer('clientcontact');
+          var rc = answer('recheck');
+          var ca = answer('changesadvice');
+          if (cc !== null) { payload.al_clientcontactrequired = cc; }
+          if (rc !== null) { payload.al_recheckrequired = rc; }
+          if (ca !== null) { payload.al_changesadvice = ca; }
+          if (markComplete) { payload.al_completerequested = true; }
+
           request.send(JSON.stringify(payload));
-        }).fail(function () {
-          show('This page did not load completely. Refresh and try again.', 'error');
-          busy(false);
-        });
-      }
+        }
 
-      save.addEventListener('click', function () { send(false); });
-      complete.addEventListener('click', function () { send(true); });
+        next();
+      }).fail(function () {
+        show('This page did not load completely. Refresh and try again.', 'error');
+        busy(false);
+      });
     }
 
-    for (var i = 0; i < panels.length; i += 1) {
-      wire(panels[i]);
-    }
+    submit.addEventListener('click', function () { send(true); });
+    if (draft) { draft.addEventListener('click', function () { send(false); }); }
   })();
 </script>
 
@@ -1057,7 +1325,11 @@
     }
 
     function wire(panel) {
-      var actionId = panel.getAttribute('data-action-id');
+      // Every action still awaiting a supervisor. One decision covers the remediation
+      // (project owner, 2026-09-10), so the same decision and notes are recorded against
+      // each of them in turn - the sign-off row is per action because that is what BR-008
+      // attests to, but the person makes the judgement once.
+      var actionIds = (panel.getAttribute('data-action-ids') || '').split(',');
       var decision = panel.querySelector('[data-ot-signoff-decision]');
       var notes = panel.querySelector('[data-ot-signoff-notes]');
       var save = panel.querySelector('[data-ot-signoff-save]');
@@ -1091,18 +1363,198 @@
         save.disabled = true;
         show('Recording...', 'info');
 
-        // One JSON column on the signatory's own contact row. SignoffRequestPlugin parses
-        // it and creates the al_signoff; the browser no longer names a navigation property
-        // at all, which is what Power Pages kept refusing.
-        var payload = {
-          al_signoffrequest: JSON.stringify({
-            actionId: actionId,
-            decision: Number(decision.value),
-            notes: notes.value
-          })
-        };
+        window.shell.getTokenDeferred().done(function (token) {
+          var index = 0;
+
+          // One at a time, and a refusal stops the rest: each is a separate write, so
+          // firing them together would leave the supervisor guessing which ones landed.
+          function next() {
+            if (index >= actionIds.length) {
+              show('Sign-off recorded. Reloading...', 'success');
+              window.setTimeout(function () { window.location.reload(); }, 800);
+              return;
+            }
+
+            var actionId = actionIds[index];
+            if (!actionId) { index += 1; next(); return; }
+
+            // One JSON column on the signatory's own contact row. SignoffRequestPlugin
+            // parses it and creates the al_signoff; the browser no longer names a
+            // navigation property at all, which is what Power Pages kept refusing.
+            var payload = {
+              al_signoffrequest: JSON.stringify({
+                actionId: actionId,
+                decision: Number(decision.value),
+                notes: notes.value
+              })
+            };
+
+            var request = new XMLHttpRequest();
+            request.open('PATCH', '/_api/contacts(' + contactId + ')', true);
+            request.setRequestHeader('Content-Type', 'application/json');
+            request.setRequestHeader('__RequestVerificationToken', token);
+
+            request.onreadystatechange = function () {
+              if (request.readyState !== 4) { return; }
+
+              if (request.status >= 200 && request.status < 300) {
+                index += 1;
+                next();
+                return;
+              }
+
+              show(friendlyError(request.responseText, request.status), 'error');
+              save.disabled = false;
+            };
+
+            request.send(JSON.stringify(payload));
+          }
+
+          next();
+        }).fail(function () {
+          show('This page did not load completely. Refresh and try again.', 'error');
+          save.disabled = false;
+        });
+      });
+    }
+
+    for (var i = 0; i < panels.length; i += 1) {
+      wire(panels[i]);
+    }
+  })();
+</script>
+
+<script>
+  /*
+   * The regrade (OD-041, AD-031, BR-005, BR-007).
+   *
+   *   page -> PATCH contact.al_regraderequest (JSON)
+   *        -> RegradeRequestPlugin  (checks the T&C Supervisor web role)
+   *        -> RegradeCasePlugin.Regrade  (the same rules al_RegradeCase enforces)
+   *
+   * The fourth browser-driven write on this site, and it takes the shape the first three
+   * settled on: a Custom API cannot be invoked from a Power Pages page, so the page writes
+   * one JSON column on the signed-in user's own contact row - the Self-scoped contact
+   * permission makes that the only row it can reach - and the work happens server-side as
+   * the application user. Nothing here is a security boundary (NFR-SEC-01): the role is
+   * checked in the plug-in, against the contact that was actually written.
+   */
+  (function () {
+    'use strict';
+
+    var panels = document.querySelectorAll('[data-ot-regrade]');
+    if (!panels.length) { return; }
+
+    var contactId = '{{ user.id }}';
+
+    // The server's own words, out of the OData error body. Same reasoning as the sign-off's
+    // reader above: scanning the raw text for a prefix drags the JSON tail along with it.
+    function serverMessage(raw) {
+      var text = String(raw || '').trim();
+      if (!text) { return ''; }
+
+      var message = text;
+      try {
+        var body = JSON.parse(text);
+        var error = body && body.error ? body.error : body;
+        if (error && error.innererror && error.innererror.message) {
+          message = error.innererror.message;
+        } else if (error && error.message) {
+          message = error.message;
+        }
+      } catch (ignored) {
+        // Not JSON. Keep the raw text.
+      }
+
+      message = String(message || '').replace(/\s+/g, ' ').trim();
+      if (message.length > 300) { message = message.substring(0, 300) + '...'; }
+      return message;
+    }
+
+    function friendlyError(raw, httpStatus) {
+      var text = serverMessage(raw);
+
+      var prefixes = ['PRECONDITION:', 'VALIDATION:', 'CONFLICT:'];
+      for (var i = 0; i < prefixes.length; i += 1) {
+        var at = text.indexOf(prefixes[i]);
+        if (at !== -1) {
+          return text.substring(at + prefixes[i].length).trim();
+        }
+      }
+
+      var unexpected = text.indexOf('UNEXPECTED:');
+      if (unexpected !== -1) {
+        return 'Nothing was recorded. ' + text.substring(unexpected + 'UNEXPECTED:'.length).trim();
+      }
+
+      if (httpStatus === 400) {
+        return 'The portal rejected the request before checking any permission, so nothing was '
+          + 'recorded. This is a fault in the page rather than in your account - please report it.';
+      }
+      var code = /9004010[0-9]/.exec(text);
+      if (code) {
+        return 'The site refused this write (error ' + code[0] + '), so nothing was recorded. '
+          + 'Your role is not the problem - please report it.';
+      }
+      if (httpStatus === 403) {
+        return 'Your portal account is not allowed to write a regrade request, so nothing was recorded. '
+          + 'Ask an administrator to check your account rather than retrying.';
+      }
+      if (httpStatus === 401) {
+        return 'Your session was not accepted, so nothing was recorded. Reload the page and sign in again.';
+      }
+      return 'That outcome was not recorded, and nothing has been changed. '
+        + (text ? 'The server said: ' + text : 'The server gave no detail.')
+        + (httpStatus ? ' (status ' + httpStatus + ')' : '');
+    }
+
+    function wire(panel) {
+      var outcomeId = panel.getAttribute('data-outcome-id') || '';
+      var rowVersion = panel.getAttribute('data-row-version') || '';
+      var grade = panel.querySelector('[data-ot-regrade-outcome]');
+      var reason = panel.querySelector('[data-ot-regrade-reason]');
+      var save = panel.querySelector('[data-ot-regrade-save]');
+      var status = panel.querySelector('[data-ot-regrade-status]');
+
+      function show(message, kind) {
+        status.textContent = message;
+        status.className = 'ot-response__status ot-response__status--' + (kind || 'info');
+        status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+      }
+
+      save.addEventListener('click', function () {
+        if (save.disabled) { return; }
+
+        if (!grade.value) {
+          show('Choose the final outcome for this case.', 'error');
+          return;
+        }
+
+        // AD-031 makes this mandatory and RegradeRequestPlugin refuses without it. Told
+        // here so the supervisor is not made to wait for a round trip to find out.
+        if (!reason.value.trim()) {
+          show('A regrade must say why the outcome was changed.', 'error');
+          return;
+        }
+
+        if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
+          show('This page did not load completely. Refresh and try again.', 'error');
+          return;
+        }
+
+        save.disabled = true;
+        show('Recording...', 'info');
 
         window.shell.getTokenDeferred().done(function (token) {
+          var payload = {
+            al_regraderequest: JSON.stringify({
+              outcomeId: outcomeId,
+              finalOutcome: grade.value,
+              reason: reason.value,
+              expectedRowVersion: rowVersion
+            })
+          };
+
           var request = new XMLHttpRequest();
           request.open('PATCH', '/_api/contacts(' + contactId + ')', true);
           request.setRequestHeader('Content-Type', 'application/json');
@@ -1112,7 +1564,7 @@
             if (request.readyState !== 4) { return; }
 
             if (request.status >= 200 && request.status < 300) {
-              show('Sign-off recorded. Reloading...', 'success');
+              show('Final outcome recorded. Reloading...', 'success');
               window.setTimeout(function () { window.location.reload(); }, 800);
               return;
             }

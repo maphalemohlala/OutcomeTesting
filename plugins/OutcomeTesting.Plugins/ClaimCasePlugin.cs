@@ -206,8 +206,8 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// The check this claim is for: the earliest unsubmitted review instance on the
-        /// case, or a new one for the discipline the route says comes next.
+        /// The check this claim is for: the unsubmitted review instance for the discipline
+        /// the route says comes next, or a new one where none exists.
         ///
         /// Creating it here is what makes the queue self-service. Nothing else in the
         /// solution creates a review instance, so a queued case generally has none, and a
@@ -215,8 +215,77 @@ namespace OutcomeTesting.Plugins
         /// case in the queue. The discipline is taken from the route rather than from the
         /// page the checker was on, so BR-004's ordering — Tax before AQS — is decided
         /// server-side.
+        ///
+        /// The route is asked <em>first</em>, and the search for an existing instance is
+        /// then confined to the discipline it names. Reading "the earliest unsubmitted
+        /// instance" as the check that is due — which is what this did — only holds while
+        /// the route has not changed since the instances were created, and a route can
+        /// change at any time: <c>UpdateCaseDetailsPlugin.DeriveRoute</c> re-derives it on
+        /// every edit that touches the tax-check answer or the Tax team's disposition. An
+        /// AQS-only case allocated and then edited to require a Tax check keeps its open
+        /// AQS instance, and taking that as the check due strands the case outright — the
+        /// Tax check BR-004 now requires is never created, so it appears nowhere on the
+        /// case, while the AQS submit that is offered instead is refused by
+        /// <c>SubmitReviewPlugin.EnsureTaxPrecedesAqs</c> until the Tax check is in.
+        /// Asking the route first opens the Tax check and leaves the AQS instance for its
+        /// own leg, which is the order the route asked for all along.
         /// </summary>
-        private static Entity ResolveOrCreateReview(
+        public static Entity ResolveOrCreateReview(
+            IOrganizationService service, Entity outcomeCase, AssignCasePlugin.Assignee assignee)
+        {
+            // Where the case carries no route at all — every case created before the route
+            // seed existed — the instances are the only evidence there is, so they decide,
+            // as they do in SubmitReviewPlugin's own route reads. NextDiscipline refuses a
+            // routeless case rather than guessing, which would make such a case unclaimable
+            // where today it can still be picked up.
+            if (outcomeCase.GetAttributeValue<EntityReference>(CaseRouteAttr) == null)
+            {
+                return LegacyEarliestUnsubmittedReview(service, outcomeCase, assignee);
+            }
+
+            var next = NextDiscipline(service, outcomeCase);
+            EnsureDisciplineRole(service, assignee.ContactId, next);
+
+            var query = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet(ReviewTypeAttr, AssignedContactAttr),
+                Criteria = new FilterExpression
+                {
+                    Conditions =
+                    {
+                        new ConditionExpression("statecode", ConditionOperator.Equal, 0),
+                        new ConditionExpression(CaseLookup, ConditionOperator.Equal, outcomeCase.Id),
+                        new ConditionExpression(SubmittedOnAttr, ConditionOperator.Null),
+                        new ConditionExpression(ReviewTypeAttr, ConditionOperator.Equal, next),
+                    },
+                },
+                Orders = { new OrderExpression(SequenceAttr, OrderType.Ascending) },
+                TopCount = 1,
+            };
+
+            var existing = service.RetrieveMultiple(query).Entities;
+            if (existing.Count > 0)
+            {
+                // The narrow race two checkers can hit: both read a queued case, one wins.
+                // The loser is told rather than silently made a co-assignee.
+                if (existing[0].GetAttributeValue<EntityReference>(AssignedContactAttr) != null)
+                {
+                    throw new InvalidPluginExecutionException(
+                        CommandHelpers.PreconditionPrefix +
+                        "Another checker has already started checks on this case.");
+                }
+
+                return existing[0];
+            }
+
+            return OpenNextReview(service, outcomeCase, assignee, next);
+        }
+
+        /// <summary>
+        /// The pre-route behaviour, kept for cases that carry no <c>al_reviewrouteid</c>:
+        /// the earliest unsubmitted instance on the case, whatever its discipline.
+        /// </summary>
+        private static Entity LegacyEarliestUnsubmittedReview(
             IOrganizationService service, Entity outcomeCase, AssignCasePlugin.Assignee assignee)
         {
             var query = new QueryExpression(ReviewEntity)
@@ -236,25 +305,23 @@ namespace OutcomeTesting.Plugins
             };
 
             var existing = service.RetrieveMultiple(query).Entities;
-            if (existing.Count > 0)
+            if (existing.Count == 0)
             {
-                // The narrow race two checkers can hit: both read a queued case, one wins.
-                // The loser is told rather than silently made a co-assignee.
-                if (existing[0].GetAttributeValue<EntityReference>(AssignedContactAttr) != null)
-                {
-                    throw new InvalidPluginExecutionException(
-                        CommandHelpers.PreconditionPrefix +
-                        "Another checker has already started checks on this case.");
-                }
-
-                var existingType = existing[0].GetAttributeValue<OptionSetValue>(ReviewTypeAttr);
-                EnsureDisciplineRole(service, assignee.ContactId, existingType == null ? 0 : existingType.Value);
-                return existing[0];
+                // No route and no open instance: there is nothing to say which check is due.
+                // NextDiscipline gives that its own message rather than inventing one.
+                return OpenNextReview(service, outcomeCase, assignee, NextDiscipline(service, outcomeCase));
             }
 
-            var next = NextDiscipline(service, outcomeCase);
-            EnsureDisciplineRole(service, assignee.ContactId, next);
-            return OpenNextReview(service, outcomeCase, assignee, next);
+            if (existing[0].GetAttributeValue<EntityReference>(AssignedContactAttr) != null)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "Another checker has already started checks on this case.");
+            }
+
+            var existingType = existing[0].GetAttributeValue<OptionSetValue>(ReviewTypeAttr);
+            EnsureDisciplineRole(service, assignee.ContactId, existingType == null ? 0 : existingType.Value);
+            return existing[0];
         }
 
         /// <summary>
@@ -390,6 +457,16 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static int NextDiscipline(IOrganizationService service, Entity outcomeCase)
         {
+            int next;
+            if (TryNextDiscipline(service, outcomeCase, out next))
+            {
+                return next;
+            }
+
+            // Nothing is due. Which of the three reasons it is decides what the checker is
+            // told, so it is worked out here rather than in TryNextDiscipline, whose callers
+            // only need to know whether anything is outstanding. The extra read costs one
+            // round trip on a path that is about to throw anyway.
             var routeRef = outcomeCase.GetAttributeValue<EntityReference>(CaseRouteAttr);
             if (routeRef == null)
             {
@@ -411,21 +488,81 @@ namespace OutcomeTesting.Plugins
                     "This case's review route requires no check, so there is nothing to pick up.");
             }
 
+            throw new InvalidPluginExecutionException(
+                CommandHelpers.PreconditionPrefix +
+                "Every check this case's route requires has already been submitted, so there is nothing to pick up.");
+        }
+
+        /// <summary>
+        /// Which discipline the case owes next, or false when it owes none — no route, a
+        /// route requiring neither check, or every required check already submitted.
+        ///
+        /// The same ordering decision <see cref="NextDiscipline"/> makes, and the only copy
+        /// of it. That one throws because a claim has to tell the checker which of those
+        /// three it hit; a route change only needs to know whether anything is outstanding,
+        /// and an exception is not how that question should be answered.
+        /// </summary>
+        public static bool TryNextDiscipline(IOrganizationService service, Entity outcomeCase, out int next)
+        {
+            next = 0;
+
+            var routeRef = outcomeCase.GetAttributeValue<EntityReference>(CaseRouteAttr);
+            if (routeRef == null)
+            {
+                return false;
+            }
+
+            var route = service.Retrieve(
+                RouteEntity, routeRef.Id, new ColumnSet(RouteRequiresTaxAttr, RouteRequiresAqsAttr));
+
+            var requiresTax = route.GetAttributeValue<bool?>(RouteRequiresTaxAttr) ?? false;
+            var requiresAqs = route.GetAttributeValue<bool?>(RouteRequiresAqsAttr) ?? false;
+
+            if (!requiresTax && !requiresAqs)
+            {
+                return false;
+            }
+
             var submitted = SubmittedDisciplines(service, outcomeCase.Id);
 
             if (requiresTax && !submitted.Contains(ResponseRules.ReviewTypeTax))
             {
-                return ResponseRules.ReviewTypeTax;
+                next = ResponseRules.ReviewTypeTax;
+                return true;
             }
 
             if (requiresAqs && !submitted.Contains(ResponseRules.ReviewTypeAqs))
             {
-                return ResponseRules.ReviewTypeAqs;
+                next = ResponseRules.ReviewTypeAqs;
+                return true;
             }
 
-            throw new InvalidPluginExecutionException(
-                CommandHelpers.PreconditionPrefix +
-                "Every check this case's route requires has already been submitted, so there is nothing to pick up.");
+            return false;
+        }
+
+        /// <summary>
+        /// Whether the case has an open, unsubmitted review instance for this discipline —
+        /// that is, whether the check that is due is one somebody can already work.
+        /// </summary>
+        public static bool HasOpenReview(IOrganizationService service, Guid caseId, int reviewType)
+        {
+            var query = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression
+                {
+                    Conditions =
+                    {
+                        new ConditionExpression("statecode", ConditionOperator.Equal, 0),
+                        new ConditionExpression(CaseLookup, ConditionOperator.Equal, caseId),
+                        new ConditionExpression(SubmittedOnAttr, ConditionOperator.Null),
+                        new ConditionExpression(ReviewTypeAttr, ConditionOperator.Equal, reviewType),
+                    },
+                },
+            };
+
+            return service.RetrieveMultiple(query).Entities.Count > 0;
         }
 
         /// <summary>The disciplines whose review on this case has been submitted (active rows only).</summary>

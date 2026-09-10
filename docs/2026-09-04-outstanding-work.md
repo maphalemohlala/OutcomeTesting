@@ -1,8 +1,17 @@
 ﻿# Outstanding work
 
-Started 2026-09-04. **Last reviewed 2026-09-09**, after the remediation-raising gap was found
-and closed. Every environment claim below was re-queried on 2026-09-08 or later rather than
-carried forward.
+Started 2026-09-04. **Last reviewed 2026-09-10**, after the 8 September requirements pack was
+assessed against the built solution. Every environment claim below was re-queried on 2026-09-08
+or later rather than carried forward.
+
+> **2026-09-10 in one line: the project owner's requirements pack is mostly a description of
+> what already exists, and the distance left is not features — it is a second environment and
+> two workflow decisions.** Six of its ten must-haves are built, two are partial, and two have
+> not started. The largest item in the pack — one remediation action per failed item — was
+> **raised and resolved the same day**, built across six commits that logged no decision entry
+> and recorded after the fact as AD-107. **§7 below is the new register section and ranks first
+> despite its number**, which is kept only so the §1 to §6 citations in other documents keep
+> resolving. Record: `docs/2026-09-10-requirements-gap-assessment.md`.
 
 > **2026-09-09 in one line: a reported permissions fault was a feature that had never been
 > built.** "The remediation page shows no cases" was true for every account, because nothing in
@@ -287,6 +296,118 @@ solution awareness as a **preview feature**, "not meant for production use": tha
 the platform owner before it becomes the PROD promotion path, not a tooling detail.
 
 Sequenced behind item 5 for the same reason.
+
+---
+
+## 7. The 8 September requirements pack — RANKS FIRST
+
+**Owner:** Project owner for the decisions, Delivery for the build.
+Source: `docs/reference/2026-09-08-solution-requirements.md`. Full assessment, with the code
+each claim rests on: `docs/2026-09-10-requirements-gap-assessment.md`. ID mapping: MR-01 to
+MR-18 in `knowledge/requirements-index.md`.
+
+Numbered 7 to keep the §1 to §6 citations in other documents resolving. It is the first thing
+on this register by cost, because every item below it is sequenced behind DEV sign-off and
+these are what DEV sign-off consists of.
+
+### 7.1 The workflow decisions — two left, one already answered
+
+Neither is a defect, and neither can be resolved by Delivery, because each changes what the
+business means by a word it already uses.
+
+| OD | The question in one line | Why it cannot be assumed |
+|---|---|---|
+| **OD-041** | Does the supervisor regrade in the portal, or in the Code App as today? | Approve and regrade are currently two applications, two permission systems, two licensing positions. A portal-only supervisor cannot finish the workflow the pack's §7.1 draws |
+| **OD-039** | Is subsection a level of the data model, or the AD-098 code mapping? | Decides whether the next checklist restructure is a data change or a two-language code change. Costs nothing today; V8 renders correctly |
+
+**Done when:** each has a named owner, a date and a source reference in `decision-log.md`, per
+this project's own recording rule.
+
+**OD-040 — one action per failed item — was raised and resolved on 2026-09-10, in that order.**
+It was the largest item in the pack and it is built: `d8ee4c4`, with the `splitremediation`
+migration verb in `efb4636`, recorded after the fact as **AD-107**. The deciding reason was the
+agreed form itself — it carries a remedial action, an owner, a target date and a sign-off against
+**every numbered row**, and all four are single-valued columns, so one action could draw the rows
+but never let the adviser answer them separately.
+
+Carry the part that was easy to get wrong and was not: the three counting rules AD-097 had
+correctly identified as the reason to keep one action were **all changed in the same commit** —
+completion no longer completes the remediation, `RemediationApproved` now requires every action
+to be approved rather than any one (or approving the first would open the OD-038 AQS gate on an
+unremediated file), and the assignment email is keyed on the review so five actions send one
+message.
+
+**The process gap is worth naming, because it is the second time this month.** The build landed
+across six commits that recorded no decision entry, and this register and the decision log both
+described the old shape until 2026-09-10. A decision of that size is not carried by a commit
+message.
+
+### 7.2 The one thing that is simply not built
+
+**MR-07 / OD-042 — landing-page routing.** `app/src/app/router.tsx` renders `DashboardPage` at
+`/` with no `RequirePermission` wrapper, and `app/src/types/permissions.ts` seeds **every** role
+with View on `page.dashboard`. Those two together are why nobody has hit this: there is no role
+today that lacks dashboard access to be misrouted.
+
+The resolver is the small half. **Withdrawing the blanket grant is the half that changes
+meaning**, because it changes what the 52 seeded web role rules assert — so it is OD-042's
+business decision first and a build second.
+
+**Done when:** a role that should not land on the dashboard exists, and both the app and portal
+Home send it to its first permitted work area instead.
+
+### 7.3 Two more decisions, both cheap, both blocking an acceptance criterion
+
+- **OD-045 — name the defect tracker.** §15.4 and the final acceptance criterion both require
+  it; nothing in the solution records defects and no mechanism is named anywhere. Needs no build
+  if an existing tracker is nominated. Cheap and blocking is a bad combination to discover on
+  the first day of testing.
+- **OD-046 — notification templates and sender.** The mechanism is built, proved end to end and
+  already sends from a service mailbox, so §9.3 is met in DEV. Only wording is missing. **Carry
+  the shape risk:** bodies are C# strings in the assembly, so approved wording is either
+  hard-coded — a plug-in redeploy per wording change — or needs somewhere to live that is not
+  code. Where templates live is part of this decision, not a later surprise.
+
+### 7.4 Committed is not deployed
+
+Most of the branch landed overnight on 2026-09-10 — the remediation per-item work, the portal
+remediation list, the fail-item rows and the reference-document fix, six commits from `93571bf`
+to `85dcb87`. What is **still uncommitted** is the dashboard redesign alone: `DashboardPage.tsx`,
+its CSS, `tokens.css`, the untracked `dashboardShares.*`, plus `checklist-v8.md`,
+`ContactsMigration.cs` and `OT-Review-Detail`.
+
+Suites green on the current tree: **301** app, **571** plug-in.
+
+**The gap the tests cannot close is deployment, not commitment.** AD-106 and AD-107 are both
+plug-in behaviour changes, and AD-106's own entry says it needs a push to take effect. Neither
+was verified against `Env_AQ_Dev` for this assessment. Until `registerall` has run against the
+current assembly, DEV is applying the previous rules — one action per review, yes/no answers
+still becoming remediation lines — while the repository and every document here describe the new
+ones.
+
+**Done when:** the assembly is pushed and a submit in DEV is observed raising one action per
+fail item.
+
+### 7.5 What the pack asks for that is genuinely additive
+
+Recorded so it is not re-raised as a gap: **OD-043** (initial and final as two series, cheapest
+to decide *before* the dashboard change is committed, since it lands in the same code) and
+**OD-044** ("rejected for further action" as a distinct state — the data already distinguishes
+the two periods under AD-079, so this may be a rendering answer rather than a new status value).
+
+### 7.6 What the pack does not change
+
+- **§8.5 Power BI** re-raises what AD-034 closed as out of MVP scope, but re-raises it *as
+  backlog*, which is consistent. §8.5 asks only that it be documented and prioritised — it is,
+  as MR-16.
+- **§13.1 Trail Light** — the export is built and proved against the supplied map. What has
+  **not** happened is a validation run by Trail Light against a real file. That is an external
+  dependency, not a build item.
+- **§12.3 newer Intelligent Office extract** and **§11.4 multiple daily uploads** are now
+  **OD-047**, owned rather than left in prose. Worth answering together: the extract change is
+  the natural moment to add `al_paraplanneremail` and retire the AD-082 full-name match, which
+  is the one place in the solution where a near-miss could email a client outcome to the wrong
+  para-planner.
 
 ---
 

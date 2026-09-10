@@ -45,6 +45,9 @@ namespace OutcomeTesting.Plugins
         private const int TaxCheckRequiredNo = 120910561;
         private const string RouteCodeTaxThenAqs = "ROUTE-TAX-AQS";
         private const string RouteCodeAqsOnly = "ROUTE-AQS";
+        private const string RouteCodeTaxOnly = "ROUTE-TAX";
+        private const string DispositionAttr = "al_taxteamdisposition";
+        private const int DispositionReturnToParaplanner = 120910571;
 
         private const int CommandUpdateCaseDetails = 120910778;
 
@@ -190,6 +193,14 @@ namespace OutcomeTesting.Plugins
             // the update so the walk starts from the status the caller's own change left.
             QueueAfterEdit(userService, before, update, changes);
 
+            // OD-048: a case already past the queue whose route now owes a check nobody has
+            // opened goes back to it. Runs after QueueAfterEdit and is exclusive of it - that
+            // one moves a case forward INTO the queue from Imported or Ready for Allocation,
+            // this one returns a case to it from Assigned or Review In Progress, so no status
+            // satisfies both. The system service, because releasing the prior assignment and
+            // moving the case are the command's consequences rather than the caller's edit.
+            RequeueAfterRouteChange(systemService, before, update, changes);
+
             // A corrected adviser name reaches the remediation actions raised while the old
             // one matched no contact (BR-006): they were on the worklist with nobody able to
             // answer them, and the name was the fault. Only open, unassigned actions move.
@@ -300,29 +311,53 @@ namespace OutcomeTesting.Plugins
             var afterTax = update.Contains(TaxRequiredAttr)
                 ? update.GetAttributeValue<OptionSetValue>(TaxRequiredAttr)
                 : beforeTax;
-            if (afterTax == null)
+
+            // The Tax team's disposition decides whether the case goes on to AQS at all.
+            // "Return to paraplanner" means the Tax check is the whole of it and no AQS
+            // check is owed (project owner, 2026-09-10), so it overrides what the tax-check
+            // answer would otherwise derive - that answer says a Tax check was needed, not
+            // where the case goes afterwards.
+            var beforeDisposition = before.GetAttributeValue<OptionSetValue>(DispositionAttr);
+            var afterDisposition = update.Contains(DispositionAttr)
+                ? update.GetAttributeValue<OptionSetValue>(DispositionAttr)
+                : beforeDisposition;
+            var returnedToParaplanner =
+                afterDisposition != null && afterDisposition.Value == DispositionReturnToParaplanner;
+
+            if (afterTax == null && !returnedToParaplanner)
             {
                 return;
             }
 
             var currentRoute = before.GetAttributeValue<EntityReference>(RouteAttr);
-            var taxChanged = beforeTax == null || beforeTax.Value != afterTax.Value;
-            if (!taxChanged && currentRoute != null)
+            var taxChanged = afterTax != null && (beforeTax == null || beforeTax.Value != afterTax.Value);
+            var dispositionChanged = (beforeDisposition == null) != (afterDisposition == null)
+                || (beforeDisposition != null && afterDisposition != null
+                    && beforeDisposition.Value != afterDisposition.Value);
+
+            if (!taxChanged && !dispositionChanged && currentRoute != null)
             {
                 return;
             }
 
             string code;
-            switch (afterTax.Value)
+            if (returnedToParaplanner)
             {
-                case TaxCheckRequiredYes:
-                    code = RouteCodeTaxThenAqs;
-                    break;
-                case TaxCheckRequiredNo:
-                    code = RouteCodeAqsOnly;
-                    break;
-                default:
-                    return;
+                code = RouteCodeTaxOnly;
+            }
+            else
+            {
+                switch (afterTax.Value)
+                {
+                    case TaxCheckRequiredYes:
+                        code = RouteCodeTaxThenAqs;
+                        break;
+                    case TaxCheckRequiredNo:
+                        code = RouteCodeAqsOnly;
+                        break;
+                    default:
+                        return;
+                }
             }
 
             var routeId = findRoute(code);
@@ -552,6 +587,86 @@ namespace OutcomeTesting.Plugins
                 status,
                 routeAfter != null,
                 changes);
+        }
+
+        /// <summary>
+        /// OD-048: an edit that changes the route can leave a case owing a check nobody can
+        /// pick up, so the case goes back to the shared queue for it.
+        ///
+        /// A route is re-derived from the tax-check answer and the Tax team's disposition
+        /// (<see cref="DeriveRoute(Entity, Entity, List{string}, Func{string, Guid?})"/>),
+        /// and the review instances already opened are not reconciled with it. An AQS-only
+        /// case that has been claimed carries an open AQS instance; edited to require a Tax
+        /// check, it now owes Tax first (BR-004) — but it sits at Assigned, so it is out of
+        /// the queue and cannot be claimed, and the AQS submit it still offers is refused by
+        /// <c>SubmitReviewPlugin.EnsureTaxPrecedesAqs</c> until the Tax check is in. The case
+        /// could not progress by any route at all. AD-112 fixed the claim's half of that;
+        /// this is the half that gets the case back within reach of a claim.
+        ///
+        /// Deliberately narrow. It runs only when this edit actually changed the route
+        /// (<see cref="DeriveRoute(Entity, Entity, List{string}, Func{string, Guid?})"/>
+        /// writes the column only then), only from Assigned or Review In Progress, and only
+        /// when the discipline now due has <em>no open instance</em> — so a route change that
+        /// did not change what comes next leaves the checker holding their work. A status the
+        /// caller set in the same call is theirs, as it is for
+        /// <see cref="QueueAfterEdit"/>: a second move on top of a deliberate one would make
+        /// the history read as two decisions.
+        ///
+        /// The active assignment is released with the move, because a case in the queue
+        /// carrying a live assignment is the same inconsistency the Tax-to-AQS handoff
+        /// already avoids (AD-076). The row itself is preserved, never deleted (AD-037), so
+        /// the allocation trail survives (BR-003, BR-012).
+        /// </summary>
+        public static bool RequeueAfterRouteChange(
+            IOrganizationService service, Entity before, Entity update, List<string> changes)
+        {
+            if (before == null)
+            {
+                throw new ArgumentNullException(nameof(before));
+            }
+
+            if (update == null)
+            {
+                throw new ArgumentNullException(nameof(update));
+            }
+
+            if (!update.Contains(RouteAttr) || update.Contains(StatusAttr))
+            {
+                return false;
+            }
+
+            var status = CaseTransitions.CurrentStatus(service, before.Id);
+            if (status != CaseLifecycle.Assigned && status != CaseLifecycle.ReviewInProgress)
+            {
+                return false;
+            }
+
+            var effective = new Entity(CaseEntity, before.Id)
+            {
+                [RouteAttr] = update.GetAttributeValue<EntityReference>(RouteAttr),
+            };
+
+            int due;
+            if (!ClaimCasePlugin.TryNextDiscipline(service, effective, out due))
+            {
+                return false;
+            }
+
+            if (ClaimCasePlugin.HasOpenReview(service, before.Id, due))
+            {
+                return false;
+            }
+
+            AssignCasePlugin.ReleasePriorAssignments(service, before.Id);
+            CaseTransitions.MoveThrough(service, before.Id, status, new[] { CaseLifecycle.Queued });
+
+            changes.Add(
+                "Status " + CaseLifecycle.NameOf(status.Value) + " -> " + CaseLifecycle.NameOf(CaseLifecycle.Queued)
+                + " (returned to the queue: the new route owes a "
+                + (due == ResponseRules.ReviewTypeTax ? "Tax" : "AQS")
+                + " check that has not been opened, OD-048)");
+
+            return true;
         }
 
         private static void ApplyFields(

@@ -1,4 +1,4 @@
-using OutcomeTesting.Plugins;
+﻿using OutcomeTesting.Plugins;
 using Xunit;
 
 namespace OutcomeTesting.Plugins.Tests
@@ -19,6 +19,10 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData(CaseLifecycle.Queued, CaseLifecycle.Assigned)]
         [InlineData(CaseLifecycle.Assigned, CaseLifecycle.ReviewInProgress)]
         [InlineData(CaseLifecycle.ReviewInProgress, CaseLifecycle.Submitted)]
+        // A check reallocated after the checker started it: the review instance is
+        // stamped back to Assigned, and the case has to be able to follow it there
+        // (project owner direction, 2026-09-10 - managers reassign after a review starts).
+        [InlineData(CaseLifecycle.ReviewInProgress, CaseLifecycle.Assigned)]
         // Submitted -> Awaiting Remediation | Closed
         [InlineData(CaseLifecycle.Submitted, CaseLifecycle.AwaitingRemediation)]
         [InlineData(CaseLifecycle.Submitted, CaseLifecycle.Closed)]

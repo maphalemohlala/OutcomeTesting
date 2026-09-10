@@ -78,6 +78,30 @@
     </fetch>
     {% endfetchxml %}
 
+    {% comment %}
+      The route, so Review progress can show the checks the case OWES rather than only the
+      review instances that happen to exist. Those are not the same list: a route is
+      re-derived on every case edit that touches the tax-check answer or the Tax team's
+      disposition (UpdateCaseDetailsPlugin.DeriveRoute), while the instances already opened
+      stay as they are. A case edited from AQS-only to Tax-then-AQS therefore carries an AQS
+      instance and no Tax one, and a table built from the instances alone showed the AQS
+      check by itself — with nothing to say a Tax check was owed and had to come first.
+    {% endcomment %}
+    {% fetchxml route %}
+    <fetch top="1">
+      <entity name="al_reviewroute">
+        <attribute name="al_name" />
+        <attribute name="al_requirestaxreview" />
+        <attribute name="al_requiresaqsreview" />
+        <link-entity name="al_outcomecase" from="al_reviewrouteid" to="al_reviewrouteid" alias="oc">
+          <filter type="and">
+            <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
+          </filter>
+        </link-entity>
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+
     {% fetchxml actions %}
     <fetch>
       <entity name="al_remediationaction">
@@ -184,12 +208,49 @@
       </dl>
     </section>
 
+    {% comment %}
+      One line per check the case owes, in BR-004 order — Tax first, then AQS — rather than
+      one line per review instance in whatever order they were created. The route says which
+      checks are owed; the instances say how far each has got. A check the route requires
+      with no instance yet is shown as Not started, so an outstanding Tax check is visible on
+      the case instead of being absent from the table entirely.
+
+      An instance whose discipline the route no longer requires is still listed: it is real
+      work someone may have done, and dropping it would hide it. So the row is rendered when
+      the route requires the check OR an instance exists, never on the route alone.
+
+      al_reviewtype: 120910200 Tax, 120910201 AQS, compared on .value as the review page does.
+    {% endcomment %}
+    {% assign tax_review = null %}
+    {% assign aqs_review = null %}
+    {% for r in reviews.results.entities %}
+      {% if r.al_reviewtype.value == 120910200 and tax_review == null %}{% assign tax_review = r %}{% endif %}
+      {% if r.al_reviewtype.value == 120910201 and aqs_review == null %}{% assign aqs_review = r %}{% endif %}
+    {% endfor %}
+
+    {% assign rt = null %}
+    {% for row in route.results.entities %}{% if rt == null %}{% assign rt = row %}{% endif %}{% endfor %}
+
+    {% assign requires_tax = false %}
+    {% assign requires_aqs = false %}
+    {% if rt %}
+      {% if rt.al_requirestaxreview %}{% assign requires_tax = true %}{% endif %}
+      {% if rt.al_requiresaqsreview %}{% assign requires_aqs = true %}{% endif %}
+    {% endif %}
+
+    {% assign show_tax = false %}
+    {% if requires_tax or tax_review %}{% assign show_tax = true %}{% endif %}
+    {% assign show_aqs = false %}
+    {% if requires_aqs or aqs_review %}{% assign show_aqs = true %}{% endif %}
+
     <section class="ot-card" aria-labelledby="ot-case-reviews">
       <h2 class="ot-card__title" id="ot-case-reviews">Review progress</h2>
-      {% if reviews.results.entities.size > 0 %}
+      {% if show_tax or show_aqs %}
         <div class="ot-table-wrap">
           <table class="ot-table">
-            <caption>Tax runs before AQS when both are required (BR-004).</caption>
+            <caption>
+              {% if rt %}Route: {{ rt.al_name | escape }}. {% endif %}Tax runs before AQS when both are required (BR-004).
+            </caption>
             <thead>
               <tr>
                 <th scope="col">Sequence</th>
@@ -201,19 +262,63 @@
               </tr>
             </thead>
             <tbody>
-              {% for r in reviews.results.entities %}
-                <tr>
-                  <td>{{ r.al_sequence | default: '—' }}</td>
-                  <td><a href="/review?id={{ r.al_reviewinstanceid }}">{{ r.al_name | default: 'Open review' | escape }}</a></td>
-                  <td>{{ r.al_reviewtype.label | escape }}</td>
-                  <td>{% include 'OT Status Badge' status: r.al_reviewstatus.label %}</td>
-                  <td>{{ r.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</td>
-                  <td>{{ r.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>
-                </tr>
-              {% endfor %}
+              {% if show_tax %}
+                {% if tax_review %}
+                  <tr>
+                    <td>{{ tax_review.al_sequence | default: 1 }}</td>
+                    <td><a href="/review?id={{ tax_review.al_reviewinstanceid }}">{{ tax_review.al_name | default: 'Open review' | escape }}</a></td>
+                    <td>{{ tax_review.al_reviewtype.label | escape }}</td>
+                    <td>{% include 'OT Status Badge' status: tax_review.al_reviewstatus.label %}</td>
+                    <td>{{ tax_review.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</td>
+                    <td>{{ tax_review.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>
+                  </tr>
+                {% else %}
+                  <tr class="ot-row--owed">
+                    <td>1</td>
+                    <td>Tax check</td>
+                    <td>Tax</td>
+                    <td>{% include 'OT Status Badge' status: 'Not started' %}</td>
+                    <td>—</td>
+                    <td>—</td>
+                  </tr>
+                {% endif %}
+              {% endif %}
+              {% if show_aqs %}
+                {% if aqs_review %}
+                  <tr>
+                    <td>{{ aqs_review.al_sequence | default: 2 }}</td>
+                    <td><a href="/review?id={{ aqs_review.al_reviewinstanceid }}">{{ aqs_review.al_name | default: 'Open review' | escape }}</a></td>
+                    <td>{{ aqs_review.al_reviewtype.label | escape }}</td>
+                    <td>{% include 'OT Status Badge' status: aqs_review.al_reviewstatus.label %}</td>
+                    <td>{{ aqs_review.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</td>
+                    <td>{{ aqs_review.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>
+                  </tr>
+                {% else %}
+                  <tr class="ot-row--owed">
+                    <td>2</td>
+                    <td>AQS check</td>
+                    <td>AQS</td>
+                    <td>{% include 'OT Status Badge' status: 'Not started' %}</td>
+                    <td>—</td>
+                    <td>—</td>
+                  </tr>
+                {% endif %}
+              {% endif %}
             </tbody>
           </table>
         </div>
+        {% comment %}
+          The state IO-SEED-AQS-04 is in: the AQS check is open and answerable, but the Tax
+          check the route puts before it has not been created, so the AQS submit is refused
+          by SubmitReviewPlugin.EnsureTaxPrecedesAqs. Saying so here is the difference
+          between a checker finding out now and finding out after answering every question.
+        {% endcomment %}
+        {% if requires_tax and aqs_review and tax_review == null %}
+          <p class="ot-note ot-note--blocked">
+            This case owes a Tax check that has not been created yet, and BR-004 requires it
+            before AQS. The AQS check below cannot be submitted until the Tax check is in.
+          </p>
+        {% endif %}
       {% else %}
         {% include 'OT Empty State' title: 'No reviews yet' message: 'A review instance is created when the case is routed to Tax or AQS.' %}
       {% endif %}
