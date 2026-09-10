@@ -1,22 +1,20 @@
 /**
- * Splitting a remediation action's description back into the items it was built from.
+ * Splitting a remediation action's description into the items it was built from.
  *
  * `Remediation.Describe` (plugins/OutcomeTesting.Plugins/Remediation.cs) writes one
  * `al_description`: a heading, one "- item" line per thing the checker marked down, then
- * the checker's own observation and the standing sentence. Rendered as written, all of
- * that lands in a single "Issue / fail reason" cell, which is not the form the project
- * owner signed off - the paper form numbers the issues, one to a row.
+ * the checker's observation and the standing sentence. The agreed form numbers the issues
+ * one to a row, so the items are split back out here.
  *
- * The split is done here rather than by raising an action per item: the action is the unit
- * the BR-010 clock, the adviser's response and the T&C sign-off all hang off, and one
- * action per issue would move the case to Awaiting Sign-off on the first completion.
+ * Only the items are drawn. The heading, the observation and the standing sentence are all
+ * read past (project owner, 2026-09-10): the sentence said the same thing under every row
+ * of every case, and what it says about why the action was raised is the Outcome above the
+ * table. All of it stays in `al_description`, which is the record Dataverse keeps.
+ *
  * The two portal templates carry the same split in Liquid.
  */
 
 import type { RemediationActionRow } from './remediationMapping';
-
-/** The heading `Remediation.Describe` puts above the items. Dropped, not shown as a row. */
-const ISSUES_HEADING = 'Issues found on the check:';
 
 /**
  * How `Remediation.Describe` opens the bracket holding the outcome: "...when the review was
@@ -26,42 +24,15 @@ const ISSUES_HEADING = 'Issues found on the check:';
  */
 const OUTCOME_MARKER = 'submitted (';
 
-/**
- * The sentence `Remediation.Describe` ends every description with: "Raised automatically
- * when the review was submitted (<outcome>). Review the file and record what you have put
- * right."
- *
- * Not shown (project owner, 2026-09-10). It said the same thing under every row of every
- * case, and both halves of it are now on the page in their own right - the outcome as the
- * remediation's Outcome, and what to do about it as the row the adviser answers. What is
- * left of a note is the checker's own words, which are particular to the case.
- *
- * It stays in `al_description`, which is the record Dataverse keeps and the only place the
- * outcome is written down; this drops it on the way to the screen, not out of the data.
- */
-const STANDING_SENTENCE = 'Raised automatically when the review was submitted';
-
-/**
- * The second half of it. `Remediation.Describe` writes the whole sentence on one line, but
- * a description that has been through a renderer, an export or a hand edit can carry the
- * break, and half a sentence left under the rows is worse than either whole or gone.
- */
-const STANDING_TAIL = 'Review the file and record what you have put right';
-
 export interface RemediationIssues {
   /** One entry per item the checker marked down; empty when the description carries none. */
   issues: string[];
-  /** What is left once the items are out: the checker's observation and why this was raised. */
-  note: string | null;
   /** The outcome the remediation was raised for; null when the description names none. */
   outcome: string | null;
 }
 
 /**
  * The outcome out of the description's standing sentence.
- *
- * Read from the description rather than from the note, because the note no longer carries
- * the sentence: it is dropped on the way to the screen and the outcome would go with it.
  *
  * The marker has to be present before the brackets mean anything: a description with no
  * reason behind it still carries the sentence, and a checker's observation is free text
@@ -85,9 +56,16 @@ function outcomeIn(description: string): string | null {
   return outcome ? outcome : null;
 }
 
+/**
+ * The items and the outcome, out of one description.
+ *
+ * Only the "- item" lines are kept. The heading above them, the checker's observation and
+ * the standing sentence are all read past: none of the three is drawn any more (project
+ * owner, 2026-09-10), and what the description says about why the action was raised is the
+ * Outcome above the table.
+ */
 export function splitIssues(description: string | null | undefined): RemediationIssues {
   const issues: string[] = [];
-  const rest: string[] = [];
 
   for (const raw of (description ?? '').split(/\r?\n/)) {
     const line = raw.trim();
@@ -100,32 +78,14 @@ export function splitIssues(description: string | null | undefined): Remediation
       continue;
     }
 
-    if (
-      line === ISSUES_HEADING ||
-      line.startsWith(STANDING_SENTENCE) ||
-      line.startsWith(STANDING_TAIL)
-    ) {
-      continue;
-    }
-
-    rest.push(line);
+    // Everything else is the checker's observation, the heading or the standing sentence.
+    // None of it is drawn (project owner, 2026-09-10): the observation went with the rest
+    // when the table was cut back to the issues themselves, and what the description says
+    // about why it was raised is the Outcome above the table.
   }
 
-  // The blank line between the observation and the standing sentence is a paragraph break
-  // worth keeping; the gap the items left behind is not.
-  const note = rest.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-
-  return { issues, note: note ? note : null, outcome: outcomeIn(description ?? '') };
+  return { issues, outcome: outcomeIn(description ?? '') };
 }
-
-/**
- * Columns in the actions table, for the row a group's note spans.
- *
- * No., issue, remedial action, owner, target date, status, age, sign-off, and the column
- * the Mark complete button sits in. The four that carried the adviser's answers are gone:
- * they are the form's last block now, drawn once under the table as the portal draws it.
- */
-export const ACTION_COLUMNS = 9;
 
 export interface IssueLine {
   number: number;
@@ -135,7 +95,6 @@ export interface IssueLine {
 export interface ActionGroup {
   action: RemediationActionRow;
   lines: IssueLine[];
-  note: string | null;
 }
 
 /**
@@ -168,23 +127,12 @@ export function outcomeOf(actions: RemediationActionRow[]): string | null {
  */
 export function groupIssues(actions: RemediationActionRow[]): ActionGroup[] {
   let number = 0;
-  let shownNote: string | null = null;
 
   return actions.map((action) => {
-    const { issues, note } = splitIssues(action.description);
-    // An action raised before the list existed, or one whose description is only the
-    // standing sentence, still gets its row: the note is the issue it has to show.
-    const lines = issues.length > 0 ? issues : [note ?? '—'];
-
-    // A review raises one action per item, and every one of them carries the same
-    // provenance - the checker's observation and why the remediation was raised. Each
-    // record keeps it so it stands alone in Dataverse; the table shows it once per run of
-    // actions that share it, rather than under every row.
-    const carried = issues.length > 0 ? note : null;
-    const repeated = carried !== null && carried === shownNote;
-    if (carried !== null) {
-      shownNote = carried;
-    }
+    const { issues } = splitIssues(action.description);
+    // An action raised before the list existed, or one dropoutcomeactions stripped back to
+    // its standing sentence, still gets its row - there is simply nothing to name in it.
+    const lines = issues.length > 0 ? issues : ['—'];
 
     return {
       action,
@@ -192,7 +140,6 @@ export function groupIssues(actions: RemediationActionRow[]): ActionGroup[] {
         number += 1;
         return { number, issue };
       }),
-      note: repeated ? null : carried,
     };
   });
 }

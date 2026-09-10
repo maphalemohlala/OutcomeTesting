@@ -1,8 +1,8 @@
 import { Fragment, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
+import { StageLabel } from '../../components/status/StageLabel';
 import { Notice } from '../../components/feedback/Notice';
-import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import {
   useRemediation,
   type RemediationCase,
@@ -10,12 +10,13 @@ import {
   type RemediationActionRow,
   type SignoffRow,
 } from './useRemediation';
-import { ACTION_COLUMNS, groupIssues, outcomeOf } from './remediationIssues';
+import { groupIssues, outcomeOf } from './remediationIssues';
 import { remediationForm, signoffCell } from './remediationForm';
 import { remediationClock } from '../../lib/workingDays';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { completeRemediation } from '../../services/commands/completeRemediation';
 import { messageForFailure } from '../../services/errors';
+import type { CaseStatus } from '../../types/domain';
 import { classify } from '../../services/commands/failures';
 import './RemediationPage.css';
 
@@ -123,7 +124,7 @@ export function ActionsTable({
         </tr>
       </thead>
       <tbody>
-        {groupIssues(actions).map(({ action, lines, note }) => (
+        {groupIssues(actions).map(({ action, lines }) => (
           <Fragment key={action.id}>
             {lines.map(({ number, issue }, index) => (
               <tr key={number}>
@@ -167,13 +168,6 @@ export function ActionsTable({
                 ) : null}
               </tr>
             ))}
-            {note ? (
-              <tr className="remediation__context">
-                <td className="remediation__note" colSpan={ACTION_COLUMNS}>
-                  {note}
-                </td>
-              </tr>
-            ) : null}
           </Fragment>
         ))}
       </tbody>
@@ -213,22 +207,14 @@ export function RemediationFormBlock({
   ];
 
   return (
-    <>
-      <dl className="remediation__form">
-        {fields.map(([label, value]) => (
-          <div key={label} className="remediation__form-field">
-            <dt>{label}</dt>
-            <dd>{value ?? '—'}</dd>
-          </div>
-        ))}
-      </dl>
-      <p className="remediation__note">
-        The three answers are the adviser&rsquo;s, recorded on the remediation action (the
-        first action carrying an answer). &ldquo;All remedial actions checked and
-        approved&rdquo; reads Yes when every action&rsquo;s latest supervisor decision is
-        Approved.
-      </p>
-    </>
+    <dl className="remediation__form">
+      {fields.map(([label, value]) => (
+        <div key={label} className="remediation__form-field">
+          <dt>{label}</dt>
+          <dd>{value ?? '—'}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -237,19 +223,10 @@ export function RemediationPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeState | null>(null);
-  const [actionStatus, setActionStatus] = useState('');
   const state = useRemediation(caseId, reloadKey);
   const intent = useIntentKeys();
 
   const allActions = state.status === 'ready' ? state.actions : [];
-  const actionStatuses = useMemo(
-    () => [...new Set(allActions.map((a) => a.status).filter(Boolean))].sort(),
-    [allActions],
-  );
-  const filteredActions = useMemo(
-    () => (actionStatus ? allActions.filter((a) => a.status === actionStatus) : allActions),
-    [allActions, actionStatus],
-  );
   // The outcome the remediation was raised for. Read across every action rather than the
   // filtered set: it is the case's, so narrowing the table by status must not change it.
   const outcome = useMemo(() => outcomeOf(allActions), [allActions]);
@@ -305,38 +282,16 @@ export function RemediationPage() {
           />
 
           <section className="remediation__section" aria-labelledby="remediation-actions">
-            <h2 id="remediation-actions">
+            <h2 id="remediation-actions" className="remediation__heading">
               {state.outcomeCase?.reference ?? 'Remediation actions'}
               {state.outcomeCase?.status ? (
-                <span className="remediation__status">{state.outcomeCase.status}</span>
+                <StageLabel status={state.outcomeCase.status as CaseStatus} />
               ) : null}
             </h2>
             <RemediationDetails outcomeCase={state.outcomeCase} outcome={outcome} caseId={caseId} />
             {notice ? <Notice tone={notice.tone}>{notice.message}</Notice> : null}
-            {allActions.length > 0 ? (
-              <FilterBar
-                summary={`${filteredActions.length} of ${allActions.length} actions`}
-                onClear={() => setActionStatus('')}
-                clearDisabled={actionStatus === ''}
-              >
-                <FilterField label="Status" htmlFor="remediation-status">
-                  <select
-                    id="remediation-status"
-                    value={actionStatus}
-                    onChange={(e) => setActionStatus(e.target.value)}
-                  >
-                    <option value="">All statuses</option>
-                    {actionStatuses.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </FilterField>
-              </FilterBar>
-            ) : null}
             <ActionsTable
-              actions={filteredActions}
+              actions={allActions}
               signoffs={state.signoffs}
               adviserName={state.outcomeCase?.adviserName ?? null}
               busyId={busyId}

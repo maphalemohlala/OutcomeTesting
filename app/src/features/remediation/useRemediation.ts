@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Al_outcomecasesal_casestatus } from '../../generated/models/Al_outcomecasesModel';
 import {
   Al_outcomecasesService,
   Al_outcomesService,
@@ -85,7 +86,10 @@ export function useRemediation(caseId: string | undefined, reloadKey = 0): Remed
           outcomeCase: record
             ? {
                 reference: record.al_casereference ?? null,
-                status: record.al_casestatusname ?? null,
+                // Read off the option value rather than the formatted name: the SDK
+                // leaves al_casestatusname unset on this read, so the badge drew nothing.
+                // caseDetailMapping resolves the case status the same way.
+                status: Al_outcomecasesal_casestatus[record.al_casestatus] ?? null,
                 clientName: record.al_clientname ?? null,
                 adviserName: record.al_advisername ?? null,
               }

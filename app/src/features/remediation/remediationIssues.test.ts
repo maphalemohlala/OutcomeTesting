@@ -80,55 +80,38 @@ describe('splitIssues', () => {
     ]);
   });
 
-  it('leaves the checker’s own words as the note, and nothing else', () => {
-    // The standing sentence is not shown (project owner, 2026-09-10): it said the same
-    // thing under every row of every case, and both halves of it are on the page in their
-    // own right now - the outcome as the remediation's Outcome, and what to do about it as
-    // the row the adviser answers.
-    expect(splitIssues(DESCRIPTION).note).toBe('The checker recorded: passed');
-  });
+  it('keeps nothing but the items - no heading, observation or standing sentence', () => {
+    // None of the three is drawn (project owner, 2026-09-10). The observation went with the
+    // rest when the table was cut back to the issues themselves, and what the description
+    // says about why it was raised is the Outcome above the table.
+    const { issues } = splitIssues(DESCRIPTION);
 
-  it('drops the standing sentence even when it arrives broken across lines', () => {
-    const split = [
-      'Raised automatically when the review was submitted (Tax check: Fail).',
-      'Review the file and record what you have put right.',
-    ].join('\n');
-
-    expect(splitIssues(split).note).toBeNull();
+    expect(issues.every((issue) => issue.startsWith('Fail point:'))).toBe(true);
+    expect(issues.join(' ')).not.toContain('The checker recorded');
+    expect(issues.join(' ')).not.toContain('Raised automatically');
   });
 
   it('reads a description written with Windows line endings', () => {
     const crlf = 'Issues found on the check:\r\n- One\r\n- Two\r\n\r\nA note.';
-    expect(splitIssues(crlf)).toEqual({
-      issues: ['One', 'Two'],
-      note: 'A note.',
+    expect(splitIssues(crlf)).toEqual({ issues: ['One', 'Two'], outcome: null });
+  });
+
+  it('finds no items in a description the plug-in did not write', () => {
+    expect(splitIssues('Please re-check the client agreement.')).toEqual({
+      issues: [],
       outcome: null,
     });
-  });
-
-  it('leaves a description the plug-in did not write whole, as the note', () => {
-    const plain = 'Please re-check the client agreement before responding.';
-    expect(splitIssues(plain)).toEqual({ issues: [], note: plain, outcome: null });
-  });
-
-  it('has no note left when the description was only the standing sentence', () => {
-    const standing = 'Raised automatically when the review was submitted. Review the file.';
-    expect(splitIssues(standing).note).toBeNull();
   });
 
   it('reads an item list with no checker observation behind it', () => {
     const noObservation = 'Issues found on the check:\n- One\n\nRaised automatically.';
-    expect(splitIssues(noObservation)).toEqual({
-      issues: ['One'],
-      note: 'Raised automatically.',
-      outcome: null,
-    });
+    expect(splitIssues(noObservation)).toEqual({ issues: ['One'], outcome: null });
   });
 
   it('has nothing to show for an absent or blank description', () => {
-    expect(splitIssues(null)).toEqual({ issues: [], note: null, outcome: null });
-    expect(splitIssues(undefined)).toEqual({ issues: [], note: null, outcome: null });
-    expect(splitIssues('   ')).toEqual({ issues: [], note: null, outcome: null });
+    expect(splitIssues(null)).toEqual({ issues: [], outcome: null });
+    expect(splitIssues(undefined)).toEqual({ issues: [], outcome: null });
+    expect(splitIssues('   ')).toEqual({ issues: [], outcome: null });
   });
 
   it('drops a bullet with nothing behind it', () => {
@@ -180,30 +163,12 @@ describe('groupIssues', () => {
     expect(groups[1].lines[0].issue).toBe('Three');
   });
 
-  it('keeps the context off the item rows, as the group note', () => {
+  it('keeps the context off the rows entirely', () => {
     const [group] = groupIssues([action('a', DESCRIPTION)]);
-    expect(group.lines.some((line) => line.issue.includes('The checker recorded'))).toBe(false);
-    expect(group.note).toBe('The checker recorded: passed');
-  });
+    const drawn = group.lines.map((line) => line.issue).join(' ');
 
-  it('shows the shared context once across the actions a review raised together', () => {
-    // One action per item, each carrying the same provenance in its own description.
-    const item = (text: string) =>
-      ['Issues found on the check:', `- ${text}`, '', 'The checker recorded: passed'].join('\n');
-    const groups = groupIssues([action('a', item('One')), action('b', item('Two'))]);
-
-    expect(groups[0].note).toBe('The checker recorded: passed');
-    expect(groups[1].note).toBeNull();
-  });
-
-  it('shows the context again when the next action carries a different one', () => {
-    const groups = groupIssues([
-      action('a', ['Issues found on the check:', '- One', '', 'First context.'].join('\n')),
-      action('b', ['Issues found on the check:', '- Two', '', 'Second context.'].join('\n')),
-    ]);
-
-    expect(groups[0].note).toBe('First context.');
-    expect(groups[1].note).toBe('Second context.');
+    expect(drawn).not.toContain('The checker recorded');
+    expect(drawn).not.toContain('Raised automatically');
   });
 
   it('shows an action with no item list as one row, and adds no note under it', () => {
@@ -215,8 +180,7 @@ describe('groupIssues', () => {
       'Raised automatically when the review was submitted (Tax check: Fail). Review the file.',
     ].join('\n');
     const [group] = groupIssues([action('a', stripped)]);
-    expect(group.lines).toEqual([{ number: 1, issue: 'The checker recorded: failed' }]);
-    expect(group.note).toBeNull();
+    expect(group.lines).toEqual([{ number: 1, issue: '—' }]);
   });
 
   it('falls back to a dash when the description says nothing of its own', () => {

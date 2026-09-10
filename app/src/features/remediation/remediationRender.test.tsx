@@ -126,12 +126,13 @@ describe('the remediation actions table', () => {
     expect(body[1]).toHaveLength(2);
   });
 
-  it('shows the checker’s own words once, under the items', () => {
+  it('draws no context row under the items at all', () => {
+    // The checker's observation is not shown (project owner, 2026-09-10); the four item
+    // rows and the header are the whole table.
     const body = rows(draw([action('a1', DESCRIPTION)])).slice(1);
-    const note = body[4];
 
-    expect(note).toHaveLength(1);
-    expect(note[0]).toBe('The checker recorded: no CRA on file');
+    expect(body).toHaveLength(4);
+    expect(draw([action('a1', DESCRIPTION)])).not.toContain('The checker recorded');
   });
 
   it('never repeats the standing sentence under the rows', () => {
@@ -168,7 +169,7 @@ describe('the remediation actions table', () => {
     const body = rows(draw([action('a1', stripped)])).slice(1);
 
     expect(body).toHaveLength(1);
-    expect(body[0].slice(0, 2)).toEqual(['1', 'The checker recorded: failed']);
+    expect(body[0].slice(0, 2)).toEqual(['1', '—']);
   });
 
   it('falls back to a dash when a description says nothing at all', () => {
@@ -215,6 +216,15 @@ describe('the remediation details', () => {
     expect(markup).toContain('<dt>Adviser</dt>');
     expect(markup).toContain('Seed Adviser 01');
     expect(markup).toContain('Open the full case record');
+  });
+
+  it("draws the four fields in the portal's order", () => {
+    // Client, Adviser, Outcome, Case - across the card, not stacked down it. The order is
+    // the portal's and is what makes the two screens read as the same one.
+    const markup = details('Tax check: Insufficient evidence');
+    const labels = [...markup.matchAll(/<dt>([^<]+)<\/dt>/g)].map((m) => m[1]);
+
+    expect(labels).toEqual(['Client', 'Adviser', 'Outcome', 'Case']);
   });
 
   it('draws nothing at all when there is neither a case nor an outcome', () => {

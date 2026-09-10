@@ -26,26 +26,36 @@
   border-bottom: 1px solid var(--colour-border);
 }
 
+/* The case details, laid out as the portal's .ot-dl lays them out: the fields across the
+   card rather than stacked down it, each a small uppercase label over its value. The app
+   drew a two-column list, which put four short values in a narrow ribbon down the left and
+   read as a different screen from the portal's (project owner, 2026-09-10). */
 .remediation__details {
   display: grid;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-}
-
-.remediation__detail {
-  display: grid;
-  grid-template-columns: minmax(9rem, 40%) 1fr;
-  gap: var(--space-3);
-  align-items: baseline;
-  font-size: var(--text-sm);
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-4) var(--space-5);
+  margin: 0 0 var(--space-4);
 }
 
 .remediation__detail dt {
+  margin-bottom: var(--space-1);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--colour-text-muted);
 }
 
 .remediation__detail dd {
-  font-weight: 500;
+  margin: 0;
+  font-size: var(--text-base);
+}
+
+/* The reference and the case status sit on one line, as the portal's card title does. */
+.remediation__heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .remediation__note {
@@ -186,11 +196,3 @@
   text-align: left;
 }
 
-.remediation__status {
-  margin-left: var(--space-3);
-  padding: 0 var(--space-2);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--colour-text-muted);
-  border: 1px solid var(--colour-border);
-}

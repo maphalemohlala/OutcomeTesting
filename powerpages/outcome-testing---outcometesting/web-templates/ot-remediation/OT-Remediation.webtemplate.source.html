@@ -476,15 +476,16 @@
                       </tr>
                     {% endif %}
                   {% endfor %}
-                  {% if ot_note != '' and ot_note != ot_shown_note %}
-                    <tr class="ot-issue-note"><td colspan="8">{{ ot_note | escape }}</td></tr>
-                  {% endif %}
-                  {% if ot_note != '' %}{% assign ot_shown_note = ot_note %}{% endif %}
+                  {% comment %}
+                    The checker's observation is not drawn under the rows (project owner,
+                    2026-09-10). ot_note is still captured because the same loop counts the
+                    items, and ot_count is what decides the branch above.
+                  {% endcomment %}
                 {% else %}
                   {% assign row_no = row_no | plus: 1 %}
                   <tr>
                     <td>{{ row_no }}</td>
-                    <td>{{ a.al_description | escape | newline_to_br }}</td>
+                    <td>—</td>
                     <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
                     <td>{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
                     <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
@@ -676,11 +677,6 @@
           <div><dt>Supervisor sign-off</dt><dd>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
           <div><dt>Adviser sign-off</dt><dd>{% if latest_adviser %}{{ latest_adviser.al_assignedcontactid.name | default: c.al_advisername | escape }}, {{ latest_adviser.al_completedon | date: 'dd MMM yyyy' }}{% if latest_adviser.al_evidencereference %} (IO {{ latest_adviser.al_evidencereference | escape }}){% endif %}{% else %}—{% endif %}</dd></div>
         </dl>
-        <p class="ot-response__hint">
-          The three answers are the adviser's, recorded on the remediation action{% if rows.size > 1 %} (the first action carrying an answer){% endif %}.
-          "All remedial actions checked and approved" reads Yes when every action's latest
-          supervisor decision is Approved.
-        </p>
       {% else %}
         {% include 'OT Empty State' title: 'No remediation actions' message: 'Nothing has been raised against this case.' %}
       {% endif %}
