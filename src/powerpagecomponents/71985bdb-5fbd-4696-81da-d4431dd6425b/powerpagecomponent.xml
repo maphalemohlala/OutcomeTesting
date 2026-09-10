@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="71985bdb-5fbd-4696-81da-d4431dd6425b">
+  <content>{
+  "pageid": "6b7c4888-877a-41ec-8a9c-2245601999f7"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Profile</name>
+  <powerpagecomponenttype>13</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

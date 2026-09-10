@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000aa">
+  <content>{
+  "description": "Allowlist of columns the browser may write on al_caseassignment. The case and the checker only. The business code, the assigned Dataverse user, the timestamp and the active flag are stamped by ClaimCasePlugin, so a claim cannot be backdated or given a forged key.",
+  "value": "al_outcomecaseid,al_assignedcontactid"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Webapi/al_caseassignment/fields</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

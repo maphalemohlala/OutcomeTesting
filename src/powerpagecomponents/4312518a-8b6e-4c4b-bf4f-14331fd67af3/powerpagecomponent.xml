@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="4312518a-8b6e-4c4b-bf4f-14331fd67af3">
+  <content>{
+  "pageid": "e3ab9f5e-60b9-47df-a196-022777161753"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Default Offline Page</name>
+  <powerpagecomponenttype>13</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

@@ -1,0 +1,19 @@
+<powerpagesites>
+  <powerpagesite powerpagesiteid="b4cfe195-fd15-42e8-94e5-f27bcceaf5fc">
+    <content>{
+  "defaultbotconsumerid": "7a644a4c-9aa3-f111-aaac-e4fade069307",
+  "defaultlanguage": "4bbb1efd-ae70-4f3e-9908-b80d79cc5d41",
+  "footerwebtemplateid": "72611496-c9b6-43b4-82db-d1251433d001",
+  "headerwebtemplateid": "64649891-6a26-411d-8263-eb649bb3f88b",
+  "parentwebsiteid": "b4cfe195-fd15-42e8-94e5-f27bcceaf5fc",
+  "website_language": 1033
+}</content>
+    <datamodelversion>2.0</datamodelversion>
+    <enhancedauthorization>0</enhancedauthorization>
+    <iscustomizable>1</iscustomizable>
+    <name>Outcome Testing - outcometesting</name>
+    <primarydomainname>outcometesting.powerappsportals.com</primarydomainname>
+    <statecode>0</statecode>
+    <statuscode>1</statuscode>
+  </powerpagesite>
+</powerpagesites>

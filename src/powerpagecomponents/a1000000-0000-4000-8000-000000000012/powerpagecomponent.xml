@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-000000000012">
+  <content>{
+  "source": "{% comment %}\r\n  Empty state. Include with:\r\n  (% include 'OT Empty State' title: 'No cases yet' message: 'Explain what would put something here.' %)\r\n\r\n  An empty list must always say why it is empty and what happens next (PP-04).\r\n{% endcomment %}\r\n&lt;div class=\"ot-empty\"&gt;\r\n  &lt;p class=\"ot-empty__title\"&gt;{{ title | default: 'Nothing to show' | escape }}&lt;/p&gt;\r\n  &lt;p&gt;{{ message | default: 'There is nothing here yet.' | escape }}&lt;/p&gt;\r\n&lt;/div&gt;\r\n"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>OT Empty State</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

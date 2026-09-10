@@ -1,0 +1,27 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-000000000072">
+  <content>{
+  "append": true,
+  "appendto": true,
+  "create": true,
+  "delete": false,
+  "entitylogicalname": "al_response",
+  "entityname": "Response - on a review assigned to me",
+  "parententitypermission": "a1000000-0000-4000-8000-000000000071",
+  "parentrelationship": "al_reviewinstance_response",
+  "read": true,
+  "scope": 756150003,
+  "write": true,
+  "adx_entitypermission_webrole": [
+    "a1000000-0000-4000-8000-000000000090",
+    "a1000000-0000-4000-8000-000000000091"
+  ]
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Response - on a review assigned to me</name>
+  <powerpagecomponenttype>18</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

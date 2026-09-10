@@ -1,0 +1,22 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000b3">
+  <content>{
+  "right": 2,
+  "scope": 1,
+  "webpageid": "a1000000-0000-4000-8000-000000000036",
+  "adx_webpageaccesscontrolrule_webrole": [
+    "a1000000-0000-4000-8000-000000000090",
+    "a1000000-0000-4000-8000-000000000091",
+    "a1000000-0000-4000-8000-000000000095",
+    "a1000000-0000-4000-8000-000000000096",
+    "c53b2908-1fc1-4470-89cd-6f5b95c17ffe"
+  ]
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Restrict read - Review</name>
+  <powerpagecomponenttype>10</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

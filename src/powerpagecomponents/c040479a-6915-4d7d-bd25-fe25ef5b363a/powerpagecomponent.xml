@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="c040479a-6915-4d7d-bd25-fe25ef5b363a">
+  <content>{
+  "source": "{%raw%}\r\n&lt;script id=\"search-order-select\" type=\"text/x-handlebars-template\"&gt;\r\n  {{#if sortingOptions}}\r\n  &lt;select id=\"search_sort_options\" tabIndex=\"0\" aria-readonly=\"true\"&gt;\r\n    {{#each sortingOptions}}\r\n      {{#ifvalue this value=\"relevance\" }}\r\n        &lt;option value=\"{{this}}\"&gt;{%endraw%} {% editable snippets \"Search/Facet/SortOrder/Relevance\" default: resx.Sorting_Relevance %}{%raw%}&lt;/option&gt;\r\n      {{/ifvalue}}\r\n      {{#ifvalue this value=\"rating\" }}\r\n        &lt;option value=\"{{this}}\"&gt;{%endraw%} {% editable snippets \"Search/Facet/SortOrder/AverageUserRating\" default: resx.Sorting_Rating %}{%raw%}&lt;/option&gt;\r\n      {{/ifvalue}}\r\n      {{#ifvalue this value=\"knowledgearticleviews\" }}\r\n        &lt;option value=\"{{this}}\"&gt;{%endraw%} {% editable snippets \"Search/Facet/SortOrder/Views\" default: resx.Sorting_ViewCount %}{%raw%}&lt;/option&gt;\r\n      {{/ifvalue}}\r\n    {{/each}}\r\n  &lt;/select&gt;\r\n  &lt;label for=\"search_sort_options\" class=\"visually-hidden\"&gt;{%endraw%}{{resx.Sorting_Options}}{%raw%}&lt;/label&gt;\r\n  {{/if}}\r\n&lt;/script&gt;\r\n{% endraw %}"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Faceted Search - Sort Template</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

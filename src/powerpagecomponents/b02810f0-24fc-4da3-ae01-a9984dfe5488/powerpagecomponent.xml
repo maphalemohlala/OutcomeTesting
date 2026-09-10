@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="b02810f0-24fc-4da3-ae01-a9984dfe5488">
+  <content>{
+  "filecontent": null,
+  "source": 0
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Authentication/Registration/LoginButtonAuthenticationType</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

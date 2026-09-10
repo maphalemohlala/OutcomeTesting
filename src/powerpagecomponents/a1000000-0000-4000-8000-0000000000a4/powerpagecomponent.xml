@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a4">
+  <content>{
+  "description": "Allowlist of columns the browser may write on al_reviewinstance. Two trigger columns: al_submitrequested, which SubmitRequestPlugin reads to drive submission; and al_answerrequest, which carries an answer payload consumed by AnswerRequestPlugin because the browser cannot create an al_response directly. Status, submitted-on and the assigned contact stay off the list so the plug-ins remain the sole authority.",
+  "value": "al_submitrequested,al_answerrequest"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Webapi/al_reviewinstance/fields</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

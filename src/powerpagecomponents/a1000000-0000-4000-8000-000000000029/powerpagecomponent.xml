@@ -1,0 +1,17 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-000000000029">
+  <content>{
+  "entityname": "adx_webpage",
+  "isdefault": false,
+  "type": 756150001,
+  "usewebsiteheaderandfooter": true,
+  "webtemplateid": "a1000000-0000-4000-8000-00000000001d"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>OT Not Found Page</name>
+  <powerpagecomponenttype>6</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

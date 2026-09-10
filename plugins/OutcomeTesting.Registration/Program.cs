@@ -317,6 +317,11 @@ if (args.Length >= 4 && args[0].Equals("addcommandvalue", StringComparison.Ordin
     return AddCommandValue(args[1], commandValue, args[3]);
 }
 
+if (args.Length >= 5 && args[0].Equals("setattributedescription", StringComparison.OrdinalIgnoreCase))
+{
+    return SetAttributeDescription(args[1], args[2], args[3], args[4]);
+}
+
 if (args.Length >= 6 && args[0].Equals("addoptionvalue", StringComparison.OrdinalIgnoreCase))
 {
     if (!int.TryParse(args[4], out var optionValue))
@@ -5925,6 +5930,59 @@ int AddOptionValue(string orgUrl, string entity, string attribute, int value, st
     Console.WriteLine(ok
         ? $"{entity}.{attribute} {value} = '{label}' inserted and published ({after.Count} values)."
         : $"Insert returned success, but metadata does not read back {value} = '{label}'.");
+    return ok ? 0 : 2;
+}
+
+// Rewrites a column's description, the other half of a choice value authored in `src/`.
+//
+// A description is documentation, so it is tempting to leave it to the next export. It is
+// not safe to: the round trip copies DEV over `src/`, so a description corrected by hand is
+// reverted every time, and the correction is exactly the kind of edit nobody makes twice.
+// al_notification.al_event said "the five AD-035 names only" while carrying six.
+int SetAttributeDescription(string orgUrl, string entity, string attribute, string description)
+{
+    using var svc = Connect(orgUrl);
+
+    var response = (RetrieveAttributeResponse)svc.Execute(new RetrieveAttributeRequest
+    {
+        EntityLogicalName = entity,
+        LogicalName = attribute,
+        RetrieveAsIfPublished = false,
+    });
+
+    var metadata = response.AttributeMetadata;
+    var before = metadata.Description?.UserLocalizedLabel?.Label ?? string.Empty;
+    if (string.Equals(before, description, StringComparison.Ordinal))
+    {
+        Console.WriteLine($"{entity}.{attribute} already carries that description.");
+        return 0;
+    }
+
+    metadata.Description = new Label(description, 1033);
+    svc.Execute(new UpdateAttributeRequest
+    {
+        EntityName = entity,
+        Attribute = metadata,
+        MergeLabels = false,
+    });
+
+    svc.Execute(new PublishXmlRequest
+    {
+        ParameterXml = $"<importexportxml><entities><entity>{entity}</entity></entities></importexportxml>",
+    });
+
+    var after = (RetrieveAttributeResponse)svc.Execute(new RetrieveAttributeRequest
+    {
+        EntityLogicalName = entity,
+        LogicalName = attribute,
+        RetrieveAsIfPublished = false,
+    });
+
+    var written = after.AttributeMetadata.Description?.UserLocalizedLabel?.Label ?? string.Empty;
+    var ok = string.Equals(written, description, StringComparison.Ordinal);
+    Console.WriteLine(ok
+        ? $"{entity}.{attribute} description updated and published."
+        : $"Update returned success, but metadata reads back: '{written}'.");
     return ok ? 0 : 2;
 }
 

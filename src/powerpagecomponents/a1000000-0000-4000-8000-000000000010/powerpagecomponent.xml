@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-000000000010">
+  <content>{
+  "source": "{% comment %}\r\n  Outcome Testing page shell.\r\n  Every portal page extends this and fills the \"content\" block.\r\n  Usage: extends 'OT Layout', then a block named content.\r\n\r\n  Header, navigation and footer come from the site's header/footer templates;\r\n  outcome-testing.css restyles those to Ascot Lloyd brand values.\r\n{% endcomment %}\r\n\r\n{% comment %}\r\n  Roundo is the brand's single primary font (brand/ typography sheet),\r\n  served from Fontshare, the source the sheet itself names. Weights are\r\n  Light 300, Regular 400, Medium 500, SemiBold 600.\r\n\r\n  The stylesheet carries a version querystring so a browser holding the\r\n  previous file picks up changes without a hard refresh. Bump it whenever\r\n  outcome-testing.css changes materially.\r\n{% endcomment %}\r\n&lt;link rel=\"preconnect\" href=\"https://api.fontshare.com\" crossorigin&gt;\r\n&lt;link rel=\"stylesheet\" href=\"https://api.fontshare.com/v2/css?f[]=roundo@300,400,500,600&amp;display=swap\"&gt;\r\n&lt;link rel=\"stylesheet\" href=\"/outcome-testing.css?v=10\"&gt;\r\n\r\n&lt;main class=\"ot-page\" id=\"ot-main\"&gt;\r\n  &lt;div class=\"ot-page__inner\"&gt;\r\n\r\n    {% unless page.url == '/' %}\r\n      &lt;nav class=\"ot-breadcrumb\" aria-label=\"Breadcrumb\"&gt;\r\n        &lt;a href=\"/\"&gt;Home&lt;/a&gt;\r\n        &lt;span aria-hidden=\"true\"&gt;/&lt;/span&gt;\r\n        &lt;span aria-current=\"page\"&gt;{{ page.title | escape }}&lt;/span&gt;\r\n      &lt;/nav&gt;\r\n    {% endunless %}\r\n\r\n    &lt;header class=\"ot-page__header\"&gt;\r\n      &lt;h1 class=\"ot-page__title\"&gt;{{ page.title | escape }}&lt;/h1&gt;\r\n      {% if page.summary and page.summary != empty %}\r\n        &lt;p class=\"ot-page__lede\"&gt;{{ page.summary }}&lt;/p&gt;\r\n      {% endif %}\r\n    &lt;/header&gt;\r\n\r\n    {% unless user %}\r\n      &lt;div class=\"ot-notice\" role=\"status\"&gt;\r\n        You are not signed in.\r\n        &lt;a href=\"{{ website.sign_in_url_substitution }}\"&gt;Sign in&lt;/a&gt; to see your work.\r\n      &lt;/div&gt;\r\n    {% endunless %}\r\n\r\n    {% block content %}{% endblock %}\r\n\r\n  &lt;/div&gt;\r\n&lt;/main&gt;\r\n"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>OT Layout</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

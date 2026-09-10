@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="46d25a84-6f99-4e33-9fb7-bc25410c34d6">
+  <content>{
+  "source": "{% assign page_type = page_type %}\r\n\r\n&lt;div class=\"tabs-header\" id=\"mainContent\"&gt;\r\n  &lt;ul class=\"nav nav-tabs\"&gt;\r\n    {% if page_type == 'topic' %}\r\n      &lt;li class=\"nav-item\" role=\"presentation\"&gt;\r\n        &lt;a class=\"nav-link\" title=\"{{ page.parent.title }}\" href=\"{{ page.parent.url }}\"&gt;{{ page.parent.title }}&lt;/a&gt;\r\n      &lt;/li&gt;\r\n      {% for child in page.parent.children %}\r\n        {% if child.title == page.title %}\r\n          &lt;li role=\"presentation\" class=\" nav-item active\"&gt;\r\n            &lt;a class=\"nav-link\" title=\"{{ page.title }}\" href=\"{{ page.url }}\"&gt;{{ page.title }}&lt;/a&gt;\r\n          &lt;/li&gt;\r\n        {% else %}\r\n        &lt;li class=\"nav-item\" role=\"presentation\"&gt;\r\n          &lt;a class=\"nav-link\" title=\"{{ child.title }}\" href=\"{{ child.url }}\"&gt;{{ child.title }}&lt;/a&gt;\r\n        &lt;/li&gt;\r\n        {% endif %}\r\n      {% endfor %}\r\n    {% else %}\r\n      &lt;li role=\"presentation\" class=\" nav-item active\"&gt;\r\n        &lt;a class=\"nav-link\" title=\"{{ page.title }}\" href=\"{{ page.url }}\"&gt;{{ page.title }}&lt;/a&gt;\r\n      &lt;/li&gt;\r\n      {% for child in page.children %}\r\n        &lt;li class=\"nav-item\" role=\"presentation\"&gt;\r\n          &lt;a class=\"nav-link\" title=\"{{ child.title }}\" href=\"{{ child.url }}\"&gt;{{ child.title }}&lt;/a&gt;\r\n        &lt;/li&gt;\r\n      {% endfor %}\r\n    {% endif %}\r\n  &lt;/ul&gt;\r\n&lt;/div&gt;"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Tab Header</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

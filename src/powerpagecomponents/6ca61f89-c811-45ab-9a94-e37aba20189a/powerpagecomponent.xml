@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="6ca61f89-c811-45ab-9a94-e37aba20189a">
+  <content>{
+  "value": "3.0.2511.1"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Metadata/Template-Version</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

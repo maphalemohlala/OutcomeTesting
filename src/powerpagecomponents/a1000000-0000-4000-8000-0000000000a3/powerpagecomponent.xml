@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a3">
+  <content>{
+  "description": "Exposes al_reviewinstance to the portal Web API so the review page can request a submission. Paired with a one-column allowlist: the only writable column is al_submitrequested, which SubmitRequestPlugin reads. A Custom API cannot be called from a page and this replaces the cloud flow that used to bridge that gap.",
+  "value": "true"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Webapi/al_reviewinstance/enabled</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

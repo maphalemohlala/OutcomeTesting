@@ -1,0 +1,26 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-000000000076">
+  <content>{
+  "append": true,
+  "appendto": false,
+  "contactrelationship": "contact_al_caseassignment",
+  "create": true,
+  "delete": false,
+  "entitylogicalname": "al_caseassignment",
+  "entityname": "Case Assignment - claim from the queue",
+  "read": true,
+  "scope": 756150001,
+  "write": false,
+  "adx_entitypermission_webrole": [
+    "a1000000-0000-4000-8000-000000000090",
+    "a1000000-0000-4000-8000-000000000091"
+  ]
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Case Assignment - claim from the queue</name>
+  <powerpagecomponenttype>18</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

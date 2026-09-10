@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="bc2fafe0-3bfd-40bb-a053-19193c23c760">
+  <content>{
+  "source": "{% if ad %}\r\n&lt;div&gt;\r\n {% if ad.redirect_url %}&lt;a class=\"ad-link\" href=\"{{ ad.redirect_url | h }}\"&gt;{% endif %}\r\n {% if ad.title %}\r\n &lt;h5 class=\"ad-title\"&gt;{{ ad.title | h }}&lt;/h5&gt;\r\n {% endif %}\r\n {% if ad.image.url %}\r\n &lt;img class=\"ad-link-image mx-auto\" src=\"{{ ad.image.url | h }}\" alt=\"{{ ad.image.alternate_text | h }}\"{% if ad.image.height %} height=\"{{ ad.image.height }}\"{% endif %}{% if ad.image.width %} width=\"{{ ad.image.width }}\"{% endif %} style=\"{% if ad.image.height %}height:{{ ad.image.height }}px;{% endif %}{% if ad.image.width %}width:{{ ad.image.width }}px;{% endif %}\"&gt;\r\n {% endif %}\r\n {% if ad.redirect_url %}&lt;/a&gt;{% endif %}\r\n {% if show_copy %}{% if ad.copy %}\r\n &lt;div class=\"ad-copy\"&gt;{{ ad.copy }}&lt;/div&gt;\r\n {% endif %}{% endif %}\r\n&lt;/div&gt;\r\n{% endif %}"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Ad Template</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

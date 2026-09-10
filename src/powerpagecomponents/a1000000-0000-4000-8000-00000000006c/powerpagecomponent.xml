@@ -1,0 +1,26 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-00000000006c">
+  <content>{
+  "append": true,
+  "appendto": false,
+  "create": true,
+  "delete": false,
+  "entitylogicalname": "al_signoff",
+  "entityname": "Signoff - T\u0026C attestation",
+  "parententitypermission": "a1000000-0000-4000-8000-000000000062",
+  "parentrelationship": "al_remediationaction_signoff",
+  "read": true,
+  "scope": 756150003,
+  "write": false,
+  "adx_entitypermission_webrole": [
+    "a1000000-0000-4000-8000-000000000093"
+  ]
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Signoff - T&amp;C attestation</name>
+  <powerpagecomponenttype>18</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

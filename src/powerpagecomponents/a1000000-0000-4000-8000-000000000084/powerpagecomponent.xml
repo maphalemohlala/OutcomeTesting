@@ -1,0 +1,21 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-000000000084">
+  <content>{
+  "disablepagevalidation": false,
+  "displayimageonly": false,
+  "displayorder": 5,
+  "displaypagechildlinks": false,
+  "openinnewwindow": false,
+  "pageid": "a1000000-0000-4000-8000-000000000035",
+  "publishingstateid": "2d4a3214-4408-4e1e-a97b-35db119255f8",
+  "robotsfollowlink": true,
+  "weblinksetid": "c680b111-b81d-495d-b66b-224729a5fab6"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Remediation</name>
+  <powerpagecomponenttype>5</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

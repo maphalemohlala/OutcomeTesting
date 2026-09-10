@@ -1,0 +1,15 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000ad">
+  <content>{
+  "description": "Allowlist of columns the browser may write on contact. Two trigger columns: al_claimrequest, which carries the id of the case being claimed (AD-076), and al_signoffrequest, which carries the T&amp;C attestation as JSON (AD-099). Each is acted on by its own plug-in, which checks the contact's web role server-side. Everything a contact record actually holds - name, email, the web roles - stays off this list, so exposing contact to the Web API grants the page these two writes and nothing else.",
+  "value": "al_claimrequest,al_signoffrequest,al_regraderequest",
+  "source": 0
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Webapi/contact/fields</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

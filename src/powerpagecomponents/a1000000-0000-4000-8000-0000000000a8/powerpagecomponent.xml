@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a8">
+  <content>{
+  "description": "Allowlist of columns the browser may write on al_signoff. The decision, the notes and the action it relates to. The name, business code, case and timestamp are stamped by SignoffGuardPlugin, so the browser cannot choose a key or backdate a sign-off.",
+  "value": "al_signoffdecision,al_notes,al_remediationactionid"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Webapi/al_signoff/fields</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

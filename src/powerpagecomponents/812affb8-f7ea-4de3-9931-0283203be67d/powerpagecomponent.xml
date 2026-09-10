@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="812affb8-f7ea-4de3-9931-0283203be67d">
+  <content>{
+  "source": "&lt;div class=\"wrapper-body\"&gt;\r\n  &lt;section class=\"page_section section-landing\"&gt;\r\n    &lt;div class=\"container\"&gt;\r\n      &lt;div class=\"row \"&gt;\r\n        &lt;div class=\"col-lg-12\"&gt;\r\n          &lt;br&gt;\r\n          &lt;br&gt;\r\n          &lt;br&gt;\r\n          &lt;br&gt;\r\n          &lt;h1 class=\"section-landing-heading\"&gt;{% editable snippets 'Home/Title' type: 'text' %}&lt;/h1&gt;&lt;br&gt;\r\n          &lt;h2 class=\"section-landing-sub-heading\"&gt;{% editable page 'adx_summary' type: 'html', liquid: true %}&lt;/h2&gt;\r\n          &lt;br&gt;\r\n          &lt;br&gt;\r\n        &lt;/div&gt;\r\n      &lt;/div&gt;\r\n    &lt;/div&gt;\r\n  &lt;/section&gt;\r\n\r\n  &lt;section class=\"page_section\"&gt;\r\n    &lt;div class=\"layer_up\"&gt;&amp;nbsp;&lt;/div&gt;\r\n    &lt;div class=\"container\"&gt;\r\n      &lt;div class=\"content-home\"&gt;\r\n        {% include 'Page Copy' %}\r\n      &lt;/div&gt;\r\n    &lt;/div&gt;\r\n    &lt;div class=\"layer_down\"&gt;&amp;nbsp;&lt;/div&gt;\r\n  &lt;/section&gt;\r\n&lt;div class=\"push\"&gt;&lt;/div&gt;\r\n&lt;/div&gt;"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Home</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

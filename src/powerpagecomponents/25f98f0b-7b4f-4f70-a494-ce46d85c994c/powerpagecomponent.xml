@@ -1,0 +1,18 @@
+<powerpagecomponent powerpagecomponentid="25f98f0b-7b4f-4f70-a494-ce46d85c994c">
+  <content>{
+  "display_name": "Mobile Header",
+  "type": 756150001,
+  "value": "{% comment %}\r\n  The logo lockup already carries the Ascot Lloyd wordmark, so the site name is\r\n  not repeated beside it. The name is still announced: it is the image's alt\r\n  text, taken from the 'Logo alt text' snippet.\r\n\r\n  Dropping the heading also leaves one h1 per page. OT Layout emits\r\n  &lt;h1 class=\"ot-page__title\"&gt; for the page itself, so rendering a second h1\r\n  here gave every page two top-level headings (NFR-ACC-01).\r\n{% endcomment %}\r\n&lt;a href='~/'&gt;\r\n  {% if snippets['Logo URL'] %}&lt;img src='{{ snippets['Logo URL'] }}' alt='{{ snippets['Logo alt text'] }}' style='width: auto; height: 32px; margin: 0 10px;'&gt;{% endif %}\r\n&lt;/a&gt;\r\n"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Mobile Header</name>
+  <powerpagecomponenttype>7</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <powerpagesitelanguageid>
+    <powerpagesitelanguageid>4bbb1efd-ae70-4f3e-9908-b80d79cc5d41</powerpagesitelanguageid>
+  </powerpagesitelanguageid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

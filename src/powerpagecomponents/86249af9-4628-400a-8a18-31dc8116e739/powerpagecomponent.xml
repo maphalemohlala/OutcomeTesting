@@ -1,0 +1,20 @@
+<powerpagecomponent powerpagecomponentid="86249af9-4628-400a-8a18-31dc8116e739">
+  <content>{
+  "contentdisposition": 756150000,
+  "enabletracking": false,
+  "excludefromsearch": false,
+  "hiddenfromsitemap": false,
+  "parentpageid": "52570e2a-4d91-41f8-95c9-d0017a937039",
+  "partialurl": "Logo-sm-64.png",
+  "publishingstateid": "2d4a3214-4408-4e1e-a97b-35db119255f8"
+}</content>
+  <filecontent mimetype="application/octet-stream">Logo-sm-64.png</filecontent>
+  <iscustomizable>1</iscustomizable>
+  <name>Logo-sm-64.png</name>
+  <powerpagecomponenttype>3</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

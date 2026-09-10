@@ -1,0 +1,19 @@
+<powerpagecomponent powerpagecomponentid="9ee963d0-82e3-4153-9557-bf31af41ea62">
+  <content>{
+  "managecontentsnippets": true,
+  "managesitemarkers": true,
+  "manageweblinksets": true,
+  "previewunpublishedentities": true,
+  "adx_websiteaccess_webrole": [
+    "c53b2908-1fc1-4470-89cd-6f5b95c17ffe"
+  ]
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Administrative permissions for Basic Portal</name>
+  <powerpagecomponenttype>12</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

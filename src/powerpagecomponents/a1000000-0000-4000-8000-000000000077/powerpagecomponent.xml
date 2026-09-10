@@ -1,0 +1,26 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-000000000077">
+  <content>{
+  "append": false,
+  "appendto": false,
+  "create": false,
+  "delete": false,
+  "entitylogicalname": "contact",
+  "entityname": "Contact - claim request (self)",
+  "read": true,
+  "scope": 756150004,
+  "write": true,
+  "adx_entitypermission_webrole": [
+    "a1000000-0000-4000-8000-000000000090",
+    "a1000000-0000-4000-8000-000000000091",
+    "a1000000-0000-4000-8000-000000000093"
+  ]
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Contact - claim request (self)</name>
+  <powerpagecomponenttype>18</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

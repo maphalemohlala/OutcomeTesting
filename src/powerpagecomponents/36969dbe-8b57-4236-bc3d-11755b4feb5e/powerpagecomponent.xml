@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="36969dbe-8b57-4236-bc3d-11755b4feb5e">
+  <content>{
+  "source": "{%raw%}\r\n &lt;script id=\"facets-view-pagination\" type=\"text/x-handlebars-template\"&gt;\r\n  {{#if needsPagination}}\r\n   &lt;ul class=\"pagination\"&gt;\r\n    {{#ifvalue pageNumber value=1}}\r\n     &lt;li class=\" page-item disabled\"&gt;&lt;span class=\"aspNetDisabled\" aria-label=\"{%endraw%}{{ resx.Pagination_First_Page }}{%raw%}\"&gt;«&lt;/span&gt;&lt;/li&gt;\r\n     &lt;li class=\" page-item disabled\"&gt;&lt;span class=\"aspNetDisabled\" aria-label=\"{%endraw%}{{ resx.Pagination_Previous_Page }}{%raw%}\"&gt;‹&lt;/span&gt;&lt;/li&gt;\r\n    {{else}}\r\n     &lt;li&gt;&lt;a class=\" page-item  page-link js-go-to-1\" aria-label=\"{%endraw%}{{ resx.Pagination_First_Page }}{%raw%}\" href=\"\"&gt;«&lt;/a&gt;&lt;/li&gt;\r\n     &lt;li&gt;&lt;a class=\" page-item  page-link js-go-to-{{previousPage}}\" aria-label=\"{%endraw%}{{ resx.Pagination_Previous_Page }}{%raw%}\" href=\"\"&gt;‹&lt;/a&gt;&lt;/li&gt;\r\n    {{/ifvalue}}\r\n    {{#each pageLinks}}\r\n     {{#ifvalue this value=../pageNumber}}\r\n      &lt;li class=\" page-item active\" aria-label=\"{{ stringFormat \"\r\n       {%endraw%}{{ resx.Pagination_Current_Page }}{%raw%}\" this}}\" tabIndex=\"0\"&gt;&lt;span&gt;{{this}}&lt;/span&gt;&lt;/li&gt;\r\n     {{else}}\r\n      &lt;li&gt;&lt;a class=\" page-item  page-link js-go-to-{{this}}\" aria-label=\"{{ stringFormat \"\r\n       {%endraw%}{{ resx.Pagination_Page }}{%raw%}\" this}}\" href=\"\"&gt;{{this}}&lt;/a&gt;&lt;/li&gt;\r\n     {{/ifvalue}}\r\n    {{/each}}\r\n\r\n    {{#ifvalue pageNumber value=pageCount}}\r\n     &lt;li class=\" page-item disabled\"&gt;&lt;span aria-label=\"{%endraw%}{{ resx.Pagination_Next_Page }}{%raw%}\"&gt;›&lt;/span&gt;&lt;/li&gt;\r\n     &lt;li class=\" page-item disabled\"&gt;&lt;span aria-label=\"{%endraw%}{{ resx.Pagination_Last_Page }}{%raw%}\"&gt;»&lt;/span&gt;&lt;/li&gt;\r\n    {{else}}\r\n     &lt;li&gt;&lt;a class=\" page-item  page-link js-go-to-{{nextPage}}\" aria-label=\"{%endraw%}{{ resx.Pagination_Next_Page }}{%raw%}\" href=\"\"&gt;›&lt;/a&gt;&lt;/li&gt;\r\n     &lt;li&gt;&lt;a class=\" page-item  page-link js-go-to-{{pageCount}}\" aria-label=\"{%endraw%}{{ resx.Pagination_Last_Page }}{%raw%}\" href=\"\"&gt;»&lt;/a&gt;&lt;/li&gt;\r\n    {{/ifvalue}}\r\n   &lt;/ul&gt;\r\n  {{/if}}\r\n &lt;/script&gt;\r\n {% endraw %}"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Faceted Search - Paging Template</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

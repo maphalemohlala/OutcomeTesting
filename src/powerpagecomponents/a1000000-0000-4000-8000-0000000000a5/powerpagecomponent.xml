@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a5">
+  <content>{
+  "description": "Exposes al_remediationaction to the portal Web API so an adviser can record their response and ask for the action to be completed (PP-12, AD-045). Paired with a three-column allowlist; CompleteRequestPlugin does the rest.",
+  "value": "true"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Webapi/al_remediationaction/enabled</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

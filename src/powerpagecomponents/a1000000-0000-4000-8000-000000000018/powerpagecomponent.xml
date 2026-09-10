@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-000000000018">
+  <content>{
+  "source": "{% extends 'OT Layout' %}\r\n{% block content %}\r\n  {% include 'OT Review List' reviewtype: 120910201 heading: 'AQS reviews' %}\r\n{% endblock %}\r\n"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>OT AQS Reviews</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

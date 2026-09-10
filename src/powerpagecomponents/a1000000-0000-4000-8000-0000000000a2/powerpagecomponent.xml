@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a2">
+  <content>{
+  "description": "Allowlist of columns the browser may write on al_response: the four answer columns. The browser no longer writes al_response at all - Power Pages refused the create's @odata.bind association with 90040106 whatever this list allowed, so the page now PATCHes a JSON payload onto al_reviewinstance.al_answerrequest instead, and AnswerRequestPlugin -&gt; AnswerWriter does the al_response create-or-update server-side as the application user. This setting therefore governs nothing the page still uses; it is kept because removing a Web API allowlist entry is not something an upload does, and because al_responsecode and al_name should stay off it regardless. Earlier the same day, while the create path was still being repaired rather than replaced, al_reviewinstanceid and al_questionversionid were added here on the reasoning that an @odata.bind travels as a navigation property rather than a column and so escapes the allowlist - a reasoning this file recorded as correct at the time (the setting governs the columns the Web API may act on however they are addressed, matching Webapi/al_caseassignment/fields and Webapi/al_signoff/fields). Once the create path itself was deleted in favour of the server-side write, those two lookups had nothing left to authorize and were removed.",
+  "value": "al_answertext,al_answerchoice,al_answerchoices,al_answerdate"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Webapi/al_response/fields</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

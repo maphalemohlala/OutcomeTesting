@@ -1,0 +1,25 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000b0">
+  <content>{
+  "right": 2,
+  "scope": 2,
+  "webpageid": "52570e2a-4d91-41f8-95c9-d0017a937039",
+  "adx_webpageaccesscontrolrule_webrole": [
+    "a1000000-0000-4000-8000-000000000090",
+    "a1000000-0000-4000-8000-000000000091",
+    "a1000000-0000-4000-8000-000000000092",
+    "a1000000-0000-4000-8000-000000000093",
+    "a1000000-0000-4000-8000-000000000095",
+    "a1000000-0000-4000-8000-000000000096",
+    "a1000000-0000-4000-8000-000000000097",
+    "c53b2908-1fc1-4470-89cd-6f5b95c17ffe"
+  ]
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Restrict read - portal roles</name>
+  <powerpagecomponenttype>10</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

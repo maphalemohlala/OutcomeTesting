@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a7">
+  <content>{
+  "description": "Exposes al_signoff to the portal Web API so a T&amp;C Manager can attest to a completed remediation (PP-12, FR-023, BR-008). Sign-off is a create, which the Web API does support, so this needs no trigger column - and a separate table means create can be bound to the T&amp;C Supervisor role alone.",
+  "value": "true"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Webapi/al_signoff/enabled</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

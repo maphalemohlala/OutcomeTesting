@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="9f87bc38-4308-442b-b442-7c8ff6d8b364">
+  <content>{
+  "value": "{\"status\":\"enable\",\"selectedThemeId\":\"329a43fa-5471-4678-8330-d3a0b404e9bb\",\"version\":\"V2\"}"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>ThemeFeature</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

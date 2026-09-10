@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="b5f18a7e-9681-41cb-8583-c40d1f386e57">
+  <content>{
+  "description": "Site setting that determines if the language code is included in the portal URL.",
+  "value": "False"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>MultiLanguage/DisplayLanguageCodeInURL</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

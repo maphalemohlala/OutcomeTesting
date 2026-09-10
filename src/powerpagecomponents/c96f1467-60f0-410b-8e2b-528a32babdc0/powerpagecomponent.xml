@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="c96f1467-60f0-410b-8e2b-528a32babdc0">
+  <content>{
+  "description": "Enabling this setting will show all customer activity on the portal timeline.",
+  "value": "false"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>CustomerSupport/DisplayAllUserActivitiesOnTimeline</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

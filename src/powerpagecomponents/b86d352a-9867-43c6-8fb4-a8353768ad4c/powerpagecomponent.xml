@@ -1,0 +1,18 @@
+<powerpagecomponent powerpagecomponentid="b86d352a-9867-43c6-8fb4-a8353768ad4c">
+  <content>{
+  "display_name": "Footer",
+  "type": 756150001,
+  "value": "{% comment %}\r\n  The logo URL is read from the same 'Logo URL' snippet the header uses, so the\r\n  address is defined in one place and a brand change reaches both marks.\r\n\r\n  alt is deliberately empty and the mark is not a link: the header logo already\r\n  announces Ascot Lloyd and already links home, so repeating either here would\r\n  give screen reader and keyboard users a duplicate they have to step past.\r\n{% endcomment %}\r\n{% if snippets['Logo URL'] %}\r\n  &lt;img class=\"ot-footer__logo\" src=\"{{ snippets['Logo URL'] }}\" alt=\"\" aria-hidden=\"true\"&gt;\r\n{% endif %}\r\n&lt;p class=\"smallText\"&gt;Copyright © {{ now | date: 'yyyy' }}. All rights reserved.&lt;/p&gt;"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Footer</name>
+  <powerpagecomponenttype>7</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <powerpagesitelanguageid>
+    <powerpagesitelanguageid>4bbb1efd-ae70-4f3e-9908-b80d79cc5d41</powerpagesitelanguageid>
+  </powerpagesitelanguageid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

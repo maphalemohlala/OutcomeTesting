@@ -1,0 +1,17 @@
+<powerpagecomponent powerpagecomponentid="99ee6cc0-e944-4f3d-b049-cb64605138df">
+  <content>{
+  "display_name": "Header",
+  "type": 756150000
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Header</name>
+  <powerpagecomponenttype>7</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <powerpagesitelanguageid>
+    <powerpagesitelanguageid>4bbb1efd-ae70-4f3e-9908-b80d79cc5d41</powerpagesitelanguageid>
+  </powerpagesitelanguageid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

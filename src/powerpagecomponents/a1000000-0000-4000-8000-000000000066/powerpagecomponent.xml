@@ -1,0 +1,25 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-000000000066">
+  <content>{
+  "append": false,
+  "appendto": false,
+  "create": false,
+  "delete": false,
+  "entitylogicalname": "al_section",
+  "entityname": "Section - read",
+  "read": true,
+  "scope": 756150000,
+  "write": false,
+  "adx_entitypermission_webrole": [
+    "c53b2908-1fc1-4470-89cd-6f5b95c17ffe",
+    "e24b50c5-1443-4725-84c9-70355724547f"
+  ]
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Section - read</name>
+  <powerpagecomponenttype>18</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

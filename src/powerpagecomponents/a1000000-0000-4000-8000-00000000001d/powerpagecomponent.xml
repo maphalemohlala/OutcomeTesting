@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-00000000001d">
+  <content>{
+  "source": "{% extends 'OT Layout' %}\r\n{% block content %}\r\n{% comment %}\r\n  Page not found (PP-16).\r\n\r\n  Says what happened, what is still safe, and what to do next, without\r\n  exposing a stack trace, query, table name or id.\r\n{% endcomment %}\r\n\r\n&lt;section class=\"ot-card\" aria-labelledby=\"ot-notfound\"&gt;\r\n  &lt;h2 class=\"ot-card__title\" id=\"ot-notfound\"&gt;We could not find that page&lt;/h2&gt;\r\n  &lt;p&gt;\r\n    The address may be mistyped, or the page may have moved. Nothing you were working\r\n    on has been lost.\r\n  &lt;/p&gt;\r\n  &lt;p&gt;\r\n    &lt;a class=\"ot-btn ot-btn--primary\" href=\"/\"&gt;Back to My Work&lt;/a&gt;\r\n    &lt;a class=\"ot-btn\" href=\"/cases\"&gt;Case search&lt;/a&gt;\r\n  &lt;/p&gt;\r\n&lt;/section&gt;\r\n{% endblock %}\r\n"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>OT Not Found</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

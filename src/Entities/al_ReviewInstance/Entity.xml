@@ -13,6 +13,45 @@
         <Description description="One pass of a checklist over a case by one review type. A single table carries Tax and AQS through al_ReviewType rather than two tables. FR-010, BR-004." languagecode="1033" />
       </Descriptions>
       <attributes>
+        <attribute PhysicalName="al_AnswerRequest">
+          <Type>ntext</Type>
+          <Name>al_answerrequest</Name>
+          <LogicalName>al_answerrequest</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>textarea</Format>
+          <MaxLength>32768</MaxLength>
+          <displaynames>
+            <displayname description="Answer Request" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Carries one answer as a JSON payload from the review page. The page PATCHes this column and AnswerRequestPlugin creates or updates the al_response server-side, because Power Pages refuses the browser's al_response create with error 90040106 whatever the table permissions say (2026-09-08). Transient: it holds the last payload written, and is never read as business data." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_assignedcontactid">
           <Type>lookup</Type>
           <Name>al_assignedcontactid</Name>

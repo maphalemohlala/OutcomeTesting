@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a1">
+  <content>{
+  "description": "Exposes al_response to the portal Web API so a checker can save answers from the review page (AD-053). Answering needs no cloud flow because the Web API supports create and update; only actions are unsupported, which is why submission does need one.",
+  "value": "true"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Webapi/al_response/enabled</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

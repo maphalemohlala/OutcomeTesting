@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="dbcb9f0f-c991-4526-a0bc-5144f132b190">
+  <content>{
+  "source": "{% assign search_page = sitemarkers['Search'] %}\r\n{% assign query = settings['search/query'] | default:'@(Query)' %}\r\n{% block main %}\r\n&lt;div class=\"handlebars-search-container\" data-url=\"{{ search_page.url | h }}\" data-query=\"{{query}}\"&gt;\r\n &lt;div class=\"row search-body-container\"&gt;\r\n   &lt;div class=\"col-sm-12 loader\"&gt;&lt;div class=\"fa-spin\"&gt;&lt;span class=\"fa fa-spinner fa-4x\" aria-hidden=\"true\"&gt;&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;\r\n &lt;/div&gt;\r\n \r\n  &lt;div class=\"js-facet-order-definition d-none\"&gt;\r\n   &lt;div class=\"facet-order-item\"&gt;_logicalname&lt;/div&gt;\r\n   &lt;div class=\"facet-order-item\"&gt;modifiedon.date&lt;/div&gt;\r\n   &lt;div class=\"facet-order-item\"&gt;rating&lt;/div&gt;\r\n   &lt;div class=\"facet-order-item\"&gt;associated.product&lt;/div&gt;\r\n  &lt;/div&gt;\r\n  \r\n  {% include 'Faceted Search - Paging Template' %}\r\n  {% include 'Faceted Search - Sort Template' %}  \r\n  {% include 'Faceted Search - Facets Template' %}\r\n  {% include 'Faceted Search - Results Template' %}  \r\n&lt;/div&gt;\r\n\r\n{%raw%}\r\n&lt;script id=\"facets-view-body-container\" type=\"text/x-handlebars-template\"&gt;\r\n {{#if facetViews }}\r\n  &lt;div class=\"col-lg-3 col-md-4 facets\"&gt;&lt;/div&gt;  \r\n  &lt;div class=\"col-lg-9 col-md-8 col-sm-12 loader\"&gt;&lt;div class=\"fa-spin\"&gt;&lt;span class=\"fa fa-spinner fa-4x\" aria-hidden=\"true\"&gt;&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;\r\n  &lt;div class=\"col-lg-9 col-md-8 col-sm-12 js-search-body\"&gt;\r\n   &lt;div class=\" d-none d-sm-block d-md-block d-lg-block hidden-xs search-order js-search-body float-end\"&gt;&lt;/div&gt;\r\n   &lt;div class=\"search-results\" role=\"alert\"&gt;&lt;/div&gt;\r\n   &lt;div class=\"search-pagination text-center\"&gt;&lt;/div&gt;\r\n  &lt;/div&gt;\r\n  {{else}}\r\n  &lt;div class=\"col-lg-12 col-md-12 col-sm-12 js-search-body\"&gt;\r\n   &lt;div class=\" d-none d-sm-block d-md-block d-lg-block hidden-xs search-order js-search-body float-end\"&gt;&lt;/div&gt;\r\n   &lt;div class=\"search-results\"&gt;&lt;/div&gt;\r\n   &lt;div class=\"search-pagination text-center\"&gt;&lt;/div&gt;\r\n  &lt;/div&gt;  \r\n  {{/if}}\r\n&lt;/script&gt;\r\n{% endraw %}\r\n{% endblock %}"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Faceted Search - Main Template</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

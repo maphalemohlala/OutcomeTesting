@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="6a02d55e-00cb-45cc-91f2-acb0c3569abc">
+  <content>{
+  "source": "{% extends 'Layout 1 Column' %}\r\n{% block main %}\r\n  {% include 'Page Copy' %}\r\n&lt;div class=\"container\" role=\"main\"&gt;\r\n    {% include 'Child Navigation' showdescriptions: true %}\r\n    {% if page.adx_entitylist %}\r\n    {% include 'entity_list' key: page.adx_entitylist.id %}\r\n    {% endif %}\r\n\r\n    {% if page.adx_entityform %}\r\n    {% entityform id: page.adx_entityform.id %}\r\n    {% endif %}\r\n\r\n    {% if page.adx_webform %}\r\n    {% webform id: page.adx_webform.id %}\r\n    {% endif %}\r\n&lt;/div&gt;\r\n{% endblock %}"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Full Page</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

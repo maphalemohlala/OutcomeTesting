@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a9">
+  <content>{
+  "description": "Exposes al_caseassignment to the portal Web API so a checker can pick a case up out of the shared queue (AD-076). A create, like the sign-off, so it needs no trigger column and can carry its own Contact-scoped permission - which is what ties the claim to the signed-in contact, since a portal write reaches Dataverse as the site's application user and cannot be attributed to a caller (AD-053).",
+  "value": "true"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Webapi/al_caseassignment/enabled</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

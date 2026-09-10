@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="4791ea1d-639d-43a2-ae50-aff4da198373">
+  <content>{
+  "source": "{% unless placement %}\r\n  {% if id %}\r\n    {% assign placement = polls.placements[id] %}\r\n  {% elsif name %}\r\n    {% assign placement = polls.placements[name] %}\r\n  {% endif %}\r\n{% endunless %}\r\n\r\n{% if placement %}\r\n&lt;div class=\"poll\" data-url=\"{{ placement.random_url | h }}\" data-submit-url=\"{{ placement.submit_url | h }}\"&gt;&lt;/div&gt;\r\n{% endif %}"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Random Poll</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

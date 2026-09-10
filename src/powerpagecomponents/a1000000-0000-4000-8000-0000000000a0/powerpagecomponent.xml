@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a0">
+  <content>{
+  "description": "Trigger id of the \"Submit Review\" cloud flow for THIS environment, taken from the flow's Power Pages trigger URL (the guid after /trigger/). SUPERSEDED: submission no longer goes through Power Automate. The review page writes al_submitrequested over the Web API and SubmitRequestPlugin does the work, so this setting is unused and stays empty. Kept rather than deleted because deleting a site setting is not what an upload does.",
+  "value": ""
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>OutcomeTesting/Flow/SubmitReview</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

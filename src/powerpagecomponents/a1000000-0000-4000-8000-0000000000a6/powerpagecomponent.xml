@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a6">
+  <content>{
+  "description": "Allowlist of columns the browser may write on al_remediationaction. The adviser's own words, the Intelligent Office reference (PP-14), the completion trigger, and the three remediation-form answers (AD-095): client contact required, recheck required, changes the advice. Status and completed-on stay off the list so the plug-in remains the sole authority over the transition.",
+  "value": "al_adviserresponse,al_evidencereference,al_completerequested,al_clientcontactrequired,al_recheckrequired,al_changesadvice"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Webapi/al_remediationaction/fields</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

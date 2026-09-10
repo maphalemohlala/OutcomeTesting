@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000ab">
+  <content>{
+  "description": "Switches on the \"Run checks\" button that lets a checker pick a queued case up (AD-076). Turned ON 2026-09-03, once ClaimCasePlugin was registered in DEV. It was held OFF until then because without the plug-in the Web API create still succeeds — the columns it stamps are only business required and Dataverse does not enforce that through the API — so the page would have reported success while the case stayed in the queue and left assignment rows that AD-037 forbids deleting. The queue list itself renders either way. Turning this on in a NEW environment requires the same two prerequisites in this order: the plug-in step registered, then the \"Case Assignment - claim from the queue\" permission uploaded.",
+  "value": "true"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>OutcomeTesting/Claim/Enabled</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

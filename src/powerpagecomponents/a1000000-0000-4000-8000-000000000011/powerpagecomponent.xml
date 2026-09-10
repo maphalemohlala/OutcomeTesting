@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-000000000011">
+  <content>{
+  "source": "{% comment %}\r\n  Status badge. Include with:  (% include 'OT Status Badge' status: row.al_casestatus.label %)\r\n\r\n  Colour never carries the meaning on its own — the label is always rendered\r\n  as text inside the badge (NFR-ACC-01).\r\n{% endcomment %}\r\n{% assign s = status | default: '' | downcase %}\r\n{% if s == '' %}\r\n  &lt;span class=\"ot-badge ot-badge--none\"&gt;Not set&lt;/span&gt;\r\n{% elsif s contains 'potential harm' %}\r\n  &lt;span class=\"ot-badge ot-badge--harm\"&gt;{{ status | escape }}&lt;/span&gt;\r\n{% elsif s contains 'insufficient' %}\r\n  &lt;span class=\"ot-badge ot-badge--insufficient\"&gt;{{ status | escape }}&lt;/span&gt;\r\n{% elsif s contains 'issues' %}\r\n  &lt;span class=\"ot-badge ot-badge--issues\"&gt;{{ status | escape }}&lt;/span&gt;\r\n{% elsif s contains 'pass' %}\r\n  &lt;span class=\"ot-badge ot-badge--pass\"&gt;{{ status | escape }}&lt;/span&gt;\r\n{% elsif s contains 'closed' or s contains 'no check required' %}\r\n  &lt;span class=\"ot-badge ot-badge--closed\"&gt;{{ status | escape }}&lt;/span&gt;\r\n{% elsif s contains 'failed' or s contains 'blocked' or s contains 'overdue' %}\r\n  &lt;span class=\"ot-badge ot-badge--blocked\"&gt;{{ status | escape }}&lt;/span&gt;\r\n{% elsif s contains 'progress' or s contains 'assigned' or s contains 'submitted' %}\r\n  &lt;span class=\"ot-badge ot-badge--active\"&gt;{{ status | escape }}&lt;/span&gt;\r\n{% else %}\r\n  &lt;span class=\"ot-badge ot-badge--waiting\"&gt;{{ status | escape }}&lt;/span&gt;\r\n{% endif %}\r\n"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>OT Status Badge</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="7a644a4c-9aa3-f111-aaac-e4fade069307">
+  <content>{
+  "botschemaname": "cr8b1_9e5b496c-daee-4bee-a3f0-80f381fb9d45",
+  "configjson": "{\"skillConfigViewName\":\"Outcome Testing bot Answers\"}"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Bot Consumer</name>
+  <powerpagecomponenttype>27</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

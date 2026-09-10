@@ -1,0 +1,13 @@
+<powerpagecomponent powerpagecomponentid="16f4f575-6657-43d4-82d5-0107529c9391">
+  <content>{
+  "source": "&lt;div class=\"page-copy\"&gt;\r\n {% editable page 'adx_copy' type: 'html', liquid: true %}\r\n&lt;/div&gt;"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Page Copy</name>
+  <powerpagecomponenttype>8</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000ac">
+  <content>{
+  "description": "Exposes contact to the portal Web API so a checker can request a claim. Paired with a one-column allowlist: the only writable column is al_claimrequest, which ClaimRequestPlugin reads. The browser used to POST an al_caseassignment carrying two @odata.bind lookups instead; Power Pages refused that association with 90040106 through three verified permission repairs, the same refusal and the same resolution as the answering module (AD-053). Writing a contact rather than an assignment is also the stronger boundary: the contact permission is Self-scoped, so the request can only reach the signed-in user's own row, and the plug-in takes the claimant from that row rather than from the payload.",
+  "value": "true"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Webapi/contact/enabled</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

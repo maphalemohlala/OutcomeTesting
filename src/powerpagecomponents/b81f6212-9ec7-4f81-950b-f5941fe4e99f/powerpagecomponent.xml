@@ -1,0 +1,18 @@
+<powerpagecomponent powerpagecomponentid="b81f6212-9ec7-4f81-950b-f5941fe4e99f">
+  <content>{
+  "display_name": "Search/Facet/Downloads",
+  "type": 756150000,
+  "value": "Downloads"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Search/Facet/Downloads</name>
+  <powerpagecomponenttype>7</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <powerpagesitelanguageid>
+    <powerpagesitelanguageid>4bbb1efd-ae70-4f3e-9908-b80d79cc5d41</powerpagesitelanguageid>
+  </powerpagesitelanguageid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

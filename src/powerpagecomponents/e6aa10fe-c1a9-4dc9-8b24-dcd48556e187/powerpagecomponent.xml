@@ -1,0 +1,18 @@
+<powerpagecomponent powerpagecomponentid="e6aa10fe-c1a9-4dc9-8b24-dcd48556e187">
+  <content>{
+  "copy": "&lt;h4&gt;About Starter Portal&lt;/h4&gt;&lt;p&gt;This site uses sample data and text, please update as per your requirement.&lt;/p&gt;",
+  "display_name": "Footer",
+  "publishingstateid": "2d4a3214-4408-4e1e-a97b-35db119255f8"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Footer</name>
+  <powerpagecomponenttype>4</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <powerpagesitelanguageid>
+    <powerpagesitelanguageid>4bbb1efd-ae70-4f3e-9908-b80d79cc5d41</powerpagesitelanguageid>
+  </powerpagesitelanguageid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

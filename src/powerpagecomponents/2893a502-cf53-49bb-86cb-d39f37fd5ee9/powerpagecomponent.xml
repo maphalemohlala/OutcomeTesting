@@ -1,0 +1,18 @@
+<powerpagecomponent powerpagecomponentid="2893a502-cf53-49bb-86cb-d39f37fd5ee9">
+  <content>{
+  "display_name": "Header/Search/ToolTip",
+  "type": 756150000,
+  "value": "Search"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Header/Search/ToolTip</name>
+  <powerpagecomponenttype>7</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <powerpagesitelanguageid>
+    <powerpagesitelanguageid>4bbb1efd-ae70-4f3e-9908-b80d79cc5d41</powerpagesitelanguageid>
+  </powerpagesitelanguageid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

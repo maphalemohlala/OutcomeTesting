@@ -1,0 +1,20 @@
+<powerpagecomponent powerpagecomponentid="059048fc-4bab-437e-83e3-520c49ce4eb7">
+  <content>{
+  "contentdisposition": 756150000,
+  "enabletracking": false,
+  "excludefromsearch": false,
+  "hiddenfromsitemap": false,
+  "parentpageid": "52570e2a-4d91-41f8-95c9-d0017a937039",
+  "partialurl": "PWALogo.png",
+  "publishingstateid": "2d4a3214-4408-4e1e-a97b-35db119255f8"
+}</content>
+  <filecontent mimetype="application/octet-stream">PWALogo.png</filecontent>
+  <iscustomizable>1</iscustomizable>
+  <name>PWALogo.png</name>
+  <powerpagecomponenttype>3</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>
