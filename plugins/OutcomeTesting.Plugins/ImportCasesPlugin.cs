@@ -120,10 +120,10 @@ namespace OutcomeTesting.Plugins
             var batchCode = BuildBatchCode(context);
             var batchId = systemService.Create(new Entity(BatchEntity)
             {
-                ["al_name"] = Truncate(fileName, 100),
+                ["al_name"] = CommandHelpers.Truncate(fileName, 100),
                 ["al_importbatchcode"] = batchCode,
                 ["al_batchstatus"] = new OptionSetValue(BatchStatusValidating),
-                ["al_source"] = Truncate(fileName, 400),
+                ["al_source"] = CommandHelpers.Truncate(fileName, 400),
                 ["al_importedon"] = DateTime.UtcNow,
                 ["al_totalrows"] = parsed.Total,
                 ["al_importedcount"] = 0,
@@ -395,7 +395,7 @@ namespace OutcomeTesting.Plugins
                 ["al_importexceptioncode"] = code,
                 ["al_exceptionstatus"] = new OptionSetValue(status),
                 ["al_importbatchid"] = new EntityReference(BatchEntity, batchId),
-                ["al_reason"] = Truncate(reason, ImportRules.RawDataLimit),
+                ["al_reason"] = CommandHelpers.Truncate(reason, ImportRules.RawDataLimit),
                 ["al_rownumber"] = rowNumber,
                 ["al_rawdata"] = raw,
             };
@@ -481,12 +481,6 @@ namespace OutcomeTesting.Plugins
             }
 
             return message;
-        }
-
-        private static string Truncate(string value, int length)
-        {
-            value = value ?? string.Empty;
-            return value.Length > length ? value.Substring(0, length) : value;
         }
 
         /// <summary>

@@ -200,7 +200,7 @@ namespace OutcomeTesting.Plugins
             service.Update(new Entity(NotificationOutbox.NotificationEntity, notificationId)
             {
                 ["al_status"] = new OptionSetValue(NotificationOutbox.StatusFailed),
-                ["al_failurereason"] = Truncate(reason, FailureReasonLength),
+                ["al_failurereason"] = CommandHelpers.Truncate(reason, FailureReasonLength),
             });
 
             return Result.Failed;
@@ -225,10 +225,5 @@ namespace OutcomeTesting.Plugins
                 : innermost.Message + " (" + error.Message + ")";
         }
 
-        private static string Truncate(string value, int length)
-        {
-            value = value ?? string.Empty;
-            return value.Length > length ? value.Substring(0, length) : value;
-        }
     }
 }

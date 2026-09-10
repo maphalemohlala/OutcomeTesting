@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isVersionEffective } from './versionEffective';
-import { answerOf, date, text } from './reviewAnswer';
+import { answerOf } from './reviewAnswer';
+import { date, text } from '../../lib/format';
 import { buildSections, type ReviewSection } from './reviewSections';
 import {
   caseHeaderFields,

@@ -139,6 +139,26 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// Whether this submit earns the adviser the "Case check - Pass" letter (project
+        /// owner, 2026-09-10): the case is finished and nothing is owed on it.
+        ///
+        /// Closing is the whole test, and it is a stronger one than "the grade was a Pass".
+        /// <see cref="NextCaseStatusForAqs"/> reaches Closed only on an unflagged Pass, and
+        /// a Tax pass with AQS still to come returns the case to the queue rather than
+        /// closing it - so a leg that finished while the case has not cannot tell the
+        /// adviser it is over.
+        ///
+        /// It also disposes of the earlier leg without a second query. A Tax leg that raised
+        /// remediation parks the case at Awaiting Remediation, and that remediation has to
+        /// clear sign-off before the case can reach its AQS check at all (OD-038), so a case
+        /// that closes here has nothing outstanding behind it either.
+        /// </summary>
+        public static bool EarnsPassNotification(int nextCaseStatus, bool requiresRemediation)
+        {
+            return !requiresRemediation && nextCaseStatus == CaseLifecycle.Closed;
+        }
+
+        /// <summary>
         /// Where an AQS submit leaves the case: closed on an unflagged Pass, awaiting
         /// remediation on anything else (BR-006).
         ///

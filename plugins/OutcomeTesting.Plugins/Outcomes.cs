@@ -50,12 +50,8 @@ namespace OutcomeTesting.Plugins
                 return null;
             }
 
-            return Formatted(outcome, FinalOutcomeAttr) ?? Formatted(outcome, InitialOutcomeAttr);
+            return CommandHelpers.Formatted(outcome, FinalOutcomeAttr) ?? CommandHelpers.Formatted(outcome, InitialOutcomeAttr);
         }
 
-        private static string Formatted(Entity entity, string attribute)
-        {
-            return entity.FormattedValues.ContainsKey(attribute) ? entity.FormattedValues[attribute] : null;
-        }
     }
 }

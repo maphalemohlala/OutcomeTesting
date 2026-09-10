@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Globalization;
-using System.ServiceModel;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -41,6 +39,11 @@ namespace OutcomeTesting.Plugins
         public const int EventRemediationAssigned = 120910802;
         public const int EventSignoffApproved = 120910803;
         public const int EventSignoffRejected = 120910804;
+
+        // Added 2026-09-10 for the adviser's "Case check - Pass" letter. Additive, as the
+        // header above records: an option value appended to al_notification_event costs
+        // nothing to the rows already carrying the first five.
+        public const int EventCasePassed = 120910805;
 
         public const int StatusPending = 120910810;
         public const int StatusSent = 120910811;
@@ -87,6 +90,7 @@ namespace OutcomeTesting.Plugins
                 case EventRemediationAssigned: return "Remediation assigned";
                 case EventSignoffApproved: return "Sign-off approved";
                 case EventSignoffRejected: return "Sign-off rejected";
+                case EventCasePassed: return "Case passed";
                 default: return "Unknown";
             }
         }
@@ -95,11 +99,11 @@ namespace OutcomeTesting.Plugins
         /// Writes one outbox row. Returns the new row's id, or <see cref="Guid.Empty"/> when
         /// an identical event was already queued for the same target.
         ///
-        /// A duplicate-key collision is swallowed because it is the expected outcome of a
-        /// retry and means the outbox is already correct. Every other failure is allowed to
-        /// propagate: the row belongs to the same transaction as the state change, and
-        /// silently dropping it would produce exactly the failure OD-030 warns about — the
-        /// system looking correct while nothing arrives.
+        /// An already-queued event is not an error: it is the expected outcome of a retry, and
+        /// it means the outbox is already correct, so it returns rather than throwing. Every
+        /// other failure is allowed to propagate: the row belongs to the same transaction as
+        /// the state change, and silently dropping it would produce exactly the failure OD-030
+        /// warns about — the system looking correct while nothing arrives.
         /// </summary>
         public static Guid Queue(
             IOrganizationService service,
@@ -132,14 +136,14 @@ namespace OutcomeTesting.Plugins
             var code = CodeFor(eventValue, targetId, occurrence);
             var row = new Entity(NotificationEntity)
             {
-                ["al_name"] = Truncate(EventName(eventValue) + ": " + subject, 200),
+                ["al_name"] = CommandHelpers.Truncate(EventName(eventValue) + ": " + subject, 200),
                 ["al_notificationcode"] = code,
                 ["al_event"] = new OptionSetValue(eventValue),
                 ["al_status"] = new OptionSetValue(StatusPending),
                 ["al_targettable"] = targetTable,
                 ["al_targetid"] = targetId.ToString("D"),
-                ["al_subject"] = Truncate(subject, 400),
-                ["al_body"] = Truncate(body, 4000),
+                ["al_subject"] = CommandHelpers.Truncate(subject, 400),
+                ["al_body"] = CommandHelpers.Truncate(body, 4000),
                 ["al_queuedon"] = DateTime.UtcNow,
                 ["al_correlationid"] = correlationId.ToString("D"),
             };
@@ -149,7 +153,7 @@ namespace OutcomeTesting.Plugins
             // row a person has to look at: the drain refuses to send without one.
             if (!string.IsNullOrWhiteSpace(recipientEmail))
             {
-                row["al_recipientemail"] = Truncate(recipientEmail, 200);
+                row["al_recipientemail"] = CommandHelpers.Truncate(recipientEmail, 200);
             }
 
             // Read before writing, because a duplicate must never reach the platform as a
@@ -177,6 +181,20 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// True when this event is already queued for this target.
+        ///
+        /// The same question <see cref="Queue"/> asks itself, offered to callers that would
+        /// otherwise do expensive work to build a notification the outbox already holds. It
+        /// is an optimisation and not a guarantee: <see cref="Queue"/> still asks again, so a
+        /// caller that skips this is correct, just slower.
+        /// </summary>
+        public static bool AlreadyQueued(
+            IOrganizationService service, int eventValue, Guid targetId, string occurrence)
+        {
+            return Exists(service, CodeFor(eventValue, targetId, occurrence));
+        }
+
+        /// <summary>
         /// True when the outbox already holds this code.
         ///
         /// Deliberately not a try/catch around the create: see <see cref="Queue"/>. A race
@@ -195,26 +213,6 @@ namespace OutcomeTesting.Plugins
             query.Criteria.AddCondition("al_notificationcode", ConditionOperator.Equal, code);
 
             return service.RetrieveMultiple(query).Entities.Count > 0;
-        }
-
-        /// <summary>
-        /// True when the create failed because the alternate key already holds this code.
-        /// DuplicateRecord (0x80040237) and the alternate-key variant both mean "already
-        /// queued", which is a success for an outbox.
-        /// </summary>
-        public static bool IsDuplicateKey(FaultException<OrganizationServiceFault> fault)
-        {
-            if (fault.Detail != null)
-            {
-                var code = fault.Detail.ErrorCode;
-                if (code == unchecked((int)0x80040237) || code == unchecked((int)0x80060892))
-                {
-                    return true;
-                }
-            }
-
-            var message = fault.Message ?? string.Empty;
-            return message.IndexOf("duplicate", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         /// <summary>Work email of a contact (AD-010), or null when there is none to reach.</summary>
@@ -305,6 +303,39 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// The BR-005 grade a review recorded, or null when it recorded none.
+        ///
+        /// Read from the al_outcome row for that review rather than for the case, which is
+        /// what keeps a two-leg case honest: a Tax leg records no grade, and reading "the
+        /// case's outcome" on a Tax-then-AQS case would hand the Tax remediation whichever
+        /// leg's row came back first.
+        /// </summary>
+        public static int? InitialOutcome(IOrganizationService service, EntityReference review)
+        {
+            if (review == null)
+            {
+                return null;
+            }
+
+            var query = new QueryExpression("al_outcome")
+            {
+                ColumnSet = new ColumnSet("al_initialoutcome"),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, review.Id);
+
+            var rows = service.RetrieveMultiple(query).Entities;
+            if (rows.Count == 0)
+            {
+                return null;
+            }
+
+            var grade = rows[0].GetAttributeValue<OptionSetValue>("al_initialoutcome");
+            return grade == null ? (int?)null : grade.Value;
+        }
+
+        /// <summary>
         /// A portal link to one case, or null when this environment has no site to link into.
         ///
         /// The domain is read from the Power Pages site row rather than from configuration.
@@ -342,18 +373,6 @@ namespace OutcomeTesting.Plugins
             }
 
             return "https://" + domain.Trim().TrimEnd('/') + "/case-details?id=" + outcomeCase.Id.ToString("D");
-        }
-
-        private static string Truncate(string value, int length)
-        {
-            value = value ?? string.Empty;
-            return value.Length > length ? value.Substring(0, length) : value;
-        }
-
-        /// <summary>Formats a count for a notification body without culture surprises.</summary>
-        public static string Number(int value)
-        {
-            return value.ToString(CultureInfo.InvariantCulture);
         }
     }
 }

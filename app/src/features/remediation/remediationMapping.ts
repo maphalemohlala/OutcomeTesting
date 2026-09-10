@@ -11,6 +11,7 @@ import {
   Al_signoffsal_signoffdecision,
   type Al_signoffs,
 } from '../../generated/models/Al_signoffsModel';
+import { date, text } from '../../lib/format';
 
 export interface RemediationActionRow {
   id: string;
@@ -66,21 +67,7 @@ export interface SignoffRow {
   signedOffBy: string | null;
 }
 
-export function date(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const time = new Date(value).getTime();
-  if (Number.isNaN(time)) return null;
-  return new Date(time).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
-export function text(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}
 
 /** Labels for the three remedial-form answers (AD-095); values from the 1209107xx band. */
 export const CLIENT_CONTACT_REQUIRED: Record<number, string> = {

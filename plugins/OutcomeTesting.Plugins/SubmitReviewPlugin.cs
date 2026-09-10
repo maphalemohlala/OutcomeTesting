@@ -24,9 +24,9 @@ namespace OutcomeTesting.Plugins
         private const string InIdempotencyKey = "IdempotencyKey";
 
         // Custom API response parameters.
-        private const string OutStatus = "Status";
-        private const string OutAuditEventId = "AuditEventId";
-        private const string OutConflict = "Conflict";
+        private const string OutStatus = CommandHelpers.OutStatus;
+        private const string OutAuditEventId = CommandHelpers.OutAuditEventId;
+        private const string OutConflict = CommandHelpers.OutConflict;
 
         // al_reviewinstance.
         private const string ReviewEntity = "al_reviewinstance";
@@ -73,7 +73,7 @@ namespace OutcomeTesting.Plugins
         // Distinct failure prefixes so the client can branch (command-concurrency skill).
         private const string ConflictPrefix = "CONFLICT: ";
         private const string UnauthorizedPrefix = "UNAUTHORIZED: ";
-        private const string PreconditionPrefix = "PRECONDITION: ";
+        private const string PreconditionPrefix = CommandHelpers.PreconditionPrefix;
 
         public SubmitReviewPlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(SubmitReviewPlugin))
@@ -90,9 +90,9 @@ namespace OutcomeTesting.Plugins
             var context = localPluginContext.PluginExecutionContext;
             var service = localPluginContext.PluginUserService;
 
-            var targetId = ParseRequiredGuid(context, InTargetId);
-            var idempotencyKey = GetRequiredString(context, InIdempotencyKey);
-            var expectedRowVersion = GetOptionalString(context, InExpectedRowVersion);
+            var targetId = CommandHelpers.ParseRequiredGuid(context, InTargetId);
+            var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
+            var expectedRowVersion = CommandHelpers.GetOptionalString(context, InExpectedRowVersion);
 
             var result = Submit(
                 service,
@@ -104,7 +104,7 @@ namespace OutcomeTesting.Plugins
                 requireCallerOwnsReview: true,
                 details: null);
 
-            SetResponse(context, result.Status, result.AuditEventId, result.Conflict);
+            CommandHelpers.SetResponse(context, result.Status, result.AuditEventId, result.Conflict);
         }
 
         /// <summary>The outcome of a submission, in the shape the Custom API responds with.</summary>
@@ -211,7 +211,7 @@ namespace OutcomeTesting.Plugins
                 }
                 catch (System.ServiceModel.FaultException<OrganizationServiceFault> fault)
                 {
-                    if (IsConcurrencyFault(fault))
+                    if (CommandHelpers.IsConcurrencyFault(fault))
                     {
                         throw new InvalidPluginExecutionException(
                             ConflictPrefix + "This review changed since you loaded it. Reload and try again.");
@@ -225,7 +225,7 @@ namespace OutcomeTesting.Plugins
                 service.Update(update);
             }
 
-            FinaliseReview(service, review, targetId);
+            FinaliseReview(service, review, targetId, correlationId);
 
             var auditId = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details, actorName);
 
@@ -770,7 +770,7 @@ namespace OutcomeTesting.Plugins
         /// PassFailInsufficient scale of Q-TAX-02 (AD-055). The Tax grade stays on its
         /// response, and AD-039's export contract has no Tax column.
         /// </summary>
-        private static void FinaliseReview(IOrganizationService service, Entity review, Guid targetId)
+        private static void FinaliseReview(IOrganizationService service, Entity review, Guid targetId, Guid correlationId)
         {
             var caseRef = review.GetAttributeValue<EntityReference>(ReviewOutcomeCase);
             if (caseRef == null)
@@ -862,6 +862,13 @@ namespace OutcomeTesting.Plugins
                     sequence,
                     remediationReason,
                     isAqs ? AqsObservationQuestionCode : TaxObservationQuestionCode);
+            }
+            else if (OutcomeRules.EarnsPassNotification(nextStatus, requiresRemediation))
+            {
+                // "Case check - Pass" (project owner, 2026-09-10). Inside the submit
+                // transaction like the remediation above, so the letter and the state it
+                // reports on cannot come apart - the outbox guarantee OD-030 rests on.
+                NotificationEmitterPlugin.QueueCasePassed(service, correlationId, caseRef);
             }
 
             // OutcomeRules.HopsFor is the single description of the route a submit takes:
@@ -985,20 +992,6 @@ namespace OutcomeTesting.Plugins
                 && response.GetAttributeValue<DateTime?>("al_answerdate").HasValue;
         }
 
-        private static bool IsConcurrencyFault(System.ServiceModel.FaultException<OrganizationServiceFault> fault)
-        {
-            // ConcurrencyVersionMismatch (0x80060892); fall back to message text in case
-            // the exact code varies by platform build.
-            if (fault.Detail != null && fault.Detail.ErrorCode == unchecked((int)0x80060892))
-            {
-                return true;
-            }
-
-            var message = fault.Message ?? string.Empty;
-            return message.IndexOf("row version", StringComparison.OrdinalIgnoreCase) >= 0
-                || message.IndexOf("concurrency", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
         private static void EnsureCaller(IOrganizationService service, Guid callerId, Entity review)
         {
             var owner = review.GetAttributeValue<EntityReference>("ownerid");
@@ -1027,7 +1020,7 @@ namespace OutcomeTesting.Plugins
 
             if (owner.LogicalName == "team")
             {
-                if (!IsTeamMember(service, owner.Id, callerId))
+                if (!CommandHelpers.IsTeamMember(service, owner.Id, callerId))
                 {
                     throw new InvalidPluginExecutionException(
                         UnauthorizedPrefix + "Only a member of the team that owns this review can submit it.");
@@ -1037,21 +1030,6 @@ namespace OutcomeTesting.Plugins
 
             throw new InvalidPluginExecutionException(
                 UnauthorizedPrefix + "This review has an owner type that cannot be verified.");
-        }
-
-        /// <summary>True when <paramref name="userId"/> belongs to the given team.</summary>
-        private static bool IsTeamMember(IOrganizationService service, Guid teamId, Guid userId)
-        {
-            var query = new QueryExpression("teammembership")
-            {
-                ColumnSet = new ColumnSet(false),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("teamid", ConditionOperator.Equal, teamId);
-            query.Criteria.AddCondition("systemuserid", ConditionOperator.Equal, userId);
-
-            return service.RetrieveMultiple(query).Entities.Count > 0;
         }
 
         private static Entity FindAuditByKey(IOrganizationService service, string idempotencyKey)
@@ -1113,13 +1091,6 @@ namespace OutcomeTesting.Plugins
             return service.Create(audit);
         }
 
-        private static void SetResponse(IPluginExecutionContext context, string status, Guid auditEventId, bool conflict)
-        {
-            context.OutputParameters[OutStatus] = status;
-            context.OutputParameters[OutAuditEventId] = auditEventId.ToString("D");
-            context.OutputParameters[OutConflict] = conflict;
-        }
-
         private static string StatusName(int status)
         {
             switch (status)
@@ -1131,38 +1102,5 @@ namespace OutcomeTesting.Plugins
             }
         }
 
-        private static Guid ParseRequiredGuid(IPluginExecutionContext context, string name)
-        {
-            var raw = GetRequiredString(context, name);
-            Guid value;
-            if (!Guid.TryParse(raw, out value) || value == Guid.Empty)
-            {
-                throw new InvalidPluginExecutionException(PreconditionPrefix + name + " must be a valid record id.");
-            }
-
-            return value;
-        }
-
-        private static string GetRequiredString(IPluginExecutionContext context, string name)
-        {
-            var value = GetOptionalString(context, name);
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                throw new InvalidPluginExecutionException(PreconditionPrefix + name + " is required.");
-            }
-
-            return value;
-        }
-
-        private static string GetOptionalString(IPluginExecutionContext context, string name)
-        {
-            object value;
-            if (context.InputParameters.TryGetValue(name, out value) && value is string)
-            {
-                return (string)value;
-            }
-
-            return null;
-        }
     }
 }

@@ -257,6 +257,11 @@ namespace OutcomeTesting.Plugins
             };
             responses.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
 
+            // Two passes, so the reads below are batched rather than paid per answer. The
+            // first pass keeps only what the second needs: a non-pass answer and the version
+            // it was given against. The cheap check on the answer still runs first, so a Pass
+            // costs nothing here either.
+            var candidates = new List<KeyValuePair<Guid, OptionSetValue>>();
             foreach (var response in CommandHelpers.RetrieveAll(service, responses))
             {
                 responseIds.Add(response.Id);
@@ -273,15 +278,57 @@ namespace OutcomeTesting.Plugins
                     continue;
                 }
 
-                var version = service.Retrieve(
-                    "al_questionversion",
-                    versionRef.Id,
-                    new ColumnSet("al_questiontext", "al_responsetype", "al_effectivefrom", "al_effectiveto", "al_displayorder", "al_questionid"));
+                candidates.Add(new KeyValuePair<Guid, OptionSetValue>(versionRef.Id, choice));
+            }
+
+            // One query each for the versions, their questions and those questions' sections,
+            // rather than three Retrieves per marked-down answer. A fifteen-item review was
+            // paying forty-five round trips for what three answer.
+            var versions = ByIdIn(
+                service,
+                "al_questionversion",
+                new ColumnSet("al_questiontext", "al_responsetype", "al_effectivefrom", "al_effectiveto", "al_displayorder", "al_questionid"),
+                Ids(candidates));
+
+            var questionIds = new List<Guid>();
+            foreach (var version in versions.Values)
+            {
+                var questionRef = version.GetAttributeValue<EntityReference>("al_questionid");
+                if (questionRef != null)
+                {
+                    questionIds.Add(questionRef.Id);
+                }
+            }
+
+            var questions = ByIdIn(
+                service, "al_question", new ColumnSet("al_sectionid", "al_questioncode"), questionIds);
+
+            var sectionIds = new List<Guid>();
+            foreach (var question in questions.Values)
+            {
+                var sectionRef = question.GetAttributeValue<EntityReference>("al_sectionid");
+                if (sectionRef != null)
+                {
+                    sectionIds.Add(sectionRef.Id);
+                }
+            }
+
+            var sections = ByIdIn(
+                service, "al_section", new ColumnSet("al_displayorder"), sectionIds);
+
+            foreach (var candidate in candidates)
+            {
+                var choice = candidate.Value;
+
+                Entity version;
+                if (!versions.TryGetValue(candidate.Key, out version))
+                {
+                    continue;
+                }
 
                 // The scale decides this, not the answer on its own: Insufficient evidence is
                 // one option value shared by the suitability scale and the Consumer Duty one,
-                // and only the first of those is a remediable test point. The cheap check on
-                // the answer above runs first so a Pass never costs a Retrieve.
+                // and only the first of those is a remediable test point.
                 var responseType = version.GetAttributeValue<OptionSetValue>("al_responsetype");
                 if (responseType == null || !IsNonPassAnswer(responseType.Value, choice.Value))
                 {
@@ -302,18 +349,20 @@ namespace OutcomeTesting.Plugins
                     continue;
                 }
 
-                // One read of the question serves both the outcome test and the ordering
-                // below, which is why it is fetched here rather than inside SectionOrder.
-                var question = Question(service, version.GetAttributeValue<EntityReference>("al_questionid"));
+                // One lookup of the question serves both the outcome test and the ordering
+                // below, which is why it is resolved here rather than inside SectionOrder.
+                var question = Lookup(questions, version, "al_questionid");
                 if (question != null
                     && OutcomeQuestionCodes.Contains(question.GetAttributeValue<string>("al_questioncode") ?? string.Empty))
                 {
                     continue;
                 }
 
+                var section = Lookup(sections, question, "al_sectionid");
+
                 answers.Add(new RankedItem
                 {
-                    Section = SectionOrder(service, question),
+                    Section = section == null ? 0 : section.GetAttributeValue<int?>("al_displayorder") ?? 0,
                     Order = version.GetAttributeValue<int?>("al_displayorder") ?? 0,
                     Text = text.Trim() + ": " + labels.Label("al_response", "al_answerchoice", choice.Value),
                 });
@@ -342,22 +391,36 @@ namespace OutcomeTesting.Plugins
             links.Criteria.AddCondition("al_responseid", ConditionOperator.In, responseIds.ToArray());
 
             var seen = new HashSet<Guid>();
-            var points = new List<RankedItem>();
+            var ticked = new List<Guid>();
             foreach (var link in service.RetrieveMultiple(links).Entities)
             {
                 var reasonId = link.GetAttributeValue<Guid>("al_failreasonid");
-                if (reasonId == Guid.Empty || !seen.Add(reasonId))
+                if (reasonId != Guid.Empty && seen.Add(reasonId))
+                {
+                    ticked.Add(reasonId);
+                }
+            }
+
+            // One query for the ticked reasons, not one Retrieve each. AD-096 defines twenty
+            // of them, so a review that ticked most of the block was paying twenty round
+            // trips to read two columns immediately after the query that found them.
+            //
+            // al_name holds the document's whole row, category prefix included ("AML - ID
+            // verification issue"), because the document does not punctuate the twenty rows
+            // consistently and a label built from al_category plus a separator cannot
+            // reproduce that. So the name is used as written and nothing is prefixed here.
+            var reasons = ByIdIn(
+                service, "al_failreason", new ColumnSet("al_name", "al_displayorder"), ticked);
+
+            var points = new List<RankedItem>();
+            foreach (var reasonId in ticked)
+            {
+                Entity reason;
+                if (!reasons.TryGetValue(reasonId, out reason))
                 {
                     continue;
                 }
 
-                // al_name holds the document's whole row, category prefix included ("AML - ID
-                // verification issue"), because the document does not punctuate the twenty
-                // rows consistently and a label built from al_category plus a separator
-                // cannot reproduce that. So the name is used as written and nothing is
-                // prefixed here; al_category is still read, for ordering within a category.
-                var reason = service.Retrieve(
-                    "al_failreason", reasonId, new ColumnSet("al_name", "al_displayorder"));
                 var name = reason.GetAttributeValue<string>("al_name") ?? string.Empty;
 
                 points.Add(new RankedItem
@@ -377,33 +440,81 @@ namespace OutcomeTesting.Plugins
             return items;
         }
 
-        /// <summary>
-        /// The question a version belongs to, with the two columns
-        /// <see cref="NonPassItems"/> needs of it; null when the version names none.
-        /// </summary>
-        private static Entity Question(IOrganizationService service, EntityReference questionRef)
+        /// <summary>The version ids of a candidate list, in order and with repeats kept out.</summary>
+        private static List<Guid> Ids(List<KeyValuePair<Guid, OptionSetValue>> candidates)
         {
-            return questionRef == null
-                ? null
-                : service.Retrieve("al_question", questionRef.Id, new ColumnSet("al_sectionid", "al_questioncode"));
+            var ids = new List<Guid>();
+            var seen = new HashSet<Guid>();
+            foreach (var candidate in candidates)
+            {
+                if (seen.Add(candidate.Key))
+                {
+                    ids.Add(candidate.Key);
+                }
+            }
+
+            return ids;
         }
 
-        /// <summary>The display order of the section a question sits in; 0 when unknown.</summary>
-        private static int SectionOrder(IOrganizationService service, Entity question)
+        /// <summary>
+        /// Reads a set of rows by primary key in one query, keyed by id.
+        ///
+        /// Empty in, empty out - an <c>In</c> with no values is a query Dataverse rejects,
+        /// and a review with nothing marked down is the ordinary case rather than an error.
+        /// </summary>
+        private static Dictionary<Guid, Entity> ByIdIn(
+            IOrganizationService service, string entity, ColumnSet columns, List<Guid> ids)
         {
-            if (question == null)
+            var byId = new Dictionary<Guid, Entity>();
+            if (ids.Count == 0)
             {
-                return 0;
+                return byId;
             }
 
-            var sectionRef = question.GetAttributeValue<EntityReference>("al_sectionid");
-            if (sectionRef == null)
+            var keys = new List<object>();
+            var seen = new HashSet<Guid>();
+            foreach (var id in ids)
             {
-                return 0;
+                if (seen.Add(id))
+                {
+                    keys.Add(id);
+                }
             }
 
-            var section = service.Retrieve("al_section", sectionRef.Id, new ColumnSet("al_displayorder"));
-            return section.GetAttributeValue<int?>("al_displayorder") ?? 0;
+            var query = new QueryExpression(entity)
+            {
+                ColumnSet = columns,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition(entity + "id", ConditionOperator.In, keys.ToArray());
+
+            foreach (var row in CommandHelpers.RetrieveAll(service, query))
+            {
+                byId[row.Id] = row;
+            }
+
+            return byId;
+        }
+
+        /// <summary>
+        /// The row a lookup on <paramref name="from"/> points at, out of an already-read set;
+        /// null where there is no lookup or the target was not returned.
+        /// </summary>
+        private static Entity Lookup(Dictionary<Guid, Entity> rows, Entity from, string attribute)
+        {
+            if (from == null)
+            {
+                return null;
+            }
+
+            var reference = from.GetAttributeValue<EntityReference>(attribute);
+            if (reference == null)
+            {
+                return null;
+            }
+
+            Entity row;
+            return rows.TryGetValue(reference.Id, out row) ? row : null;
         }
 
         private sealed class RankedItem

@@ -3,22 +3,9 @@ import {
   Al_responsesal_answerchoices,
   type Al_responses,
 } from '../../generated/models/Al_responsesModel';
+import { date, text } from '../../lib/format';
 
-export function text(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}
 
-export function date(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const time = new Date(value).getTime();
-  if (Number.isNaN(time)) return null;
-  return new Date(time).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 /**
  * The reviewer's answer, whichever response field the question type populated. The SDK

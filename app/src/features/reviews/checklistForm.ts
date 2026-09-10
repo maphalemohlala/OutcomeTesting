@@ -10,7 +10,7 @@ import {
   type Al_outcomecases,
 } from '../../generated/models/Al_outcomecasesModel';
 import { choiceLabel } from '../../lib/choiceLabel';
-import { date, text } from './reviewAnswer';
+import { date, text } from '../../lib/format';
 import type { FormRow, ReviewSection, SectionedAnswer } from './reviewSections';
 
 /**
@@ -152,9 +152,6 @@ export function isTicked(row: FormRow<TickedAnswer>, option: ChoiceOption): bool
   if (!response) return false;
   return response.answerChoice === option.value || response.answerChoices.includes(option.value);
 }
-
-/** The section codes of the File Quality outcome blocks, one per team (checklist-v8.md). */
-export const FILE_QUALITY_OUTCOME_CODES = new Set(['S-FQOUT', 'S-FQTAX']);
 
 /** Whether the section's help text is the document's "Outcome lens" footer line (E1 to E5). */
 export function isOutcomeLens(section: ReviewSection): boolean {

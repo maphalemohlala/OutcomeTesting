@@ -7,6 +7,7 @@ import {
   Al_reviewinstancesal_reviewtype,
   type Al_reviewinstances,
 } from '../../generated/models/Al_reviewinstancesModel';
+import { date } from '../../lib/format';
 
 export interface CaseReview {
   id: string;
@@ -24,16 +25,6 @@ export type CaseReviewsState =
   | { status: 'loading' }
   | { status: 'ready'; reviews: CaseReview[] };
 
-function date(value: string | undefined): string | null {
-  if (!value) return null;
-  const time = new Date(value).getTime();
-  if (Number.isNaN(time)) return null;
-  return new Date(time).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 function toReview(record: Al_reviewinstances): CaseReview {
   return {

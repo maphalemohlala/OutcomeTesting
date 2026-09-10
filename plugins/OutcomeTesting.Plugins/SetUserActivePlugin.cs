@@ -44,7 +44,7 @@ namespace OutcomeTesting.Plugins
             var systemService = localPluginContext.PluginUserService;   // permission read + audit
 
             var userId = CommandHelpers.ParseRequiredGuid(context, InUserId);
-            var active = GetRequiredBool(context, InActive);
+            var active = CommandHelpers.GetRequiredBool(context, InActive);
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
 
             // Permission check before the idempotency lookup (matching AssignUserRolePlugin):
@@ -84,17 +84,6 @@ namespace OutcomeTesting.Plugins
                 ContactRegistry.Entity, userId, null, details, idempotencyKey, context);
 
             SetResponse(context, userId.ToString("D"), active, auditId);
-        }
-
-        private static bool GetRequiredBool(IPluginExecutionContext context, string name)
-        {
-            object value;
-            if (context.InputParameters.TryGetValue(name, out value) && value is bool)
-            {
-                return (bool)value;
-            }
-
-            throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + name + " is required.");
         }
 
         private static void SetResponse(IPluginExecutionContext context, string userId, bool active, Guid auditId)

@@ -246,12 +246,17 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            // Each distinct review is checked once. Associating several fail reasons against
+            // answers on one review used to re-read that same review row once per response,
+            // in a synchronous pre-operation step on the user's critical path - and the
+            // answer cannot differ between two responses on the same review.
+            var checkedReviews = new HashSet<Guid>();
             foreach (var responseId in CollectResponseIds(context))
             {
                 var response = service.Retrieve(
                     ResponseEntity, responseId, new ColumnSet("al_reviewinstanceid"));
                 var reviewRef = response.GetAttributeValue<EntityReference>("al_reviewinstanceid");
-                if (reviewRef == null)
+                if (reviewRef == null || !checkedReviews.Add(reviewRef.Id))
                 {
                     continue;
                 }

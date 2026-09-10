@@ -18,6 +18,11 @@ namespace OutcomeTesting.Plugins
         public const string ConflictPrefix = "CONFLICT: ";
         public const string UnauthorizedPrefix = "UNAUTHORIZED: ";
         public const string PreconditionPrefix = "PRECONDITION: ";
+
+        // The output parameters every al_* command answers with. See SetResponse.
+        public const string OutStatus = "Status";
+        public const string OutAuditEventId = "AuditEventId";
+        public const string OutConflict = "Conflict";
         public const string ValidationPrefix = "VALIDATION: ";
         public const string NotFoundPrefix = "NOTFOUND: ";
 
@@ -135,6 +140,86 @@ namespace OutcomeTesting.Plugins
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Who a drained notification is sent from: the account the step runs as, or null
+        /// where the context names none. Both drain entry points ask the same question, so
+        /// they get the same answer from one place.
+        /// </summary>
+        public static EntityReference Sender(IPluginExecutionContext context)
+        {
+            return context.UserId == Guid.Empty
+                ? null
+                : new EntityReference("systemuser", context.UserId);
+        }
+
+        /// <summary>
+        /// How a contact is named in an audit detail line: name and id where the reference
+        /// carries a name, the id alone where it does not, and an explicit "(none recorded)"
+        /// rather than a blank where there is no contact at all.
+        /// </summary>
+        public static string Describe(EntityReference contact)
+        {
+            if (contact == null)
+            {
+                return "(none recorded)";
+            }
+
+            return string.IsNullOrEmpty(contact.Name)
+                ? contact.Id.ToString("D")
+                : contact.Name + " " + contact.Id.ToString("D");
+        }
+
+        /// <summary>The formatted (display) value of an attribute, or null where there is none.</summary>
+        public static string Formatted(Entity entity, string attribute)
+        {
+            return entity.FormattedValues.ContainsKey(attribute) ? entity.FormattedValues[attribute] : null;
+        }
+
+        /// <summary>
+        /// Writes the three output parameters every command in this solution answers with.
+        ///
+        /// The names are the command contract, not one plug-in's choice, which is why they
+        /// live here: a command that spelled one of them differently would be accepted by the
+        /// platform and then read as empty by every caller.
+        /// </summary>
+        public static void SetResponse(
+            IPluginExecutionContext context, string status, Guid auditEventId, bool conflict)
+        {
+            context.OutputParameters[OutStatus] = status;
+            context.OutputParameters[OutAuditEventId] = auditEventId.ToString("D");
+            context.OutputParameters[OutConflict] = conflict;
+        }
+
+        /// <summary>
+        /// True when the user belongs to the team. Used to decide whether a caller may act on
+        /// a team-owned record, so it is deliberately one definition: two copies of a
+        /// permission check are two things to keep in step, and only one of them gets fixed.
+        /// </summary>
+        public static bool IsTeamMember(IOrganizationService service, Guid teamId, Guid userId)
+        {
+            var query = new QueryExpression("teammembership")
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("teamid", ConditionOperator.Equal, teamId);
+            query.Criteria.AddCondition("systemuserid", ConditionOperator.Equal, userId);
+
+            return service.RetrieveMultiple(query).Entities.Count > 0;
+        }
+
+        /// <summary>
+        /// Cuts a value to what its column holds. Every caller is guarding a Dataverse length
+        /// limit, which is the one reason this solution ever truncates anything, so the rule
+        /// lives here rather than three times over.
+        /// </summary>
+        public static string Truncate(string value, int length)
+        {
+            value = value ?? string.Empty;
+            return value.Length > length ? value.Substring(0, length) : value;
         }
 
         /// <summary>True when the row is in the Active state (statecode 0).</summary>

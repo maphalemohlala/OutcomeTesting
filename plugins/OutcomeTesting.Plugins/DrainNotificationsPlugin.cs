@@ -69,7 +69,7 @@ namespace OutcomeTesting.Plugins
             var failed = 0;
             foreach (var row in pending)
             {
-                switch (NotificationDrain.Send(systemService, row, Sender(context)))
+                switch (NotificationDrain.Send(systemService, row, CommandHelpers.Sender(context)))
                 {
                     case NotificationDrain.Result.Sent:
                         sent++;
@@ -126,11 +126,5 @@ namespace OutcomeTesting.Plugins
             return requested.Value > MaxRowsCeiling ? MaxRowsCeiling : requested.Value;
         }
 
-        private static EntityReference Sender(IPluginExecutionContext context)
-        {
-            return context.UserId == Guid.Empty
-                ? null
-                : new EntityReference("systemuser", context.UserId);
-        }
     }
 }

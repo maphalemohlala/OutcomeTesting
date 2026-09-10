@@ -712,17 +712,29 @@
               {% endif %}
 
               {% comment %}
-                The questions for the remediation as a whole, drawn as the last rows of the
-                same table (project owner, 2026-09-10: they belong within the table). The
-                paper form prints them in a ruled block directly under the numbered rows,
-                and putting them in the table is what makes that one grid rather than two
-                that happen to sit near each other.
+                The adviser's three answers and the Intelligent Office reference, asked ONCE
+                for the whole remediation (project owner, 2026-09-10: "they should be for the
+                overall remediation... the rows only need to record the remedial action for
+                each issue").
 
-                They are answered once, not per row, so they are written to every one of
-                this adviser's actions that is still open - see the script below. Completed
-                actions are excluded: RemediationResponseGuard refuses a response-column
-                change once an action is Completed, because that is what the supervisor
-                attested to (BR-008).
+                AD-107 raises one action per fail item, and these five columns live on the
+                action row, so asking them in each row's panel asked an adviser with four
+                issues the same four questions four times. There is no case-level row to hold
+                them, so the answers are written to every one of this adviser's actions that
+                is still open - see the script below - which keeps any action correct when
+                read on its own, and survives an action being deleted, as dropoutcomeactions
+                does.
+
+                Completed actions are deliberately excluded from that list:
+                RemediationResponseGuard refuses a response-column change once an action is
+                Completed, because that is what the supervisor attested to (BR-008). So a
+                later change reaches the actions still in flight and leaves the attested ones
+                as they were signed off.
+
+                They are drawn as the last rows of the same table (project owner, 2026-09-10:
+                they belong within the table). The paper form prints them in a ruled block
+                directly under the numbered rows, and putting them in the table is what makes
+                that one grid rather than two that happen to sit near each other.
               {% endcomment %}
               {% assign answer_ids = '' %}
               {% assign answers_source = null %}
@@ -747,6 +759,14 @@
                 {% endif %}
               {% endfor %}
               {% if answers_source == null %}{% assign answers_source = form_source %}{% endif %}
+              {% comment %}
+                And a source for the read-only cells in those same rows, for a reader who is
+                not the adviser: the first action, so the cell shows the recorded label or a
+                dash rather than nothing. Read with a loop, never entities[0]. It follows
+                answers_source deliberately - a checked radio must come from an action that
+                actually carries an answer, not from the first row on the case.
+              {% endcomment %}
+              {% if form_source == null %}{% for a in rows %}{% if form_source == null %}{% assign form_source = a %}{% endif %}{% endfor %}{% endif %}
 
               <tr class="ot-form-rows__lead">
                 <th scope="row" colspan="2">Client contact required?</th>
@@ -806,63 +826,25 @@
           </p>
         {% endif %}
 
-        {% comment %}
-          The rest of the paper form, read-only. The three answers are the adviser's, written
-          in their own panel above; the sign-offs are the supervisor's and the adviser's,
-          written through their own commands. Rendering them as inputs here would put a second
-          write path on the same columns, so they are reported rather than collected.
-
-          `form_source` falls back to the first action when none carries an answer yet, so the
-          block shows dashes rather than disappearing. Read with a loop, never entities[0].
-        {% endcomment %}
-        {% if form_source == null %}{% for a in rows %}{% if form_source == null %}{% assign form_source = a %}{% endif %}{% endfor %}{% endif %}
-
-        {% comment %}
-          The adviser's three answers and the Intelligent Office reference, asked ONCE for
-          the whole remediation (project owner, 2026-09-10: "they should be for the overall
-          remediation... the rows only need to record the remedial action for each issue").
-
-          AD-107 raises one action per fail item, and these five columns live on the action
-          row, so asking them in each row's panel asked an adviser with four issues the same
-          four questions four times. There is no case-level row to hold them, so the answers
-          are written to every one of this adviser's actions that is still open - which
-          keeps any action correct when read on its own, and survives an action being
-          deleted, as dropoutcomeactions does.
-
-          Completed actions are deliberately excluded from the list: RemediationResponseGuard
-          refuses a response-column change once an action is Completed, because that is what
-          the supervisor attested to (BR-008). So a later change reaches the actions still in
-          flight and leaves the attested ones as they were signed off.
-        {% endcomment %}
         {% assign outcome = null %}
         {% for o in caseoutcomes.results.entities %}{% if outcome == null %}{% assign outcome = o %}{% endif %}{% endfor %}
 
         {% comment %}
-          The rest of the paper form, read-only, in the three blocks the document draws:
-          the four answers two to a row, the regraded outcome with the note that says whose
-          signature it is, and the two sign-offs as signatory and date. The Code App builds
-          the same three from remediationFormLayout, so the two platforms cannot drift.
+          The rest of the paper form, read-only: the regraded outcome with the note that says
+          whose signature it is, and below it the two sign-offs as signatory and date.
 
-          Reported rather than collected. The three answers are written in the adviser's own
-          panel above, the regrade is al_RegradeCase and the supervisor's decision is a
-          create on al_signoff - rendering them as inputs here would put a second write path
-          on columns that already have a permissioned one.
+          The four answers are NOT repeated here. They close the actions table above, where
+          they are radios for this adviser and the recorded label for everyone else, so a
+          copy in this block drew the same four questions twice - an editable set and a grey
+          read-only set beneath it. One rendering, which already covers both readers.
+
+          Reported rather than collected: the regrade is al_RegradeCase and the supervisor's
+          decision is a create on al_signoff, so inputs here would be a second write path on
+          columns that already have a permissioned one.
         {% endcomment %}
         <table class="ot-remedial-form__grid">
-          <caption class="ot-visually-hidden">Questions for this remediation</caption>
+          <caption class="ot-visually-hidden">Regraded outcome for this remediation</caption>
           <tbody>
-            <tr>
-              <th scope="row">Client contact required?</th>
-              <td>{{ form_source.al_clientcontactrequired.label | default: '—' | escape }}</td>
-              <th scope="row">Recheck required?</th>
-              <td>{{ form_source.al_recheckrequired.label | default: '—' | escape }}</td>
-            </tr>
-            <tr>
-              <th scope="row">Do the remedial actions change the advice?</th>
-              <td>{{ form_source.al_changesadvice.label | default: '—' | escape }}</td>
-              <th scope="row">All remedial actions checked and approved?</th>
-              <td>{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</td>
-            </tr>
             <tr>
               <th scope="row">
                 Regraded outcome

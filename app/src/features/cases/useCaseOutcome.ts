@@ -6,6 +6,7 @@ import {
   Al_outcomesal_initialoutcome,
   type Al_outcomes,
 } from '../../generated/models/Al_outcomesModel';
+import { date } from '../../lib/format';
 
 export interface CaseOutcomeRow {
   id: string;
@@ -22,16 +23,6 @@ export type CaseOutcomeState =
   | { status: 'loading' }
   | { status: 'ready'; outcomes: CaseOutcomeRow[] };
 
-function date(value: string | undefined): string | null {
-  if (!value) return null;
-  const time = new Date(value).getTime();
-  if (Number.isNaN(time)) return null;
-  return new Date(time).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 function toOutcome(record: Al_outcomes): CaseOutcomeRow {
   return {

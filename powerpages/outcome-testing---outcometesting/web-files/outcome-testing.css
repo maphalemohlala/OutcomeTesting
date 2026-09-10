@@ -740,16 +740,6 @@ footer a:focus-visible, .footer a:focus-visible {
    answer stay secondary so a checker scans down the questions.
    ------------------------------------------------------------------ */
 
-.ot-section-help {
-  margin: 0;
-  padding: var(--space-3) var(--space-4) 0;
-  color: var(--colour-text-muted);
-  font-size: var(--text-sm);
-  max-width: 70ch;
-}
-
-.ot-answer--row .ot-answer__status { font-weight: 400; }
-
 .ot-required {
   display: inline-block;
   margin-left: var(--space-2);
@@ -761,19 +751,6 @@ footer a:focus-visible, .footer a:focus-visible {
   text-decoration: none;
   border-bottom: none;
   cursor: help;
-}
-
-.ot-type {
-  font-size: var(--text-xs);
-  color: var(--colour-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.ot-unanswered {
-  color: var(--colour-text-muted);
-  font-style: italic;
 }
 
 /* ------------------------------------------------------------------
@@ -865,8 +842,6 @@ footer a:focus-visible, .footer a:focus-visible {
    Adviser response (PP-12)
    ------------------------------------------------------------------ */
 
-.ot-response-row td { background: var(--colour-surface); }
-
 .ot-response summary {
   cursor: pointer;
   font-weight: 600;
@@ -874,61 +849,9 @@ footer a:focus-visible, .footer a:focus-visible {
   padding: var(--space-2) 0;
 }
 
-.ot-response__field {
-  display: grid;
-  gap: var(--space-2);
-  max-width: 44rem;
-  margin-bottom: var(--space-3);
-}
-
-.ot-response__field label { font-weight: 600; }
-
-.ot-response__label {
-  font-weight: 600;
-  color: var(--colour-text-muted);
-  font-size: var(--text-sm);
-}
-
-.ot-response__field select {
-  font: inherit;
-  padding: var(--space-2) var(--space-3);
-  color: var(--colour-text);
-  background: var(--colour-background);
-  border: 1px solid var(--colour-border-strong);
-  border-radius: var(--radius-sm);
-}
-
-.ot-response__field textarea,
-.ot-response__field input {
-  font: inherit;
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  color: var(--colour-text);
-  background: var(--colour-background);
-  border: 1px solid var(--colour-border-strong);
-  border-radius: var(--radius-sm);
-}
-
-.ot-response__hint {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--colour-text-muted);
-}
-
-.ot-response__actions {
-  display: flex;
-  gap: var(--space-3);
-  margin: 0 0 var(--space-2);
-}
-
 .ot-response__status { margin: 0; font-size: var(--text-sm); }
 .ot-response__status--success { color: var(--colour-outcome-pass); font-weight: 600; }
 .ot-response__status--error   { color: var(--colour-outcome-harm); font-weight: 600; }
-
-.ot-response__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-5); }
-.ot-response__field fieldset, fieldset.ot-response__field { border: 0; padding: 0; margin: 0 0 var(--space-4); }
-fieldset.ot-response__field legend { font-weight: 600; margin-bottom: var(--space-1); }
-fieldset.ot-response__field label { margin-right: var(--space-5); }
 
 /* ------------------------------------------------------------------
    Accessibility
@@ -1028,19 +951,7 @@ fieldset.ot-response__field label { margin-right: var(--space-5); }
    conveyed by colour alone, both NFR-ACC-01 requirements. */
 .ot-answer { border-bottom: 1px solid var(--ot-rule, #e5e5e5); padding: 1rem 0; }
 .ot-answer:last-child { border-bottom: 0; }
-.ot-answer__field { border: 0; margin: 0; padding: 0; }
-.ot-answer__legend { font-weight: 500; margin-bottom: 0.5rem; padding: 0; }
-.ot-answer__options { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 /* Primary root cause is a 3x3 grid on the document, read left to right, not one long run. */
-.ot-answer__options[data-ot-columns="3"] {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  max-width: 46rem;
-}
-.ot-answer__option { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
-.ot-answer__input { width: 100%; max-width: 46rem; padding: 0.5rem; font: inherit; }
-.ot-answer__input:focus-visible,
-.ot-answer__option input:focus-visible { outline: 3px solid var(--portalThemeColor1, #005a9e); outline-offset: 2px; }
 .ot-answer__status { min-height: 1.25rem; margin: 0.35rem 0 0; font-size: 0.85rem; }
 .ot-answer__status--saving { color: var(--ot-muted, #595959); }
 .ot-answer__status--saved { color: var(--ot-muted, #595959); }
@@ -1085,7 +996,6 @@ fieldset.ot-response__field label { margin-right: var(--space-5); }
    remediation should read like the review forms). The Code App mirrors this from
    remediationFormLayout. */
 .ot-checklist .ot-remedial-form__grid th { width: 22%; }
-.ot-checklist .ot-remedial-form__grid td { width: 28%; }
 .ot-checklist .ot-remedial-form__signoffs th { width: 50%; }
 
 /* The paper prints these in brackets beside the label, lighter than the label itself. */
@@ -1358,19 +1268,12 @@ fieldset.ot-response__field label { margin-right: var(--space-5); }
  * why the action was raised - sits under them once, rather than being repeated on every
  * row. Set below the items in weight because the items are what the adviser answers.
  */
-.ot-issue-note td {
-  padding-top: 0;
-  border-top: 0;
-  font-size: 0.9em;
-  color: var(--colour-text-muted);
-}
 
 /* The way back from a case's remediation form to the list of cases. */
 .ot-back {
   margin: 0 0 var(--space-3);
   font-size: var(--text-sm);
 }
-
 
 /* =========================================================================================
    The remediation form's editable cells (project owner, 2026-09-10)

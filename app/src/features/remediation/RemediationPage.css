@@ -12,20 +12,6 @@
   text-decoration: underline;
 }
 
-.remediation__section {
-  padding: var(--space-4);
-  margin-bottom: var(--space-5);
-  background: var(--colour-surface);
-  border: 1px solid var(--colour-border);
-}
-
-.remediation__section h2 {
-  margin-bottom: var(--space-3);
-  padding-bottom: var(--space-2);
-  font-size: var(--text-lg);
-  border-bottom: 1px solid var(--colour-border);
-}
-
 /* The case details, laid out as the portal's .ot-dl lays them out: the fields across the
    card rather than stacked down it, each a small uppercase label over its value. The app
    drew a two-column list, which put four short values in a narrow ribbon down the left and
@@ -51,12 +37,6 @@
 }
 
 /* The reference and the case status sit on one line, as the portal's card title does. */
-.remediation__heading {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
 
 .remediation__note {
   font-size: var(--text-sm);
@@ -75,40 +55,6 @@
   border: 0;
 }
 
-.remediation__notice {
-  margin-bottom: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
-  border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-border-strong);
-}
-
-.remediation__notice[data-tone='success'] {
-  border-left-color: var(--colour-action);
-}
-
-.remediation__action-btn {
-  padding: var(--space-1) var(--space-3);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--colour-action);
-  background: transparent;
-  border: 1px solid var(--colour-action);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-.remediation__action-btn:hover:not(:disabled) {
-  color: var(--colour-action-text);
-  background: var(--colour-action-hover);
-}
-
-.remediation__action-btn:disabled {
-  color: var(--colour-text-muted);
-  border-color: var(--colour-border);
-  cursor: not-allowed;
-}
-
 /* One non-pass item to a cell; long ones wrap rather than stretching the table. */
 .remediation__issue {
   min-width: 22ch;
@@ -118,10 +64,6 @@
  * The context an action carries behind its items - the checker's observation and why it
  * was raised - sits under them as a footnote rather than being repeated on every row.
  */
-.remediation__context td {
-  white-space: pre-line;
-  padding-top: 0;
-}
 
 .remediation__table td[data-empty='true'] {
   font-style: italic;

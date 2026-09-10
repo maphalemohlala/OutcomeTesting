@@ -129,10 +129,10 @@ namespace OutcomeTesting.Plugins
                     ["al_advisercode"] = outcomeCase.GetAttributeValue<string>("al_advisercode"),
                     ["al_paraplannername"] = outcomeCase.GetAttributeValue<string>("al_paraplanner"),
                     ["al_paraplannercode"] = outcomeCase.GetAttributeValue<string>("al_paraplannercode"),
-                    ["al_casetype"] = Formatted(outcomeCase, "al_casetype"),
-                    ["al_productsolutiontype"] = Formatted(outcomeCase, "al_productsolutiontype"),
+                    ["al_casetype"] = CommandHelpers.Formatted(outcomeCase, "al_casetype"),
+                    ["al_productsolutiontype"] = CommandHelpers.Formatted(outcomeCase, "al_productsolutiontype"),
                     ["al_clientname"] = outcomeCase.GetAttributeValue<string>("al_clientname"),
-                    ["al_preorpostcheck"] = Formatted(outcomeCase, "al_preorpostcheck"),
+                    ["al_preorpostcheck"] = CommandHelpers.Formatted(outcomeCase, "al_preorpostcheck"),
                     ["al_advicequalitygrade"] = adviceGrade,
                     ["al_filequalitygrade"] = fileQualityGrade,
                     ["al_fqfailadvisername"] = FlaggedText(outcomeRow, "al_fqadviseraccountable", outcomeCase, "al_advisername"),
@@ -171,11 +171,6 @@ namespace OutcomeTesting.Plugins
                 null, rows.ToString(), idempotencyKey, context);
 
             SetResponse(context, batchId.ToString("D"), rows.ToString(), "Generated", auditId, false);
-        }
-
-        private static string Formatted(Entity entity, string attribute)
-        {
-            return entity.FormattedValues.ContainsKey(attribute) ? entity.FormattedValues[attribute] : null;
         }
 
         // AD-039 col 15 Advice Quality grade = final outcome, or initial when not yet

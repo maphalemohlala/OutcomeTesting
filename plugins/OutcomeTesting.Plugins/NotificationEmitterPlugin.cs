@@ -132,8 +132,41 @@ namespace OutcomeTesting.Plugins
             var action = service.Retrieve(ActionEntity, actionId,
                 new ColumnSet("al_assignedcontactid", CaseLookup, "al_name", "al_duedate", "al_reviewinstanceid"));
 
+            // Keyed on the review rather than on the action, so a submission that raises one
+            // action per thing the checker marked down (2026-09-10) sends one email and not
+            // one per item: the outbox code is derived from the target, so the second and
+            // later actions resolve to a code the outbox already holds. A later review on the
+            // same case is a different target, so it still tells the adviser.
+            //
+            // An action with no review behind it falls back to itself, which is the behaviour
+            // every action had before.
+            var reviewRef = action.GetAttributeValue<EntityReference>("al_reviewinstanceid");
+            var targetTable = reviewRef == null ? ActionEntity : reviewRef.LogicalName;
+            var targetId = reviewRef == null ? actionId : reviewRef.Id;
+
+            // Asked before the body is built, not after. Everything below costs a round trip
+            // apiece - the case, the contact, the grade, the portal domain - and on a review
+            // that raised one action per marked-down item every action after the first would
+            // pay all of them only for Queue to find the row already there and discard the
+            // lot. The code depends on nothing but the action just read, so the cheap question
+            // can be asked first.
+            if (NotificationOutbox.AlreadyQueued(
+                service, NotificationOutbox.EventRemediationAssigned, targetId, null))
+            {
+                return;
+            }
+
             var caseRef = action.GetAttributeValue<EntityReference>(CaseLookup);
-            var reference = NotificationOutbox.CaseReference(service, caseRef) ?? "a case";
+
+            // One read of the case, not two: the reference for the subject line and the names
+            // the letter opens with come back together.
+            var caseRow = caseRef == null
+                ? null
+                : service.Retrieve("al_outcomecase", caseRef.Id,
+                    new ColumnSet("al_casereference", "al_advisername", "al_clientname"));
+
+            var reference = (caseRow == null ? null : caseRow.GetAttributeValue<string>("al_casereference"))
+                ?? "a case";
             var email = NotificationOutbox.ContactEmail(service, action.GetAttributeValue<EntityReference>("al_assignedcontactid"));
 
             var due = action.GetAttributeValue<DateTime?>("al_duedate");
@@ -141,17 +174,27 @@ namespace OutcomeTesting.Plugins
                 ? " It is due by " + due.Value.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) + "."
                 : string.Empty;
 
-            // Keyed on the review rather than on the action, so a submission that raises one
-            // action per thing the checker marked down (2026-09-10) sends one email and not
-            // one per item: the outbox code is derived from the target, and the second and
-            // later creates hit the alternate key and are treated as already queued. A later
-            // review on the same case is a different target, so it still tells the adviser.
-            //
-            // An action with no review behind it falls back to itself, which is the behaviour
-            // every action had before.
-            var reviewRef = action.GetAttributeValue<EntityReference>("al_reviewinstanceid");
-            var targetTable = reviewRef == null ? ActionEntity : reviewRef.LogicalName;
-            var targetId = reviewRef == null ? actionId : reviewRef.Id;
+            // The letter the grading earned (project owner, 2026-09-10). Null for a grading
+            // the supplied copy was not written for - a flagged Pass, or a Tax leg, which
+            // records no BR-005 grade at all - and those keep the wording they already had
+            // rather than being told they received a grading they did not.
+            var grade = NotificationOutbox.InitialOutcome(service, reviewRef);
+
+            var subject = NotificationBodies.RemediationSubject(grade, reference);
+            var body = NotificationBodies.Remediation(
+                grade,
+                caseRow == null ? null : caseRow.GetAttributeValue<string>("al_advisername"),
+                caseRow == null ? null : caseRow.GetAttributeValue<string>("al_clientname"),
+                NotificationOutbox.CaseLink(service, caseRef),
+                dueText);
+
+            if (subject == null || body == null)
+            {
+                subject = "Remediation required on case " + reference;
+                body = "Remediation has been raised against case " + reference
+                    + " and assigned to you (BR-006)." + dueText
+                    + " Record your response against each item in the portal.";
+            }
 
             NotificationOutbox.Queue(
                 service,
@@ -160,10 +203,53 @@ namespace OutcomeTesting.Plugins
                 targetTable,
                 targetId,
                 email,
-                "Remediation required on case " + reference,
-                "Remediation has been raised against case " + reference
-                    + " and assigned to you (BR-006)." + dueText
-                    + " Record your response against each item in the portal.");
+                subject,
+                body);
+        }
+
+        /// <summary>
+        /// Tells the adviser their case was checked and passed, and that nothing is owed
+        /// (project owner, 2026-09-10). Called from <see cref="SubmitReviewPlugin"/> on a
+        /// submit that closes the case having raised no remediation - the test itself is
+        /// <see cref="OutcomeRules.EarnsPassNotification"/>, which is where the reasoning
+        /// for it lives.
+        ///
+        /// Public, unlike the two above, because its caller's success path is not reachable
+        /// in a unit test without standing up a whole checklist, and which adviser is told
+        /// their case passed is worth holding directly rather than through a fixture.
+        ///
+        /// Keyed on the case, so a replayed submit finds the row already queued rather than
+        /// sending the letter twice.
+        /// </summary>
+        public static void QueueCasePassed(IOrganizationService service, Guid correlationId, EntityReference caseRef)
+        {
+            if (caseRef == null)
+            {
+                return;
+            }
+
+            var caseRow = service.Retrieve("al_outcomecase", caseRef.Id,
+                new ColumnSet("al_casereference", "al_advisername", "al_clientname"));
+
+            var reference = caseRow.GetAttributeValue<string>("al_casereference");
+
+            // The adviser is named on the case as text; AdviserContact is what turns that
+            // into an address, and it declines rather than guess between two of the same
+            // name. An unmatched adviser still queues the row - see Queue.
+            var email = NotificationOutbox.ContactEmail(service, Remediation.AdviserContact(service, caseRef));
+
+            NotificationOutbox.Queue(
+                service,
+                correlationId,
+                NotificationOutbox.EventCasePassed,
+                "al_outcomecase",
+                caseRef.Id,
+                email,
+                NotificationBodies.PassSubject(reference),
+                NotificationBodies.Pass(
+                    caseRow.GetAttributeValue<string>("al_advisername"),
+                    caseRow.GetAttributeValue<string>("al_clientname"),
+                    NotificationOutbox.CaseLink(service, caseRef)));
         }
     }
 }

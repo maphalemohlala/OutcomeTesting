@@ -131,7 +131,7 @@
               <displayname description="Event" languagecode="1033" />
             </displaynames>
             <Descriptions>
-              <Description description="Which business event this notifies. The five AD-035 names only; PP-15's other four are not enumerated in any requirement (OD-030 gap (a))." languagecode="1033" />
+              <Description description="Which business event this notifies. The five AD-035 names, plus Case passed for the adviser letter added 2026-09-10; PP-15's other names are not enumerated in any requirement (OD-030 gap (a))." languagecode="1033" />
             </Descriptions>
             <options>
               <option value="120910800" IsHidden="0">
@@ -174,13 +174,21 @@
                   <Description description="A T&amp;C Manager rejected a remediation and sent it back (BR-008)." languagecode="1033" />
                 </Descriptions>
               </option>
+              <option value="120910805" IsHidden="0">
+                <labels>
+                  <label description="Case passed" languagecode="1033" />
+                </labels>
+                <Descriptions>
+                  <Description description="A submit closed the case having raised no remediation, so the adviser is told it passed (project owner, 2026-09-10)." languagecode="1033" />
+                </Descriptions>
+              </option>
             </options>
           </optionset>
           <displaynames>
             <displayname description="Event" languagecode="1033" />
           </displaynames>
           <Descriptions>
-            <Description description="Which business event this notifies. The five AD-035 names only; PP-15's other four are not enumerated in any requirement (OD-030 gap (a))." languagecode="1033" />
+            <Description description="Which business event this notifies. The five AD-035 names, plus Case passed for the adviser letter added 2026-09-10; PP-15's other names are not enumerated in any requirement (OD-030 gap (a))." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_FailureReason">

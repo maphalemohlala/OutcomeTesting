@@ -71,20 +71,8 @@ namespace OutcomeTesting.Plugins
             // retry will not change; NotificationDrain has already recorded that reason on
             // the row, where a person can see it and al_DrainNotifications can retry it
             // deliberately.
-            NotificationDrain.Send(service, notification, Sender(context));
+            NotificationDrain.Send(service, notification, CommandHelpers.Sender(context));
         }
 
-        /// <summary>
-        /// The account the step runs as. <c>UserId</c> is the registered (or impersonated)
-        /// user, not the person whose action queued the row — which is the point: portal
-        /// writes reach Dataverse as the site's application user (AD-053), so the initiating
-        /// user is not a mailbox anyone approved.
-        /// </summary>
-        private static EntityReference Sender(IPluginExecutionContext context)
-        {
-            return context.UserId == Guid.Empty
-                ? null
-                : new EntityReference("systemuser", context.UserId);
-        }
     }
 }

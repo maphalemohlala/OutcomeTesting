@@ -53,10 +53,10 @@ namespace OutcomeTesting.Plugins
 
             var targetId = CommandHelpers.ParseRequiredGuid(context, InTargetId);
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
-            var fqAdviser = GetBool(context, InFqAdviser);
-            var fqParaplanner = GetBool(context, InFqParaplanner);
-            var aqAdviser = GetBool(context, InAqAdviser);
-            var aqParaplanner = GetBool(context, InAqParaplanner);
+            var fqAdviser = CommandHelpers.GetRequiredBool(context, InFqAdviser);
+            var fqParaplanner = CommandHelpers.GetRequiredBool(context, InFqParaplanner);
+            var aqAdviser = CommandHelpers.GetRequiredBool(context, InAqAdviser);
+            var aqParaplanner = CommandHelpers.GetRequiredBool(context, InAqParaplanner);
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "page.cases", PermissionHelpers.AccessEdit);
 
@@ -100,17 +100,6 @@ namespace OutcomeTesting.Plugins
                 null, details, idempotencyKey, context);
 
             SetResponse(context, "Recorded", auditId);
-        }
-
-        private static bool GetBool(IPluginExecutionContext context, string name)
-        {
-            object value;
-            if (context.InputParameters.TryGetValue(name, out value) && value is bool)
-            {
-                return (bool)value;
-            }
-
-            throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + name + " is required.");
         }
 
         private static void SetResponse(IPluginExecutionContext context, string status, Guid auditId)

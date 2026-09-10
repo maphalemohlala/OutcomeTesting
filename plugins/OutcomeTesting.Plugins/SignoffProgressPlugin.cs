@@ -217,10 +217,11 @@ namespace OutcomeTesting.Plugins
 
             // Matched on the actions themselves rather than on the case, because a sign-off
             // does not always carry the case lookup - ResolveCase above exists for that.
-            var keys = new List<object>();
+            var keys = new object[undecided.Count];
+            var next = 0;
             foreach (var id in undecided)
             {
-                keys.Add(id);
+                keys[next++] = id;
             }
 
             var signoffs = new QueryExpression(SignoffEntity)
@@ -228,7 +229,7 @@ namespace OutcomeTesting.Plugins
                 ColumnSet = new ColumnSet(ActionLookup),
                 Criteria = new FilterExpression(),
             };
-            signoffs.Criteria.AddCondition(ActionLookup, ConditionOperator.In, keys.ToArray());
+            signoffs.Criteria.AddCondition(ActionLookup, ConditionOperator.In, keys);
 
             foreach (var signoff in service.RetrieveMultiple(signoffs).Entities)
             {

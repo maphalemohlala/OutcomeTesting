@@ -65,7 +65,7 @@ namespace OutcomeTesting.Plugins
 
             var idempotencyKey = CompletionKey(actionId, action.GetAttributeValue<DateTime?>(ClockStartedOnAttr));
 
-            var details = "Completed from the portal by contact " + Describe(contact) + ".";
+            var details = "Completed from the portal by contact " + CommandHelpers.Describe(contact) + ".";
 
             CompleteRemediationPlugin.Complete(
                 service,
@@ -109,16 +109,5 @@ namespace OutcomeTesting.Plugins
             return key;
         }
 
-        private static string Describe(EntityReference contact)
-        {
-            if (contact == null)
-            {
-                return "(none recorded)";
-            }
-
-            return string.IsNullOrEmpty(contact.Name)
-                ? contact.Id.ToString("D")
-                : contact.Name + " " + contact.Id.ToString("D");
-        }
     }
 }

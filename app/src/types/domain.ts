@@ -118,15 +118,6 @@ export const REVIEW_TYPES = ['Tax', 'AQS'] as const;
 
 export type ReviewType = (typeof REVIEW_TYPES)[number];
 
-/**
- * OD-007 (resolved 2026-08-26, AD-031). The privileged actions that reopen or
- * rewrite a graded outcome. Each preserves the initial outcome as a new record
- * rather than editing it in place (BR-007).
- */
-export const PRIVILEGED_OUTCOME_ACTIONS = ['Reopen', 'Override', 'Regrade'] as const;
-
-export type PrivilegedOutcomeAction = (typeof PRIVILEGED_OUTCOME_ACTIONS)[number];
-
 /** AD-020, AD-031. The elevated role that owns outcome corrections. */
 export const OUTCOME_CORRECTION_ROLE = 'T&C Manager' as const;
 

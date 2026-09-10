@@ -78,7 +78,7 @@ namespace OutcomeTesting.Plugins
             // actor - the details line was the only place the person's identity survived, and
             // free text is not where a history log should have to look for it.
             var contact = AssignedContact(service, reviewId);
-            var details = "Submitted from the portal by contact " + Describe(contact) + ".";
+            var details = "Submitted from the portal by contact " + CommandHelpers.Describe(contact) + ".";
 
             SubmitReviewPlugin.Submit(
                 service,
@@ -98,16 +98,5 @@ namespace OutcomeTesting.Plugins
             return review.GetAttributeValue<EntityReference>(AssignedContactAttr);
         }
 
-        private static string Describe(EntityReference contact)
-        {
-            if (contact == null)
-            {
-                return "(none recorded)";
-            }
-
-            return string.IsNullOrEmpty(contact.Name)
-                ? contact.Id.ToString("D")
-                : contact.Name + " " + contact.Id.ToString("D");
-        }
     }
 }

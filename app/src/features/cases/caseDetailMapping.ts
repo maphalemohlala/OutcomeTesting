@@ -15,6 +15,7 @@ import {
 } from '../../generated/models/Al_outcomecasesModel';
 import { choiceLabel as choice } from '../../lib/choiceLabel';
 import { lookupLabel } from './lookupLabel';
+import { date, text } from '../../lib/format';
 
 /**
  * Pure record-to-view mapping, kept free of the generated services so it stays unit
@@ -85,21 +86,7 @@ function ageInDays(createdOn: string | undefined): number {
   return Math.max(0, Math.floor((Date.now() - created) / 86_400_000));
 }
 
-function text(value: string | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}
 
-function date(value: string | undefined): string | null {
-  if (!value) return null;
-  const time = new Date(value).getTime();
-  if (Number.isNaN(time)) return null;
-  return new Date(time).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 /** ISO/date string to yyyy-MM-dd for a date input, or '' when absent/invalid. */
 function ymd(value: string | undefined): string {
