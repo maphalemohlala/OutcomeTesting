@@ -28,6 +28,14 @@ export interface RemediationActionRow {
   recheckRequired: string | null;
   changesAdvice: string | null;
   assignedTo: string | null;
+  /**
+   * Raw, unformatted. The BR-010 clock counts working days off createdOn and
+   * clockStartedOn, and "the most recently completed action" has to compare completions -
+   * neither of which a display date like "22 Sep 2026" can answer.
+   */
+  createdOn: string | null;
+  clockStartedOn: string | null;
+  completedOnRaw: string | null;
 }
 
 export interface OutcomeRow {
@@ -48,6 +56,13 @@ export interface SignoffRow {
   notes: string | null;
   signedOffOn: string | null;
   remediationAction: string | null;
+  /**
+   * The action this sign-off is against.
+   *
+   * The id, not the name: every action a review raises shares one al_name ("Remediation
+   * IO-SEED-TAX-01"), so a sign-off matched by name would attach to all of them alike.
+   */
+  remediationActionId: string | null;
   signedOffBy: string | null;
 }
 
@@ -102,6 +117,9 @@ export function toAction(record: Al_remediationactions): RemediationActionRow {
     clientContactRequired: choice(record, 'al_clientcontactrequired', CLIENT_CONTACT_REQUIRED),
     recheckRequired: choice(record, 'al_recheckrequired', RECHECK_REQUIRED),
     changesAdvice: choice(record, 'al_changesadvice', CHANGES_ADVICE),
+    createdOn: (extra.createdon as string | undefined) ?? null,
+    clockStartedOn: (extra.al_clockstartedon as string | undefined) ?? null,
+    completedOnRaw: record.al_completedon ?? null,
     rowVersion: record.versionnumber != null ? String(record.versionnumber) : null,
   };
 }
@@ -137,6 +155,10 @@ export function toSignoff(record: Al_signoffs): SignoffRow {
     notes: text(record.al_notes),
     signedOffOn: date(record.al_signedoffon),
     remediationAction: text(record.al_remediationactionidname),
+    remediationActionId:
+      ((record as unknown as Record<string, unknown>)._al_remediationactionid_value as
+        | string
+        | undefined) ?? null,
     signedOffBy: text(record.owneridname),
   };
 }

@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { RemediationActionRow } from './remediationMapping';
@@ -10,7 +11,9 @@ vi.mock('../../services/commands/completeRemediation', () => ({ completeRemediat
 vi.mock('../../services/errors', () => ({ messageForFailure: () => '' }));
 vi.mock('../../hooks/useIntentKey', () => ({ useIntentKeys: () => ({ keyFor: () => '' }) }));
 
-const { ActionsTable, RemediationDetails } = await import('./RemediationPage');
+const { ActionsTable, RemediationDetails, RemediationFormBlock } = await import(
+  './RemediationPage',
+);
 
 /**
  * What the Code App's remediation page actually draws, as markup.
@@ -26,6 +29,8 @@ const DESCRIPTION = [
   '- Fail point: AML - CRA information not recorded on FactFind',
   '- Fail point: Breach - Any other process breach has been identified',
   '- Fail point: Record Keeping - Concession required but not on file',
+  '',
+  'The checker recorded: no CRA on file',
   '',
   'Raised automatically when the review was submitted (Tax check: Pass). Review the file and record what you have put right.',
 ].join('\n');
@@ -47,12 +52,21 @@ function action(id: string, description: string): RemediationActionRow {
     recheckRequired: null,
     changesAdvice: null,
     assignedTo: 'Seed Adviser 01',
+    createdOn: '2026-09-08T09:00:00Z',
+    clockStartedOn: null,
+    completedOnRaw: null,
   };
 }
 
 function draw(actions: RemediationActionRow[]): string {
   return renderToStaticMarkup(
-    <ActionsTable actions={actions} busyId={null} onComplete={() => {}} />,
+    <ActionsTable
+      actions={actions}
+      signoffs={[]}
+      adviserName={null}
+      busyId={null}
+      onComplete={() => {}}
+    />,
   );
 }
 
@@ -101,23 +115,32 @@ describe('the remediation actions table', () => {
 
   it('spans the action’s own columns across its items rather than repeating them', () => {
     const markup = draw([action('a1', DESCRIPTION)]);
-    // Nine columns follow the issue: remedial action, owner, target date, status, the three
-    // form answers, adviser sign-off, and the complete button.
+    // Seven columns follow the issue: remedial action, owner, target date, status, age,
+    // sign-off, and the complete button. The four that carried the adviser's answers are
+    // gone - they are the form block under the table now.
     // React’s server renderer writes the attribute as rowSpan; HTML parses it either way.
-    expect([...markup.matchAll(/rowspan="4"/gi)]).toHaveLength(9);
+    expect([...markup.matchAll(/rowspan="4"/gi)]).toHaveLength(7);
 
     const body = rows(markup).slice(1);
-    expect(body[0]).toHaveLength(11);
+    expect(body[0]).toHaveLength(9);
     expect(body[1]).toHaveLength(2);
   });
 
-  it('shows the context behind the items once, under them', () => {
+  it('shows the checker’s own words once, under the items', () => {
     const body = rows(draw([action('a1', DESCRIPTION)])).slice(1);
     const note = body[4];
 
     expect(note).toHaveLength(1);
-    expect(note[0]).toContain('Raised automatically when the review was submitted');
-    expect(note[0]).not.toContain('Fail point');
+    expect(note[0]).toBe('The checker recorded: no CRA on file');
+  });
+
+  it('never repeats the standing sentence under the rows', () => {
+    // It said the same thing under every row of every case, and both halves of it are on
+    // the page in their own right now (project owner, 2026-09-10).
+    const markup = draw([action('a1', DESCRIPTION)]);
+
+    expect(markup).not.toContain('Raised automatically when the review was submitted');
+    expect(markup).not.toContain('Review the file and record what you have put right');
   });
 
   it('numbers straight through a second action', () => {
@@ -135,19 +158,47 @@ describe('the remediation actions table', () => {
   });
 
   it('still draws an action whose description carries no item list', () => {
-    const plain = 'Raised automatically when the review was submitted. Review the file.';
-    const body = rows(draw([action('a1', plain)])).slice(1);
+    // What dropoutcomeactions leaves behind when it strips a case's only action: the
+    // checker's words and nothing else.
+    const stripped = [
+      'The checker recorded: failed',
+      '',
+      'Raised automatically when the review was submitted (Tax check: Fail). Review the file.',
+    ].join('\n');
+    const body = rows(draw([action('a1', stripped)])).slice(1);
 
     expect(body).toHaveLength(1);
-    expect(body[0].slice(0, 2)).toEqual(['1', plain]);
+    expect(body[0].slice(0, 2)).toEqual(['1', 'The checker recorded: failed']);
+  });
+
+  it('falls back to a dash when a description says nothing at all', () => {
+    const body = rows(draw([action('a1', 'Raised automatically when the review was submitted.')])).slice(1);
+
+    expect(body).toHaveLength(1);
+    expect(body[0][1]).toBe('—');
   });
 });
 
+function details(outcome: string | null): string {
+  return renderToStaticMarkup(
+    <MemoryRouter>
+      <RemediationDetails
+        outcomeCase={{
+          reference: 'IO-SEED-TAX-01',
+          status: 'Awaiting Remediation',
+          clientName: 'Seed Client TAX01',
+          adviserName: 'Seed Adviser 01',
+        }}
+        outcome={outcome}
+        caseId={'case-1'}
+      />
+    </MemoryRouter>,
+  );
+}
+
 describe('the remediation details', () => {
   it('shows the outcome above the table, not as one of its numbered rows', () => {
-    const markup = renderToStaticMarkup(
-      <RemediationDetails outcome={'Tax check: Insufficient evidence'} />,
-    );
+    const markup = details('Tax check: Insufficient evidence');
 
     expect(markup).toContain('<dt>Outcome</dt>');
     expect(markup).toContain('Tax check: Insufficient evidence');
@@ -156,7 +207,50 @@ describe('the remediation details', () => {
     );
   });
 
-  it('draws nothing at all when the actions name no outcome', () => {
-    expect(renderToStaticMarkup(<RemediationDetails outcome={null} />)).toBe('');
+  it('names the client, the adviser and a way back to the case, as the portal does', () => {
+    const markup = details('Tax check: Insufficient evidence');
+
+    expect(markup).toContain('<dt>Client</dt>');
+    expect(markup).toContain('Seed Client TAX01');
+    expect(markup).toContain('<dt>Adviser</dt>');
+    expect(markup).toContain('Seed Adviser 01');
+    expect(markup).toContain('Open the full case record');
+  });
+
+  it('draws nothing at all when there is neither a case nor an outcome', () => {
+    expect(
+      renderToStaticMarkup(
+        <MemoryRouter>
+          <RemediationDetails outcomeCase={null} outcome={null} caseId={undefined} />
+        </MemoryRouter>,
+      ),
+    ).toBe('');
+  });
+});
+
+describe('the remediation form block', () => {
+  it('draws the eight fields of the form’s last block, not four columns per row', () => {
+    const markup = renderToStaticMarkup(
+      <RemediationFormBlock actions={[action('a1', DESCRIPTION)]} outcomes={[]} signoffs={[]} />,
+    );
+
+    for (const label of [
+      'Client contact required?',
+      'Recheck required?',
+      'Do the remedial actions change the advice?',
+      'All remedial actions checked and approved?',
+      'Regraded outcome',
+      'Date',
+      'Supervisor sign-off',
+      'Adviser sign-off',
+    ]) {
+      expect(markup).toContain(label);
+    }
+
+    // And none of them is a column any more.
+    const header = rows(draw([action('a1', DESCRIPTION)]))[0];
+    expect(header).not.toContain('Client contact');
+    expect(header).not.toContain('Recheck');
+    expect(header).not.toContain('Changes advice');
   });
 });

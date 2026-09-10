@@ -349,6 +349,13 @@
                   those items one to a row, so they are split back out here and the rest is
                   shown once, under them.
 
+                  The standing sentence is dropped rather than shown: it said the same thing
+                  under every row of every case, and both halves of it are on the page in
+                  their own right now - the outcome as the remediation's Outcome above, and
+                  what to do about it as the row the adviser answers (project owner,
+                  2026-09-10). It stays in al_description, which is the record Dataverse
+                  keeps and the only place the outcome is written down.
+
                   Every filter used is one this site already relies on elsewhere, and the
                   arguments are the shapes it already passes: no two-argument truncate and
                   no multi-character split, both of which this Liquid rejects. The line
@@ -366,7 +373,7 @@
                 {% assign ot_flat = a.al_description | newline_to_br | replace: '<br />', '|' | replace: '<br>', '|' %}
                 {% assign ot_lines = ot_flat | split: '|' %}
                 {% assign ot_count = 0 %}
-                {% capture ot_note %}{% for l in ot_lines %}{% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}{% if rebuilt == line %}{% assign ot_count = ot_count | plus: 1 %}{% elsif line != '' and line != 'Issues found on the check:' %}{{ line }} {% endif %}{% endfor %}{% endcapture %}
+                {% capture ot_note %}{% for l in ot_lines %}{% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}{% if rebuilt == line %}{% assign ot_count = ot_count | plus: 1 %}{% elsif line != '' and line != 'Issues found on the check:' %}{% unless line contains 'Raised automatically when the review was submitted' %}{% unless line contains 'Review the file and record what you have put right' %}{{ line }} {% endunless %}{% endunless %}{% endif %}{% endfor %}{% endcapture %}
                 {% assign ot_note = ot_note | strip %}
                 {% if ot_count > 0 %}
                   {% assign ot_shown = 0 %}

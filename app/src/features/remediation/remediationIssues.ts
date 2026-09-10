@@ -26,6 +26,28 @@ const ISSUES_HEADING = 'Issues found on the check:';
  */
 const OUTCOME_MARKER = 'submitted (';
 
+/**
+ * The sentence `Remediation.Describe` ends every description with: "Raised automatically
+ * when the review was submitted (<outcome>). Review the file and record what you have put
+ * right."
+ *
+ * Not shown (project owner, 2026-09-10). It said the same thing under every row of every
+ * case, and both halves of it are now on the page in their own right - the outcome as the
+ * remediation's Outcome, and what to do about it as the row the adviser answers. What is
+ * left of a note is the checker's own words, which are particular to the case.
+ *
+ * It stays in `al_description`, which is the record Dataverse keeps and the only place the
+ * outcome is written down; this drops it on the way to the screen, not out of the data.
+ */
+const STANDING_SENTENCE = 'Raised automatically when the review was submitted';
+
+/**
+ * The second half of it. `Remediation.Describe` writes the whole sentence on one line, but
+ * a description that has been through a renderer, an export or a hand edit can carry the
+ * break, and half a sentence left under the rows is worse than either whole or gone.
+ */
+const STANDING_TAIL = 'Review the file and record what you have put right';
+
 export interface RemediationIssues {
   /** One entry per item the checker marked down; empty when the description carries none. */
   issues: string[];
@@ -36,7 +58,10 @@ export interface RemediationIssues {
 }
 
 /**
- * The outcome out of the note's standing sentence.
+ * The outcome out of the description's standing sentence.
+ *
+ * Read from the description rather than from the note, because the note no longer carries
+ * the sentence: it is dropped on the way to the screen and the outcome would go with it.
  *
  * The marker has to be present before the brackets mean anything: a description with no
  * reason behind it still carries the sentence, and a checker's observation is free text
@@ -45,18 +70,18 @@ export interface RemediationIssues {
  * below it - which is the one rule the two portal templates can also follow, Liquid having
  * no multi-character `split` on this site.
  */
-function outcomeIn(note: string | null): string | null {
-  if (note === null || !note.includes(OUTCOME_MARKER)) {
+function outcomeIn(description: string): string | null {
+  if (!description.includes(OUTCOME_MARKER)) {
     return null;
   }
 
-  const open = note.lastIndexOf('(');
-  const close = note.indexOf(')', open);
+  const open = description.lastIndexOf('(');
+  const close = description.indexOf(')', open);
   if (close < 0) {
     return null;
   }
 
-  const outcome = note.slice(open + 1, close).trim();
+  const outcome = description.slice(open + 1, close).trim();
   return outcome ? outcome : null;
 }
 
@@ -75,7 +100,11 @@ export function splitIssues(description: string | null | undefined): Remediation
       continue;
     }
 
-    if (line === ISSUES_HEADING) {
+    if (
+      line === ISSUES_HEADING ||
+      line.startsWith(STANDING_SENTENCE) ||
+      line.startsWith(STANDING_TAIL)
+    ) {
       continue;
     }
 
@@ -86,12 +115,17 @@ export function splitIssues(description: string | null | undefined): Remediation
   // worth keeping; the gap the items left behind is not.
   const note = rest.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 
-  const text = note ? note : null;
-  return { issues, note: text, outcome: outcomeIn(text) };
+  return { issues, note: note ? note : null, outcome: outcomeIn(description ?? '') };
 }
 
-/** Columns in the actions table, for the row a group's note spans. */
-export const ACTION_COLUMNS = 11;
+/**
+ * Columns in the actions table, for the row a group's note spans.
+ *
+ * No., issue, remedial action, owner, target date, status, age, sign-off, and the column
+ * the Mark complete button sits in. The four that carried the adviser's answers are gone:
+ * they are the form's last block now, drawn once under the table as the portal draws it.
+ */
+export const ACTION_COLUMNS = 9;
 
 export interface IssueLine {
   number: number;

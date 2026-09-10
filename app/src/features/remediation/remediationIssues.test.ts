@@ -80,12 +80,21 @@ describe('splitIssues', () => {
     ]);
   });
 
-  it('leaves the checker note and the standing sentence as the note, without the heading', () => {
-    expect(splitIssues(DESCRIPTION).note).toBe(
-      'The checker recorded: passed\n\n' +
-        'Raised automatically when the review was submitted (Tax check: Insufficient evidence).\n' +
-        'Review the file and record what you have put right.',
-    );
+  it('leaves the checker’s own words as the note, and nothing else', () => {
+    // The standing sentence is not shown (project owner, 2026-09-10): it said the same
+    // thing under every row of every case, and both halves of it are on the page in their
+    // own right now - the outcome as the remediation's Outcome, and what to do about it as
+    // the row the adviser answers.
+    expect(splitIssues(DESCRIPTION).note).toBe('The checker recorded: passed');
+  });
+
+  it('drops the standing sentence even when it arrives broken across lines', () => {
+    const split = [
+      'Raised automatically when the review was submitted (Tax check: Fail).',
+      'Review the file and record what you have put right.',
+    ].join('\n');
+
+    expect(splitIssues(split).note).toBeNull();
   });
 
   it('reads a description written with Windows line endings', () => {
@@ -97,9 +106,14 @@ describe('splitIssues', () => {
     });
   });
 
-  it('leaves a description with no items whole, as the note', () => {
-    const plain = 'Raised automatically when the review was submitted. Review the file.';
+  it('leaves a description the plug-in did not write whole, as the note', () => {
+    const plain = 'Please re-check the client agreement before responding.';
     expect(splitIssues(plain)).toEqual({ issues: [], note: plain, outcome: null });
+  });
+
+  it('has no note left when the description was only the standing sentence', () => {
+    const standing = 'Raised automatically when the review was submitted. Review the file.';
+    expect(splitIssues(standing).note).toBeNull();
   });
 
   it('reads an item list with no checker observation behind it', () => {
@@ -139,6 +153,9 @@ function action(id: string, description: string): RemediationActionRow {
     recheckRequired: null,
     changesAdvice: null,
     assignedTo: null,
+    createdOn: null,
+    clockStartedOn: null,
+    completedOnRaw: null,
   };
 }
 
@@ -165,8 +182,8 @@ describe('groupIssues', () => {
 
   it('keeps the context off the item rows, as the group note', () => {
     const [group] = groupIssues([action('a', DESCRIPTION)]);
-    expect(group.lines.some((line) => line.issue.includes('Raised automatically'))).toBe(false);
-    expect(group.note).toContain('Raised automatically');
+    expect(group.lines.some((line) => line.issue.includes('The checker recorded'))).toBe(false);
+    expect(group.note).toBe('The checker recorded: passed');
   });
 
   it('shows the shared context once across the actions a review raised together', () => {
@@ -190,10 +207,22 @@ describe('groupIssues', () => {
   });
 
   it('shows an action with no item list as one row, and adds no note under it', () => {
-    const plain = 'Raised automatically when the review was submitted. Review the file.';
-    const [group] = groupIssues([action('a', plain)]);
-    expect(group.lines).toEqual([{ number: 1, issue: plain }]);
+    // What dropoutcomeactions leaves when it strips a case's only action: the checker's
+    // words become the row, because there is no item to number.
+    const stripped = [
+      'The checker recorded: failed',
+      '',
+      'Raised automatically when the review was submitted (Tax check: Fail). Review the file.',
+    ].join('\n');
+    const [group] = groupIssues([action('a', stripped)]);
+    expect(group.lines).toEqual([{ number: 1, issue: 'The checker recorded: failed' }]);
     expect(group.note).toBeNull();
+  });
+
+  it('falls back to a dash when the description says nothing of its own', () => {
+    const standing = 'Raised automatically when the review was submitted. Review the file.';
+    const [group] = groupIssues([action('a', standing)]);
+    expect(group.lines).toEqual([{ number: 1, issue: '—' }]);
   });
 
   it('still gives an action with no description at all a row', () => {

@@ -5,14 +5,18 @@ import { Notice } from '../../components/feedback/Notice';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import {
   useRemediation,
+  type RemediationCase,
   type OutcomeRow,
   type RemediationActionRow,
   type SignoffRow,
 } from './useRemediation';
 import { ACTION_COLUMNS, groupIssues, outcomeOf } from './remediationIssues';
+import { remediationForm, signoffCell } from './remediationForm';
+import { remediationClock } from '../../lib/workingDays';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { completeRemediation } from '../../services/commands/completeRemediation';
 import { messageForFailure } from '../../services/errors';
+import { classify } from '../../services/commands/failures';
 import './RemediationPage.css';
 
 interface NoticeState {
@@ -24,25 +28,58 @@ function canComplete(status: string): boolean {
   return status === 'Open' || status === 'In progress';
 }
 
+/** The BR-010 age, in the words the portal uses for it. */
+function ageOf(action: RemediationActionRow): string {
+  if (!action.createdOn) return '—';
+  const { current } = remediationClock({
+    createdon: action.createdOn,
+    al_clockstartedon: action.clockStartedOn ?? undefined,
+    al_completedon: action.completedOnRaw ?? undefined,
+  });
+  return current === 1 ? '1 working day' : `${current} working days`;
+}
+
 /**
- * The remediation's own details, above the actions.
+ * The remediation's details, above the actions.
  *
- * The outcome sits here rather than in the table. It is the result every issue in the
- * table is a reason for, so numbering it among them read as one more thing the adviser
- * had to put right (project owner, 2026-09-10).
+ * The same four the portal names: the client and adviser the case carries, the outcome the
+ * remediation was raised for, and a way back to the case record. The outcome sits here
+ * rather than in the table because it is the result every issue in the table is a reason
+ * for, so numbering it among them read as one more thing the adviser had to put right
+ * (project owner, 2026-09-10).
  *
  * Exported for remediationRender.test.tsx, as ActionsTable is.
  */
-export function RemediationDetails({ outcome }: { outcome: string | null }) {
-  if (outcome === null) {
+export function RemediationDetails({
+  outcomeCase,
+  outcome,
+  caseId,
+}: {
+  outcomeCase: RemediationCase | null;
+  outcome: string | null;
+  caseId: string | undefined;
+}) {
+  if (outcomeCase === null && outcome === null) {
     return null;
   }
 
   return (
     <dl className="remediation__details">
       <div className="remediation__detail">
+        <dt>Client</dt>
+        <dd>{outcomeCase?.clientName ?? '—'}</dd>
+      </div>
+      <div className="remediation__detail">
+        <dt>Adviser</dt>
+        <dd>{outcomeCase?.adviserName ?? '—'}</dd>
+      </div>
+      <div className="remediation__detail">
         <dt>Outcome</dt>
-        <dd>{outcome}</dd>
+        <dd>{outcome ?? '—'}</dd>
+      </div>
+      <div className="remediation__detail">
+        <dt>Case</dt>
+        <dd>{caseId ? <Link to={`/cases/${caseId}`}>Open the full case record</Link> : '—'}</dd>
       </div>
     </dl>
   );
@@ -51,10 +88,14 @@ export function RemediationDetails({ outcome }: { outcome: string | null }) {
 /** Exported for remediationRender.test.tsx, which reads the drawn rows back out. */
 export function ActionsTable({
   actions,
+  signoffs,
+  adviserName,
   busyId,
   onComplete,
 }: {
   actions: RemediationActionRow[];
+  signoffs: SignoffRow[];
+  adviserName: string | null;
   busyId: string | null;
   onComplete: (action: RemediationActionRow) => void;
 }) {
@@ -65,6 +106,7 @@ export function ActionsTable({
   }
   return (
     <table className="remediation__table">
+      <caption className="remediation__caption">Remediation and escalation</caption>
       <thead>
         <tr>
           <th scope="col">No.</th>
@@ -73,10 +115,8 @@ export function ActionsTable({
           <th scope="col">Owner</th>
           <th scope="col">Target date</th>
           <th scope="col">Status</th>
-          <th scope="col">Client contact</th>
-          <th scope="col">Recheck</th>
-          <th scope="col">Changes advice</th>
-          <th scope="col">Adviser sign-off</th>
+          <th scope="col">Age</th>
+          <th scope="col">Sign-off</th>
           <th scope="col">
             <span className="remediation__sr-only">Complete</span>
           </th>
@@ -97,13 +137,18 @@ export function ActionsTable({
                         <span className="remediation__note"> IO {action.evidenceReference}</span>
                       ) : null}
                     </td>
-                    <td rowSpan={lines.length}>{action.assignedTo ?? 'Unassigned'}</td>
+                    {/*
+                      An action nobody has been given still has an adviser: the case names
+                      one, and the portal falls back to it rather than saying "Unassigned"
+                      against a case that plainly has an owner.
+                    */}
+                    <td rowSpan={lines.length}>
+                      {action.assignedTo ?? adviserName ?? 'Unassigned'}
+                    </td>
                     <td rowSpan={lines.length}>{action.dueOn ?? '—'}</td>
                     <td rowSpan={lines.length}>{action.status}</td>
-                    <td rowSpan={lines.length}>{action.clientContactRequired ?? '—'}</td>
-                    <td rowSpan={lines.length}>{action.recheckRequired ?? '—'}</td>
-                    <td rowSpan={lines.length}>{action.changesAdvice ?? '—'}</td>
-                    <td rowSpan={lines.length}>{action.completedOn ?? '—'}</td>
+                    <td rowSpan={lines.length}>{ageOf(action)}</td>
+                    <td rowSpan={lines.length}>{signoffCell(action, signoffs)}</td>
                     <td rowSpan={lines.length}>
                       {canComplete(action.status) ? (
                         <button
@@ -136,75 +181,54 @@ export function ActionsTable({
   );
 }
 
-function OutcomesTable({ outcomes }: { outcomes: OutcomeRow[] }) {
-  if (outcomes.length === 0) {
-    return (
-      <p className="remediation__note">No graded outcome has been recorded for this case yet.</p>
-    );
-  }
-  return (
-    <table className="remediation__table">
-      <thead>
-        <tr>
-          <th scope="col">Outcome</th>
-          <th scope="col">Check</th>
-          <th scope="col">Initial</th>
-          <th scope="col">Final</th>
-          <th scope="col">Regrade reason</th>
-          <th scope="col">Regraded</th>
-          <th scope="col">Finalised</th>
-        </tr>
-      </thead>
-      <tbody>
-        {outcomes.map((outcome) => (
-          <tr key={outcome.id}>
-            <th scope="row">{outcome.reference}</th>
-            <td>{outcome.reviewInstance ?? '—'}</td>
-            <td>{outcome.initialOutcome}</td>
-            <td data-empty={outcome.finalOutcome === null ? 'true' : undefined}>
-              {outcome.finalOutcome ?? 'Not regraded'}
-            </td>
-            <td>{outcome.regradeReason ?? '—'}</td>
-            <td>{outcome.regradedOn ?? '—'}</td>
-            <td>{outcome.finalisedOn ?? '—'}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
+/**
+ * The form's last block, drawn as the paper form draws it and as the portal draws it.
+ *
+ * This replaced four columns on every row and two tables underneath. The columns repeated
+ * one set of answers down the table, and the tables were the app's own shape rather than
+ * the form's: the three answers are the adviser's and are answered once for the case, and
+ * the regrade and the supervisor's decision belong to the case, not to any one action.
+ *
+ * Exported for remediationRender.test.tsx.
+ */
+export function RemediationFormBlock({
+  actions,
+  outcomes,
+  signoffs,
+}: {
+  actions: RemediationActionRow[];
+  outcomes: OutcomeRow[];
+  signoffs: SignoffRow[];
+}) {
+  const block = remediationForm(actions, outcomes, signoffs);
+  const fields: Array<[string, string | null]> = [
+    ['Client contact required?', block.clientContactRequired],
+    ['Recheck required?', block.recheckRequired],
+    ['Do the remedial actions change the advice?', block.changesAdvice],
+    ['All remedial actions checked and approved?', block.allApproved],
+    ['Regraded outcome', block.regradedOutcome],
+    ['Date', block.regradedOn],
+    ['Supervisor sign-off', block.supervisorSignoff],
+    ['Adviser sign-off', block.adviserSignoff],
+  ];
 
-function SignoffsTable({ signoffs }: { signoffs: SignoffRow[] }) {
-  if (signoffs.length === 0) {
-    return (
-      <p className="remediation__note">No sign-off has been recorded for this case yet.</p>
-    );
-  }
   return (
-    <table className="remediation__table">
-      <thead>
-        <tr>
-          <th scope="col">Sign-off</th>
-          <th scope="col">Decision</th>
-          <th scope="col">Action</th>
-          <th scope="col">Notes</th>
-          <th scope="col">Signed off by</th>
-          <th scope="col">Signed off</th>
-        </tr>
-      </thead>
-      <tbody>
-        {signoffs.map((signoff) => (
-          <tr key={signoff.id}>
-            <th scope="row">{signoff.reference}</th>
-            <td>{signoff.decision}</td>
-            <td>{signoff.remediationAction ?? '—'}</td>
-            <td>{signoff.notes ?? '—'}</td>
-            <td>{signoff.signedOffBy ?? '—'}</td>
-            <td>{signoff.signedOffOn ?? '—'}</td>
-          </tr>
+    <>
+      <dl className="remediation__form">
+        {fields.map(([label, value]) => (
+          <div key={label} className="remediation__form-field">
+            <dt>{label}</dt>
+            <dd>{value ?? '—'}</dd>
+          </div>
         ))}
-      </tbody>
-    </table>
+      </dl>
+      <p className="remediation__note">
+        The three answers are the adviser&rsquo;s, recorded on the remediation action (the
+        first action carrying an answer). &ldquo;All remedial actions checked and
+        approved&rdquo; reads Yes when every action&rsquo;s latest supervisor decision is
+        Approved.
+      </p>
+    </>
   );
 }
 
@@ -249,11 +273,11 @@ export function RemediationPage() {
           setNotice({ tone: 'error', message: messageForFailure(result) });
         }
       })
-      .catch(() => {
+      .catch((error) => {
         setBusyId(null);
         setNotice({
           tone: 'error',
-          message: 'Something went wrong while processing your request. Please try again later.',
+          message: messageForFailure(classify(error)),
         });
       });
   };
@@ -281,8 +305,13 @@ export function RemediationPage() {
           />
 
           <section className="remediation__section" aria-labelledby="remediation-actions">
-            <h2 id="remediation-actions">Remediation actions</h2>
-            <RemediationDetails outcome={outcome} />
+            <h2 id="remediation-actions">
+              {state.outcomeCase?.reference ?? 'Remediation actions'}
+              {state.outcomeCase?.status ? (
+                <span className="remediation__status">{state.outcomeCase.status}</span>
+              ) : null}
+            </h2>
+            <RemediationDetails outcomeCase={state.outcomeCase} outcome={outcome} caseId={caseId} />
             {notice ? <Notice tone={notice.tone}>{notice.message}</Notice> : null}
             {allActions.length > 0 ? (
               <FilterBar
@@ -306,17 +335,18 @@ export function RemediationPage() {
                 </FilterField>
               </FilterBar>
             ) : null}
-            <ActionsTable actions={filteredActions} busyId={busyId} onComplete={handleComplete} />
-          </section>
-
-          <section className="remediation__section" aria-labelledby="remediation-outcomes">
-            <h2 id="remediation-outcomes">Outcomes</h2>
-            <OutcomesTable outcomes={state.outcomes} />
-          </section>
-
-          <section className="remediation__section" aria-labelledby="remediation-signoffs">
-            <h2 id="remediation-signoffs">Sign-off</h2>
-            <SignoffsTable signoffs={state.signoffs} />
+            <ActionsTable
+              actions={filteredActions}
+              signoffs={state.signoffs}
+              adviserName={state.outcomeCase?.adviserName ?? null}
+              busyId={busyId}
+              onComplete={handleComplete}
+            />
+            <RemediationFormBlock
+              actions={allActions}
+              outcomes={state.outcomes}
+              signoffs={state.signoffs}
+            />
           </section>
         </>
       ) : null}
