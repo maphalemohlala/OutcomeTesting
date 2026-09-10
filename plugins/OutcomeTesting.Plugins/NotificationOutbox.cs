@@ -131,19 +131,49 @@ namespace OutcomeTesting.Plugins
                 row["al_recipientemail"] = Truncate(recipientEmail, 200);
             }
 
-            try
+            // Read before writing, because a duplicate must never reach the platform as a
+            // fault. This used to let the create fail on the alternate key and swallow the
+            // fault, and that is the one thing a plug-in may not do: the platform aborts the
+            // whole transaction of a plug-in that absorbs an OrganizationService fault and
+            // carries on - "ISV code reduced the open transaction count" - which is the rule
+            // OptionLabels already records for the metadata read.
+            //
+            // It was harmless while a transaction only ever queued one notification: the
+            // duplicate arose on a replayed submit, which is a fresh transaction, and losing
+            // that one was the point. From 2026-09-10 a review raises one action per thing
+            // the checker marked down, NotificationEmitterPlugin fires on each create, and
+            // the code is keyed on the review - so the second create in the same transaction
+            // collided, the catch swallowed it, and the platform failed the whole submit.
+            // Reassigning several actions from one case edit died the same way.
+            //
+            // A read of a row this transaction created is visible to it, so this closes both.
+            if (Exists(service, code))
             {
-                return service.Create(row);
+                return Guid.Empty;
             }
-            catch (FaultException<OrganizationServiceFault> fault)
-            {
-                if (IsDuplicateKey(fault))
-                {
-                    return Guid.Empty;
-                }
 
-                throw;
-            }
+            return service.Create(row);
+        }
+
+        /// <summary>
+        /// True when the outbox already holds this code.
+        ///
+        /// Deliberately not a try/catch around the create: see <see cref="Queue"/>. A race
+        /// between two transactions can still lose to the alternate key, and that fault is
+        /// left to propagate rather than be absorbed - a refused write the caller can see
+        /// beats a transaction the platform kills for hiding one.
+        /// </summary>
+        private static bool Exists(IOrganizationService service, string code)
+        {
+            var query = new QueryExpression(NotificationEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_notificationcode", ConditionOperator.Equal, code);
+
+            return service.RetrieveMultiple(query).Entities.Count > 0;
         }
 
         /// <summary>

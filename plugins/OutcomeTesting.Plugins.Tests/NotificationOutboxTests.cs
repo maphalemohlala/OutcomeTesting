@@ -276,5 +276,51 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Null(NotificationOutbox.CaseLink(service, new EntityReference("al_outcomecase", Target)));
         }
+
+        [Fact]
+        public void Queues_one_notification_per_target_without_a_second_create()
+        {
+            // The 2026-09-10 fault. A review now raises one action per thing the checker
+            // marked down, and the emitter fires on each create - but the outbox code is
+            // keyed on the review, so the second and later calls are the same row. That was
+            // "handled" by letting the create fail on the alternate key and swallowing the
+            // fault, which is the one thing a plug-in may not do: the platform aborts the
+            // whole transaction of a plug-in that absorbs an OrganizationService fault and
+            // carries on ("ISV code reduced the open transaction count"), which is what
+            // OptionLabels already records. The submit, and any case edit that reassigns
+            // several actions, died on it.
+            //
+            // So the duplicate must never reach the platform as a fault: it is read first.
+            var service = new FakeOrganizationService();
+            var review = Guid.NewGuid();
+
+            var first = NotificationOutbox.Queue(
+                service, Guid.NewGuid(), NotificationOutbox.EventRemediationAssigned,
+                "al_reviewinstance", review, "adviser@example.com", "Subject", "Body");
+
+            var second = NotificationOutbox.Queue(
+                service, Guid.NewGuid(), NotificationOutbox.EventRemediationAssigned,
+                "al_reviewinstance", review, "adviser@example.com", "Subject", "Body");
+
+            Assert.NotEqual(Guid.Empty, first);
+            Assert.Equal(Guid.Empty, second);
+            Assert.Single(service.Creates);
+        }
+
+        [Fact]
+        public void Queues_separately_for_a_different_target()
+        {
+            // Two reviews on one case are two things to tell the adviser about.
+            var service = new FakeOrganizationService();
+
+            NotificationOutbox.Queue(
+                service, Guid.NewGuid(), NotificationOutbox.EventRemediationAssigned,
+                "al_reviewinstance", Guid.NewGuid(), "adviser@example.com", "Subject", "Body");
+            NotificationOutbox.Queue(
+                service, Guid.NewGuid(), NotificationOutbox.EventRemediationAssigned,
+                "al_reviewinstance", Guid.NewGuid(), "adviser@example.com", "Subject", "Body");
+
+            Assert.Equal(2, service.Creates.Count);
+        }
 }
 }
