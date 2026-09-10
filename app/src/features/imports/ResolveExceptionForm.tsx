@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ValidationSummary } from '../../components/feedback/ValidationSummary';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { messageForFailure } from '../../services/errors';
+import { classify } from '../../services/commands/failures';
 import {
   IMPORT_RESOLUTIONS,
   IMPORT_RESOLUTION_HELP,
@@ -65,9 +66,9 @@ export function ResolveExceptionForm({ exception, onResolved, onCancel }: Props)
         intent.release(token);
         onResolved();
       })
-      .catch(() => {
+      .catch((error) => {
         setSaving(false);
-        setFailure('We could not close this exception. Nothing has been changed.');
+        setFailure(`We could not close this exception. Nothing has been changed. ${messageForFailure(classify(error))}`);
       });
   }
 

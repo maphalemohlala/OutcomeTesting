@@ -4,6 +4,7 @@ import { Notice } from '../../components/feedback/Notice';
 import { Modal } from '../../components/feedback/Modal';
 import { ValidationSummary } from '../../components/feedback/ValidationSummary';
 import { messageForFailure } from '../../services/errors';
+import { classify } from '../../services/commands/failures';
 import { UserPicker } from '../../components/form/UserPicker';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { updateCaseDetails } from '../../services/commands/updateCaseDetails';
@@ -207,9 +208,9 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
           setModalError(messageForFailure(result));
         }
       })
-      .catch(() => {
+      .catch((error) => {
         setSaving(false);
-        setModalError('Something went wrong while processing your request. Please try again later.');
+        setModalError(messageForFailure(classify(error)));
       });
   }
 

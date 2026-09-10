@@ -6,6 +6,7 @@ import { ValidationSummary } from '../../components/feedback/ValidationSummary';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { messageForFailure } from '../../services/errors';
+import { classify } from '../../services/commands/failures';
 import {
   FINAL_OUTCOMES,
   regradeCase,
@@ -106,9 +107,9 @@ export function RecheckPage() {
         setFinalOutcome('');
         setReloadKey((key) => key + 1);
       })
-      .catch(() => {
+      .catch((error) => {
         setSaving(false);
-        setFailure('We could not record the regrade. Nothing has been changed.');
+        setFailure(`We could not record the regrade. Nothing has been changed. ${messageForFailure(classify(error))}`);
       });
   }
 

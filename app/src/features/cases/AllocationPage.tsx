@@ -6,6 +6,7 @@ import { ValidationSummary } from '../../components/feedback/ValidationSummary';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { messageForFailure } from '../../services/errors';
+import { classify } from '../../services/commands/failures';
 import { assignCase } from '../../services/commands/assignCase';
 import { useCaseDetail } from './useCaseDetail';
 import { useCaseReviews } from './useCaseReviews';
@@ -94,9 +95,9 @@ export function AllocationPage() {
         setReason('');
         setReloadKey((key) => key + 1);
       })
-      .catch(() => {
+      .catch((error) => {
         setSaving(false);
-        setFailure('We could not record the allocation. Nothing has been changed.');
+        setFailure(`We could not record the allocation. Nothing has been changed. ${messageForFailure(classify(error))}`);
       });
   }
 

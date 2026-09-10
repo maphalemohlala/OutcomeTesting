@@ -22,7 +22,13 @@ export const DEFAULT_FAILURE_MESSAGES: Record<CommandFailureKind, string> = {
 /**
  * The message to show the user for a failed command. Server-specific text is preferred
  * for the kinds that carry a meaningful reason (validation, permission, not-found,
- * conflict, precondition); a system-level failure never leaks raw detail.
+ * conflict, precondition, unexpected) - and since 2026-09-10 that includes a plug-in
+ * failure nobody wrote a rule for, which PluginBase now names rather than letting it reach
+ * the browser as an unclassifiable fault.
+ *
+ * A system-level failure still never leaks raw detail. What lands there is infrastructure
+ * text - it has carried a host and an internal address before now - so it keeps the
+ * friendly sentence and logTechnical keeps the cause.
  */
 export function messageForFailure(failure: CommandFailure): string {
   if (failure.kind === 'unavailable') {

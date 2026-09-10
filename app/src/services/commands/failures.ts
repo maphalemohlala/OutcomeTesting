@@ -116,7 +116,13 @@ export function classify(error: unknown): CommandFailure {
     }
   }
 
-  // Unclassified failures are system-level: log the raw cause for support, show a safe message.
+  // Unclassified: nothing our code raised, so this is the platform, the network or the
+  // page rather than a rule speaking. The cause is logged and deliberately not returned:
+  // it is free text from infrastructure and has carried a host and an internal address
+  // before now, which NFR-OBS-01 keeps out of the browser. Since 2026-09-10 a plug-in
+  // failure cannot land here at all - PluginBase prefixes even an unexpected one - so what
+  // reaches this line really is the network, the data client or a bug in the page, and the
+  // console log is where its detail belongs.
   logTechnical('command failed', error);
   return {
     ok: false,
