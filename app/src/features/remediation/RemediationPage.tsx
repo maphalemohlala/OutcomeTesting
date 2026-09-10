@@ -9,7 +9,7 @@ import {
   type RemediationActionRow,
   type SignoffRow,
 } from './useRemediation';
-import { ACTION_COLUMNS, groupIssues } from './remediationIssues';
+import { ACTION_COLUMNS, groupIssues, outcomeOf } from './remediationIssues';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { completeRemediation } from '../../services/commands/completeRemediation';
 import { messageForFailure } from '../../services/errors';
@@ -22,6 +22,30 @@ interface NoticeState {
 
 function canComplete(status: string): boolean {
   return status === 'Open' || status === 'In progress';
+}
+
+/**
+ * The remediation's own details, above the actions.
+ *
+ * The outcome sits here rather than in the table. It is the result every issue in the
+ * table is a reason for, so numbering it among them read as one more thing the adviser
+ * had to put right (project owner, 2026-09-10).
+ *
+ * Exported for remediationRender.test.tsx, as ActionsTable is.
+ */
+export function RemediationDetails({ outcome }: { outcome: string | null }) {
+  if (outcome === null) {
+    return null;
+  }
+
+  return (
+    <dl className="remediation__details">
+      <div className="remediation__detail">
+        <dt>Outcome</dt>
+        <dd>{outcome}</dd>
+      </div>
+    </dl>
+  );
 }
 
 /** Exported for remediationRender.test.tsx, which reads the drawn rows back out. */
@@ -202,6 +226,9 @@ export function RemediationPage() {
     () => (actionStatus ? allActions.filter((a) => a.status === actionStatus) : allActions),
     [allActions, actionStatus],
   );
+  // The outcome the remediation was raised for. Read across every action rather than the
+  // filtered set: it is the case's, so narrowing the table by status must not change it.
+  const outcome = useMemo(() => outcomeOf(allActions), [allActions]);
 
   const handleComplete = (action: RemediationActionRow) => {
     if (busyId !== null) return;
@@ -255,6 +282,7 @@ export function RemediationPage() {
 
           <section className="remediation__section" aria-labelledby="remediation-actions">
             <h2 id="remediation-actions">Remediation actions</h2>
+            <RemediationDetails outcome={outcome} />
             {notice ? <Notice tone={notice.tone}>{notice.message}</Notice> : null}
             {allActions.length > 0 ? (
               <FilterBar

@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { groupIssues, splitIssues } from './remediationIssues';
+import { groupIssues, outcomeOf, splitIssues } from './remediationIssues';
 import type { RemediationActionRow } from './remediationMapping';
 
-/** The description Remediation.Describe writes for a Tax review that did not pass. */
+/**
+ * The description Remediation.Describe writes for a Tax review that did not pass.
+ *
+ * The Tax check outcome is deliberately not one of the items: it is the result the items
+ * are reasons for, and it is carried in the standing sentence's brackets instead.
+ */
 const DESCRIPTION = [
   'Issues found on the check:',
-  '- Tax check outcome: Insufficient evidence',
   '- Fail point: AML - No CRA completed or missing data fields',
   '- Fail point: AML - CRA highlighted a High Risk, with no supporting form completed',
   '- Fail point: Record Keeping - Concession required but not on file',
@@ -21,12 +25,53 @@ const DESCRIPTION = [
 describe('splitIssues', () => {
   it('gives one issue per item the checker marked down', () => {
     expect(splitIssues(DESCRIPTION).issues).toEqual([
-      'Tax check outcome: Insufficient evidence',
       'Fail point: AML - No CRA completed or missing data fields',
       'Fail point: AML - CRA highlighted a High Risk, with no supporting form completed',
       'Fail point: Record Keeping - Concession required but not on file',
       'Fail point: Record Keeping - No client agreement or client acceptance in place',
     ]);
+  });
+
+  it('reads the outcome out of the standing sentence', () => {
+    expect(splitIssues(DESCRIPTION).outcome).toBe('Tax check: Insufficient evidence');
+  });
+
+  it('reads an AQS grade, which is the reason written without a prefix', () => {
+    const graded = [
+      'Issues found on the check:',
+      '- Fail point: AML - ID verification issue',
+      '',
+      'Raised automatically when the review was submitted (Potential harm).',
+      'Review the file and record what you have put right.',
+    ].join('\n');
+    expect(splitIssues(graded).outcome).toBe('Potential harm');
+  });
+
+  it('takes the sentence brackets, not brackets the checker typed', () => {
+    const noisy = [
+      'Issues found on the check:',
+      '- One',
+      '',
+      'The checker recorded: no CRA on file (see IO-1234) and no TOB',
+      '',
+      'Raised automatically when the review was submitted (Fail).',
+      'Review the file and record what you have put right.',
+    ].join('\n');
+    expect(splitIssues(noisy).outcome).toBe('Fail');
+  });
+
+  it('names no outcome when the sentence carries no reason', () => {
+    const noReason = [
+      'Issues found on the check:',
+      '- One',
+      '',
+      'Raised automatically when the review was submitted. Review the file.',
+    ].join('\n');
+    expect(splitIssues(noReason).outcome).toBeNull();
+  });
+
+  it('names no outcome from a checker note alone, the marker being absent', () => {
+    expect(splitIssues('The checker recorded: see file (IO-1234)').outcome).toBeNull();
   });
 
   it('keeps the hyphens inside an item and strips only the bullet', () => {
@@ -45,12 +90,16 @@ describe('splitIssues', () => {
 
   it('reads a description written with Windows line endings', () => {
     const crlf = 'Issues found on the check:\r\n- One\r\n- Two\r\n\r\nA note.';
-    expect(splitIssues(crlf)).toEqual({ issues: ['One', 'Two'], note: 'A note.' });
+    expect(splitIssues(crlf)).toEqual({
+      issues: ['One', 'Two'],
+      note: 'A note.',
+      outcome: null,
+    });
   });
 
   it('leaves a description with no items whole, as the note', () => {
     const plain = 'Raised automatically when the review was submitted. Review the file.';
-    expect(splitIssues(plain)).toEqual({ issues: [], note: plain });
+    expect(splitIssues(plain)).toEqual({ issues: [], note: plain, outcome: null });
   });
 
   it('reads an item list with no checker observation behind it', () => {
@@ -58,13 +107,14 @@ describe('splitIssues', () => {
     expect(splitIssues(noObservation)).toEqual({
       issues: ['One'],
       note: 'Raised automatically.',
+      outcome: null,
     });
   });
 
   it('has nothing to show for an absent or blank description', () => {
-    expect(splitIssues(null)).toEqual({ issues: [], note: null });
-    expect(splitIssues(undefined)).toEqual({ issues: [], note: null });
-    expect(splitIssues('   ')).toEqual({ issues: [], note: null });
+    expect(splitIssues(null)).toEqual({ issues: [], note: null, outcome: null });
+    expect(splitIssues(undefined)).toEqual({ issues: [], note: null, outcome: null });
+    expect(splitIssues('   ')).toEqual({ issues: [], note: null, outcome: null });
   });
 
   it('drops a bullet with nothing behind it', () => {
@@ -95,12 +145,12 @@ function action(id: string, description: string): RemediationActionRow {
 describe('groupIssues', () => {
   it('gives every item its own numbered line', () => {
     const [group] = groupIssues([action('a', DESCRIPTION)]);
-    expect(group.lines).toHaveLength(5);
+    expect(group.lines).toHaveLength(4);
     expect(group.lines[0]).toEqual({
       number: 1,
-      issue: 'Tax check outcome: Insufficient evidence',
+      issue: 'Fail point: AML - No CRA completed or missing data fields',
     });
-    expect(group.lines[4].number).toBe(5);
+    expect(group.lines[3].number).toBe(4);
   });
 
   it('numbers straight through, so a second action carries on from the first', () => {
@@ -149,5 +199,37 @@ describe('groupIssues', () => {
   it('still gives an action with no description at all a row', () => {
     const [group] = groupIssues([action('a', '—')]);
     expect(group.lines).toEqual([{ number: 1, issue: '—' }]);
+  });
+});
+
+describe('outcomeOf', () => {
+  it('reads the outcome the actions were raised for', () => {
+    expect(outcomeOf([action('a', DESCRIPTION), action('b', DESCRIPTION)])).toBe(
+      'Tax check: Insufficient evidence',
+    );
+  });
+
+  it('names both when a Tax and an AQS review each raised remediation', () => {
+    const raisedFor = (reason: string) =>
+      [
+        'Issues found on the check:',
+        '- One',
+        '',
+        'Raised automatically when the review was submitted (' + reason + ').',
+      ].join('\n');
+
+    expect(
+      outcomeOf([
+        action('a', raisedFor('Tax check: Insufficient evidence')),
+        action('b', raisedFor('Fail')),
+      ]),
+    ).toBe('Tax check: Insufficient evidence; Fail');
+  });
+
+  it('has no outcome to give for actions that name none', () => {
+    expect(outcomeOf([])).toBeNull();
+    expect(
+      outcomeOf([action('a', ['Issues found on the check:', '- One'].join('\n'))]),
+    ).toBeNull();
   });
 });

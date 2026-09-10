@@ -377,6 +377,11 @@ if (args.Length >= 2 && args[0].Equals("splitremediation", StringComparison.Ordi
     return SplitRemediation(args[1], ConfirmedFor(args, args[1]));
 }
 
+if (args.Length >= 2 && args[0].Equals("dropoutcomeactions", StringComparison.OrdinalIgnoreCase))
+{
+    return DropOutcomeActions(args[1], ConfirmedFor(args, args[1]));
+}
+
 if (args.Length >= 2 && args[0].Equals("migratetocontacts", StringComparison.OrdinalIgnoreCase))
 {
     return MigrateToContacts(args);
@@ -692,6 +697,147 @@ int SplitRemediation(string orgUrl, bool confirm)
 
     Console.WriteLine($"Done. {recoded} action(s) re-coded, {created} created.");
     return 0;
+}
+
+// The 2026-09-10 backfill. Remediation.NonPassItems no longer lists the question that
+// records the review's own outcome - Q-TAX-02 (Tax check outcome), Q-FQ-01 and Q-FQTAX-01
+// (File quality outcome) - because the outcome is the result every other item is a reason
+// for, and it is already named in the description's standing sentence. Actions raised
+// before that rule still carry it as their one item, and no display change can remove
+// them: they are rows, and the portal's fetch does not filter by state.
+//
+// This deletes those rows, and only those: an action whose single item is an outcome
+// answer. Deleted rather than deactivated because nothing that reads them filters on
+// statecode, so a deactivated one would still be numbered in the table it has to leave.
+//
+// Nothing an adviser has touched is deleted. An action carrying a response, a completion,
+// any of the three form answers or a sign-off is reported and left alone - the row is
+// evidence at that point, and losing it is worse than a stale line on a form. The rest of
+// a review's actions are untouched, and the renderers number by position, so the numbering
+// closes up on its own.
+//
+// The outcome wording is read from the environment rather than hard-coded: al_questiontext
+// is versioned (BR-013), so what a description was built from is whatever version was in
+// force when the review was submitted, and every version of the three questions is
+// therefore a wording this has to recognise.
+int DropOutcomeActions(string orgUrl, bool confirm)
+{
+    using var svc = Connect(orgUrl);
+
+    var wordings = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var version in svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_questionversion\">" +
+        "<attribute name=\"al_questiontext\"/>" +
+        "<link-entity name=\"al_question\" from=\"al_questionid\" to=\"al_questionid\">" +
+        "<filter type=\"and\"><condition attribute=\"al_questioncode\" operator=\"in\">" +
+        "<value>Q-TAX-02</value><value>Q-FQ-01</value><value>Q-FQTAX-01</value>" +
+        "</condition></filter></link-entity></entity></fetch>")).Entities)
+    {
+        var text = version.GetAttributeValue<string>("al_questiontext");
+        if (!string.IsNullOrWhiteSpace(text)) { wordings.Add(text.Trim()); }
+    }
+
+    if (wordings.Count == 0)
+    {
+        Console.Error.WriteLine(
+            "No version of Q-TAX-02, Q-FQ-01 or Q-FQTAX-01 was found, so an outcome item " +
+            "cannot be recognised. Nothing read, nothing written.");
+        return 1;
+    }
+
+    Console.WriteLine($"Outcome wordings in force: {string.Join(", ", wordings)}");
+
+    var actions = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_remediationaction\">" +
+        "<attribute name=\"al_remediationactionid\"/><attribute name=\"al_remediationactioncode\"/>" +
+        "<attribute name=\"al_description\"/><attribute name=\"al_adviserresponse\"/>" +
+        "<attribute name=\"al_completedon\"/><attribute name=\"al_evidencereference\"/>" +
+        "<attribute name=\"al_clientcontactrequired\"/><attribute name=\"al_recheckrequired\"/>" +
+        "<attribute name=\"al_changesadvice\"/>" +
+        "<order attribute=\"al_remediationactioncode\"/></entity></fetch>")).Entities;
+
+    var signedOff = new HashSet<Guid>();
+    foreach (var signoff in svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_signoff\"><attribute name=\"al_remediationactionid\"/></entity></fetch>")).Entities)
+    {
+        var actionRef = signoff.GetAttributeValue<EntityReference>("al_remediationactionid");
+        if (actionRef != null) { signedOff.Add(actionRef.Id); }
+    }
+
+    var doomed = new List<Entity>();
+    var kept = new List<(Entity Action, string Why)>();
+    foreach (var a in actions)
+    {
+        var items = SplitDescription(a.GetAttributeValue<string>("al_description")).Items;
+
+        // One item, and that item an outcome answer. More than one means the action was
+        // never split (splitremediation's job, not this one) and this must not touch it.
+        if (items.Count != 1 || !IsOutcomeItem(items[0], wordings))
+        {
+            continue;
+        }
+
+        var why = WorkDoneOn(a, signedOff);
+        if (why != null) { kept.Add((a, why)); } else { doomed.Add(a); }
+    }
+
+    Console.WriteLine($"{doomed.Count} outcome action(s) to delete, of {actions.Count} read.");
+    foreach (var a in doomed)
+    {
+        Console.WriteLine($"   {a.GetAttributeValue<string>("al_remediationactioncode")}  " +
+            $"{SplitDescription(a.GetAttributeValue<string>("al_description")).Items[0]}");
+    }
+
+    foreach (var (a, why) in kept)
+    {
+        Console.WriteLine($"   KEPT {a.GetAttributeValue<string>("al_remediationactioncode")}  {why}");
+    }
+
+    if (!confirm)
+    {
+        Console.WriteLine("Dry run. Re-run with --confirm <orgUrl> to delete them.");
+        return 0;
+    }
+
+    foreach (var a in doomed)
+    {
+        svc.Delete("al_remediationaction", a.Id);
+        Console.WriteLine($"   deleted {a.GetAttributeValue<string>("al_remediationactioncode")}");
+    }
+
+    Console.WriteLine($"Done. {doomed.Count} deleted, {kept.Count} left alone.");
+    return 0;
+}
+
+// An item is the outcome when it reads "<question text>: <answer>" for one of the wordings
+// the three outcome questions have been issued under. Compared on the wording plus the
+// colon so a test point whose text merely starts the same way is not caught.
+bool IsOutcomeItem(string item, HashSet<string> wordings)
+{
+    foreach (var wording in wordings)
+    {
+        if (item.StartsWith(wording + ":", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// Why an action must be kept, or null when nothing has been recorded against it.
+string? WorkDoneOn(Entity a, HashSet<Guid> signedOff)
+{
+    if (signedOff.Contains(a.Id)) { return "a sign-off has been recorded against it"; }
+    if (a.GetAttributeValue<DateTime?>("al_completedon") != null) { return "the adviser has completed it"; }
+    if (!string.IsNullOrWhiteSpace(a.GetAttributeValue<string>("al_adviserresponse"))) { return "the adviser has responded on it"; }
+    if (!string.IsNullOrWhiteSpace(a.GetAttributeValue<string>("al_evidencereference"))) { return "it carries an evidence reference"; }
+    if (a.Contains("al_clientcontactrequired") || a.Contains("al_recheckrequired") || a.Contains("al_changesadvice"))
+    {
+        return "it carries the adviser's form answers";
+    }
+
+    return null;
 }
 
 // The item list and the context behind it, read back out of a description

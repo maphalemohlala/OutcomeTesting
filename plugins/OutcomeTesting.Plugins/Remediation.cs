@@ -97,6 +97,14 @@ namespace OutcomeTesting.Plugins
         /// rather than an option number. <paramref name="observation"/> is the checker's own
         /// words from the fail observation question, which AD-019 leaves optional - so this
         /// has to read as a whole sentence without it.
+        ///
+        /// The reason is written in brackets at the end of the standing sentence, and that
+        /// is a format as much as <see cref="IssuesHeading"/> is: the two portal templates,
+        /// the Code App (app/src/features/remediation/remediationIssues.ts) and the
+        /// registration tool's splitter all read it back out as the remediation's Outcome,
+        /// which is where the outcome is shown now that it is no longer numbered as an
+        /// issue. It is the last bracket the description opens - the observation is written
+        /// above this sentence - which is what makes it findable without a column of its own.
         /// </summary>
         public static string Describe(string reason, string observation)
         {
@@ -162,6 +170,31 @@ namespace OutcomeTesting.Plugins
 
             return text.Length <= DescriptionMaxLength ? text : text.Substring(0, DescriptionMaxLength);
         }
+
+        /// <summary>
+        /// The questions that record the review's own result rather than something the
+        /// adviser has to put right: Q-TAX-02 (Tax check outcome), and the File quality
+        /// outcome question of each discipline - Q-FQ-01 for AQS, Q-FQTAX-01 for Tax.
+        ///
+        /// Left out of the item list for the reason the grade scale is already left out
+        /// (see <see cref="IsRemediableScale"/>): the outcome is the reason the action
+        /// gives, written into the description by
+        /// <see cref="Describe(string, string, IList{string})"/> as "(Tax check:
+        /// Insufficient evidence)" or as the grade's own label, so listing it again as an
+        /// issue only says the same thing twice. It is the outcome, and every other item
+        /// is a reason for it - the renderers show it as the remediation's Outcome and
+        /// number only the reasons (project owner, 2026-09-10).
+        ///
+        /// A case whose only non-pass answer is its outcome therefore lists no items at
+        /// all, and <see cref="Raise"/> falls to the single un-indexed action it has always
+        /// raised for a grade with no test point behind it. Remediation is still owed and
+        /// still raised; nothing itemisable was marked down.
+        ///
+        /// Held as business codes rather than question text because the text is versioned
+        /// (BR-013) and the code is not.
+        /// </summary>
+        private static readonly HashSet<string> OutcomeQuestionCodes =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Q-TAX-02", "Q-FQ-01", "Q-FQTAX-01" };
 
         /// <summary>
         /// The scales whose answers prepopulate a remediation action: Pass / Fail and
@@ -269,9 +302,18 @@ namespace OutcomeTesting.Plugins
                     continue;
                 }
 
+                // One read of the question serves both the outcome test and the ordering
+                // below, which is why it is fetched here rather than inside SectionOrder.
+                var question = Question(service, version.GetAttributeValue<EntityReference>("al_questionid"));
+                if (question != null
+                    && OutcomeQuestionCodes.Contains(question.GetAttributeValue<string>("al_questioncode") ?? string.Empty))
+                {
+                    continue;
+                }
+
                 answers.Add(new RankedItem
                 {
-                    Section = SectionOrder(service, version.GetAttributeValue<EntityReference>("al_questionid")),
+                    Section = SectionOrder(service, question),
                     Order = version.GetAttributeValue<int?>("al_displayorder") ?? 0,
                     Text = text.Trim() + ": " + labels.Label("al_response", "al_answerchoice", choice.Value),
                 });
@@ -335,15 +377,25 @@ namespace OutcomeTesting.Plugins
             return items;
         }
 
-        /// <summary>The display order of the section a question sits in; 0 when unknown.</summary>
-        private static int SectionOrder(IOrganizationService service, EntityReference questionRef)
+        /// <summary>
+        /// The question a version belongs to, with the two columns
+        /// <see cref="NonPassItems"/> needs of it; null when the version names none.
+        /// </summary>
+        private static Entity Question(IOrganizationService service, EntityReference questionRef)
         {
-            if (questionRef == null)
+            return questionRef == null
+                ? null
+                : service.Retrieve("al_question", questionRef.Id, new ColumnSet("al_sectionid", "al_questioncode"));
+        }
+
+        /// <summary>The display order of the section a question sits in; 0 when unknown.</summary>
+        private static int SectionOrder(IOrganizationService service, Entity question)
+        {
+            if (question == null)
             {
                 return 0;
             }
 
-            var question = service.Retrieve("al_question", questionRef.Id, new ColumnSet("al_sectionid"));
             var sectionRef = question.GetAttributeValue<EntityReference>("al_sectionid");
             if (sectionRef == null)
             {

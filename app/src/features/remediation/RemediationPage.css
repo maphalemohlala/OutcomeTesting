@@ -26,6 +26,28 @@
   border-bottom: 1px solid var(--colour-border);
 }
 
+.remediation__details {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.remediation__detail {
+  display: grid;
+  grid-template-columns: minmax(9rem, 40%) 1fr;
+  gap: var(--space-3);
+  align-items: baseline;
+  font-size: var(--text-sm);
+}
+
+.remediation__detail dt {
+  color: var(--colour-text-muted);
+}
+
+.remediation__detail dd {
+  font-weight: 500;
+}
+
 .remediation__note {
   font-size: var(--text-sm);
   color: var(--colour-text-muted);

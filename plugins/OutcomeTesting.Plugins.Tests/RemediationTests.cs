@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
@@ -282,7 +282,7 @@ namespace OutcomeTesting.Plugins.Tests
                 new { Type = ResponseRules.TypeYesNoNa, Choice = ResponseRules.ChoiceNo, Text = "CRA completed with mandatory fields and risk rating recorded." },
                 new { Type = ResponseRules.TypeYesNoInsufficient, Choice = ResponseRules.ChoiceInsufficient, Text = "Price & Value outcome" },
                 new { Type = ResponseRules.TypeGrade, Choice = ResponseRules.ChoicePotentialHarm, Text = "Advice Quality Grade" },
-                new { Type = ResponseRules.TypePassFail, Choice = ResponseRules.ChoiceFail, Text = "File quality outcome" },
+                new { Type = ResponseRules.TypePassFail, Choice = ResponseRules.ChoiceFail, Text = "Adviser charges clearly disclosed and evidenced" },
             };
 
             var order = 1;
@@ -304,8 +304,116 @@ namespace OutcomeTesting.Plugins.Tests
 
             var items = Remediation.NonPassItems(service, reviewId, new DateTime(2026, 9, 9, 12, 0, 0, DateTimeKind.Utc));
 
-            // Only the Pass / Fail one survives.
-            Assert.Equal(new[] { "File quality outcome: Fail" }, items);
+            // Only the Pass / Fail one survives. Its question carries no business code, so
+            // the outcome rule below leaves it alone - this test is about the scales.
+            Assert.Equal(new[] { "Adviser charges clearly disclosed and evidenced: Fail" }, items);
+        }
+
+        [Theory]
+        [InlineData("Q-TAX-02", "Tax check outcome")]
+        [InlineData("Q-FQ-01", "File quality outcome")]
+        [InlineData("Q-FQTAX-01", "File quality outcome")]
+        public void Leaves_out_the_question_that_records_the_outcome(string code, string text)
+        {
+            // The outcome is not something the adviser has to put right - it is the thing
+            // every other item is a reason for, and the action already names it as its
+            // reason. Left out for the same reason the grade scale is (project owner,
+            // 2026-09-10), even though it is answered on a remediable Pass / Fail scale.
+            var service = new FakeOrganizationService();
+            service.SeedOptionSet("al_response", "al_answerchoice",
+                ResponseRules.ChoiceFail, "Fail",
+                ResponseRules.ChoiceInsufficient, "Insufficient evidence");
+
+            var reviewId = Guid.NewGuid();
+            var section = Guid.NewGuid();
+            service.Seed("al_section", section, "al_displayorder", 1);
+
+            var outcomeQuestion = Guid.NewGuid();
+            var outcomeVersion = Guid.NewGuid();
+            service.Seed("al_question", outcomeQuestion,
+                "al_questioncode", code,
+                "al_sectionid", new EntityReference("al_section", section));
+            service.Seed("al_questionversion", outcomeVersion,
+                "al_questiontext", text,
+                "al_displayorder", 1,
+                "al_responsetype", new OptionSetValue(ResponseRules.TypePassFailInsufficient),
+                "al_questionid", new EntityReference("al_question", outcomeQuestion));
+            service.Seed("al_response", Guid.NewGuid(),
+                "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
+                "al_questionversionid", new EntityReference("al_questionversion", outcomeVersion),
+                "al_answerchoice", new OptionSetValue(ResponseRules.ChoiceInsufficient));
+
+            // A test point of the same discipline, on the same scale, to prove the rule is
+            // the question's code and not the scale or the answer.
+            var pointQuestion = Guid.NewGuid();
+            var pointVersion = Guid.NewGuid();
+            service.Seed("al_question", pointQuestion,
+                "al_questioncode", "Q-E4-01",
+                "al_sectionid", new EntityReference("al_section", section));
+            service.Seed("al_questionversion", pointVersion,
+                "al_questiontext", "Adviser charges clearly disclosed and evidenced",
+                "al_displayorder", 2,
+                "al_responsetype", new OptionSetValue(ResponseRules.TypePassFailInsufficient),
+                "al_questionid", new EntityReference("al_question", pointQuestion));
+            service.Seed("al_response", Guid.NewGuid(),
+                "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
+                "al_questionversionid", new EntityReference("al_questionversion", pointVersion),
+                "al_answerchoice", new OptionSetValue(ResponseRules.ChoiceFail));
+
+            var items = Remediation.NonPassItems(service, reviewId, new DateTime(2026, 9, 10, 12, 0, 0, DateTimeKind.Utc));
+
+            Assert.Equal(new[] { "Adviser charges clearly disclosed and evidenced: Fail" }, items);
+        }
+
+        [Fact]
+        public void Raises_the_single_action_when_the_outcome_was_the_only_non_pass()
+        {
+            // A Tax check that came back Insufficient evidence with no fail point ticked now
+            // lists no items at all. Remediation is still owed, so the un-indexed action
+            // Raise has always kept for a grade with no test point behind it is what is
+            // raised - the case is never left in Awaiting Remediation with an empty worklist.
+            var service = new FakeOrganizationService();
+            var reviewId = Guid.NewGuid();
+            var section = Guid.NewGuid();
+            service.SeedOptionSet("al_response", "al_answerchoice",
+                ResponseRules.ChoiceInsufficient, "Insufficient evidence");
+            service.Seed("al_section", section, "al_displayorder", 1);
+
+            var question = Guid.NewGuid();
+            var version = Guid.NewGuid();
+            service.Seed("al_question", question,
+                "al_questioncode", "Q-TAX-02",
+                "al_sectionid", new EntityReference("al_section", section));
+            service.Seed("al_questionversion", version,
+                "al_questiontext", "Tax check outcome",
+                "al_displayorder", 1,
+                "al_responsetype", new OptionSetValue(ResponseRules.TypePassFailInsufficient),
+                "al_questionid", new EntityReference("al_question", question));
+            service.Seed("al_response", Guid.NewGuid(),
+                "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
+                "al_questionversionid", new EntityReference("al_questionversion", version),
+                "al_answerchoice", new OptionSetValue(ResponseRules.ChoiceInsufficient));
+
+            var items = Remediation.NonPassItems(service, reviewId, new DateTime(2026, 9, 10, 12, 0, 0, DateTimeKind.Utc));
+            Assert.Empty(items);
+
+            var raised = Remediation.Raise(
+                service,
+                new EntityReference("al_outcomecase", Guid.NewGuid()),
+                "IO-012",
+                reviewId,
+                1,
+                "Tax check: Insufficient evidence",
+                null,
+                items,
+                null,
+                Monday);
+
+            Assert.Single(raised);
+            Assert.Equal("REM-IO-012-1", service.Creates.Single().GetAttributeValue<string>("al_remediationactioncode"));
+            Assert.Contains(
+                "(Tax check: Insufficient evidence)",
+                service.Creates.Single().GetAttributeValue<string>("al_description"));
         }
 
         [Theory]

@@ -10,7 +10,7 @@ vi.mock('../../services/commands/completeRemediation', () => ({ completeRemediat
 vi.mock('../../services/errors', () => ({ messageForFailure: () => '' }));
 vi.mock('../../hooks/useIntentKey', () => ({ useIntentKeys: () => ({ keyFor: () => '' }) }));
 
-const { ActionsTable } = await import('./RemediationPage');
+const { ActionsTable, RemediationDetails } = await import('./RemediationPage');
 
 /**
  * What the Code App's remediation page actually draws, as markup.
@@ -121,11 +121,17 @@ describe('the remediation actions table', () => {
   });
 
   it('numbers straight through a second action', () => {
-    const second = ['Issues found on the check:', '- Tax check outcome: Fail'].join('\n');
+    const second = [
+      'Issues found on the check:',
+      '- Fail point: Record Keeping - No client agreement or client acceptance in place',
+    ].join('\n');
     const body = rows(draw([action('a1', DESCRIPTION), action('a2', second)])).slice(1);
     const last = body[body.length - 1];
 
-    expect(last.slice(0, 2)).toEqual(['5', 'Tax check outcome: Fail']);
+    expect(last.slice(0, 2)).toEqual([
+      '5',
+      'Fail point: Record Keeping - No client agreement or client acceptance in place',
+    ]);
   });
 
   it('still draws an action whose description carries no item list', () => {
@@ -134,5 +140,23 @@ describe('the remediation actions table', () => {
 
     expect(body).toHaveLength(1);
     expect(body[0].slice(0, 2)).toEqual(['1', plain]);
+  });
+});
+
+describe('the remediation details', () => {
+  it('shows the outcome above the table, not as one of its numbered rows', () => {
+    const markup = renderToStaticMarkup(
+      <RemediationDetails outcome={'Tax check: Insufficient evidence'} />,
+    );
+
+    expect(markup).toContain('<dt>Outcome</dt>');
+    expect(markup).toContain('Tax check: Insufficient evidence');
+    expect(rows(draw([action('a', DESCRIPTION)])).flat()).not.toContain(
+      'Tax check: Insufficient evidence',
+    );
+  });
+
+  it('draws nothing at all when the actions name no outcome', () => {
+    expect(renderToStaticMarkup(<RemediationDetails outcome={null} />)).toBe('');
   });
 });

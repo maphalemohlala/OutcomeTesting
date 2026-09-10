@@ -18,11 +18,46 @@ import type { RemediationActionRow } from './remediationMapping';
 /** The heading `Remediation.Describe` puts above the items. Dropped, not shown as a row. */
 const ISSUES_HEADING = 'Issues found on the check:';
 
+/**
+ * How `Remediation.Describe` opens the bracket holding the outcome: "...when the review was
+ * submitted (Tax check: Insufficient evidence)." The outcome is not one of the numbered
+ * items - it is the result every item is a reason for - so it is read back out here and
+ * shown as the remediation's Outcome instead (project owner, 2026-09-10).
+ */
+const OUTCOME_MARKER = 'submitted (';
+
 export interface RemediationIssues {
   /** One entry per item the checker marked down; empty when the description carries none. */
   issues: string[];
   /** What is left once the items are out: the checker's observation and why this was raised. */
   note: string | null;
+  /** The outcome the remediation was raised for; null when the description names none. */
+  outcome: string | null;
+}
+
+/**
+ * The outcome out of the note's standing sentence.
+ *
+ * The marker has to be present before the brackets mean anything: a description with no
+ * reason behind it still carries the sentence, and a checker's observation is free text
+ * that may well have brackets of its own. Once it is present, the outcome is the last
+ * bracket the description opens - the observation is written above the sentence, never
+ * below it - which is the one rule the two portal templates can also follow, Liquid having
+ * no multi-character `split` on this site.
+ */
+function outcomeIn(note: string | null): string | null {
+  if (note === null || !note.includes(OUTCOME_MARKER)) {
+    return null;
+  }
+
+  const open = note.lastIndexOf('(');
+  const close = note.indexOf(')', open);
+  if (close < 0) {
+    return null;
+  }
+
+  const outcome = note.slice(open + 1, close).trim();
+  return outcome ? outcome : null;
 }
 
 export function splitIssues(description: string | null | undefined): RemediationIssues {
@@ -51,7 +86,8 @@ export function splitIssues(description: string | null | undefined): Remediation
   // worth keeping; the gap the items left behind is not.
   const note = rest.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 
-  return { issues, note: note ? note : null };
+  const text = note ? note : null;
+  return { issues, note: text, outcome: outcomeIn(text) };
 }
 
 /** Columns in the actions table, for the row a group's note spans. */
@@ -66,6 +102,25 @@ export interface ActionGroup {
   action: RemediationActionRow;
   lines: IssueLine[];
   note: string | null;
+}
+
+/**
+ * The outcome the actions were raised for, or null when none of them names one.
+ *
+ * Read across the set rather than off the first row so a case whose Tax and AQS reviews
+ * both raised remediation does not report only the earlier of the two. They are joined in
+ * the order the actions come in, each shown once.
+ */
+export function outcomeOf(actions: RemediationActionRow[]): string | null {
+  const seen: string[] = [];
+  for (const action of actions) {
+    const { outcome } = splitIssues(action.description);
+    if (outcome !== null && !seen.includes(outcome)) {
+      seen.push(outcome);
+    }
+  }
+
+  return seen.length > 0 ? seen.join('; ') : null;
 }
 
 /**

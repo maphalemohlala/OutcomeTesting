@@ -300,9 +300,55 @@
         {{ c.al_casereference | default: 'Case' | escape }}
         {% include 'OT Status Badge' status: c.al_casestatus.label %}
       </h2>
+      {% comment %}
+        The outcome the remediation was raised for, read back out of the actions.
+
+        It is not one of the numbered issues and is no longer raised as one: it is the result
+        every issue in the table is a reason for, and numbering it among them read as one more
+        thing the adviser had to put right (project owner, 2026-09-10). Remediation.Describe
+        writes it in brackets at the end of the standing sentence - "...when the review was
+        submitted (Tax check: Insufficient evidence)." - so it is already on every action and
+        needs no column of its own.
+
+        The marker has to be there before the brackets mean anything: an action raised with no
+        reason behind it still carries the sentence, and a checker's observation is free text
+        that may have brackets of its own. Once it is, the outcome is the last bracket the
+        description opens, the observation being written above the sentence and never below it.
+
+        Both splits are on one character, this Liquid having no multi-character split, and each
+        is assigned before it is walked, a for tag taking a variable rather than a filtered
+        expression. The two ends are taken by walking the pieces rather than with first / last
+        or an index - the same caution the item split below is written with, on a site that has
+        rejected both an index into a collection and a two-argument filter.
+
+        Read across every action rather than off the first, so a case whose Tax and AQS reviews
+        both raised remediation names both. The same block is in OT Case Detail.
+      {% endcomment %}
+      {% assign ot_outcome = '' %}
+      {% for a in rows %}
+        {% if a.al_description contains 'submitted (' %}
+          {% assign ot_tail = '' %}
+          {% assign ot_opens = a.al_description | split: '(' %}
+          {% for piece in ot_opens %}{% assign ot_tail = piece %}{% endfor %}
+          {% assign ot_reason = '' %}
+          {% assign ot_taken = false %}
+          {% assign ot_closes = ot_tail | split: ')' %}
+          {% for piece in ot_closes %}{% unless ot_taken %}{% assign ot_reason = piece | strip %}{% assign ot_taken = true %}{% endunless %}{% endfor %}
+          {% if ot_reason != '' %}
+            {% unless ot_outcome contains ot_reason %}
+              {% if ot_outcome == '' %}
+                {% assign ot_outcome = ot_reason %}
+              {% else %}
+                {% assign ot_outcome = ot_outcome | append: '; ' | append: ot_reason %}
+              {% endif %}
+            {% endunless %}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
       <dl class="ot-dl">
         <div><dt>Client</dt><dd>{{ c.al_clientname | default: '—' | escape }}</dd></div>
         <div><dt>Adviser</dt><dd>{{ c.al_advisername | default: '—' | escape }}</dd></div>
+        <div><dt>Outcome</dt><dd>{{ ot_outcome | default: '—' | escape }}</dd></div>
         <div><dt>Case</dt><dd><a href="/case-details?id={{ c.al_outcomecaseid }}">Open the full case record</a></dd></div>
       </dl>
 
