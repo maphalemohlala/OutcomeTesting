@@ -29,6 +29,7 @@ namespace OutcomeTesting.Plugins
         private const string ActionLookup = "al_remediationactionid";
         private const string CaseLookup = "al_outcomecaseid";
         private const string ReviewLookup = "al_reviewinstanceid";
+        private const string FinalOutcomeAttr = "al_finaloutcome";
 
         private const int StatusInProgress = Remediation.StatusInProgress;
         public const int DecisionApprovedValue = 120910720;
@@ -83,10 +84,12 @@ namespace OutcomeTesting.Plugins
                 service.Update(ReopenedAction(actionRef.Id, DateTime.UtcNow));
             }
 
+            var reviewId = ResolveReview(service, actionRef);
             var caseId = ResolveCase(service, signoff, actionRef);
             if (caseId.HasValue)
             {
-                MoveCase(service, caseId.Value, decision.Value, ResolveReview(service, actionRef));
+                MoveCase(service, caseId.Value, decision.Value, reviewId);
+                RecordFinalOutcome(service, context, signoff, caseId.Value, reviewId);
             }
 
             // One Audit Event per decision. A create raised by the al_SignOffRemediation
@@ -138,8 +141,17 @@ namespace OutcomeTesting.Plugins
             var email = NotificationOutbox.ContactEmail(service, action.GetAttributeValue<EntityReference>("al_assignedcontactid"));
             var notes = signoff.GetAttributeValue<string>(NotesAttr);
 
+            // What approval now means depends on whether the supervisor graded as they
+            // approved (project owner, 2026-09-11). Where they did, the case is finished and
+            // saying it "moved on to recheck" would send the adviser looking for a step that
+            // is not coming; where they did not, it is still waiting on one.
+            var finalOutcome = signoff.GetAttributeValue<OptionSetValue>(FinalOutcomeAttr);
+
             var body = approved
-                ? "Your remediation on case " + reference + " has been approved and the case has moved on to recheck."
+                ? finalOutcome == null
+                    ? "Your remediation on case " + reference + " has been approved and the case has moved on to recheck."
+                    : "Your remediation on case " + reference + " has been approved, and the case is now closed with a final outcome of "
+                        + RegradeCasePlugin.FinalOutcomeLabel(finalOutcome.Value) + "."
                 : "Your remediation on case " + reference + " has been sent back for further work. "
                     + "The ten-working-day clock has restarted from today (OD-018).";
 
@@ -284,6 +296,97 @@ namespace OutcomeTesting.Plugins
         /// lifecycle rather than assumed, so a case that is not where it expects is left
         /// alone instead of jumping.
         /// </summary>
+        /// <summary>
+        /// Writes the final outcome the supervisor recorded as they approved, which closes
+        /// the case (project owner, 2026-09-11, settling OD-041).
+        ///
+        /// Approving used to leave the case at Awaiting Recheck for a separate regrade, and
+        /// nothing prompted anyone to do it - so a remediated case sat there, still showing
+        /// the grade it was given before the adviser put anything right, and never reached
+        /// Closed. The export collects Closed cases only, as
+        /// <see cref="RegradeCasePlugin.CloseAfterRecheck"/> records, so it never reached
+        /// Trail Light either.
+        ///
+        /// <b>Run after <see cref="MoveCase"/> and gated on the status it left behind.</b> A
+        /// check raises one action per thing marked down and the page signs them off one by
+        /// one, each carrying the same grade; only the last one clears
+        /// <see cref="AnyAwaitingSignoff"/> and reaches Awaiting Recheck. Asking the case
+        /// where it is now is therefore what makes this happen once, without this having to
+        /// count sign-offs a second time.
+        ///
+        /// The regrade itself is <see cref="RegradeCasePlugin.Regrade"/> - the same method
+        /// the Code App's al_RegradeCase and the portal's regrade panel call (AD-111), so a
+        /// grade set here is written, audited and closed exactly as one set there is.
+        /// </summary>
+        private static void RecordFinalOutcome(
+            IOrganizationService service,
+            IPluginExecutionContext context,
+            Entity signoff,
+            Guid caseId,
+            Guid? reviewId)
+        {
+            var finalOutcome = signoff.GetAttributeValue<OptionSetValue>(FinalOutcomeAttr);
+            if (finalOutcome == null)
+            {
+                return;
+            }
+
+            // Anything else means this was not the sign-off that finished the check: an
+            // earlier one of the set, a rejection, or a Tax leg handing back to the queue.
+            if (CaseTransitions.CurrentStatus(service, caseId) != CaseLifecycle.AwaitingRecheck)
+            {
+                return;
+            }
+
+            var outcomeId = OutcomeFor(service, caseId, reviewId);
+            if (outcomeId == Guid.Empty)
+            {
+                // No graded outcome to override - a remediated Tax-only case has no
+                // al_outcome row at all (AD-055). MoveCase has already closed that one.
+                return;
+            }
+
+            RegradeCasePlugin.Regrade(
+                service,
+                service,
+                outcomeId,
+                RegradeCasePlugin.FinalOutcomeLabel(finalOutcome.Value),
+                signoff.GetAttributeValue<string>(NotesAttr),
+                null,
+                "signoff-regrade-" + outcomeId.ToString("N"),
+                context);
+        }
+
+        /// <summary>
+        /// The Outcome the check being signed off recorded: the one for this review where the
+        /// sign-off knows which review it was, and the case's otherwise.
+        ///
+        /// Scoped to the review because a Tax-then-AQS case can carry an Outcome per leg, and
+        /// regrading whichever came back first would put the AQS supervisor's grade on the
+        /// Tax check (the reason NotificationOutbox.InitialOutcome reads by review too).
+        /// </summary>
+        private static Guid OutcomeFor(IOrganizationService service, Guid caseId, Guid? reviewId)
+        {
+            var query = new QueryExpression("al_outcome")
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+
+            if (reviewId.HasValue)
+            {
+                query.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId.Value);
+            }
+            else
+            {
+                query.Criteria.AddCondition(CaseLookup, ConditionOperator.Equal, caseId);
+            }
+
+            var rows = service.RetrieveMultiple(query).Entities;
+            return rows.Count == 0 ? Guid.Empty : rows[0].Id;
+        }
+
         public static void MoveCase(IOrganizationService service, Guid caseId, int decision, Guid? reviewId = null)
         {
             var current = CaseTransitions.CurrentStatus(service, caseId);

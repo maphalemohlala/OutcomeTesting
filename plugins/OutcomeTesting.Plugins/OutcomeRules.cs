@@ -14,6 +14,23 @@ namespace OutcomeTesting.Plugins
     public static class OutcomeRules
     {
         // al_outcome.al_initialoutcome / al_finaloutcome — the BR-005 four-value scale.
+        // The final outcome's own band. al_Outcome keeps the initial and the final in
+        // separate columns so both survive a regrade (BR-007), and they are separate option
+        // sets: 1209107_0_x is the grade a check gave, 1209107_1_x the grade it ended on.
+        public const int FinalOutcomePass = 120910710;
+        public const int FinalOutcomePassWithIssues = 120910711;
+        public const int FinalOutcomeInsufficient = 120910712;
+        public const int FinalOutcomePotentialHarm = 120910713;
+
+        /// <summary>Whether the value is one the BR-005 final scale defines.</summary>
+        public static bool IsFinalOutcome(int value)
+        {
+            return value == FinalOutcomePass
+                || value == FinalOutcomePassWithIssues
+                || value == FinalOutcomeInsufficient
+                || value == FinalOutcomePotentialHarm;
+        }
+
         public const int OutcomePass = 120910700;
         public const int OutcomePassWithIssues = 120910701;
         public const int OutcomeInsufficient = 120910702;

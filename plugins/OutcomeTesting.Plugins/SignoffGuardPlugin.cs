@@ -30,6 +30,7 @@ namespace OutcomeTesting.Plugins
         private const string NotesAttr = "al_notes";
         private const string ActionLookup = "al_remediationactionid";
         private const string CaseLookup = "al_outcomecaseid";
+        private const string FinalOutcomeAttr = "al_finaloutcome";
 
         private const int StatusCompleted = Remediation.StatusCompleted;
         private const int DecisionRejectedValue = 120910721;
@@ -74,6 +75,42 @@ namespace OutcomeTesting.Plugins
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix + "A rejected sign-off must record notes explaining the return.");
+            }
+
+            // The final outcome the supervisor records as they approve (project owner,
+            // 2026-09-11, settling OD-041). Approving used to leave the case at Awaiting
+            // Recheck for a separate regrade, and a case that never got one never reached
+            // Closed - so it never reached the export either, which collects Closed cases.
+            //
+            // A rejection grades nothing: it sends the work back to the adviser, and the
+            // check it belongs to has not finished. Refused rather than ignored, because a
+            // page that sends one is wrong about what it is doing.
+            var finalOutcome = signoff.GetAttributeValue<OptionSetValue>(FinalOutcomeAttr);
+            if (finalOutcome != null)
+            {
+                if (decision.Value == DecisionRejectedValue)
+                {
+                    throw new InvalidPluginExecutionException(
+                        CommandHelpers.ValidationPrefix +
+                        "A rejected sign-off returns the remediation to the adviser, so it cannot record a final outcome.");
+                }
+
+                if (!OutcomeRules.IsFinalOutcome(finalOutcome.Value))
+                {
+                    throw new InvalidPluginExecutionException(
+                        CommandHelpers.ValidationPrefix +
+                        "The final outcome must be Pass, Pass with issues, Insufficient evidence or Potential harm.");
+                }
+
+                // AD-031: overriding a grade records why, and the notes are where the
+                // supervisor says it. Required here as well as in RegradeCasePlugin.Regrade,
+                // so the supervisor is told before the sign-off is written rather than after.
+                if (string.IsNullOrWhiteSpace(notes))
+                {
+                    throw new InvalidPluginExecutionException(
+                        CommandHelpers.PreconditionPrefix +
+                        "Recording a final outcome must say why the grade was set (AD-031).");
+                }
             }
 
             var actionRef = signoff.GetAttributeValue<EntityReference>(ActionLookup);

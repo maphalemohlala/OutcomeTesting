@@ -912,6 +912,29 @@
                 <option value="120910721">Rejected</option>
               </select>
             </div>
+            {% comment %}
+              The final outcome, recorded as the approval is made (project owner, 2026-09-11,
+              settling OD-041). Approving used to leave the case at Awaiting Recheck for a
+              separate regrade on the panel below, and nothing prompted anyone to do it - so
+              a remediated case sat there still showing the grade the check gave before the
+              adviser put anything right, and never reached Closed or the export.
+
+              Offered only where there is a graded outcome to override, the same condition the
+              regrade panel uses: a remediated Tax-only case has no al_outcome row at all
+              (AD-055) and MoveCase closes it without one.
+            {% endcomment %}
+            {% if outcome and outcome.al_initialoutcome %}
+              <div class="ot-field" data-ot-signoff-grade-field>
+                <label for="ot-signoff-outcome">Final outcome</label>
+                <select id="ot-signoff-outcome" data-ot-signoff-outcome>
+                  <option value="">Leave for a separate regrade</option>
+                  <option value="120910710">Pass</option>
+                  <option value="120910711">Pass with issues</option>
+                  <option value="120910712">Insufficient evidence</option>
+                  <option value="120910713">Potential harm</option>
+                </select>
+              </div>
+            {% endif %}
             <div class="ot-field">
               <label for="ot-notes">Notes</label>
               <textarea id="ot-notes" rows="3" data-ot-signoff-notes></textarea>
@@ -1436,6 +1459,7 @@
       var actionIds = (panel.getAttribute('data-action-ids') || '').split(',');
       var decision = panel.querySelector('[data-ot-signoff-decision]');
       var notes = panel.querySelector('[data-ot-signoff-notes]');
+      var grade = panel.querySelector('[data-ot-signoff-outcome]');
       var save = panel.querySelector('[data-ot-signoff-save]');
       var status = panel.querySelector('[data-ot-signoff-status]');
 
@@ -1456,6 +1480,20 @@
         // Told before the round trip; SignoffGuardPlugin refuses it regardless.
         if (decision.value === REJECTED && !notes.value.trim()) {
           show('A rejection must say what the adviser needs to put right.', 'error');
+          return;
+        }
+
+        // A rejection sends the work back, so it grades nothing. The guard refuses the
+        // combination rather than ignoring it, so catch it here where it can be corrected.
+        if (decision.value === REJECTED && grade && grade.value) {
+          show('A rejection sends the remediation back to the adviser, so it cannot record a final outcome.', 'error');
+          return;
+        }
+
+        // AD-031: setting a grade records why. Required in SignoffGuardPlugin too, because a
+        // page is not a boundary.
+        if (grade && grade.value && !notes.value.trim()) {
+          show('Recording a final outcome must say why the grade was set.', 'error');
           return;
         }
 
@@ -1489,7 +1527,10 @@
               al_signoffrequest: JSON.stringify({
                 actionId: actionId,
                 decision: Number(decision.value),
-                notes: notes.value
+                notes: notes.value,
+                // Zero where the supervisor left it for a separate regrade, or where the
+                // case has no graded outcome and the field was not rendered at all.
+                finalOutcome: grade && grade.value ? Number(grade.value) : 0
               })
             };
 

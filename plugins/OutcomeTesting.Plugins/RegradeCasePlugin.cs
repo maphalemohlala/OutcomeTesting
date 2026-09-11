@@ -237,6 +237,20 @@ namespace OutcomeTesting.Plugins
             }
         }
 
+        /// <summary>
+        /// The label <see cref="Regrade"/> expects for a final-outcome option value.
+        ///
+        /// Public because the remediation sign-off now records the final outcome as it
+        /// approves (project owner, 2026-09-11), and it holds the grade as the option value
+        /// <c>al_signoff.al_finaloutcome</c> carries rather than as text. Going back through
+        /// the label keeps one parser: <see cref="ParseOutcome"/> stays the only place a
+        /// grade name is turned into a value.
+        /// </summary>
+        public static string FinalOutcomeLabel(int value)
+        {
+            return OutcomeLabel(value);
+        }
+
         private static string OutcomeLabel(int value)
         {
             switch (value)

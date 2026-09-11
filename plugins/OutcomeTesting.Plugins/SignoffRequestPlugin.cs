@@ -135,6 +135,16 @@ namespace OutcomeTesting.Plugins
                 signoff["al_notes"] = payload.Notes.Trim();
             }
 
+            // Carried through unvalidated, exactly as the decision and the notes are: the
+            // rules are SignoffGuardPlugin's, which refuses a grade on a rejection and a
+            // value the BR-005 scale does not define, and the consequences are
+            // SignoffProgressPlugin's. This plug-in only exists because the browser cannot
+            // make the association.
+            if (payload.FinalOutcome != 0)
+            {
+                signoff["al_finaloutcome"] = new OptionSetValue(payload.FinalOutcome);
+            }
+
             return service.Create(signoff);
         }
 
@@ -175,6 +185,15 @@ namespace OutcomeTesting.Plugins
 
         [DataMember(Name = "notes")]
         public string Notes { get; set; }
+
+        /// <summary>
+        /// The final BR-005 outcome, recorded as the supervisor approves (project owner,
+        /// 2026-09-11). Zero when the page sent none, which is every rejection and any
+        /// approval on a case with no graded outcome to override - a remediated Tax-only
+        /// case has no al_outcome row at all (AD-055).
+        /// </summary>
+        [DataMember(Name = "finalOutcome")]
+        public int FinalOutcome { get; set; }
 
         public static SignoffRequestPayload Parse(string json)
         {
