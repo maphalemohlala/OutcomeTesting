@@ -516,8 +516,14 @@ footer a:focus-visible, .footer a:focus-visible {
   color: var(--colour-text);
 }
 
+/* textarea is listed alongside input and select deliberately. It was missing, so the
+   regrade Reason and the sign-off Notes on the remediation page drew with no border,
+   no padding and no background - an unmarked area of page that did not read as a field
+   at all. The .ot-checklist textareas are borderless on purpose and are not touched by
+   these rules; that component replicates a paper form. */
 .ot-field input,
-.ot-field select {
+.ot-field select,
+.ot-field textarea {
   font-family: var(--font-body);
   font-size: var(--text-base);
   color: var(--colour-text);
@@ -529,8 +535,17 @@ footer a:focus-visible, .footer a:focus-visible {
   width: 100%;
 }
 
+/* Only the textarea resizes, and only vertically: a horizontal drag would push it out
+   of the form's column. */
+.ot-field textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+  line-height: 1.45;
+}
+
 .ot-field input:focus-visible,
-.ot-field select:focus-visible {
+.ot-field select:focus-visible,
+.ot-field textarea:focus-visible {
   outline: 2px solid var(--colour-focus);
   outline-offset: 1px;
   border-color: var(--colour-focus);

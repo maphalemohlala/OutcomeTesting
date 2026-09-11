@@ -1301,8 +1301,26 @@
               return;
             }
 
-            show('Signed off. Reloading...', 'success');
-            window.setTimeout(function () { window.location.reload(); }, 800);
+            /*
+             * The reload cannot be guaranteed to show the result, which is why the message
+             * says so rather than promising it.
+             *
+             * Every write on this page is a PATCH to a trigger column that a synchronous
+             * plug-in turns into writes on OTHER tables - al_outcome, al_outcomecase,
+             * al_signoff, al_remediationaction. Those rows are committed by the time the
+             * PATCH returns, but the portal did not write them, so its own render cache is
+             * not invalidated by the write path. It learns through Dataverse change
+             * tracking (AD-094), which is polled and eventually consistent: change tracking
+             * makes the portal ABLE to notice, not synchronous about it.
+             *
+             * At 800ms the reload beat that consistently, so a regrade that had fully
+             * succeeded - outcome recorded, case closed, audit event written - re-rendered
+             * with every value unchanged and read as a silent failure. Reported against
+             * IO-300005 on 2026-09-11. A longer delay narrows the window but cannot close
+             * it, so the text carries the caveat.
+             */
+            show('Signed off. Refreshing - if the page still shows the old state, the site cache has not caught up; reload again in a moment.', 'success');
+            window.setTimeout(function () { window.location.reload(); }, 2500);
             return;
           }
 
@@ -1512,8 +1530,8 @@
           // firing them together would leave the supervisor guessing which ones landed.
           function next() {
             if (index >= actionIds.length) {
-              show('Sign-off recorded. Reloading...', 'success');
-              window.setTimeout(function () { window.location.reload(); }, 800);
+              show('Sign-off recorded. Refreshing - if the page still shows the old state, the site cache has not caught up; reload again in a moment.', 'success');
+              window.setTimeout(function () { window.location.reload(); }, 2500);
               return;
             }
 
@@ -1709,8 +1727,8 @@
             if (request.readyState !== 4) { return; }
 
             if (request.status >= 200 && request.status < 300) {
-              show('Final outcome recorded. Reloading...', 'success');
-              window.setTimeout(function () { window.location.reload(); }, 800);
+              show('Final outcome recorded and the case closed. Refreshing - if the grade below still reads the old value, the site cache has not caught up; reload again in a moment.', 'success');
+              window.setTimeout(function () { window.location.reload(); }, 2500);
               return;
             }
 
