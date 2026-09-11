@@ -244,6 +244,16 @@ if (args.Length >= 2 && args[0].Equals("addchoicecolumn", StringComparison.Ordin
     return AddChoiceColumn(args);
 }
 
+if (args.Length >= 2 && args[0].Equals("adddatecolumn", StringComparison.OrdinalIgnoreCase))
+{
+    return AddDateColumn(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("addboolcolumn", StringComparison.OrdinalIgnoreCase))
+{
+    return AddBoolColumn(args);
+}
+
 if (args.Length >= 2 && args[0].Equals("setstepfilter", StringComparison.OrdinalIgnoreCase))
 {
     return SetStepFilter(args);
@@ -2757,6 +2767,164 @@ int AddMemoColumn(string[] a)
 
     Console.WriteLine(
         $"Created {entity}.{created.LogicalName} (memo, max {created.MaxLength}) in solution {SolutionUniqueName}.");
+    return 0;
+}
+
+// A date-only column (AD-123). DateOnly behaviour rather than UserLocal because every
+// effective date in this model is compared a day at a time: a UserLocal column would put
+// "is this section in force today" at the mercy of the reader's time zone, which is the
+// class of bug AD-091 was raised to fix.
+int AddDateColumn(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 5 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This writes metadata to a live environment. Re-run as: adddatecolumn <orgUrl> " +
+            "<entityLogicalName> <SchemaName> <displayName> [<description>] --confirm <orgUrl>");
+        return 1;
+    }
+
+    var entity = a[2].Trim();
+    var schemaName = a[3].Trim();
+    var displayName = a[4];
+    var description = a.Length > 5 && !a[5].StartsWith("--", StringComparison.Ordinal) ? a[5] : string.Empty;
+    var logicalName = schemaName.ToLowerInvariant();
+
+    using var svc = Connect(orgUrl);
+
+    var existing = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    if (existing.EntityMetadata.Attributes.Any(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)))
+    {
+        Console.Error.WriteLine($"'{entity}' already has a column '{logicalName}'. Nothing was changed.");
+        return 1;
+    }
+
+    svc.Execute(new CreateAttributeRequest
+    {
+        SolutionUniqueName = SolutionUniqueName,
+        EntityName = entity,
+        Attribute = new DateTimeAttributeMetadata
+        {
+            SchemaName = schemaName,
+            LogicalName = logicalName,
+            Format = DateTimeFormat.DateOnly,
+            DateTimeBehavior = DateTimeBehavior.DateOnly,
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+            DisplayName = NotificationTable.Text(displayName),
+            Description = NotificationTable.Text(description),
+        },
+    });
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    var after = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    var created = after.EntityMetadata.Attributes.FirstOrDefault(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)) as DateTimeAttributeMetadata;
+
+    if (created == null)
+    {
+        Console.Error.WriteLine($"'{logicalName}' was not found on '{entity}' after the create returned. Investigate before relying on it.");
+        return 1;
+    }
+
+    // The behaviour is read back too, not just the column: a date column that arrived as
+    // UserLocal would look identical in every listing and be wrong only at a time-zone
+    // boundary, which is exactly where nobody is looking.
+    Console.WriteLine(
+        $"Created {entity}.{created.LogicalName} (date, behaviour {created.DateTimeBehavior?.Value ?? "unknown"}) in solution {SolutionUniqueName}.");
+    return 0;
+}
+
+// A two-option boolean column (AD-123). The default matters more than it looks: every
+// existing row takes it, so a flag that must not change behaviour for content already
+// published is created defaulting to false.
+int AddBoolColumn(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 6 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This writes metadata to a live environment. Re-run as: addboolcolumn <orgUrl> " +
+            "<entityLogicalName> <SchemaName> <displayName> <true|false> [<description>] --confirm <orgUrl>");
+        return 1;
+    }
+
+    var entity = a[2].Trim();
+    var schemaName = a[3].Trim();
+    var displayName = a[4];
+
+    bool defaultValue;
+    if (!bool.TryParse(a[5], out defaultValue))
+    {
+        Console.Error.WriteLine($"Default value '{a[5]}' is not 'true' or 'false'.");
+        return 1;
+    }
+
+    var description = a.Length > 6 && !a[6].StartsWith("--", StringComparison.Ordinal) ? a[6] : string.Empty;
+    var logicalName = schemaName.ToLowerInvariant();
+
+    using var svc = Connect(orgUrl);
+
+    var existing = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    if (existing.EntityMetadata.Attributes.Any(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)))
+    {
+        Console.Error.WriteLine($"'{entity}' already has a column '{logicalName}'. Nothing was changed.");
+        return 1;
+    }
+
+    svc.Execute(new CreateAttributeRequest
+    {
+        SolutionUniqueName = SolutionUniqueName,
+        EntityName = entity,
+        Attribute = new BooleanAttributeMetadata
+        {
+            SchemaName = schemaName,
+            LogicalName = logicalName,
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+            DisplayName = NotificationTable.Text(displayName),
+            Description = NotificationTable.Text(description),
+            DefaultValue = defaultValue,
+            OptionSet = new BooleanOptionSetMetadata(
+                new OptionMetadata(NotificationTable.Text("Yes"), 1),
+                new OptionMetadata(NotificationTable.Text("No"), 0)),
+        },
+    });
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    var after = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    var created = after.EntityMetadata.Attributes.FirstOrDefault(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)) as BooleanAttributeMetadata;
+
+    if (created == null)
+    {
+        Console.Error.WriteLine($"'{logicalName}' was not found on '{entity}' after the create returned. Investigate before relying on it.");
+        return 1;
+    }
+
+    Console.WriteLine(
+        $"Created {entity}.{created.LogicalName} (boolean, default {created.DefaultValue}) in solution {SolutionUniqueName}.");
     return 0;
 }
 
