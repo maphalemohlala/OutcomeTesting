@@ -164,8 +164,8 @@ which is a runbook to be executed, not a record of a completed deployment.
 
 ### Not yet built
 
-- **Assignment filtering.** Every list is unfiltered and says so on the page. Filtering needs `al_assignedcontactid` (AD-047), which exists on `al_ReviewInstance` and `al_RemediationAction` but is not yet used to filter a query.
-- **Status and route filters.** Deferred until Phase 3.
+- **Assignment filtering on the remediation list.** Built on the other two and stale here until 2026-09-11. The case list and the review list both carry an **Assigned to me** scope keyed on `al_assignedcontactid` (AD-047) — the case list through an inner join to `al_ReviewInstance`, the review list as a condition on the instance itself. `/remediation` still filters by case reference alone, though `al_RemediationAction` carries the same column.
+- **Status filter on the review list.** Also stale until 2026-09-11: the case list filters on reference, client, adviser, status, priority, case type, advice-date range, outcome and review route, and the review list on reference and route. Only a status filter on the review list is outstanding. The route filters on both lists returned nothing until `al_reviewroute` was given a read permission (AD-115), which is why they read as unbuilt for longer than they were.
 - **Working-day ageing.** Implemented on the remediation report (OD-018); the reset-and-preserve behaviour across a rejected sign-off is not yet built.
 
 ## Rules

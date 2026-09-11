@@ -63,10 +63,11 @@ drawing the layout around an empty body, since one shared template renders both.
   Widening a read is OD-022 territory and is the project owner's call.
 - **`AL Portal - Planner` has no holders in DEV.** Seeding, most likely, but it means that
   path has never been exercised.
-- **Two cases sit at Awaiting Recheck with a grade and no final outcome** — IO-300005 and
-  IO-SEED-TXA-01. They cannot be closed in bulk: the final outcome is the supervisor's
-  judgement under BR-005 and the reason is mandatory under AD-031, so neither is derivable
-  from the data. One supervisor action each, on the regrade panel that now renders.
+- **IO-SEED-TXA-01 sits at Awaiting Recheck with a grade and no final outcome.** It cannot
+  be closed from here: the final outcome is the supervisor's judgement under BR-005 and the
+  reason is mandatory under AD-031, so neither is derivable from the data. One supervisor
+  action, on the regrade panel that now renders. IO-300005 was the other and was closed by
+  the project owner the same day — see the round below.
 
 ## Full `Deploy-Portal.ps1` run
 
@@ -103,3 +104,61 @@ It will print the same line on every future deploy. The fix is a manifest rebuil
 `pac pages download` does truthfully — but a download also **re-arms the table-permission
 section that `Deploy-Portal.ps1` deliberately strips** (see the README), so it is not worth
 doing for cosmetics alone. Do it as part of the next deliberate download, not on its own.
+
+
+## Second round, same day — what the first round's fixes exposed
+
+Recording the final outcome on IO-300005 through the regrade panel, now that it renders,
+surfaced three things. One was a real defect, one was a cosmetic defect, and one was the
+form working as designed and being wrong about it.
+
+| # | Step | Command | Result |
+|---|---|---|---|
+| 4 | Change tracking | `setchangetracking <orgUrl> <12 tables>` | 11 already on; `al_caseassignment` enabled and published |
+| 5 | Stylesheet | `pushwebfile <orgUrl> …050 outcome-testing.css` | 44809 bytes |
+| 6 | Remediation template | `pushwebtemplate <orgUrl> …019 <source>` | 88699 chars |
+
+### The regrade had worked; the page had not caught up (AD-117)
+
+Reported as "it showed that it was done successfully, but the status did not change". It had
+succeeded in full — `al_finaloutcome` Pass, `al_regradedon` and `al_finalisedon` stamped,
+case `Closed`, initial outcome preserved, and an audit event keyed
+`portal-regrade-36d49fef…` written at 08:46:01Z, which is the portal path and not a direct
+write.
+
+The page reloads 800ms after the PATCH returns. That was too early. A regrade PATCHes
+`contact.al_regraderequest`; `RegradeRequestPlugin` writes `al_outcome` and `al_outcomecase`.
+**The portal did not write those rows**, so its render cache is not invalidated by the write
+path — it learns through Dataverse change tracking (AD-094), which is polled. Change
+tracking was verified enabled on every portal-read table while diagnosing this, so the
+mechanism is present; it is simply not synchronous. The delay is now 2500ms and each of the
+three write paths on the page says the view may not have caught up, because a longer delay
+narrows that window and cannot close it.
+
+### The Reason and Notes fields had no borders (AD-117)
+
+`.ot-field input, .ot-field select` carried the border, padding and background and
+`textarea` was never in the selector, so the regrade **Reason** and the sign-off **Notes**
+drew as unmarked areas of page. Added, with a vertical-only resize. The `.ot-checklist`
+textareas stay borderless — that component replicates a paper form.
+
+### A settled check now keeps its rows (AD-118)
+
+AD-114(c) collapsed a check whose every action had been approved. On a case where *all*
+checks are approved that left the form with no numbered rows at all: IO-300005 showed only
+"Every issue raised on this case has been remediated and approved", so the T&C Supervisor
+recording the final outcome could not see the issue or fail reason behind any of the
+twenty-three remedial actions being signed off. Reversed on the project owner's direction.
+Every action is drawn, a closed check says so in its heading and is set back with muted
+heading text, and its rows stay at full contrast because they are the record being checked.
+
+Cheap to reverse because nothing in those rows is an input — the adviser's answers, the
+sign-off and the regrade are separate panels below the grid, so a settled row was already
+read-only and the only question was whether it was drawn.
+
+### Verification
+
+Liquid tag balance was checked explicitly before deploying, since removing an
+`unless`/`endunless` pair is how a template of this size breaks silently: no unclosed tags,
+34/34 comment pairs. Both gates passed. All 16 deployed templates re-verified byte-identical
+to source after each push.
