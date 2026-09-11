@@ -126,11 +126,11 @@ namespace OutcomeTesting.Plugins.Tests
                 new List<string>
                 {
                     "Adviser charges clearly disclosed and evidenced: Fail",
-                    "Fail point: Record Keeping - TOB not provided or out of date",
+                    "Record Keeping - TOB not provided or out of date",
                 });
 
             var issues = description.IndexOf("- Adviser charges clearly disclosed and evidenced: Fail", StringComparison.Ordinal);
-            var point = description.IndexOf("- Fail point: Record Keeping - TOB not provided or out of date", StringComparison.Ordinal);
+            var point = description.IndexOf("- Record Keeping - TOB not provided or out of date", StringComparison.Ordinal);
             var observation = description.IndexOf("The checker recorded: Charges were not evidenced.", StringComparison.Ordinal);
             var instruction = description.IndexOf("Raised automatically", StringComparison.Ordinal);
 
@@ -243,23 +243,27 @@ namespace OutcomeTesting.Plugins.Tests
 
             var items = Remediation.NonPassItems(service, reviewId, new DateTime(2026, 9, 9, 12, 0, 0, DateTimeKind.Utc));
 
-            // The AML No is not an item: remediation is prepopulated from the pass/fail test
-            // points only (project owner, 2026-09-09). Its ticked fail points are still
-            // listed - those are the File Quality fail reasons, and they are read across
-            // every answer on the review whatever that answer was.
+            // The AML No is an item from 2026-09-11 (project owner), and leads because its
+            // section comes first. The N/A on the same scale is still left out: a checking
+            // point that does not apply is not something to put right.
+            //
+            // Its ticked fail points are listed either way - those are the File Quality fail
+            // reasons, read across every answer on the review whatever that answer was, and
+            // they follow the answers rather than interleaving with them.
             Assert.Equal(
                 new[]
                 {
+                    "ID verification completed and retained for all relevant clients/parties.: No",
                     "Adviser charges clearly disclosed and evidenced: Fail",
                     "Ongoing charges justified relative to service provided: Insufficient evidence",
-                    "Fail point: AML - ID verification issue",
-                    "Fail point: Record Keeping - TOB not provided or out of date",
+                    "AML - ID verification issue",
+                    "Record Keeping - TOB not provided or out of date",
                 },
                 items);
         }
 
         [Fact]
-        public void Leaves_out_the_yes_no_scales_and_the_grade()
+        public void Leaves_out_the_plain_yes_no_scales_and_the_grade()
         {
             // The subtle one: Insufficient evidence is a single option value shared by the
             // suitability scale and the Consumer Duty Yes / No / Insufficient evidence scale,
@@ -304,9 +308,19 @@ namespace OutcomeTesting.Plugins.Tests
 
             var items = Remediation.NonPassItems(service, reviewId, new DateTime(2026, 9, 9, 12, 0, 0, DateTimeKind.Utc));
 
-            // Only the Pass / Fail one survives. Its question carries no business code, so
-            // the outcome rule below leaves it alone - this test is about the scales.
-            Assert.Equal(new[] { "Adviser charges clearly disclosed and evidenced: Fail" }, items);
+            // The Pass / Fail one and the Consumer Duty one survive, in checklist order. The
+            // plain Yes / No scales stay out - a No on an AML or CRA checking point is not
+            // itemised remediation - and so does the grade, which the action already names as
+            // its reason. Neither surviving question carries a business code, so the outcome
+            // rule leaves both alone; this test is about the scales.
+            Assert.Equal(
+                new[]
+                {
+                    "CRA completed with mandatory fields and risk rating recorded.: No",
+                    "Price & Value outcome: Insufficient evidence",
+                    "Adviser charges clearly disclosed and evidenced: Fail",
+                },
+                items);
         }
 
         [Theory]
@@ -421,11 +435,21 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData(ResponseRules.TypePassFailInsufficient, ResponseRules.ChoiceFail, true)]
         [InlineData(ResponseRules.TypePassFailInsufficient, ResponseRules.ChoiceInsufficient, true)]
         [InlineData(ResponseRules.TypePassFailInsufficient, ResponseRules.ChoicePass, false)]
+        // Plain Yes / No stays out: it carries "Remedial action required?", where a No means
+        // no action is needed. See Remediation.IsRemediableScale.
         [InlineData(ResponseRules.TypeYesNo, ResponseRules.ChoiceNo, false)]
-        [InlineData(ResponseRules.TypeYesNoNa, ResponseRules.ChoiceNo, false)]
-        [InlineData(ResponseRules.TypeYesNoInsufficient, ResponseRules.ChoiceInsufficient, false)]
+        // The AML and CRA checking points, on from 2026-09-11 (project owner). N/A is not a
+        // failure - a checking point that does not apply to the case is answered N/A.
+        [InlineData(ResponseRules.TypeYesNoNa, ResponseRules.ChoiceNo, true)]
+        [InlineData(ResponseRules.TypeYesNoNa, ResponseRules.ChoiceNa, false)]
+        [InlineData(ResponseRules.TypeYesNoNa, ResponseRules.ChoiceYes, false)]
+        // The Consumer Duty overlay, on from 2026-09-11 (project owner). Both of its
+        // non-Yes answers are things the adviser has to put right; a Yes is not.
+        [InlineData(ResponseRules.TypeYesNoInsufficient, ResponseRules.ChoiceNo, true)]
+        [InlineData(ResponseRules.TypeYesNoInsufficient, ResponseRules.ChoiceInsufficient, true)]
+        [InlineData(ResponseRules.TypeYesNoInsufficient, ResponseRules.ChoiceYes, false)]
         [InlineData(ResponseRules.TypeGrade, ResponseRules.ChoicePotentialHarm, false)]
-        public void Counts_only_a_non_pass_on_a_pass_fail_scale(int responseType, int choice, bool expected)
+        public void Counts_only_a_non_pass_on_a_remediable_scale(int responseType, int choice, bool expected)
         {
             Assert.Equal(expected, Remediation.IsNonPassAnswer(responseType, choice));
         }
@@ -456,8 +480,8 @@ namespace OutcomeTesting.Plugins.Tests
                 new List<string>
                 {
                     "Tax check outcome: Insufficient evidence",
-                    "Fail point: AML - No CRA completed or missing data fields",
-                    "Fail point: Record Keeping - Concession required but not on file",
+                    "AML - No CRA completed or missing data fields",
+                    "Record Keeping - Concession required but not on file",
                 },
                 null,
                 Monday);

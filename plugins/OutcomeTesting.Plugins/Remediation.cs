@@ -197,14 +197,26 @@ namespace OutcomeTesting.Plugins
             new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Q-TAX-02", "Q-FQ-01", "Q-FQTAX-01" };
 
         /// <summary>
-        /// The scales whose answers prepopulate a remediation action: Pass / Fail and
-        /// Pass / Fail / Insufficient evidence, and no others (project owner, 2026-09-09).
+        /// The scales whose answers prepopulate a remediation action: Pass / Fail,
+        /// Pass / Fail / Insufficient evidence, the Consumer Duty overlay's
+        /// Yes / No / Insufficient evidence, and the AML and CRA checking points'
+        /// Yes / No / N/A.
         ///
-        /// The yes/no scales are deliberately out. A No on an AML and CRA checking point or
-        /// on a Consumer Duty outcome used to be listed as something the adviser had to put
-        /// right, and so did an Insufficient evidence on Consumer Duty, which answers
-        /// Yes / No / Insufficient evidence - the same option value the suitability scale
-        /// uses, which is why the answer alone cannot decide this and the scale has to.
+        /// <b>The last two joined on 2026-09-11 (project owner), superseding the 2026-09-09
+        /// direction that kept every yes/no scale out.</b> Each reaches exactly the questions
+        /// it was asked for and nothing else, which is why the widening is by scale:
+        ///
+        /// - Yes / No / Insufficient evidence is used only by Q-CD-01 to Q-CD-04, the
+        ///   Consumer Duty overlay's four outcomes.
+        /// - Yes / No / N/A is used only by Q-AML-01 to Q-AML-05, section S-AMLCRA.
+        ///
+        /// <b>Plain Yes / No is deliberately still out, and it is not the same omission.</b>
+        /// That scale carries Q-FQ-03 and Q-FQTAX-03, both "Remedial action required?", which
+        /// is the question that <em>raises</em> remediation - <c>OutcomeRules.RemedialActionFlagged</c>
+        /// reads it. A No there means no remedial action is needed, so listing it would put
+        /// "Remedial action required?: No" in front of the adviser as something to put right
+        /// on cases graded down for other reasons. It also carries Q-E2-LENS, the outcome-lens
+        /// tick, which is a judgement about the file and not a test point of its own.
         ///
         /// The grade scale is out too. The grade is already the reason the action gives
         /// (<see cref="Describe(string, string, IList{string})"/>), so listing it again as
@@ -213,18 +225,58 @@ namespace OutcomeTesting.Plugins
         public static bool IsRemediableScale(int responseType)
         {
             return responseType == ResponseRules.TypePassFail
-                || responseType == ResponseRules.TypePassFailInsufficient;
+                || responseType == ResponseRules.TypePassFailInsufficient
+                || responseType == ResponseRules.TypeYesNoInsufficient
+                || responseType == ResponseRules.TypeYesNoNa;
         }
 
         /// <summary>
-        /// An answer that belongs on the remediation action's issue list: a Fail or an
-        /// Insufficient evidence recorded on one of the pass/fail scales
-        /// (<see cref="IsRemediableScale"/>). Potential harm cannot reach here, being only
-        /// on the grade scale, and neither can a No.
+        /// Whether an answer could be a non-pass on <em>some</em> remediable scale.
+        ///
+        /// The cheap first look, taken before the question version has been read and so
+        /// before the scale is known. It has to admit No as well as the
+        /// <see cref="ResponseRules.IsNonPass"/> answers, because a No is a failed Consumer
+        /// Duty outcome and dropping it here would keep the overlay out however
+        /// <see cref="IsRemediableScale"/> reads. <see cref="IsNonPassAnswer"/> still decides.
+        /// </summary>
+        private static bool CouldBeNonPass(int choice)
+        {
+            return ResponseRules.IsNonPass(choice) || choice == ResponseRules.ChoiceNo;
+        }
+
+        /// <summary>
+        /// An answer that belongs on the remediation action's issue list: something the
+        /// checker marked down on a scale <see cref="IsRemediableScale"/> admits.
+        ///
+        /// What counts as marked down is the scale's own question, which is why this takes
+        /// both. A Fail or an Insufficient evidence on a pass/fail scale; a No on an AML or
+        /// CRA checking point; a No or an Insufficient evidence on a Consumer Duty outcome.
+        ///
+        /// <b>N/A is not a failure</b> and is the reason the AML scale cannot be read by
+        /// <see cref="ResponseRules.IsNonPass"/> alone: a checking point that does not apply
+        /// to this case is answered N/A, and putting that in front of an adviser as
+        /// something to put right would be worse than saying nothing. Potential harm cannot
+        /// reach here, being only on the grade scale.
         /// </summary>
         public static bool IsNonPassAnswer(int responseType, int choice)
         {
-            return IsRemediableScale(responseType) && ResponseRules.IsNonPass(choice);
+            if (!IsRemediableScale(responseType))
+            {
+                return false;
+            }
+
+            if (responseType == ResponseRules.TypeYesNoNa)
+            {
+                return choice == ResponseRules.ChoiceNo;
+            }
+
+            if (responseType == ResponseRules.TypeYesNoInsufficient)
+            {
+                return choice == ResponseRules.ChoiceNo
+                    || choice == ResponseRules.ChoiceInsufficient;
+            }
+
+            return ResponseRules.IsNonPass(choice);
         }
 
         /// <summary>
@@ -232,12 +284,17 @@ namespace OutcomeTesting.Plugins
         /// out: every Fail or Insufficient evidence recorded on a pass/fail test point
         /// (<see cref="IsRemediableScale"/>) whose question version is in force on
         /// <paramref name="asOf"/>, each as "question: answer", followed by every File
-        /// Quality fail point ticked on the review as "Fail point: reason". This is what the
+        /// Quality fail point ticked on the review, as the reason reads on the checklist. This
+        /// is what the
         /// remediation action's "Issue / fail reason" is prepopulated with.
         ///
-        /// The yes/no answers are not here and are not an omission: remediation is raised
-        /// against the pass/fail test points, and the fail points below carry the AML, Breach
-        /// and Record Keeping failures in their own right (project owner, 2026-09-09).
+        /// From 2026-09-11 this includes the Consumer Duty overlay's No and Insufficient
+        /// evidence answers and a No on an AML or CRA checking point (project owner), which
+        /// supersedes the 2026-09-09 direction that kept every yes/no scale out. Plain
+        /// Yes / No is still out, and <see cref="IsRemediableScale"/> records why: that scale
+        /// carries "Remedial action required?", where a No means no action is needed. The
+        /// File Quality fail points below are unaffected and still carry the AML, Breach and
+        /// Record Keeping failures in their own right (AD-096).
         ///
         /// Read from the responses rather than from a fixed list of questions so a
         /// checklist change (FR-030) reaches here without a code change. A retired version's
@@ -267,7 +324,7 @@ namespace OutcomeTesting.Plugins
                 responseIds.Add(response.Id);
 
                 var choice = response.GetAttributeValue<OptionSetValue>("al_answerchoice");
-                if (choice == null || !ResponseRules.IsNonPass(choice.Value))
+                if (choice == null || !CouldBeNonPass(choice.Value))
                 {
                     continue;
                 }
@@ -408,7 +465,10 @@ namespace OutcomeTesting.Plugins
             // al_name holds the document's whole row, category prefix included ("AML - ID
             // verification issue"), because the document does not punctuate the twenty rows
             // consistently and a label built from al_category plus a separator cannot
-            // reproduce that. So the name is used as written and nothing is prefixed here.
+            // reproduce that. So the name is used as written and nothing is prefixed here -
+            // including the "Fail point: " label these carried until 2026-09-11, dropped
+            // (project owner) so the adviser reads the issue itself rather than a category
+            // word in front of every other row.
             var reasons = ByIdIn(
                 service, "al_failreason", new ColumnSet("al_name", "al_displayorder"), ticked);
 
@@ -427,7 +487,7 @@ namespace OutcomeTesting.Plugins
                 {
                     Section = 0,
                     Order = reason.GetAttributeValue<int?>("al_displayorder") ?? 0,
-                    Text = "Fail point: " + name.Trim(),
+                    Text = name.Trim(),
                 });
             }
 

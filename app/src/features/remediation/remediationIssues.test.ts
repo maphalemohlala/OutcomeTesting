@@ -11,10 +11,10 @@ import type { RemediationActionRow } from './remediationMapping';
  */
 const DESCRIPTION = [
   'Issues found on the check:',
-  '- Fail point: AML - No CRA completed or missing data fields',
-  '- Fail point: AML - CRA highlighted a High Risk, with no supporting form completed',
-  '- Fail point: Record Keeping - Concession required but not on file',
-  '- Fail point: Record Keeping - No client agreement or client acceptance in place',
+  '- AML - No CRA completed or missing data fields',
+  '- AML - CRA highlighted a High Risk, with no supporting form completed',
+  '- Record Keeping - Concession required but not on file',
+  '- Record Keeping - No client agreement or client acceptance in place',
   '',
   'The checker recorded: passed',
   '',
@@ -25,10 +25,10 @@ const DESCRIPTION = [
 describe('splitIssues', () => {
   it('gives one issue per item the checker marked down', () => {
     expect(splitIssues(DESCRIPTION).issues).toEqual([
-      'Fail point: AML - No CRA completed or missing data fields',
-      'Fail point: AML - CRA highlighted a High Risk, with no supporting form completed',
-      'Fail point: Record Keeping - Concession required but not on file',
-      'Fail point: Record Keeping - No client agreement or client acceptance in place',
+      'AML - No CRA completed or missing data fields',
+      'AML - CRA highlighted a High Risk, with no supporting form completed',
+      'Record Keeping - Concession required but not on file',
+      'Record Keeping - No client agreement or client acceptance in place',
     ]);
   });
 
@@ -39,7 +39,7 @@ describe('splitIssues', () => {
   it('reads an AQS grade, which is the reason written without a prefix', () => {
     const graded = [
       'Issues found on the check:',
-      '- Fail point: AML - ID verification issue',
+      '- AML - ID verification issue',
       '',
       'Raised automatically when the review was submitted (Potential harm).',
       'Review the file and record what you have put right.',
@@ -86,7 +86,10 @@ describe('splitIssues', () => {
     // says about why it was raised is the Outcome above the table.
     const { issues } = splitIssues(DESCRIPTION);
 
-    expect(issues.every((issue) => issue.startsWith('Fail point:'))).toBe(true);
+    // Every line is one of the fixture's own items. The plug-in stopped labelling fail
+    // points "Fail point: " on 2026-09-11, so the check is that nothing but the items
+    // survived, not that they carry a prefix.
+    expect(issues).toHaveLength(4);
     expect(issues.join(' ')).not.toContain('The checker recorded');
     expect(issues.join(' ')).not.toContain('Raised automatically');
   });
@@ -148,7 +151,7 @@ describe('groupIssues', () => {
     expect(group.lines).toHaveLength(4);
     expect(group.lines[0]).toEqual({
       number: 1,
-      issue: 'Fail point: AML - No CRA completed or missing data fields',
+      issue: 'AML - No CRA completed or missing data fields',
     });
     expect(group.lines[3].number).toBe(4);
   });

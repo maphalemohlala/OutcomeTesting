@@ -25,10 +25,10 @@ const { ActionsTable, RemediationDetails, RemediationFormBlock } = await import(
 
 const DESCRIPTION = [
   'Issues found on the check:',
-  '- Fail point: AML - No CRA completed or missing data fields',
-  '- Fail point: AML - CRA information not recorded on FactFind',
-  '- Fail point: Breach - Any other process breach has been identified',
-  '- Fail point: Record Keeping - Concession required but not on file',
+  '- AML - No CRA completed or missing data fields',
+  '- AML - CRA information not recorded on FactFind',
+  '- Breach - Any other process breach has been identified',
+  '- Record Keeping - Concession required but not on file',
   '',
   'The checker recorded: no CRA on file',
   '',
@@ -87,19 +87,19 @@ describe('the remediation actions table', () => {
 
     expect(body[0].slice(0, 2)).toEqual([
       '1',
-      'Fail point: AML - No CRA completed or missing data fields',
+      'AML - No CRA completed or missing data fields',
     ]);
     expect(body[1].slice(0, 2)).toEqual([
       '2',
-      'Fail point: AML - CRA information not recorded on FactFind',
+      'AML - CRA information not recorded on FactFind',
     ]);
     expect(body[2].slice(0, 2)).toEqual([
       '3',
-      'Fail point: Breach - Any other process breach has been identified',
+      'Breach - Any other process breach has been identified',
     ]);
     expect(body[3].slice(0, 2)).toEqual([
       '4',
-      'Fail point: Record Keeping - Concession required but not on file',
+      'Record Keeping - Concession required but not on file',
     ]);
   });
 
@@ -146,14 +146,14 @@ describe('the remediation actions table', () => {
   it('numbers straight through a second action', () => {
     const second = [
       'Issues found on the check:',
-      '- Fail point: Record Keeping - No client agreement or client acceptance in place',
+      '- Record Keeping - No client agreement or client acceptance in place',
     ].join('\n');
     const body = rows(draw([action('a1', DESCRIPTION), action('a2', second)])).slice(1);
     const last = body[body.length - 1];
 
     expect(last.slice(0, 2)).toEqual([
       '5',
-      'Fail point: Record Keeping - No client agreement or client acceptance in place',
+      'Record Keeping - No client agreement or client acceptance in place',
     ]);
   });
 
