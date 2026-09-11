@@ -550,7 +550,15 @@
           <div><dt>Recheck required?</dt><dd>{{ form_source.al_recheckrequired.label | default: '—' | escape }}</dd></div>
           <div><dt>Do the remedial actions change the advice?</dt><dd>{{ form_source.al_changesadvice.label | default: '—' | escape }}</dd></div>
           <div><dt>All remedial actions checked and approved?</dt><dd>{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</dd></div>
-          <div><dt>Regraded outcome</dt><dd>{% if outcome and outcome.al_finaloutcome %}{{ outcome.al_finaloutcome.label | escape }}{% else %}—{% endif %}</dd></div>
+{% comment %}
+            Through OT Outcome Label, not `.label` directly: an option set the platform does
+            not supply a formatted value for renders blank, so this drew empty on a case that
+            had been regraded (IO-300005, 2026-09-11). `final` alone, so this stays the
+            regraded outcome rather than falling back to the initial grade.
+          {% endcomment %}
+          {% capture regraded_label %}{% include 'OT Outcome Label' final: outcome.al_finaloutcome %}{% endcapture %}
+          {% assign regraded_label = regraded_label | strip %}
+          <div><dt>Regraded outcome</dt><dd>{% if regraded_label != '' %}{{ regraded_label | escape }}{% else %}—{% endif %}</dd></div>
           <div><dt>Date</dt><dd>{% if outcome and outcome.al_regradedon %}{{ outcome.al_regradedon | date: 'dd MMM yyyy' }}{% elsif outcome and outcome.al_finalisedon %}{{ outcome.al_finalisedon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
           <div><dt>Supervisor sign-off</dt><dd>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}, {{ latest_supervisor.ownerid.name | escape }}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</dd></div>
           <div><dt>Adviser sign-off</dt><dd>{% if latest_adviser %}{{ latest_adviser.al_assignedcontactid.name | escape }}, {{ latest_adviser.al_completedon | date: 'dd MMM yyyy' }}{% if latest_adviser.al_evidencereference %} (IO {{ latest_adviser.al_evidencereference | escape }}){% endif %}{% else %}—{% endif %}</dd></div>

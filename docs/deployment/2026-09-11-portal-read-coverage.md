@@ -162,3 +162,30 @@ Liquid tag balance was checked explicitly before deploying, since removing an
 `unless`/`endunless` pair is how a template of this size breaks silently: no unclosed tags,
 34/34 comment pairs. Both gates passed. All 16 deployed templates re-verified byte-identical
 to source after each push.
+
+
+## Third round — the regrade that recorded and read as though it had not
+
+| # | Step | Command | Result |
+|---|---|---|---|
+| 7 | Remediation, case detail, layout | `pushwebtemplate` x3 | 90555 / 30712 / 2156 chars |
+
+Two faults, reported together against IO-300005.
+
+**The portal drew the regraded outcome blank while the Code App showed the case closed.**
+The row was correct throughout. The tell is that the cell drew *blank* rather than as a dash:
+`{% if outcome and outcome.al_finaloutcome %}` passes on the object and `.label` returns an
+empty string, because the platform does not always supply a formatted value for an option
+set. `OT Outcome Label` exists for this and carries a numeric fallback, and only
+`OT Case List` was using it. The four raw reads on `OT Remediation` and `OT Case Detail` now
+go through it, passed `final` alone so they stay the regraded grade. The Code App reads
+Dataverse directly, which is why it was never affected.
+
+**The Reason and Notes borders had shipped twice and reached nobody.** `OT Layout` links
+`/outcome-testing.css?v=N` precisely so a browser holding the old file picks up a change, and
+the version was not bumped either time. Now `?v=11`, and the instruction in the layout says
+to bump on every change rather than a "material" one.
+
+Verification: Liquid balance checked across all 48 web templates (none unclosed, comment
+pairs matched) before deploying; both gates pass; all 16 deployed templates re-verified
+byte-identical to source, with `?v=11` and the include confirmed live by query.

@@ -832,7 +832,23 @@
                 <span class="ot-remedial-form__note">(for potential harms / insufficient evidence — the supervisor signs this off)</span>
               </th>
               <td colspan="3">
-                {% if outcome and outcome.al_finaloutcome %}{{ outcome.al_finaloutcome.label | escape }}{% else %}—{% endif %}
+                {% comment %}
+                  Through OT Outcome Label, not `.label` directly. The platform does not
+                  always supply a formatted value for an option set, which renders as an
+                  empty string rather than as an error - so `{% if outcome.al_finaloutcome %}`
+                  passes on the object, `.label` yields nothing, and the cell draws blank
+                  while the row plainly carries Pass. Reported 2026-09-11 on IO-300005, whose
+                  regrade had recorded correctly and read as though it had not. The include
+                  carries the numeric fallback for exactly this, which is the reason it
+                  exists; only the case list was using it.
+
+                  Passed `final` alone, so this stays the REGRADED outcome and does not fall
+                  back to the initial grade the way the shared precedence rule does. Neither
+                  template defines `initial` or `final`, so nothing leaks into the include.
+                {% endcomment %}
+                {% capture regraded_label %}{% include 'OT Outcome Label' final: outcome.al_finaloutcome %}{% endcapture %}
+                {% assign regraded_label = regraded_label | strip %}
+                {% if regraded_label != '' %}{{ regraded_label | escape }}{% else %}—{% endif %}
                 {% if outcome and outcome.al_regradedon %}<span class="ot-remedial-form__note">· {{ outcome.al_regradedon | date: 'dd MMM yyyy' }}</span>{% elsif outcome and outcome.al_finalisedon %}<span class="ot-remedial-form__note">· {{ outcome.al_finalisedon | date: 'dd MMM yyyy' }}</span>{% endif %}
               </td>
             </tr>
@@ -960,10 +976,19 @@
                data-outcome-id="{{ outcome.al_outcomeid }}"
                data-row-version="{{ outcome.versionnumber }}">
             <h3 class="ot-form-submit__title">Regraded outcome</h3>
+{% comment %}
+              Both grades through OT Outcome Label rather than `.label`, for the reason the
+              Regraded outcome cell above gives: an unformatted option set renders blank, so
+              this hint read "The initial outcome was ." on a case that had one.
+            {% endcomment %}
+            {% capture initial_label %}{% include 'OT Outcome Label' initial: outcome.al_initialoutcome %}{% endcapture %}
+            {% assign initial_label = initial_label | strip %}
+            {% capture final_label %}{% include 'OT Outcome Label' final: outcome.al_finaloutcome %}{% endcapture %}
+            {% assign final_label = final_label | strip %}
             <p class="ot-form-submit__hint">
               The initial outcome was
-              <strong>{{ outcome.al_initialoutcome.label | escape }}</strong>{% if outcome.al_finaloutcome %},
-              regraded to <strong>{{ outcome.al_finaloutcome.label | escape }}</strong>{% if outcome.al_regradedon %}
+              <strong>{{ initial_label | default: 'not recorded' | escape }}</strong>{% if final_label != '' %},
+              regraded to <strong>{{ final_label | escape }}</strong>{% if outcome.al_regradedon %}
               on {{ outcome.al_regradedon | date: 'dd MMM yyyy' }}{% endif %}{% endif %}. Recording a final
               outcome does not change it — both are kept (BR-007).
             </p>

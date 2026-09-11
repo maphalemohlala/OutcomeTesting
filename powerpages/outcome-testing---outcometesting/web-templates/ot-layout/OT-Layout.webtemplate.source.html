@@ -13,12 +13,16 @@
   Light 300, Regular 400, Medium 500, SemiBold 600.
 
   The stylesheet carries a version querystring so a browser holding the
-  previous file picks up changes without a hard refresh. Bump it whenever
-  outcome-testing.css changes materially.
+  previous file picks up changes without a hard refresh. Bump it on EVERY
+  change to outcome-testing.css, not only a material one - a browser holding
+  the old file is not told what changed, and the deploy succeeds either way, so
+  the omission looks exactly like a CSS rule that does not work. That is how a
+  border fix for the remediation Reason and Notes fields shipped to DEV twice
+  on 2026-09-11 and was reported both times as not showing.
 {% endcomment %}
 <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
 <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=roundo@300,400,500,600&display=swap">
-<link rel="stylesheet" href="/outcome-testing.css?v=10">
+<link rel="stylesheet" href="/outcome-testing.css?v=11">
 
 <main class="ot-page" id="ot-main">
   <div class="ot-page__inner">
