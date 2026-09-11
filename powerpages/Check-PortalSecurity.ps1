@@ -27,9 +27,13 @@
          delete. Scope alone must never be relied on to contain a right.
      10. A Grant Change page rule may bind only the Administrators role. Grant
          Change overrides every Restrict Read rule for whoever holds it.
+     11. Every table a web template queries has a read permission. Table
+         permissions fail closed, so a missing one renders the feature empty
+         rather than raising anything.
 
-    Two guards refuse to treat a broken scan as a clean one: an empty page
-    scan, and a webrole.yml where no role can be identified as anonymous.
+    Three guards refuse to treat a broken scan as a clean one: an empty page
+    scan, an empty web-template scan, and a webrole.yml where no role can be
+    identified as anonymous.
 
     Run before every `pac pages upload`, alongside Check-ComponentIds.ps1.
 
@@ -379,8 +383,79 @@ else {
     }
 }
 
+# ---------------------------------------------------------------- 11
+# Assertion 11: every Dataverse table a web template queries must have a read
+# permission. Table permissions fail closed, so a table with no permission does not
+# error - the query simply returns nothing, and the feature built on it renders as
+# though there were no data. Nothing else in this gate notices.
+#
+# This has now happened twice. al_outcome was queried by the Home tiles, the case
+# list grade column, the case detail, the regrade panel and the sign-off final
+# outcome, with no permission: every one of them rendered empty, and the regrade
+# panel was believed "built and deployed" for as long as it had never once drawn.
+# al_reviewroute was the same shape - the route filter on the case and review lists
+# silently offered no options, and because the AQS claim queue INNER JOINs it, that
+# queue was empty for every user and no AQS checker could claim a case at all.
+#
+# An inner join is the dangerous case: an unreadable table in an outer join blanks a
+# column, but in an inner join it collapses the whole result set.
+$templateDir = Join-Path $SitePath 'web-templates'
+$queriedTables = @{}
+$templateCount = 0
+if (Test-Path -LiteralPath $templateDir) {
+    foreach ($f in Get-ChildItem -LiteralPath $templateDir -Recurse -File -Filter '*.webtemplate.source.html') {
+        $templateCount++
+        $text = Get-Content -LiteralPath $f.FullName -Raw
+        if (-not $text) { continue }
+        # Liquid comments are stripped first: these templates carry long explanatory
+        # comments that name tables in prose, and counting those would demand a
+        # permission for a table the site never queries.
+        $text = [regex]::Replace($text, '\{%\s*comment\s*%\}.*?\{%\s*endcomment\s*%\}', '',
+                                 [System.Text.RegularExpressions.RegexOptions]::Singleline)
+        foreach ($m in [regex]::Matches($text, '<(entity|link-entity)\s+name="([a-z_0-9]+)"')) {
+            $table = $m.Groups[2].Value
+            if (-not $queriedTables.ContainsKey($table)) { $queriedTables[$table] = @() }
+            if ($queriedTables[$table] -notcontains $f.Directory.Name) {
+                $queriedTables[$table] += $f.Directory.Name
+            }
+        }
+    }
+}
+
+# Many-to-many intersect tables are not permissioned in their own right by Power
+# Pages - access comes from a read permission on each end of the relationship. Both
+# ends of this one (al_failreason and al_response) are queried as entities in their
+# own right elsewhere, so this assertion still covers them; only the intersect name
+# is exempt.
+$intersectTables = @('al_al_failreason_al_response')
+
+$readableTables = @{}
+foreach ($p in $permissions) {
+    $read = ($p.adx_read -replace "^'|'$", '').Trim()
+    if ($read -match '^(?i)true$' -and $p.adx_entitylogicalname) {
+        $readableTables[($p.adx_entitylogicalname -replace "^'|'$", '').Trim()] = $true
+    }
+}
+
+# Same shape as the empty-page guard: a scan that finds no templates, or templates
+# with no queries at all, is a broken scan and not a clean site.
+if ($templateCount -eq 0) {
+    Add-Failure 'guard empty-template-scan' "No web templates found under '$templateDir'. Template discovery is broken; refusing to treat that as a clean site."
+}
+elseif ($queriedTables.Count -eq 0) {
+    Add-Failure 'guard empty-template-scan' "Scanned $templateCount web templates and found no FetchXML table references at all. The scan is broken; refusing to treat that as a clean site."
+}
+
+foreach ($table in ($queriedTables.Keys | Sort-Object)) {
+    if ($intersectTables -contains $table) { continue }
+    if (-not $readableTables.ContainsKey($table)) {
+        $where = ($queriedTables[$table] | Sort-Object) -join ', '
+        Add-Failure '11 table read coverage' "Web template(s) query '$table' but no table permission grants read on it, so every one of those queries returns nothing: $where"
+    }
+}
+
 # ---------------------------------------------------------------- report
-Write-Host "Checked $($permissions.Count) table permissions, $($rules.Count) page rules, $($pages.Count) web pages and $($roles.Count) web roles under $SitePath."
+Write-Host "Checked $($permissions.Count) table permissions, $($rules.Count) page rules, $($pages.Count) web pages, $($roles.Count) web roles and $templateCount web templates ($($queriedTables.Count) tables queried) under $SitePath."
 
 if ($failures.Count -eq 0) {
     Write-Host 'Portal security assertions all pass.' -ForegroundColor Green
