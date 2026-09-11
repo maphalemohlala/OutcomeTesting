@@ -317,6 +317,11 @@ if (args.Length >= 4 && args[0].Equals("addcommandvalue", StringComparison.Ordin
     return AddCommandValue(args[1], commandValue, args[3]);
 }
 
+if (args.Length >= 4 && args[0].Equals("setcasepeople", StringComparison.OrdinalIgnoreCase))
+{
+    return SetCasePeople(args[1], args[2], args[3], ConfirmedFor(args, args[1]));
+}
+
 if (args.Length >= 2 && args[0].Equals("backfilltaxoutcome", StringComparison.OrdinalIgnoreCase))
 {
     return BackfillTaxOutcome(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
@@ -5936,6 +5941,78 @@ int AddOptionValue(string orgUrl, string entity, string attribute, int value, st
         ? $"{entity}.{attribute} {value} = '{label}' inserted and published ({after.Count} values)."
         : $"Insert returned success, but metadata does not read back {value} = '{label}'.");
     return ok ? 0 : 2;
+}
+
+// Points a seeded case's adviser, para-planner and checker name at one real person.
+//
+// Seeding exists to exercise the paths that only run when a name resolves. Both ends of the
+// BR-009 / BR-006 routing match a **name** against contact.fullname - the case carries
+// al_paraplanner and al_advisername as text and no address (AD-082) - so a case seeded with
+// "Seed Adviser 01" queues its notifications with no recipient and the drain marks them
+// Failed, which exercises nothing. Naming a contact that actually exists is what makes the
+// adviser letters and the para-planner notification deliverable.
+//
+// Matching is deliberately strict about ambiguity for the reason AD-082 gives: two people
+// sharing a name leave ParaplannerEmail unable to choose, so this refuses a name that does
+// not resolve to exactly one active contact with a work email rather than seeding data that
+// will silently fail later.
+//
+// Written straight through the SDK rather than through al_UpdateCaseDetails. No step is
+// registered on al_outcomecase, so nothing is bypassed, and an audit trail of seed rows being
+// relabelled is noise rather than history.
+int SetCasePeople(string orgUrl, string referenceLike, string personName, bool confirm)
+{
+    using var svc = Connect(orgUrl);
+
+    var name = personName.Trim();
+    var matches = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch top=\"5\"><entity name=\"contact\"><attribute name=\"contactid\"/>" +
+        "<attribute name=\"emailaddress1\"/><filter>" +
+        "<condition attribute=\"fullname\" operator=\"eq\" value=\"" + System.Security.SecurityElement.Escape(name) + "\"/>" +
+        "<condition attribute=\"statecode\" operator=\"eq\" value=\"0\"/>" +
+        "<condition attribute=\"emailaddress1\" operator=\"not-null\"/>" +
+        "</filter></entity></fetch>")).Entities;
+
+    if (matches.Count != 1)
+    {
+        Console.Error.WriteLine(
+            $"'{name}' resolves to {matches.Count} active contact(s) with a work email, not one. " +
+            "Seeding a name the notification paths cannot resolve would fail silently later (AD-082).");
+        return 1;
+    }
+
+    Console.WriteLine($"'{name}' resolves to {matches[0].GetAttributeValue<string>("emailaddress1")}.");
+
+    var cases = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_outcomecase\"><attribute name=\"al_outcomecaseid\"/>" +
+        "<attribute name=\"al_casereference\"/><filter>" +
+        "<condition attribute=\"al_casereference\" operator=\"like\" value=\"" + System.Security.SecurityElement.Escape(referenceLike) + "\"/>" +
+        "</filter><order attribute=\"al_casereference\"/></entity></fetch>")).Entities;
+
+    Console.WriteLine($"{cases.Count} case(s) matching '{referenceLike}'.");
+    foreach (var c in cases)
+    {
+        Console.WriteLine($"   {c.GetAttributeValue<string>("al_casereference")}");
+    }
+
+    if (!confirm)
+    {
+        Console.WriteLine("Dry run. Re-run with --confirm <orgUrl> to write.");
+        return 0;
+    }
+
+    foreach (var c in cases)
+    {
+        svc.Update(new Entity("al_outcomecase", c.Id)
+        {
+            ["al_advisername"] = name,
+            ["al_paraplanner"] = name,
+            ["al_checkername"] = name,
+        });
+    }
+
+    Console.WriteLine($"Set adviser, para-planner and checker name to '{name}' on {cases.Count} case(s).");
+    return 0;
 }
 
 // Stamps al_outcomecase.al_taxoutcome from the Q-TAX-02 answer of every submitted Tax review.
