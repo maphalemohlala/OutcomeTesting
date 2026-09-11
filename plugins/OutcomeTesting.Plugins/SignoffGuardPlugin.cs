@@ -92,14 +92,22 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.PreconditionPrefix + "Only a completed remediation action can be signed off.");
             }
 
-            // Sign-off happens once. Without this the same action can be signed off twice,
+            // An approval happens once. Without this the same action can be approved twice,
             // and a later rejection would reopen an already-approved action, leaving two
             // contradictory sign-offs with nothing recording which is authoritative.
-            if (HasExistingSignoff(service, actionRef.Id))
+            //
+            // A rejection is deliberately not caught here: it is the start of the BR-008 loop
+            // rather than the end of it. This asked whether the action carried *any* sign-off
+            // until 2026-09-11, which made every rejection terminal - the adviser reworked,
+            // the case returned to Awaiting Sign-off, and the supervisor was then refused the
+            // decision that would have closed it. IO-300003 and IO-300006 sat there with the
+            // rework done, and no action in the environment had ever reached a second
+            // decision.
+            if (AlreadySettled(service, actionRef.Id))
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix +
-                    "This remediation action has already been signed off. Reopening a completed sign-off is a privileged correction (AD-031).");
+                    "This remediation action has already been approved. Reopening an approved sign-off is a privileged correction (AD-031).");
             }
 
             signoff["al_name"] = "SignOff " + actionRef.Id.ToString("D");
@@ -115,11 +123,15 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// True when this action already carries an active sign-off. Read with the system
-        /// service so the answer does not depend on the caller's read privileges: a sign-off
-        /// they cannot see is still a sign-off.
+        /// True when this action has already been <b>approved</b>, which is the only decision
+        /// that ends it. A rejection leaves the action live - it reopens for the adviser
+        /// (<see cref="SignoffProgressPlugin"/>) and must be decidable again once reworked -
+        /// so it is not counted here.
+        ///
+        /// Read with the system service so the answer does not depend on the caller's read
+        /// privileges: a sign-off they cannot see is still a sign-off.
         /// </summary>
-        private static bool HasExistingSignoff(IOrganizationService service, Guid actionId)
+        public static bool AlreadySettled(IOrganizationService service, Guid actionId)
         {
             var query = new QueryExpression(SignoffEntity)
             {
@@ -129,6 +141,8 @@ namespace OutcomeTesting.Plugins
             };
             query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
             query.Criteria.AddCondition(ActionLookup, ConditionOperator.Equal, actionId);
+            query.Criteria.AddCondition(
+                DecisionAttr, ConditionOperator.Equal, SignoffProgressPlugin.DecisionApprovedValue);
 
             return service.RetrieveMultiple(query).Entities.Count > 0;
         }
