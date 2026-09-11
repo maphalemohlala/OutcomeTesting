@@ -458,11 +458,16 @@
                 owner, 2026-09-10).
 
                 A Tax-then-AQS case remediates twice, and the two are separate remediations:
-                its Tax check raised five actions here and its AQS check eighteen, and drawing
-                all twenty-three as one numbered list put the checker's finished work back in
-                front of them every time the second leg opened. A check whose every action has
-                been approved is settled, so it collapses away; what is left is the
-                remediation actually in hand.
+                its Tax check raised five actions here and its AQS check eighteen. A check
+                whose every action has been approved is settled, and its rows are drawn like
+                any other with the approval named in the check's heading.
+
+                Settled rows were collapsed away between 2026-09-10 and 2026-09-11 (AD-114c).
+                That is reversed: the T&C Supervisor signing the case off needs to see the
+                issue and fail reason behind every remedial action, and on a case whose checks
+                are all approved the collapse left the form with no numbered rows at all
+                (project owner, 2026-09-11). Nothing on this form is an input, so a settled
+                row is already read-only - what changes is only whether it is drawn.
 
                 Approved as a whole, not action by action, which is the rule
                 SignoffProgressPlugin now enforces server-side: the case leaves Awaiting
@@ -505,19 +510,12 @@
               {% endfor %}
 
               {% comment %}
-                Nothing collapses on a case with only one check (project owner, 2026-09-10):
-                such a remediation keeps exactly the behaviour it had before collapsing
-                existed. What this hides is the OTHER leg's finished work, and a single-leg
-                case has no other leg - collapsing there would empty the form rather than
-                tidy it.
+                ot_checks is kept because the heading below reads differently on a one-check
+                case, and the earlier reset of ot_settled on such a case is gone with the
+                collapse it existed for: a single approved check should still say so.
               {% endcomment %}
-              {% if ot_checks < 2 %}
-                {% assign ot_settled = '' %}
-                {% assign ot_settled_note = '' %}
-              {% endif %}
 
               {% assign ot_group = '' %}
-              {% assign ot_drawn = 0 %}
               {% for a in rows %}
                 {% assign latest = null %}
                 {% if signoffs %}{% for s in signoffs.results.entities %}{% if latest == null and s.al_remediationactionid.id == a.al_remediationactionid %}{% assign latest = s %}{% endif %}{% endfor %}{% endif %}
@@ -563,22 +561,21 @@
                   drawing stops here, which is what "collapses away" means.
                 {% endcomment %}
                 {% capture rprobe %}|{{ a.al_reviewinstanceid.id }}|{% endcapture %}
-                {% assign hide = false %}
-                {% if ot_settled contains rprobe %}{% assign hide = true %}{% endif %}
-
-                {% unless hide %}
+                {% assign is_settled = false %}
+                {% if ot_settled contains rprobe %}{% assign is_settled = true %}{% endif %}
                 {% comment %}
                   The check these rows belong to, named once above them. A Tax-then-AQS case
                   can have both legs live at once only if one was sent back, so this is usually
                   a single heading - but when it is not, the two remediations have to be
                   telling apart on sight.
                 {% endcomment %}
-                {% assign ot_drawn = ot_drawn | plus: 1 %}
                 {% assign this_group = a.al_reviewinstanceid.name | default: 'This check' %}
                 {% if this_group != ot_group %}
                   {% assign ot_group = this_group %}
-                  <tr class="ot-remedial-group">
-                    <th scope="colgroup" colspan="8">{{ ot_group | escape }}</th>
+                  <tr class="ot-remedial-group{% if is_settled %} ot-remedial-group--settled{% endif %}">
+                    <th scope="colgroup" colspan="8">
+                      {{ ot_group | escape }}{% if is_settled %}<span class="ot-remedial-form__note"> · every action approved, closed</span>{% endif %}
+                    </th>
                   </tr>
                 {% endif %}
                 {% assign ot_flat = a.al_description | newline_to_br | replace: '<br />', '|' | replace: '<br>', '|' %}
@@ -693,23 +690,7 @@
                   written (AD-069), and CompleteRemediationPlugin re-checks the status and the
                   response server-side.
                 {% endcomment %}
-                {% endunless %}
               {% endfor %}
-
-              {% if ot_drawn == 0 %}
-                {% comment %}
-                  Every check settled, so every numbered row collapsed away and the columns
-                  would otherwise head an empty list. The questions below are still the
-                  remediation's and still belong on the form, so the table stays and says
-                  what happened to the rows instead of showing a gap.
-                {% endcomment %}
-                <tr>
-                  <td colspan="8" class="ot-remedial-settled">
-                    Every issue raised on this case has been remediated and approved. The
-                    numbered rows are closed; the case record keeps them in full.
-                  </td>
-                </tr>
-              {% endif %}
 
               {% comment %}
                 The adviser's three answers and the Intelligent Office reference, asked ONCE
@@ -814,15 +795,15 @@
 
         {% if ot_settled_note != '' %}
           {% comment %}
-            What is not on the form, said rather than left to be noticed. A checker who
-            remembers approving five Tax actions needs to know they were settled, not that
-            the page lost them.
+            Which checks are closed and when they were approved, under the table that now
+            draws their rows. It read "Settled and not shown" while those rows were collapsed;
+            they are shown, so it says what was approved and leaves the rows to speak.
           {% endcomment %}
           <p class="ot-filters__summary">
-            Settled and not shown: {{ ot_settled_note }}. Every action on
+            Closed: {{ ot_settled_note }}. Every action on
             {% if ot_settled_note contains ';' %}those checks was{% else %}that check was{% endif %}
-            approved, so {% if ot_settled_note contains ';' %}they are{% else %}it is{% endif %}
-            closed. The case record keeps them in full.
+            approved, and {% if ot_settled_note contains ';' %}their rows are{% else %}its rows are{% endif %}
+            above for reference.
           </p>
         {% endif %}
 

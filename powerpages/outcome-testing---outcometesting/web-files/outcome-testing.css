@@ -443,9 +443,11 @@ footer a:focus-visible, .footer a:focus-visible {
 
 /* The check a run of remediation rows belongs to, named once above them. A
    Tax-then-AQS case remediates twice and the two are separate remediations
-   (2026-09-10); a settled check is not drawn at all, so this heading appears
-   only when more than one is genuinely live. Styled as a band rather than a
-   caption so it reads as part of the grid it divides. */
+   (2026-09-10). Every check is drawn, settled or not (2026-09-11): the
+   supervisor signing the case off needs the issue and fail reason behind each
+   remedial action, so a closed check keeps its rows and says so in the heading.
+   Styled as a band rather than a caption so it reads as part of the grid it
+   divides. */
 .ot-remedial-settled {
   color: var(--colour-text-muted);
   font-style: italic;
@@ -462,6 +464,14 @@ footer a:focus-visible, .footer a:focus-visible {
   text-align: left;
   padding: var(--space-2) var(--space-3);
   color: var(--colour-text);
+}
+
+/* A closed check is still fully drawn; it is set back rather than hidden, so the
+   live remediation is the one that reads first. Muted text on the heading only -
+   the rows themselves stay at full contrast, because they are the record the
+   supervisor is checking. */
+.ot-remedial-group--settled th {
+  color: var(--colour-text-muted);
 }
 
 /* ------------------------------------------------------------------
