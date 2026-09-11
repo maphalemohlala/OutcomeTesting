@@ -67,3 +67,39 @@ drawing the layout around an empty body, since one shared template renders both.
   IO-SEED-TXA-01. They cannot be closed in bulk: the final outcome is the supervisor's
   judgement under BR-005 and the reason is mandatory under AD-031, so neither is derivable
   from the data. One supervisor action each, on the regrade panel that now renders.
+
+## Full `Deploy-Portal.ps1` run
+
+Run after the targeted steps above, as the reconcile. Both gates passed (242 ids; 11
+assertions), 16 permission files were moved aside and 0 permission records needed stripping
+from the manifest — it was already stripped from an earlier run, which is the state the
+README says to leave it in. Upload succeeded in 41.7s; `restoretablepermissions` wrote 16;
+verification by query reported **16 in source, 16 deployed, and nothing else**. Exit 0.
+
+Re-checked afterwards rather than assumed: all 16 `OT *` web templates are still
+byte-identical to source, `OT Review List` included. An upload is the thing most likely to
+undo the restore in step 1, so that check is the point.
+
+### One failed record, and why it is not a fault
+
+The upload printed:
+
+```
+Updating table powerpagecomponent with record ID:f065878a-f8a9-f111-aaac-e4fade069307
+FAILED due to Entity 'powerpagecomponent' With Id = f065878a-... Does Not Exist
+```
+
+That id is the `annotationid` in `web-files/outcome-testing.css.webfile.yml`, and the
+manifest still tracks it under the web file content records. It is a **standard-model
+leftover**: on this enhanced-model site the CSS bytes live in the component's `filecontent`
+file column (`4977a36d-…`, `filecontent_name: outcome-testing.css`), not in an `annotation`.
+Querying `annotation` for `objectid = …050` returns nothing at all, which is the enhanced
+model behaving correctly rather than a missing file.
+
+The stylesheet itself deployed: the component's `modifiedon` is `2026-09-11T08:40:31Z`,
+written by this run. Nothing was lost, and the upload reported success overall.
+
+It will print the same line on every future deploy. The fix is a manifest rebuild, which
+`pac pages download` does truthfully — but a download also **re-arms the table-permission
+section that `Deploy-Portal.ps1` deliberately strips** (see the README), so it is not worth
+doing for cosmetics alone. Do it as part of the next deliberate download, not on its own.
