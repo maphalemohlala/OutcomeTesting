@@ -68,12 +68,6 @@
   color: var(--colour-text-muted);
 }
 
-/* The Tax check's own grade (AD-055). Deliberately not styled like OutcomeIndicator: it is
-   a different scale from the BR-005 grades and must not be mistaken for one. */
-.worklist__tax-grade {
-  color: var(--colour-text-muted);
-}
-
 .worklist__unavailable {
   max-width: 60ch;
   padding: var(--space-4);

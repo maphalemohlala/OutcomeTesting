@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
-import { OutcomeIndicator } from '../../components/status/OutcomeIndicator';
+import { OutcomeIndicator, TaxOutcomeIndicator } from '../../components/status/OutcomeIndicator';
 import { StageLabel } from '../../components/status/StageLabel';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import { ExportMenu } from '../../components/export/ExportMenu';
@@ -283,9 +283,9 @@ export function CaseWorklistPage() {
                         ) : item.taxOutcome ? (
                           // A Tax check grades on its own scale and writes no al_outcome row
                           // (AD-055), so a Tax-only case has no BR-005 outcome to show and
-                          // read as ungraded however it was graded. Named as a Tax result so
-                          // the two scales are not silently mixed in one column.
-                          <span className="worklist__tax-grade">Tax: {item.taxOutcome}</span>
+                          // read as ungraded however it was graded. Labelled "Tax:" so the
+                          // two scales are not silently mixed in one column.
+                          <TaxOutcomeIndicator outcome={item.taxOutcome} />
                         ) : (
                           'Not yet graded'
                         )}

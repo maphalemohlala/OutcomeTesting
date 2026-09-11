@@ -3,6 +3,13 @@
 
   Colour never carries the meaning on its own — the label is always rendered
   as text inside the badge (NFR-ACC-01).
+
+  The Tax check's grade comes through here too, as "Tax: Pass" and the rest, so a
+  Tax check reads in the same colours as an AQS one. 'insufficient' and 'pass'
+  already matched; 'fail' widened from 'failed' on 2026-09-11 to catch the Tax
+  scale's own Fail, which has no BR-005 equivalent. Nothing that should read green
+  or purple contains 'fail', and the statuses that already matched 'failed' —
+  Validation Failed, a Failed notification — are blocked either way.
 {% endcomment %}
 {% assign s = status | default: '' | downcase %}
 {% if s == '' %}
@@ -17,7 +24,7 @@
   <span class="ot-badge ot-badge--pass">{{ status | escape }}</span>
 {% elsif s contains 'closed' or s contains 'no check required' %}
   <span class="ot-badge ot-badge--closed">{{ status | escape }}</span>
-{% elsif s contains 'failed' or s contains 'blocked' or s contains 'overdue' %}
+{% elsif s contains 'fail' or s contains 'blocked' or s contains 'overdue' %}
   <span class="ot-badge ot-badge--blocked">{{ status | escape }}</span>
 {% elsif s contains 'progress' or s contains 'assigned' or s contains 'submitted' %}
   <span class="ot-badge ot-badge--active">{{ status | escape }}</span>
