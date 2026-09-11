@@ -189,3 +189,27 @@ to bump on every change rather than a "material" one.
 Verification: Liquid balance checked across all 48 web templates (none unclosed, comment
 pairs matched) before deploying; both gates pass; all 16 deployed templates re-verified
 byte-identical to source, with `?v=11` and the include confirmed live by query.
+
+
+## Fourth round — unknown tag 'endcomment'
+
+The AD-119 change shipped with `{% if outcome.al_finaloutcome %}` written inside a Liquid
+comment as an illustration, and the remediation page answered **unknown tag 'endcomment'**.
+DotLiquid tokenises tags inside a comment block, so the unclosed `if` consumed the
+`{% endcomment %}` — and the error names a tag that is not the problem.
+
+The templates already wrote `(% if %)` with parentheses in prose for precisely this reason.
+The convention was real and unenforced, so it held by imitation until a comment was added
+without noticing it.
+
+Both gates passed and the upload succeeded, because neither read the template as Liquid.
+Assertion 12 now does (AD-120), and it was proved in both directions: reintroducing the brace
+fails the gate naming the file, line and tag; removing it passes.
+
+| # | Step | Command | Result |
+|---|---|---|---|
+| 8 | Remediation template | `pushwebtemplate <orgUrl> …019 <source>` | 90555 chars |
+
+Verified after: all 16 deployed templates byte-identical to source, and the live
+`OT Remediation` re-scanned from the environment — 0 tags inside comments, comment depth 0
+at end of file.

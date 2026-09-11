@@ -835,7 +835,7 @@
                 {% comment %}
                   Through OT Outcome Label, not `.label` directly. The platform does not
                   always supply a formatted value for an option set, which renders as an
-                  empty string rather than as an error - so `{% if outcome.al_finaloutcome %}`
+                  empty string rather than as an error - so `(% if outcome.al_finaloutcome %)`
                   passes on the object, `.label` yields nothing, and the cell draws blank
                   while the row plainly carries Pass. Reported 2026-09-11 on IO-300005, whose
                   regrade had recorded correctly and read as though it had not. The include

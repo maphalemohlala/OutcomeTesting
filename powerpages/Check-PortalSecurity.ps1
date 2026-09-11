@@ -30,6 +30,8 @@
      11. Every table a web template queries has a read permission. Table
          permissions fail closed, so a missing one renders the feature empty
          rather than raising anything.
+     12. Every web template parses: no real Liquid tag inside a comment, and
+         no unbalanced block tag. Both deploy cleanly and break at render.
 
     Three guards refuse to treat a broken scan as a clean one: an empty page
     scan, an empty web-template scan, and a webrole.yml where no role can be
@@ -451,6 +453,66 @@ foreach ($table in ($queriedTables.Keys | Sort-Object)) {
     if (-not $readableTables.ContainsKey($table)) {
         $where = ($queriedTables[$table] | Sort-Object) -join ', '
         Add-Failure '11 table read coverage' "Web template(s) query '$table' but no table permission grants read on it, so every one of those queries returns nothing: $where"
+    }
+}
+
+# ---------------------------------------------------------------- 12
+# Assertion 12: every web template parses. Two faults, both of which deploy
+# cleanly and break the page at render time.
+#
+#   (a) A Liquid tag inside a {% comment %} block. DotLiquid still tokenises
+#       tags inside a comment, so an illustrative {% if %} written in prose has
+#       no {% endif %}, swallows the {% endcomment %}, and the page dies with
+#       "unknown tag 'endcomment'" - naming a tag that is not the problem. The
+#       templates here write (% if %) with parentheses for this reason; that
+#       convention is now enforced rather than remembered. This fired on
+#       OT Remediation on 2026-09-11.
+#
+#   (b) An unbalanced block tag anywhere. Removing an {% unless %} and leaving
+#       its {% endunless %} is the shape that gets through review.
+#
+# Checked by walking the tags in order, because counting opens against closes
+# passes happily on a file where they interleave wrongly, and stripping comments
+# with a regex first - which is what missed (a) by hand - pairs the first
+# {% comment %} with the first {% endcomment %} and hides the very fault it is
+# looking for.
+$blockPairs = @{
+    'if' = 'endif'; 'for' = 'endfor'; 'unless' = 'endunless'; 'case' = 'endcase'
+    'capture' = 'endcapture'; 'fetchxml' = 'endfetchxml'; 'block' = 'endblock'; 'raw' = 'endraw'
+}
+$blockCloses = @{}
+foreach ($k in $blockPairs.Keys) { $blockCloses[$blockPairs[$k]] = $k }
+
+if (Test-Path -LiteralPath $templateDir) {
+    foreach ($f in Get-ChildItem -LiteralPath $templateDir -Recurse -File -Filter '*.webtemplate.source.html') {
+        $text = Get-Content -LiteralPath $f.FullName -Raw
+        if (-not $text) { continue }
+        $depth = 0
+        $stack = [System.Collections.Generic.List[string]]::new()
+        foreach ($m in [regex]::Matches($text, '\{%-?\s*(\w+)')) {
+            $tag = $m.Groups[1].Value
+            $line = ($text.Substring(0, $m.Index) -split "`n").Count
+            if ($tag -eq 'comment') {
+                if ($depth -gt 0) { Add-Failure '12 template parses' "$($f.Name):$line nests a {% comment %} inside another. Liquid comments do not nest." }
+                $depth++
+            }
+            elseif ($tag -eq 'endcomment') {
+                $depth--
+                if ($depth -lt 0) { Add-Failure '12 template parses' "$($f.Name):$line has an {% endcomment %} with no open comment."; $depth = 0 }
+            }
+            elseif ($depth -gt 0) {
+                Add-Failure '12 template parses' "$($f.Name):$line writes a real {% $tag %} inside a comment. Use (% $tag %) - the tag is still parsed in a comment block, and an unclosed one is reported as ""unknown tag 'endcomment'""."
+            }
+            elseif ($blockPairs.ContainsKey($tag)) { $stack.Add($tag) }
+            elseif ($blockCloses.ContainsKey($tag)) {
+                $want = $blockCloses[$tag]
+                if ($stack.Count -eq 0) { Add-Failure '12 template parses' "$($f.Name):$line closes {% $tag %} with nothing open." }
+                elseif ($stack[$stack.Count - 1] -ne $want) { Add-Failure '12 template parses' "$($f.Name):$line closes {% $tag %} while {% $($stack[$stack.Count - 1]) %} is open." }
+                else { $stack.RemoveAt($stack.Count - 1) }
+            }
+        }
+        if ($depth -gt 0) { Add-Failure '12 template parses' "$($f.Name) leaves a {% comment %} unclosed." }
+        if ($stack.Count -gt 0) { Add-Failure '12 template parses' "$($f.Name) leaves $($stack -join ', ') unclosed." }
     }
 }
 
