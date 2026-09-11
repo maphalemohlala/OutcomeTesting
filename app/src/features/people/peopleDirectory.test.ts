@@ -13,6 +13,7 @@ function caseRow(overrides: Partial<CaseSummary>): CaseSummary {
     createdOn: null,
     ageInDays: 0,
     latestOutcome: null,
+    taxOutcome: null,
     initialOutcome: null,
     finalOutcome: null,
     finalisedOn: null,

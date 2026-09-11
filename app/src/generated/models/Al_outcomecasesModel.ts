@@ -64,6 +64,12 @@ export const Al_outcomecasesal_taxcheckrequired = {
   120910561: 'No'
 } as const;
 export type Al_outcomecasesal_taxcheckrequired = keyof typeof Al_outcomecasesal_taxcheckrequired;
+export const Al_outcomecasesal_taxoutcome = {
+  120910300: 'Pass',
+  120910301: 'Fail',
+  120910302: 'Insufficient evidence'
+} as const;
+export type Al_outcomecasesal_taxoutcome = keyof typeof Al_outcomecasesal_taxoutcome;
 export const Al_outcomecasesal_taxteamdisposition = {
   120910570: 'Submit to AQS',
   120910571: 'Return to paraplanner'
@@ -111,6 +117,7 @@ export interface Al_outcomecasesBase {
   "al_reviewrouteid@odata.bind"?: string;
   al_samplesource?: Al_outcomecasesal_samplesource;
   al_taxcheckrequired?: Al_outcomecasesal_taxcheckrequired;
+  al_taxoutcome?: Al_outcomecasesal_taxoutcome;
   al_taxteamdisposition?: Al_outcomecasesal_taxteamdisposition;
   al_vulnerableclient?: Al_outcomecasesal_vulnerableclient;
   importsequencenumber?: number;
@@ -132,6 +139,7 @@ export interface Al_outcomecases extends Al_outcomecasesBase {
   al_reviewrouteidname?: string;
   al_samplesourcename?: string;
   al_taxcheckrequiredname?: string;
+  al_taxoutcomename?: string;
   al_taxteamdispositionname?: string;
   al_vulnerableclientname?: string;
   createdbyname?: string;

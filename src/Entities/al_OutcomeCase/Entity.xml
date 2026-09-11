@@ -1206,6 +1206,71 @@
             <Description description="Whether the Tax check section applies. Drives the BR-004 route (Tax-only, AQS-only or Tax-then-AQS)." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_TaxOutcome">
+          <Type>picklist</Type>
+          <Name>al_taxoutcome</Name>
+          <LogicalName>al_taxoutcome</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <optionset Name="al_outcomecase_al_taxoutcome">
+            <OptionSetType>picklist</OptionSetType>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Tax outcome" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="The Tax check's own grade (AD-055), stamped on the case by SubmitReviewPlugin when a Tax review is submitted. Deliberately not al_Outcome: that table carries only the BR-005 advice quality scale, which has no Fail, and a row there would populate the AD-075 export columns a Tax-only case must leave blank and stop the case closing. Values match al_response.al_answerchoice so the stamp needs no mapping." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="120910300" IsHidden="0">
+                <labels>
+                  <label description="Pass" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910301" IsHidden="0">
+                <labels>
+                  <label description="Fail" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910302" IsHidden="0">
+                <labels>
+                  <label description="Insufficient evidence" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Tax outcome" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The Tax check's own grade (AD-055), stamped on the case by SubmitReviewPlugin when a Tax review is submitted. Deliberately not al_Outcome: that table carries only the BR-005 advice quality scale, which has no Fail, and a row there would populate the AD-075 export columns a Tax-only case must leave blank and stop the case closing. Values match al_response.al_answerchoice so the stamp needs no mapping." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_TaxTeamDisposition">
           <Type>picklist</Type>
           <Name>al_taxteamdisposition</Name>

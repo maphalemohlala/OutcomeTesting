@@ -44,6 +44,10 @@ namespace OutcomeTesting.Plugins
         private const string CaseStatus = "al_casestatus";
         private const string RouteEntity = "al_reviewroute";
         private const string CaseReviewRoute = "al_reviewrouteid";
+
+        // The Tax check's own grade, on the case. See StampTaxOutcome for why it is not an
+        // al_outcome row. Created in DEV 2026-09-11.
+        private const string TaxOutcomeAttr = "al_taxoutcome";
         private const string RouteRequiresTax = "al_requirestaxreview";
         private const string RouteRequiresAqs = "al_requiresaqsreview";
 
@@ -747,6 +751,35 @@ namespace OutcomeTesting.Plugins
         /// Whether the case carries an Outcome at all. A Tax check records none (AD-055), so a
         /// remediated Tax-only case has no final outcome to set at recheck.
         /// </summary>
+        /// <summary>
+        /// Records the Tax check's own grade on the case (AD-055).
+        ///
+        /// Deliberately not an <c>al_outcome</c> row, which is what a reading of "record the
+        /// Tax grade like the AQS one" would suggest. Three things stop that:
+        ///
+        /// - <c>al_outcome.al_initialoutcome</c> is the BR-005 advice quality scale and has
+        ///   no <b>Fail</b>, so a failed Tax check could only be recorded as something it was
+        ///   not.
+        /// - <see cref="HasOutcome"/> is what closes a case after sign-off
+        ///   (<see cref="SignoffProgressPlugin"/>), and it counts rows per case with no
+        ///   review filter - a Tax row would leave every Tax-only case stalled at Awaiting
+        ///   Recheck instead of closing.
+        /// - <c>GenerateExportPlugin.ResolveOutcome</c> reads one Outcome per case, and
+        ///   AD-075 blanks the two graded columns for a Tax-only case on purpose. A Tax row
+        ///   would fill them with a grade the Trail Light contract does not define.
+        ///
+        /// A column of its own carries the Tax scale honestly and leaves all three alone. The
+        /// option values are <c>al_response.al_answerchoice</c>'s own, so the answer is copied
+        /// rather than translated - there is no mapping table to drift.
+        /// </summary>
+        private static void StampTaxOutcome(IOrganizationService service, Guid caseId, int answerChoice)
+        {
+            service.Update(new Entity(CaseEntity, caseId)
+            {
+                [TaxOutcomeAttr] = new OptionSetValue(answerChoice),
+            });
+        }
+
         public static bool HasOutcome(IOrganizationService service, Guid caseId)
         {
             var query = new QueryExpression(OutcomeEntity)
@@ -844,6 +877,8 @@ namespace OutcomeTesting.Plugins
                 requiresRemediation = taxRequiresRemediation || remedialFlagged;
                 remediationReason = "Tax check: "
                     + new OptionLabels(service).Label(ResponseEntity, "al_answerchoice", answer.Value);
+
+                StampTaxOutcome(service, caseRef.Id, answer.Value);
             }
 
             // BR-006's other half. The case status alone has always said remediation was

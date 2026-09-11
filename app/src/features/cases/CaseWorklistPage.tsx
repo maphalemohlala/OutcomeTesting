@@ -280,6 +280,12 @@ export function CaseWorklistPage() {
                       <td>
                         {item.latestOutcome ? (
                           <OutcomeIndicator outcome={item.latestOutcome} />
+                        ) : item.taxOutcome ? (
+                          // A Tax check grades on its own scale and writes no al_outcome row
+                          // (AD-055), so a Tax-only case has no BR-005 outcome to show and
+                          // read as ungraded however it was graded. Named as a Tax result so
+                          // the two scales are not silently mixed in one column.
+                          <span className="worklist__tax-grade">Tax: {item.taxOutcome}</span>
                         ) : (
                           'Not yet graded'
                         )}

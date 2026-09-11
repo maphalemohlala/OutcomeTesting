@@ -317,6 +317,11 @@ if (args.Length >= 4 && args[0].Equals("addcommandvalue", StringComparison.Ordin
     return AddCommandValue(args[1], commandValue, args[3]);
 }
 
+if (args.Length >= 2 && args[0].Equals("backfilltaxoutcome", StringComparison.OrdinalIgnoreCase))
+{
+    return BackfillTaxOutcome(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+}
+
 if (args.Length >= 5 && args[0].Equals("setattributedescription", StringComparison.OrdinalIgnoreCase))
 {
     return SetAttributeDescription(args[1], args[2], args[3], args[4]);
@@ -5931,6 +5936,119 @@ int AddOptionValue(string orgUrl, string entity, string attribute, int value, st
         ? $"{entity}.{attribute} {value} = '{label}' inserted and published ({after.Count} values)."
         : $"Insert returned success, but metadata does not read back {value} = '{label}'.");
     return ok ? 0 : 2;
+}
+
+// Stamps al_outcomecase.al_taxoutcome from the Q-TAX-02 answer of every submitted Tax review.
+//
+// SubmitReviewPlugin stamps it from 2026-09-11, so this is only for the checks submitted
+// before the column existed. Those are the cases the bug was reported on: IO-300004 answered
+// Q-TAX-02 Pass and closed, and every screen still read it as ungraded because the grade was
+// only ever on the response and nothing displays responses.
+//
+// Idempotent and additive. A case that already carries a value is left alone, so a re-run
+// after a later submit cannot overwrite a fresher grade with an older review's answer, and
+// the newest submitted review wins where a case somehow carries two Tax legs.
+int BackfillTaxOutcome(string orgUrl, bool confirm)
+{
+    using var svc = Connect(orgUrl);
+
+    // Submitted Tax reviews, newest last, with the case they belong to and the answer
+    // recorded against Q-TAX-02. One query rather than a read per review.
+    var rows = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_response\">" +
+        "<attribute name=\"al_answerchoice\"/>" +
+        "<link-entity name=\"al_questionversion\" from=\"al_questionversionid\" to=\"al_questionversionid\">" +
+        "<link-entity name=\"al_question\" from=\"al_questionid\" to=\"al_questionid\">" +
+        "<filter><condition attribute=\"al_questioncode\" operator=\"eq\" value=\"Q-TAX-02\"/></filter>" +
+        "</link-entity></link-entity>" +
+        "<link-entity name=\"al_reviewinstance\" from=\"al_reviewinstanceid\" to=\"al_reviewinstanceid\" alias=\"ri\">" +
+        "<attribute name=\"al_submittedon\"/>" +
+        "<filter><condition attribute=\"al_reviewstatus\" operator=\"eq\" value=\"120910212\"/></filter>" +
+        "<link-entity name=\"al_outcomecase\" from=\"al_outcomecaseid\" to=\"al_outcomecaseid\" alias=\"oc\">" +
+        "<attribute name=\"al_outcomecaseid\"/><attribute name=\"al_casereference\"/>" +
+        "<attribute name=\"al_taxoutcome\"/>" +
+        "</link-entity></link-entity>" +
+        "<filter><condition attribute=\"al_answerchoice\" operator=\"not-null\"/></filter>" +
+        "</entity></fetch>")).Entities;
+
+    var pending = new List<(Guid CaseId, string Reference, int Choice, DateTime? SubmittedOn)>();
+    var already = 0;
+
+    foreach (var row in rows)
+    {
+        var caseId = Alias<Guid>(row, "oc.al_outcomecaseid");
+        if (caseId == Guid.Empty)
+        {
+            continue;
+        }
+
+        if (Alias<OptionSetValue>(row, "oc.al_taxoutcome") != null)
+        {
+            already++;
+            continue;
+        }
+
+        var choice = row.GetAttributeValue<OptionSetValue>("al_answerchoice");
+        if (choice == null)
+        {
+            continue;
+        }
+
+        pending.Add((
+            caseId,
+            Alias<string>(row, "oc.al_casereference") ?? caseId.ToString("D"),
+            choice.Value,
+            Alias<DateTime?>(row, "ri.al_submittedon")));
+    }
+
+    // Newest submitted review wins, and one write per case.
+    var byCase = pending
+        .GroupBy(p => p.CaseId)
+        .Select(g => g.OrderByDescending(p => p.SubmittedOn ?? DateTime.MinValue).First())
+        .OrderBy(p => p.Reference, StringComparer.Ordinal)
+        .ToList();
+
+    Console.WriteLine($"{rows.Count} submitted Tax answer(s); {already} case(s) already stamped; {byCase.Count} to write.");
+    foreach (var p in byCase)
+    {
+        Console.WriteLine($"   {p.Reference}  <- {p.Choice}");
+    }
+
+    if (!confirm)
+    {
+        Console.WriteLine("Dry run. Re-run with --confirm to write.");
+        return 0;
+    }
+
+    var written = 0;
+    foreach (var p in byCase)
+    {
+        svc.Update(new Entity("al_outcomecase", p.CaseId)
+        {
+            ["al_taxoutcome"] = new OptionSetValue(p.Choice),
+        });
+        written++;
+    }
+
+    Console.WriteLine($"Stamped {written} case(s).");
+    return 0;
+}
+
+/// <summary>An aliased column from a link-entity, unwrapped, or default where it is absent.</summary>
+static T Alias<T>(Entity row, string name)
+{
+    if (!row.Contains(name))
+    {
+        return default!;
+    }
+
+    var value = row[name];
+    if (value is AliasedValue aliased)
+    {
+        value = aliased.Value;
+    }
+
+    return value is T typed ? typed : default!;
 }
 
 // Rewrites a column's description, the other half of a choice value authored in `src/`.

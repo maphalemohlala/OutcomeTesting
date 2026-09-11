@@ -706,6 +706,9 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-badge--blocked      { color: var(--colour-outcome-harm); }
 .ot-badge--closed       { color: var(--colour-stage-closed); }
 .ot-badge--none         { color: var(--colour-text-muted); }
+/* The Tax check's own grade (AD-055). Muted rather than coloured like the BR-005 grades
+   above, because it is a different scale and must not read as one of them. */
+.ot-badge--tax          { color: var(--colour-text-muted); }
 
 /* ------------------------------------------------------------------
    A check the route requires that has not been created yet. Held back

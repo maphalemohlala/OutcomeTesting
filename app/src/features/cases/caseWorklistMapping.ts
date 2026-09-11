@@ -6,6 +6,7 @@ import {
   Al_outcomecasesal_preorpostcheck,
   Al_outcomecasesal_priority,
   Al_outcomecasesal_productsolutiontype,
+  Al_outcomecasesal_taxoutcome,
   type Al_outcomecases,
 } from '../../generated/models/Al_outcomecasesModel';
 import {
@@ -40,6 +41,12 @@ export interface CaseSummary {
   ageInDays: number;
   /** Final outcome, or the initial where none is set yet (BR-007). */
   latestOutcome: Outcome | null;
+  /**
+   * The Tax check's own grade (AD-055), which is not on the BR-005 scale and so is not an
+   * `Outcome`. A Tax-only case has no `al_outcome` row at all, and read without this every
+   * closed and passed Tax case showed as ungraded - the IO-300004 report.
+   */
+  taxOutcome: string | null;
   initialOutcome: Outcome | null;
   finalOutcome: Outcome | null;
   finalisedOn: string | null;
@@ -138,6 +145,7 @@ export function toSummary(record: Al_outcomecases, grades?: CaseOutcomeGrades): 
     createdOn: record.createdon ?? null,
     ageInDays: ageInDays(record.createdon),
     latestOutcome: grades?.final ?? grades?.initial ?? null,
+    taxOutcome: choiceLabel(Al_outcomecasesal_taxoutcome, record.al_taxoutcome, record.al_taxoutcomename),
     initialOutcome: grades?.initial ?? null,
     finalOutcome: grades?.final ?? null,
     finalisedOn: grades?.finalisedOn ?? null,

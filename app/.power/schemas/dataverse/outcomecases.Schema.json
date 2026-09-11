@@ -463,6 +463,40 @@
           "x-ms-schema-name": "al_taxcheckrequiredName",
           "x-ms-read-only": true
         },
+        "al_taxoutcome": {
+          "type": "string",
+          "title": "Tax outcome",
+          "x-ms-dataverse-attribute": "al_taxoutcome",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "al_TaxOutcome",
+          "enum": [
+            "Pass",
+            "Fail",
+            "Insufficient evidence"
+          ],
+          "x-ms-enum-values": [
+            120910300,
+            120910301,
+            120910302
+          ],
+          "Color": [
+            null,
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "ce3398cf-a9ad-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Tax outcome",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "al_taxoutcomename": {
+          "type": "string",
+          "title": "al_taxoutcomename",
+          "x-ms-dataverse-attribute": "al_taxoutcomename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_taxoutcomeName",
+          "x-ms-read-only": true
+        },
         "al_taxteamdisposition": {
           "type": "string",
           "title": "Tax team disposition",
