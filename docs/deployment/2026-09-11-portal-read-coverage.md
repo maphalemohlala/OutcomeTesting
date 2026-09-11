@@ -213,3 +213,27 @@ fails the gate naming the file, line and tag; removing it passes.
 Verified after: all 16 deployed templates byte-identical to source, and the live
 `OT Remediation` re-scanned from the environment — 0 tags inside comments, comment depth 0
 at end of file.
+
+
+## Fifth round — why the Reason box was still bare
+
+| # | Step | Command | Result |
+|---|---|---|---|
+| 9 | Stylesheet | `pushwebfile <orgUrl> …050 outcome-testing.css` | 45812 bytes |
+| 10 | Layout | `pushwebtemplate <orgUrl> …010 <source>` | `?v=12` confirmed live by query |
+
+Reported as borders showing "only when you click on the field". That is the signature of a
+base rule losing while the focus rule wins: what appeared on click was the focus outline, not
+a border.
+
+`OT Remediation` wraps its entire form in `.ot-checklist` — from line 400 to line 1041, so
+the sign-off and regrade panels are both inside it — and that component strips its own fields
+bare on purpose, because it replicates a paper form. `.ot-checklist textarea` and
+`.ot-field textarea` match the Reason box at **identical specificity (0,2,0)**, and the
+checklist block sits later in the stylesheet, so it won.
+
+The two earlier attempts were each correct and each insufficient: AD-117 added `textarea` to
+a selector that was already being overridden, and AD-119 bumped the cache version so that
+losing rule finally reached the browser — which is what made the real cause visible at all.
+The `.ot-field` rules now also name `.ot-checklist`, taking them to (0,3,0), so the result no
+longer depends on rule order.

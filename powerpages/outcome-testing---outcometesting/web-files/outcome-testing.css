@@ -529,11 +529,24 @@ footer a:focus-visible, .footer a:focus-visible {
 /* textarea is listed alongside input and select deliberately. It was missing, so the
    regrade Reason and the sign-off Notes on the remediation page drew with no border,
    no padding and no background - an unmarked area of page that did not read as a field
-   at all. The .ot-checklist textareas are borderless on purpose and are not touched by
-   these rules; that component replicates a paper form. */
+   at all.
+
+   The .ot-checklist selectors below are not decoration. That component replicates a
+   paper form and deliberately strips its own fields bare - border: 0, transparent
+   background, 1px padding - and the remediation form wraps EVERYTHING in .ot-checklist,
+   including the sign-off and regrade panels. `.ot-checklist textarea` and `.ot-field
+   textarea` therefore both match the Reason box at identical specificity (0,2,0), and
+   the checklist block sits later in this file, so it won: the field drew bare at rest
+   and appeared to gain a border on click, which was only the focus outline. Naming
+   .ot-checklist here takes the specificity to (0,3,0) so a real form field keeps its
+   own styling wherever it sits, and stops the answer depending on rule order. The
+   checklist's own paper-form inputs are untouched - they carry no .ot-field. */
 .ot-field input,
 .ot-field select,
-.ot-field textarea {
+.ot-field textarea,
+.ot-checklist .ot-field input,
+.ot-checklist .ot-field select,
+.ot-checklist .ot-field textarea {
   font-family: var(--font-body);
   font-size: var(--text-base);
   color: var(--colour-text);
@@ -547,7 +560,8 @@ footer a:focus-visible, .footer a:focus-visible {
 
 /* Only the textarea resizes, and only vertically: a horizontal drag would push it out
    of the form's column. */
-.ot-field textarea {
+.ot-field textarea,
+.ot-checklist .ot-field textarea {
   min-height: 4.5rem;
   resize: vertical;
   line-height: 1.45;
@@ -555,7 +569,10 @@ footer a:focus-visible, .footer a:focus-visible {
 
 .ot-field input:focus-visible,
 .ot-field select:focus-visible,
-.ot-field textarea:focus-visible {
+.ot-field textarea:focus-visible,
+.ot-checklist .ot-field input:focus-visible,
+.ot-checklist .ot-field select:focus-visible,
+.ot-checklist .ot-field textarea:focus-visible {
   outline: 2px solid var(--colour-focus);
   outline-offset: 1px;
   border-color: var(--colour-focus);
