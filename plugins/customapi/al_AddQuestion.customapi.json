@@ -1,0 +1,33 @@
+{
+  "$comment": "Contract for the AddQuestion server-side command (AD-003, AD-122). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_AddQuestion",
+    "name": "al_AddQuestion",
+    "displayname": "Add Question",
+    "description": "Creates a question and its first version in a section of the checklist version in force. Enforces the caller holds Edit on question.retire and writes an immutable Audit Event.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.AddQuestionPlugin"
+  },
+  "requestParameters": [
+    { "uniquename": "SectionId", "name": "SectionId", "displayname": "Section id", "description": "Id of the al_section to add the question to.", "type": 10, "isoptional": false },
+    { "uniquename": "QuestionCode", "name": "QuestionCode", "displayname": "Question code", "description": "Unique code for the question, for example Q-E1-06.", "type": 10, "isoptional": false },
+    { "uniquename": "Name", "name": "Name", "displayname": "Name", "description": "Short name for the question row.", "type": 10, "isoptional": false },
+    { "uniquename": "Wording", "name": "Wording", "displayname": "Wording", "description": "Question text as the reviewer reads it.", "type": 10, "isoptional": false },
+    { "uniquename": "ResponseType", "name": "ResponseType", "displayname": "Response type", "description": "Numeric al_responsetype option value.", "type": 10, "isoptional": false },
+    { "uniquename": "Mandatory", "name": "Mandatory", "displayname": "Mandatory", "description": "'true' or 'false'. Absent is treated as true.", "type": 10, "isoptional": true },
+    { "uniquename": "DisplayOrder", "name": "DisplayOrder", "displayname": "Display order", "description": "Optional integer order within the section. Absent appends after the highest.", "type": 10, "isoptional": true },
+    { "uniquename": "EffectiveFrom", "name": "EffectiveFrom", "displayname": "Effective from", "description": "Optional yyyy-MM-dd. Absent is today. May not be in the past.", "type": 10, "isoptional": true },
+    { "uniquename": "IdempotencyKey", "name": "IdempotencyKey", "displayname": "Idempotency key", "description": "Stable key for the intent; a replay returns the same question.", "type": 10, "isoptional": false }
+  ],
+  "responseProperties": [
+    { "uniquename": "QuestionId", "name": "QuestionId", "displayname": "Question id", "description": "Id of the al_question created.", "type": 10 },
+    { "uniquename": "VersionId", "name": "VersionId", "displayname": "Version id", "description": "Id of the al_questionversion created.", "type": 10 },
+    { "uniquename": "AuditEventId", "name": "AuditEventId", "displayname": "Audit event id", "description": "Id of the Audit Event written.", "type": 10 },
+    { "uniquename": "Conflict", "name": "Conflict", "displayname": "Conflict", "description": "True when an optimistic-concurrency conflict was detected.", "type": 0 }
+  ]
+}
