@@ -5,6 +5,152 @@
  */
 
 export const dataSourcesInfo = {
+  "al_addquestion": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_AddQuestion": {
+        "path": "/api/data/v9.2/al_AddQuestion",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "SectionId",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "QuestionCode",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Name",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Wording",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "ResponseType",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Mandatory",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "DisplayOrder",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "EffectiveFrom",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "al_addsection": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_AddSection": {
+        "path": "/api/data/v9.2/al_AddSection",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "SectionCode",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Name",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "HelpText",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "OwnerRole",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "DisplayOrder",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "IsOptional",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "EffectiveFrom",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "Questions",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
   "al_adoptroleassignment": {
     "tableId": "",
     "version": "",
@@ -454,6 +600,61 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "al_movequestion": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_MoveQuestion": {
+        "path": "/api/data/v9.2/al_MoveQuestion",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "QuestionId",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "TargetSectionId",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "NewQuestionCode",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "EffectiveFrom",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "Reason",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
   "al_outcomecases": {
     "tableId": "",
     "version": "",
@@ -633,6 +834,92 @@ export const dataSourcesInfo = {
             "name": "Mandatory",
             "in": "body",
             "required": false,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "al_retirequestion": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_RetireQuestion": {
+        "path": "/api/data/v9.2/al_RetireQuestion",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "QuestionId",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "EffectiveTo",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "Reason",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "al_retiresection": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_RetireSection": {
+        "path": "/api/data/v9.2/al_RetireSection",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "SectionId",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "EffectiveTo",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "Reason",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
             "type": "string"
           }
         ],
@@ -943,6 +1230,73 @@ export const dataSourcesInfo = {
             "name": "ExpectedRowVersion",
             "in": "body",
             "required": false,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "al_updatesection": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_UpdateSection": {
+        "path": "/api/data/v9.2/al_UpdateSection",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "SectionId",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Name",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "HelpText",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "OwnerRole",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "DisplayOrder",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "IsOptional",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "Reason",
+            "in": "body",
+            "required": true,
             "type": "string"
           },
           {
