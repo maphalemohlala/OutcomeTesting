@@ -1,0 +1,28 @@
+{
+  "$comment": "Contract for the RetireQuestion server-side command (AD-003, AD-122). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_RetireQuestion",
+    "name": "al_RetireQuestion",
+    "displayname": "Retire Question",
+    "description": "Dates out the current version of a question and creates no successor, so it stops being asked while the answers it holds keep resolving. Refuses the question codes compiled logic depends on. Enforces Edit on question.retire and writes an immutable Audit Event.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.RetireQuestionPlugin"
+  },
+  "requestParameters": [
+    { "uniquename": "QuestionId", "name": "QuestionId", "displayname": "Question id", "description": "Id of the al_question to retire.", "type": 10, "isoptional": false },
+    { "uniquename": "EffectiveTo", "name": "EffectiveTo", "displayname": "Effective to", "description": "Optional yyyy-MM-dd. Absent is today. May not be in the past.", "type": 10, "isoptional": true },
+    { "uniquename": "Reason", "name": "Reason", "displayname": "Reason", "description": "Why the question is no longer asked. Required and recorded on the Audit Event.", "type": 10, "isoptional": false },
+    { "uniquename": "IdempotencyKey", "name": "IdempotencyKey", "displayname": "Idempotency key", "description": "Stable key for the intent; a replay returns the same result.", "type": 10, "isoptional": false }
+  ],
+  "responseProperties": [
+    { "uniquename": "QuestionId", "name": "QuestionId", "displayname": "Question id", "description": "Id of the al_question retired.", "type": 10 },
+    { "uniquename": "RetiredVersionId", "name": "RetiredVersionId", "displayname": "Retired version id", "description": "Id of the al_questionversion dated out.", "type": 10 },
+    { "uniquename": "AuditEventId", "name": "AuditEventId", "displayname": "Audit event id", "description": "Id of the Audit Event written.", "type": 10 },
+    { "uniquename": "Conflict", "name": "Conflict", "displayname": "Conflict", "description": "True when an optimistic-concurrency conflict was detected.", "type": 0 }
+  ]
+}
