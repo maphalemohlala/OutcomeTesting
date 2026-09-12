@@ -45,6 +45,10 @@ function QuestionRow({
         </span>
         <span className="library__muted">v{question.versionNumber}</span>
 
+        {/* Stated, not only styled. The line-through and the dimming are invisible to a
+            screen reader, and "is this still asked" is the whole point of the row. */}
+        {question.retired ? <span className="library__flag">Retired</span> : null}
+
         {guarded ? (
           <span className="library__flag" title={guarded}>
             Required by grading
@@ -97,6 +101,7 @@ function SectionBlock({
         <h2 id={`section-${section.id}`}>{section.name}</h2>
         <div className="library__section-meta">
           <span className="library__owner">{section.ownerRole}</span>
+          {section.retired ? <span className="library__flag">Retired</span> : null}
           {section.isOptional ? <span className="library__flag">Optional</span> : null}
           {section.conditional ? <span className="library__flag">Conditional</span> : null}
           <span className="library__muted">
