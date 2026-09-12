@@ -18,6 +18,7 @@
     { "uniquename": "NewWording", "name": "NewWording", "displayname": "New wording", "description": "Wording for the new question version.", "type": 10, "isoptional": false },
     { "uniquename": "ResponseType", "name": "ResponseType", "displayname": "Response type", "description": "Optional. Numeric al_responsetype option value for the new version. Absent carries the current value forward.", "type": 10, "isoptional": true },
     { "uniquename": "Mandatory", "name": "Mandatory", "displayname": "Mandatory", "description": "Optional. 'true' or 'false' for whether the new version is mandatory. Absent carries the current value forward.", "type": 10, "isoptional": true },
+    { "uniquename": "DisplayOrder", "name": "DisplayOrder", "displayname": "Display order", "description": "Optional. Integer order for the new version. Absent carries the current value forward. Display order is frozen on the version (AD-015), so reordering is a new version, never an in-place update.", "type": 10, "isoptional": true },
     { "uniquename": "IdempotencyKey", "name": "IdempotencyKey", "displayname": "Idempotency key", "description": "Stable key for the intent; a replay returns the same successor version.", "type": 10, "isoptional": false }
   ],
   "responseProperties": [

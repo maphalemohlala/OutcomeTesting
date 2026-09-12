@@ -12,6 +12,7 @@ export interface RetireAndSucceedQuestionInput {
   newWording: string;
   responseType?: number;
   mandatory?: boolean;
+  displayOrder?: number;
   idempotencyKey: string;
 }
 
@@ -32,5 +33,6 @@ export function retireAndSucceedQuestion(
   };
   if (input.responseType !== undefined) body.ResponseType = String(input.responseType);
   if (input.mandatory !== undefined) body.Mandatory = input.mandatory ? 'true' : 'false';
+  if (input.displayOrder !== undefined) body.DisplayOrder = String(input.displayOrder);
   return executeCommand<RetireAndSucceedQuestionOutput>('al_RetireAndSucceedQuestion', body);
 }

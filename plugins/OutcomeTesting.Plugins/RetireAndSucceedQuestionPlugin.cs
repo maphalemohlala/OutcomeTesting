@@ -18,6 +18,7 @@ namespace OutcomeTesting.Plugins
         private const string InNewWording = "NewWording";
         private const string InResponseType = "ResponseType";
         private const string InMandatory = "Mandatory";
+        private const string InDisplayOrder = "DisplayOrder";
         private const string InIdempotencyKey = "IdempotencyKey";
 
         private const string OutNewVersionId = "NewVersionId";
@@ -48,6 +49,7 @@ namespace OutcomeTesting.Plugins
             var newWording = CommandHelpers.GetRequiredString(context, InNewWording);
             var responseTypeOverride = CommandHelpers.GetOptionalString(context, InResponseType);
             var mandatoryOverride = CommandHelpers.GetOptionalString(context, InMandatory);
+            var displayOrderOverride = CommandHelpers.GetOptionalString(context, InDisplayOrder);
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "question.retire", PermissionHelpers.AccessEdit);
@@ -108,7 +110,16 @@ namespace OutcomeTesting.Plugins
             {
                 successor["al_ismandatory"] = current.GetAttributeValue<bool>("al_ismandatory");
             }
-            if (current.Contains("al_displayorder"))
+            // Display order is frozen on the version (AD-015), so reordering a question is a
+            // new version rather than an in-place update - the same shape as the wording,
+            // response type and mandatory flag above.
+            int displayOrderValue;
+            if (!string.IsNullOrWhiteSpace(displayOrderOverride)
+                && int.TryParse(displayOrderOverride, out displayOrderValue))
+            {
+                successor["al_displayorder"] = displayOrderValue;
+            }
+            else if (current.Contains("al_displayorder"))
             {
                 successor["al_displayorder"] = current.GetAttributeValue<int>("al_displayorder");
             }
