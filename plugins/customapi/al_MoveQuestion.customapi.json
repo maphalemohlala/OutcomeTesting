@@ -1,0 +1,31 @@
+{
+  "$comment": "Contract for the MoveQuestion server-side command (AD-003, AD-122). A move is a retire plus an add in one transaction, never a lookup update. Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_MoveQuestion",
+    "name": "al_MoveQuestion",
+    "displayname": "Move Question",
+    "description": "Retires a question in its current section and creates it in the target, carrying the same wording, response type and mandatory flag. History stays attached to the section the answers were written in. Refuses the question codes compiled logic depends on. Enforces Edit on question.retire and writes an immutable Audit Event.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.MoveQuestionPlugin"
+  },
+  "requestParameters": [
+    { "uniquename": "QuestionId", "name": "QuestionId", "displayname": "Question id", "description": "Id of the al_question to move.", "type": 10, "isoptional": false },
+    { "uniquename": "TargetSectionId", "name": "TargetSectionId", "displayname": "Target section id", "description": "Id of the al_section to move it to.", "type": 10, "isoptional": false },
+    { "uniquename": "NewQuestionCode", "name": "NewQuestionCode", "displayname": "New question code", "description": "Code for the question in its new section; codes are unique and never freed.", "type": 10, "isoptional": false },
+    { "uniquename": "EffectiveFrom", "name": "EffectiveFrom", "displayname": "Effective from", "description": "Optional yyyy-MM-dd for the new question. Absent is today.", "type": 10, "isoptional": true },
+    { "uniquename": "Reason", "name": "Reason", "displayname": "Reason", "description": "Why the question is moving. Required and recorded on the Audit Event.", "type": 10, "isoptional": false },
+    { "uniquename": "IdempotencyKey", "name": "IdempotencyKey", "displayname": "Idempotency key", "description": "Stable key for the intent; a replay returns the same result.", "type": 10, "isoptional": false }
+  ],
+  "responseProperties": [
+    { "uniquename": "RetiredVersionId", "name": "RetiredVersionId", "displayname": "Retired version id", "description": "Id of the al_questionversion dated out in the old section.", "type": 10 },
+    { "uniquename": "NewQuestionId", "name": "NewQuestionId", "displayname": "New question id", "description": "Id of the al_question created in the target section.", "type": 10 },
+    { "uniquename": "NewVersionId", "name": "NewVersionId", "displayname": "New version id", "description": "Id of its first al_questionversion.", "type": 10 },
+    { "uniquename": "AuditEventId", "name": "AuditEventId", "displayname": "Audit event id", "description": "Id of the Audit Event written.", "type": 10 },
+    { "uniquename": "Conflict", "name": "Conflict", "displayname": "Conflict", "description": "True when an optimistic-concurrency conflict was detected.", "type": 0 }
+  ]
+}
