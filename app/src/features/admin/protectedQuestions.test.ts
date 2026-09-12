@@ -1,5 +1,8 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+// Imported as text rather than read with node:fs, because tsconfig.app.json restricts
+// ambient types to vite/client on purpose - app code must not reach for Node APIs that do
+// not exist in a browser, and one test is not a reason to widen that.
+import checklistGuardsSource from '../../../../plugins/OutcomeTesting.Plugins/ChecklistGuards.cs?raw';
 import { PROTECTED_QUESTION_CODES, protectedReason } from './protectedQuestions';
 
 /**
@@ -45,11 +48,9 @@ describe('the mirror matches the plug-in assembly', () => {
     // Read from the C# rather than restated, because a hand-copied list goes stale
     // silently: a ninth code added server-side would leave the UI offering a Retire
     // control the server refuses.
-    const csharp = readFileSync(
-      new URL('../../../../plugins/OutcomeTesting.Plugins/ChecklistGuards.cs', import.meta.url),
-      'utf8',
-    );
-    const inCsharp = [...csharp.matchAll(/\{ "(Q-[A-Z0-9-]+)",/g)].map((m) => m[1]).sort();
+    const inCsharp = [...checklistGuardsSource.matchAll(/\{ "(Q-[A-Z0-9-]+)",/g)]
+      .map((m) => m[1])
+      .sort();
 
     expect(inCsharp).toHaveLength(8);
     expect(inCsharp).toEqual([...PROTECTED_QUESTION_CODES].sort());
