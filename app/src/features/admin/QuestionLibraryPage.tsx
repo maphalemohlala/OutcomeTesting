@@ -5,8 +5,10 @@ import { usePermissions } from '../../app/permissions/permissionContext';
 import { protectedReason } from './protectedQuestions';
 import { QuestionModal } from './QuestionModal';
 import { RetireModal } from './RetireModal';
+import { SectionModal } from './SectionModal';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { retireQuestion } from '../../services/commands/questions';
+import { retireSection } from '../../services/commands/sections';
 import './QuestionLibraryPage.css';
 
 /** What the page currently has open, if anything. */
@@ -14,7 +16,10 @@ type Editing =
   | { kind: 'none' }
   | { kind: 'add-question'; sectionId: string }
   | { kind: 'edit-question'; sectionId: string; question: LibraryQuestion }
-  | { kind: 'retire-question'; question: LibraryQuestion };
+  | { kind: 'retire-question'; question: LibraryQuestion }
+  | { kind: 'add-section' }
+  | { kind: 'edit-section'; section: LibrarySection }
+  | { kind: 'retire-section'; section: LibrarySection };
 
 function QuestionRow({
   question,
@@ -72,12 +77,16 @@ function SectionBlock({
   onAddQuestion,
   onEditQuestion,
   onRetireQuestion,
+  onEditSection,
+  onRetireSection,
 }: {
   section: LibrarySection;
   canEdit: boolean;
   onAddQuestion: () => void;
   onEditQuestion: (question: LibraryQuestion) => void;
   onRetireQuestion: (question: LibraryQuestion) => void;
+  onEditSection: () => void;
+  onRetireSection: () => void;
 }) {
   const live = section.questions.filter((question) => !question.retired);
   const retired = section.questions.filter((question) => question.retired);
@@ -94,9 +103,17 @@ function SectionBlock({
             {live.length} {live.length === 1 ? 'question' : 'questions'}
           </span>
           {canEdit && !section.retired ? (
-            <button type="button" className="library__btn library__btn--ghost" onClick={onAddQuestion}>
-              Add question
-            </button>
+            <>
+              <button type="button" className="library__btn library__btn--ghost" onClick={onAddQuestion}>
+                Add question
+              </button>
+              <button type="button" className="library__btn library__btn--ghost" onClick={onEditSection}>
+                Edit section
+              </button>
+              <button type="button" className="library__btn library__btn--ghost" onClick={onRetireSection}>
+                Retire section
+              </button>
+            </>
           ) : null}
         </div>
       </header>
@@ -175,6 +192,18 @@ export function QuestionLibraryPage() {
           </section>
         ) : (
           <div className="library">
+            {canEdit ? (
+              <div className="library__toolbar">
+                <button
+                  type="button"
+                  className="library__btn"
+                  onClick={() => setEditing({ kind: 'add-section' })}
+                >
+                  Add section
+                </button>
+              </div>
+            ) : null}
+
             {live.map((section) => (
               <SectionBlock
                 key={section.id}
@@ -185,6 +214,8 @@ export function QuestionLibraryPage() {
                   setEditing({ kind: 'edit-question', sectionId: section.id, question })
                 }
                 onRetireQuestion={(question) => setEditing({ kind: 'retire-question', question })}
+                onEditSection={() => setEditing({ kind: 'edit-section', section })}
+                onRetireSection={() => setEditing({ kind: 'retire-section', section })}
               />
             ))}
 
@@ -199,12 +230,44 @@ export function QuestionLibraryPage() {
                     onAddQuestion={() => undefined}
                     onEditQuestion={() => undefined}
                     onRetireQuestion={() => undefined}
+                    onEditSection={() => undefined}
+                    onRetireSection={() => undefined}
                   />
                 ))}
               </details>
             ) : null}
           </div>
         )
+      ) : null}
+
+      {editing.kind === 'add-section' || editing.kind === 'edit-section' ? (
+        <SectionModal
+          mode={editing.kind === 'add-section' ? 'add' : 'edit'}
+          section={editing.kind === 'edit-section' ? editing.section : undefined}
+          onClose={close}
+          onSaved={reload}
+        />
+      ) : null}
+
+      {editing.kind === 'retire-section' ? (
+        <RetireModal
+          subject="section"
+          name={`${editing.section.code} — ${editing.section.name}`}
+          questionCount={editing.section.questions.filter((q) => !q.retired).length}
+          onConfirm={(reason, effectiveTo) =>
+            retireSection({
+              sectionId: editing.section.id,
+              reason,
+              effectiveTo,
+              idempotencyKey: intent.keyFor(`retire-section:${editing.section.id}`),
+            })
+          }
+          onClose={close}
+          onRetired={() => {
+            intent.release(`retire-section:${editing.section.id}`);
+            reload();
+          }}
+        />
       ) : null}
 
       {editing.kind === 'retire-question' ? (
