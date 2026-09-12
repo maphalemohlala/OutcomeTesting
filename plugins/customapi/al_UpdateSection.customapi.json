@@ -1,0 +1,32 @@
+{
+  "$comment": "Contract for the UpdateSection server-side command (AD-003, AD-043, AD-123). Sections are not versioned, so the Audit Event's before/after is what preserves the trail. Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_UpdateSection",
+    "name": "al_UpdateSection",
+    "displayname": "Update Section",
+    "description": "Amends a section's name, help text, owning team, display order or optional flag in place, recording the before and after of each changed field on an immutable Audit Event. Enforces Edit on question.retire.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.UpdateSectionPlugin"
+  },
+  "requestParameters": [
+    { "uniquename": "SectionId", "name": "SectionId", "displayname": "Section id", "description": "Id of the al_section to amend.", "type": 10, "isoptional": false },
+    { "uniquename": "Name", "name": "Name", "displayname": "Name", "description": "Optional. New section name.", "type": 10, "isoptional": true },
+    { "uniquename": "HelpText", "name": "HelpText", "displayname": "Help text", "description": "Optional. New guidance shown under the heading.", "type": 10, "isoptional": true },
+    { "uniquename": "OwnerRole", "name": "OwnerRole", "displayname": "Owner role", "description": "Optional. 120910100 Tax, 120910101 AQS, or 120910105 Both. Retroactive: owner role is not versioned, so the change reaches submitted reviews.", "type": 10, "isoptional": true },
+    { "uniquename": "DisplayOrder", "name": "DisplayOrder", "displayname": "Display order", "description": "Optional. New integer order within the checklist version.", "type": 10, "isoptional": true },
+    { "uniquename": "IsOptional", "name": "IsOptional", "displayname": "Optional", "description": "Optional. 'true' or 'false'. Takes effect on every unsubmitted review immediately; there is no effective date on the flag.", "type": 10, "isoptional": true },
+    { "uniquename": "Reason", "name": "Reason", "displayname": "Reason", "description": "Why the section is being amended. Required and recorded on the Audit Event.", "type": 10, "isoptional": false },
+    { "uniquename": "IdempotencyKey", "name": "IdempotencyKey", "displayname": "Idempotency key", "description": "Stable key for the intent; a replay returns the same result.", "type": 10, "isoptional": false }
+  ],
+  "responseProperties": [
+    { "uniquename": "SectionId", "name": "SectionId", "displayname": "Section id", "description": "Id of the al_section amended.", "type": 10 },
+    { "uniquename": "Changes", "name": "Changes", "displayname": "Changes", "description": "The before and after of each changed field, as recorded on the Audit Event. Empty when nothing changed.", "type": 10 },
+    { "uniquename": "AuditEventId", "name": "AuditEventId", "displayname": "Audit event id", "description": "Id of the Audit Event written, or empty when nothing changed.", "type": 10 },
+    { "uniquename": "Conflict", "name": "Conflict", "displayname": "Conflict", "description": "True when an optimistic-concurrency conflict was detected.", "type": 0 }
+  ]
+}
