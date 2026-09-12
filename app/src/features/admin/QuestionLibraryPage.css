@@ -252,3 +252,9 @@
 .library__retired--sections {
   margin-top: var(--space-4);
 }
+
+/* What is about to be retired, named plainly at the top of the confirm. */
+.library__subject {
+  margin: 0;
+  font-weight: var(--weight-medium, 500);
+}

@@ -4,22 +4,28 @@ import { useQuestionLibrary, type LibraryQuestion, type LibrarySection } from '.
 import { usePermissions } from '../../app/permissions/permissionContext';
 import { protectedReason } from './protectedQuestions';
 import { QuestionModal } from './QuestionModal';
+import { RetireModal } from './RetireModal';
+import { useIntentKeys } from '../../hooks/useIntentKey';
+import { retireQuestion } from '../../services/commands/questions';
 import './QuestionLibraryPage.css';
 
 /** What the page currently has open, if anything. */
 type Editing =
   | { kind: 'none' }
   | { kind: 'add-question'; sectionId: string }
-  | { kind: 'edit-question'; sectionId: string; question: LibraryQuestion };
+  | { kind: 'edit-question'; sectionId: string; question: LibraryQuestion }
+  | { kind: 'retire-question'; question: LibraryQuestion };
 
 function QuestionRow({
   question,
   canEdit,
   onEdit,
+  onRetire,
 }: {
   question: LibraryQuestion;
   canEdit: boolean;
   onEdit: () => void;
+  onRetire: () => void;
 }) {
   const guarded = protectedReason(question.code);
 
@@ -47,6 +53,14 @@ function QuestionRow({
             Edit question
           </button>
         ) : null}
+
+        {/* Retire is hidden for a protected code because the server refuses it (AD-122).
+            The chip above already says which question it is and why. */}
+        {canEdit && !question.retired && !guarded ? (
+          <button type="button" className="library__btn library__btn--ghost" onClick={onRetire}>
+            Retire
+          </button>
+        ) : null}
       </div>
     </li>
   );
@@ -57,11 +71,13 @@ function SectionBlock({
   canEdit,
   onAddQuestion,
   onEditQuestion,
+  onRetireQuestion,
 }: {
   section: LibrarySection;
   canEdit: boolean;
   onAddQuestion: () => void;
   onEditQuestion: (question: LibraryQuestion) => void;
+  onRetireQuestion: (question: LibraryQuestion) => void;
 }) {
   const live = section.questions.filter((question) => !question.retired);
   const retired = section.questions.filter((question) => question.retired);
@@ -95,6 +111,7 @@ function SectionBlock({
               question={question}
               canEdit={canEdit}
               onEdit={() => onEditQuestion(question)}
+              onRetire={() => onRetireQuestion(question)}
             />
           ))}
         </ol>
@@ -110,6 +127,7 @@ function SectionBlock({
                 question={question}
                 canEdit={canEdit}
                 onEdit={() => onEditQuestion(question)}
+                onRetire={() => onRetireQuestion(question)}
               />
             ))}
           </ol>
@@ -130,6 +148,7 @@ export function QuestionLibraryPage() {
   const live = sections.filter((section) => !section.retired);
   const retired = sections.filter((section) => section.retired);
   const reload = () => setReloadKey((key) => key + 1);
+  const intent = useIntentKeys();
   const close = () => setEditing({ kind: 'none' });
 
   return (
@@ -165,6 +184,7 @@ export function QuestionLibraryPage() {
                 onEditQuestion={(question) =>
                   setEditing({ kind: 'edit-question', sectionId: section.id, question })
                 }
+                onRetireQuestion={(question) => setEditing({ kind: 'retire-question', question })}
               />
             ))}
 
@@ -178,6 +198,7 @@ export function QuestionLibraryPage() {
                     canEdit={false}
                     onAddQuestion={() => undefined}
                     onEditQuestion={() => undefined}
+                    onRetireQuestion={() => undefined}
                   />
                 ))}
               </details>
@@ -186,7 +207,27 @@ export function QuestionLibraryPage() {
         )
       ) : null}
 
-      {editing.kind !== 'none' ? (
+      {editing.kind === 'retire-question' ? (
+        <RetireModal
+          subject="question"
+          name={`${editing.question.code} — ${editing.question.wording}`}
+          onConfirm={(reason, effectiveTo) =>
+            retireQuestion({
+              questionId: editing.question.id,
+              reason,
+              effectiveTo,
+              idempotencyKey: intent.keyFor(`retire:${editing.question.id}`),
+            })
+          }
+          onClose={close}
+          onRetired={() => {
+            intent.release(`retire:${editing.question.id}`);
+            reload();
+          }}
+        />
+      ) : null}
+
+      {editing.kind === 'add-question' || editing.kind === 'edit-question' ? (
         <QuestionModal
           mode={editing.kind === 'add-question' ? 'add' : 'edit'}
           sections={live}
