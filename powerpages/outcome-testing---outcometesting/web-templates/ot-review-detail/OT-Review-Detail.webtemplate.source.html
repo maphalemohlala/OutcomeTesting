@@ -318,9 +318,21 @@
               <attribute name="al_helptext" />
               <attribute name="al_ownerrole" />
               <attribute name="al_sectioncode" />
+              <attribute name="al_isoptional" />
               <filter type="and">
                 <condition attribute="al_checklistversionid" operator="eq" value="{{ cv_id }}" />
-                <condition attribute="al_ownerrole" operator="eq" value="{{ owner_role }}" />
+                <condition attribute="al_ownerrole" operator="in">
+                  <value>{{ owner_role }}</value>
+                  <value>120910105</value>
+                </condition>
+                <filter type="or">
+                  <condition attribute="al_effectivefrom" operator="null" />
+                  <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ as_of }}" />
+                </filter>
+                <filter type="or">
+                  <condition attribute="al_effectiveto" operator="null" />
+                  <condition attribute="al_effectiveto" operator="gt" value="{{ as_of }}" />
+                </filter>
               </filter>
             </link-entity>
           </link-entity>
@@ -351,9 +363,21 @@
           <attribute name="al_sectionid" />
           <attribute name="al_sectioncode" />
           <attribute name="al_displayorder" />
+          <attribute name="al_isoptional" />
           <filter type="and">
             <condition attribute="al_checklistversionid" operator="eq" value="{{ cv_id | xml_escape }}" />
-            <condition attribute="al_ownerrole" operator="eq" value="{{ owner_role }}" />
+            <condition attribute="al_ownerrole" operator="in">
+              <value>{{ owner_role }}</value>
+              <value>120910105</value>
+            </condition>
+            <filter type="or">
+              <condition attribute="al_effectivefrom" operator="null" />
+              <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ as_of }}" />
+            </filter>
+            <filter type="or">
+              <condition attribute="al_effectiveto" operator="null" />
+              <condition attribute="al_effectiveto" operator="gt" value="{{ as_of }}" />
+            </filter>
           </filter>
           <order attribute="al_displayorder" />
         </entity>
@@ -489,6 +513,7 @@
           {% assign scode = qv['s.al_sectioncode'] %}
           {% assign sname = qv['s.al_name'] %}
           {% assign shelp = qv['s.al_helptext'] %}
+          {% assign soptional = qv['s.al_isoptional'] %}
 
           {% comment %}
             The block this section belongs to. Every section carries a code, so the fallback
@@ -638,7 +663,14 @@
               </table>
             {% endif %}
 
-            <h2>{{ blk_title | escape }}</h2>
+            {% comment %}
+              An optional section may be left blank at submit (AD-123). The marker sits on
+              the block heading only where the block is one section; a block that folds
+              several sections together - Suitability, File Quality Outcome - carries the
+              flag of whichever section opened it, which would mislabel the rest. Those
+              get the marker on their own subsection row further down instead.
+            {% endcomment %}
+            <h2>{{ blk_title | escape }}{% unless blk_subsections %}{% if soptional %} <span class="ot-optional">Optional</span>{% endif %}{% endunless %}</h2>
             {% if blk_intro != blank %}
               <p class="intro">{{ blk_intro | escape }}</p>
             {% endif %}
@@ -662,7 +694,7 @@
               {% if current_section != '' and prev_help != blank %}
                 <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
               {% endif %}
-              <tr class="section"><td colspan="{{ ncols }}">{{ scode | remove_first: 'S-' }}. {{ sname | escape }}</td></tr>
+              <tr class="section"><td colspan="{{ ncols }}">{{ scode | remove_first: 'S-' }}. {{ sname | escape }}{% if soptional %} <span class="ot-optional">Optional</span>{% endif %}</td></tr>
             {% endif %}
             {% assign current_section = sid %}
             {% assign prev_help = shelp %}
