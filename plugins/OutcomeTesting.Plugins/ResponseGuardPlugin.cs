@@ -172,15 +172,19 @@ namespace OutcomeTesting.Plugins
             var section = service.Retrieve(
                 "al_section",
                 sectionRef.Id,
-                new ColumnSet("al_ownerrole", "al_checklistversionid"));
+                new ColumnSet("al_ownerrole", "al_checklistversionid", "al_effectivefrom", "al_effectiveto"));
 
             var reviewType = review.GetAttributeValue<OptionSetValue>("al_reviewtype");
-            var ownerRole = section.GetAttributeValue<OptionSetValue>("al_ownerrole");
-            if (reviewType == null || ownerRole == null
-                || ownerRole.Value != ResponseRules.OwnerRoleFor(reviewType.Value))
+            if (reviewType == null)
             {
                 throw new InvalidPluginExecutionException(
-                    PreconditionPrefix + "This question belongs to another discipline's section.");
+                    PreconditionPrefix + "This review has no recognised discipline.");
+            }
+
+            var sectionRefusal = SectionRefusal(section, reviewType.Value, DateTime.UtcNow);
+            if (sectionRefusal != null)
+            {
+                throw new InvalidPluginExecutionException(PreconditionPrefix + sectionRefusal);
             }
 
             var issued = review.GetAttributeValue<EntityReference>("al_checklistversionid");
@@ -190,6 +194,38 @@ namespace OutcomeTesting.Plugins
                 throw new InvalidPluginExecutionException(
                     PreconditionPrefix + "This question is not part of the checklist version issued to this review.");
             }
+        }
+
+        /// <summary>
+        /// Why this section cannot be answered by this review, or null when it can
+        /// (AD-123). Public and static so it can be tested with a plain Entity, exactly as
+        /// RemediationResponseGuardPlugin.Refusal is. The assembly is signed and carries no
+        /// InternalsVisibleTo, so internal would not be reachable from the tests.
+        ///
+        /// Owner role is membership rather than equality: a Both section is answered by the
+        /// Tax review and the AQS review alike, each writing its own responses. Equality
+        /// here is what would make a Both section render in both front ends and then refuse
+        /// every answer typed into it.
+        /// </summary>
+        public static string SectionRefusal(Entity section, int reviewType, DateTime asOf)
+        {
+            var ownerRole = section.GetAttributeValue<OptionSetValue>("al_ownerrole");
+            if (ownerRole == null || !SectionRules.OwnerRoleServes(ownerRole.Value, reviewType))
+            {
+                return "This question belongs to another discipline's section.";
+            }
+
+            // A retired section takes no new answers, while the answers it already holds
+            // keep resolving (AD-091).
+            if (!SectionRules.IsSectionEffective(
+                section.GetAttributeValue<DateTime?>("al_effectivefrom"),
+                section.GetAttributeValue<DateTime?>("al_effectiveto"),
+                asOf))
+            {
+                return "This section is no longer part of the checklist, so it cannot be answered.";
+            }
+
+            return null;
         }
 
         private static void EnsureAnswerShape(Entity target, Entity pre, int responseType)
