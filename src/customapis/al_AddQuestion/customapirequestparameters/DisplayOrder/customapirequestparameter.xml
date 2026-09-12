@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="DisplayOrder">
+  <description default="Optional integer order within the section. Absent appends after the highest.">
+    <label description="Optional integer order within the section. Absent appends after the highest." languagecode="1033" />
+  </description>
+  <displayname default="Display order">
+    <label description="Display order" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>DisplayOrder</name>
+  <type>10</type>
+</customapirequestparameter>

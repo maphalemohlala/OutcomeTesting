@@ -1,0 +1,18 @@
+<customapi uniquename="al_MoveQuestion">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Retires a question in its current section and creates it in the target, carrying its wording, response type and mandatory flag, so history stays attached to the section the answers were written in. Refuses the codes compiled logic depends on. Enforces Edit on question.retire and audits immutably.">
+    <label description="Retires a question in its current section and creates it in the target, carrying its wording, response type and mandatory flag, so history stays attached to the section the answers were written in. Refuses the codes compiled logic depends on. Enforces Edit on question.retire and audits immutably." languagecode="1033" />
+  </description>
+  <displayname default="Move Question">
+    <label description="Move Question" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_MoveQuestion</name>
+  <plugintypeid>
+    <plugintypeexportkey>09eb3cd0-8eae-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

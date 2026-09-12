@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="RetiredVersionId">
+  <description default="Id of the al_questionversion dated out.">
+    <label description="Id of the al_questionversion dated out." languagecode="1033" />
+  </description>
+  <displayname default="Retired version id">
+    <label description="Retired version id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>RetiredVersionId</name>
+  <type>10</type>
+</customapiresponseproperty>

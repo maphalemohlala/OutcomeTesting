@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="ResponseType">
+  <description default="Numeric al_responsetype option value.">
+    <label description="Numeric al_responsetype option value." languagecode="1033" />
+  </description>
+  <displayname default="Response type">
+    <label description="Response type" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>ResponseType</name>
+  <type>10</type>
+</customapirequestparameter>

@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="IsOptional">
+  <description default="Optional. 'true' or 'false'. Takes effect on every unsubmitted review immediately; there is no effective date on the flag.">
+    <label description="Optional. 'true' or 'false'. Takes effect on every unsubmitted review immediately; there is no effective date on the flag." languagecode="1033" />
+  </description>
+  <displayname default="Optional">
+    <label description="Optional" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>IsOptional</name>
+  <type>10</type>
+</customapirequestparameter>

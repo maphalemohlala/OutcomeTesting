@@ -1,0 +1,18 @@
+<customapi uniquename="al_AddSection">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Creates a section under the checklist version in force, with its questions, in one transaction. Owned by Tax, AQS or Both. Enforces Edit on question.retire and writes an immutable Audit Event.">
+    <label description="Creates a section under the checklist version in force, with its questions, in one transaction. Owned by Tax, AQS or Both. Enforces Edit on question.retire and writes an immutable Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Add Section">
+    <label description="Add Section" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_AddSection</name>
+  <plugintypeid>
+    <plugintypeexportkey>77d58c91-8eae-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

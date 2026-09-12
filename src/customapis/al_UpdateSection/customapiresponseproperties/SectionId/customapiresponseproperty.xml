@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="SectionId">
+  <description default="Id of the al_section amended.">
+    <label description="Id of the al_section amended." languagecode="1033" />
+  </description>
+  <displayname default="Section id">
+    <label description="Section id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>SectionId</name>
+  <type>10</type>
+</customapiresponseproperty>

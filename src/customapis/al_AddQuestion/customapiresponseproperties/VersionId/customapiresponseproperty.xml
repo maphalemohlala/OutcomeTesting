@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="VersionId">
+  <description default="Id of the al_questionversion created.">
+    <label description="Id of the al_questionversion created." languagecode="1033" />
+  </description>
+  <displayname default="Version id">
+    <label description="Version id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>VersionId</name>
+  <type>10</type>
+</customapiresponseproperty>

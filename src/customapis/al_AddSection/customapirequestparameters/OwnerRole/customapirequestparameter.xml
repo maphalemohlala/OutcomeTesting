@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="OwnerRole">
+  <description default="120910100 Tax team, 120910101 AQS checker, or 120910105 Both.">
+    <label description="120910100 Tax team, 120910101 AQS checker, or 120910105 Both." languagecode="1033" />
+  </description>
+  <displayname default="Owner role">
+    <label description="Owner role" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>OwnerRole</name>
+  <type>10</type>
+</customapirequestparameter>

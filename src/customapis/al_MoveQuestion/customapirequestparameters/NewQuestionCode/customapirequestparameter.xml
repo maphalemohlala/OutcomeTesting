@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="NewQuestionCode">
+  <description default="Code for the question in its new section; codes are unique and never freed.">
+    <label description="Code for the question in its new section; codes are unique and never freed." languagecode="1033" />
+  </description>
+  <displayname default="New question code">
+    <label description="New question code" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>NewQuestionCode</name>
+  <type>10</type>
+</customapirequestparameter>

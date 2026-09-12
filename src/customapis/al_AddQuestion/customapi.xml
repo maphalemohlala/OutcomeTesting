@@ -1,0 +1,18 @@
+<customapi uniquename="al_AddQuestion">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Creates a question and its first version in a section of the checklist version in force. Enforces the caller holds Edit on question.retire and writes an immutable Audit Event.">
+    <label description="Creates a question and its first version in a section of the checklist version in force. Enforces the caller holds Edit on question.retire and writes an immutable Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Add Question">
+    <label description="Add Question" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_AddQuestion</name>
+  <plugintypeid>
+    <plugintypeexportkey>c5bc1385-8eae-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

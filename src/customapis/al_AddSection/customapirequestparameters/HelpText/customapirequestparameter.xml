@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="HelpText">
+  <description default="Optional guidance shown under the heading.">
+    <label description="Optional guidance shown under the heading." languagecode="1033" />
+  </description>
+  <displayname default="Help text">
+    <label description="Help text" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>HelpText</name>
+  <type>10</type>
+</customapirequestparameter>

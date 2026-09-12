@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="SectionId">
+  <description default="Id of the al_section to add the question to.">
+    <label description="Id of the al_section to add the question to." languagecode="1033" />
+  </description>
+  <displayname default="Section id">
+    <label description="Section id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>SectionId</name>
+  <type>10</type>
+</customapirequestparameter>

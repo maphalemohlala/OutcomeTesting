@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Wording">
+  <description default="Question text as the reviewer reads it.">
+    <label description="Question text as the reviewer reads it." languagecode="1033" />
+  </description>
+  <displayname default="Wording">
+    <label description="Wording" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>Wording</name>
+  <type>10</type>
+</customapirequestparameter>

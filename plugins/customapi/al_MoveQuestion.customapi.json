@@ -4,7 +4,7 @@
     "uniquename": "al_MoveQuestion",
     "name": "al_MoveQuestion",
     "displayname": "Move Question",
-    "description": "Retires a question in its current section and creates it in the target, carrying the same wording, response type and mandatory flag. History stays attached to the section the answers were written in. Refuses the question codes compiled logic depends on. Enforces Edit on question.retire and writes an immutable Audit Event.",
+    "description": "Retires a question in its current section and creates it in the target, carrying its wording, response type and mandatory flag, so history stays attached to the section the answers were written in. Refuses the codes compiled logic depends on. Enforces Edit on question.retire and audits immutably.",
     "bindingtype": 0,
     "boundentitylogicalname": null,
     "isfunction": false,

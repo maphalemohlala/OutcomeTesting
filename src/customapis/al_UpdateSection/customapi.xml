@@ -1,0 +1,18 @@
+<customapi uniquename="al_UpdateSection">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Amends a section's name, help text, owning team, display order or optional flag in place, recording the before and after of each changed field on an immutable Audit Event. Enforces Edit on question.retire.">
+    <label description="Amends a section's name, help text, owning team, display order or optional flag in place, recording the before and after of each changed field on an immutable Audit Event. Enforces Edit on question.retire." languagecode="1033" />
+  </description>
+  <displayname default="Update Section">
+    <label description="Update Section" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_UpdateSection</name>
+  <plugintypeid>
+    <plugintypeexportkey>ba63a078-8fae-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

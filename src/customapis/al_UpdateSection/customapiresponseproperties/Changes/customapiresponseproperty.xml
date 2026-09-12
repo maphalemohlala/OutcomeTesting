@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Changes">
+  <description default="The before and after of each changed field. Empty when nothing changed.">
+    <label description="The before and after of each changed field. Empty when nothing changed." languagecode="1033" />
+  </description>
+  <displayname default="Changes">
+    <label description="Changes" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>Changes</name>
+  <type>10</type>
+</customapiresponseproperty>

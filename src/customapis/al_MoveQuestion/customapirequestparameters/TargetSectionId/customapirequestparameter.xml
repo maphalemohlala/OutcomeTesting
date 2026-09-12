@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="TargetSectionId">
+  <description default="Id of the al_section to move it to.">
+    <label description="Id of the al_section to move it to." languagecode="1033" />
+  </description>
+  <displayname default="Target section id">
+    <label description="Target section id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>TargetSectionId</name>
+  <type>10</type>
+</customapirequestparameter>

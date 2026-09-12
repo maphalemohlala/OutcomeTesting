@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="QuestionCode">
+  <description default="Unique code for the question, for example Q-E1-06.">
+    <label description="Unique code for the question, for example Q-E1-06." languagecode="1033" />
+  </description>
+  <displayname default="Question code">
+    <label description="Question code" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>QuestionCode</name>
+  <type>10</type>
+</customapirequestparameter>

@@ -1,0 +1,18 @@
+<customapi uniquename="al_RetireQuestion">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Dates out the current version of a question and creates no successor, so it stops being asked while the answers it holds keep resolving. Refuses the question codes compiled logic depends on. Enforces Edit on question.retire and writes an immutable Audit Event.">
+    <label description="Dates out the current version of a question and creates no successor, so it stops being asked while the answers it holds keep resolving. Refuses the question codes compiled logic depends on. Enforces Edit on question.retire and writes an immutable Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Retire Question">
+    <label description="Retire Question" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_RetireQuestion</name>
+  <plugintypeid>
+    <plugintypeexportkey>9cf6c041-8fae-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

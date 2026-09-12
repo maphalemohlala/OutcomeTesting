@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="SectionCode">
+  <description default="Unique code for the section, for example S-CD2.">
+    <label description="Unique code for the section, for example S-CD2." languagecode="1033" />
+  </description>
+  <displayname default="Section code">
+    <label description="Section code" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>SectionCode</name>
+  <type>10</type>
+</customapirequestparameter>

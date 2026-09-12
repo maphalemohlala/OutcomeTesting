@@ -1,0 +1,18 @@
+<customapi uniquename="al_RetireSection">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Dates out a section, which removes its questions from the form and the submit gate while the answers they hold keep resolving. Refuses a section holding a question code compiled logic depends on. Enforces Edit on question.retire and writes an immutable Audit Event.">
+    <label description="Dates out a section, which removes its questions from the form and the submit gate while the answers they hold keep resolving. Refuses a section holding a question code compiled logic depends on. Enforces Edit on question.retire and writes an immutable Audit Event." languagecode="1033" />
+  </description>
+  <displayname default="Retire Section">
+    <label description="Retire Section" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_RetireSection</name>
+  <plugintypeid>
+    <plugintypeexportkey>669cdf47-8fae-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

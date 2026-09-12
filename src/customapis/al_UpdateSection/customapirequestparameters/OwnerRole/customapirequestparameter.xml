@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="OwnerRole">
+  <description default="Optional. 120910100 Tax, 120910101 AQS, or 120910105 Both. Retroactive: owner role is not versioned, so the change reaches submitted reviews.">
+    <label description="Optional. 120910100 Tax, 120910101 AQS, or 120910105 Both. Retroactive: owner role is not versioned, so the change reaches submitted reviews." languagecode="1033" />
+  </description>
+  <displayname default="Owner role">
+    <label description="Owner role" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>OwnerRole</name>
+  <type>10</type>
+</customapirequestparameter>

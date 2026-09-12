@@ -25,7 +25,7 @@
   ],
   "responseProperties": [
     { "uniquename": "SectionId", "name": "SectionId", "displayname": "Section id", "description": "Id of the al_section amended.", "type": 10 },
-    { "uniquename": "Changes", "name": "Changes", "displayname": "Changes", "description": "The before and after of each changed field, as recorded on the Audit Event. Empty when nothing changed.", "type": 10 },
+    { "uniquename": "Changes", "name": "Changes", "displayname": "Changes", "description": "The before and after of each changed field. Empty when nothing changed.", "type": 10 },
     { "uniquename": "AuditEventId", "name": "AuditEventId", "displayname": "Audit event id", "description": "Id of the Audit Event written, or empty when nothing changed.", "type": 10 },
     { "uniquename": "Conflict", "name": "Conflict", "displayname": "Conflict", "description": "True when an optimistic-concurrency conflict was detected.", "type": 0 }
   ]

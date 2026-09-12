@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Questions">
+  <description default="Optional JSON array of {code, name, wording, responseType, mandatory, displayOrder}. Must be an array, not an object.">
+    <label description="Optional JSON array of {code, name, wording, responseType, mandatory, displayOrder}. Must be an array, not an object." languagecode="1033" />
+  </description>
+  <displayname default="Questions">
+    <label description="Questions" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>Questions</name>
+  <type>10</type>
+</customapirequestparameter>

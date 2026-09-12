@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="QuestionId">
+  <description default="Id of the al_question created.">
+    <label description="Id of the al_question created." languagecode="1033" />
+  </description>
+  <displayname default="Question id">
+    <label description="Question id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>QuestionId</name>
+  <type>10</type>
+</customapiresponseproperty>

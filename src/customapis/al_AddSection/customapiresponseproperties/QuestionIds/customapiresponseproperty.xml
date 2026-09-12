@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="QuestionIds">
+  <description default="Comma-separated ids of the questions created, in order.">
+    <label description="Comma-separated ids of the questions created, in order." languagecode="1033" />
+  </description>
+  <displayname default="Question ids">
+    <label description="Question ids" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>QuestionIds</name>
+  <type>10</type>
+</customapiresponseproperty>

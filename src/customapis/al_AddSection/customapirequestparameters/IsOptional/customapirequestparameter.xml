@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="IsOptional">
+  <description default="'true' or 'false'. Absent is false. An optional section's questions are not owed at submit.">
+    <label description="'true' or 'false'. Absent is false. An optional section's questions are not owed at submit." languagecode="1033" />
+  </description>
+  <displayname default="Optional">
+    <label description="Optional" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>IsOptional</name>
+  <type>10</type>
+</customapirequestparameter>

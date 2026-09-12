@@ -187,9 +187,19 @@
                   <label description="SetFailAccountability" languagecode="1033" />
                 </labels>
               </option>
+              <option value="120910793" IsHidden="0">
+                <labels>
+                  <label description="AddQuestion" languagecode="1033" />
+                </labels>
+              </option>
               <option value="120910752" IsHidden="0">
                 <labels>
                   <label description="ReturnCase" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910794" IsHidden="0">
+                <labels>
+                  <label description="RetireQuestion" languagecode="1033" />
                 </labels>
               </option>
               <option value="120910753" IsHidden="0">
@@ -202,14 +212,34 @@
                   <label description="SubmitReview" languagecode="1033" />
                 </labels>
               </option>
+              <option value="120910795" IsHidden="0">
+                <labels>
+                  <label description="MoveQuestion" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910796" IsHidden="0">
+                <labels>
+                  <label description="AddSection" languagecode="1033" />
+                </labels>
+              </option>
               <option value="120910755" IsHidden="0">
                 <labels>
                   <label description="IssueOutcome" languagecode="1033" />
                 </labels>
               </option>
+              <option value="120910797" IsHidden="0">
+                <labels>
+                  <label description="RetireSection" languagecode="1033" />
+                </labels>
+              </option>
               <option value="120910756" IsHidden="0">
                 <labels>
                   <label description="CompleteRemediation" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910798" IsHidden="0">
+                <labels>
+                  <label description="UpdateSection" languagecode="1033" />
                 </labels>
               </option>
               <option value="120910757" IsHidden="0">

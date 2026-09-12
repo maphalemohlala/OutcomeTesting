@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="Mandatory">
+  <description default="'true' or 'false'. Absent is treated as true.">
+    <label description="'true' or 'false'. Absent is treated as true." languagecode="1033" />
+  </description>
+  <displayname default="Mandatory">
+    <label description="Mandatory" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>Mandatory</name>
+  <type>10</type>
+</customapirequestparameter>
