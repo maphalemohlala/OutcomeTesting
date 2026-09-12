@@ -1,154 +1,142 @@
 import { useState } from 'react';
 import { PageIntro } from '../../components/layout/PageIntro';
-import {
-  useQuestionLibrary,
-  RESPONSE_TYPE_OPTIONS,
-  type LibraryQuestion,
-} from './useQuestionLibrary';
+import { useQuestionLibrary, type LibraryQuestion, type LibrarySection } from './useQuestionLibrary';
 import { usePermissions } from '../../app/permissions/permissionContext';
-import { useIntentKeys } from '../../hooks/useIntentKey';
-import { retireAndSucceedQuestion } from '../../services/commands/questions';
+import { protectedReason } from './protectedQuestions';
+import { QuestionModal } from './QuestionModal';
 import './QuestionLibraryPage.css';
+
+/** What the page currently has open, if anything. */
+type Editing =
+  | { kind: 'none' }
+  | { kind: 'add-question'; sectionId: string }
+  | { kind: 'edit-question'; sectionId: string; question: LibraryQuestion };
 
 function QuestionRow({
   question,
   canEdit,
-  onSaved,
+  onEdit,
 }: {
   question: LibraryQuestion;
   canEdit: boolean;
-  onSaved: () => void;
+  onEdit: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(question.wording);
-  const [draftResponseType, setDraftResponseType] = useState(question.responseTypeValue);
-  const [draftMandatory, setDraftMandatory] = useState(question.mandatory);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const intent = useIntentKeys();
-
-  async function onSave() {
-    if (!draft.trim()) {
-      setError('Enter the new wording.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    const result = await retireAndSucceedQuestion({
-      questionId: question.id,
-      newWording: draft.trim(),
-      responseType: draftResponseType,
-      mandatory: draftMandatory,
-      idempotencyKey: intent.keyFor(question.id),
-    });
-    setBusy(false);
-    if (result.ok) {
-      intent.release(question.id);
-      setEditing(false);
-      onSaved();
-    } else {
-      setError(result.message);
-    }
-  }
+  const guarded = protectedReason(question.code);
 
   return (
-    <li className="library__question">
-      {editing ? (
-        <div className="library__edit">
-          <textarea
-            className="library__textarea"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={3}
-            aria-label="New question wording"
-          />
-          <div className="library__edit-fields">
-            <label className="library__field">
-              <span>Response type</span>
-              <select
-                value={draftResponseType}
-                onChange={(e) => setDraftResponseType(Number(e.target.value))}
-              >
-                {RESPONSE_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="library__check">
-              <input
-                type="checkbox"
-                checked={draftMandatory}
-                onChange={(e) => setDraftMandatory(e.target.checked)}
-              />
-              <span>Mandatory</span>
-            </label>
-          </div>
-          <div className="library__edit-actions">
-            <button type="button" className="library__btn" onClick={onSave} disabled={busy}>
-              {busy ? 'Saving…' : 'Save new version'}
+    <li className="library__question" data-retired={question.retired ? 'true' : 'false'}>
+      <p className="library__wording">{question.wording}</p>
+      <div className="library__question-meta">
+        <span className="library__code">{question.code}</span>
+        <span className="library__response">{question.responseType}</span>
+        <span className="library__requirement" data-required={question.mandatory ? 'true' : 'false'}>
+          {question.mandatory ? 'Mandatory' : 'Optional'}
+        </span>
+        <span className="library__muted">v{question.versionNumber}</span>
+
+        {guarded ? (
+          <span className="library__flag" title={guarded}>
+            Required by grading
+          </span>
+        ) : null}
+
+        {/* A retired question offers no action: there is nothing to do to it, and offering
+            something that would be refused is worse than offering nothing. */}
+        {canEdit && !question.retired ? (
+          <button type="button" className="library__btn library__btn--ghost" onClick={onEdit}>
+            Edit question
+          </button>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
+function SectionBlock({
+  section,
+  canEdit,
+  onAddQuestion,
+  onEditQuestion,
+}: {
+  section: LibrarySection;
+  canEdit: boolean;
+  onAddQuestion: () => void;
+  onEditQuestion: (question: LibraryQuestion) => void;
+}) {
+  const live = section.questions.filter((question) => !question.retired);
+  const retired = section.questions.filter((question) => question.retired);
+
+  return (
+    <section className="library__section" aria-labelledby={`section-${section.id}`}>
+      <header className="library__section-head">
+        <h2 id={`section-${section.id}`}>{section.name}</h2>
+        <div className="library__section-meta">
+          <span className="library__owner">{section.ownerRole}</span>
+          {section.isOptional ? <span className="library__flag">Optional</span> : null}
+          {section.conditional ? <span className="library__flag">Conditional</span> : null}
+          <span className="library__muted">
+            {live.length} {live.length === 1 ? 'question' : 'questions'}
+          </span>
+          {canEdit && !section.retired ? (
+            <button type="button" className="library__btn library__btn--ghost" onClick={onAddQuestion}>
+              Add question
             </button>
-            <button
-              type="button"
-              className="library__btn library__btn--ghost"
-              onClick={() => {
-                setEditing(false);
-                setDraft(question.wording);
-                setDraftResponseType(question.responseTypeValue);
-                setDraftMandatory(question.mandatory);
-                setError(null);
-              }}
-              disabled={busy}
-            >
-              Cancel
-            </button>
-          </div>
-          {error ? (
-            <p className="library__error" role="status">
-              {error}
-            </p>
           ) : null}
         </div>
+      </header>
+
+      {live.length === 0 ? (
+        <p className="library__muted">No questions in this section.</p>
       ) : (
-        <>
-          <p className="library__wording">{question.wording}</p>
-          <div className="library__question-meta">
-            <span className="library__response">{question.responseType}</span>
-            <span
-              className="library__requirement"
-              data-required={question.mandatory ? 'true' : 'false'}
-            >
-              {question.mandatory ? 'Mandatory' : 'Optional'}
-            </span>
-            <span className="library__muted">v{question.versionNumber}</span>
-            {canEdit ? (
-              <button
-                type="button"
-                className="library__btn library__btn--ghost"
-                onClick={() => setEditing(true)}
-              >
-                Edit question
-              </button>
-            ) : null}
-          </div>
-        </>
+        <ol className="library__questions">
+          {live.map((question) => (
+            <QuestionRow
+              key={question.id}
+              question={question}
+              canEdit={canEdit}
+              onEdit={() => onEditQuestion(question)}
+            />
+          ))}
+        </ol>
       )}
-    </li>
+
+      {retired.length > 0 ? (
+        <details className="library__retired">
+          <summary>Retired ({retired.length})</summary>
+          <ol className="library__questions">
+            {retired.map((question) => (
+              <QuestionRow
+                key={question.id}
+                question={question}
+                canEdit={canEdit}
+                onEdit={() => onEditQuestion(question)}
+              />
+            ))}
+          </ol>
+        </details>
+      ) : null}
+    </section>
   );
 }
 
 export function QuestionLibraryPage() {
   const [reloadKey, setReloadKey] = useState(0);
+  const [editing, setEditing] = useState<Editing>({ kind: 'none' });
   const state = useQuestionLibrary(reloadKey);
   const { can, ready } = usePermissions();
   const canEdit = ready && can('question.retire', 'Edit');
+
+  const sections = state.status === 'ready' ? state.sections : [];
+  const live = sections.filter((section) => !section.retired);
+  const retired = sections.filter((section) => section.retired);
+  const reload = () => setReloadKey((key) => key + 1);
+  const close = () => setEditing({ kind: 'none' });
 
   return (
     <>
       <PageIntro
         title="Question library"
-        purpose="See the published checklist as reviewers answer it today. Editing creates a new version and retires the old one, so historic responses are preserved (FR-030, FR-031)."
+        purpose="The checklist as reviewers answer it today. Editing creates a new version and retires the old one, so answers already given keep the version they were answered against (FR-030, FR-031)."
       />
 
       {state.status === 'loading' ? <p role="status">Loading the question library…</p> : null}
@@ -161,51 +149,52 @@ export function QuestionLibraryPage() {
       ) : null}
 
       {state.status === 'ready' ? (
-        state.sections.length === 0 ? (
+        sections.length === 0 ? (
           <section className="library__unavailable" aria-labelledby="library-empty">
             <h2 id="library-empty">No checklist is published</h2>
             <p>No sections are visible to you yet.</p>
           </section>
         ) : (
           <div className="library">
-            {state.sections.map((section) => (
-              <section
+            {live.map((section) => (
+              <SectionBlock
                 key={section.id}
-                className="library__section"
-                aria-labelledby={`section-${section.id}`}
-              >
-                <header className="library__section-head">
-                  <h2 id={`section-${section.id}`}>{section.name}</h2>
-                  <div className="library__section-meta">
-                    <span className="library__owner">{section.ownerRole}</span>
-                    {section.conditional ? (
-                      <span className="library__flag">Conditional</span>
-                    ) : null}
-                    <span className="library__muted">
-                      {section.questions.length}{' '}
-                      {section.questions.length === 1 ? 'question' : 'questions'}
-                    </span>
-                  </div>
-                </header>
-
-                {section.questions.length === 0 ? (
-                  <p className="library__muted">No questions in this section.</p>
-                ) : (
-                  <ol className="library__questions">
-                    {section.questions.map((question) => (
-                      <QuestionRow
-                        key={question.id}
-                        question={question}
-                        canEdit={canEdit}
-                        onSaved={() => setReloadKey((k) => k + 1)}
-                      />
-                    ))}
-                  </ol>
-                )}
-              </section>
+                section={section}
+                canEdit={canEdit}
+                onAddQuestion={() => setEditing({ kind: 'add-question', sectionId: section.id })}
+                onEditQuestion={(question) =>
+                  setEditing({ kind: 'edit-question', sectionId: section.id, question })
+                }
+              />
             ))}
+
+            {retired.length > 0 ? (
+              <details className="library__retired library__retired--sections">
+                <summary>Retired sections ({retired.length})</summary>
+                {retired.map((section) => (
+                  <SectionBlock
+                    key={section.id}
+                    section={section}
+                    canEdit={false}
+                    onAddQuestion={() => undefined}
+                    onEditQuestion={() => undefined}
+                  />
+                ))}
+              </details>
+            ) : null}
           </div>
         )
+      ) : null}
+
+      {editing.kind !== 'none' ? (
+        <QuestionModal
+          mode={editing.kind === 'add-question' ? 'add' : 'edit'}
+          sections={live}
+          sectionId={editing.sectionId}
+          question={editing.kind === 'edit-question' ? editing.question : undefined}
+          onClose={close}
+          onSaved={reload}
+        />
       ) : null}
     </>
   );

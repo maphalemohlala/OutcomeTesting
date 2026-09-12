@@ -204,3 +204,51 @@
   font-size: var(--text-sm);
   color: var(--colour-outcome-harm);
 }
+
+/* The question and section editors. Fields stack, because the modal is narrow and every
+   field here is a full sentence rather than a token. */
+.library__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.library__form-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* What saving will do, stated before it is pressed. An edit creates a new version; a move
+   retires the question here and creates it there. Neither is recoverable by guessing. */
+.library__consequence {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.library__code {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
+  color: var(--colour-text-muted);
+}
+
+/* Retired content is shown rather than hidden - the library is where an administrator sees
+   what was taken out - but it is visibly not part of the checklist any more. */
+.library__question[data-retired='true'] {
+  opacity: 0.65;
+}
+
+.library__question[data-retired='true'] .library__wording {
+  text-decoration: line-through;
+}
+
+.library__retired > summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+  padding: var(--space-2) 0;
+}
+
+.library__retired--sections {
+  margin-top: var(--space-4);
+}
