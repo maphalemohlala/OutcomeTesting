@@ -1,0 +1,33 @@
+{
+  "$comment": "Contract for the AddSection server-side command (AD-003, AD-123). Questions arrive as a JSON array in a string parameter, because Custom API parameters are scalars. Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_AddSection",
+    "name": "al_AddSection",
+    "displayname": "Add Section",
+    "description": "Creates a section under the checklist version in force, with its questions, in one transaction. Owned by Tax, AQS or Both. Enforces Edit on question.retire and writes an immutable Audit Event.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.AddSectionPlugin"
+  },
+  "requestParameters": [
+    { "uniquename": "SectionCode", "name": "SectionCode", "displayname": "Section code", "description": "Unique code for the section, for example S-CD2.", "type": 10, "isoptional": false },
+    { "uniquename": "Name", "name": "Name", "displayname": "Name", "description": "Section name as the reviewer reads it.", "type": 10, "isoptional": false },
+    { "uniquename": "HelpText", "name": "HelpText", "displayname": "Help text", "description": "Optional guidance shown under the heading.", "type": 10, "isoptional": true },
+    { "uniquename": "OwnerRole", "name": "OwnerRole", "displayname": "Owner role", "description": "120910100 Tax team, 120910101 AQS checker, or 120910105 Both.", "type": 10, "isoptional": false },
+    { "uniquename": "DisplayOrder", "name": "DisplayOrder", "displayname": "Display order", "description": "Optional integer. Absent appends after the highest in the version.", "type": 10, "isoptional": true },
+    { "uniquename": "IsOptional", "name": "IsOptional", "displayname": "Optional", "description": "'true' or 'false'. Absent is false. An optional section's questions are not owed at submit.", "type": 10, "isoptional": true },
+    { "uniquename": "EffectiveFrom", "name": "EffectiveFrom", "displayname": "Effective from", "description": "Optional yyyy-MM-dd. Absent is today. May not be in the past.", "type": 10, "isoptional": true },
+    { "uniquename": "Questions", "name": "Questions", "displayname": "Questions", "description": "Optional JSON array of {code, name, wording, responseType, mandatory, displayOrder}. Must be an array, not an object.", "type": 10, "isoptional": true },
+    { "uniquename": "IdempotencyKey", "name": "IdempotencyKey", "displayname": "Idempotency key", "description": "Stable key for the intent; a replay returns the same section.", "type": 10, "isoptional": false }
+  ],
+  "responseProperties": [
+    { "uniquename": "SectionId", "name": "SectionId", "displayname": "Section id", "description": "Id of the al_section created.", "type": 10 },
+    { "uniquename": "QuestionIds", "name": "QuestionIds", "displayname": "Question ids", "description": "Comma-separated ids of the questions created, in order.", "type": 10 },
+    { "uniquename": "AuditEventId", "name": "AuditEventId", "displayname": "Audit event id", "description": "Id of the Audit Event written.", "type": 10 },
+    { "uniquename": "Conflict", "name": "Conflict", "displayname": "Conflict", "description": "True when an optimistic-concurrency conflict was detected.", "type": 0 }
+  ]
+}
