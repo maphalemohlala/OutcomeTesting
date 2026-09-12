@@ -72,7 +72,7 @@
       "uniquename": "Duplicates",
       "name": "Duplicates",
       "displayname": "Duplicates",
-      "description": "Rows skipped because the IO reference already exists (BR-001).",
+      "description": "Rows skipped because the TaskID already exists (BR-001).",
       "type": 10
     },
     {

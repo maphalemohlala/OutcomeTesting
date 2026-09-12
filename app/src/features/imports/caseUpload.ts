@@ -1,112 +1,108 @@
-import {
-  Al_outcomecasesal_adviserstatus,
-  Al_outcomecasesal_casetype,
-  Al_outcomecasesal_preorpostcheck,
-  Al_outcomecasesal_productsolutiontype,
-  Al_outcomecasesal_samplesource,
-  Al_outcomecasesal_taxcheckrequired,
-  Al_outcomecasesal_taxteamdisposition,
-  Al_outcomecasesal_vulnerableclient,
-  type Al_outcomecasesBase,
-} from '../../generated/models/Al_outcomecasesModel';
+/**
+ * The preview half of the Intelligent Office task extract import (2026-09-12 design).
+ *
+ * This is deliberately the same parser as `ImportRules` in the plug-in assembly, kept in
+ * step with it by hand. It is an affordance, not a boundary: `al_ImportCases` re-parses and
+ * re-validates every row server-side (AD-003), so a rule that disagrees between the two
+ * shows a row as importable here and then rejects it there. When one changes, change both.
+ */
 
 /** al_casestatus for a freshly imported case (Imported, BR-001). */
 const CASE_STATUS_IMPORTED = 120910580;
 
+/** al_taxcheckrequired, the input DeriveRoute reads to pick the route (BR-004). */
+export const TAX_CHECK_REQUIRED_YES = 120910560;
+export const TAX_CHECK_REQUIRED_NO = 120910561;
+
+/** al_preorpostcheck; every task in a Pre-Advice extract is a pre-check. */
+const PRE_OR_POST_CHECK_PRE = 120910540;
+
+/** Checklist slots the extract carries, whether or not they are used. */
+const CHECKLIST_SLOTS = 10;
+
 type ColumnKind = 'text' | 'date' | 'choice';
 
 interface ColumnDef {
-  /** Header text as it appears in the template CSV. */
+  /** Header text exactly as the extract carries it. */
   header: string;
-  /** Target al_outcomecase field. */
-  field: keyof Al_outcomecasesBase;
+  /** Target al_outcomecase column. */
+  field: string;
   kind: ColumnKind;
-  required?: boolean;
-  /** Numeric option-set map (label -> value) for choice columns. */
+  /** Numeric option-set map (value -> label) for choice columns. */
   choices?: Record<number, string>;
-  /** Example value shown in the template's guide row. */
-  example: string;
 }
 
 /**
- * Case-header columns from knowledge/checklist-v8.md, mapped to the deployed
- * al_outcomecase schema. IO reference is the BR-001 import key.
+ * Columns of the extract, under IO's own header names. The workbook is transcribed to CSV
+ * without renaming anything, so this table and `ImportRules.Columns` describe the same file.
+ * TaskID is the import key and the only mandatory column.
  */
 const COLUMNS: ColumnDef[] = [
-  { header: 'IO reference', field: 'al_casereference', kind: 'text', required: true, example: 'IO-000123' },
-  { header: 'Client name', field: 'al_clientname', kind: 'text', example: 'A. Client' },
-  { header: 'Adviser name', field: 'al_advisername', kind: 'text', example: 'Jane Adviser' },
-  { header: 'Adviser code', field: 'al_advisercode', kind: 'text', example: 'ADV-01' },
+  { header: 'TaskID', field: 'al_casereference', kind: 'text' },
+  { header: 'ServiceCaseSequentialRef', field: 'al_servicecaseref', kind: 'text' },
+  { header: 'ClientRef', field: 'al_clientref', kind: 'text' },
+  { header: 'Client', field: 'al_clientname', kind: 'text' },
+  { header: 'AdviserName', field: 'al_advisername', kind: 'text' },
+  { header: 'AdviserEmail', field: 'al_adviseremail', kind: 'text' },
+  // AD-113: the name the file carried, not proof of allocation.
+  { header: 'AssignedTo', field: 'al_checkername', kind: 'text' },
+  // The paraplanner who raised the pre-advice check task (project owner, 2026-09-12).
+  { header: 'AssignedBy', field: 'al_paraplanner', kind: 'text' },
   {
-    header: 'Adviser status',
-    field: 'al_adviserstatus',
+    header: 'Status',
+    field: 'al_iotaskstatus',
     kind: 'choice',
-    choices: Al_outcomecasesal_adviserstatus,
-    example: 'CAS',
-  },
-  { header: 'Paraplanner', field: 'al_paraplanner', kind: 'text', example: 'Sam Paraplanner' },
-  { header: 'Paraplanner code', field: 'al_paraplannercode', kind: 'text', example: 'PP-01' },
-  { header: 'Products', field: 'al_products', kind: 'text', example: 'Pension; ISA' },
-  {
-    header: 'Case type',
-    field: 'al_casetype',
-    kind: 'choice',
-    choices: Al_outcomecasesal_casetype,
-    example: 'New advice',
-  },
-  { header: 'Advice date', field: 'al_advicedate', kind: 'date', example: '31/01/2026' },
-  {
-    header: 'Product / solution type',
-    field: 'al_productsolutiontype',
-    kind: 'choice',
-    choices: Al_outcomecasesal_productsolutiontype,
-    example: 'Accumulation Pension',
+    choices: { 120910620: 'Not Started', 120910621: 'In Progress', 120910622: 'Complete' },
   },
   {
-    header: 'Sample source',
-    field: 'al_samplesource',
+    header: 'Outcome',
+    field: 'al_iooutcome',
     kind: 'choice',
-    choices: Al_outcomecasesal_samplesource,
-    example: 'Random',
+    choices: {
+      120910610: 'Pass',
+      120910611: 'Pass with issues',
+      120910612: 'Insufficient evidence',
+      120910613: 'Potential harm',
+    },
   },
-  { header: 'Checker name', field: 'al_checkername', kind: 'text', example: 'Chris Checker' },
-  { header: 'Check date', field: 'al_checkdate', kind: 'date', example: '05/02/2026' },
-  {
-    header: 'Pre or post check',
-    field: 'al_preorpostcheck',
-    kind: 'choice',
-    choices: Al_outcomecasesal_preorpostcheck,
-    example: 'Pre',
-  },
-  {
-    header: 'Vulnerable client',
-    field: 'al_vulnerableclient',
-    kind: 'choice',
-    choices: Al_outcomecasesal_vulnerableclient,
-    example: 'N/A',
-  },
-  {
-    header: 'Tax check required',
-    field: 'al_taxcheckrequired',
-    kind: 'choice',
-    choices: Al_outcomecasesal_taxcheckrequired,
-    example: 'No',
-  },
-  {
-    header: 'Tax team disposition',
-    field: 'al_taxteamdisposition',
-    kind: 'choice',
-    choices: Al_outcomecasesal_taxteamdisposition,
-    example: 'Submit to AQS',
-  },
+  { header: 'CompletedBy', field: 'al_iocompletedby', kind: 'text' },
+  { header: 'CompletedDate', field: 'al_iocompleteddate', kind: 'date' },
+  { header: 'StartDate', field: 'al_taskstartdate', kind: 'date' },
+  { header: 'DueDate', field: 'al_duedate', kind: 'date' },
+  { header: 'CreatedDate', field: 'al_iocreateddate', kind: 'date' },
+  { header: 'CreatedBy', field: 'al_iocreatedby', kind: 'text' },
+  { header: 'TaskType', field: 'al_tasktype', kind: 'text' },
+  { header: 'WorkflowName', field: 'al_workflowname', kind: 'text' },
+  { header: 'ServiceStatus', field: 'al_servicestatus', kind: 'text' },
 ];
 
-export const TEMPLATE_HEADERS = COLUMNS.map((c) => c.header);
+/**
+ * The reasons a paraplanner can select inside the IO task, and whether each calls for a Tax
+ * check (client, 2026-09-11). The two Tax items carry the short names the client used as
+ * well as the wording the workbook exports.
+ */
+const CHECKLIST_ITEMS: Record<string, boolean> = {
+  'tax check': true,
+  tax: true,
+  'trust documentation check': true,
+  'trust documentation': true,
+  'high risk item 1': false,
+  'high risk item 2': false,
+  'enhanced supervision': false,
+  'pre-cas adviser': false,
+  leaver: false,
+};
+
+/** The canonical name for each accepted alias. */
+const CHECKLIST_CANONICAL_NAMES: Record<string, string> = {
+  tax: 'Tax Check',
+  'trust documentation': 'Trust Documentation Check',
+};
 
 export interface ParsedCase {
   rowNumber: number;
   reference: string;
-  record: Omit<Al_outcomecasesBase, 'al_outcomecaseid'>;
+  record: Record<string, unknown>;
   raw: string;
 }
 
@@ -128,17 +124,6 @@ function csvCell(value: string): string {
   return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-/** Header row plus one guide row so users can see the expected format. */
-export function buildTemplateCsv(): string {
-  const header = TEMPLATE_HEADERS.map(csvCell).join(',');
-  // Choice columns list every accepted value so uploads use options the schema knows;
-  // this guide row is skipped on import (isGuideRow), so it never becomes a case.
-  const guide = COLUMNS.map((c) =>
-    csvCell(c.kind === 'choice' && c.choices ? Object.values(c.choices).join(' | ') : c.example),
-  ).join(',');
-  return `${header}\r\n${guide}\r\n`;
-}
-
 function downloadCsv(filename: string, content: string): void {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -151,10 +136,6 @@ function downloadCsv(filename: string, content: string): void {
   URL.revokeObjectURL(url);
 }
 
-export function downloadTemplate(): void {
-  downloadCsv('outcome-case-upload-template.csv', buildTemplateCsv());
-}
-
 /** One row per rejected/skipped case, so a user can correct and re-upload (FR-002). */
 export interface ValidationReportRow {
   rowNumber: number;
@@ -165,14 +146,10 @@ export interface ValidationReportRow {
 }
 
 export function buildValidationReportCsv(rows: ValidationReportRow[]): string {
-  const header = ['Row', 'IO reference', 'Status', 'Reason', 'Original row']
-    .map(csvCell)
-    .join(',');
+  const header = ['Row', 'TaskID', 'Status', 'Reason', 'Original row'].map(csvCell).join(',');
   const body = rows
     .map((r) =>
-      [String(r.rowNumber), r.caseReference ?? '', r.status, r.reason, r.raw]
-        .map(csvCell)
-        .join(','),
+      [String(r.rowNumber), r.caseReference ?? '', r.status, r.reason, r.raw].map(csvCell).join(','),
     )
     .join('\r\n');
   return `${header}\r\n${body}\r\n`;
@@ -241,12 +218,10 @@ function findChoice(map: Record<number, string>, label: string): number | null {
 }
 
 /**
- * Accepts dd/mm/yyyy (UK) or yyyy-mm-dd, and written-out forms like "31 Jan 2026";
- * returns yyyy-mm-dd. Kept deliberately in step with `ImportRules.ParseDate` in the
- * plug-in, which is the rule this only previews — a value the two disagree about would
- * show as importable here and then be rejected by the command.
+ * Accepts yyyy-mm-dd (what the workbook reader emits), dd/mm/yyyy, and written-out forms
+ * like "31 Jan 2026"; returns yyyy-mm-dd. Kept in step with `ImportRules.ParseDate`.
  *
- * A numeric date that matches neither accepted order is rejected rather than handed to
+ * A numeric date matching neither accepted order is rejected rather than handed to
  * `new Date`, which reads month-first: 01/13/2026 would come back as 13 January, and an
  * extract that named a thirteenth month is a data error, not a January date.
  */
@@ -269,9 +244,22 @@ function parseDate(value: string): string | null {
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) return null;
   // Read back the local components, not the UTC ones. `new Date('31 Jan 2026')` is local
-  // midnight, and `toISOString()` on that lands on the 30th anywhere east of UTC — an
-  // advice date silently a day early, which no later check would catch.
+  // midnight, and `toISOString()` on that lands on the 30th anywhere east of UTC.
   return isoIfReal(parsed.getFullYear(), parsed.getMonth() + 1, parsed.getDate());
+}
+
+/**
+ * A date that may carry a time, as the checklist completion stamps do. Returns the value
+ * unchanged when it already reads as ISO, so the stamp keeps its time.
+ */
+function parseDateTime(value: string): string | null {
+  const trimmed = value.trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(trimmed);
+  if (iso) {
+    const day = isoIfReal(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+    return day === null ? null : `${day}T${iso[4]}:${iso[5]}:${iso[6] ?? '00'}`;
+  }
+  return parseDate(trimmed);
 }
 
 /** Formats a date, rejecting one that does not exist (31 February and the like). */
@@ -287,15 +275,82 @@ function isoIfReal(year: number, month: number, day: number): string | null {
   return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-function isGuideRow(fields: string[]): boolean {
-  const ref = (fields[0] ?? '').trim().toLowerCase();
-  return ref === 'io-000123';
+export interface ChecklistSelection {
+  /** Selected item names, canonicalised, in the order the row carried them. */
+  items: string[];
+  completedBy: string | null;
+  completedOn: string | null;
+  /** True when a selected item calls for a Tax check. */
+  requiresTax: boolean;
+  /** Set when the row cannot be routed; the row is rejected (BR-002). */
+  error: string | null;
 }
 
 /**
- * Parses an Intelligent Office extract into cases to create and rows to flag.
- * Only IO reference is mandatory (BR-001); other columns are validated only when
- * present. No business rule is invented — unrecognised choices become exceptions.
+ * Reads the ChecklistItem/CompletedBy/CompletionDate triplets into the one selection the
+ * case carries.
+ *
+ * An item counts as selected when its name is one we recognise **and** it carries a
+ * completion stamp. The column number is never consulted, which makes this correct whether
+ * IO packs a partial selection into the first free slots or lists every item in fixed slots
+ * and stamps only the chosen ones (design §5).
+ */
+export function readChecklist(
+  fields: string[],
+  headerIndex: Map<string, number>,
+): ChecklistSelection {
+  const selection: ChecklistSelection = {
+    items: [],
+    completedBy: null,
+    completedOn: null,
+    requiresTax: false,
+    error: null,
+  };
+
+  const cell = (header: string): string => {
+    const index = headerIndex.get(header.toLowerCase());
+    return index === undefined ? '' : (fields[index] ?? '').trim();
+  };
+
+  for (let slot = 1; slot <= CHECKLIST_SLOTS; slot += 1) {
+    const name = cell(`ChecklistItem${slot}`);
+    const by = cell(`CompletedBy${slot}`);
+    const on = cell(`CompletionDate${slot}`);
+
+    // No stamp means the paraplanner did not pick this item, whatever its name. Checked
+    // before the name is recognised, so an item IO lists but nobody selected cannot fail
+    // the row.
+    if (name === '' || (by === '' && on === '')) continue;
+
+    const key = name.toLowerCase();
+    if (!Object.prototype.hasOwnProperty.call(CHECKLIST_ITEMS, key)) {
+      selection.error = `Checklist item "${name}" is not recognised, so the review route cannot be determined.`;
+      return selection;
+    }
+
+    selection.items.push(CHECKLIST_CANONICAL_NAMES[key] ?? name);
+    if (CHECKLIST_ITEMS[key]) selection.requiresTax = true;
+
+    if (by !== '' && selection.completedBy === null) selection.completedBy = by;
+
+    const stamp = parseDateTime(on);
+    if (stamp !== null && (selection.completedOn === null || stamp < selection.completedOn)) {
+      selection.completedOn = stamp;
+    }
+  }
+
+  if (selection.items.length === 0) {
+    selection.error = 'No checklist items are selected, so the review route cannot be determined.';
+  }
+
+  return selection;
+}
+
+/**
+ * Parses an Intelligent Office task extract into cases to create and rows to flag.
+ * Only TaskID is mandatory (BR-001); other columns are validated only when present.
+ * No business rule is invented — an unrecognised choice or an unreadable date is an
+ * exception carrying its reason, never a silent default.
  */
 export function parseCaseCsv(text: string): ParseResult {
   const rows = tokenise(text).filter((r) => r.some((c) => c.trim() !== ''));
@@ -303,17 +358,19 @@ export function parseCaseCsv(text: string): ParseResult {
     return { valid: [], invalid: [], fatal: 'The file is empty.' };
   }
 
-  const headerRow = rows[0].map((h) => h.trim().toLowerCase());
-  const columnIndex = new Map<keyof Al_outcomecasesBase, number>();
-  for (const col of COLUMNS) {
-    const idx = headerRow.indexOf(col.header.toLowerCase());
-    if (idx !== -1) columnIndex.set(col.field, idx);
-  }
-  if (!columnIndex.has('al_casereference')) {
+  // Indexed by the extract's own header names, because the checklist triplets are addressed
+  // by name too and are not columns in the table above.
+  const headerIndex = new Map<string, number>();
+  rows[0].forEach((header, index) => {
+    const key = header.trim().toLowerCase();
+    if (key !== '' && !headerIndex.has(key)) headerIndex.set(key, index);
+  });
+
+  if (!headerIndex.has('taskid')) {
     return {
       valid: [],
       invalid: [],
-      fatal: 'The file is missing the "IO reference" column. Use the supplied template.',
+      fatal: 'The file is missing the "TaskID" column. Use the Intelligent Office task extract.',
     };
   }
 
@@ -323,28 +380,31 @@ export function parseCaseCsv(text: string): ParseResult {
 
   for (let r = 1; r < rows.length; r += 1) {
     const fields = rows[r];
-    if (isGuideRow(fields)) continue;
     const rowNumber = r + 1;
     const raw = fields.map(csvCell).join(',').slice(0, 2000);
-    const cellOf = (field: keyof Al_outcomecasesBase): string =>
-      (fields[columnIndex.get(field) ?? -1] ?? '').trim();
+    const cellOf = (header: string): string => {
+      const index = headerIndex.get(header.toLowerCase());
+      return index === undefined ? '' : (fields[index] ?? '').trim();
+    };
 
-    const reference = cellOf('al_casereference');
+    const reference = cellOf('TaskID');
     if (!reference) {
-      invalid.push({ rowNumber, caseReference: null, reason: 'Missing IO reference (BR-001).', raw });
+      invalid.push({ rowNumber, caseReference: null, reason: 'Missing TaskID (BR-001).', raw });
       continue;
     }
+    // One task is one case, so two tasks on one service case both import. It is a repeated
+    // TaskID that is the error.
     if (seen.has(reference.toLowerCase())) {
       invalid.push({
         rowNumber,
         caseReference: reference,
-        reason: 'Duplicate IO reference within this file.',
+        reason: 'Duplicate TaskID within this file.',
         raw,
       });
       continue;
     }
 
-    const record: Omit<Al_outcomecasesBase, 'al_outcomecaseid'> = {
+    const record: Record<string, unknown> = {
       al_name: reference,
       al_casereference: reference,
       al_casestatus: CASE_STATUS_IMPORTED,
@@ -353,25 +413,46 @@ export function parseCaseCsv(text: string): ParseResult {
 
     let rowError: string | null = null;
     for (const col of COLUMNS) {
-      if (col.field === 'al_casereference' || !columnIndex.has(col.field)) continue;
-      const value = cellOf(col.field);
+      if (col.field === 'al_casereference' || !headerIndex.has(col.header.toLowerCase())) continue;
+      const value = cellOf(col.header);
       if (!value) continue;
       if (col.kind === 'text') {
-        (record as Record<string, unknown>)[col.field] = value;
+        record[col.field] = value;
       } else if (col.kind === 'date') {
         const parsed = parseDate(value);
         if (!parsed) {
           rowError = `"${col.header}" is not a valid date: "${value}".`;
           break;
         }
-        (record as Record<string, unknown>)[col.field] = parsed;
+        record[col.field] = parsed;
       } else {
         const choice = findChoice(col.choices!, value);
         if (choice === null) {
           rowError = `"${col.header}" value "${value}" is not an accepted option.`;
           break;
         }
-        (record as Record<string, unknown>)[col.field] = choice;
+        record[col.field] = choice;
+      }
+    }
+
+    // Every task in a Pre-Advice extract is a pre-check; the extract has no column for it.
+    if (cellOf('TaskType').toLowerCase().startsWith('pre-advice')) {
+      record.al_preorpostcheck = PRE_OR_POST_CHECK_PRE;
+    }
+
+    // The checklist is the route's only input now, so a row whose checklist cannot be read
+    // is rejected rather than created without one.
+    if (rowError === null) {
+      const checklist = readChecklist(fields, headerIndex);
+      if (checklist.error !== null) {
+        rowError = checklist.error;
+      } else {
+        record.al_checklistitems = checklist.items.join('\n');
+        record.al_taxcheckrequired = checklist.requiresTax
+          ? TAX_CHECK_REQUIRED_YES
+          : TAX_CHECK_REQUIRED_NO;
+        if (checklist.completedBy !== null) record.al_checklistcompletedby = checklist.completedBy;
+        if (checklist.completedOn !== null) record.al_checklistcompleteddate = checklist.completedOn;
       }
     }
 

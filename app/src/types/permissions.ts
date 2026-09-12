@@ -148,9 +148,20 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   ...APP_ROLES.map((role) => ({ role, resource: 'page.dashboard' as ResourceKey, level: 'View' as AccessLevel })),
 
   // Tax + AQS reviewers work cases and reviews (AD-020 section ownership).
-  { role: 'AL Portal - Tax Reviewer', resource: 'page.cases', level: 'View' },
+  //
+  // Edit rather than View on page.cases (project owner, 2026-09-12): the IO task extract
+  // carries none of the case-header fields -- adviser code, paraplanner code, products,
+  // case type, advice date, product/solution type, sample source, check date, vulnerable
+  // client, tax check required, tax team disposition -- and the client's direction is that
+  // Tax and AQS complete them by hand as part of doing the check. At View the panel renders
+  // read-only and al_UpdateCaseDetails refuses the write, so the people named as filling
+  // them in could not.
+  //
+  // This is the whole of page.cases, not just those fields: it also admits al_casestatus,
+  // al_priority, al_duedate and al_taxcheckrequired, and that last one re-derives the route.
+  { role: 'AL Portal - Tax Reviewer', resource: 'page.cases', level: 'Edit' },
   { role: 'AL Portal - Tax Reviewer', resource: 'page.reviews', level: 'Edit' },
-  { role: 'AL Portal - AQS Reviewer', resource: 'page.cases', level: 'View' },
+  { role: 'AL Portal - AQS Reviewer', resource: 'page.cases', level: 'Edit' },
   { role: 'AL Portal - AQS Reviewer', resource: 'page.reviews', level: 'Edit' },
 
   // Advisers own remediation (AD-020, BR-006).

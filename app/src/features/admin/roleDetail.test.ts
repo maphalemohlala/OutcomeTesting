@@ -34,7 +34,7 @@ describe('buildRoleGrants', () => {
     const grants = buildRoleGrants(TAX, []);
 
     expect(levelOf(grants, 'page.reviews')).toMatchObject({ level: 'Edit', source: 'Default' });
-    expect(levelOf(grants, 'page.cases')).toMatchObject({ level: 'View', source: 'Default' });
+    expect(levelOf(grants, 'page.cases')).toMatchObject({ level: 'Edit', source: 'Default' });
     // Nothing grants the Tax Reviewer the admin screens, so they are not listed at all.
     expect(levelOf(grants, 'page.admin.security')).toBeUndefined();
     expect(grants.every((grant) => grant.level !== 'None')).toBe(true);
@@ -120,7 +120,7 @@ describe('buildRoleGrants', () => {
       rule({ id: 'perm-4', resource: 'page.invented', level: 'Manage' }),
     ]);
 
-    expect(levelOf(grants, 'page.cases')).toMatchObject({ level: 'View', source: 'Default' });
+    expect(levelOf(grants, 'page.cases')).toMatchObject({ level: 'Edit', source: 'Default' });
     expect(levelOf(grants, 'page.invented')).toBeUndefined();
   });
 

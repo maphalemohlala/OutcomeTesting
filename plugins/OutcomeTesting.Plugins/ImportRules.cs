@@ -6,7 +6,7 @@ using System.Text;
 namespace OutcomeTesting.Plugins
 {
     /// <summary>
-    /// Parsing and validation for an Intelligent Office case extract (BR-001, BR-002).
+    /// Parsing and validation for an Intelligent Office task extract (BR-001, BR-002).
     ///
     /// This is the authoritative copy of the rule. The Code App carries the same parser so
     /// a user sees rejections before uploading, but that copy is an affordance, not a
@@ -32,7 +32,36 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public const int MaxRows = 1000;
 
-        private const string GuideReference = "IO-000123";
+        /// <summary>al_taxcheckrequired, the input DeriveRoute reads to pick the route.</summary>
+        public const int TaxCheckRequiredYes = 120910560;
+
+        public const int TaxCheckRequiredNo = 120910561;
+
+        /// <summary>al_preorpostcheck; every task in a Pre-Advice extract is a pre-check.</summary>
+        public const int PreOrPostCheckPre = 120910540;
+
+        /// <summary>
+        /// al_iooutcome, the outcome the extract already carried. Deliberately its own
+        /// option set and its own column: it is what IO recorded, not the BR-005 grade a
+        /// checker produces here (D3).
+        /// </summary>
+        public const int IoOutcomePass = 120910610;
+
+        public const int IoOutcomePassWithIssues = 120910611;
+
+        public const int IoOutcomeInsufficientEvidence = 120910612;
+
+        public const int IoOutcomePotentialHarm = 120910613;
+
+        /// <summary>al_iotaskstatus, the task's own status in IO.</summary>
+        public const int IoTaskStatusNotStarted = 120910620;
+
+        public const int IoTaskStatusInProgress = 120910621;
+
+        public const int IoTaskStatusComplete = 120910622;
+
+        /// <summary>Checklist slots the extract carries, whether or not they are used.</summary>
+        private const int ChecklistSlots = 10;
 
         public enum ColumnKind
         {
@@ -51,7 +80,7 @@ namespace OutcomeTesting.Plugins
                 Choices = choices;
             }
 
-            /// <summary>Header text as it appears in the template CSV.</summary>
+            /// <summary>Header text exactly as the extract carries it.</summary>
             public string Header { get; private set; }
 
             /// <summary>Target al_outcomecase column.</summary>
@@ -118,42 +147,176 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Case-header columns from knowledge/checklist-v8.md mapped to the deployed
-        /// al_outcomecase schema, in the same order and with the same option labels as the
-        /// upload template. IO reference is the BR-001 import key and the only mandatory
-        /// column; every other column is validated only when a value is present, because no
-        /// requirement makes them mandatory and inventing one would reject valid extracts.
+        /// Columns of the Intelligent Office Pre-Advice Check task extract, under IO's own
+        /// header names (2026-09-12 design §4). The Code App transcribes the workbook to CSV
+        /// without renaming anything, so this table is the single place the extract's shape
+        /// is known.
+        ///
+        /// TaskID is the import key and the only mandatory column; every other column is
+        /// validated only when a value is present. The extract's remaining ~60 columns are
+        /// constant, empty or personal data we do not hold (D8), and are deliberately absent.
         /// </summary>
         public static readonly ColumnDef[] Columns = new[]
         {
-            new ColumnDef("IO reference", "al_casereference", ColumnKind.Text, null),
-            new ColumnDef("Client name", "al_clientname", ColumnKind.Text, null),
-            new ColumnDef("Adviser name", "al_advisername", ColumnKind.Text, null),
-            new ColumnDef("Adviser code", "al_advisercode", ColumnKind.Text, null),
-            new ColumnDef("Adviser status", "al_adviserstatus", ColumnKind.Choice, Options(
-                120910500, "PreCAS", 120910501, "CAS", 120910502, "Enhanced", 120910503, "Watchlist")),
-            new ColumnDef("Paraplanner", "al_paraplanner", ColumnKind.Text, null),
-            new ColumnDef("Paraplanner code", "al_paraplannercode", ColumnKind.Text, null),
-            new ColumnDef("Products", "al_products", ColumnKind.Text, null),
-            new ColumnDef("Case type", "al_casetype", ColumnKind.Choice, Options(
-                120910510, "New advice", 120910511, "Ongoing", 120910512, "Review", 120910513, "Switch/Transfer")),
-            new ColumnDef("Advice date", "al_advicedate", ColumnKind.Date, null),
-            new ColumnDef("Product / solution type", "al_productsolutiontype", ColumnKind.Choice, Options(
-                120910520, "Accumulation investment", 120910521, "Accumulation Pension", 120910522, "IHT",
-                120910523, "Protection", 120910524, "No change reviews")),
-            new ColumnDef("Sample source", "al_samplesource", ColumnKind.Choice, Options(
-                120910530, "Random", 120910531, "Mandatory", 120910532, "High Risk", 120910533, "Thematic")),
-            new ColumnDef("Checker name", "al_checkername", ColumnKind.Text, null),
-            new ColumnDef("Check date", "al_checkdate", ColumnKind.Date, null),
-            new ColumnDef("Pre or post check", "al_preorpostcheck", ColumnKind.Choice, Options(
-                120910540, "Pre", 120910541, "Post")),
-            new ColumnDef("Vulnerable client", "al_vulnerableclient", ColumnKind.Choice, Options(
-                120910550, "Yes", 120910551, "No", 120910552, "Potentially vulnerable", 120910553, "N/A")),
-            new ColumnDef("Tax check required", "al_taxcheckrequired", ColumnKind.Choice, Options(
-                120910560, "Yes", 120910561, "No")),
-            new ColumnDef("Tax team disposition", "al_taxteamdisposition", ColumnKind.Choice, Options(
-                120910570, "Submit to AQS", 120910571, "Return to paraplanner")),
+            new ColumnDef("TaskID", "al_casereference", ColumnKind.Text, null),
+            new ColumnDef("ServiceCaseSequentialRef", "al_servicecaseref", ColumnKind.Text, null),
+            new ColumnDef("ClientRef", "al_clientref", ColumnKind.Text, null),
+            new ColumnDef("Client", "al_clientname", ColumnKind.Text, null),
+            new ColumnDef("AdviserName", "al_advisername", ColumnKind.Text, null),
+            new ColumnDef("AdviserEmail", "al_adviseremail", ColumnKind.Text, null),
+            // AD-113: this is the name the file carried, not proof of allocation.
+            new ColumnDef("AssignedTo", "al_checkername", ColumnKind.Text, null),
+            // The paraplanner who raised the pre-advice check task (project owner,
+            // 2026-09-12), which is one of the header fields the client asked be
+            // pre-populated from IO rather than typed in.
+            new ColumnDef("AssignedBy", "al_paraplanner", ColumnKind.Text, null),
+            new ColumnDef("Status", "al_iotaskstatus", ColumnKind.Choice, Options(
+                IoTaskStatusNotStarted, "Not Started",
+                IoTaskStatusInProgress, "In Progress",
+                IoTaskStatusComplete, "Complete")),
+            new ColumnDef("Outcome", "al_iooutcome", ColumnKind.Choice, Options(
+                IoOutcomePass, "Pass",
+                IoOutcomePassWithIssues, "Pass with issues",
+                IoOutcomeInsufficientEvidence, "Insufficient evidence",
+                IoOutcomePotentialHarm, "Potential harm")),
+            new ColumnDef("CompletedBy", "al_iocompletedby", ColumnKind.Text, null),
+            new ColumnDef("CompletedDate", "al_iocompleteddate", ColumnKind.Date, null),
+            new ColumnDef("StartDate", "al_taskstartdate", ColumnKind.Date, null),
+            new ColumnDef("DueDate", "al_duedate", ColumnKind.Date, null),
+            new ColumnDef("CreatedDate", "al_iocreateddate", ColumnKind.Date, null),
+            new ColumnDef("CreatedBy", "al_iocreatedby", ColumnKind.Text, null),
+            new ColumnDef("TaskType", "al_tasktype", ColumnKind.Text, null),
+            new ColumnDef("WorkflowName", "al_workflowname", ColumnKind.Text, null),
+            new ColumnDef("ServiceStatus", "al_servicestatus", ColumnKind.Text, null),
         };
+
+        /// <summary>
+        /// The reasons a paraplanner can select inside the IO task, and the discipline each
+        /// one calls for (client, 2026-09-11). Tax wins where both are selected, because the
+        /// client's rule is that Tax is always the starting point and the Tax team then
+        /// decides whether AQS is genuinely owed -- which is the disposition override
+        /// DeriveRoute already applies.
+        ///
+        /// Keys are matched case-insensitively after trimming. The two Tax items carry the
+        /// short names the client used as well as the wording the workbook exports, because
+        /// both name the same item and which one IO emits is not yet confirmed (design §5).
+        /// </summary>
+        public static readonly IDictionary<string, bool> ChecklistItems =
+            new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Tax Check", true },
+                { "Tax", true },
+                { "Trust Documentation Check", true },
+                { "Trust documentation", true },
+                { "High Risk Item 1", false },
+                { "High Risk Item 2", false },
+                { "Enhanced Supervision", false },
+                { "Pre-CAS Adviser", false },
+                { "Leaver", false },
+            };
+
+        /// <summary>
+        /// The canonical name for each accepted alias, so al_checklistitems reads the same
+        /// whichever wording the extract used.
+        /// </summary>
+        private static readonly IDictionary<string, string> ChecklistCanonicalNames =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Tax", "Tax Check" },
+                { "Trust documentation", "Trust Documentation Check" },
+            };
+
+        /// <summary>What one row's checklist columns said (design §5).</summary>
+        public sealed class ChecklistSelection
+        {
+            public ChecklistSelection()
+            {
+                Items = new List<string>();
+            }
+
+            /// <summary>Selected item names, canonicalised, in the order the row carried them.</summary>
+            public List<string> Items { get; private set; }
+
+            public string CompletedBy { get; set; }
+
+            public DateTime? CompletedOn { get; set; }
+
+            /// <summary>True when a selected item calls for a Tax check.</summary>
+            public bool RequiresTax { get; set; }
+
+            /// <summary>Set when the row cannot be routed; the row is rejected (BR-002).</summary>
+            public string Error { get; set; }
+        }
+
+        /// <summary>
+        /// Reads the ChecklistItem/CompletedBy/CompletionDate triplets into the one selection
+        /// the case carries.
+        ///
+        /// An item counts as selected when its name is one we recognise **and** it carries a
+        /// completion stamp. The column number is never consulted, which is what makes this
+        /// correct under both readings of a partial selection: if IO packs selections into
+        /// the first free slots, every item present is stamped and counted; if it lists every
+        /// item in fixed slots and stamps only the chosen ones, the unstamped ones are
+        /// skipped. The question outstanding with the client confirms this reader rather than
+        /// shaping it.
+        ///
+        /// All seven items in the supplied workbook share one stamp -- the paraplanner
+        /// completes the checklist in a single action -- so one stamp is kept per case (D4).
+        /// The earliest wins if they ever disagree; the item list is what routing reads.
+        /// </summary>
+        public static ChecklistSelection ReadChecklist(IList<string> fields, IDictionary<string, int> headerIndex)
+        {
+            var selection = new ChecklistSelection();
+
+            for (var slot = 1; slot <= ChecklistSlots; slot++)
+            {
+                var name = HeaderCell(fields, headerIndex, "ChecklistItem" + slot);
+                var by = HeaderCell(fields, headerIndex, "CompletedBy" + slot);
+                var on = HeaderCell(fields, headerIndex, "CompletionDate" + slot);
+
+                // No stamp means the paraplanner did not pick this item, whatever its name.
+                // Checked before the name is recognised, so an item IO lists but nobody
+                // selected cannot fail the row.
+                if (name.Length == 0 || (by.Length == 0 && on.Length == 0))
+                {
+                    continue;
+                }
+
+                if (!ChecklistItems.ContainsKey(name))
+                {
+                    selection.Error = "Checklist item \"" + name
+                        + "\" is not recognised, so the review route cannot be determined.";
+                    return selection;
+                }
+
+                string canonical;
+                selection.Items.Add(ChecklistCanonicalNames.TryGetValue(name, out canonical) ? canonical : name);
+
+                if (ChecklistItems[name])
+                {
+                    selection.RequiresTax = true;
+                }
+
+                if (by.Length > 0 && string.IsNullOrEmpty(selection.CompletedBy))
+                {
+                    selection.CompletedBy = by;
+                }
+
+                var stamp = ParseDateTime(on);
+                if (stamp.HasValue && (!selection.CompletedOn.HasValue || stamp.Value < selection.CompletedOn.Value))
+                {
+                    selection.CompletedOn = stamp.Value;
+                }
+            }
+
+            if (selection.Items.Count == 0)
+            {
+                selection.Error =
+                    "No checklist items are selected, so the review route cannot be determined.";
+            }
+
+            return selection;
+        }
 
         /// <summary>Tokenises CSV text into rows of fields, honouring quotes and embedded newlines.</summary>
         public static List<List<string>> Tokenise(string text)
@@ -323,16 +486,38 @@ namespace OutcomeTesting.Plugins
             return value.Length > 0;
         }
 
-        /// <summary>The template ships a guide row of example values; it is never a case.</summary>
-        public static bool IsGuideRow(IList<string> fields)
+        /// <summary>
+        /// A date that may carry a time, as the checklist completion stamps do. The Code App
+        /// resolves the workbook's serials to ISO before posting, so the time arrives as
+        /// "2026-09-04T13:54:00"; a plain date still parses through <see cref="ParseDate"/>.
+        /// </summary>
+        public static DateTime? ParseDateTime(string value)
         {
-            var reference = fields.Count > 0 ? (fields[0] ?? string.Empty).Trim() : string.Empty;
-            return string.Equals(reference, GuideReference, StringComparison.OrdinalIgnoreCase);
+            var trimmed = (value ?? string.Empty).Trim();
+            if (trimmed.Length == 0)
+            {
+                return null;
+            }
+
+            DateTime parsed;
+            var iso = new[]
+            {
+                "yyyy-MM-ddTHH:mm:ss",
+                "yyyy-MM-ddTHH:mm",
+                "yyyy-MM-dd HH:mm:ss",
+                "yyyy-MM-dd HH:mm",
+            };
+            if (DateTime.TryParseExact(trimmed, iso, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+            {
+                return parsed;
+            }
+
+            return ParseDate(trimmed);
         }
 
         /// <summary>
         /// Parses an extract into cases to create and rows to flag (BR-002). No business rule
-        /// is invented: only the IO reference is mandatory, and an unrecognised choice or an
+        /// is invented: only TaskID is mandatory, and an unrecognised choice or an
         /// unreadable date becomes an exception carrying the reason, never a silent default.
         /// </summary>
         public static ParseResult ParseCsv(string csv)
@@ -370,22 +555,21 @@ namespace OutcomeTesting.Plugins
                 header.Add((cell ?? string.Empty).Trim());
             }
 
-            var columnIndex = new Dictionary<string, int>();
-            foreach (var column in Columns)
+            // Indexed by the extract's own header names, because the checklist triplets are
+            // addressed by name too and are not ColumnDefs.
+            var headerIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < header.Count; i++)
             {
-                for (var i = 0; i < header.Count; i++)
+                if (header[i].Length > 0 && !headerIndex.ContainsKey(header[i]))
                 {
-                    if (string.Equals(header[i], column.Header, StringComparison.OrdinalIgnoreCase))
-                    {
-                        columnIndex[column.Attribute] = i;
-                        break;
-                    }
+                    headerIndex[header[i]] = i;
                 }
             }
 
-            if (!columnIndex.ContainsKey("al_casereference"))
+            if (!headerIndex.ContainsKey("TaskID"))
             {
-                result.Fatal = "The file is missing the \"IO reference\" column. Use the supplied template.";
+                result.Fatal =
+                    "The file is missing the \"TaskID\" column. Use the Intelligent Office task extract.";
                 return result;
             }
 
@@ -394,34 +578,31 @@ namespace OutcomeTesting.Plugins
             for (var r = 1; r < rows.Count; r++)
             {
                 var fields = rows[r];
-                if (IsGuideRow(fields))
-                {
-                    continue;
-                }
-
                 var rowNumber = lineNumbers[r];
                 var raw = BuildRaw(fields);
 
-                var reference = Cell(fields, columnIndex, "al_casereference");
+                var reference = HeaderCell(fields, headerIndex, "TaskID");
                 if (reference.Length == 0)
                 {
                     result.Invalid.Add(new ImportRowError
                     {
                         RowNumber = rowNumber,
                         Reference = null,
-                        Reason = "Missing IO reference (BR-001).",
+                        Reason = "Missing TaskID (BR-001).",
                         Raw = raw,
                     });
                     continue;
                 }
 
+                // D2: one task is one case, so two tasks on one service case both import. It
+                // is a repeated TaskID that is the error.
                 if (seen.Contains(reference))
                 {
                     result.Invalid.Add(new ImportRowError
                     {
                         RowNumber = rowNumber,
                         Reference = reference,
-                        Reason = "Duplicate IO reference within this file.",
+                        Reason = "Duplicate TaskID within this file.",
                         Raw = raw,
                     });
                     continue;
@@ -436,12 +617,12 @@ namespace OutcomeTesting.Plugins
                 string rowError = null;
                 foreach (var column in Columns)
                 {
-                    if (column.Attribute == "al_casereference" || !columnIndex.ContainsKey(column.Attribute))
+                    if (column.Attribute == "al_casereference" || !headerIndex.ContainsKey(column.Header))
                     {
                         continue;
                     }
 
-                    var value = Cell(fields, columnIndex, column.Attribute);
+                    var value = HeaderCell(fields, headerIndex, column.Header);
                     if (value.Length == 0)
                     {
                         continue;
@@ -475,6 +656,43 @@ namespace OutcomeTesting.Plugins
                     }
                 }
 
+                // Every task in a Pre-Advice extract is a pre-check; the extract has no
+                // column of its own for it.
+                if (HeaderCell(fields, headerIndex, "TaskType")
+                    .StartsWith("Pre-Advice", StringComparison.OrdinalIgnoreCase))
+                {
+                    values["al_preorpostcheck"] = PreOrPostCheckPre;
+                }
+
+                // The checklist is the route's only input now (D6), so a row whose checklist
+                // cannot be read is rejected rather than created without one. DeriveRoute
+                // returns early on a null tax answer and writes nothing, which would leave
+                // the case at Imported with no route and nothing downstream to surface it.
+                if (rowError == null)
+                {
+                    var checklist = ReadChecklist(fields, headerIndex);
+                    if (checklist.Error != null)
+                    {
+                        rowError = checklist.Error;
+                    }
+                    else
+                    {
+                        values["al_checklistitems"] = string.Join("\n", checklist.Items);
+                        values["al_taxcheckrequired"] =
+                            checklist.RequiresTax ? TaxCheckRequiredYes : TaxCheckRequiredNo;
+
+                        if (!string.IsNullOrEmpty(checklist.CompletedBy))
+                        {
+                            values["al_checklistcompletedby"] = checklist.CompletedBy;
+                        }
+
+                        if (checklist.CompletedOn.HasValue)
+                        {
+                            values["al_checklistcompleteddate"] = checklist.CompletedOn.Value;
+                        }
+                    }
+                }
+
                 if (rowError != null)
                 {
                     result.Invalid.Add(new ImportRowError
@@ -500,10 +718,11 @@ namespace OutcomeTesting.Plugins
             return result;
         }
 
-        private static string Cell(IList<string> fields, IDictionary<string, int> columnIndex, string attribute)
+        /// <summary>One cell, addressed by the extract's own header name.</summary>
+        private static string HeaderCell(IList<string> fields, IDictionary<string, int> headerIndex, string header)
         {
             int index;
-            if (!columnIndex.TryGetValue(attribute, out index) || index >= fields.Count)
+            if (!headerIndex.TryGetValue(header, out index) || index >= fields.Count)
             {
                 return string.Empty;
             }

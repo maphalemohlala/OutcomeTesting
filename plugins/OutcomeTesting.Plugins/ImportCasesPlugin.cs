@@ -58,7 +58,7 @@ namespace OutcomeTesting.Plugins
         private const int ReferenceLookupChunk = 200;
 
         private const string DuplicateReason =
-            "IO reference already exists in Dataverse - skipped to avoid a duplicate case.";
+            "TaskID already exists in Dataverse - skipped to avoid a duplicate case.";
 
         private const string RejectedReason =
             "Dataverse rejected this case. Check the values and try again.";

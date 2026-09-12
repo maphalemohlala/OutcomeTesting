@@ -144,7 +144,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // A row rejected for having no reference is the common case, and "null" as a
             // string would show up in the report as a case called null.
-            var json = ImportCasesPlugin.ReportRow(4, null, "Invalid", "Missing IO reference (BR-001).", "");
+            var json = ImportCasesPlugin.ReportRow(4, null, "Invalid", "Missing TaskID (BR-001).", "");
 
             Assert.Contains("\"caseReference\":null", json);
         }

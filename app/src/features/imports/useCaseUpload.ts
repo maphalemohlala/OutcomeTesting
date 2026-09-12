@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { importCases, type ImportReportRow } from '../../services/commands/importCases';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { parseCaseCsv, type ValidationReportRow } from './caseUpload';
+import { workbookToCsv } from './xlsx';
 
 export interface UploadResult {
   batchReference: string;
@@ -47,9 +48,18 @@ export function useCaseUpload(onUploaded: () => void) {
     setState({ phase: 'processing', message: 'Reading file…' });
     let text: string;
     try {
-      text = await file.text();
-    } catch {
-      setState({ phase: 'error', message: 'The file could not be read.' });
+      // A workbook is transcribed to CSV here and posted as text, so the command's contract
+      // is unchanged and `ImportRules` still owns every rule (2026-09-12 design §3). The
+      // conversion resolves Excel's date serials using the cell styles, which is the only
+      // place that information exists — by the time the server sees the row, a date is ISO.
+      text = /\.xlsx$/i.test(file.name)
+        ? await workbookToCsv(await file.arrayBuffer())
+        : await file.text();
+    } catch (error) {
+      setState({
+        phase: 'error',
+        message: error instanceof Error ? error.message : 'The file could not be read.',
+      });
       return;
     }
 

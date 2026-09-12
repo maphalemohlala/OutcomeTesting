@@ -5,7 +5,7 @@ import { usePermissions } from '../../app/permissions/permissionContext';
 import { useCaseIntake } from './useCaseIntake';
 import { useCaseUpload } from './useCaseUpload';
 import { ResolveExceptionForm } from './ResolveExceptionForm';
-import { downloadTemplate, downloadValidationReport } from './caseUpload';
+import { downloadValidationReport } from './caseUpload';
 import './CaseIntakePage.css';
 
 export function CaseIntakePage() {
@@ -35,14 +35,9 @@ export function CaseIntakePage() {
         title="Case intake"
         purpose="Track uploaded Intelligent Office extracts and resolve the rows that failed validation (FR-001 to FR-003)."
         actions={
+          // No template to download any more: the extract is produced from Intelligent
+          // Office, not filled in here (2026-09-12 design, D1).
           <div className="intake__actions">
-            <button
-              type="button"
-              className="intake__btn intake__btn--ghost"
-              onClick={downloadTemplate}
-            >
-              Download template
-            </button>
             <button
               type="button"
               className="intake__btn"
@@ -54,7 +49,7 @@ export function CaseIntakePage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
               className="visually-hidden"
               onChange={onChooseFile}
             />

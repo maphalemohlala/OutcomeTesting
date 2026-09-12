@@ -1,6 +1,6 @@
 <customapiresponseproperty uniquename="Duplicates">
-  <description default="Rows skipped because the IO reference already exists (BR-001).">
-    <label description="Rows skipped because the IO reference already exists (BR-001)." languagecode="1033" />
+  <description default="Rows skipped because the TaskID already exists (BR-001).">
+    <label description="Rows skipped because the TaskID already exists (BR-001)." languagecode="1033" />
   </description>
   <displayname default="Duplicates">
     <label description="Duplicates" languagecode="1033" />
