@@ -156,56 +156,122 @@
     </fetch>
     {% endfetchxml %}
 
-    <section class="ot-card" aria-labelledby="ot-case-mgmt">
-      <h2 class="ot-card__title" id="ot-case-mgmt">
-        {{ c.al_casereference | default: 'Case' | escape }}
-        {% include 'OT Status Badge' status: c.al_casestatus.label %}
-      </h2>
-      <dl class="ot-dl">
-        <div><dt>Case type</dt><dd>{{ c.al_casetype.label | default: '—' | escape }}</dd></div>
-        <div><dt>Priority</dt><dd>{{ c.al_priority.label | default: '—' | escape }}</dd></div>
-        <div><dt>Sample source</dt><dd>{{ c.al_samplesource.label | default: '—' | escape }}</dd></div>
-        <div><dt>Pre or post check</dt><dd>{{ c.al_preorpostcheck.label | default: '—' | escape }}</dd></div>
-        <div><dt>Checker</dt><dd>{{ c.al_checkername | default: '—' | escape }}</dd></div>
-        <div><dt>Due date</dt><dd>{{ c.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
-      </dl>
+    {% comment %}
+      Offered only once at least one review on the case has been submitted - a file printed
+      from a case whose checks are still being answered is a draft with no submission date
+      on it, indistinguishable once printed from the record of a finished check.
+
+      Above the document rather than inside it, which is where the review page puts its own
+      print action: the sheet carries the record, the page around it carries the controls.
+    {% endcomment %}
+    {% assign submitted_reviews = 0 %}
+    {% for r in reviews.results.entities %}
+      {% if r.al_submittedon %}{% assign submitted_reviews = submitted_reviews | plus: 1 %}{% endif %}
+    {% endfor %}
+
+    {% if submitted_reviews > 0 %}
+      <p class="ot-print-action">
+        <button type="button" class="ot-btn" data-ot-print>Save as PDF</button>
+      </p>
+
+      <script>
+        (function () {
+          'use strict';
+          var button = document.querySelector('[data-ot-print]');
+          if (!button) { return; }
+          button.addEventListener('click', function () { window.print(); });
+        })();
+      </script>
+    {% endif %}
+
+    {% comment %}
+      The case drawn as the document (project owner, 2026-09-12), the same way the review
+      and remediation forms are. .ot-checklist is the V8 sheet - Calibri, every cell ruled,
+      grey label and header bands - so the three pages read as one family instead of this
+      one being the odd card-and-definition-list page among them.
+
+      Presentation only. Nothing here reads or writes anything it did not before: the page
+      is as read-only as it was, every fetchxml and every condition is unchanged, and the
+      label/value pairs are the same pairs in the same reading order. The document's own
+      meta table replaces the definition lists because .ot-dl inside .ot-checklist is a
+      flowing list, not a ruled block, and the sheet rules everything.
+    {% endcomment %}
+    <div class="ot-checklist">
+    <div class="doc-footer">Outcome Testing — Case record | V8</div>
+    <h1>
+      {{ c.al_casereference | default: 'Case' | escape }}
+      {% include 'OT Status Badge' status: c.al_casestatus.label %}
+    </h1>
+
+    <section aria-labelledby="ot-case-mgmt">
+      <h2 id="ot-case-mgmt">Case management</h2>
+      <table class="meta">
+        <tbody>
+          <tr>
+            <td class="lbl">Case type</td><td class="val">{{ c.al_casetype.label | default: '—' | escape }}</td>
+            <td class="lbl">Priority</td><td class="val">{{ c.al_priority.label | default: '—' | escape }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Sample source</td><td class="val">{{ c.al_samplesource.label | default: '—' | escape }}</td>
+            <td class="lbl">Pre or post check</td><td class="val">{{ c.al_preorpostcheck.label | default: '—' | escape }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Checker</td><td class="val">{{ c.al_checkername | default: '—' | escape }}</td>
+            <td class="lbl">Due date</td><td class="val">{{ c.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+          </tr>
+        </tbody>
+      </table>
     </section>
 
-    <section class="ot-card" aria-labelledby="ot-case-client">
-      <h2 class="ot-card__title" id="ot-case-client">Client</h2>
-      <dl class="ot-dl">
-        <div><dt>Client name</dt><dd>{{ c.al_clientname | default: '—' | escape }}</dd></div>
-        <div>
-          <dt>Vulnerable client</dt>
-          <dd>{% if c.al_vulnerableclient %}Yes{% else %}No{% endif %}</dd>
-        </div>
-      </dl>
+    <section aria-labelledby="ot-case-client">
+      <h2 id="ot-case-client">Client</h2>
+      <table class="meta">
+        <tbody>
+          <tr>
+            <td class="lbl">Client name</td><td class="val">{{ c.al_clientname | default: '—' | escape }}</td>
+            <td class="lbl">Vulnerable client</td><td class="val">{% if c.al_vulnerableclient %}Yes{% else %}No{% endif %}</td>
+          </tr>
+        </tbody>
+      </table>
     </section>
 
-    <section class="ot-card" aria-labelledby="ot-case-adviser">
-      <h2 class="ot-card__title" id="ot-case-adviser">Adviser and paraplanner</h2>
-      <dl class="ot-dl">
-        <div><dt>Adviser</dt><dd>{{ c.al_advisername | default: '—' | escape }}</dd></div>
-        <div><dt>Adviser code</dt><dd>{{ c.al_advisercode | default: '—' | escape }}</dd></div>
-        <div><dt>Adviser status</dt><dd>{{ c.al_adviserstatus.label | default: '—' | escape }}</dd></div>
-        <div><dt>Paraplanner</dt><dd>{{ c.al_paraplanner | default: '—' | escape }}</dd></div>
-        <div><dt>Paraplanner code</dt><dd>{{ c.al_paraplannercode | default: '—' | escape }}</dd></div>
-      </dl>
+    <section aria-labelledby="ot-case-adviser">
+      <h2 id="ot-case-adviser">Adviser and paraplanner</h2>
+      <table class="meta">
+        <tbody>
+          <tr>
+            <td class="lbl">Adviser</td><td class="val">{{ c.al_advisername | default: '—' | escape }}</td>
+            <td class="lbl">Adviser code</td><td class="val">{{ c.al_advisercode | default: '—' | escape }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Adviser status</td><td class="val">{{ c.al_adviserstatus.label | default: '—' | escape }}</td>
+            <td class="lbl">Paraplanner</td><td class="val">{{ c.al_paraplanner | default: '—' | escape }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Paraplanner code</td><td class="val" colspan="3">{{ c.al_paraplannercode | default: '—' | escape }}</td>
+          </tr>
+        </tbody>
+      </table>
     </section>
 
-    <section class="ot-card" aria-labelledby="ot-case-advice">
-      <h2 class="ot-card__title" id="ot-case-advice">Advice and product</h2>
-      <dl class="ot-dl">
-        <div><dt>Advice date</dt><dd>{{ c.al_advicedate | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
-        <div><dt>Check date</dt><dd>{{ c.al_checkdate | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
-        <div><dt>Products</dt><dd>{{ c.al_products | default: '—' | escape }}</dd></div>
-        <div><dt>Product solution type</dt><dd>{{ c.al_productsolutiontype.label | default: '—' | escape }}</dd></div>
-        <div>
-          <dt>Tax check required</dt>
-          <dd>{% if c.al_taxcheckrequired %}Yes{% else %}No{% endif %}</dd>
-        </div>
-        <div><dt>Tax team disposition</dt><dd>{{ c.al_taxteamdisposition.label | default: '—' | escape }}</dd></div>
-      </dl>
+    <section aria-labelledby="ot-case-advice">
+      <h2 id="ot-case-advice">Advice and product</h2>
+      <table class="meta">
+        <tbody>
+          <tr>
+            <td class="lbl">Advice date</td><td class="val">{{ c.al_advicedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+            <td class="lbl">Check date</td><td class="val">{{ c.al_checkdate | date: 'dd MMM yyyy' | default: '—' }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Products</td><td class="val">{{ c.al_products | default: '—' | escape }}</td>
+            <td class="lbl">Product solution type</td><td class="val">{{ c.al_productsolutiontype.label | default: '—' | escape }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Tax check required</td><td class="val">{% if c.al_taxcheckrequired %}Yes{% else %}No{% endif %}</td>
+            <td class="lbl">Tax team disposition</td><td class="val">{{ c.al_taxteamdisposition.label | default: '—' | escape }}</td>
+          </tr>
+        </tbody>
+      </table>
     </section>
 
     {% comment %}
@@ -243,11 +309,11 @@
     {% assign show_aqs = false %}
     {% if requires_aqs or aqs_review %}{% assign show_aqs = true %}{% endif %}
 
-    <section class="ot-card" aria-labelledby="ot-case-reviews">
-      <h2 class="ot-card__title" id="ot-case-reviews">Review progress</h2>
+    <section aria-labelledby="ot-case-reviews">
+      <h2 id="ot-case-reviews">Review progress</h2>
       {% if show_tax or show_aqs %}
         <div class="ot-table-wrap">
-          <table class="ot-table">
+          <table>
             <caption>
               {% if rt %}Route: {{ rt.al_name | escape }}. {% endif %}Tax runs before AQS when both are required (BR-004).
             </caption>
@@ -324,42 +390,8 @@
       {% endif %}
     </section>
 
-    {% comment %}
-      The case as one document: header, reviews and remediation together. Same mechanism as
-      the review page - the browser's print dialogue, with outcome-testing.css's print rules
-      stripping the chrome - so the two exports cannot drift apart.
-
-      Offered only once at least one review on the case has been SUBMITTED, which is the
-      same test the review page now applies to its own button.
-
-      It used to be enough that a review instance existed. That put the export on a case
-      whose checks were still being answered, and the file it produced was a draft with no
-      submission date on it - indistinguishable, once printed, from the record of a finished
-      check. A case with no review at all was already excluded for the weaker version of the
-      same reason: nothing worth exporting had happened yet.
-    {% endcomment %}
-    {% assign submitted_reviews = 0 %}
-    {% for r in reviews.results.entities %}
-      {% if r.al_submittedon %}{% assign submitted_reviews = submitted_reviews | plus: 1 %}{% endif %}
-    {% endfor %}
-
-    {% if submitted_reviews > 0 %}
-      <p class="ot-print-action">
-        <button type="button" class="ot-btn" data-ot-print>Save as PDF</button>
-      </p>
-
-      <script>
-        (function () {
-          'use strict';
-          var button = document.querySelector('[data-ot-print]');
-          if (!button) { return; }
-          button.addEventListener('click', function () { window.print(); });
-        })();
-      </script>
-    {% endif %}
-
-    <section class="ot-card" aria-labelledby="ot-case-remediation">
-      <h2 class="ot-card__title" id="ot-case-remediation">Remediation</h2>
+    <section aria-labelledby="ot-case-remediation">
+      <h2 id="ot-case-remediation">Remediation</h2>
       {% assign case_actions = actions.results.entities %}
       {% if case_actions.size > 0 %}
         {% assign all_approved = true %}
@@ -413,11 +445,13 @@
             {% endif %}
           {% endif %}
         {% endfor %}
-        <dl class="ot-dl">
-          <div><dt>Outcome</dt><dd>{{ ot_outcome | default: '—' | escape }}</dd></div>
-        </dl>
+        <table class="meta">
+          <tbody>
+            <tr><td class="lbl">Outcome</td><td class="val" colspan="3">{{ ot_outcome | default: '—' | escape }}</td></tr>
+          </tbody>
+        </table>
         <div class="ot-table-wrap">
-          <table class="ot-table">
+          <table>
             <caption>Remediation and escalation</caption>
             <thead>
               <tr>
@@ -567,6 +601,7 @@
         {% include 'OT Empty State' title: 'No remediation' message: 'A pass outcome requires no remediation. Actions appear here for any non-pass outcome.' %}
       {% endif %}
     </section>
+    </div>
 
   {% endif %}
 {% endif %}

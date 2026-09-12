@@ -539,6 +539,7 @@
           {% assign grid_rt = 0 %}
           {% assign grid_col = 'Check' %}
           {% assign subsections = false %}
+          {% assign known = false %}
           {% comment %}
             Written as if / elsif on one value at a time, deliberately.
 
@@ -556,32 +557,81 @@
             'endcomment'" and takes the whole page down. Name tags in prose, without braces.
           {% endcomment %}
           {% if scode == 'S-TAX' %}
+            {% assign known = true %}
             {% assign blk_title = 'File Quality - Tax check section' %}
           {% elsif scode == 'S-AMLCRA' %}
+            {% assign known = true %}
             {% assign blk_title = 'File Quality - AML and CRA checking points' %}
             {% assign layout = 'grid' %}{% assign grid_rt = 120910008 %}
           {% elsif scode == 'S-FQOUT' %}
+            {% assign known = true %}
             {% assign blk = 'S-FQ' %}
             {% assign blk_title = 'File Quality Outcome' %}
           {% elsif scode == 'S-FQTAX' %}
+            {% assign known = true %}
             {% assign blk = 'S-FQ' %}
             {% assign blk_title = 'File Quality Outcome' %}
           {% elsif scode == 'S-E1' or scode == 'S-E2' or scode == 'S-E3' or scode == 'S-E4' or scode == 'S-E5' %}
+            {% assign known = true %}
             {% assign blk = 'S-E' %}
             {% assign blk_title = 'Suitability core checks' %}
             {% assign blk_intro = 'Suitability core checks are shown in a consistent Pass/Fail format against each test point.' %}
             {% assign layout = 'grid' %}{% assign grid_rt = 120910006 %}{% assign grid_col = 'Suitability test point' %}
             {% assign subsections = true %}
           {% elsif scode == 'S-CRP' %}
+            {% assign known = true %}
             {% assign blk_title = 'Centralised Retirement Proposition' %}
             {% assign blk_intro = 'Complete this section where retirement income planning or decumulation advice is in scope.' %}
             {% assign layout = 'grid' %}{% assign grid_rt = 120910006 %}{% assign grid_col = 'Centralised Retirement Proposition test point' %}
           {% elsif scode == 'S-CD' %}
+            {% assign known = true %}
             {% assign blk_title = 'Consumer Duty overlay' %}
             {% assign layout = 'grid' %}{% assign grid_rt = 120910009 %}{% assign grid_col = 'Outcome' %}
           {% elsif scode == 'S-GRADE' %}
+            {% assign known = true %}
             {% assign blk_title = 'Checker judgement and grading' %}
           {% endif %}
+
+          {% comment %}
+            A section added through checklist administration (AD-123) carries a code this
+            template has never seen, so the chain above leaves it on the defaults: layout
+            inline, which opens a meta table, and no tick columns at all. Every seeded
+            section whose questions use the same scale opens a ruled grid instead, so an
+            added section came out in a different table shape from the rest of the document
+            - the same stylesheet, drawn wrong.
+
+            So where the code is not one this template knows, the shape is taken from the
+            section's own questions rather than from its name. One pass over this section's
+            rows: if every scale-typed question agrees on one response type, that is the
+            grid and its tick columns are the ones the chain below picks for that type; a
+            section mixing two scales, or carrying none, stays a meta table, which is what
+            a free-text or date section should be.
+
+            Guarded on `known` rather than on the layout value, deliberately. S-TAX and
+            S-GRADE are recognised and are meta on the document, so "still inline" cannot
+            tell an unrecognised section from a recognised flat one - deriving on that test
+            would redraw two seeded blocks the reference file pins (AD-098, AD-104).
+          {% endcomment %}
+          {% unless known %}
+            {% assign sec_rt = 0 %}
+            {% assign sec_mixed = false %}
+            {% for q in qrows %}
+              {% if q['s.al_sectionid'] == sid %}
+                {% assign qrt = q.al_responsetype.value %}
+                {% if qrt == 120910006 or qrt == 120910008 or qrt == 120910009 %}
+                  {% if sec_rt == 0 %}
+                    {% assign sec_rt = qrt %}
+                  {% elsif sec_rt != qrt %}
+                    {% assign sec_mixed = true %}
+                  {% endif %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {% if sec_rt != 0 and sec_mixed == false %}
+              {% assign layout = 'grid' %}
+              {% assign grid_rt = sec_rt %}
+            {% endif %}
+          {% endunless %}
 
           {% comment %}
             The tick columns for whichever scale this block is headed by. A `case` on an
