@@ -324,23 +324,30 @@ namespace OutcomeTesting.Plugins
             questionLink.EntityAlias = "q";
             var sectionLink = questionLink.AddLink("al_section", "al_sectionid", "al_sectionid");
             sectionLink.EntityAlias = "s";
+            sectionLink.Columns = new ColumnSet(
+                "al_effectivefrom", "al_effectiveto", "al_isoptional", "al_ownerrole");
             sectionLink.LinkCriteria.AddCondition(
                 "al_checklistversionid", ConditionOperator.Equal, checklistVersion.Id);
-            sectionLink.LinkCriteria.AddCondition(
-                "al_ownerrole", ConditionOperator.Equal, ownerRole);
 
-            // Only the versions in force today are owed an answer (AD-015, BR-013). A
+            // Owner role is membership, not equality: a Both section (AD-123) is owed by
+            // the Tax review and the AQS review alike, each answering its own copy.
+            // Equality here is what made a shared section impossible to express.
+            sectionLink.LinkCriteria.AddCondition(
+                "al_ownerrole", ConditionOperator.In, ownerRole, SectionRules.OwnerRoleBoth);
+
+            // Only what is in force today is owed an answer (AD-015, BR-013, AD-123). A
             // retired version stays Active so the answers it holds keep resolving, but
             // demanding a fresh answer on it is how one Tax review came to carry two answers
             // to the same question, one of which then decided the case.
+            //
+            // Judged in memory rather than in the query for the reason AD-091 gives: a
+            // date-only column compared inside a query is at the mercy of how the platform
+            // coerces it.
             var now = DateTime.UtcNow;
             var required = new List<Entity>();
             foreach (var version in service.RetrieveMultiple(mandatoryQuery).Entities)
             {
-                if (ResponseRules.IsVersionEffective(
-                    version.GetAttributeValue<DateTime?>("al_effectivefrom"),
-                    version.GetAttributeValue<DateTime?>("al_effectiveto"),
-                    now))
+                if (IsOwed(version, now))
                 {
                     required.Add(version);
                 }
@@ -1004,6 +1011,54 @@ namespace OutcomeTesting.Plugins
         /// multi-select. ResponseGuardPlugin always read the column at its real type;
         /// this is the same read.
         /// </summary>
+        /// <summary>
+        /// Whether one row of the mandatory query is actually owed an answer (AD-123).
+        /// Three gates, in the order they are cheapest to fail: the section is not
+        /// optional, the section is in force, and the question version is in force.
+        ///
+        /// Public and static so it can be tested with a plain Entity. The assembly is
+        /// signed and deliberately carries no InternalsVisibleTo (see PluginBase), so
+        /// public is what makes a helper reachable from the test project — HasAnswer is
+        /// public for the same reason.
+        ///
+        /// al_isoptional is null on every section that existed before AD-123, because
+        /// Dataverse applies a boolean default to new rows only. Absent therefore reads as
+        /// required, which is the safe direction: the alternative silently excuses every
+        /// seeded section from the gate.
+        /// </summary>
+        public static bool IsOwed(Entity versionWithSection, DateTime asOf)
+        {
+            var optional = versionWithSection.GetAttributeValue<AliasedValue>("s.al_isoptional");
+            if (optional != null && optional.Value is bool && (bool)optional.Value)
+            {
+                return false;
+            }
+
+            if (!SectionRules.IsSectionEffective(
+                AliasedDate(versionWithSection, "s.al_effectivefrom"),
+                AliasedDate(versionWithSection, "s.al_effectiveto"),
+                asOf))
+            {
+                return false;
+            }
+
+            return ResponseRules.IsVersionEffective(
+                versionWithSection.GetAttributeValue<DateTime?>("al_effectivefrom"),
+                versionWithSection.GetAttributeValue<DateTime?>("al_effectiveto"),
+                asOf);
+        }
+
+        /// <summary>
+        /// A date read through a link-entity alias. Aliased values arrive boxed, and a
+        /// column holding null arrives as no aliased value at all rather than as an
+        /// aliased null.
+        /// </summary>
+        private static DateTime? AliasedDate(Entity row, string alias)
+        {
+            var aliased = row.GetAttributeValue<AliasedValue>(alias);
+            return aliased != null && aliased.Value is DateTime ? (DateTime?)aliased.Value : null;
+        }
+
         public static bool HasAnswer(Entity response)
         {
             var text = response.GetAttributeValue<string>("al_answertext");
