@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { isVersionEffective } from './versionEffective';
+import { buildSectionFilter, referenceDay } from './sectionFilter';
 import { answerOf } from './reviewAnswer';
 import { date, text } from '../../lib/format';
 import { buildSections, type ReviewSection } from './reviewSections';
@@ -233,15 +234,16 @@ export function useReviewDetail(
         // checklist version issued to the review. Read after the review because both keys
         // come off it. The case is the document's header block; either read failing leaves
         // its block absent rather than failing the page.
+        // Owned by this discipline or by Both, and in force on the review's reference day
+        // (AD-123). The reference day is computed once here and reused for the answers
+        // below, so the sections and the answers can never be read as of different days.
         const ownerRole = OWNER_ROLE[header.type] ?? OWNER_ROLE[expectedType];
-        const sectionFilter = [
-          `al_ownerrole eq ${ownerRole}`,
-          header.checklistVersionId
-            ? `_al_checklistversionid_value eq ${header.checklistVersionId}`
-            : null,
-        ]
-          .filter(Boolean)
-          .join(' and ');
+        const referenceDayValue = referenceDay(review.data.al_submittedon);
+        const sectionFilter = buildSectionFilter(
+          ownerRole,
+          header.checklistVersionId ?? null,
+          referenceDayValue,
+        );
 
         const responseIds = responses.success
           ? responses.data.map((response) => response.al_responseid)
@@ -262,7 +264,7 @@ export function useReviewDetail(
         // keeps the answers written against it, but showing them beside the current
         // version's is how one review came to list Tax check reason three times. An answer
         // whose version is unknown (the versions read failed) is kept rather than hidden.
-        const asOf = review.data.al_submittedon ? new Date(review.data.al_submittedon) : new Date();
+        const asOf = new Date(referenceDayValue);
         const versionById = new Map<string, Al_questionversions>();
         const effective: Al_questionversions[] = [];
         if (versions.success) {
