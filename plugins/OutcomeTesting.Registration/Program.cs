@@ -393,6 +393,11 @@ if (args.Length >= 2 && args[0].Equals("pushassembly", StringComparison.OrdinalI
     return PushAssembly(args[1], args.Length > 2 ? args[2] : null);
 }
 
+if (args.Length >= 3 && args[0].Equals("callapi", StringComparison.OrdinalIgnoreCase))
+{
+    return CallApi(args);
+}
+
 if (args.Length >= 4 && args[0].Equals("pushwebtemplate", StringComparison.OrdinalIgnoreCase))
 {
     return PushWebTemplate(args[1], args[2], args[3]);
@@ -1556,6 +1561,56 @@ int SetStepState(string[] a)
 // `pac plugin push --type Assembly` (AD-061) for when pac has no valid token. Plug-in types
 // and steps are untouched, which is the point: `registerall` also re-upserts every Custom
 // API, and a code fix should not have to. Reads the Release build by default.
+// Invokes any unbound Custom API by name, so a command can be exercised against an
+// environment without a purpose-built verb for it. Every parameter is sent as a string,
+// which is not a limitation here: Custom API parameters are scalars, and the checklist
+// administration commands (AD-122, AD-123) take strings throughout for exactly that reason.
+//
+// Deliberately not gated behind --confirm. It is the caller's own plug-in that decides what
+// the call is allowed to do - EnsureAppPermission and the precondition guards - and a verb
+// that can only read would not exercise them.
+int CallApi(string[] a)
+{
+    var orgUrl = a[1];
+    var apiName = a[2];
+
+    var request = new OrganizationRequest(apiName);
+    for (var i = 3; i < a.Length; i++)
+    {
+        var pair = a[i];
+        var split = pair.IndexOf('=');
+        if (split <= 0)
+        {
+            Console.Error.WriteLine($"Parameter '{pair}' is not name=value.");
+            return 1;
+        }
+
+        request[pair.Substring(0, split)] = pair.Substring(split + 1);
+    }
+
+    using var svc = Connect(orgUrl);
+
+    try
+    {
+        var response = svc.Execute(request);
+        foreach (var result in response.Results)
+        {
+            Console.WriteLine($"  {result.Key} = {result.Value}");
+        }
+
+        Console.WriteLine($"{apiName} succeeded.");
+        return 0;
+    }
+    catch (Exception error)
+    {
+        // The message is the point: these commands refuse with PRECONDITION:, UNAUTHORIZED:
+        // or VALIDATION: and a sentence saying why, and that sentence is what is being
+        // exercised.
+        Console.Error.WriteLine($"{apiName} failed: {error.Message}");
+        return 1;
+    }
+}
+
 int PushAssembly(string orgUrl, string? dllPathArg)
 {
     var dllPath = Path.GetFullPath(dllPathArg ?? Path.Combine(System.AppContext.BaseDirectory, "..", "..", "..", "..",
