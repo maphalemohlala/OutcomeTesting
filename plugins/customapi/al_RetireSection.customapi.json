@@ -1,0 +1,27 @@
+{
+  "$comment": "Contract for the RetireSection server-side command (AD-003, AD-123). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_RetireSection",
+    "name": "al_RetireSection",
+    "displayname": "Retire Section",
+    "description": "Dates out a section, which removes its questions from the form and the submit gate while the answers they hold keep resolving. Refuses a section holding a question code compiled logic depends on. Enforces Edit on question.retire and writes an immutable Audit Event.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.RetireSectionPlugin"
+  },
+  "requestParameters": [
+    { "uniquename": "SectionId", "name": "SectionId", "displayname": "Section id", "description": "Id of the al_section to retire.", "type": 10, "isoptional": false },
+    { "uniquename": "EffectiveTo", "name": "EffectiveTo", "displayname": "Effective to", "description": "Optional yyyy-MM-dd. Absent is today. May not be in the past.", "type": 10, "isoptional": true },
+    { "uniquename": "Reason", "name": "Reason", "displayname": "Reason", "description": "Why the section is no longer part of the checklist. Required and recorded on the Audit Event.", "type": 10, "isoptional": false },
+    { "uniquename": "IdempotencyKey", "name": "IdempotencyKey", "displayname": "Idempotency key", "description": "Stable key for the intent; a replay returns the same result.", "type": 10, "isoptional": false }
+  ],
+  "responseProperties": [
+    { "uniquename": "SectionId", "name": "SectionId", "displayname": "Section id", "description": "Id of the al_section retired.", "type": 10 },
+    { "uniquename": "AuditEventId", "name": "AuditEventId", "displayname": "Audit event id", "description": "Id of the Audit Event written.", "type": 10 },
+    { "uniquename": "Conflict", "name": "Conflict", "displayname": "Conflict", "description": "True when an optimistic-concurrency conflict was detected.", "type": 0 }
+  ]
+}
