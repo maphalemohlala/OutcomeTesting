@@ -1503,9 +1503,26 @@
               // Not JSON. Keep the raw text.
             }
 
-            message = String(message || '').replace(/\s+/g, ' ').trim();
-            if (message.length > 300) { message = message.substring(0, 300) + '...'; }
-            return message;
+            return String(message || '').replace(/\s+/g, ' ').trim();
+          }
+
+          /*
+           * The cap belongs here, not in serverMessage, and that is the whole of a defect
+           * found on 2026-09-13.
+           *
+           * The unanswered-questions refusal carries its question version ids in a bracketed
+           * tail at the END of the message, and friendlyError reads that tail to mark the
+           * rows. Capping the message before the tail was read cut it off from FOUR
+           * unanswered questions upward - 311 characters at four, against a 300 cap - so the
+           * rows went unmarked and the text on screen ended mid-identifier. One or three
+           * unanswered fitted, which is why it looked like it worked.
+           *
+           * Each branch below now caps what it actually puts on screen, after the tail has
+           * been taken off. An error line is still read on screen, and the whole of a
+           * platform fault is still not readable there.
+           */
+          function cap(text) {
+            return text.length > 300 ? text.substring(0, 300) + '...' : text;
           }
 
           function friendlyError(raw, httpStatus) {
@@ -1527,11 +1544,11 @@
                 markUnanswered(tail[1].split(','));
                 detail = detail.substring(0, tail.index).trim();
               }
-              return detail;
+              return cap(detail);
             }
             if (text.indexOf('UNEXPECTED:') !== -1) {
               var unexpected = text.indexOf('UNEXPECTED:');
-              return 'This review was not submitted. ' + text.substring(unexpected + 'UNEXPECTED:'.length).trim();
+              return 'This review was not submitted. ' + cap(text.substring(unexpected + 'UNEXPECTED:'.length).trim());
             }
             if (httpStatus === 403) {
               /*
@@ -1567,7 +1584,7 @@
              * discarded.
              */
             return 'This review was not submitted, and nothing has been changed. '
-              + (text ? 'The server said: ' + text : 'The server gave no detail.')
+              + (text ? 'The server said: ' + cap(text) : 'The server gave no detail.')
               + (httpStatus ? ' (status ' + httpStatus + ')' : '');
           }
 
