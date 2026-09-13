@@ -165,7 +165,7 @@
     <section class="ot-card" aria-labelledby="ot-review-summary">
       <h2 class="ot-card__title" id="ot-review-summary">
         {{ rv.al_reviewtype.label | escape }} review
-        {% include 'OT Status Badge' status: rv.al_reviewstatus.label %}
+        <span data-ot-review-status>{% include 'OT Status Badge' status: rv.al_reviewstatus.label %}</span>
       </h2>
       <dl class="ot-dl">
         <div>
@@ -184,7 +184,7 @@
         <div><dt>Checklist version</dt><dd>{{ rv.al_checklistversionid.name | default: '—' | escape }}</dd></div>
         <div><dt>Sequence</dt><dd>{{ rv.al_sequence | default: '—' }}</dd></div>
         <div><dt>Started</dt><dd>{{ rv.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
-        <div><dt>Submitted</dt><dd>{{ rv.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
+        <div><dt>Submitted</dt><dd data-ot-submitted-on>{{ rv.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</dd></div>
       </dl>
 
       {% comment %}
@@ -1600,6 +1600,45 @@
            * disabled, leaving the status line so the confirmation stays readable. The
            * autosave script sees disabled controls as nothing to save.
            */
+          /*
+           * 'dd MMM yyyy', the format the Liquid date filter renders into the cell below, so
+           * the date this writes cannot be told from the date the server drew.
+           */
+          function today() {
+            var now = new Date();
+            var day = now.getDate();
+            var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return (day < 10 ? '0' + day : String(day)) + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
+          }
+
+          /*
+           * Locking the controls is not the whole of what a submit changes on this page.
+           *
+           * The summary above carries the review's status and its Submitted date, both
+           * server-rendered, and neither moved when the page stopped reloading after a
+           * submit (AD-094). So a submitted review sat there reading "In progress" and "—"
+           * under a message saying it was submitted and locked - the same contradiction
+           * reported on IO-300001's regrade, which is AD-130.
+           *
+           * Both are certain here: the PATCH returned 2xx, so the review IS submitted, by
+           * this person, today. The badge class mirrors OT Status Badge, where 'Submitted'
+           * matches its 'submitted' branch and is ot-badge--active.
+           */
+          function markSubmitted() {
+            var status = document.querySelector('[data-ot-review-status]');
+            if (status) {
+              status.textContent = '';
+              var badge = document.createElement('span');
+              badge.className = 'ot-badge ot-badge--active';
+              badge.textContent = 'Submitted';
+              status.appendChild(badge);
+            }
+
+            var when = document.querySelector('[data-ot-submitted-on]');
+            if (when) { when.textContent = today(); }
+          }
+
           function lockPage() {
             var controls = document.querySelectorAll(
               '[data-ot-questionnaire] input, [data-ot-questionnaire] textarea, [data-ot-questionnaire] select, [data-ot-questionnaire] button');
@@ -1607,6 +1646,7 @@
             button.disabled = true;
             button.textContent = 'Submitted';
             button.setAttribute('aria-busy', 'false');
+            markSubmitted();
           }
 
           button.addEventListener('click', function () {

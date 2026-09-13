@@ -770,7 +770,8 @@
                 <th scope="row" colspan="2">Client contact required?</th>
                 <td colspan="2">
                   {% if answer_ids != '' %}
-                    <span class="ot-opts" data-ot-form-answers data-action-ids="{{ answer_ids }}">
+                    <span class="ot-opts" data-ot-form-answers data-action-ids="{{ answer_ids }}"
+                          data-user-name="{{ user.fullname | escape }}">
                       <label><input type="radio" name="ot-form-cc" value="120910793" data-ot-fq="clientcontact"{% if answers_source.al_clientcontactrequired.value == 120910793 %} checked{% endif %} /> Yes</label>
                       <label><input type="radio" name="ot-form-cc" value="120910794" data-ot-fq="clientcontact"{% if answers_source.al_clientcontactrequired.value == 120910794 %} checked{% endif %} /> No</label>
                       <label><input type="radio" name="ot-form-cc" value="120910795" data-ot-fq="clientcontact"{% if answers_source.al_clientcontactrequired.value == 120910795 %} checked{% endif %} /> Potentially</label>
@@ -804,7 +805,7 @@
                   {% endif %}
                 </td>
                 <th scope="row" colspan="2">All remedial actions checked and approved?</th>
-                <td colspan="2">{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</td>
+                <td colspan="2" data-ot-approved-cell>{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</td>
               </tr>
             </tbody>
           </table>
@@ -908,14 +909,14 @@
                 A sign-off recorded before that column existed carries none and reads as
                 decision and date alone - which is the most its row can honestly say.
               {% endcomment %}
-              <td>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}{% if latest_supervisor.al_signedbyname and latest_supervisor.al_signedbyname != '' %}, {{ latest_supervisor.al_signedbyname | escape }}{% endif %}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</td>
+              <td data-ot-supervisor-cell>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}{% if latest_supervisor.al_signedbyname and latest_supervisor.al_signedbyname != '' %}, {{ latest_supervisor.al_signedbyname | escape }}{% endif %}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</td>
             </tr>
             <tr>
               <th scope="row">
                 Adviser sign-off
                 <span class="ot-remedial-form__note">(complete remedial task in IO)</span>
               </th>
-              <td>{% if latest_adviser %}{{ latest_adviser.al_assignedcontactid.name | default: c.al_advisername | escape }}, {{ latest_adviser.al_completedon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</td>
+              <td data-ot-adviser-cell>{% if latest_adviser %}{{ latest_adviser.al_assignedcontactid.name | default: c.al_advisername | escape }}, {{ latest_adviser.al_completedon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</td>
             </tr>
           </tbody>
         </table>
@@ -942,7 +943,8 @@
           enforce nothing (NFR-SEC-01).
         {% endcomment %}
         {% if signoff_ids != '' %}
-          <div class="ot-form-submit" data-ot-signoff data-action-ids="{{ signoff_ids }}">
+          <div class="ot-form-submit" data-ot-signoff data-action-ids="{{ signoff_ids }}"
+               data-user-name="{{ user.fullname | escape }}">
             <div class="ot-field">
               <label for="ot-decision">All remedial actions checked and approved?</label>
               <select id="ot-decision" data-ot-signoff-decision>
@@ -1323,6 +1325,58 @@
       },
 
       /*
+       * The adviser has signed the form off, so the row that reports who last completed one
+       * says so. Certain: the form completes the signed-in adviser's own open actions, and
+       * the cell names that person and the date.
+       */
+      adviserCompleted: function (name) {
+        var cell = document.querySelector('[data-ot-adviser-cell]');
+        if (cell) {
+          setText(cell, (name ? name + ', ' : '') + today());
+        }
+      },
+
+      /*
+       * The supervisor has decided, so the row that reports the last decision says so, and
+       * the "All remedial actions checked and approved?" cell moves with it.
+       *
+       * Both are certain. The panel signs off EVERY action awaiting a decision on this case
+       * in one go, so after an approval every action is approved and after a rejection one
+       * is rejected - which is exactly what the cell is derived from server-side.
+       */
+      supervisorDecided: function (label, name, rejected) {
+        var cell = document.querySelector('[data-ot-supervisor-cell]');
+        if (cell) {
+          setText(cell, label + (name ? ', ' + name : '') + ', ' + today());
+        }
+
+        var approved = document.querySelector('[data-ot-approved-cell]');
+        if (approved) {
+          setText(approved, rejected ? 'No' : 'Yes');
+        }
+      },
+
+      /*
+       * Where the case went is the server's to decide, and the page must not guess it.
+       *
+       * Completing or approving can move a case to Awaiting Sign-off, Awaiting Recheck,
+       * Closed, or back to Queued where the route still owes another discipline (OD-038) -
+       * and which one depends on rules this page does not hold. So the badge is not rewritten
+       * with a guess; it is marked as possibly out of date, which is the honest thing a page
+       * can say about a value it knows may have changed and cannot recompute. A regrade is
+       * the exception and sets Closed outright, because there the outcome is certain.
+       */
+      caseStatusMayHaveMoved: function () {
+        var status = document.querySelector('[data-ot-case-status]');
+        if (!status || status.querySelector('[data-ot-stale]')) { return; }
+        var note = document.createElement('span');
+        note.className = 'ot-remedial-form__note';
+        note.setAttribute('data-ot-stale', '');
+        note.textContent = ' \u00b7 may have moved, reload to confirm';
+        status.appendChild(note);
+      },
+
+      /*
        * The final outcome has just been recorded, so the two cells that report it elsewhere
        * on the page have to move with it.
        *
@@ -1350,6 +1404,8 @@
 
         var status = document.querySelector('[data-ot-case-status]');
         if (status) {
+          // badge() clears the cell, which takes any "may have moved" marker with it. The
+          // case status is no longer uncertain: a regrade from this panel closes the case.
           badge(status, 'Closed');
         }
       },
@@ -1509,6 +1565,14 @@
       if (draft) { draft.disabled = on; }
     }
 
+    // The viewer's own name, for the summary row that reports who last completed an action.
+    // Rendered into the answers span rather than fetched, for the reason every other value
+    // on this page is: the page already knows who is signed in.
+    function viewerName() {
+      var carrier = document.querySelector('[data-ot-form-answers]');
+      return carrier ? (carrier.getAttribute('data-user-name') || '') : '';
+    }
+
     // The actions this form answers, in the order the cells appear.
     function ids() {
       var found = [];
@@ -1600,6 +1664,8 @@
             markSaved();
             if (window.otRemediationRows) {
               window.otRemediationRows.completed(ids());
+              window.otRemediationRows.adviserCompleted(viewerName());
+              window.otRemediationRows.caseStatusMayHaveMoved();
             }
             show('Signed off. ' + pending.length + ' remedial action'
               + (pending.length === 1 ? ' is' : 's are')
@@ -1783,15 +1849,22 @@
       }
 
       /*
-       * What an approval leaves to do. Approving every action moves the case to Awaiting
-       * Recheck, where the final outcome is recorded and closes it (AD-057, AD-127); a
-       * supervisor who set the grade here has already done that step.
+       * What an approval leaves to do, without promising where the case went.
+       *
+       * The obvious sentences - "the case moves to Awaiting Recheck", "the final outcome is
+       * recorded with it, which closes the case" - are both wrong on a Tax leg that still
+       * owes an AQS check: approving there returns the case to the QUEUE (OD-038), and no
+       * final outcome is recorded because the case never reaches its recheck. The page does
+       * not hold the route rules, so it says what is true either way and leaves the state to
+       * the badge, which is marked as possibly moved.
        */
       function gradeNote() {
         if (grade && grade.value) {
-          return ' The final outcome is recorded with it, which closes the case.';
+          return ' The final outcome you chose is recorded with it once the case reaches its'
+            + ' recheck, which closes the case.';
         }
-        return ' The case moves to Awaiting Recheck, where the final outcome closes it.';
+        return ' The final outcome is recorded separately, on this page, once the case reaches'
+          + ' its recheck.';
       }
 
       // A decision made is not made again from here; the guard refuses a second one on an
@@ -1858,6 +1931,10 @@
               if (window.otRemediationRows) {
                 window.otRemediationRows.decided(
                   actionIds, decisionLabel(), decision.value === REJECTED);
+                window.otRemediationRows.supervisorDecided(
+                  decisionLabel(), panel.getAttribute('data-user-name') || '',
+                  decision.value === REJECTED);
+                window.otRemediationRows.caseStatusMayHaveMoved();
               }
               show(decisionLabel() + ', recorded against ' + actionIds.length
                 + ' remedial action' + (actionIds.length === 1 ? '' : 's') + '.'
