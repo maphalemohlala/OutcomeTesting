@@ -239,6 +239,11 @@ if (args.Length >= 2 && args[0].Equals("addmemocolumn", StringComparison.Ordinal
     return AddMemoColumn(args);
 }
 
+if (args.Length >= 2 && args[0].Equals("addtextcolumn", StringComparison.OrdinalIgnoreCase))
+{
+    return AddTextColumn(args);
+}
+
 if (args.Length >= 2 && args[0].Equals("addchoicecolumn", StringComparison.OrdinalIgnoreCase))
 {
     return AddChoiceColumn(args);
@@ -2836,10 +2841,110 @@ int AddMemoColumn(string[] a)
     return 0;
 }
 
-// A date-only column (AD-123). DateOnly behaviour rather than UserLocal because every
-// effective date in this model is compared a day at a time: a UserLocal column would put
-// "is this section in force today" at the mercy of the reader's time zone, which is the
-// class of bug AD-091 was raised to fix.
+// A single-line text column, the sibling addmemocolumn had no counterpart for.
+//
+// Until now the tool could mint a memo, a choice, a date and a bool, but not an nvarchar -
+// the only StringAttributeMetadata it built was the Str() helper nested inside
+// createnotificationtable, reachable by that one table and nothing else. So the sixteen
+// columns commit 9f4e968 authored into src/ could not be created in DEV, which is what held
+// the whole import half back: nine of them are text.
+//
+// Format is Text rather than TextArea (the memo default) because these are single-line
+// values - an IO reference, an adviser email, a task type - and the format decides how every
+// form and view renders the column.
+int AddTextColumn(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 6 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This writes metadata to a live environment. Re-run as: addtextcolumn <orgUrl> " +
+            "<entityLogicalName> <SchemaName> <displayName> <maxLength> [<description>] --confirm <orgUrl>");
+        return 1;
+    }
+
+    var entity = a[2].Trim();
+    var schemaName = a[3].Trim();
+    var displayName = a[4];
+
+    // 4000 is the ceiling for nvarchar; anything longer is a memo, and silently accepting a
+    // larger number here would create a column the caller did not ask for.
+    int maxLength;
+    if (!int.TryParse(a[5], out maxLength) || maxLength < 1 || maxLength > 4000)
+    {
+        Console.Error.WriteLine("Max length must be between 1 and 4000. Use addmemocolumn for anything longer.");
+        return 1;
+    }
+
+    var description = a.Length > 6 && !a[6].StartsWith("--", StringComparison.Ordinal) ? a[6] : string.Empty;
+    var logicalName = schemaName.ToLowerInvariant();
+
+    using var svc = Connect(orgUrl);
+
+    var existing = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    if (existing.EntityMetadata.Attributes.Any(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)))
+    {
+        Console.Error.WriteLine($"'{entity}' already has a column '{logicalName}'. Nothing was changed.");
+        return 1;
+    }
+
+    svc.Execute(new CreateAttributeRequest
+    {
+        SolutionUniqueName = SolutionUniqueName,
+        EntityName = entity,
+        Attribute = new StringAttributeMetadata
+        {
+            SchemaName = schemaName,
+            LogicalName = logicalName,
+            MaxLength = maxLength,
+            FormatName = StringFormatName.Text,
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+            DisplayName = NotificationTable.Text(displayName),
+            Description = NotificationTable.Text(description),
+        },
+    });
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    var after = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    var created = after.EntityMetadata.Attributes.FirstOrDefault(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)) as StringAttributeMetadata;
+
+    if (created == null)
+    {
+        Console.Error.WriteLine($"'{logicalName}' was not found on '{entity}' after the create returned. Investigate before relying on it.");
+        return 1;
+    }
+
+    Console.WriteLine(
+        $"Created {entity}.{created.LogicalName} (text, max {created.MaxLength}) in solution {SolutionUniqueName}.");
+    return 0;
+}
+
+// A date column (AD-123). DateOnly by default because every effective date in this model is
+// compared a day at a time: a UserLocal column would put "is this section in force today" at
+// the mercy of the reader's time zone, which is the class of bug AD-091 was raised to fix.
+//
+// `--behaviour` opts out, for a column that records more than a day. The case it was added
+// for is al_outcomecase.al_checklistcompleteddate, whose src/ definition is Behavior 3 -
+// TimeZoneIndependent, not UserLocal - because, as its own description says, the IO extract
+// carries no offset, so there is no local time to convert from. UserLocal is accepted too
+// for completeness. It is a flag rather than a positional argument so that every call
+// written before it keeps working unchanged.
+//
+// Worth stating plainly because the cost of getting it wrong is not a re-run: DateTimeBehavior
+// is IMMUTABLE once the column exists. A column created DateOnly by mistake can only be put
+// right by deleting and recreating it, taking any data with it.
 int AddDateColumn(string[] a)
 {
     var orgUrl = a[1];
@@ -2847,7 +2952,8 @@ int AddDateColumn(string[] a)
     {
         Console.Error.WriteLine(
             "This writes metadata to a live environment. Re-run as: adddatecolumn <orgUrl> " +
-            "<entityLogicalName> <SchemaName> <displayName> [<description>] --confirm <orgUrl>");
+            "<entityLogicalName> <SchemaName> <displayName> [<description>] " +
+            "[--behaviour dateonly|timezoneindependent|userlocal] --confirm <orgUrl>");
         return 1;
     }
 
@@ -2856,6 +2962,41 @@ int AddDateColumn(string[] a)
     var displayName = a[4];
     var description = a.Length > 5 && !a[5].StartsWith("--", StringComparison.Ordinal) ? a[5] : string.Empty;
     var logicalName = schemaName.ToLowerInvariant();
+
+    // Default DateOnly, so every call written before this flag existed behaves as it did.
+    var behaviour = DateTimeBehavior.DateOnly;
+    for (var i = 5; i < a.Length - 1; i++)
+    {
+        if (!a[i].Equals("--behaviour", StringComparison.OrdinalIgnoreCase)
+            && !a[i].Equals("--behavior", StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        var choice = a[i + 1].Trim();
+        if (choice.Equals("dateonly", StringComparison.OrdinalIgnoreCase))
+        {
+            behaviour = DateTimeBehavior.DateOnly;
+        }
+        else if (choice.Equals("timezoneindependent", StringComparison.OrdinalIgnoreCase))
+        {
+            behaviour = DateTimeBehavior.TimeZoneIndependent;
+        }
+        else if (choice.Equals("userlocal", StringComparison.OrdinalIgnoreCase))
+        {
+            behaviour = DateTimeBehavior.UserLocal;
+        }
+        else
+        {
+            Console.Error.WriteLine(
+                $"Unknown behaviour '{choice}'. Use dateonly, timezoneindependent or userlocal.");
+            return 1;
+        }
+
+        break;
+    }
+
+    var dateOnly = behaviour.Value == DateTimeBehavior.DateOnly.Value;
 
     using var svc = Connect(orgUrl);
 
@@ -2880,8 +3021,8 @@ int AddDateColumn(string[] a)
         {
             SchemaName = schemaName,
             LogicalName = logicalName,
-            Format = DateTimeFormat.DateOnly,
-            DateTimeBehavior = DateTimeBehavior.DateOnly,
+            Format = dateOnly ? DateTimeFormat.DateOnly : DateTimeFormat.DateAndTime,
+            DateTimeBehavior = behaviour,
             RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
             DisplayName = NotificationTable.Text(displayName),
             Description = NotificationTable.Text(description),
