@@ -10,13 +10,10 @@ import {
   Al_outcomecasesal_casestatus,
   type Al_outcomecases,
 } from '../../generated/models/Al_outcomecasesModel';
-import {
-  Al_remediationactionsal_actionstatus,
-  type Al_remediationactions,
-} from '../../generated/models/Al_remediationactionsModel';
+import type { Al_remediationactions } from '../../generated/models/Al_remediationactionsModel';
 import type { Al_outcomes } from '../../generated/models/Al_outcomesModel';
 import { gradesByCase } from '../cases/caseWorklistMapping';
-import { remediationClock } from '../../lib/workingDays';
+import { remediationTotals } from './remediationTotals';
 
 export interface StatusCount {
   status: CaseStatus;
@@ -72,12 +69,6 @@ const AGEING_BANDS: { label: string; min: number; max: number }[] = [
   { label: 'Over 30 days', min: 31, max: Infinity },
 ];
 
-function isOverdue(dueDate: string | undefined): boolean {
-  if (!dueDate) return false;
-  const due = new Date(dueDate).getTime();
-  return !Number.isNaN(due) && due < Date.now();
-}
-
 function aggregate(
   records: Al_outcomecases[],
   outcomes: Al_outcomes[],
@@ -122,27 +113,10 @@ function aggregate(
   }
   const completedTotal = [...outcomeCounts.values()].reduce((total, count) => total + count, 0);
 
-  let remediationOpen = 0;
-  let remediationOverdue = 0;
-  let remediationBreached = 0;
-  let remediationCompleted = 0;
-
-  for (const action of actions) {
-    const status =
-      action.al_actionstatusname ?? Al_remediationactionsal_actionstatus[action.al_actionstatus];
-    if (status === 'Completed') {
-      remediationCompleted += 1;
-      continue;
-    }
-    remediationOpen += 1;
-    if (isOverdue(action.al_duedate)) remediationOverdue += 1;
-    // The current period, not the whole time in remediation: a rejected sign-off restarts
-    // the clock (OD-018), and counting from the original start would report a reworked
-    // action as breached before the adviser had had a day on it.
-    if (remediationClock(action).breached) {
-      remediationBreached += 1;
-    }
-  }
+  // Per remediation, not per action - the same correction the outcome counts above already
+  // carry. remediationTotals holds the rule and the reasoning, and is tested there; this
+  // module cannot be, because it imports the generated services.
+  const remediation = remediationTotals(actions);
 
   const byStatus = CASE_STATUSES.map((status) => ({
     status,
@@ -163,10 +137,10 @@ function aggregate(
     })),
     completedTotal,
     ungraded: records.length - completedTotal,
-    remediationOpen,
-    remediationOverdue,
-    remediationBreached,
-    remediationCompleted,
+    remediationOpen: remediation.open,
+    remediationOverdue: remediation.overdue,
+    remediationBreached: remediation.breached,
+    remediationCompleted: remediation.completed,
   };
 }
 

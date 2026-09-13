@@ -67,13 +67,32 @@ export const SCALE_OPTIONS: Record<number, ChoiceOption[]> = {
 /** The three-column scales that the document lays out as a tick grid. */
 const GRID_SCALES = new Set([120910005, 120910006, 120910007, 120910008, 120910009]);
 
-export function optionsFor(responseTypeValue: number | null): ChoiceOption[] {
-  return responseTypeValue == null ? [] : (SCALE_OPTIONS[responseTypeValue] ?? []);
+export function optionsFor(
+  responseTypeValue: number | null,
+  isTaxReview = false,
+): ChoiceOption[] {
+  const options = responseTypeValue == null ? [] : (SCALE_OPTIONS[responseTypeValue] ?? []);
+  if (!isTaxReview || responseTypeValue == null) return options;
+
+  // A grid on a Tax review reads 120910302 as the Tax check does (AD-055 amended). Same
+  // value, same scale, same saved answer - only the wording, and only on this discipline,
+  // because 120910006 is shared with the suitability grid.
+  //
+  // Q-TAX-02 is drawn inline and relabelled by INLINE_LABELS, so this reaches only a section
+  // added through checklist administration (AD-123) whose questions all share this scale.
+  // Keyed on the review rather than the section's owner role because "for tax checks" is what
+  // was reworded: a Both-owned section answered on a Tax review is a tax check, and a
+  // Tax-owned section never appears on an AQS review. The portal makes the same reading.
+  const overrides = INLINE_LABELS[responseTypeValue];
+  if (!overrides) return options;
+  return options.map((option) =>
+    overrides[option.value] ? { ...option, label: overrides[option.value] } : option,
+  );
 }
 
 /**
  * The outcome scales the document writes in upper case wherever it draws them inline:
- * "PASS / INSUFFICIENT EVIDENCE / FAIL" on the tax check outcome, "PASS / FAIL" on the file
+ * "PASS / PASS WITH ISSUES / FAIL" on the tax check outcome, "PASS / FAIL" on the file
  * quality outcome, "YES / NO" on remedial action required, and the four-value grade. The
  * same values are headed in title case where a tick grid heads a column with them (Pass,
  * Fail, Insufficient evidence), so the case belongs to the inline rendering rather than to
@@ -83,12 +102,32 @@ export function optionsFor(responseTypeValue: number | null): ChoiceOption[] {
 const UPPER_CASE_INLINE = new Set([120910005, 120910006, 120910007, 120910010]);
 
 /**
- * The tax check outcome as the document orders it: PASS, INSUFFICIENT EVIDENCE, FAIL. The
+ * The tax check outcome as the document orders it: PASS, PASS WITH ISSUES, FAIL. The
  * suitability grid heads the same scale Pass, Fail, Insufficient evidence, so the order is
  * the inline rendering's too. Only S-TAX answers this scale off a grid.
  */
 const INLINE_ORDER: Record<number, number[]> = {
   120910006: [120910300, 120910302, 120910301],
+};
+
+/**
+ * The labels the inline rendering gives a value in place of the scale's own, keyed by
+ * response type and then by value.
+ *
+ * The Tax check reads 120910302 as "Pass with issues" where every other user of the same
+ * scale still reads it as "Insufficient evidence" (AD-055 amended). This is wording, not a
+ * value: what the checker ticks, what is saved, and what sends the case to remediation are
+ * all exactly what they were.
+ *
+ * It belongs to the inline path rather than to the option because the inline path is
+ * Q-TAX-02's alone. 120910006 is shared with the suitability grid (S-E1 to S-E5, S-CRP),
+ * which is drawn as a grid and heads its third column from SCALE_OPTIONS - so renaming the
+ * option itself would have relabelled six AQS sections that were never asked to change.
+ * ResponseRules.PermittedChoices is still the authority on which values may be saved, and
+ * it is untouched.
+ */
+const INLINE_LABELS: Record<number, Record<number, string>> = {
+  120910006: { 120910302: 'Pass with issues' },
 };
 
 /**
@@ -107,9 +146,18 @@ export function inlineOptionsFor(responseTypeValue: number | null): ChoiceOption
         .filter((option): option is ChoiceOption => option !== undefined)
     : options;
 
-  return UPPER_CASE_INLINE.has(responseTypeValue)
-    ? ordered.map((option) => ({ ...option, label: option.label.toUpperCase() }))
+  // Rename before upper-casing, so an override is cased by the same rule as the label it
+  // replaces rather than having to be written in the document's case itself.
+  const overrides = INLINE_LABELS[responseTypeValue];
+  const relabelled = overrides
+    ? ordered.map((option) =>
+        overrides[option.value] ? { ...option, label: overrides[option.value] } : option,
+      )
     : ordered;
+
+  return UPPER_CASE_INLINE.has(responseTypeValue)
+    ? relabelled.map((option) => ({ ...option, label: option.label.toUpperCase() }))
+    : relabelled;
 }
 
 /**
@@ -129,6 +177,7 @@ export function optionGridColumns(responseTypeValue: number | null): number | nu
  */
 export function sectionLayout(
   section: ReviewSection,
+  isTaxReview = false,
 ): { kind: 'grid'; options: ChoiceOption[] } | { kind: 'inline' } {
   const first = section.rows[0]?.responseTypeValue;
   if (
@@ -136,7 +185,7 @@ export function sectionLayout(
     GRID_SCALES.has(first) &&
     section.rows.every((row) => row.responseTypeValue === first)
   ) {
-    return { kind: 'grid', options: optionsFor(first) };
+    return { kind: 'grid', options: optionsFor(first, isTaxReview) };
   }
   return { kind: 'inline' };
 }
@@ -536,6 +585,7 @@ export type FormBlock<T extends SectionedAnswer = SectionedAnswer> =
 export function formBlocks<T extends SectionedAnswer>(
   sections: ReviewSection<T>[],
   points: FailPoint[],
+  isTaxReview = false,
 ): FormBlock<T>[] {
   const blocks: FormBlock<T>[] = [];
   const failPoints: FormBlock<T> = {
@@ -580,13 +630,13 @@ export function formBlocks<T extends SectionedAnswer>(
         intro: spec.intro ?? (spec.subsections ? null : section.helpText),
         layout: spec.layout,
         columnHeading: spec.columnHeading ?? 'Check',
-        options: spec.scale == null ? [] : optionsFor(spec.scale),
+        options: spec.scale == null ? [] : optionsFor(spec.scale, isTaxReview),
         groups: [group],
       });
       continue;
     }
 
-    const layout = sectionLayout(section);
+    const layout = sectionLayout(section, isTaxReview);
     blocks.push({
       kind: 'section',
       id: section.id,

@@ -81,12 +81,14 @@ Owner: Tax team. Rendered only when the route includes Tax (BR-004).
 | Code | Question | Response type | Mandatory | Options |
 |---|---|---|---|---|
 | Q-TAX-01 | Tax check reason | MultiSelect | Yes | LSA/LSDBA/TTFAC, Trust, IHT, Tax calculation, Other |
-| Q-TAX-02 | Tax check outcome | PassFailInsufficient | Yes | PASS, INSUFFICIENT EVIDENCE, FAIL |
+| Q-TAX-02 | Tax check outcome | PassFailInsufficient | Yes | PASS, PASS WITH ISSUES, FAIL |
 | Q-TAX-03 | Case notes | MultilineText | No | |
 
 Notes: the Tax outcome is a three-value scale, not the four-value AQS grade in BR-005. Tax check reason is multi-select because a case can fail for several tax reasons at once (AD-022).
 
 Q-TAX-02 is recorded as `PassFailInsufficient`, not `SingleSelect`. Its options in the source document are PASS, INSUFFICIENT EVIDENCE, FAIL, which is exactly that scale; "SingleSelect" in the transcription described cardinality rather than a vocabulary. See AD-055.
+
+**Its middle option has since been reworded.** From 2026-09-13 the Tax check reads it as **PASS WITH ISSUES**, not INSUFFICIENT EVIDENCE (project owner direction; AD-055 amended). This is wording and nothing else: the response type is still `PassFailInsufficient`, the stored value is still `120910302`, and a case graded on it still enters remediation exactly as before. The rename is scoped to the Tax check because `PassFailInsufficient` is shared with the suitability grid (S-E1 to S-E5, S-CRP), which still reads that value as Insufficient evidence.
 
 ## S-AMLCRA — File Quality, AML and CRA checking points
 

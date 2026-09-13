@@ -268,7 +268,49 @@
           <tr><td class="lbl">Checker name</td><td class="val">{{ rv['case.al_checkername'] | escape }}</td><td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' }}</td></tr>
           <tr><td class="lbl">Client name / initials</td><td class="val">{{ rv['case.al_clientname'] | escape }}</td><td class="lbl">IO reference</td><td class="val">{{ rv['case.al_casereference'] | escape }}</td></tr>
           <tr><td class="lbl">Pre or post check</td><td class="val">{{ h_prepost.label | escape }}</td><td class="lbl">Vulnerable client?</td><td class="val">{{ h_vulnerable.label | escape }}</td></tr>
+          {% comment %}
+            The Tax team's own two fields (project owner, 2026-09-13). The document labels
+            them "(Tax team to complete)" and "For Tax team usage", so it already assigns
+            both to the Tax team; until now only the Code App could set them, and "For Tax
+            team usage" is what decides whether an AQS check follows - Return to paraplanner
+            ends the case at Tax with no AQS owed (UpdateCaseDetailsPlugin.DeriveRoute).
+
+            Editable on a Tax review that has not been submitted, read-only everywhere else.
+            A submitted review is immutable (BR-012) and its route was acted on at submit, so
+            moving the disposition afterwards would contradict something already done;
+            CaseHeaderRequestPlugin refuses it server-side on the review's status, and this
+            is the affordance rather than the boundary.
+
+            Deliberately NOT hidden by web role. The role is checked server-side against the
+            contact's own roles, and hiding the control in Liquid would look like access
+            control while enforcing nothing (NFR-SEC-01) - the same position the sign-off
+            panel on OT Remediation records.
+          {% endcomment %}
+          {% if rv.al_reviewtype.value == 120910200 and locked == false %}
+          <tr>
+            <td class="lbl">Tax check required<br>(Tax team to complete)</td>
+            <td class="val">
+              <select class="ot-field" id="ot-taxrequired" data-ot-header-field aria-label="Tax check required">
+                <option value="">—</option>
+                <option value="120910560" {% if h_taxrequired.value == 120910560 %}selected{% endif %}>Yes</option>
+                <option value="120910561" {% if h_taxrequired.value == 120910561 %}selected{% endif %}>No</option>
+              </select>
+            </td>
+            <td class="lbl">For Tax team usage</td>
+            <td class="val">
+              <select class="ot-field" id="ot-taxdisposition" data-ot-header-field aria-label="For Tax team usage">
+                <option value="">—</option>
+                <option value="120910570" {% if h_taxdisposition.value == 120910570 %}selected{% endif %}>Submit to AQS</option>
+                <option value="120910571" {% if h_taxdisposition.value == 120910571 %}selected{% endif %}>Return to paraplanner</option>
+              </select>
+              <button type="button" class="ot-btn ot-btn--secondary" id="ot-header-save"
+                      data-case-id="{{ cid }}">Save</button>
+              <span id="ot-header-status" role="status" aria-live="polite"></span>
+            </td>
+          </tr>
+          {% else %}
           <tr><td class="lbl">Tax check required<br>(Tax team to complete)</td><td class="val">{{ h_taxrequired.label | escape }}</td><td class="lbl">For Tax team usage</td><td class="val">{{ h_taxdisposition.label | escape }}</td></tr>
+          {% endif %}
         </tbody>
       </table>
     {% endcapture %}
@@ -637,9 +679,26 @@
             The tick columns for whichever scale this block is headed by. A `case` on an
             integer is the same gamble as the one above, so this is an if chain too.
           {% endcomment %}
+          {% comment %}
+            120910302 reads "Pass with issues" on a Tax review and "Insufficient evidence"
+            everywhere else (AD-055 amended, 2026-09-13). Same value, same scale, same saved
+            answer - the Tax check alone was reworded, and 120910006 is shared with the
+            suitability grid, so the wording cannot sit on the scale.
+
+            Q-TAX-02 itself is drawn inline and takes its label from OT Answer Options, so
+            this branch reaches it only through a section added by checklist administration
+            (AD-123) whose questions all use this scale. Keyed on the REVIEW's discipline
+            rather than the section's owner role, because "for tax checks" is what was
+            reworded: a Both-owned section answered on a Tax review is a tax check, and a
+            Tax-owned section cannot appear on an AQS review at all.
+          {% endcomment %}
           {% if grid_rt == 120910006 %}
             {% assign gvalues = '120910300,120910301,120910302' | split: ',' %}
-            {% assign glabels = 'Pass,Fail,Insufficient evidence' | split: ',' %}
+            {% if rv.al_reviewtype.value == 120910200 %}
+              {% assign glabels = 'Pass,Fail,Pass with issues' | split: ',' %}
+            {% else %}
+              {% assign glabels = 'Pass,Fail,Insufficient evidence' | split: ',' %}
+            {% endif %}
           {% elsif grid_rt == 120910008 %}
             {% assign gvalues = '120910305,120910306,120910307' | split: ',' %}
             {% assign glabels = 'Yes,No,N/A' | split: ',' %}
@@ -1527,6 +1586,123 @@
 
               request.send(JSON.stringify({ al_submitrequested: true }));
             }).fail(unreachable);
+          });
+        })();
+      </script>
+    {% endif %}
+
+    {% comment %}
+      Saving the Tax team's two header fields. Rendered only where the controls are: a Tax
+      review that has not been submitted.
+
+      The write is a PATCH of one JSON column on the signed-in user's OWN contact row, which
+      is the only shape this site accepts - a browser write on al_outcomecase is refused with
+      90040106 whatever the table permissions say, the same refusal and the same resolution
+      as the answer (AD-053), the claim (AD-076) and the sign-off (AD-099). The site's
+      contact permission is Self-scoped, so the request can only ever reach the signed-in
+      user's row, and CaseHeaderRequestPlugin takes the editor from the row it was given
+      rather than from anything sent here.
+
+      The token comes from shell.getTokenDeferred(), the only supported way to obtain it and
+      the way every other write on this site does it. Reading a hidden input instead is what
+      once left every write unauthenticated, because this page carries no server-rendered
+      form for Power Pages to put that input on.
+
+      An unchanged field is sent as 0, which the plug-in reads as "not sent" and leaves
+      alone. Sending the current value instead would be harmless but would put a field in the
+      audit line that nobody moved.
+    {% endcomment %}
+    {% if rv.al_reviewtype.value == 120910200 and locked == false %}
+      <script>
+        (function () {
+          var save = document.getElementById('ot-header-save');
+          var required = document.getElementById('ot-taxrequired');
+          var disposition = document.getElementById('ot-taxdisposition');
+          var status = document.getElementById('ot-header-status');
+          if (!save || !required || !disposition || !status) { return; }
+
+          var initialRequired = required.value;
+          var initialDisposition = disposition.value;
+
+          function show(message, kind) {
+            status.textContent = message;
+            status.className = kind ? 'ot-inline-status ot-inline-status--' + kind : 'ot-inline-status';
+          }
+
+          function friendly(body, code) {
+            // The server's own words where it gave any: the refusals here are business
+            // rules - the role, and the review already being submitted - and a checker can
+            // act on both. A bare status code cannot be acted on by anyone.
+            try {
+              var parsed = JSON.parse(body);
+              var text = parsed && parsed.error && parsed.error.message;
+              if (text) {
+                return text
+                  .replace('PRECONDITION: ', '')
+                  .replace('VALIDATION: ', '')
+                  .replace('UNAUTHORIZED: ', '');
+              }
+            } catch (e) { /* fall through to the code */ }
+            if (code === 403) { return 'Your portal account is not permitted to change these fields.'; }
+            return 'The change could not be saved (' + code + ').';
+          }
+
+          save.addEventListener('click', function () {
+            if (required.value === initialRequired && disposition.value === initialDisposition) {
+              show('Nothing has changed.', null);
+              return;
+            }
+
+            save.disabled = true;
+            show('Saving...', null);
+
+            if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
+              show('This page did not load completely. Refresh and try again.', 'error');
+              save.disabled = false;
+              return;
+            }
+
+            var payload = {
+              al_caseheaderrequest: JSON.stringify({
+                caseId: save.getAttribute('data-case-id'),
+                taxCheckRequired: required.value === initialRequired ? 0 : parseInt(required.value || '0', 10),
+                taxTeamDisposition: disposition.value === initialDisposition ? 0 : parseInt(disposition.value || '0', 10)
+              })
+            };
+
+            window.shell.getTokenDeferred().done(function (token) {
+              var request = new XMLHttpRequest();
+              request.open('PATCH', '/_api/contacts({{ user.id }})', true);
+              request.setRequestHeader('Content-Type', 'application/json');
+              request.setRequestHeader('__RequestVerificationToken', token);
+
+              request.onreadystatechange = function () {
+                if (request.readyState !== 4) { return; }
+                save.disabled = false;
+
+                if (request.status >= 200 && request.status < 300) {
+                  initialRequired = required.value;
+                  initialDisposition = disposition.value;
+                  // Reloaded rather than patched in place: changing these can re-derive the
+                  // route (BR-004), which the Review progress table above also shows.
+                  show('Saved. Reloading...', 'success');
+                  window.location.reload();
+                  return;
+                }
+
+                show(friendly(request.responseText, request.status), 'error');
+              };
+
+              request.onerror = function () {
+                save.disabled = false;
+                show('The change could not be saved. Check your connection and try again.', 'error');
+              };
+
+              request.send(JSON.stringify(payload));
+            }).fail(function () {
+              save.disabled = false;
+              show('This page did not load completely. Refresh and try again.', 'error');
+            });
           });
         })();
       </script>

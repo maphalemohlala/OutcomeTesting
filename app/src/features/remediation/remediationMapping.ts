@@ -146,6 +146,17 @@ export function toSignoff(record: Al_signoffs): SignoffRow {
       ((record as unknown as Record<string, unknown>)._al_remediationactionid_value as
         | string
         | undefined) ?? null,
-    signedOffBy: text(record.owneridname),
+    // The signatory the row records, not its owner.
+    //
+    // owneridname was only ever a fallback standing in for an answer nothing wrote. A portal
+    // sign-off reaches Dataverse as the site's application user (AD-053), so every one of
+    // them read "# PowerPages Data Runtime PROD" - the row's owner, never the supervisor who
+    // approved it, which is the one thing BR-008 needs the row to say. al_signedbyname is
+    // stamped by SignoffRequestPlugin from the contact whose own request column carried the
+    // decision, so it is the person. Sign-offs written before that column existed carry none
+    // and still fall back, which is the most their rows can honestly say.
+    signedOffBy:
+      text((record as unknown as Record<string, unknown>).al_signedbyname as string | undefined) ??
+      text(record.owneridname),
   };
 }

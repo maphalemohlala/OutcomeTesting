@@ -4,25 +4,50 @@ import { PageIntro } from '../../components/layout/PageIntro';
 import { StageLabel } from '../../components/status/StageLabel';
 import { Tabs } from '../../components/navigation/Tabs';
 import { PermissionGate } from '../../app/permissions/PermissionGate';
-import { useCaseDetail, type CaseField } from './useCaseDetail';
+import { useCaseDetail } from './useCaseDetail';
+import type { HeaderField } from '../reviews/checklistForm';
 import { useCaseReviews } from './useCaseReviews';
 import { CaseOutcomeSummary } from './CaseOutcomeSummary';
 import { CaseHistoryPanel } from './CaseHistoryPanel';
 import { CaseEditPanel } from './CaseEditPanel';
 import './CaseDetailPage.css';
 
-function FieldList({ fields }: { fields: CaseField[] }) {
+/**
+ * The case header as the Checker Checklist draws it: a ruled table, two label/value pairs to
+ * a row, in the document's own order (project owner, 2026-09-13).
+ *
+ * This replaced four themed panels - Client, Adviser and paraplanner, Advice and product,
+ * Check and tax. The document has no such grouping, so a reader holding the paper form had
+ * to hunt across four panels for a field the form puts in one fixed place.
+ *
+ * Pairs are built here rather than by CSS columns so the reading order is the document's
+ * (left to right, then down) for a screen reader as well as for the eye; a two-column grid
+ * would read down one column and then down the other. An odd final field leaves its second
+ * cell empty rather than stretching across, which is what the form does too.
+ */
+function HeaderTable({ fields }: { fields: HeaderField[] }) {
+  const pairs: HeaderField[][] = [];
+  for (let i = 0; i < fields.length; i += 2) pairs.push(fields.slice(i, i + 2));
+
   return (
-    <dl className="case-detail__fields">
-      {fields.map((field) => (
-        <div key={field.label} className="case-detail__field">
-          <dt>{field.label}</dt>
-          <dd data-empty={field.value === null ? 'true' : undefined}>
-            {field.value ?? 'Not recorded'}
-          </dd>
-        </div>
-      ))}
-    </dl>
+    <table className="case-detail__header">
+      <caption className="visually-hidden">Case header</caption>
+      <tbody>
+        {pairs.map((pair) => (
+          <tr key={pair[0].label}>
+            {pair.map((field) => [
+              <th key={`${field.label}-l`} scope="row">
+                {field.label}
+              </th>,
+              <td key={`${field.label}-v`} data-empty={field.value === null ? 'true' : undefined}>
+                {field.value ?? 'Not recorded'}
+              </td>,
+            ])}
+            {pair.length === 1 ? <><th aria-hidden="true" /><td aria-hidden="true" /></> : null}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -106,27 +131,10 @@ export function CaseDetailPage() {
                 label: 'Details',
                 render: () => (
                   <>
-                    <div className="case-detail__panels">
-                      <section className="case-detail__panel" aria-labelledby="panel-client">
-                        <h2 id="panel-client">Client</h2>
-                        <FieldList fields={state.detail.client} />
-                      </section>
-
-                      <section className="case-detail__panel" aria-labelledby="panel-adviser">
-                        <h2 id="panel-adviser">Adviser and paraplanner</h2>
-                        <FieldList fields={state.detail.adviser} />
-                      </section>
-
-                      <section className="case-detail__panel" aria-labelledby="panel-advice">
-                        <h2 id="panel-advice">Advice and product</h2>
-                        <FieldList fields={state.detail.adviceAndProduct} />
-                      </section>
-
-                      <section className="case-detail__panel" aria-labelledby="panel-check">
-                        <h2 id="panel-check">Check and tax</h2>
-                        <FieldList fields={state.detail.checkAndTax} />
-                      </section>
-                    </div>
+                    <section className="case-detail__panel" aria-labelledby="panel-header">
+                      <h2 id="panel-header">Case details</h2>
+                      <HeaderTable fields={state.detail.header} />
+                    </section>
 
                     <section className="case-detail__checks" aria-labelledby="panel-checks">
                       <h2 id="panel-checks">Checks on this case</h2>

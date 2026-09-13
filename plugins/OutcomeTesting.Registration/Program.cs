@@ -239,6 +239,11 @@ if (args.Length >= 2 && args[0].Equals("addmemocolumn", StringComparison.Ordinal
     return AddMemoColumn(args);
 }
 
+if (args.Length >= 2 && args[0].Equals("addtextcolumn", StringComparison.OrdinalIgnoreCase))
+{
+    return AddTextColumn(args);
+}
+
 if (args.Length >= 2 && args[0].Equals("addchoicecolumn", StringComparison.OrdinalIgnoreCase))
 {
     return AddChoiceColumn(args);
@@ -351,6 +356,17 @@ if (args.Length >= 6 && args[0].Equals("addoptionvalue", StringComparison.Ordina
     }
 
     return AddOptionValue(args[1], args[2], args[3], optionValue, args[5], args.Length >= 7 ? args[6] : null);
+}
+
+if (args.Length >= 6 && args[0].Equals("setoptionlabel", StringComparison.OrdinalIgnoreCase))
+{
+    if (!int.TryParse(args[4], out var relabelValue))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- setoptionlabel <orgUrl> <entity> <attribute> <value> <label>");
+        return 1;
+    }
+
+    return SetOptionLabel(args[1], args[2], args[3], relabelValue, args[5]);
 }
 
 if (args.Length >= 2 && args[0].Equals("provepp15", StringComparison.OrdinalIgnoreCase))
@@ -2825,10 +2841,110 @@ int AddMemoColumn(string[] a)
     return 0;
 }
 
-// A date-only column (AD-123). DateOnly behaviour rather than UserLocal because every
-// effective date in this model is compared a day at a time: a UserLocal column would put
-// "is this section in force today" at the mercy of the reader's time zone, which is the
-// class of bug AD-091 was raised to fix.
+// A single-line text column, the sibling addmemocolumn had no counterpart for.
+//
+// Until now the tool could mint a memo, a choice, a date and a bool, but not an nvarchar -
+// the only StringAttributeMetadata it built was the Str() helper nested inside
+// createnotificationtable, reachable by that one table and nothing else. So the sixteen
+// columns commit 9f4e968 authored into src/ could not be created in DEV, which is what held
+// the whole import half back: nine of them are text.
+//
+// Format is Text rather than TextArea (the memo default) because these are single-line
+// values - an IO reference, an adviser email, a task type - and the format decides how every
+// form and view renders the column.
+int AddTextColumn(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 6 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This writes metadata to a live environment. Re-run as: addtextcolumn <orgUrl> " +
+            "<entityLogicalName> <SchemaName> <displayName> <maxLength> [<description>] --confirm <orgUrl>");
+        return 1;
+    }
+
+    var entity = a[2].Trim();
+    var schemaName = a[3].Trim();
+    var displayName = a[4];
+
+    // 4000 is the ceiling for nvarchar; anything longer is a memo, and silently accepting a
+    // larger number here would create a column the caller did not ask for.
+    int maxLength;
+    if (!int.TryParse(a[5], out maxLength) || maxLength < 1 || maxLength > 4000)
+    {
+        Console.Error.WriteLine("Max length must be between 1 and 4000. Use addmemocolumn for anything longer.");
+        return 1;
+    }
+
+    var description = a.Length > 6 && !a[6].StartsWith("--", StringComparison.Ordinal) ? a[6] : string.Empty;
+    var logicalName = schemaName.ToLowerInvariant();
+
+    using var svc = Connect(orgUrl);
+
+    var existing = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    if (existing.EntityMetadata.Attributes.Any(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)))
+    {
+        Console.Error.WriteLine($"'{entity}' already has a column '{logicalName}'. Nothing was changed.");
+        return 1;
+    }
+
+    svc.Execute(new CreateAttributeRequest
+    {
+        SolutionUniqueName = SolutionUniqueName,
+        EntityName = entity,
+        Attribute = new StringAttributeMetadata
+        {
+            SchemaName = schemaName,
+            LogicalName = logicalName,
+            MaxLength = maxLength,
+            FormatName = StringFormatName.Text,
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+            DisplayName = NotificationTable.Text(displayName),
+            Description = NotificationTable.Text(description),
+        },
+    });
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    var after = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    var created = after.EntityMetadata.Attributes.FirstOrDefault(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)) as StringAttributeMetadata;
+
+    if (created == null)
+    {
+        Console.Error.WriteLine($"'{logicalName}' was not found on '{entity}' after the create returned. Investigate before relying on it.");
+        return 1;
+    }
+
+    Console.WriteLine(
+        $"Created {entity}.{created.LogicalName} (text, max {created.MaxLength}) in solution {SolutionUniqueName}.");
+    return 0;
+}
+
+// A date column (AD-123). DateOnly by default because every effective date in this model is
+// compared a day at a time: a UserLocal column would put "is this section in force today" at
+// the mercy of the reader's time zone, which is the class of bug AD-091 was raised to fix.
+//
+// `--behaviour` opts out, for a column that records more than a day. The case it was added
+// for is al_outcomecase.al_checklistcompleteddate, whose src/ definition is Behavior 3 -
+// TimeZoneIndependent, not UserLocal - because, as its own description says, the IO extract
+// carries no offset, so there is no local time to convert from. UserLocal is accepted too
+// for completeness. It is a flag rather than a positional argument so that every call
+// written before it keeps working unchanged.
+//
+// Worth stating plainly because the cost of getting it wrong is not a re-run: DateTimeBehavior
+// is IMMUTABLE once the column exists. A column created DateOnly by mistake can only be put
+// right by deleting and recreating it, taking any data with it.
 int AddDateColumn(string[] a)
 {
     var orgUrl = a[1];
@@ -2836,7 +2952,8 @@ int AddDateColumn(string[] a)
     {
         Console.Error.WriteLine(
             "This writes metadata to a live environment. Re-run as: adddatecolumn <orgUrl> " +
-            "<entityLogicalName> <SchemaName> <displayName> [<description>] --confirm <orgUrl>");
+            "<entityLogicalName> <SchemaName> <displayName> [<description>] " +
+            "[--behaviour dateonly|timezoneindependent|userlocal] --confirm <orgUrl>");
         return 1;
     }
 
@@ -2845,6 +2962,41 @@ int AddDateColumn(string[] a)
     var displayName = a[4];
     var description = a.Length > 5 && !a[5].StartsWith("--", StringComparison.Ordinal) ? a[5] : string.Empty;
     var logicalName = schemaName.ToLowerInvariant();
+
+    // Default DateOnly, so every call written before this flag existed behaves as it did.
+    var behaviour = DateTimeBehavior.DateOnly;
+    for (var i = 5; i < a.Length - 1; i++)
+    {
+        if (!a[i].Equals("--behaviour", StringComparison.OrdinalIgnoreCase)
+            && !a[i].Equals("--behavior", StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        var choice = a[i + 1].Trim();
+        if (choice.Equals("dateonly", StringComparison.OrdinalIgnoreCase))
+        {
+            behaviour = DateTimeBehavior.DateOnly;
+        }
+        else if (choice.Equals("timezoneindependent", StringComparison.OrdinalIgnoreCase))
+        {
+            behaviour = DateTimeBehavior.TimeZoneIndependent;
+        }
+        else if (choice.Equals("userlocal", StringComparison.OrdinalIgnoreCase))
+        {
+            behaviour = DateTimeBehavior.UserLocal;
+        }
+        else
+        {
+            Console.Error.WriteLine(
+                $"Unknown behaviour '{choice}'. Use dateonly, timezoneindependent or userlocal.");
+            return 1;
+        }
+
+        break;
+    }
+
+    var dateOnly = behaviour.Value == DateTimeBehavior.DateOnly.Value;
 
     using var svc = Connect(orgUrl);
 
@@ -2869,8 +3021,8 @@ int AddDateColumn(string[] a)
         {
             SchemaName = schemaName,
             LogicalName = logicalName,
-            Format = DateTimeFormat.DateOnly,
-            DateTimeBehavior = DateTimeBehavior.DateOnly,
+            Format = dateOnly ? DateTimeFormat.DateOnly : DateTimeFormat.DateAndTime,
+            DateTimeBehavior = behaviour,
             RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
             DisplayName = NotificationTable.Text(displayName),
             Description = NotificationTable.Text(description),
@@ -6163,6 +6315,105 @@ int AddOptionValue(string orgUrl, string entity, string attribute, int value, st
     Console.WriteLine(ok
         ? $"{entity}.{attribute} {value} = '{label}' inserted and published ({after.Count} values)."
         : $"Insert returned success, but metadata does not read back {value} = '{label}'.");
+    return ok ? 0 : 2;
+}
+
+// Rewords one value of a local choice column, leaving the value itself alone.
+//
+// The sibling of AddOptionValue, for the change that is wording rather than vocabulary: the
+// label a user reads moves, the integer every row already stores does not, so nothing needs
+// migrating and no saved answer changes meaning. Q-TAX-02's "Insufficient evidence" becoming
+// "Pass with issues" on al_outcomecase.al_taxoutcome (AD-055 amended) is the case it was
+// written for.
+//
+// The direction-of-travel argument AddOptionValue makes applies unchanged. AD-013 makes DEV
+// the source and `src/` the copy, so a label edited into an Entity.xml by hand survives only
+// until the next export overwrites it. Renaming here first puts the two in the supported
+// order: DEV is reworded, the export carries the wording back into `src/`, and the hand edit
+// is confirmed rather than clobbered.
+//
+// Two refusals rather than a blind write:
+//
+//   - An absent value is a typo, not a rename. InsertOptionValue is the verb for a value that
+//     does not exist yet, and silently adding one here would mint a value no code reads.
+//   - A label already worn by a *different* value is refused for the reason AddOptionValue
+//     refuses it: two options reading the same thing cannot be told apart by a user, and any
+//     text-to-value parse over the set - ImportRules.ColumnDef is one - becomes ambiguous.
+//     This is exactly why al_iooutcome cannot take this rename: 120910611 is already
+//     "Pass with issues" there.
+//
+// Read back from metadata afterwards, because UpdateOptionValue reports success on the
+// definition it changed, not on the publish that makes it visible.
+int SetOptionLabel(string orgUrl, string entity, string attribute, int value, string label)
+{
+    using var svc = Connect(orgUrl);
+
+    // Refuse a global option set outright.
+    //
+    // The whole point of the rename this verb was written for is that it reaches ONE
+    // discipline: al_taxoutcome is local to al_outcomecase, so rewording 120910302 there
+    // leaves the same value reading "Insufficient evidence" on the shared answer-choice set
+    // that the suitability grid and the Consumer Duty overlay use. Run against a column
+    // backed by a global set, an UpdateOptionValue addressed by entity and attribute reaches
+    // the global definition - so a rename meant for one column would reword every entity
+    // that shares it. That is the exact failure the scoping exists to avoid, and it would be
+    // invisible here: the read-back below would show the label correctly changed.
+    var meta = (RetrieveAttributeResponse)svc.Execute(new RetrieveAttributeRequest
+    {
+        EntityLogicalName = entity,
+        LogicalName = attribute,
+        RetrieveAsIfPublished = false,
+    });
+
+    var optionSet = ((PicklistAttributeMetadata)meta.AttributeMetadata).OptionSet;
+    if (optionSet.IsGlobal == true)
+    {
+        Console.Error.WriteLine(
+            $"{entity}.{attribute} is backed by the GLOBAL option set '{optionSet.Name}'. " +
+            "Renaming a value there would change it for every column that shares it. " +
+            "Refusing: reword a global set deliberately, not through this verb.");
+        return 1;
+    }
+
+    var before = PicklistOptions(svc, entity, attribute);
+    if (!before.TryGetValue(value, out var current))
+    {
+        Console.Error.WriteLine($"{entity}.{attribute} has no value {value}. Use addoptionvalue to mint one.");
+        return 1;
+    }
+
+    if (string.Equals(current, label, StringComparison.Ordinal))
+    {
+        Console.WriteLine($"{entity}.{attribute} {value} already reads '{label}'. Nothing to do.");
+        return 0;
+    }
+
+    var clash = before.FirstOrDefault(o =>
+        o.Key != value && string.Equals(o.Value, label, StringComparison.OrdinalIgnoreCase));
+    if (clash.Value != null)
+    {
+        Console.Error.WriteLine($"'{label}' is already {clash.Key} on {entity}.{attribute}. Refusing to leave two values with the same label.");
+        return 1;
+    }
+
+    svc.Execute(new UpdateOptionValueRequest
+    {
+        EntityLogicalName = entity,
+        AttributeLogicalName = attribute,
+        Value = value,
+        Label = new Label(label, 1033),
+    });
+
+    svc.Execute(new PublishXmlRequest
+    {
+        ParameterXml = $"<importexportxml><entities><entity>{entity}</entity></entities></importexportxml>",
+    });
+
+    var after = PicklistOptions(svc, entity, attribute);
+    var ok = after.TryGetValue(value, out var written) && written == label;
+    Console.WriteLine(ok
+        ? $"{entity}.{attribute} {value} = '{current}' -> '{label}', published ({after.Count} values)."
+        : $"Update returned success, but metadata does not read back {value} = '{label}'.");
     return ok ? 0 : 2;
 }
 

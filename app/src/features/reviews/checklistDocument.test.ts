@@ -21,7 +21,7 @@ import {
  * app draws off the seed is the form the document draws - so neither the seed nor
  * `formBlocks` can drift from the reference without a red test naming what moved.
  *
- * Two deliberate differences from the reference file, both asserted below so they stay
+ * Three deliberate differences from the reference file, each asserted below so they stay
  * deliberate rather than becoming drift:
  *
  * 1. Remediation and escalation is not a block of this form. The document marks it
@@ -30,6 +30,12 @@ import {
  * 2. The case header opens the form. It is Outcome Case columns captured at intake
  *    (checklist-v8.md, caseHeaderFields), not checklist questions, and the reference file
  *    leaves its place empty rather than transcribing it.
+ * 3. Q-TAX-02's middle option reads PASS WITH ISSUES, where the document reads INSUFFICIENT
+ *    EVIDENCE (project owner, 2026-09-13; AD-055 amended). The reference file is left as it
+ *    was supplied rather than rewritten, so the provenance every other assertion here rests
+ *    on is intact and the one option that moved is named in the assertion itself. The same
+ *    rewording reaches a grid through optionsFor(scale, isTaxReview), which covers a section
+ *    added by checklist administration rather than anything the document draws.
  */
 
 // ---------------------------------------------------------------------------------------
@@ -311,8 +317,15 @@ describe('the checklist the app draws matches the reference document', () => {
     expect(optionsOf(tax, 'File Quality - Tax check section', 'Tax check reason')).toEqual(
       documentOptions('cc_taxcheckreason'),
     );
+    // Deliberate difference 3: the tax check outcome's middle option. The document still
+    // reads it INSUFFICIENT EVIDENCE and the form now reads it PASS WITH ISSUES (project
+    // owner, 2026-09-13; AD-055 amended). Asserted as a substitution on the document's own
+    // list rather than as a literal, so the order, the casing and the other two options are
+    // still read from the reference and any further drift still reddens this test.
     expect(optionsOf(tax, 'File Quality - Tax check section', 'Tax check outcome')).toEqual(
-      documentOptions('cc_taxcheckoutcome'),
+      documentOptions('cc_taxcheckoutcome').map((label) =>
+        label === 'INSUFFICIENT EVIDENCE' ? 'PASS WITH ISSUES' : label,
+      ),
     );
     expect(optionsOf(aqs, 'File Quality Outcome', 'File quality outcome')).toEqual(
       documentOptions('cc_filequalityoutcome'),

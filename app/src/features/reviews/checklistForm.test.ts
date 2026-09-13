@@ -362,11 +362,53 @@ describe('inlineOptionsFor', () => {
     ]);
   });
 
-  it('orders the tax check outcome PASS, INSUFFICIENT EVIDENCE, FAIL as the document does', () => {
+  it('orders the tax check outcome PASS, PASS WITH ISSUES, FAIL as the document does', () => {
     expect(inlineOptionsFor(120910006)).toEqual([
       { value: 120910300, label: 'PASS' },
-      { value: 120910302, label: 'INSUFFICIENT EVIDENCE' },
+      { value: 120910302, label: 'PASS WITH ISSUES' },
       { value: 120910301, label: 'FAIL' },
+    ]);
+  });
+
+  it('renames 120910302 for the tax check only, leaving the value it saves alone', () => {
+    // AD-055 amended: the Tax check reads 120910302 as "Pass with issues" where the
+    // suitability grid that shares 120910006 still reads it as "Insufficient evidence".
+    // Wording only - the value the checker ticks is the same one, which is what the value
+    // assertions here are for, and so the remediation it triggers is unchanged too.
+    expect(inlineOptionsFor(120910006)[1]).toEqual({
+      value: 120910302,
+      label: 'PASS WITH ISSUES',
+    });
+    expect(optionsFor(120910006)[2]).toEqual({
+      value: 120910302,
+      label: 'Insufficient evidence',
+    });
+  });
+
+  it('heads a Tax review grid Pass with issues, and every other review Insufficient evidence', () => {
+    // Reaches only a section added through checklist administration (AD-123) whose questions
+    // all share 120910006 - Q-TAX-02 itself is drawn inline. Keyed on the review because
+    // "for tax checks" is what was reworded, so a Both-owned section answered on a Tax
+    // review is a tax check. Same value either way; only the wording moves.
+    expect(optionsFor(120910006, true).map((o) => o.label)).toEqual([
+      'Pass',
+      'Fail',
+      'Pass with issues',
+    ]);
+    expect(optionsFor(120910006, false).map((o) => o.label)).toEqual([
+      'Pass',
+      'Fail',
+      'Insufficient evidence',
+    ]);
+    expect(optionsFor(120910006, true)[2].value).toBe(120910302);
+  });
+
+  it('leaves a scale the Tax check never reworded alone on a Tax review', () => {
+    // The Consumer Duty overlay shares 120910302 and was not part of the rename.
+    expect(optionsFor(120910009, true).map((o) => o.label)).toEqual([
+      'Yes',
+      'No',
+      'Insufficient evidence',
     ]);
   });
 

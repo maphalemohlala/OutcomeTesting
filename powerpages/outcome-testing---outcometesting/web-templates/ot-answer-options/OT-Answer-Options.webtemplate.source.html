@@ -7,19 +7,27 @@
   authority. A value added here without a matching change there is refused on save.
 
   Single select falls to the else branch and means Primary root cause only. Q-TAX-02
-  was retyped to Pass / Fail / Insufficient evidence under AD-055, which is what makes
+  was retyped to Pass / Fail / Insufficient evidence under AD-055 (its third option now reads
+  "Pass with issues" in every Tax context; see below), which is what makes
   that unambiguous.
 {% endcomment %}
 {% comment %}
   Labels and order here are the document's INLINE ones, which are not always the grid's.
   Where the Checker Checklist draws an outcome scale beside its question rather than as a
   tick column it sets it in upper case - PASS / FAIL, YES / NO, PASS / PASS WITH ISSUES /
-  ... - and it orders the tax check outcome PASS, INSUFFICIENT EVIDENCE, FAIL, not the
+  ... - and it orders the tax check outcome PASS, PASS WITH ISSUES, FAIL, not the
   Pass / Fail / Insufficient evidence its suitability grid heads columns with. This include
   only ever renders the inline form (the review page's grid path builds its own columns from
   its own labels), so the casing and the order belong here. Primary root cause is title case
   on the document and stays as it is. The app makes the same reading in checklistForm.ts,
   inlineOptionsFor.
+
+  The tax check's third option is the one place the two readings differ in WORDING and not
+  only in case: 120910302 is "PASS WITH ISSUES" here and "Insufficient evidence" on the
+  suitability grid, which heads the same scale (AD-055 amended). That is why the rename sits
+  on this inline-only include rather than on the scale - 120910006 is shared with S-E1 to
+  S-E5 and S-CRP, and renaming the option itself would have relabelled six AQS sections
+  nobody asked to change.
 
   Only the labels move. The values are unchanged, and ResponseRules.PermittedChoices is
   still the authority on which of them may be saved.
@@ -30,7 +38,7 @@
     {% assign labels = 'PASS,FAIL' | split: ',' %}
   {% when 120910006 %}
     {% assign values = '120910300,120910302,120910301' | split: ',' %}
-    {% assign labels = 'PASS,INSUFFICIENT EVIDENCE,FAIL' | split: ',' %}
+    {% assign labels = 'PASS,PASS WITH ISSUES,FAIL' | split: ',' %}
   {% when 120910007 %}
     {% assign values = '120910305,120910306' | split: ',' %}
     {% assign labels = 'YES,NO' | split: ',' %}

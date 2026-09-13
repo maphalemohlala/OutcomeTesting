@@ -472,7 +472,7 @@
           "enum": [
             "Pass",
             "Fail",
-            "Insufficient evidence"
+            "Pass with issues"
           ],
           "x-ms-enum-values": [
             120910300,

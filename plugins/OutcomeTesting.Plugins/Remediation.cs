@@ -180,7 +180,7 @@ namespace OutcomeTesting.Plugins
         /// (see <see cref="IsRemediableScale"/>): the outcome is the reason the action
         /// gives, written into the description by
         /// <see cref="Describe(string, string, IList{string})"/> as "(Tax check:
-        /// Insufficient evidence)" or as the grade's own label, so listing it again as an
+        /// Pass with issues)" or as the grade's own label, so listing it again as an
         /// issue only says the same thing twice. It is the outcome, and every other item
         /// is a reason for it - the renderers show it as the remediation's Outcome and
         /// number only the reasons (project owner, 2026-09-10).

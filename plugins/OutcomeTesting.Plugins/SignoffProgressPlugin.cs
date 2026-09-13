@@ -26,6 +26,11 @@ namespace OutcomeTesting.Plugins
         private const string ClockStartedOnAttr = "al_clockstartedon";
         private const string DecisionAttr = "al_signoffdecision";
         private const string NotesAttr = "al_notes";
+
+        // Who signed, read back from the row SignoffRequestPlugin stamped. Named there so
+        // the writer and the reader cannot drift apart on the column name.
+        private const string SignedByIdAttr = SignoffRequestPlugin.SignedByIdAttr;
+        private const string SignedByNameAttr = SignoffRequestPlugin.SignedByNameAttr;
         private const string ActionLookup = "al_remediationactionid";
         private const string CaseLookup = "al_outcomecaseid";
         private const string ReviewLookup = "al_reviewinstanceid";
@@ -99,6 +104,17 @@ namespace OutcomeTesting.Plugins
             // both doors — that is the point of them living here.
             if (!CommandHelpers.IsWithinMessage(context, SignOffRemediationPlugin.MessageName))
             {
+                // The signatory, not the caller. A portal write reaches Dataverse as the
+                // site's application user (AD-053), so leaving WriteAuditEvent to fall back
+                // to context.InitiatingUserId recorded every portal sign-off against
+                // "# PowerPages Data Runtime PROD" - the one question an audit trail exists
+                // to answer, unanswered. SignoffRequestPlugin stamps the contact on the row
+                // for exactly this, and CompleteRequestPlugin has always named its contact
+                // the same way. Falls back to the caller where the row names no signatory,
+                // which is every sign-off written before those columns existed.
+                var signedByName = signoff.GetAttributeValue<string>(SignedByNameAttr);
+                var actorId = SignatoryId(signoff);
+
                 CommandHelpers.WriteAuditEvent(
                     service,
                     CommandSignOffRemediation,
@@ -106,9 +122,11 @@ namespace OutcomeTesting.Plugins
                     ActionEntity,
                     actionRef.Id,
                     signoff.GetAttributeValue<string>(NotesAttr),
-                    "Signed off from the portal: " + DescribeDecision(decision.Value) + ". Sign-off " + signoff.Id.ToString("D"),
+                    DescribeSignoff(decision.Value, signedByName),
                     idempotencyKey,
-                    context);
+                    context,
+                    actorId,
+                    signedByName);
             }
 
             QueueSignoffNotification(service, context, signoff, actionRef, decision.Value);
@@ -438,6 +456,51 @@ namespace OutcomeTesting.Plugins
         private static string DescribeDecision(int decision)
         {
             return decision == DecisionApprovedValue ? "Approved" : "Rejected";
+        }
+
+        /// <summary>
+        /// The audit event's details line: the decision and who made it.
+        ///
+        /// The sign-off's own GUID used to close this sentence ("Sign-off 3a8e654a-52af-..."),
+        /// which told a reader nothing they could act on - the event already carries the
+        /// target id in its own column, and a person reading a case history wants the name.
+        /// Naming the signatory is also what makes this line legible on the rows where the
+        /// actor columns are the fallback rather than the contact.
+        ///
+        /// Falls back to the bare decision where the row names no signatory, which is every
+        /// sign-off written before those columns existed. Deliberately not the GUID: an
+        /// unnamed signatory reads better as unnamed than as sixteen bytes of hex.
+        /// </summary>
+        /// <summary>
+        /// The contact who signed, from the row, or null where it names none.
+        ///
+        /// Null rather than Guid.Empty so the caller falls through to WriteAuditEvent's own
+        /// default - the initiating user - which is the right answer for every sign-off
+        /// written before the signatory columns existed. A malformed id is treated as absent
+        /// for the same reason: an audit event attributed to nobody is worse than one
+        /// attributed to the caller, and refusing the sign-off outright over a bad string
+        /// would lose a decision the supervisor has already made.
+        /// </summary>
+        public static Guid? SignatoryId(Entity signoff)
+        {
+            if (signoff == null)
+            {
+                return null;
+            }
+
+            Guid parsed;
+            return Guid.TryParse(signoff.GetAttributeValue<string>(SignedByIdAttr), out parsed)
+                && parsed != Guid.Empty
+                ? parsed
+                : (Guid?)null;
+        }
+
+        public static string DescribeSignoff(int decision, string signedByName)
+        {
+            var text = "Signed off from the portal: " + DescribeDecision(decision);
+            return string.IsNullOrWhiteSpace(signedByName)
+                ? text + "."
+                : text + " by " + signedByName.Trim() + ".";
         }
     }
 }

@@ -67,7 +67,7 @@ export type Al_outcomecasesal_taxcheckrequired = keyof typeof Al_outcomecasesal_
 export const Al_outcomecasesal_taxoutcome = {
   120910300: 'Pass',
   120910301: 'Fail',
-  120910302: 'Insufficient evidence'
+  120910302: 'Pass with issues'
 } as const;
 export type Al_outcomecasesal_taxoutcome = keyof typeof Al_outcomecasesal_taxoutcome;
 export const Al_outcomecasesal_taxteamdisposition = {

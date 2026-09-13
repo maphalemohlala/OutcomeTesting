@@ -431,7 +431,17 @@ export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
               </>
             ) : null}
 
-            {formBlocks(state.detail.sections, state.detail.failPoints).map((block) =>
+            {/*
+              The discipline decides how a grid heads 120910302: "Pass with issues" on a Tax
+              review, "Insufficient evidence" everywhere else (AD-055 amended). Passed from
+              the page's own prop rather than read from the header, because the prop is what
+              decided which review this page is for in the first place.
+            */}
+            {formBlocks(
+              state.detail.sections,
+              state.detail.failPoints,
+              reviewType === 'Tax',
+            ).map((block) =>
               block.kind === 'failpoints' ? (
                 <FailPoints key={block.id} title={block.title} points={block.points} />
               ) : (

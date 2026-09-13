@@ -241,6 +241,86 @@
             <Description description="The remediation action being signed off (BR-008, FR-023). Optional because a sign-off can be recorded at case level. Restrict delete keeps the sign-off traceable to the remediation it validated." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_SignedByContactId">
+          <Type>nvarchar</Type>
+          <Name>al_signedbycontactid</Name>
+          <LogicalName>al_signedbycontactid</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>text</Format>
+          <MaxLength>100</MaxLength>
+          <Length>200</Length>
+          <displaynames>
+            <displayname description="Signed by (contact id)" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The contact who signed, stamped by SignoffRequestPlugin from the contact row whose request column carried the decision. Held as an id and a name rather than a lookup, mirroring al_auditevent.al_ActorId: a signatory is a Contact on the portal path and a systemuser on a command path, so no one lookup spans both. Without it the row recorded no signatory at all and every reader fell back to ownerid, which for a portal write is the site's application user." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_SignedByName">
+          <Type>nvarchar</Type>
+          <Name>al_signedbyname</Name>
+          <LogicalName>al_signedbyname</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>text</Format>
+          <MaxLength>200</MaxLength>
+          <Length>400</Length>
+          <displaynames>
+            <displayname description="Signed by" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The signatory's name as at the moment of signing, resolved by CommandHelpers.ResolveActorName. Stored rather than looked up on read so the record says who signed even if the contact is later renamed or deactivated - BR-012 wants an immutable record." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_SignedOffOn">
           <Type>datetime</Type>
           <Name>al_signedoffon</Name>
