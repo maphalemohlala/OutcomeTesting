@@ -42,6 +42,19 @@ namespace OutcomeTesting.Plugins
         private const string ActionEntity = "al_remediationaction";
         public const string RequestAttr = "al_signoffrequest";
 
+        // Who signed. An id and a name rather than a lookup, which is the shape
+        // al_auditevent already uses for al_ActorId and al_ActorName, and for the same
+        // reason: the signatory is a Contact on the portal path and a systemuser on a
+        // command path, so no one lookup spans both.
+        //
+        // Until this existed al_signoff recorded no signatory at all. The Code App fell back
+        // to owneridname, and because a portal write reaches Dataverse as the site's
+        // application user (AD-053) every sign-off made through the portal read as
+        // "# PowerPages Data Runtime PROD" - the row genuinely did not know who had approved
+        // it, which is not a record BR-008 or AD-031 can rest on.
+        public const string SignedByIdAttr = "al_signedbycontactid";
+        public const string SignedByNameAttr = "al_signedbyname";
+
         public SignoffRequestPlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(SignoffRequestPlugin))
         {
@@ -123,13 +136,26 @@ namespace OutcomeTesting.Plugins
                 [RequestAttr] = null,
             });
 
-            // Only the decision, the notes and the action - the shape the browser used to
-            // POST. The name, code, case and timestamp are stamped by SignoffGuardPlugin.
+            // Only the decision, the notes, the action and the signatory - the shape the
+            // browser used to POST, plus who signed it. The name, code, case and timestamp
+            // are stamped by SignoffGuardPlugin.
+            //
+            // The signatory is contactId, never anything the payload supplied: it is
+            // PrimaryEntityId, the contact row the Self-scoped permission limited to the
+            // signed-in user, and it is the same value EnsureSupervisorRole was checked
+            // against just above. A page cannot sign in someone else's name.
             var signoff = new Entity(SignoffEntity)
             {
                 ["al_signoffdecision"] = new OptionSetValue(payload.Decision),
                 ["al_remediationactionid"] = new EntityReference(ActionEntity, actionId),
+                [SignedByIdAttr] = contactId.ToString("D"),
             };
+
+            var signatory = CommandHelpers.ResolveActorName(service, contactId);
+            if (!string.IsNullOrWhiteSpace(signatory))
+            {
+                signoff[SignedByNameAttr] = signatory;
+            }
             if (!string.IsNullOrWhiteSpace(payload.Notes))
             {
                 signoff["al_notes"] = payload.Notes.Trim();

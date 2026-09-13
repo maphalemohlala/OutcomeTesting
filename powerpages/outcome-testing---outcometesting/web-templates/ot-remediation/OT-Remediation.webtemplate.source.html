@@ -283,6 +283,7 @@
         <attribute name="al_remediationactionid" />
         <attribute name="al_signoffdecision" />
         <attribute name="al_signedoffon" />
+        <attribute name="al_signedbyname" />
         <filter type="and">
           <condition attribute="al_remediationactionid" operator="in">
             {% for a in rows %}<value>{{ a.al_remediationactionid }}</value>{% endfor %}
@@ -866,7 +867,15 @@
                 Supervisor sign-off
                 <span class="ot-remedial-form__note">(complete remedial task in IO)</span>
               </th>
-              <td>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</td>
+              {% comment %}
+                The signatory sits between the decision and the date, the order the paper
+                form reads them in. al_signedbyname is stamped by SignoffRequestPlugin from
+                the contact whose own request column carried the decision, so it names the
+                supervisor rather than the site's application user a portal write arrives as.
+                A sign-off recorded before that column existed carries none and reads as
+                decision and date alone - which is the most its row can honestly say.
+              {% endcomment %}
+              <td>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}{% if latest_supervisor.al_signedbyname and latest_supervisor.al_signedbyname != '' %}, {{ latest_supervisor.al_signedbyname | escape }}{% endif %}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</td>
             </tr>
             <tr>
               <th scope="row">

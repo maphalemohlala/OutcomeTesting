@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using OutcomeTesting.Plugins;
 using Xunit;
@@ -322,5 +322,67 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Equal(CaseLifecycle.AwaitingSignoff, CaseStatus(svc));
         }
-    }
+    
+        // ---------------------------------------------------------------------------------
+        // Who signed (BR-008, AD-031, NFR-AUD-01)
+        // ---------------------------------------------------------------------------------
+
+        private static Entity SignedBy(string id, string name)
+        {
+            var signoff = new Entity("al_signoff", Guid.NewGuid());
+            if (id != null) signoff["al_signedbycontactid"] = id;
+            if (name != null) signoff["al_signedbyname"] = name;
+            return signoff;
+        }
+
+        [Fact]
+        public void Names_the_signatory_the_row_carries()
+        {
+            var contact = Guid.Parse("5ac28998-68a7-f111-aaac-e4fade069307");
+
+            Assert.Equal(contact, SignoffProgressPlugin.SignatoryId(SignedBy(contact.ToString("D"), "A Supervisor")));
+        }
+
+        [Fact]
+        public void Falls_back_to_the_caller_where_the_row_names_no_signatory()
+        {
+            // Every sign-off written before the signatory columns existed. Null lets
+            // WriteAuditEvent use the initiating user rather than attributing to nobody.
+            Assert.Null(SignoffProgressPlugin.SignatoryId(SignedBy(null, null)));
+            Assert.Null(SignoffProgressPlugin.SignatoryId(SignedBy("", null)));
+            Assert.Null(SignoffProgressPlugin.SignatoryId(SignedBy(Guid.Empty.ToString("D"), null)));
+        }
+
+        [Fact]
+        public void Treats_a_malformed_signatory_as_absent_rather_than_refusing_the_signoff()
+        {
+            // The supervisor has already decided; losing that over a bad string would be
+            // worse than recording it against the caller.
+            Assert.Null(SignoffProgressPlugin.SignatoryId(SignedBy("not-a-guid", "A Supervisor")));
+        }
+
+        [Fact]
+        public void Writes_the_signatory_into_the_details_line_instead_of_a_raw_guid()
+        {
+            // The line used to end "Sign-off 3a8e654a-52af-f111-aaac-e4fade069307", which
+            // told a reader nothing: the event already carries the target id in its own
+            // column, and a person reading a case history wants the name.
+            var details = SignoffProgressPlugin.DescribeSignoff(
+                SignoffProgressPlugin.DecisionApprovedValue, "A Supervisor");
+
+            Assert.Equal("Signed off from the portal: Approved by A Supervisor.", details);
+            Assert.DoesNotContain("-", details.Replace("Signed off", "").Replace("sign-off", ""));
+        }
+
+        [Fact]
+        public void Leaves_the_details_line_unnamed_rather_than_hexadecimal_when_nobody_is_named()
+        {
+            Assert.Equal(
+                "Signed off from the portal: Rejected.",
+                SignoffProgressPlugin.DescribeSignoff(SignoffProgressPlugin.DecisionRejectedValue, null));
+            Assert.Equal(
+                "Signed off from the portal: Approved.",
+                SignoffProgressPlugin.DescribeSignoff(SignoffProgressPlugin.DecisionApprovedValue, "   "));
+        }
+}
 }
