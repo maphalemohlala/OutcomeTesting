@@ -166,6 +166,24 @@ export function QuestionLibraryPage() {
   const { can, ready } = usePermissions();
   const canEdit = ready && can('question.retire', 'Edit');
 
+  // One render path for live and retired sections. A retired block used to be handed five
+  // no-op handlers to satisfy the props it could never fire; the block itself already
+  // withholds every button once the section is retired.
+  const renderSection = (section: LibrarySection) => (
+    <SectionBlock
+      key={section.id}
+      section={section}
+      canEdit={canEdit && !section.retired}
+      onAddQuestion={() => setEditing({ kind: 'add-question', sectionId: section.id })}
+      onEditQuestion={(question) =>
+        setEditing({ kind: 'edit-question', sectionId: section.id, question })
+      }
+      onRetireQuestion={(question) => setEditing({ kind: 'retire-question', question })}
+      onEditSection={() => setEditing({ kind: 'edit-section', section })}
+      onRetireSection={() => setEditing({ kind: 'retire-section', section })}
+    />
+  );
+
   const sections = state.status === 'ready' ? state.sections : [];
   const live = sections.filter((section) => !section.retired);
   const retired = sections.filter((section) => section.retired);
@@ -209,36 +227,12 @@ export function QuestionLibraryPage() {
               </div>
             ) : null}
 
-            {live.map((section) => (
-              <SectionBlock
-                key={section.id}
-                section={section}
-                canEdit={canEdit}
-                onAddQuestion={() => setEditing({ kind: 'add-question', sectionId: section.id })}
-                onEditQuestion={(question) =>
-                  setEditing({ kind: 'edit-question', sectionId: section.id, question })
-                }
-                onRetireQuestion={(question) => setEditing({ kind: 'retire-question', question })}
-                onEditSection={() => setEditing({ kind: 'edit-section', section })}
-                onRetireSection={() => setEditing({ kind: 'retire-section', section })}
-              />
-            ))}
+            {live.map(renderSection)}
 
             {retired.length > 0 ? (
               <details className="library__retired library__retired--sections">
                 <summary>Retired sections ({retired.length})</summary>
-                {retired.map((section) => (
-                  <SectionBlock
-                    key={section.id}
-                    section={section}
-                    canEdit={false}
-                    onAddQuestion={() => undefined}
-                    onEditQuestion={() => undefined}
-                    onRetireQuestion={() => undefined}
-                    onEditSection={() => undefined}
-                    onRetireSection={() => undefined}
-                  />
-                ))}
+                {retired.map(renderSection)}
               </details>
             ) : null}
           </div>

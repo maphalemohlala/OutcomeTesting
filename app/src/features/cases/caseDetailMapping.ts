@@ -15,11 +15,6 @@ import { date, text } from '../../lib/format';
  * testable (the Power Apps data SDK cannot be imported under vitest).
  */
 
-export interface CaseField {
-  label: string;
-  value: string | null;
-}
-
 /**
  * Raw current values for the editable case attributes, keyed by al_outcomecase logical
  * name. Choice fields carry the numeric option value (or null), dates carry yyyy-MM-dd

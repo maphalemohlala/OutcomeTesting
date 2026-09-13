@@ -84,5 +84,27 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Contains("120910105", description);
             Assert.Contains("optional", description.ToLowerInvariant());
         }
+
+        [Fact]
+        public void A_team_change_is_named_where_the_option_labels_are_known()
+        {
+            // FR-033: the change line is what a person reads on the history screen.
+            var description = UpdateSectionPlugin.DescribeChanges(
+                Section("Tax check", false, 120910100),
+                Section("Tax check", false, 120910105),
+                value => value == 120910100 ? "Tax team" : value == 120910105 ? "Both" : value.ToString());
+
+            Assert.Contains("'Tax team' -> 'Both'", description);
+            Assert.DoesNotContain("120910100", description);
+        }
+
+        [Fact]
+        public void Handing_a_section_to_the_other_team_is_guarded_but_sharing_it_is_not()
+        {
+            Assert.True(UpdateSectionPlugin.OwnerRoleChangeNeedsGuard(120910100, 120910101));
+            Assert.False(UpdateSectionPlugin.OwnerRoleChangeNeedsGuard(120910100, 120910105));
+            Assert.False(UpdateSectionPlugin.OwnerRoleChangeNeedsGuard(120910100, 120910100));
+            Assert.True(UpdateSectionPlugin.OwnerRoleChangeNeedsGuard(null, 120910101));
+        }
     }
 }

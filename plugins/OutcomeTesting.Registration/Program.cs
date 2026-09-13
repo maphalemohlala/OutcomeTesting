@@ -316,6 +316,11 @@ if (args.Length >= 3 && args[0].Equals("deletewebrole", StringComparison.Ordinal
     return DeleteWebRole(args);
 }
 
+if (args.Length >= 3 && args[0].Equals("deleteplugintype", StringComparison.OrdinalIgnoreCase))
+{
+    return DeletePluginType(args);
+}
+
 if (args.Length >= 3 && args[0].Equals("seedadmin", StringComparison.OrdinalIgnoreCase))
 {
     return SeedAdmin(args[1], args[2]);
@@ -5603,6 +5608,150 @@ int SetWebRoleAuth(string orgUrl, string roleName, string value)
 // point of the command: deleting an empty role is tidying, and deleting one that grants
 // something is a privilege change nobody asked for. The two are indistinguishable from the
 // role row alone, which is exactly how it would go wrong.
+// Removes a plug-in type registered in the environment that the assembly no longer carries,
+// together with whatever is bound to it. One such orphan blocks every assembly push for the
+// whole solution: pushassembly is refused with 0x8004418B "PluginType [...] not found in
+// PluginAssembly", which is how CorrectTaxOutcomePlugin - built and registered from a working
+// tree and then deleted without ever being committed, once OD-053 settled that a Tax outcome
+// is corrected by no command - blocked the 2026-09-13 audit deployment.
+//
+// Refuses a type whose .cs still sits beside this project: that is not an orphan, and
+// unregistering it would remove live behaviour. The order is the one
+// deploy/Remove-OrphanedPluginTypes.ps1 established: custom API request parameters and
+// response properties, then the custom API (whose delete cascades its implementation step -
+// deleting that step directly returns "Invalid plug-in registration stage"), then any step
+// still standing, then the type. Every delete is verified by re-query, as every other
+// environment write in this tool is.
+int DeletePluginType(string[] a)
+{
+    var orgUrl = a[1];
+    var typeName = a[2].Trim();
+    if (!ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine("This PERMANENTLY DELETES a registered plug-in type and everything bound to it.");
+        Console.Error.WriteLine("Usage: dotnet run -- deleteplugintype <orgUrl> <typeName> --confirm <orgUrl>");
+        return 1;
+    }
+
+    var shortName = typeName.Substring(typeName.LastIndexOf('.') + 1);
+    var fullName = typeName.Contains('.') ? typeName : "OutcomeTesting.Plugins." + shortName;
+
+    var source = PluginSourceFile(shortName);
+    if (source != null)
+    {
+        Console.Error.WriteLine($"{source} exists, so {shortName} is not an orphan. Refusing to unregister live code.");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var typeQuery = new QueryExpression("plugintype")
+    {
+        ColumnSet = new ColumnSet("typename", "pluginassemblyid"),
+        Criteria = new FilterExpression(),
+    };
+    typeQuery.Criteria.AddCondition("typename", ConditionOperator.Equal, fullName);
+    var types = svc.RetrieveMultiple(typeQuery).Entities;
+    if (types.Count == 0)
+    {
+        Console.WriteLine($"No plug-in type named '{fullName}'. Nothing to delete.");
+        return 0;
+    }
+
+    if (types.Count > 1)
+    {
+        Console.Error.WriteLine($"{types.Count} plug-in types are named '{fullName}'. Refusing to guess; nothing was deleted.");
+        return 1;
+    }
+
+    var typeId = types[0].Id;
+    var assembly = types[0].GetAttributeValue<EntityReference>("pluginassemblyid");
+    Console.WriteLine($"Plug-in type '{fullName}' ({typeId:D}) in assembly {(assembly == null ? "(none)" : assembly.Name)}.");
+
+    var apiQuery = new QueryExpression("customapi")
+    {
+        ColumnSet = new ColumnSet("uniquename"),
+        Criteria = new FilterExpression(),
+    };
+    apiQuery.Criteria.AddCondition("plugintypeid", ConditionOperator.Equal, typeId);
+    var apis = svc.RetrieveMultiple(apiQuery).Entities;
+    foreach (var api in apis)
+    {
+        Console.WriteLine($"  bound custom API {api.GetAttributeValue<string>("uniquename")} ({api.Id:D})");
+    }
+
+    var steps = StepsOfType(svc, typeId);
+    foreach (var step in steps)
+    {
+        Console.WriteLine($"  bound step '{step.GetAttributeValue<string>("name")}' ({step.Id:D})");
+    }
+
+    foreach (var api in apis)
+    {
+        foreach (var (table, idAttr) in new[] { ("customapirequestparameter", "customapirequestparameterid"), ("customapiresponseproperty", "customapiresponsepropertyid") })
+        {
+            var partQuery = new QueryExpression(table) { ColumnSet = new ColumnSet(false), Criteria = new FilterExpression() };
+            partQuery.Criteria.AddCondition("customapiid", ConditionOperator.Equal, api.Id);
+            var parts = svc.RetrieveMultiple(partQuery).Entities;
+            foreach (var part in parts)
+            {
+                svc.Delete(table, part.Id);
+            }
+
+            Console.WriteLine($"  removed {parts.Count} from {table}");
+        }
+
+        svc.Delete("customapi", api.Id);
+        Console.WriteLine($"  deleted custom API {api.GetAttributeValue<string>("uniquename")}");
+    }
+
+    // The custom API delete cascades its own step; anything registered by hand is still here.
+    foreach (var step in StepsOfType(svc, typeId))
+    {
+        svc.Delete("sdkmessageprocessingstep", step.Id);
+        Console.WriteLine($"  deleted step '{step.GetAttributeValue<string>("name")}'");
+    }
+
+    svc.Delete("plugintype", typeId);
+
+    var remaining = svc.RetrieveMultiple(typeQuery).Entities;
+    Console.WriteLine(remaining.Count == 0
+        ? $"Deleted. No plug-in type named '{fullName}' remains; pushassembly is no longer blocked by it."
+        : $"Delete returned success but {remaining.Count} row(s) named '{fullName}' remain.");
+    return remaining.Count == 0 ? 0 : 2;
+}
+
+static List<Entity> StepsOfType(ServiceClient svc, Guid typeId)
+{
+    var query = new QueryExpression("sdkmessageprocessingstep")
+    {
+        ColumnSet = new ColumnSet("name"),
+        Criteria = new FilterExpression(),
+    };
+    query.Criteria.AddCondition("plugintypeid", ConditionOperator.Equal, typeId);
+    return new List<Entity>(svc.RetrieveMultiple(query).Entities);
+}
+
+// The .cs a plug-in type would be compiled from, walking up from this binary until the
+// plug-in project is found - so the answer does not depend on the directory dotnet run was
+// started in. Null when no such file exists, which is what makes a registered type an orphan.
+static string? PluginSourceFile(string shortName)
+{
+    var dir = new System.IO.DirectoryInfo(System.AppContext.BaseDirectory);
+    while (dir != null)
+    {
+        var candidate = System.IO.Path.Combine(dir.FullName, "OutcomeTesting.Plugins", shortName + ".cs");
+        if (System.IO.File.Exists(candidate))
+        {
+            return candidate;
+        }
+
+        dir = dir.Parent;
+    }
+
+    return null;
+}
+
 int DeleteWebRole(string[] a)
 {
     var orgUrl = a[1];
@@ -6469,7 +6618,7 @@ int VerifyTaxHeader(string[] a)
 
     var cases = new QueryExpression("al_outcomecase")
     {
-        ColumnSet = new ColumnSet("al_casereference", "al_taxcheckrequired", "al_taxteamdisposition", "al_reviewrouteid"),
+        ColumnSet = new ColumnSet("al_casereference", "al_taxcheckrequired", "al_taxteamdisposition", "al_reviewrouteid", "al_casestatus"),
         TopCount = 2,
         Criteria = new FilterExpression(),
     };
@@ -6482,6 +6631,22 @@ int VerifyTaxHeader(string[] a)
     }
 
     var target = caseRows[0];
+
+    // The plug-in re-derives the route and, from Assigned or Review In Progress, returns the
+    // case to the queue and releases its assignment (UpdateCaseDetailsPlugin.
+    // RequeueAfterRouteChange). The restore below puts three columns back; it cannot put an
+    // assignment back, so a case in either state is refused rather than proved on. The two
+    // values are CaseLifecycle.Assigned and ReviewInProgress; this tool does not link the
+    // plug-in assembly.
+    var caseStatus = target.GetAttributeValue<OptionSetValue>("al_casestatus");
+    if (caseStatus != null && (caseStatus.Value == 120910584 || caseStatus.Value == 120910585))
+    {
+        Console.Error.WriteLine(
+            "'" + caseReference + "' is Assigned or Review In Progress. A header edit there re-queues the case " +
+            "and releases its assignment, which this harness cannot restore. Name a case in another state.");
+        return 1;
+    }
+
     var contactId = FindId(svc, "contact", ("emailaddress1", contactEmail));
     if (contactId == Guid.Empty)
     {

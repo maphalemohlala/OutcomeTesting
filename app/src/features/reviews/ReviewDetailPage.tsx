@@ -12,8 +12,8 @@ import {
   type FailPoint,
   type FormBlock,
   type FormGroup,
-  type HeaderField,
 } from './checklistForm';
+import { CaseHeaderTable } from './CaseHeaderTable';
 import '../../styles/document.css';
 import './ReviewDetailPage.css';
 
@@ -92,34 +92,6 @@ function onScale(row: FormRow<ReviewResponse>, block: SectionBlock): boolean {
  * The case header: the document's opening block, its eighteen fields two to a row. Outcome
  * Case columns captured at intake, not checklist questions (checklist-v8.md).
  */
-function HeaderTable({ fields }: { fields: HeaderField[] | null }) {
-  if (fields === null) {
-    return <p className="intro">The case header could not be read, so it is not shown here.</p>;
-  }
-
-  const pairs: HeaderField[][] = [];
-  for (let i = 0; i < fields.length; i += 2) pairs.push(fields.slice(i, i + 2));
-
-  return (
-    <table className="meta">
-      <tbody>
-        {pairs.map((pair) => (
-          <tr key={pair[0].label}>
-            {pair.map((field) => [
-              <td key={`${field.label}-l`} className="lbl">
-                {field.label}
-              </td>,
-              <td key={`${field.label}-v`} className="val">
-                {field.value ?? ''}
-              </td>,
-            ])}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
 /**
  * Primary root cause, in the 3x3 the document lays it out in, under its own heading rather
  * than in a value cell of the block's table.
@@ -420,7 +392,11 @@ export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
             <div className="doc-footer">Outcome Testing Checker Checklist | V5 Draft</div>
             <h1>Outcome Testing - Checker Checklist</h1>
 
-            <HeaderTable fields={state.detail.caseHeader} />
+            {state.detail.caseHeader === null ? (
+              <p className="intro">The case header could not be read, so it is not shown here.</p>
+            ) : (
+              <CaseHeaderTable fields={state.detail.caseHeader} variant="review" />
+            )}
 
             {state.detail.sections.length === 0 ? (
               <>

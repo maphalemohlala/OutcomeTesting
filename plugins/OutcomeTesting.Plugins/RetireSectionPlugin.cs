@@ -57,7 +57,7 @@ namespace OutcomeTesting.Plugins
             }
 
             var section = userService.Retrieve(
-                SectionEntity, sectionId, new ColumnSet("al_sectioncode", "al_name"));
+                SectionEntity, sectionId, new ColumnSet("al_sectioncode", "al_name", "al_effectiveto"));
 
             // Retiring the section removes its questions from the form and the gate, so a
             // load-bearing code inside it is refused exactly as retiring that question
@@ -68,7 +68,15 @@ namespace OutcomeTesting.Plugins
                 throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + refusal);
             }
 
-            var effectiveTo = RetireQuestionPlugin.ParseEffectiveTo(effectiveToArg, DateTime.UtcNow.Date);
+            var today = DateTime.UtcNow.Date;
+            var effectiveTo = RetireQuestionPlugin.ParseEffectiveTo(effectiveToArg, today);
+
+            var alreadyRetired = RetireQuestionPlugin.AlreadyRetiredRefusal(
+                section.GetAttributeValue<DateTime?>("al_effectiveto"), today, "section");
+            if (alreadyRetired != null)
+            {
+                throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + alreadyRetired);
+            }
 
             userService.Update(new Entity(SectionEntity, sectionId) { ["al_effectiveto"] = effectiveTo });
 
@@ -89,13 +97,24 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string ProtectedCodeIn(IEnumerable<string> questionCodes)
         {
+            return ProtectedCodeIn(
+                questionCodes,
+                "Retiring the section that holds it would take it out of the form, so the section cannot be retired.");
+        }
+
+        /// <summary>
+        /// The same guard for the other edits that take a section's questions out of a
+        /// discipline's form, each naming its own consequence: making a section optional,
+        /// or handing it to the other team (UpdateSectionPlugin).
+        /// </summary>
+        public static string ProtectedCodeIn(IEnumerable<string> questionCodes, string consequence)
+        {
             foreach (var code in questionCodes)
             {
                 var reason = ChecklistGuards.ProtectedReason(code);
                 if (reason != null)
                 {
-                    return reason +
-                        " Retiring the section that holds it would take it out of the form, so the section cannot be retired.";
+                    return reason + " " + consequence;
                 }
             }
 

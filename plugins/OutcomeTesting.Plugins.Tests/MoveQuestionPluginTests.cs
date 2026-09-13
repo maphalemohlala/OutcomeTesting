@@ -38,5 +38,30 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.NotNull(refusal);
             Assert.Contains("already in", refusal);
         }
+
+        private static readonly DateTime Today = new DateTime(2026, 9, 13);
+
+        [Fact]
+        public void A_retired_question_cannot_be_moved()
+        {
+            // Moving it would date the old version out again - later than it was - and so
+            // bring it back into force for the gap.
+            var refusal = MoveQuestionPlugin.RetiredRefusal(new DateTime(2026, 8, 1), Today);
+
+            Assert.NotNull(refusal);
+            Assert.Contains("already retired", refusal);
+        }
+
+        [Fact]
+        public void A_question_dated_out_in_the_future_may_still_move()
+        {
+            Assert.Null(MoveQuestionPlugin.RetiredRefusal(new DateTime(2026, 10, 1), Today));
+        }
+
+        [Fact]
+        public void A_live_question_may_move()
+        {
+            Assert.Null(MoveQuestionPlugin.RetiredRefusal(null, Today));
+        }
     }
 }

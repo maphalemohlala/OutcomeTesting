@@ -5,9 +5,9 @@
  * authoritative. Sections and question versions use the same window, and the plug-in
  * assembly says so structurally: `SectionRules.IsSectionEffective` delegates to
  * `ResponseRules.IsVersionEffective` outright, with the comment "so the two can never
- * diverge". This module is the client half of that arrangement — `libraryStatus.inForce`
- * and `versionEffective.isVersionEffective` are thin delegations to it rather than second
- * and third copies of the rule.
+ * diverge". This module is the client half of that arrangement: the Question library reads
+ * it directly, and `versionEffective.isVersionEffective` is a thin delegation to it rather
+ * than a second copy of the rule.
  */
 
 /** The UTC day a date-only column or a timestamp falls on, or null when it is not set. */

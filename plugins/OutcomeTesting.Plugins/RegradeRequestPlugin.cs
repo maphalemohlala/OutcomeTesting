@@ -168,12 +168,9 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static void EnsureSupervisorRole(IOrganizationService service, Guid contactId)
         {
-            foreach (var role in WebRoleRegistry.RolesForContact(service, contactId))
+            if (WebRoleRegistry.HasRole(service, contactId, WebRoleRegistry.TcSupervisorRole))
             {
-                if (string.Equals(role, WebRoleRegistry.TcSupervisorRole, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
+                return;
             }
 
             throw new InvalidPluginExecutionException(

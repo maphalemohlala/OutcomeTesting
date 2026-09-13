@@ -50,6 +50,18 @@ namespace OutcomeTesting.Plugins
         private const int StatusSubmitted = 120910212;
         private const int CommandUpdateCaseDetails = 120910752;
 
+        /// <summary>
+        /// The two option sets the page may set, pinned here so a value the browser sends
+        /// is checked before it is written. The command path parses labels against the
+        /// option set; this path took any integer, and DeriveRoute silently did nothing
+        /// with one it did not know, leaving a blank header under an audit line that named
+        /// a change.
+        /// </summary>
+        public const int TaxCheckRequiredYes = 120910560;
+        public const int TaxCheckRequiredNo = 120910561;
+        public const int DispositionSubmitToAqs = 120910570;
+        public const int DispositionReturnToParaplanner = 120910571;
+
         public CaseHeaderRequestPlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(CaseHeaderRequestPlugin))
         {
@@ -122,6 +134,12 @@ namespace OutcomeTesting.Plugins
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.ValidationPrefix + "A case header edit must change at least one field.");
+            }
+
+            var unknown = UnknownOptionRefusal(payload);
+            if (unknown != null)
+            {
+                throw new InvalidPluginExecutionException(CommandHelpers.ValidationPrefix + unknown);
             }
 
             // The role is the contact's, read from the platform, never a claim in the
@@ -214,17 +232,37 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// Why the payload's option values cannot be written, or null when each is either
+        /// unsent (zero) or a value its column actually carries.
+        /// </summary>
+        public static string UnknownOptionRefusal(CaseHeaderRequestPayload payload)
+        {
+            if (payload.TaxCheckRequired != 0
+                && payload.TaxCheckRequired != TaxCheckRequiredYes
+                && payload.TaxCheckRequired != TaxCheckRequiredNo)
+            {
+                return "'" + payload.TaxCheckRequired + "' is not a Tax check required option.";
+            }
+
+            if (payload.TaxTeamDisposition != 0
+                && payload.TaxTeamDisposition != DispositionSubmitToAqs
+                && payload.TaxTeamDisposition != DispositionReturnToParaplanner)
+            {
+                return "'" + payload.TaxTeamDisposition + "' is not a For Tax team usage option.";
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Only the Tax team edits the Tax team's fields. Refused in the words the page can
         /// show, for the reason that is actually true.
         /// </summary>
         public static void EnsureTaxReviewerRole(IOrganizationService service, Guid contactId)
         {
-            foreach (var role in WebRoleRegistry.RolesForContact(service, contactId))
+            if (WebRoleRegistry.HasRole(service, contactId, WebRoleRegistry.TaxReviewerRole))
             {
-                if (string.Equals(role, WebRoleRegistry.TaxReviewerRole, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
+                return;
             }
 
             throw new InvalidPluginExecutionException(

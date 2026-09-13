@@ -448,12 +448,6 @@ footer a:focus-visible, .footer a:focus-visible {
    remedial action, so a closed check keeps its rows and says so in the heading.
    Styled as a band rather than a caption so it reads as part of the grid it
    divides. */
-.ot-remedial-settled {
-  color: var(--colour-text-muted);
-  font-style: italic;
-  padding: var(--space-4) var(--space-3);
-}
-
 .ot-remedial-group th {
   background: var(--colour-surface-header);
   border-top: 1px solid var(--colour-border);

@@ -37,5 +37,13 @@ namespace OutcomeTesting.Plugins.Tests
             // null - and a guard that throws on the way to refusing is no guard.
             Assert.Null(RetireSectionPlugin.ProtectedCodeIn(new string[] { null, "Q-E1-01" }));
         }
+
+        [Fact]
+        public void The_consequence_is_the_callers_where_one_is_given()
+        {
+            var refusal = RetireSectionPlugin.ProtectedCodeIn(new[] { "Q-GR-01" }, "so it cannot change team.");
+
+            Assert.EndsWith("so it cannot change team.", refusal);
+        }
     }
 }

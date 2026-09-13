@@ -81,11 +81,26 @@ namespace OutcomeTesting.Plugins
             {
                 int ownerRole;
                 if (!int.TryParse(ownerRoleArg, NumberStyles.Integer, CultureInfo.InvariantCulture, out ownerRole)
-                    || !IsAssignableOwnerRole(ownerRole))
+                    || !SectionRules.IsAssignableOwnerRole(ownerRole))
                 {
                     throw new InvalidPluginExecutionException(
-                        CommandHelpers.PreconditionPrefix +
-                        "Owner role must be Tax (120910100), AQS (120910101) or Both (120910105).");
+                        CommandHelpers.PreconditionPrefix + SectionRules.AssignableOwnerRoleRefusal);
+                }
+
+                // Handing a section to the other team takes its questions off this team's
+                // form and out of its submit gate, exactly as retiring it would - so a
+                // load-bearing question inside it is refused the same way (AD-122). Both
+                // serves every discipline and is always safe to move to.
+                if (OwnerRoleChangeNeedsGuard(OwnerRoleOf(before), ownerRole))
+                {
+                    var roleRefusal = RetireSectionPlugin.ProtectedCodeIn(
+                        RetireSectionPlugin.QuestionCodesIn(userService, sectionId),
+                        "Handing the section that holds it to another team would take it off that team's form, so the section's owner role cannot change.");
+                    if (roleRefusal != null)
+                    {
+                        throw new InvalidPluginExecutionException(
+                            CommandHelpers.PreconditionPrefix + roleRefusal);
+                    }
                 }
 
                 after["al_ownerrole"] = new OptionSetValue(ownerRole);
@@ -117,7 +132,8 @@ namespace OutcomeTesting.Plugins
                 if (isOptional && !IsOptionalOf(before))
                 {
                     var refusal = RetireSectionPlugin.ProtectedCodeIn(
-                        RetireSectionPlugin.QuestionCodesIn(userService, sectionId));
+                        RetireSectionPlugin.QuestionCodesIn(userService, sectionId),
+                        "Making the section that holds it optional would excuse it, so the section cannot be made optional.");
                     if (refusal != null)
                     {
                         throw new InvalidPluginExecutionException(
@@ -128,7 +144,10 @@ namespace OutcomeTesting.Plugins
                 after["al_isoptional"] = isOptional;
             }
 
-            var changes = DescribeChanges(before, after);
+            // Named, not numbered: the change line is what a person reads on the history
+            // screen (FR-033), and "Owner role: '120910100' -> '120910105'" told them nothing.
+            var labels = new OptionLabels(systemService);
+            var changes = DescribeChanges(before, after, value => labels.Label(SectionEntity, "al_ownerrole", value));
             if (changes.Length == 0)
             {
                 // Nothing to write, and nothing to audit. An Audit Event recording no change
@@ -157,6 +176,16 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string DescribeChanges(Entity before, Entity after)
         {
+            return DescribeChanges(before, after, null);
+        }
+
+        /// <summary>
+        /// As above, with the owner role written through <paramref name="ownerRoleLabel"/>
+        /// where one is supplied - the option's label in the plug-in, the raw number in a
+        /// test that has no metadata to read.
+        /// </summary>
+        public static string DescribeChanges(Entity before, Entity after, Func<int, string> ownerRoleLabel)
+        {
             var clauses = new List<string>();
 
             AddIfChanged(clauses, "Name",
@@ -168,8 +197,8 @@ namespace OutcomeTesting.Plugins
                 after.GetAttributeValue<string>("al_helptext"));
 
             AddIfChanged(clauses, "Owner role",
-                OptionOf(before, "al_ownerrole"),
-                OptionOf(after, "al_ownerrole"));
+                OptionOf(before, "al_ownerrole", ownerRoleLabel),
+                OptionOf(after, "al_ownerrole", ownerRoleLabel));
 
             AddIfChanged(clauses, "Display order",
                 IntOf(before, "al_displayorder"),
@@ -196,12 +225,33 @@ namespace OutcomeTesting.Plugins
             }
         }
 
-        private static string OptionOf(Entity row, string attribute)
+        private static string OptionOf(Entity row, string attribute, Func<int, string> label)
         {
             var option = row.GetAttributeValue<OptionSetValue>(attribute);
-            return option == null
-                ? string.Empty
-                : option.Value.ToString(CultureInfo.InvariantCulture);
+            if (option == null)
+            {
+                return string.Empty;
+            }
+
+            return label == null
+                ? option.Value.ToString(CultureInfo.InvariantCulture)
+                : label(option.Value);
+        }
+
+        /// <summary>The section's owner role, or null where the row carries none.</summary>
+        public static int? OwnerRoleOf(Entity row)
+        {
+            var option = row.GetAttributeValue<OptionSetValue>("al_ownerrole");
+            return option == null ? (int?)null : option.Value;
+        }
+
+        /// <summary>
+        /// Whether a change of owner role has to be checked against the section's protected
+        /// questions: any move to a role other than Both, since Both serves every discipline.
+        /// </summary>
+        public static bool OwnerRoleChangeNeedsGuard(int? before, int after)
+        {
+            return (!before.HasValue || before.Value != after) && after != SectionRules.OwnerRoleBoth;
         }
 
         private static string IntOf(Entity row, string attribute)
@@ -214,13 +264,6 @@ namespace OutcomeTesting.Plugins
         private static bool IsOptionalOf(Entity row)
         {
             return row.Contains("al_isoptional") && row.GetAttributeValue<bool>("al_isoptional");
-        }
-
-        private static bool IsAssignableOwnerRole(int ownerRole)
-        {
-            return ownerRole == ResponseRules.OwnerRoleTaxTeam
-                || ownerRole == ResponseRules.OwnerRoleAqsChecker
-                || ownerRole == SectionRules.OwnerRoleBoth;
         }
 
         private static Entity CopyOf(Entity row)

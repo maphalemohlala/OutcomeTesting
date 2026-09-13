@@ -280,7 +280,7 @@ export function RemediationPage() {
   // stays at zero because nothing here changes what it reads.
   const state = useRemediation(caseId, 0);
 
-  const allActions = state.status === 'ready' ? state.actions : [];
+  const allActions = useMemo(() => (state.status === 'ready' ? state.actions : []), [state]);
   // The outcome the remediation was raised for. Read across every action rather than the
   // filtered set: it is the case's, so narrowing the table by status must not change it.
   const outcome = useMemo(() => outcomeOf(allActions), [allActions]);

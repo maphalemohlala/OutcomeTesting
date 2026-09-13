@@ -100,7 +100,7 @@ namespace OutcomeTesting.Plugins
                     "That section is no longer part of the checklist, so a question cannot be added to it.");
             }
 
-            EnsureCodeIsFree(userService, questionCode);
+            ChecklistQueries.EnsureQuestionCodeIsFree(userService, questionCode);
 
             var displayOrder = ResolveDisplayOrder(userService, sectionId, displayOrderArg);
 
@@ -186,29 +186,6 @@ namespace OutcomeTesting.Plugins
             }
 
             return parsed;
-        }
-
-        /// <summary>
-        /// al_questioncode carries the al_questioncodekey alternate key, so a duplicate
-        /// collides at the platform. Caught here so the caller reads a sentence about the
-        /// code rather than a key-violation stack.
-        /// </summary>
-        private static void EnsureCodeIsFree(IOrganizationService service, string questionCode)
-        {
-            var query = new QueryExpression(QuestionEntity)
-            {
-                ColumnSet = new ColumnSet("al_questionid"),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("al_questioncode", ConditionOperator.Equal, questionCode);
-
-            if (service.RetrieveMultiple(query).Entities.Count > 0)
-            {
-                throw new InvalidPluginExecutionException(
-                    CommandHelpers.PreconditionPrefix +
-                    "Question code '" + questionCode + "' is already in use.");
-            }
         }
 
         /// <summary>Explicit order where given, otherwise after the highest in the section.</summary>

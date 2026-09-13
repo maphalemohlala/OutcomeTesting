@@ -65,11 +65,10 @@ namespace OutcomeTesting.Plugins
 
             int ownerRole;
             if (!int.TryParse(ownerRoleArg, NumberStyles.Integer, CultureInfo.InvariantCulture, out ownerRole)
-                || !IsAssignableOwnerRole(ownerRole))
+                || !SectionRules.IsAssignableOwnerRole(ownerRole))
             {
                 throw new InvalidPluginExecutionException(
-                    CommandHelpers.PreconditionPrefix +
-                    "Owner role must be Tax (120910100), AQS (120910101) or Both (120910105).");
+                    CommandHelpers.PreconditionPrefix + SectionRules.AssignableOwnerRoleRefusal);
             }
 
             // Parsed before anything is written, so a bad element refuses the call rather
@@ -82,12 +81,20 @@ namespace OutcomeTesting.Plugins
                 && string.Equals(isOptionalArg.Trim(), "true", StringComparison.OrdinalIgnoreCase);
 
             EnsureSectionCodeIsFree(userService, sectionCode);
+
+            // Checked for every question before the section is created, not as each is
+            // written: a collision on the third question would otherwise roll back a
+            // transaction that had looked like it was succeeding. One query for all of them.
+            var codes = new List<string>();
             foreach (var spec in questions)
             {
-                EnsureQuestionCodeIsFree(userService, spec.Code);
+                codes.Add(spec.Code);
             }
 
-            var checklistVersionId = ResolveChecklistVersion(userService);
+            ChecklistQueries.EnsureQuestionCodesAreFree(userService, codes);
+
+            var checklistVersionId = ChecklistQueries.ChecklistVersionInForce(
+                userService, "No checklist version is in force, so a section cannot be added (BR-013).");
             var displayOrder = ResolveDisplayOrder(userService, checklistVersionId, displayOrderArg);
 
             var section = new Entity(SectionEntity)
@@ -147,18 +154,6 @@ namespace OutcomeTesting.Plugins
             SetResponse(context, sectionId.ToString("D"), questionIds, auditId);
         }
 
-        /// <summary>
-        /// Tax, AQS or Both. Adviser, T&amp;C Manager and Manager / Admin are valid owner
-        /// roles that no review is ever opened as, so a section owned by one is owed by
-        /// nobody - refused rather than created as something invisible.
-        /// </summary>
-        private static bool IsAssignableOwnerRole(int ownerRole)
-        {
-            return ownerRole == ResponseRules.OwnerRoleTaxTeam
-                || ownerRole == ResponseRules.OwnerRoleAqsChecker
-                || ownerRole == SectionRules.OwnerRoleBoth;
-        }
-
         private static void EnsureSectionCodeIsFree(IOrganizationService service, string sectionCode)
         {
             var query = new QueryExpression(SectionEntity)
@@ -175,64 +170,6 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.PreconditionPrefix +
                     "Section code '" + sectionCode + "' is already in use.");
             }
-        }
-
-        /// <summary>
-        /// Checked for every question before the section is created, not as each is written:
-        /// a collision on the third question would otherwise roll back a transaction that
-        /// had looked like it was succeeding.
-        /// </summary>
-        private static void EnsureQuestionCodeIsFree(IOrganizationService service, string questionCode)
-        {
-            var query = new QueryExpression(QuestionEntity)
-            {
-                ColumnSet = new ColumnSet("al_questionid"),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("al_questioncode", ConditionOperator.Equal, questionCode);
-
-            if (service.RetrieveMultiple(query).Entities.Count > 0)
-            {
-                throw new InvalidPluginExecutionException(
-                    CommandHelpers.PreconditionPrefix +
-                    "Question code '" + questionCode + "' is already in use.");
-            }
-        }
-
-        /// <summary>
-        /// The checklist version in force today, resolved as ClaimCasePlugin resolves it:
-        /// the window is applied in memory rather than in the query, because a date-range
-        /// condition would put the answer at the mercy of how the platform compares a
-        /// date-only column to a UTC timestamp.
-        /// </summary>
-        private static Guid ResolveChecklistVersion(IOrganizationService service)
-        {
-            var query = new QueryExpression(ChecklistVersionEntity)
-            {
-                ColumnSet = new ColumnSet("al_effectivefrom", "al_effectiveto"),
-                Criteria = new FilterExpression
-                {
-                    Conditions = { new ConditionExpression("statecode", ConditionOperator.Equal, 0) },
-                },
-                Orders = { new OrderExpression("al_effectivefrom", OrderType.Descending) },
-            };
-
-            var today = DateTime.UtcNow.Date;
-            foreach (var version in service.RetrieveMultiple(query).Entities)
-            {
-                var from = version.GetAttributeValue<DateTime?>("al_effectivefrom");
-                var to = version.GetAttributeValue<DateTime?>("al_effectiveto");
-
-                if ((!from.HasValue || from.Value.Date <= today) && (!to.HasValue || to.Value.Date >= today))
-                {
-                    return version.Id;
-                }
-            }
-
-            throw new InvalidPluginExecutionException(
-                CommandHelpers.PreconditionPrefix +
-                "No checklist version is in force, so a section cannot be added (BR-013).");
         }
 
         private static int ResolveDisplayOrder(

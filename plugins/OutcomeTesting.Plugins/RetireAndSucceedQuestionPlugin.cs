@@ -61,7 +61,8 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            var current = GetCurrentVersion(userService, questionId);
+            var current = ChecklistQueries.CurrentVersionOf(
+                userService, questionId, "al_versionnumber", "al_responsetype", "al_ismandatory", "al_displayorder");
             if (current == null)
             {
                 throw new InvalidPluginExecutionException(
@@ -131,20 +132,6 @@ namespace OutcomeTesting.Plugins
                 "Superseded v" + currentNumber, newNumber.ToString(), idempotencyKey, context);
 
             SetResponse(context, newVersionId.ToString("D"), newNumber.ToString(), auditId, false);
-        }
-
-        private static Entity GetCurrentVersion(IOrganizationService service, Guid questionId)
-        {
-            var query = new QueryExpression(VersionEntity)
-            {
-                ColumnSet = new ColumnSet("al_versionnumber", "al_responsetype", "al_ismandatory", "al_displayorder"),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("al_questionid", ConditionOperator.Equal, questionId);
-            query.AddOrder("al_versionnumber", OrderType.Descending);
-            var found = service.RetrieveMultiple(query).Entities;
-            return found.Count > 0 ? found[0] : null;
         }
 
         private static void SetResponse(IPluginExecutionContext context, string newVersionId, string versionNumber, Guid auditId, bool conflict)

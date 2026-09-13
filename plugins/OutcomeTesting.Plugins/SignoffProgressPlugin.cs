@@ -47,6 +47,37 @@ namespace OutcomeTesting.Plugins
         {
         }
 
+        /// <summary>
+        /// The Audit Event key for one sign-off row - its own id, so each decision on an
+        /// action is recorded once and a second decision is not mistaken for a replay.
+        /// </summary>
+        public static string ReplayKeyFor(Guid signoffId)
+        {
+            return "signoff-" + signoffId.ToString("N");
+        }
+
+        /// <summary>
+        /// The created row's id. The post-operation target carries it; the pipeline's "id"
+        /// output is the fallback; and a row with neither falls back to the action, so the
+        /// guard still holds rather than lapsing.
+        /// </summary>
+        private static Guid SignoffId(IPluginExecutionContext context, Entity signoff, EntityReference actionRef)
+        {
+            if (signoff.Id != Guid.Empty)
+            {
+                return signoff.Id;
+            }
+
+            object created;
+            if (context.OutputParameters.TryGetValue("id", out created)
+                && created is Guid && (Guid)created != Guid.Empty)
+            {
+                return (Guid)created;
+            }
+
+            return actionRef.Id;
+        }
+
         protected override void ExecuteDataversePlugin(ILocalPluginContext localPluginContext)
         {
             if (localPluginContext == null)
@@ -76,9 +107,14 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            // A replay writes no second Audit Event: the key is derived from the action, and
-            // the guard has already refused a second sign-off on the same one (NFR-REL-01).
-            var idempotencyKey = "signoff-" + actionRef.Id.ToString("N");
+            // A replay writes no second Audit Event (NFR-REL-01). Keyed on the sign-off row,
+            // not the action: an action that is rejected and later approved is genuinely two
+            // decisions (SignoffGuardPlugin.AlreadySettled lets the second one in), and a key
+            // derived from the action found the rejection's event and returned here before
+            // the approval could move the case, record the outcome or write its own event -
+            // the IO-300003 deadlock moved one plug-in along. A platform retry of the same
+            // create carries the same row id, so the replay guard still holds.
+            var idempotencyKey = ReplayKeyFor(SignoffId(context, signoff, actionRef));
             if (CommandHelpers.FindAuditByKey(service, idempotencyKey, CommandSignOffRemediation) != null)
             {
                 return;

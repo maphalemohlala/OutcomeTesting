@@ -104,8 +104,38 @@ interface XmlElement {
  * Every `<tag>` in the document, with its attribute text and its content. Adequate because
  * none of the elements read here nest inside another of the same name.
  */
+/**
+ * One compiled pattern per tag and per attribute name, for the life of the module. Both
+ * scanners are called several times per cell, so a 60-column, 1,000-row extract used to
+ * compile a few hundred thousand RegExp objects on the UI thread before the preview drew.
+ * The element pattern is global and is walked to exhaustion by `elements`, which leaves
+ * its lastIndex at zero; it is reset before each use anyway, so a thrown match can never
+ * leave the next call starting mid-sheet.
+ */
+const elementPatterns = new Map<string, RegExp>();
+const attributePatterns = new Map<string, RegExp>();
+
+function elementPattern(tag: string): RegExp {
+  let pattern = elementPatterns.get(tag);
+  if (!pattern) {
+    pattern = new RegExp(`<${tag}(\\s[^>]*?)?(?:/>|>([\\s\\S]*?)</${tag}>)`, 'g');
+    elementPatterns.set(tag, pattern);
+  }
+  pattern.lastIndex = 0;
+  return pattern;
+}
+
+function attributePattern(name: string): RegExp {
+  let pattern = attributePatterns.get(name);
+  if (!pattern) {
+    pattern = new RegExp(`\\s${name}="([^"]*)"`);
+    attributePatterns.set(name, pattern);
+  }
+  return pattern;
+}
+
 function elements(xml: string, tag: string): XmlElement[] {
-  const pattern = new RegExp(`<${tag}(\\s[^>]*?)?(?:/>|>([\\s\\S]*?)</${tag}>)`, 'g');
+  const pattern = elementPattern(tag);
   const found: XmlElement[] = [];
   let match = pattern.exec(xml);
   while (match !== null) {
@@ -116,7 +146,7 @@ function elements(xml: string, tag: string): XmlElement[] {
 }
 
 function attribute(attributes: string, name: string): string | null {
-  const match = new RegExp(`\\s${name}="([^"]*)"`).exec(attributes);
+  const match = attributePattern(name).exec(attributes);
   return match ? decodeXml(match[1]) : null;
 }
 

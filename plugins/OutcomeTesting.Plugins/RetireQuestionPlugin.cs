@@ -76,12 +76,20 @@ namespace OutcomeTesting.Plugins
                     " It cannot be retired without a code change.");
             }
 
-            var effectiveTo = ParseEffectiveTo(effectiveToArg, DateTime.UtcNow.Date);
-            var current = CurrentVersion(userService, questionId);
+            var today = DateTime.UtcNow.Date;
+            var effectiveTo = ParseEffectiveTo(effectiveToArg, today);
+            var current = ChecklistQueries.CurrentVersionOf(userService, questionId, "al_versionnumber", "al_effectiveto");
             if (current == null)
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix + "That question has no version to retire.");
+            }
+
+            var alreadyRetired = AlreadyRetiredRefusal(
+                current.GetAttributeValue<DateTime?>("al_effectiveto"), today, "question");
+            if (alreadyRetired != null)
+            {
+                throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + alreadyRetired);
             }
 
             userService.Update(new Entity(VersionEntity, current.Id) { ["al_effectiveto"] = effectiveTo });
@@ -126,19 +134,22 @@ namespace OutcomeTesting.Plugins
             return day;
         }
 
-        private static Entity CurrentVersion(IOrganizationService service, Guid questionId)
+        /// <summary>
+        /// Why a row already out of force cannot be retired again, or null while it is live
+        /// or dated out only in the future. A second retire used to overwrite the first date
+        /// with today, which brought the row back into force for the gap and changed what
+        /// every review submitted in between owed. A future date may still be revised.
+        /// </summary>
+        public static string AlreadyRetiredRefusal(DateTime? effectiveTo, DateTime today, string subject)
         {
-            var query = new QueryExpression(VersionEntity)
+            if (!effectiveTo.HasValue || effectiveTo.Value.Date > today.Date)
             {
-                ColumnSet = new ColumnSet("al_versionnumber", "al_effectiveto"),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("al_questionid", ConditionOperator.Equal, questionId);
-            query.AddOrder("al_versionnumber", OrderType.Descending);
+                return null;
+            }
 
-            var found = service.RetrieveMultiple(query).Entities;
-            return found.Count > 0 ? found[0] : null;
+            return "That " + subject + " was retired on "
+                + effectiveTo.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                + " and is no longer in force, so there is nothing to retire.";
         }
 
         private static void SetResponse(

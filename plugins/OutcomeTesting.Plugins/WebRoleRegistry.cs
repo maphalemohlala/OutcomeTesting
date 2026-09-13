@@ -104,6 +104,25 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// Whether a contact holds one named web role. The portal plug-ins each gate a
+        /// write on this (the claim, the regrade, the sign-off and the Tax team header edit),
+        /// and each used to loop over <see cref="RolesForContact"/> itself; one comparison
+        /// here means a renamed or trimmed role is handled once, on every gate.
+        /// </summary>
+        public static bool HasRole(IOrganizationService service, Guid contactId, string roleName)
+        {
+            foreach (var role in RolesForContact(service, contactId))
+            {
+                if (string.Equals(role, roleName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Every web role row named <paramref name="roleName"/>, not just an arbitrary one.
         /// Backs <see cref="ExcludedFromResolution"/> only; <see cref="FindByName"/> keeps its
         /// found[0] behaviour for association targets, which is a separate pre-existing

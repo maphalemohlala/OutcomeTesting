@@ -384,5 +384,17 @@ namespace OutcomeTesting.Plugins.Tests
                 "Signed off from the portal: Approved.",
                 SignoffProgressPlugin.DescribeSignoff(SignoffProgressPlugin.DecisionApprovedValue, "   "));
         }
-}
+
+        [Fact]
+        public void A_second_decision_on_the_same_action_has_its_own_replay_key()
+        {
+            // Keyed on the action, the approval that followed a rejection found the
+            // rejection's Audit Event and returned before moving the case.
+            var rejection = SignoffProgressPlugin.ReplayKeyFor(Guid.NewGuid());
+            var approval = SignoffProgressPlugin.ReplayKeyFor(Guid.NewGuid());
+
+            Assert.NotEqual(rejection, approval);
+            Assert.StartsWith("signoff-", approval);
+        }
+    }
 }

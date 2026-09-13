@@ -104,24 +104,35 @@ namespace OutcomeTesting.Plugins
                     "The target section is no longer part of the checklist.");
             }
 
-            EnsureCodeIsFree(userService, newCode);
+            ChecklistQueries.EnsureQuestionCodeIsFree(userService, newCode);
 
             var today = DateTime.UtcNow.Date;
             var effectiveFrom = AddQuestionPlugin.ParseEffectiveFrom(effectiveFromArg, today);
 
             // Retire where it was. The version stays Active so its answers keep resolving.
-            var current = CurrentVersion(userService, questionId);
+            // One read carries everything the new version copies forward.
+            var current = ChecklistQueries.CurrentVersionOf(
+                userService, questionId,
+                "al_versionnumber", "al_effectiveto", "al_questiontext", "al_responsetype", "al_ismandatory", "al_displayorder");
             if (current == null)
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix + "That question has no version to move.");
             }
 
-            var source = userService.Retrieve(
-                VersionEntity, current.Id,
-                new ColumnSet("al_questiontext", "al_responsetype", "al_ismandatory", "al_displayorder"));
+            var retiredRefusal = RetiredRefusal(current.GetAttributeValue<DateTime?>("al_effectiveto"), today);
+            if (retiredRefusal != null)
+            {
+                throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + retiredRefusal);
+            }
 
-            userService.Update(new Entity(VersionEntity, current.Id) { ["al_effectiveto"] = today });
+            // Dated out on the day the new version starts, not today. A move announced ahead
+            // of time used to leave the question asked in neither section until that day: the
+            // old version ended today and the new one had not begun. The window is out of
+            // force from the start of effective-to (ResponseRules.IsVersionEffective), so
+            // ending the old on the day the new begins hands over with neither a gap nor a
+            // day on which both sections ask it.
+            userService.Update(new Entity(VersionEntity, current.Id) { ["al_effectiveto"] = effectiveFrom });
 
             // Create it where it is going, carrying the frozen answer shape forward.
             var newQuestionId = userService.Create(new Entity(QuestionEntity)
@@ -136,17 +147,17 @@ namespace OutcomeTesting.Plugins
             {
                 ["al_name"] = "Question version v1",
                 ["al_questionversioncode"] = "QV-" + newQuestionId.ToString("N") + "-v1",
-                ["al_questiontext"] = source.GetAttributeValue<string>("al_questiontext"),
+                ["al_questiontext"] = current.GetAttributeValue<string>("al_questiontext"),
                 ["al_versionnumber"] = 1,
                 ["al_effectivefrom"] = effectiveFrom,
-                ["al_ismandatory"] = source.GetAttributeValue<bool>("al_ismandatory"),
-                ["al_displayorder"] = source.GetAttributeValue<int>("al_displayorder"),
+                ["al_ismandatory"] = current.GetAttributeValue<bool>("al_ismandatory"),
+                ["al_displayorder"] = current.GetAttributeValue<int>("al_displayorder"),
                 ["al_questionid"] = new EntityReference(QuestionEntity, newQuestionId),
                 ["statecode"] = new OptionSetValue(0),
                 ["statuscode"] = new OptionSetValue(1),
             };
 
-            var responseType = source.GetAttributeValue<OptionSetValue>("al_responsetype");
+            var responseType = current.GetAttributeValue<OptionSetValue>("al_responsetype");
             if (responseType != null)
             {
                 newVersion["al_responsetype"] = new OptionSetValue(responseType.Value);
@@ -188,37 +199,20 @@ namespace OutcomeTesting.Plugins
             return null;
         }
 
-        private static void EnsureCodeIsFree(IOrganizationService service, string questionCode)
+        /// <summary>
+        /// Why a question already out of force cannot move, or null while it is live or
+        /// dated out only in the future. Moving a retired question would date its version
+        /// out again - later than it was - and so bring it back into force for the gap,
+        /// changing what every review submitted in between owed.
+        /// </summary>
+        public static string RetiredRefusal(DateTime? currentEffectiveTo, DateTime today)
         {
-            var query = new QueryExpression(QuestionEntity)
+            if (currentEffectiveTo.HasValue && currentEffectiveTo.Value.Date <= today.Date)
             {
-                ColumnSet = new ColumnSet("al_questionid"),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("al_questioncode", ConditionOperator.Equal, questionCode);
-
-            if (service.RetrieveMultiple(query).Entities.Count > 0)
-            {
-                throw new InvalidPluginExecutionException(
-                    CommandHelpers.PreconditionPrefix +
-                    "Question code '" + questionCode + "' is already in use.");
+                return "That question is already retired, so it cannot be moved. Add it to the target section as a new question instead.";
             }
-        }
 
-        private static Entity CurrentVersion(IOrganizationService service, Guid questionId)
-        {
-            var query = new QueryExpression(VersionEntity)
-            {
-                ColumnSet = new ColumnSet("al_versionnumber"),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("al_questionid", ConditionOperator.Equal, questionId);
-            query.AddOrder("al_versionnumber", OrderType.Descending);
-
-            var found = service.RetrieveMultiple(query).Entities;
-            return found.Count > 0 ? found[0] : null;
+            return null;
         }
 
         private static void SetResponse(

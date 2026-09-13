@@ -5,7 +5,8 @@ import { Al_sectionsal_ownerrole } from '../../generated/models/Al_sectionsModel
 import type { Al_questions } from '../../generated/models/Al_questionsModel';
 import type { Al_questionversions } from '../../generated/models/Al_questionversionsModel';
 import { Al_questionversionsal_responsetype } from '../../generated/models/Al_questionversionsModel';
-import { inForce, OWNER_ROLE_LABEL } from './libraryStatus';
+import { inForceOn } from '../../lib/effectiveWindow';
+import { OWNER_ROLE_LABEL } from '../../lib/ownerRole';
 
 /**
  * The al_section columns AD-123 added. The generated Al_sections model predates them, and
@@ -125,7 +126,7 @@ function build(
       // The current version is still the current one whether or not it is in force; a
       // retired question is shown as retired rather than hidden, because the library is
       // where an administrator sees what was taken out.
-      retired: !inForce(version.al_effectivefrom, version.al_effectiveto, asOf),
+      retired: !inForceOn(version.al_effectivefrom, version.al_effectiveto, asOf),
     };
     const list = questionsBySection.get(sectionId) ?? [];
     list.push(row);
@@ -146,7 +147,7 @@ function build(
         // Absent reads as required: al_isoptional is null on every section that predates
         // AD-123, because Dataverse applies a boolean default to new rows only.
         isOptional: schedule.al_isoptional === true,
-        retired: !inForce(schedule.al_effectivefrom, schedule.al_effectiveto, asOf),
+        retired: !inForceOn(schedule.al_effectivefrom, schedule.al_effectiveto, asOf),
         order: section.al_displayorder ?? 0,
         questions: (questionsBySection.get(section.al_sectionid) ?? []).sort(
           (a, b) => a.order - b.order,

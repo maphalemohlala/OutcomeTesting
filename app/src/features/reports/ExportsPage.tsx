@@ -41,8 +41,8 @@ export function ExportsPage() {
   const [recordSearch, setRecordSearch] = useState('');
   const [recordGrade, setRecordGrade] = useState('');
 
-  const batches = state.status === 'ready' ? state.batches : [];
-  const records = state.status === 'ready' ? state.records : [];
+  const batches = useMemo(() => (state.status === 'ready' ? state.batches : []), [state]);
+  const records = useMemo(() => (state.status === 'ready' ? state.records : []), [state]);
 
   const batchStatuses = useMemo(
     () => [...new Set(batches.map((b) => b.status).filter(Boolean))].sort(),

@@ -349,12 +349,9 @@ namespace OutcomeTesting.Plugins
                         "This check has no recognised discipline, so it cannot be picked up.");
             }
 
-            foreach (var role in WebRoleRegistry.RolesForContact(service, contactId))
+            if (WebRoleRegistry.HasRole(service, contactId, required))
             {
-                if (string.Equals(role, required, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
+                return;
             }
 
             throw new InvalidPluginExecutionException(
@@ -414,30 +411,8 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         private static Guid ResolveChecklistVersion(IOrganizationService service)
         {
-            var query = new QueryExpression(ChecklistVersionEntity)
-            {
-                ColumnSet = new ColumnSet(EffectiveFromAttr, EffectiveToAttr),
-                Criteria = new FilterExpression
-                {
-                    Conditions = { new ConditionExpression("statecode", ConditionOperator.Equal, 0) },
-                },
-                Orders = { new OrderExpression(EffectiveFromAttr, OrderType.Descending) },
-            };
-
-            var today = DateTime.UtcNow.Date;
-            foreach (var version in service.RetrieveMultiple(query).Entities)
-            {
-                var from = version.GetAttributeValue<DateTime?>(EffectiveFromAttr);
-                var to = version.GetAttributeValue<DateTime?>(EffectiveToAttr);
-
-                if ((!from.HasValue || from.Value.Date <= today) && (!to.HasValue || to.Value.Date >= today))
-                {
-                    return version.Id;
-                }
-            }
-
-            throw new InvalidPluginExecutionException(
-                CommandHelpers.PreconditionPrefix +
+            return ChecklistQueries.ChecklistVersionInForce(
+                service,
                 "No checklist version is in force, so a check cannot be opened. Ask an administrator to publish one (BR-013).");
         }
 

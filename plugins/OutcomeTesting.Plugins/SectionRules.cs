@@ -47,5 +47,23 @@ namespace OutcomeTesting.Plugins
 
             return sectionOwnerRole == disciplineRole || sectionOwnerRole == OwnerRoleBoth;
         }
+
+        /// <summary>
+        /// Tax, AQS or Both. Adviser, T&amp;C Manager and Manager / Admin are valid owner
+        /// roles that no review is ever opened as, so a section owned by one is owed by
+        /// nobody - refused rather than created as something invisible. One predicate for
+        /// AddSection and UpdateSection, so the two cannot disagree about which roles a
+        /// section may be given.
+        /// </summary>
+        public static bool IsAssignableOwnerRole(int ownerRole)
+        {
+            return ownerRole == ResponseRules.OwnerRoleTaxTeam
+                || ownerRole == ResponseRules.OwnerRoleAqsChecker
+                || ownerRole == OwnerRoleBoth;
+        }
+
+        /// <summary>The refusal both commands give for any other owner role.</summary>
+        public const string AssignableOwnerRoleRefusal =
+            "Owner role must be Tax (120910100), AQS (120910101) or Both (120910105).";
     }
 }

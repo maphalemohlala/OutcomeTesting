@@ -41,5 +41,34 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Throws<InvalidPluginExecutionException>(
                 () => RetireQuestionPlugin.ParseEffectiveTo("soon", Today));
         }
+
+        [Fact]
+        public void A_question_already_out_of_force_cannot_be_retired_again()
+        {
+            // A second retire used to overwrite the first date with today, which brought the
+            // question back into force for the gap and changed what submitted reviews owed.
+            var refusal = RetireQuestionPlugin.AlreadyRetiredRefusal(new DateTime(2026, 8, 1), Today, "question");
+
+            Assert.NotNull(refusal);
+            Assert.Contains("2026-08-01", refusal);
+        }
+
+        [Fact]
+        public void A_retirement_dated_out_today_counts_as_already_retired()
+        {
+            Assert.NotNull(RetireQuestionPlugin.AlreadyRetiredRefusal(Today, Today, "question"));
+        }
+
+        [Fact]
+        public void A_future_dated_retirement_may_still_be_revised()
+        {
+            Assert.Null(RetireQuestionPlugin.AlreadyRetiredRefusal(new DateTime(2026, 10, 1), Today, "question"));
+        }
+
+        [Fact]
+        public void A_question_with_no_end_date_is_in_force()
+        {
+            Assert.Null(RetireQuestionPlugin.AlreadyRetiredRefusal(null, Today, "question"));
+        }
     }
 }

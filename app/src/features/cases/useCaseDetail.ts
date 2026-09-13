@@ -4,7 +4,7 @@ import { logTechnical } from '../../services/errors';
 import { toDetail } from './caseDetailMapping';
 import type { CaseDetail } from './caseDetailMapping';
 
-export type { CaseDetail, CaseEditValues, CaseField } from './caseDetailMapping';
+export type { CaseDetail, CaseEditValues } from './caseDetailMapping';
 
 export type CaseDetailState =
   | { status: 'unavailable'; reason: string }

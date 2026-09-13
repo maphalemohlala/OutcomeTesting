@@ -127,33 +127,6 @@
   border-bottom: 1px solid var(--colour-border);
 }
 
-.case-detail__fields {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.case-detail__field {
-  display: grid;
-  grid-template-columns: minmax(9rem, 40%) 1fr;
-  gap: var(--space-3);
-  align-items: baseline;
-  font-size: var(--text-sm);
-}
-
-.case-detail__field dt {
-  color: var(--colour-text-muted);
-}
-
-.case-detail__field dd {
-  font-weight: 500;
-}
-
-.case-detail__field dd[data-empty='true'] {
-  font-weight: 400;
-  font-style: italic;
-  color: var(--colour-text-muted);
-}
-
 .case-detail__lineage {
   display: flex;
   align-items: baseline;

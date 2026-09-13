@@ -5,7 +5,7 @@ import { StageLabel } from '../../components/status/StageLabel';
 import { Tabs } from '../../components/navigation/Tabs';
 import { PermissionGate } from '../../app/permissions/PermissionGate';
 import { useCaseDetail } from './useCaseDetail';
-import type { HeaderField } from '../reviews/checklistForm';
+import { CaseHeaderTable } from '../reviews/CaseHeaderTable';
 import { useCaseReviews } from './useCaseReviews';
 import { CaseOutcomeSummary } from './CaseOutcomeSummary';
 import { CaseHistoryPanel } from './CaseHistoryPanel';
@@ -13,44 +13,12 @@ import { CaseEditPanel } from './CaseEditPanel';
 import './CaseDetailPage.css';
 
 /**
- * The case header as the Checker Checklist draws it: a ruled table, two label/value pairs to
- * a row, in the document's own order (project owner, 2026-09-13).
- *
- * This replaced four themed panels - Client, Adviser and paraplanner, Advice and product,
- * Check and tax. The document has no such grouping, so a reader holding the paper form had
- * to hunt across four panels for a field the form puts in one fixed place.
- *
- * Pairs are built here rather than by CSS columns so the reading order is the document's
- * (left to right, then down) for a screen reader as well as for the eye; a two-column grid
- * would read down one column and then down the other. An odd final field leaves its second
- * cell empty rather than stretching across, which is what the form does too.
+ * The case header is drawn by CaseHeaderTable as the Checker Checklist draws it (project
+ * owner, 2026-09-13). This replaced four themed panels - Client, Adviser and paraplanner,
+ * Advice and product, Check and tax. The document has no such grouping, so a reader
+ * holding the paper form had to hunt across four panels for a field the form puts in one
+ * fixed place.
  */
-function HeaderTable({ fields }: { fields: HeaderField[] }) {
-  const pairs: HeaderField[][] = [];
-  for (let i = 0; i < fields.length; i += 2) pairs.push(fields.slice(i, i + 2));
-
-  return (
-    <table className="case-detail__header">
-      <caption className="visually-hidden">Case header</caption>
-      <tbody>
-        {pairs.map((pair) => (
-          <tr key={pair[0].label}>
-            {pair.map((field) => [
-              <th key={`${field.label}-l`} scope="row">
-                {field.label}
-              </th>,
-              <td key={`${field.label}-v`} data-empty={field.value === null ? 'true' : undefined}>
-                {field.value ?? 'Not recorded'}
-              </td>,
-            ])}
-            {pair.length === 1 ? <><th aria-hidden="true" /><td aria-hidden="true" /></> : null}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
 export function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const [reloadKey, setReloadKey] = useState(0);
@@ -133,7 +101,7 @@ export function CaseDetailPage() {
                   <>
                     <section className="case-detail__panel" aria-labelledby="panel-header">
                       <h2 id="panel-header">Case details</h2>
-                      <HeaderTable fields={state.detail.header} />
+                      <CaseHeaderTable fields={state.detail.header} variant="case" />
                     </section>
 
                     <section className="case-detail__checks" aria-labelledby="panel-checks">

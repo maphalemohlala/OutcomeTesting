@@ -69,7 +69,7 @@ export function CaseWorklistPage() {
     [params],
   );
 
-  const allCases = state.status === 'ready' ? state.cases : [];
+  const allCases = useMemo(() => (state.status === 'ready' ? state.cases : []), [state]);
 
   const priorities = useMemo(
     () =>

@@ -549,6 +549,29 @@
         {% endcomment %}
         {% assign first_row = true %}
         {% for sec in sections.results.entities %}
+        {% comment %}
+          The shape of a section this template does not know, derived once per section
+          rather than once per question row (which is where the block below used to sit, so
+          a ten-question added section re-scanned every row ten times). Read against the
+          section code, which is the same match the inner loop makes. sec_rt is the one
+          response type every scale-typed question in the section agrees on, or 0 when it
+          carries none; sec_mixed is set when two scales meet. Consumed under `unless known`
+          below, where the seeded codes have already been recognised.
+        {% endcomment %}
+        {% assign sec_rt = 0 %}
+        {% assign sec_mixed = false %}
+        {% for q in qrows %}
+          {% if q['s.al_sectioncode'] == sec.al_sectioncode %}
+            {% assign qrt = q.al_responsetype.value %}
+            {% if qrt == 120910006 or qrt == 120910008 or qrt == 120910009 %}
+              {% if sec_rt == 0 %}
+                {% assign sec_rt = qrt %}
+              {% elsif sec_rt != qrt %}
+                {% assign sec_mixed = true %}
+              {% endif %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
         {% for qv in qrows %}
           {% if qv['s.al_sectioncode'] == sec.al_sectioncode %}
           {% assign sid = qv['s.al_sectionid'] %}
@@ -644,10 +667,11 @@
 
             So where the code is not one this template knows, the shape is taken from the
             section's own questions rather than from its name. One pass over this section's
-            rows: if every scale-typed question agrees on one response type, that is the
-            grid and its tick columns are the ones the chain below picks for that type; a
-            section mixing two scales, or carrying none, stays a meta table, which is what
-            a free-text or date section should be.
+            rows, made once per section at the top of the outer loop: if every scale-typed
+            question agrees on one response type, that is the grid and its tick columns are
+            the ones the chain below picks for that type; a section mixing two scales, or
+            carrying none, stays a meta table, which is what a free-text or date section
+            should be.
 
             Guarded on `known` rather than on the layout value, deliberately. S-TAX and
             S-GRADE are recognised and are meta on the document, so "still inline" cannot
@@ -655,20 +679,6 @@
             would redraw two seeded blocks the reference file pins (AD-098, AD-104).
           {% endcomment %}
           {% unless known %}
-            {% assign sec_rt = 0 %}
-            {% assign sec_mixed = false %}
-            {% for q in qrows %}
-              {% if q['s.al_sectionid'] == sid %}
-                {% assign qrt = q.al_responsetype.value %}
-                {% if qrt == 120910006 or qrt == 120910008 or qrt == 120910009 %}
-                  {% if sec_rt == 0 %}
-                    {% assign sec_rt = qrt %}
-                  {% elsif sec_rt != qrt %}
-                    {% assign sec_mixed = true %}
-                  {% endif %}
-                {% endif %}
-              {% endif %}
-            {% endfor %}
             {% if sec_rt != 0 and sec_mixed == false %}
               {% assign layout = 'grid' %}
               {% assign grid_rt = sec_rt %}

@@ -70,5 +70,26 @@ namespace OutcomeTesting.Plugins.Tests
             // page writing a column nothing reads.
             Assert.Equal("al_caseheaderrequest", CaseHeaderRequestPlugin.RequestAttr);
         }
+
+        [Fact]
+        public void Refuses_a_value_the_option_set_does_not_carry()
+        {
+            // Any integer used to be written straight to the case; DeriveRoute did nothing with
+            // one it did not know, and the header drew blank under an audit line naming a change.
+            var swapped = new CaseHeaderRequestPayload { CaseId = "x", TaxCheckRequired = 120910571, TaxTeamDisposition = 0 };
+            var typo = new CaseHeaderRequestPayload { CaseId = "x", TaxCheckRequired = 0, TaxTeamDisposition = 1 };
+
+            Assert.Contains("Tax check required", CaseHeaderRequestPlugin.UnknownOptionRefusal(swapped));
+            Assert.Contains("For Tax team usage", CaseHeaderRequestPlugin.UnknownOptionRefusal(typo));
+        }
+
+        [Fact]
+        public void Accepts_the_options_the_columns_carry_and_zero_for_unsent()
+        {
+            Assert.Null(CaseHeaderRequestPlugin.UnknownOptionRefusal(
+                new CaseHeaderRequestPayload { CaseId = "x", TaxCheckRequired = 120910561, TaxTeamDisposition = 120910570 }));
+            Assert.Null(CaseHeaderRequestPlugin.UnknownOptionRefusal(
+                new CaseHeaderRequestPayload { CaseId = "x", TaxCheckRequired = 0, TaxTeamDisposition = 0 }));
+        }
     }
 }
