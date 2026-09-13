@@ -41,10 +41,77 @@
   font-weight: 600;
 }
 
-.case-detail__panels {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
-  gap: var(--space-4);
+/*
+ * The case header, drawn as the Checker Checklist draws it: a ruled table, two label/value
+ * pairs to a row (project owner, 2026-09-13). Replaced a four-panel auto-fit grid, whose
+ * themed groups the document has no trace of.
+ *
+ * Ruled on every cell rather than only between rows, because on the paper form the rules are
+ * what pair a label with its value across a wide row - without them the eye loses which
+ * value belongs to which label at the right-hand end.
+ */
+.case-detail__header {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  table-layout: fixed;
+}
+
+.case-detail__header th,
+.case-detail__header td {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--colour-border);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.case-detail__header th {
+  width: 22%;
+  font-weight: 600;
+  color: var(--colour-text);
+  background: var(--colour-surface-muted, transparent);
+}
+
+.case-detail__header td {
+  width: 28%;
+  font-weight: 400;
+}
+
+.case-detail__header td[data-empty='true'] {
+  font-style: italic;
+  color: var(--colour-text-muted);
+}
+
+/* The odd field's filler cells carry no rule, so the table does not end on an empty box. */
+.case-detail__header th[aria-hidden='true'],
+.case-detail__header td[aria-hidden='true'] {
+  border: 0;
+  background: none;
+}
+
+/*
+ * Stacks on a narrow viewport: four fixed columns at phone width squeezes every value to a
+ * character or two. Each cell becomes a full-width row, label above value, which is the
+ * order the document reads anyway.
+ */
+@media (max-width: 45rem) {
+  .case-detail__header,
+  .case-detail__header tbody,
+  .case-detail__header tr,
+  .case-detail__header th,
+  .case-detail__header td {
+    display: block;
+    width: auto;
+  }
+
+  .case-detail__header tr {
+    margin-bottom: var(--space-3);
+  }
+
+  .case-detail__header th {
+    border-bottom: 0;
+  }
 }
 
 .case-detail__panel {

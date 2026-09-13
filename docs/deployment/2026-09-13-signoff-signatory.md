@@ -97,10 +97,11 @@ page down on 2026-09-11 with "unknown tag 'endcomment'".
 
 ## Still open
 
-- **Existing sign-offs cannot be repaired from their own rows** — the signatory was never
-  recorded, so there is nothing to read. The Audit Events written alongside them do carry the
-  contact on the paths that passed one, so a backfill is possible; it has not been run, and
-  is worth a decision before this reaches TEST.
+- **Existing sign-offs are not backfilled, and will not be.** Their rows never recorded a
+  signatory, so nothing can be read back from them; a backfill from the Audit Events was
+  possible but is not needed. Project owner direction, 2026-09-13: **TEST holds no data yet**,
+  so every sign-off that will exist there is written by the fixed code. The DEV rows keep
+  their application-user owner and are left as the history they are.
 - **A Tax-only case shows "—" for the regraded outcome, correctly.** Reported as a fault
   against case 254397454 (route "Tax only", disposition "Return to paraplanner"). That case
   carries no `al_outcome` row because AD-055 gives a remediated Tax-only case no BR-005

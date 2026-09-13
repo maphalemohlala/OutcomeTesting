@@ -1,18 +1,11 @@
 import type { CaseStatus, ReviewRoute } from '../../types/domain';
 import { REVIEW_ROUTES } from '../../types/domain';
 import {
-  Al_outcomecasesal_adviserstatus,
   Al_outcomecasesal_casestatus,
-  Al_outcomecasesal_casetype,
-  Al_outcomecasesal_preorpostcheck,
   Al_outcomecasesal_priority,
-  Al_outcomecasesal_productsolutiontype,
-  Al_outcomecasesal_samplesource,
-  Al_outcomecasesal_taxcheckrequired,
-  Al_outcomecasesal_taxteamdisposition,
-  Al_outcomecasesal_vulnerableclient,
   type Al_outcomecases,
 } from '../../generated/models/Al_outcomecasesModel';
+import { caseHeaderFields, type HeaderField } from '../reviews/checklistForm';
 import { choiceLabel as choice } from '../../lib/choiceLabel';
 import { lookupLabel } from './lookupLabel';
 import { date, text } from '../../lib/format';
@@ -68,10 +61,17 @@ export interface CaseDetail {
   dueDate: string | null;
   rowVersion: string | null;
   previousCase: string | null;
-  client: CaseField[];
-  adviser: CaseField[];
-  adviceAndProduct: CaseField[];
-  checkAndTax: CaseField[];
+  /**
+   * The case header exactly as the Checker Checklist draws it: eighteen fields, two to a
+   * row (project owner, 2026-09-13). One list rather than the four themed groups this page
+   * used to show - Client, Adviser and paraplanner, Advice and product, Check and tax -
+   * because the document has no such grouping and a reader comparing the app with the paper
+   * form had to hunt across four panels for a field the form puts in a fixed place.
+   *
+   * Built by caseHeaderFields, which the review page's own header already uses, so the two
+   * screens cannot drift on which fields the header carries or what they are called.
+   */
+  header: HeaderField[];
   edit: CaseEditValues;
 }
 
@@ -119,83 +119,7 @@ export function toDetail(record: Al_outcomecases): CaseDetail {
     dueDate: date(extra.al_duedate),
     rowVersion: record.versionnumber != null ? String(record.versionnumber) : null,
     previousCase: lookupLabel(record, 'al_previouscaseid', record.al_previouscaseidname),
-    client: [
-      { label: 'Client', value: text(record.al_clientname) },
-      {
-        label: 'Vulnerable client',
-        value: choice(
-          Al_outcomecasesal_vulnerableclient,
-          record.al_vulnerableclient,
-          record.al_vulnerableclientname,
-        ),
-      },
-    ],
-    adviser: [
-      { label: 'Adviser', value: text(record.al_advisername) },
-      { label: 'Adviser code', value: text(record.al_advisercode) },
-      {
-        label: 'Adviser status',
-        value: choice(
-          Al_outcomecasesal_adviserstatus,
-          record.al_adviserstatus,
-          record.al_adviserstatusname,
-        ),
-      },
-      { label: 'Paraplanner', value: text(record.al_paraplanner) },
-      { label: 'Paraplanner code', value: text(record.al_paraplannercode) },
-    ],
-    adviceAndProduct: [
-      {
-        label: 'Case type',
-        value: choice(Al_outcomecasesal_casetype, record.al_casetype, record.al_casetypename),
-      },
-      {
-        label: 'Product/solution type',
-        value: choice(
-          Al_outcomecasesal_productsolutiontype,
-          record.al_productsolutiontype,
-          record.al_productsolutiontypename,
-        ),
-      },
-      { label: 'Products', value: text(record.al_products) },
-      { label: 'Advice date', value: date(record.al_advicedate) },
-      {
-        label: 'Sample source',
-        value: choice(
-          Al_outcomecasesal_samplesource,
-          record.al_samplesource,
-          record.al_samplesourcename,
-        ),
-      },
-      {
-        label: 'Check point',
-        value: choice(
-          Al_outcomecasesal_preorpostcheck,
-          record.al_preorpostcheck,
-          record.al_preorpostcheckname,
-        ),
-      },
-    ],
-    checkAndTax: [
-      { label: 'Checker', value: text(record.al_checkername) },
-      { label: 'Check date', value: date(record.al_checkdate) },
-      {
-        label: 'Tax check required',
-        value: choice(
-          Al_outcomecasesal_taxcheckrequired,
-          record.al_taxcheckrequired,
-          record.al_taxcheckrequiredname,
-        ),
-      },
-      {
-        label: 'Tax team disposition',
-        value: choice(
-          Al_outcomecasesal_taxteamdisposition,
-          record.al_taxteamdisposition,
-          record.al_taxteamdispositionname,
-        ),
-      },
-    ],
+    header: caseHeaderFields(record),
     edit: {
       al_clientname: text(record.al_clientname) ?? '',
       al_advisername: text(record.al_advisername) ?? '',

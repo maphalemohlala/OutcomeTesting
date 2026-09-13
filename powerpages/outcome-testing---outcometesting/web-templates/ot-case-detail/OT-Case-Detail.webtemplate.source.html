@@ -223,52 +223,67 @@
       </table>
     </section>
 
-    <section aria-labelledby="ot-case-client">
-      <h2 id="ot-case-client">Client</h2>
-      <table class="meta">
-        <tbody>
-          <tr>
-            <td class="lbl">Client name</td><td class="val">{{ c.al_clientname | default: '—' | escape }}</td>
-            <td class="lbl">Vulnerable client</td><td class="val">{% if c.al_vulnerableclient %}Yes{% else %}No{% endif %}</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+    {% comment %}
+      The case header as the Checker Checklist draws it: eighteen fields, two label/value
+      pairs to a row, in the document's own order (project owner, 2026-09-13).
 
-    <section aria-labelledby="ot-case-adviser">
-      <h2 id="ot-case-adviser">Adviser and paraplanner</h2>
+      This replaced three themed sections - Client, Adviser and paraplanner, Advice and
+      product. The table shape was already the document's; the grouping was not, and the
+      document has no trace of it, so a reader holding the paper form had to hunt across
+      three headings for a field the form puts in one fixed place. The Code App draws the
+      same eighteen from caseHeaderFields, so the two front ends now agree on which fields
+      the header carries and what each is called.
+
+      Case management above keeps its own section deliberately: status, route, priority and
+      due date are this system's operational state, not fields of the paper form.
+
+      Every choice renders through .label. Two of these used to be written as a truthiness
+      test - "if c.al_taxcheckrequired then Yes else No" - which reads the option-set OBJECT,
+      not its value: the object is present whenever ANY option is set, so a case answered No
+      rendered Yes. Vulnerable client was worse, carrying four options (Yes, No, Potentially
+      vulnerable, N/A) of which three rendered as Yes and an unset one as No. A missing
+      formatted value now shows a dash, which is honest, rather than a confident wrong
+      answer.
+    {% endcomment %}
+    <section aria-labelledby="ot-case-header">
+      <h2 id="ot-case-header">Case details</h2>
       <table class="meta">
         <tbody>
           <tr>
-            <td class="lbl">Adviser</td><td class="val">{{ c.al_advisername | default: '—' | escape }}</td>
-            <td class="lbl">Adviser code</td><td class="val">{{ c.al_advisercode | default: '—' | escape }}</td>
+            <td class="lbl">Adviser name</td><td class="val">{{ c.al_advisername | default: '—' | escape }}</td>
+            <td class="lbl">Adviser status</td><td class="val">{{ c.al_adviserstatus.label | default: '—' | escape }}</td>
           </tr>
           <tr>
-            <td class="lbl">Adviser status</td><td class="val">{{ c.al_adviserstatus.label | default: '—' | escape }}</td>
+            <td class="lbl">Adviser code</td><td class="val">{{ c.al_advisercode | default: '—' | escape }}</td>
             <td class="lbl">Paraplanner</td><td class="val">{{ c.al_paraplanner | default: '—' | escape }}</td>
           </tr>
           <tr>
-            <td class="lbl">Paraplanner code</td><td class="val" colspan="3">{{ c.al_paraplannercode | default: '—' | escape }}</td>
+            <td class="lbl">Paraplanner code</td><td class="val">{{ c.al_paraplannercode | default: '—' | escape }}</td>
+            <td class="lbl">Product(s)</td><td class="val">{{ c.al_products | default: '—' | escape }}</td>
           </tr>
-        </tbody>
-      </table>
-    </section>
-
-    <section aria-labelledby="ot-case-advice">
-      <h2 id="ot-case-advice">Advice and product</h2>
-      <table class="meta">
-        <tbody>
           <tr>
+            <td class="lbl">Case type</td><td class="val">{{ c.al_casetype.label | default: '—' | escape }}</td>
             <td class="lbl">Advice date</td><td class="val">{{ c.al_advicedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Product / solution type</td><td class="val">{{ c.al_productsolutiontype.label | default: '—' | escape }}</td>
+            <td class="lbl">Sample source</td><td class="val">{{ c.al_samplesource.label | default: '—' | escape }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Checker name</td><td class="val">{{ c.al_checkername | default: '—' | escape }}</td>
             <td class="lbl">Check date</td><td class="val">{{ c.al_checkdate | date: 'dd MMM yyyy' | default: '—' }}</td>
           </tr>
           <tr>
-            <td class="lbl">Products</td><td class="val">{{ c.al_products | default: '—' | escape }}</td>
-            <td class="lbl">Product solution type</td><td class="val">{{ c.al_productsolutiontype.label | default: '—' | escape }}</td>
+            <td class="lbl">Client name / initials</td><td class="val">{{ c.al_clientname | default: '—' | escape }}</td>
+            <td class="lbl">IO reference</td><td class="val">{{ c.al_casereference | default: '—' | escape }}</td>
           </tr>
           <tr>
-            <td class="lbl">Tax check required</td><td class="val">{% if c.al_taxcheckrequired %}Yes{% else %}No{% endif %}</td>
-            <td class="lbl">Tax team disposition</td><td class="val">{{ c.al_taxteamdisposition.label | default: '—' | escape }}</td>
+            <td class="lbl">Pre or post check</td><td class="val">{{ c.al_preorpostcheck.label | default: '—' | escape }}</td>
+            <td class="lbl">Vulnerable client?</td><td class="val">{{ c.al_vulnerableclient.label | default: '—' | escape }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Tax check required</td><td class="val">{{ c.al_taxcheckrequired.label | default: '—' | escape }}</td>
+            <td class="lbl">For Tax team usage</td><td class="val">{{ c.al_taxteamdisposition.label | default: '—' | escape }}</td>
           </tr>
         </tbody>
       </table>
