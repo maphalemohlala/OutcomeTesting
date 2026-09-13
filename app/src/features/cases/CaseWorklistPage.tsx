@@ -45,7 +45,9 @@ function applyFilters(cases: CaseSummary[], filters: Filters): CaseSummary[] {
       return false;
     }
     if (filters.priority && (item.priority ?? '') !== filters.priority) return false;
-    if (filters.outcome === 'none' && item.latestOutcome) return false;
+    // "Not yet graded" is what the Outcome cell says, and that cell shows the Tax grade where
+    // a case has no BR-005 outcome (AD-055), so a Tax-graded case is not ungraded.
+    if (filters.outcome === 'none' && (item.latestOutcome || item.taxOutcome)) return false;
     if (filters.outcome && filters.outcome !== 'none' && item.latestOutcome !== filters.outcome) {
       return false;
     }

@@ -118,6 +118,18 @@ describe('refusalFor', () => {
     ).toContain('why the question is moving');
   });
 
+  it('does not ask for wording on a move, which carries the wording forward', () => {
+    expect(
+      refusalFor({
+        mode: 'edit',
+        intent: 'move',
+        draft: { ...original, sectionId: 'sec-2', wording: '' },
+        questionCode: 'Q-E2-04',
+        reason: 'Belongs under outcome 2.',
+      }),
+    ).toBeNull();
+  });
+
   it('refuses a move with no new code', () => {
     expect(
       refusalFor({

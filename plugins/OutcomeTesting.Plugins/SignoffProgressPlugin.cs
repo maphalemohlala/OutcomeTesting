@@ -248,10 +248,14 @@ namespace OutcomeTesting.Plugins
         /// <summary>
         /// Whether an action on this check is still waiting for a decision.
         ///
-        /// An action counts as decided once a sign-off row exists against it - approved or
-        /// rejected - because the guard refuses a second one, so the row is the decision. A
-        /// rejection never reaches this test: it returns the case to Awaiting Remediation
-        /// immediately, which is the whole check going back.
+        /// An action counts as decided once an <b>approved</b> sign-off exists against it.
+        /// It used to count any row, "because the guard refuses a second one" - and it did,
+        /// until 2026-09-12, when SignoffGuardPlugin.AlreadySettled started letting a rejected
+        /// action be decided again once reworked. From then a reworked action still carrying
+        /// its old rejection row read as decided here, so approving the other actions on the
+        /// check moved the case on with that one never approved. A rejection is not a
+        /// decision that ends anything: it returns the case to Awaiting Remediation at once,
+        /// which is the whole check going back, and the action comes back for a real one.
         ///
         /// Scoped to the review instance when the action carries one. Rows written before
         /// that link existed carry none, and gating those on nothing would restore the
@@ -296,6 +300,7 @@ namespace OutcomeTesting.Plugins
                 Criteria = new FilterExpression(),
             };
             signoffs.Criteria.AddCondition(ActionLookup, ConditionOperator.In, keys);
+            signoffs.Criteria.AddCondition(DecisionAttr, ConditionOperator.Equal, DecisionApprovedValue);
 
             foreach (var signoff in service.RetrieveMultiple(signoffs).Entities)
             {

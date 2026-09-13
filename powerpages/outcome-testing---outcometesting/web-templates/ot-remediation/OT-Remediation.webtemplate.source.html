@@ -740,9 +740,17 @@
                   {% if answer_ids == '' %}{% assign answer_ids = a.al_remediationactionid %}{% else %}{% assign answer_ids = answer_ids | append: ',' | append: a.al_remediationactionid %}{% endif %}
                   {% if answers_source == null %}{% assign answers_source = a %}{% endif %}
                 {% endif %}
+                {% comment %}
+                  Decided means APPROVED. A rejection reopens the action for rework and the
+                  guard then accepts a second decision on it (SignoffGuardPlugin.AlreadySettled,
+                  2026-09-12); counting the rejection row as the decision kept the reworked
+                  action out of this panel, so the supervisor had no control to give it the
+                  approval that would close the loop - the IO-300003 shape, reintroduced on
+                  the page. 120910720 is Approved on al_signoffdecision.
+                {% endcomment %}
                 {% if a.al_completedon and a.al_actionstatus.value == 120910602 %}
                   {% assign has_decision = false %}
-                  {% if signoffs %}{% for sg in signoffs.results.entities %}{% if sg.al_remediationactionid.id == a.al_remediationactionid %}{% assign has_decision = true %}{% endif %}{% endfor %}{% endif %}
+                  {% if signoffs %}{% for sg in signoffs.results.entities %}{% if sg.al_remediationactionid.id == a.al_remediationactionid and sg.al_signoffdecision.value == 120910720 %}{% assign has_decision = true %}{% endif %}{% endfor %}{% endif %}
                   {% unless has_decision %}
                     {% if signoff_ids == '' %}{% assign signoff_ids = a.al_remediationactionid %}{% else %}{% assign signoff_ids = signoff_ids | append: ',' | append: a.al_remediationactionid %}{% endif %}
                   {% endunless %}

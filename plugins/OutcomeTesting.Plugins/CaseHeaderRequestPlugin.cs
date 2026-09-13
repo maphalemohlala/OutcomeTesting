@@ -48,7 +48,10 @@ namespace OutcomeTesting.Plugins
         private const string ReviewCaseAttr = "al_outcomecaseid";
 
         private const int StatusSubmitted = 120910212;
-        private const int CommandUpdateCaseDetails = 120910752;
+        // The same event the command path writes, taken from it rather than re-declared: a
+        // re-declaration here carried 120910752, which is ReturnCase on al_command, so every
+        // portal header edit was audited as a return until 2026-09-13.
+        public const int CommandUpdateCaseDetails = UpdateCaseDetailsPlugin.CommandUpdateCaseDetails;
 
         /// <summary>
         /// The two option sets the page may set, pinned here so a value the browser sends

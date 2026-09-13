@@ -16,8 +16,8 @@ Everything since the cleanup audit closed on 2026-09-10 (`50b154d`): 69 commits,
 about 28,700 lines added. Reviewed by six scoped finders against the range, each finding then
 verified by hand against the current source before anything was changed. Five further
 finders — line-by-line TypeScript, line-by-line portal and schema, cross-file tracing,
-removed-behaviour and altitude — were cut off by the session's rate limit before reporting,
-so those angles are **not covered** and are listed under "Still open".
+removed-behaviour and altitude — were cut off by the session's rate limit before reporting
+in the first pass; they were re-run in the second pass, recorded at the end of this note.
 
 Baselines before any change: **769** plug-in tests, **464** app tests, `tsc -b` clean, eight
 lint warnings.
@@ -106,9 +106,6 @@ change.
 
 ## Still open
 
-- **Five audit angles did not report** (rate limit): line-by-line TypeScript, line-by-line
-  portal/schema/API, cross-file tracing, removed-behaviour, altitude. The range they would
-  have covered is `50b154d..HEAD`.
 - **Not seen in a browser.** The case page's remediation block is balanced and pushed, but
   no signed-in user has opened
   `/case-details/?id=af352f30-50af-f111-aaac-e4fade069307` since the push. That case is the
@@ -123,3 +120,70 @@ change.
 - **`graphify update .`** exits with "No code files found": no graph exists for this repo,
   so the instruction in the user-level CLAUDE.md that presumes one cannot be followed until
   a full `graphify .` has been run once.
+
+---
+
+## Second pass, same day: the five angles that were cut off
+
+Project owner, 2026-09-13: complete the five review angles the rate limit stopped. Re-run
+over `50b154d..HEAD` (now including the first pass's commit), each finding verified against
+current source before anything was changed.
+
+### Defects fixed
+
+| | Where | What was wrong | What it does now |
+|---|---|---|---|
+| 8 | `SignoffProgressPlugin.AnyAwaitingSignoff` | Counted **any** sign-off row as the decision, "because the guard refuses a second one" — which stopped being true on 2026-09-12 when `AlreadySettled` let a rejected action be decided again. A reworked action still carrying its rejection row read as decided, so approving the check's other actions moved the case on (or regraded and closed it) with that action never approved | Only an **approved** sign-off decides. Recorded as **AD-125**, which amends AD-114(a) |
+| 9 | `OT Remediation` decision panel | Offered the panel only for completed actions with **no** sign-off row, so the reworked action never came back to the supervisor — the IO-300003 deadlock on the page | Offered unless an **approved** sign-off exists |
+| 10 | `CaseHeaderRequestPlugin` | Audited the portal header edit under `al_command` **120910752**, which is `ReturnCase`; the command path uses 120910778 `UpdateCaseDetails`. The history screen labelled every portal header edit a return, and `verifytaxheader` queried the same wrong value so its "new audit event" check passed on it | Takes the value from `UpdateCaseDetailsPlugin`; pinned by a test; the harness queries 120910778. The proof-run rows already written under ReturnCase are immutable and stay |
+| 11 | `OT Review Detail` header selects | The "—" option encoded as 0, which the plug-in reads as "not sent", so a clear reported Saved and changed nothing | The dash is a disabled placeholder; clearing a recorded answer is a case correction through `al_UpdateCaseDetails` |
+| 12 | `powerpages/…/sitesetting.yml` | `Webapi/contact/fields` in portal source still allowlisted three columns; DEV and `src/` carry four. A site uploaded from source would refuse every header-edit PATCH | Four columns, description updated |
+| 13 | `OutcomeIndicator.tsx` | `TAX_SHAPE` keyed the Tax scale's third grade as "Insufficient evidence", but the label is "Pass with issues" since the AD-055 amendment — the one grade that sends a case to remediation drew with no mark | Keyed on the label the generated model carries |
+| 14 | `CaseWorklistPage` | The "Not yet graded" filter tested only the BR-005 outcome, so a Tax-graded case was listed as ungraded beneath a cell reading "Tax: Pass" | A Tax grade counts as graded |
+| 15 | `questionModalIntent.refusalFor` | Demanded wording on a move, where the control is disabled and the wording is carried forward, so a cleared draft could not be moved | Not asked for on a move |
+| 16 | `al_RetireAndSucceedQuestion` | The `DisplayOrder` request parameter existed in the contract JSON, the plug-in and the app, but **not in DEV** and not in `src/` — a reorder from the Question library would have been refused by the Web API | `registerall` created it; `addcomponent` put it in the solution; its solution file is in `src/` |
+
+### Altitude and coverage
+
+- `SignoffGuardPlugin.DecisionRefusal` — the three final-outcome rules (a rejection carries no
+  grade; the grade is on the BR-005 final scale; a grade needs notes) were decided inline in
+  Execute and had no test. Now a static with five.
+- `Remediation.CouldBeNonPass` is derived from `IsNonPassAnswer` over the remediable scales
+  rather than restated by hand.
+- `ImportParserTests` (new) — the CSV and date primitives the IO extract rewrite left
+  implemented but untested: quoted commas, doubled quotes, day-first dates, month-first and
+  out-of-range refusal, cell quoting, JSON escaping.
+- `caseUpload.test.ts` regains the month-first, written-out and ISO-timestamp date cases.
+
+### src/ copy-back (AD-013)
+
+The DEV export differed from `src/` in exactly what the tracer said: the seven plug-in types
+registered since 9f4e968 were missing from the assembly's type list, and the contact step
+`{c3013097-…}` was missing from `Solution.xml`'s root components. Both files were copied back
+from the export. Every other file under `customapis/` and `SdkMessageProcessingSteps/` was
+identical apart from line endings.
+
+### What ran
+
+| | Step | Result |
+|---|---|---|
+| 9 | `dotnet test` (plugins) | **804 passed** (18 new) |
+| 10 | `npx vitest run`, `npx tsc -b`, `npx eslint src` | **484 passed**, clean, clean |
+| 11 | `pushwebtemplate … OT Remediation` | `a1000000-…-019`, **93176 → 93822 chars** |
+| 12 | `pushwebtemplate … OT Review Detail` | `a1000000-…-01b`, **94978 → 95510 chars** |
+| 13 | `dotnet build -c Release` → `registerall` | assembly updated (**221,696 bytes**), 31 commands upserted, `DisplayOrder` present on `al_RetireAndSucceedQuestion` (verified by query), **0 disabled steps** afterwards |
+| 14 | `addcomponent … 10039 95f6c041-8fae-f111-aaac-e4fade069307` | `DisplayOrder` added to the solution, verified by query. `addcomponent` is new: `registerall` upserts a contract's parameters into the default solution, and the tool had no verb to add one component. The tool's own component-type table said 372 for a request parameter; this environment says 372 is a connector and a request parameter is **10039** (`solutioncomponentdefinition`), so the table is corrected too |
+| 15 | `npm run build` → `npx pa app push` | built clean, **pushed successfully** |
+| 16 | `pac solution export` → `unpack` → scoped copy-back | `Solution.xml`, the assembly type list |
+
+### Left as they are, deliberately
+
+- **Altitude**: `ProtectedCodeIn` stays on `RetireSectionPlugin` and the two window refusals
+  (`AlreadyRetiredRefusal`, `RetiredRefusal`) stay on their plug-ins; `CaseHeaderTable` keeps
+  its variant flag; the working-day script is inlined in both portal templates. Each is a
+  fair point about placement and none changes behaviour; moving them is a refactor for a
+  quieter day, not a fix.
+- `ChecklistVersionInForce` still counts the effective-to day as in force, as before.
+- Not seen in a browser: the case page's remediation block and the reworked-action sign-off
+  panel. The case in the report is the proof for the first; a rejected-then-reworked action
+  is the proof for the second.

@@ -296,6 +296,11 @@ if (args.Length >= 6 && args[0].Equals("registerstep", StringComparison.OrdinalI
         args.Length > 8 ? args[8] : null);
 }
 
+if (args.Length >= 4 && args[0].Equals("addcomponent", StringComparison.OrdinalIgnoreCase))
+{
+    return AddComponent(args[1], int.Parse(args[2]), Guid.Parse(args[3]), args.Length > 4 ? args[4] : SolutionUniqueName);
+}
+
 if (args.Length >= 2 && args[0].Equals("addsitetosolution", StringComparison.OrdinalIgnoreCase))
 {
     return AddSiteToSolution(args[1], args.Length > 2 ? args[2] : SolutionUniqueName);
@@ -2314,9 +2319,11 @@ static string DescribeComponent(IOrganizationService svc, int componentType, Gui
         [91] = ("Plug-in assembly", "pluginassembly", "name"),
         [92] = ("SDK message step", "sdkmessageprocessingstep", "name"),
         [93] = ("SDK step image", "sdkmessageprocessingstepimage", "name"),
-        [371] = ("Custom API", "customapi", "uniquename"),
-        [372] = ("Custom API request parameter", "customapirequestparameter", "uniquename"),
-        [373] = ("Custom API response property", "customapiresponseproperty", "uniquename"),
+        // Resolved from solutioncomponentdefinition in Env_AQ_Dev on 2026-09-13; the 371-373 this table
+        // carried are not what this environment uses (372 there is a connector).
+        [10038] = ("Custom API", "customapi", "uniquename"),
+        [10039] = ("Custom API request parameter", "customapirequestparameter", "uniquename"),
+        [10040] = ("Custom API response property", "customapiresponseproperty", "uniquename"),
     };
 
     if (!known.TryGetValue(componentType, out var info))
@@ -5851,6 +5858,19 @@ static List<Entity> ComponentsReferencing(ServiceClient svc, Guid roleId)
 // hard-coded. Microsoft's own documentation gives two different numbers for the site in one
 // example (10463 in the command, 10319 in the prose immediately below it), so a literal
 // copied from the docs is not trustworthy; the environment is.
+// One named component into the solution, by the numeric type AddSolutionComponentRequest
+// takes (10039 is a custom API request parameter here; solutioncomponentdefinition is the authority). Exists because registerall upserts a
+// contract's parameters into the default solution: DisplayOrder on al_RetireAndSucceedQuestion
+// was live in DEV and absent from every export until it was added this way (2026-09-13).
+int AddComponent(string orgUrl, int componentType, Guid id, string solutionUniqueName)
+{
+    using var svc = Connect(orgUrl);
+    svc.Execute(new AddSolutionComponentRequest { ComponentId = id, ComponentType = componentType, SolutionUniqueName = solutionUniqueName, AddRequiredComponents = false });
+    var rows = svc.RetrieveMultiple(new FetchExpression("<fetch><entity name='solutioncomponent'><attribute name='solutioncomponentid'/><filter><condition attribute='objectid' operator='eq' value='" + id.ToString("D") + "'/><condition attribute='componenttype' operator='eq' value='" + componentType + "'/></filter><link-entity name='solution' from='solutionid' to='solutionid'><filter><condition attribute='uniquename' operator='eq' value='" + solutionUniqueName + "'/></filter></link-entity></entity></fetch>")).Entities;
+    Console.WriteLine(rows.Count > 0 ? $"Added: component type {componentType} {id:D} is in {solutionUniqueName}." : $"Add returned but {id} is NOT in {solutionUniqueName}.");
+    return rows.Count > 0 ? 0 : 2;
+}
+
 int AddSiteToSolution(string orgUrl, string solutionUniqueName)
 {
     using var svc = Connect(orgUrl);
@@ -6696,7 +6716,7 @@ int VerifyTaxHeader(string[] a)
         Criteria = new FilterExpression(),
     };
     priorAudit.Criteria.AddCondition("al_targetid", ConditionOperator.Equal, target.Id.ToString("D"));
-    priorAudit.Criteria.AddCondition("al_command", ConditionOperator.Equal, 120910752);
+    priorAudit.Criteria.AddCondition("al_command", ConditionOperator.Equal, 120910778); // UpdateCaseDetails, not 120910752 (ReturnCase)
     priorAudit.AddOrder("createdon", OrderType.Descending);
     var priorRows = svc.RetrieveMultiple(priorAudit).Entities;
     var newestBefore = priorRows.Count > 0 ? priorRows[0].Id : Guid.Empty;
@@ -6773,7 +6793,7 @@ int VerifyTaxHeader(string[] a)
             Criteria = new FilterExpression(),
         };
         audit.Criteria.AddCondition("al_targetid", ConditionOperator.Equal, target.Id.ToString("D"));
-        audit.Criteria.AddCondition("al_command", ConditionOperator.Equal, 120910752);
+        audit.Criteria.AddCondition("al_command", ConditionOperator.Equal, 120910778); // UpdateCaseDetails, not 120910752 (ReturnCase)
         audit.AddOrder("createdon", OrderType.Descending);
         var events = svc.RetrieveMultiple(audit).Entities;
         var newestAfter = events.Count > 0 ? events[0].Id : Guid.Empty;

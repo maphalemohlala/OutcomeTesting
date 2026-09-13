@@ -68,7 +68,9 @@ export function refusalFor(submission: QuestionSubmission): string | null {
   const { mode, intent, draft, questionCode, reason } = submission;
   const isMove = intent === 'move';
 
-  if (!draft.wording.trim()) {
+  // Not asked for on a move either: the control is disabled and shows the version being
+  // carried forward, so an emptied draft is neither visible nor sent.
+  if (!isMove && !draft.wording.trim()) {
     return 'Enter the question wording.';
   }
 

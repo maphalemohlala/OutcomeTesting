@@ -22,7 +22,10 @@ export function OutcomeIndicator({ outcome }: { outcome: Outcome }) {
 
 /**
  * The Tax check's own grade (AD-055), which is a different scale from BR-005 - it has a
- * Fail, and no Pass with issues or Potential harm.
+ * Fail, and no Potential harm. Its third value was reworded from Insufficient evidence to
+ * Pass with issues on 2026-09-13 (AD-055 amended), and the key here is the label the
+ * generated model carries: keyed on the old wording, that grade - the one that sends a case
+ * to remediation - fell through to the unmarked branch while Pass and Fail drew colour.
  *
  * It borrows the BR-005 marks rather than minting new ones, so a Pass reads green and an
  * Insufficient evidence purple on both checks. The scale stays legible because the label is
@@ -33,7 +36,7 @@ export function OutcomeIndicator({ outcome }: { outcome: Outcome }) {
 const TAX_SHAPE: Record<string, string> = {
   Pass: 'pass',
   Fail: 'harm',
-  'Insufficient evidence': 'insufficient',
+  'Pass with issues': 'issues',
 };
 
 export function TaxOutcomeIndicator({ outcome }: { outcome: string }) {

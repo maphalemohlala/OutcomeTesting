@@ -49,7 +49,7 @@ namespace OutcomeTesting.Plugins
         private const string DispositionAttr = "al_taxteamdisposition";
         private const int DispositionReturnToParaplanner = 120910571;
 
-        private const int CommandUpdateCaseDetails = 120910778;
+        public const int CommandUpdateCaseDetails = 120910778;
 
         public UpdateCaseDetailsPlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(UpdateCaseDetailsPlugin))

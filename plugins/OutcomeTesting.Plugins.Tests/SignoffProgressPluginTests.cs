@@ -204,13 +204,14 @@ namespace OutcomeTesting.Plugins.Tests
             return id;
         }
 
-        private static void SignedOff(FakeOrganizationService svc, Guid actionId)
+        private static void SignedOff(FakeOrganizationService svc, Guid actionId, int decision = Approved)
         {
             svc.Seed(
                 "al_signoff",
                 Guid.NewGuid(),
                 "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
-                "al_remediationactionid", new EntityReference("al_remediationaction", actionId));
+                "al_remediationactionid", new EntityReference("al_remediationaction", actionId),
+                "al_signoffdecision", new OptionSetValue(decision));
         }
 
         /// <summary>
@@ -395,6 +396,25 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.NotEqual(rejection, approval);
             Assert.StartsWith("signoff-", approval);
+        }
+
+        [Fact]
+        public void A_reworked_action_whose_only_decision_was_a_rejection_still_holds_the_case()
+        {
+            // The guard lets a rejected action be decided again once reworked (2026-09-12).
+            // Counting its rejection row as the decision let the other approvals move the
+            // case on with this one never approved - the AD-114(a) gate with a hole in it.
+            var svc = CaseAt(CaseLifecycle.AwaitingSignoff);
+            Route(svc, tax: false, aqs: true);
+
+            var reworked = ActionOn(svc, AqsReviewId);
+            var other = ActionOn(svc, AqsReviewId);
+            SignedOff(svc, reworked, Rejected);
+            SignedOff(svc, other);
+
+            SignoffProgressPlugin.MoveCase(svc, CaseId, Approved, AqsReviewId);
+
+            Assert.Equal(CaseLifecycle.AwaitingSignoff, CaseStatus(svc));
         }
     }
 }

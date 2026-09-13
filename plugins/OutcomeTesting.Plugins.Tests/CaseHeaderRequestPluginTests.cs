@@ -91,5 +91,15 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Null(CaseHeaderRequestPlugin.UnknownOptionRefusal(
                 new CaseHeaderRequestPayload { CaseId = "x", TaxCheckRequired = 0, TaxTeamDisposition = 0 }));
         }
+
+        [Fact]
+        public void Audits_under_the_same_command_as_the_command_path()
+        {
+            // A re-declared constant carried ReturnCase's value, so every portal header edit
+            // was written to the trail as a return. The value is the command path's, and it
+            // is pinned to the al_command option the app's generated model calls UpdateCaseDetails.
+            Assert.Equal(UpdateCaseDetailsPlugin.CommandUpdateCaseDetails, CaseHeaderRequestPlugin.CommandUpdateCaseDetails);
+            Assert.Equal(120910778, CaseHeaderRequestPlugin.CommandUpdateCaseDetails);
+        }
     }
 }

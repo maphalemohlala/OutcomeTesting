@@ -295,6 +295,18 @@ describe('dates and derived values', () => {
     expect(parse(row('1', { dueDate: '06/08/2026' })).valid[0].record.al_duedate).toBe('2026-08-06');
   });
 
+  it('rejects a month-first date rather than misreading it, as ImportRules.ParseDate does', () => {
+    expect(parse(row('1', { dueDate: '01/13/2026' })).valid).toHaveLength(0);
+  });
+
+  it('accepts a written-out date, which cannot be misread', () => {
+    expect(parse(row('1', { dueDate: '31 Jan 2026' })).valid[0].record.al_duedate).toBe('2026-01-31');
+  });
+
+  it('reads an ISO timestamp as its date', () => {
+    expect(parse(row('1', { dueDate: '2026-08-06T09:30:00Z' })).valid[0].record.al_duedate).toBe('2026-08-06');
+  });
+
   it('rejects a date that does not exist', () => {
     const result = parse(row('1', { dueDate: '31/02/2026' }));
 

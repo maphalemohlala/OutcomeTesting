@@ -286,12 +286,19 @@
             control while enforcing nothing (NFR-SEC-01) - the same position the sign-off
             panel on OT Remediation records.
           {% endcomment %}
+          {% comment %}
+            The dash is a placeholder, not a choice: the request encodes an unchanged field as
+            0 and CaseHeaderRequestPlugin reads 0 as "not sent", so selecting the dash could
+            never clear a value - the page reported Saved and the value stayed. Disabled, so
+            it shows only while the field is still empty. Clearing a recorded answer is not a
+            Tax checker's edit; that is a case correction through al_UpdateCaseDetails.
+          {% endcomment %}
           {% if rv.al_reviewtype.value == 120910200 and locked == false %}
           <tr>
             <td class="lbl">Tax check required<br>(Tax team to complete)</td>
             <td class="val">
               <select class="ot-field" id="ot-taxrequired" data-ot-header-field aria-label="Tax check required">
-                <option value="">—</option>
+                <option value="" disabled>—</option>
                 <option value="120910560" {% if h_taxrequired.value == 120910560 %}selected{% endif %}>Yes</option>
                 <option value="120910561" {% if h_taxrequired.value == 120910561 %}selected{% endif %}>No</option>
               </select>
@@ -299,7 +306,7 @@
             <td class="lbl">For Tax team usage</td>
             <td class="val">
               <select class="ot-field" id="ot-taxdisposition" data-ot-header-field aria-label="For Tax team usage">
-                <option value="">—</option>
+                <option value="" disabled>—</option>
                 <option value="120910570" {% if h_taxdisposition.value == 120910570 %}selected{% endif %}>Submit to AQS</option>
                 <option value="120910571" {% if h_taxdisposition.value == 120910571 %}selected{% endif %}>Return to paraplanner</option>
               </select>

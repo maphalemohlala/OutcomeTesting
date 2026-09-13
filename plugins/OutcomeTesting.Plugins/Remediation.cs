@@ -230,18 +230,37 @@ namespace OutcomeTesting.Plugins
                 || responseType == ResponseRules.TypeYesNoNa;
         }
 
+        /// <summary>The scales <see cref="IsRemediableScale"/> admits, for the pre-filter below.</summary>
+        private static readonly int[] RemediableScales =
+        {
+            ResponseRules.TypePassFail,
+            ResponseRules.TypePassFailInsufficient,
+            ResponseRules.TypeYesNoInsufficient,
+            ResponseRules.TypeYesNoNa,
+        };
+
         /// <summary>
         /// Whether an answer could be a non-pass on <em>some</em> remediable scale.
         ///
         /// The cheap first look, taken before the question version has been read and so
-        /// before the scale is known. It has to admit No as well as the
-        /// <see cref="ResponseRules.IsNonPass"/> answers, because a No is a failed Consumer
-        /// Duty outcome and dropping it here would keep the overlay out however
-        /// <see cref="IsRemediableScale"/> reads. <see cref="IsNonPassAnswer"/> still decides.
+        /// before the scale is known. Derived from <see cref="IsNonPassAnswer"/> over every
+        /// remediable scale rather than restated by hand: a hand-kept copy admitted "IsNonPass
+        /// or No" and had to be kept in step by comment, so a scale that marks down on some
+        /// other value would have passed every IsNonPassAnswer test while this filter quietly
+        /// dropped its rows before they were reached. <see cref="IsNonPassAnswer"/> still
+        /// decides once the scale is known.
         /// </summary>
         private static bool CouldBeNonPass(int choice)
         {
-            return ResponseRules.IsNonPass(choice) || choice == ResponseRules.ChoiceNo;
+            foreach (var scale in RemediableScales)
+            {
+                if (IsNonPassAnswer(scale, choice))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

@@ -110,5 +110,45 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.False(SignoffGuardPlugin.AlreadySettled(service, ActionId));
         }
+
+        // ---------------------------------------------------------------------------------
+        // What a decision may carry (BR-008, OD-041, AD-031)
+        // ---------------------------------------------------------------------------------
+
+        [Fact]
+        public void An_approval_with_a_final_grade_and_notes_is_accepted()
+        {
+            Assert.Null(SignoffGuardPlugin.DecisionRefusal(Approved, OutcomeRules.FinalOutcomePassWithIssues, "Rework accepted."));
+        }
+
+        [Fact]
+        public void A_rejection_must_say_why()
+        {
+            Assert.Contains("notes", SignoffGuardPlugin.DecisionRefusal(Rejected, null, "  "));
+            Assert.Null(SignoffGuardPlugin.DecisionRefusal(Rejected, null, "Evidence still missing."));
+        }
+
+        [Fact]
+        public void A_rejection_cannot_carry_a_final_outcome()
+        {
+            // It sends the work back; the check it belongs to has not finished.
+            var refusal = SignoffGuardPlugin.DecisionRefusal(Rejected, OutcomeRules.FinalOutcomePassWithIssues, "Sent back.");
+
+            Assert.NotNull(refusal);
+            Assert.Contains("cannot record a final outcome", refusal);
+        }
+
+        [Fact]
+        public void A_final_outcome_must_be_on_the_final_scale_and_must_be_explained()
+        {
+            Assert.Contains("must be Pass", SignoffGuardPlugin.DecisionRefusal(Approved, 1, "Why."));
+            Assert.Contains("AD-031", SignoffGuardPlugin.DecisionRefusal(Approved, OutcomeRules.FinalOutcomePassWithIssues, null));
+        }
+
+        [Fact]
+        public void A_decision_is_required()
+        {
+            Assert.Contains("approved or rejected", SignoffGuardPlugin.DecisionRefusal(null, null, "x"));
+        }
     }
 }
