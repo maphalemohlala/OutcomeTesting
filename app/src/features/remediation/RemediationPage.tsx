@@ -9,7 +9,7 @@ import {
   type RemediationActionRow,
   type SignoffRow,
 } from './useRemediation';
-import { groupIssues, outcomeOf } from './remediationIssues';
+import { groupIssues, outcomeOf, type ActionGroup } from './remediationIssues';
 import {
   liveActions,
   remediationForm,
@@ -114,15 +114,19 @@ export function ActionsTable({
     );
   }
 
-  // The check is named once above its run of rows rather than on every one. Worked out here
-  // because the map below cannot carry state across iterations without it.
-  let previous: string | null = null;
-  const groups = groupIssues(live).map((group) => {
+  // The check is named once above its run of rows rather than on every one. A run is broken
+  // only by a *different* named check: a group naming none carries the previous heading
+  // forward, so the same check resuming after it is not announced twice.
+  //
+  // Built with a loop rather than a map that reassigns a captured variable, which reads as a
+  // closure outliving the render even though it does not.
+  const groups: (ActionGroup & { heading: string | null })[] = [];
+  let named: string | null = null;
+  for (const group of groupIssues(live)) {
     const check = group.action.triggeredBy;
-    const heading = check && check !== previous ? check : null;
-    previous = check ?? previous;
-    return { ...group, heading };
-  });
+    groups.push({ ...group, heading: check && check !== named ? check : null });
+    if (check) named = check;
+  }
 
   return (
     <>

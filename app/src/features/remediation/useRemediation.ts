@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isRecordId } from '../../services/odata';
 import { Al_outcomecasesal_casestatus } from '../../generated/models/Al_outcomecasesModel';
 import {
   Al_outcomecasesService,
@@ -58,7 +59,10 @@ export function useRemediation(caseId: string | undefined, reloadKey = 0): Remed
   }
 
   useEffect(() => {
-    if (!caseId) return;
+    // The id comes from the route, so it is untrusted until it parses as a record id; an
+    // id that is not one never reaches a filter (services/odata.ts). The unavailable state
+    // for a malformed id is derived below rather than set here.
+    if (!isRecordId(caseId)) return;
     let cancelled = false;
 
     const filter = `_al_outcomecaseid_value eq ${caseId}`;
@@ -111,6 +115,13 @@ export function useRemediation(caseId: string | undefined, reloadKey = 0): Remed
       cancelled = true;
     };
   }, [caseId, reloadKey]);
+
+  if (caseId && !isRecordId(caseId)) {
+    return {
+      status: 'unavailable',
+      reason: 'The remediation record for this case could not be loaded from Dataverse.',
+    };
+  }
 
   return state;
 }

@@ -30,9 +30,23 @@ const TEAMS = [
   { value: OWNER_ROLE_BOTH, label: 'Both' },
 ];
 
-const DEFAULT_RESPONSE_TYPE = RESPONSE_TYPE_OPTIONS[0]?.value ?? 120910006;
+/**
+ * A question row as it is being typed. `responseType` is null until the administrator picks
+ * one — there is no default, for the reason `questionModalIntent` gives: the response type
+ * decides how the question can be answered, and `al_AddSection` accepts any integer it
+ * parses, so a silent default is never caught downstream.
+ */
+type DraftQuestion = Omit<SectionQuestionInput, 'responseType'> & {
+  key: number;
+  responseType: number | null;
+};
 
-type DraftQuestion = SectionQuestionInput & { key: number };
+/** A row the administrator has finished, narrowed to what `addSection` will accept. */
+type CompleteQuestion = DraftQuestion & { responseType: number };
+
+function isComplete(row: DraftQuestion): row is CompleteQuestion {
+  return row.code.trim() !== '' && row.wording.trim() !== '' && row.responseType !== null;
+}
 
 export function SectionModal({ mode, section, onClose, onSaved }: Props) {
   const [sectionCode, setSectionCode] = useState(section?.code ?? '');
@@ -59,13 +73,13 @@ export function SectionModal({ mode, section, onClose, onSaved }: Props) {
         code: '',
         name: '',
         wording: '',
-        responseType: DEFAULT_RESPONSE_TYPE,
+        responseType: null,
         mandatory: true,
       },
     ]);
   }
 
-  function setRow(key: number, patch: Partial<SectionQuestionInput>) {
+  function setRow(key: number, patch: Partial<Omit<DraftQuestion, 'key'>>) {
     setQuestions((rows) => rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
     setError(null);
   }
@@ -88,9 +102,11 @@ export function SectionModal({ mode, section, onClose, onSaved }: Props) {
 
     // Validated here as well as server-side, where the whole array is checked before
     // anything is written: a half-filled row should cost a keystroke, not a round trip.
-    const incomplete = questions.find((row) => !row.code.trim() || !row.wording.trim());
-    if (incomplete) {
-      setError('Every question needs a code and its wording, or remove the row.');
+    const complete = questions.filter(isComplete);
+    if (complete.length !== questions.length) {
+      setError(
+        'Every question needs a code, its wording and a response type, or remove the row.',
+      );
       return;
     }
 
@@ -107,7 +123,7 @@ export function SectionModal({ mode, section, onClose, onSaved }: Props) {
             ownerRole,
             displayOrder: displayOrder || undefined,
             isOptional,
-            questions: questions.map((row) => ({
+            questions: complete.map((row) => ({
               code: row.code.trim(),
               // al_name is a required short label and the wording is the only text typed.
               name: row.wording.trim().slice(0, 200),
@@ -243,10 +259,17 @@ export function SectionModal({ mode, section, onClose, onSaved }: Props) {
                   aria-label={`Question ${index + 1} wording`}
                 />
                 <select
-                  value={row.responseType}
-                  onChange={(e) => setRow(row.key, { responseType: Number(e.target.value) })}
+                  value={row.responseType ?? ''}
+                  onChange={(e) =>
+                    setRow(row.key, {
+                      responseType: e.target.value === '' ? null : Number(e.target.value),
+                    })
+                  }
                   aria-label={`Question ${index + 1} response type`}
                 >
+                  <option value="" disabled>
+                    Select how it is answered…
+                  </option>
                   {RESPONSE_TYPE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}

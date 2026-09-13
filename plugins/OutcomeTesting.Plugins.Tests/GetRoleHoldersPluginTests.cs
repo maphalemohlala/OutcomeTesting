@@ -156,5 +156,46 @@ namespace OutcomeTesting.Plugins.Tests
             contact["fullname"] = "Person " + email;
             return contact;
         }
+        [Fact]
+        public void ReportsAHolderWhoseMappingCarriesOnlyTheLegacyPicklist()
+        {
+            // AD-087 stopped offering the picklist, but rows written before it still grant
+            // the role: PermissionHelpers reads al_approle when al_rolecode is blank, and
+            // ResolveRoleCodesForEmail reports the label as the role code. Matching the
+            // mapping read on al_rolecode alone hid such a holder from this screen entirely
+            // — so the grant could be neither seen nor withdrawn from the role detail page.
+            var svc = new FakeOrganizationService();
+            svc.Seed(
+                "al_userrolemapping",
+                Guid.NewGuid(),
+                "al_useremail", "legacy@ascotlloyd.co.uk",
+                "al_approle", new OptionSetValue(120910765),
+                "statecode", new OptionSetValue(0));
+            ReturnsAssociatedContacts(svc);
+
+            var holder = Assert.Single(GetRoleHoldersPlugin.Read(svc, "Administrator"));
+            Assert.Equal("legacy@ascotlloyd.co.uk", holder.Email);
+            Assert.NotNull(holder.MappingId);
+            Assert.True(holder.MappingActive);
+        }
+
+        [Fact]
+        public void IgnoresARowWhoseRoleCodeNamesADifferentRole()
+        {
+            // al_approle carries a schema default, so a code-based row also carries a
+            // picklist value. al_rolecode outranks it (AD-044), so this row belongs to the
+            // Tax Reviewer and must not appear under Administrator.
+            var svc = new FakeOrganizationService();
+            svc.Seed(
+                "al_userrolemapping",
+                Guid.NewGuid(),
+                "al_useremail", "coded@ascotlloyd.co.uk",
+                "al_rolecode", Role,
+                "al_approle", new OptionSetValue(120910765),
+                "statecode", new OptionSetValue(0));
+            ReturnsAssociatedContacts(svc);
+
+            Assert.Empty(GetRoleHoldersPlugin.Read(svc, "Administrator"));
+        }
     }
 }

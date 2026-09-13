@@ -263,5 +263,85 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Contains(Role, result.Details);
             Assert.Contains("Reconciled a role held in two places", result.Details);
         }
+        /// <summary>
+        /// The picklist label that names the same role a web role can carry. AD-087 stopped
+        /// offering the picklist, but rows written before it still sit in the table, and
+        /// PermissionHelpers.ResolveRoleCodesForEmail already treats such a row's label as a
+        /// role code — so revoke has to reach it under that name too.
+        /// </summary>
+        private const string LegacyRole = "Administrator";
+
+        private const int LegacyRoleValue = 120910765;
+
+        private static FakeOrganizationService LegacyEnvironment()
+        {
+            var svc = new FakeOrganizationService();
+            svc.Seed("contact", ContactId, "emailaddress1", Email, "fullname", "A Person");
+            svc.Seed(
+                WebRoleRegistry.RoleEntity,
+                RoleId,
+                WebRoleRegistry.NameAttr, LegacyRole,
+                WebRoleRegistry.AuthenticatedAttr, false);
+            svc.SeedWebRoleAssociation(ContactId, RoleId);
+            return svc;
+        }
+
+        [Fact]
+        public void RevokingWithdrawsALegacyPicklistMappingForTheSameRole()
+        {
+            // A mapping written through al_AssignUserRole's AppRole branch carries
+            // al_approle and NO al_rolecode. Matching on al_rolecode alone never saw it, so
+            // revoke removed the association and left the row active — and
+            // PermissionHelpers.GetMappedRoles honours any active row, so the person kept
+            // the role the administrator had just withdrawn.
+            var svc = LegacyEnvironment();
+            var legacy = svc.Seed(
+                "al_userrolemapping", Guid.NewGuid(),
+                "al_useremail", Email,
+                "al_approle", new OptionSetValue(LegacyRoleValue),
+                "statecode", new OptionSetValue(0));
+
+            AdoptRoleAssignmentPlugin.Apply(svc, svc, Email, LegacyRole, adopt: false);
+
+            var update = Assert.Single(svc.Updates, r => r.LogicalName == "al_userrolemapping");
+            Assert.Equal(legacy.Id, update.Id);
+            Assert.Equal(1, update.GetAttributeValue<OptionSetValue>("statecode").Value);
+        }
+
+        [Fact]
+        public void RevokingLeavesARowWhoseRoleCodeNamesADifferentRole()
+        {
+            // al_approle carries a schema default, so a row written with only a role code
+            // comes back ALSO carrying a picklist value. Reaching legacy rows must not turn
+            // that stray default into a second identity: al_rolecode outranks it (AD-044),
+            // exactly as GetMappedRoles reads it, so this row is the Tax Reviewer's and
+            // revoking Administrator must not touch it.
+            var svc = LegacyEnvironment();
+            svc.Seed(
+                "al_userrolemapping", Guid.NewGuid(),
+                "al_useremail", Email,
+                "al_rolecode", Role,
+                "al_approle", new OptionSetValue(LegacyRoleValue),
+                "statecode", new OptionSetValue(0));
+
+            AdoptRoleAssignmentPlugin.Apply(svc, svc, Email, LegacyRole, adopt: false);
+
+            Assert.DoesNotContain(svc.Updates, r => r.LogicalName == "al_userrolemapping");
+        }
+
+        [Fact]
+        public void RevokingLeavesALegacyMappingBelongingToSomebodyElse()
+        {
+            var svc = LegacyEnvironment();
+            svc.Seed(
+                "al_userrolemapping", Guid.NewGuid(),
+                "al_useremail", "someone.else@ascotlloyd.co.uk",
+                "al_approle", new OptionSetValue(LegacyRoleValue),
+                "statecode", new OptionSetValue(0));
+
+            AdoptRoleAssignmentPlugin.Apply(svc, svc, Email, LegacyRole, adopt: false);
+
+            Assert.DoesNotContain(svc.Updates, r => r.LogicalName == "al_userrolemapping");
+        }
     }
 }

@@ -1,3 +1,5 @@
+import { OWNER_ROLE_BOTH } from '../../lib/ownerRole';
+
 /**
  * The sections a review must render (AD-123). Mirrors the section half of the portal's
  * review FetchXML and `SectionRules` in `plugins/OutcomeTesting.Plugins`, which is the
@@ -11,9 +13,9 @@
 /**
  * A section owed by the Tax review and the AQS review alike. Each answers its own copy,
  * because responses hang off the review instance and not off the section. Mirrors
- * `SectionRules.OwnerRoleBoth`.
+ * `SectionRules.OwnerRoleBoth`, and is pinned to it by `lib/ownerRole.test.ts`.
  */
-export const OWNER_ROLE_BOTH = 120910105;
+export { OWNER_ROLE_BOTH } from '../../lib/ownerRole';
 
 /**
  * Owned by this discipline or by Both, on the checklist version issued to the review, and in

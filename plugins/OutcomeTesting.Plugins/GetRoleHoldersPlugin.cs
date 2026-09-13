@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -62,11 +63,21 @@ namespace OutcomeTesting.Plugins
 
             var query = new QueryExpression(MappingEntity)
             {
-                ColumnSet = new ColumnSet("al_useremail", "al_rolecode", "statecode"),
+                ColumnSet = new ColumnSet("al_useremail", "al_rolecode", "al_approle", "statecode"),
                 Criteria = new FilterExpression(),
             };
-            query.Criteria.AddCondition("al_rolecode", ConditionOperator.Equal, trimmed);
-            var mappings = CommandHelpers.RetrieveAll(service, query);
+
+            // Which rows grant this role is PermissionHelpers' rule, not an al_rolecode
+            // equality (AD-044). A row written through al_AssignUserRole's picklist branch
+            // carries al_approle alone, and matching on the code hid such a holder from this
+            // screen entirely — so a live grant could be neither seen here nor withdrawn,
+            // because al_SetRoleAssignmentActive takes the MappingId this read never
+            // returned. Reporting the same holders the gate authorises is the whole point
+            // of AD-089.
+            PermissionHelpers.AddRoleIdentityFilter(query.Criteria, trimmed);
+            var mappings = CommandHelpers.RetrieveAll(service, query)
+                .Where(row => PermissionHelpers.MatchesRole(row, trimmed))
+                .ToList();
 
             return RoleHolders.Merge(mappings, ContactsHolding(service, trimmed));
         }

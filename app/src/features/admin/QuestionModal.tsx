@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { addQuestion, moveQuestion, retireAndSucceedQuestion } from '../../services/commands/questions';
-import { intentFor, type QuestionDraft } from './questionModalIntent';
+import { intentFor, refusalFor, type QuestionDraft } from './questionModalIntent';
 import { RESPONSE_TYPE_OPTIONS, type LibraryQuestion, type LibrarySection } from './useQuestionLibrary';
 
 /**
@@ -25,13 +25,11 @@ interface Props {
   onSaved: () => void;
 }
 
-const DEFAULT_RESPONSE_TYPE = RESPONSE_TYPE_OPTIONS[0]?.value ?? 120910006;
-
 export function QuestionModal({ mode, sections, sectionId, question, onClose, onSaved }: Props) {
   const original: QuestionDraft = {
     wording: question?.wording ?? '',
     sectionId,
-    responseType: question?.responseTypeValue ?? DEFAULT_RESPONSE_TYPE,
+    responseType: question?.responseTypeValue ?? null,
     mandatory: question?.mandatory ?? true,
     displayOrder: question?.order ?? 0,
   };
@@ -47,6 +45,11 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
   const isMove = editIntent === 'move';
   const token = question?.id ?? `add:${sectionId}`;
 
+  // A move carries the wording, response type, mandatory flag and display order forward from
+  // the version it retires, so those four controls show the values that will actually be
+  // carried, disabled — not edits made before the section was changed, which are discarded.
+  const shown = isMove ? original : draft;
+
   function set<K extends keyof QuestionDraft>(key: K, value: QuestionDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
     setError(null);
@@ -54,23 +57,15 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
 
   async function onSave() {
     const wording = draft.wording.trim();
-    if (!wording) {
-      setError('Enter the question wording.');
-      return;
-    }
-
-    if (mode === 'add' && !questionCode.trim()) {
-      setError('Enter a question code. Codes are unique and are never reused.');
-      return;
-    }
-
-    if (isMove && !questionCode.trim()) {
-      setError('Enter a new code for the question in its new section. Codes are never reused.');
-      return;
-    }
-
-    if (isMove && !reason.trim()) {
-      setError('Say why the question is moving. The reason is recorded on the audit trail.');
+    const refusal = refusalFor({
+      mode,
+      intent: editIntent,
+      draft,
+      questionCode,
+      reason,
+    });
+    if (refusal) {
+      setError(refusal);
       return;
     }
 
@@ -92,7 +87,7 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
             // administrator has typed, so it doubles as the name within its 200-char limit.
             name: wording.slice(0, 200),
             wording,
-            responseType: draft.responseType,
+            responseType: draft.responseType!,
             mandatory: draft.mandatory,
             displayOrder: draft.displayOrder || undefined,
             idempotencyKey: key,
@@ -108,7 +103,7 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
           : await retireAndSucceedQuestion({
               questionId: question!.id,
               newWording: wording,
-              responseType: draft.responseType,
+              responseType: draft.responseType!,
               mandatory: draft.mandatory,
               displayOrder: draft.displayOrder,
               idempotencyKey: key,
@@ -133,8 +128,9 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
         <label className="library__field">
           <span>Wording</span>
           <textarea
-            value={draft.wording}
+            value={shown.wording}
             onChange={(e) => set('wording', e.target.value)}
+            disabled={isMove}
             rows={3}
           />
         </label>
@@ -157,10 +153,18 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
         <label className="library__field">
           <span>Response type</span>
           <select
-            value={draft.responseType}
-            onChange={(e) => set('responseType', Number(e.target.value))}
+            value={shown.responseType ?? ''}
+            onChange={(e) =>
+              set('responseType', e.target.value === '' ? null : Number(e.target.value))
+            }
             disabled={isMove}
           >
+            {/* No option is selected until the administrator picks one. Left out, the
+                browser selects the first — Text — and a question nobody meant to make
+                free-text is created without anyone touching the control. */}
+            <option value="" disabled>
+              Select how it is answered…
+            </option>
             {RESPONSE_TYPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -172,7 +176,7 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
         <label className="library__check">
           <input
             type="checkbox"
-            checked={draft.mandatory}
+            checked={shown.mandatory}
             onChange={(e) => set('mandatory', e.target.checked)}
             disabled={isMove}
           />
@@ -183,7 +187,7 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
           <span>Display order</span>
           <input
             type="number"
-            value={draft.displayOrder}
+            value={shown.displayOrder}
             onChange={(e) => set('displayOrder', Number(e.target.value))}
             disabled={isMove}
             min={0}
@@ -213,7 +217,7 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
           {mode === 'add'
             ? 'The question is added to the checklist version in force. If it is mandatory it will be owed by every review of that team that has not yet been submitted.'
             : isMove
-              ? 'Moving retires this question where it is and creates it in the new section under a new code, so the answers already given stay attached to the section they were answered in. The wording, response type and mandatory flag are carried across — other edits in this form are not applied.'
+              ? 'Moving retires this question where it is and creates it in the new section under a new code, so the answers already given stay attached to the section they were answered in. The wording, response type, mandatory flag and display order are carried across unchanged, which is why they are shown here but cannot be edited — change them first, then move, or move first and then edit.'
               : editIntent === 'none'
                 ? 'Nothing has changed yet.'
                 : 'Saving creates a new version and retires the current one. Reviews already submitted keep the version they were answered against.'}
