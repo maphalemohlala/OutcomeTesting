@@ -369,6 +369,11 @@ if (args.Length >= 6 && args[0].Equals("setoptionlabel", StringComparison.Ordina
     return SetOptionLabel(args[1], args[2], args[3], relabelValue, args[5]);
 }
 
+if (args.Length >= 4 && args[0].Equals("verifytaxheader", StringComparison.OrdinalIgnoreCase))
+{
+    return VerifyTaxHeader(args);
+}
+
 if (args.Length >= 2 && args[0].Equals("provepp15", StringComparison.OrdinalIgnoreCase))
 {
     return ProvePp15(args);
@@ -6415,6 +6420,241 @@ int SetOptionLabel(string orgUrl, string entity, string attribute, int value, st
         ? $"{entity}.{attribute} {value} = '{current}' -> '{label}', published ({after.Count} values)."
         : $"Update returned success, but metadata does not read back {value} = '{label}'.");
     return ok ? 0 : 2;
+}
+
+// Exercises CaseHeaderRequestPlugin end to end against a live environment, through the
+// portal's own write path: a PATCH of one JSON column on a contact row.
+//
+// Named explicitly rather than discovered. The August audit found the older verify verbs
+// select the FIRST row of al_outcomecase with no filter and no environment guard, then
+// mutate real business records against it - "verifyregrade against production leaves
+// permanent audit events on a real client case recording a regrade that never happened".
+// This one takes the case reference and the contact email as arguments and refuses anything
+// it cannot resolve to exactly one row, so it can only ever touch a record the caller named.
+//
+// What it proves is what no unit test can: that the step is registered and fires, that the
+// payload deserialises server-side, that the role guard refuses a contact without
+// AL Portal - Tax Reviewer, that a successful edit applies AND re-derives the route
+// (BR-004), that the trigger column is cleared so a replay is a real second write, and that
+// the audit event names the contact rather than the site's application user (AD-053).
+//
+// Restores whatever it changed, in a finally, for the reason the harness it is modelled on
+// records: a failure part-way through must not strand a seeded value on a real case.
+int VerifyTaxHeader(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 4 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This writes to a live environment. Re-run as: verifytaxheader <orgUrl> " +
+            "<caseReference> <contactEmail> --confirm <orgUrl>");
+        return 1;
+    }
+
+    var caseReference = a[2].Trim();
+    var contactEmail = a[3].Trim();
+
+    using var svc = Connect(orgUrl);
+    var pass = true;
+    void Check(string name, bool ok, string detail)
+    {
+        Console.WriteLine("  [" + (ok ? "PASS" : "FAIL") + "] " + name + ": " + detail);
+        pass &= ok;
+    }
+
+    string Describe(OptionSetValue v)
+    {
+        return v == null ? "(none)" : v.Value.ToString();
+    }
+
+    var cases = new QueryExpression("al_outcomecase")
+    {
+        ColumnSet = new ColumnSet("al_casereference", "al_taxcheckrequired", "al_taxteamdisposition", "al_reviewrouteid"),
+        TopCount = 2,
+        Criteria = new FilterExpression(),
+    };
+    cases.Criteria.AddCondition("al_casereference", ConditionOperator.Equal, caseReference);
+    var caseRows = svc.RetrieveMultiple(cases).Entities;
+    if (caseRows.Count != 1)
+    {
+        Console.Error.WriteLine("'" + caseReference + "' matched " + caseRows.Count + " cases. Name exactly one.");
+        return 1;
+    }
+
+    var target = caseRows[0];
+    var contactId = FindId(svc, "contact", ("emailaddress1", contactEmail));
+    if (contactId == Guid.Empty)
+    {
+        Console.Error.WriteLine("No contact with email '" + contactEmail + "'.");
+        return 1;
+    }
+
+    // The role name, not a reference to the plug-in assembly: this tool does not link it.
+    const string TaxReviewerRole = "AL Portal - Tax Reviewer";
+    var roles = RolesOf(svc, contactId);
+    var holdsTaxReviewer = false;
+    foreach (var r in roles)
+    {
+        if (string.Equals(r, TaxReviewerRole, StringComparison.OrdinalIgnoreCase))
+        {
+            holdsTaxReviewer = true;
+        }
+    }
+
+    Console.WriteLine("Case '" + caseReference + "' " + target.Id + ", contact '" + contactEmail + "' " + contactId + ".");
+    Console.WriteLine("  Roles held: " + (roles.Count == 0 ? "(none)" : string.Join(", ", roles.ToArray())));
+    Console.WriteLine("  Holds " + TaxReviewerRole + ": " + holdsTaxReviewer);
+
+    var beforeRequired = target.GetAttributeValue<OptionSetValue>("al_taxcheckrequired");
+    var beforeDisposition = target.GetAttributeValue<OptionSetValue>("al_taxteamdisposition");
+    var beforeRoute = target.GetAttributeValue<EntityReference>("al_reviewrouteid");
+    Console.WriteLine("  Before: taxCheckRequired=" + Describe(beforeRequired)
+        + ", disposition=" + Describe(beforeDisposition)
+        + ", route=" + (beforeRoute == null ? "(none)" : beforeRoute.Name));
+    Console.WriteLine();
+
+    // Submit to AQS where it is not already, otherwise Return to paraplanner: the value has
+    // to CHANGE for the plug-in to record anything, and the route has to move with it or
+    // DeriveRoute has not run.
+    const int SubmitToAqs = 120910570;
+    const int ReturnToParaplanner = 120910571;
+    var sending = beforeDisposition != null && beforeDisposition.Value == SubmitToAqs
+        ? ReturnToParaplanner
+        : SubmitToAqs;
+
+    // The newest UpdateCaseDetails event on this case as it stands, so the check below can
+    // tell a new one from one that was already here.
+    var priorAudit = new QueryExpression("al_auditevent")
+    {
+        ColumnSet = new ColumnSet(false),
+        TopCount = 1,
+        Criteria = new FilterExpression(),
+    };
+    priorAudit.Criteria.AddCondition("al_targetid", ConditionOperator.Equal, target.Id.ToString("D"));
+    priorAudit.Criteria.AddCondition("al_command", ConditionOperator.Equal, 120910752);
+    priorAudit.AddOrder("createdon", OrderType.Descending);
+    var priorRows = svc.RetrieveMultiple(priorAudit).Entities;
+    var newestBefore = priorRows.Count > 0 ? priorRows[0].Id : Guid.Empty;
+
+    var payload = "{\"caseId\":\"" + target.Id.ToString("D") + "\",\"taxCheckRequired\":0,\"taxTeamDisposition\":" + sending + "}";
+    Console.WriteLine("Writing contact.al_caseheaderrequest = " + payload);
+
+    string refusal = null;
+    try
+    {
+        svc.Update(new Entity("contact", contactId)
+        {
+            ["al_caseheaderrequest"] = payload,
+        });
+    }
+    catch (Exception ex)
+    {
+        refusal = ex.Message;
+    }
+
+    if (!holdsTaxReviewer)
+    {
+        Check("refused a contact without the Tax Reviewer role", refusal != null,
+            refusal == null ? "the write was ACCEPTED, which it must not be" : refusal.Split('\n')[0]);
+        Check("names the role in the refusal",
+            refusal != null && refusal.IndexOf(TaxReviewerRole, StringComparison.OrdinalIgnoreCase) >= 0,
+            refusal == null ? "(no refusal)" : "message names the role");
+
+        var afterRefusal = svc.Retrieve("al_outcomecase", target.Id, new ColumnSet("al_taxteamdisposition"));
+        var stillBefore = afterRefusal.GetAttributeValue<OptionSetValue>("al_taxteamdisposition");
+        Check("left the case untouched", Describe(stillBefore) == Describe(beforeDisposition),
+            "disposition=" + Describe(stillBefore));
+
+        Console.WriteLine();
+        Console.WriteLine(pass
+            ? "Refusal path proved. Grant the role to a contact to exercise a successful edit."
+            : "FAILURES above.");
+        return pass ? 0 : 2;
+    }
+
+    try
+    {
+        Check("accepted the edit", refusal == null, refusal ?? "no refusal");
+        if (refusal != null)
+        {
+            return 2;
+        }
+
+        var after = svc.Retrieve("al_outcomecase", target.Id,
+            new ColumnSet("al_taxteamdisposition", "al_reviewrouteid"));
+        var afterDisposition = after.GetAttributeValue<OptionSetValue>("al_taxteamdisposition");
+        var afterRoute = after.GetAttributeValue<EntityReference>("al_reviewrouteid");
+
+        Check("disposition applied", afterDisposition != null && afterDisposition.Value == sending,
+            Describe(beforeDisposition) + " -> " + Describe(afterDisposition));
+
+        var beforeRouteName = beforeRoute == null ? null : beforeRoute.Name;
+        var afterRouteName = afterRoute == null ? null : afterRoute.Name;
+        Check("route re-derived (BR-004)", beforeRouteName != afterRouteName,
+            (beforeRouteName ?? "(none)") + " -> " + (afterRouteName ?? "(none)"));
+
+        var clearedRow = svc.Retrieve("contact", contactId, new ColumnSet("al_caseheaderrequest"));
+        Check("trigger column cleared",
+            string.IsNullOrEmpty(clearedRow.GetAttributeValue<string>("al_caseheaderrequest")),
+            "al_caseheaderrequest is empty");
+
+        // Compared against the newest event captured BEFORE the edit. Taking the latest one
+        // alone would pass on an event an earlier UpdateCaseDetails left behind - and if this
+        // edit wrote none at all, that stale event is exactly what the check would find.
+        var audit = new QueryExpression("al_auditevent")
+        {
+            ColumnSet = new ColumnSet("al_actorname", "al_actorid", "al_details"),
+            TopCount = 1,
+            Criteria = new FilterExpression(),
+        };
+        audit.Criteria.AddCondition("al_targetid", ConditionOperator.Equal, target.Id.ToString("D"));
+        audit.Criteria.AddCondition("al_command", ConditionOperator.Equal, 120910752);
+        audit.AddOrder("createdon", OrderType.Descending);
+        var events = svc.RetrieveMultiple(audit).Entities;
+        var newestAfter = events.Count > 0 ? events[0].Id : Guid.Empty;
+        var actorId = events.Count > 0 ? events[0].GetAttributeValue<string>("al_actorid") : null;
+
+        Check("a NEW audit event was written", newestAfter != Guid.Empty && newestAfter != newestBefore,
+            newestAfter == Guid.Empty ? "(no audit event at all)"
+                : newestAfter == newestBefore ? "the newest event predates this edit" : newestAfter.ToString());
+
+        Check("audit event names the contact, not the application user",
+            actorId != null && actorId.Equals(contactId.ToString("D"), StringComparison.OrdinalIgnoreCase),
+            events.Count == 0
+                ? "(no audit event)"
+                : "actor=" + events[0].GetAttributeValue<string>("al_actorname") + " " + actorId);
+    }
+    finally
+    {
+        // Put the case back however this went. A verification that leaves a seeded
+        // disposition behind has changed the route of a real case to prove a point.
+        var restore = new Entity("al_outcomecase", target.Id);
+        restore["al_taxteamdisposition"] = beforeDisposition;
+        restore["al_taxcheckrequired"] = beforeRequired;
+        restore["al_reviewrouteid"] = beforeRoute;
+        svc.Update(restore);
+
+        // Read back rather than reporting the intent. Printing the before-values would say
+        // "Restored" whether or not the write landed, which is the one sentence of this
+        // harness anybody reads when something has gone wrong on a live case.
+        var restored = svc.Retrieve("al_outcomecase", target.Id,
+            new ColumnSet("al_taxteamdisposition", "al_taxcheckrequired", "al_reviewrouteid"));
+        var backDisposition = restored.GetAttributeValue<OptionSetValue>("al_taxteamdisposition");
+        var backRequired = restored.GetAttributeValue<OptionSetValue>("al_taxcheckrequired");
+        var backRoute = restored.GetAttributeValue<EntityReference>("al_reviewrouteid");
+        var clean = Describe(backDisposition) == Describe(beforeDisposition)
+            && Describe(backRequired) == Describe(beforeRequired)
+            && (backRoute == null ? null : backRoute.Name) == (beforeRoute == null ? null : beforeRoute.Name);
+
+        Console.WriteLine();
+        Console.WriteLine((clean ? "Restored" : "RESTORE INCOMPLETE - check this case by hand")
+            + ": disposition=" + Describe(backDisposition)
+            + ", taxCheckRequired=" + Describe(backRequired)
+            + ", route=" + (backRoute == null ? "(none)" : backRoute.Name));
+    }
+
+    Console.WriteLine(pass ? "Tax header edit proved end to end." : "FAILURES above.");
+    return pass ? 0 : 2;
 }
 
 // Points a seeded case's adviser, para-planner and checker name at one real person.

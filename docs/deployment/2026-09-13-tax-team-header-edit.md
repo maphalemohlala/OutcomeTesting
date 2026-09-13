@@ -91,11 +91,82 @@ existing one.
 
 ---
 
+## Proved against DEV
+
+Run with `verifytaxheader`, added to the registration tool for this. It writes the same JSON
+column on the same contact row the portal PATCHes, so the whole server path runs: the step,
+the payload, the guards, the derivation and the audit event. Only the browser half is
+untested, and it is the thin half.
+
+**The refusal**, as `angela.houghton@ascotlloyd.co.uk` (holds T&C Supervisor, not Tax Reviewer):
+
+```
+Roles held: AL Portal - T&C Supervisor
+Holds AL Portal - Tax Reviewer: False
+  [PASS] refused a contact without the Tax Reviewer role:
+         PRECONDITION: Editing the Tax team's fields needs the
+         AL Portal - Tax Reviewer role on your portal account.
+  [PASS] names the role in the refusal
+  [PASS] left the case untouched: disposition=(none)
+```
+
+Worth noting the refused contact holds **T&C Supervisor**, a senior portal role. The guard is
+role-specific and not seniority-based, which is what BR-008's separation of duties needs.
+
+**The edit**, as `Simunye.Radingwana@ascotlloyd.co.uk` on seeded case `IO-SEED-TAX-01`:
+
+```
+  [PASS] accepted the edit: no refusal
+  [PASS] disposition applied: (none) -> 120910570
+  [PASS] route re-derived (BR-004): Tax only -> Tax then AQS
+  [PASS] trigger column cleared: al_caseheaderrequest is empty
+  [PASS] a NEW audit event was written
+  [PASS] audit event names the contact, not the application user:
+         actor=Simunye Radingwana 2fe7f28b-67a7-f111-aaac-e4fade069307
+
+Restored: disposition=(none), taxCheckRequired=120910560, route=Tax only
+```
+
+`Tax only -> Tax then AQS` is the line that matters. It is not a column changing: it is
+`UpdateCaseDetailsPlugin.DeriveRoute` running inside the portal path and re-deciding whether
+an AQS review is owed, which is the whole point of the feature. The last line closes the loop
+with `2026-09-13-signoff-signatory.md` - the event names the person, not
+`# PowerPages Data Runtime PROD`.
+
+### How the harness is built, and why
+
+Modelled on `verify` / `verifysignoff` / `verifyregrade`, with three deliberate differences,
+each answering something the 2026-08-27 audit found in those:
+
+- **It names its target.** The older verbs take the FIRST row of `al_outcomecase` with no
+  filter and no environment guard; the audit's example was `verifyregrade` against production
+  leaving "permanent audit events on a real client case recording a regrade that never
+  happened". This one takes a case reference and a contact email and refuses anything that
+  does not resolve to exactly one row.
+- **It restores in a `finally`, then reads back.** An earlier draft printed the before-values
+  and called them "Restored", which says the same thing whether or not the write landed. It
+  now re-reads the row and says `RESTORE INCOMPLETE - check this case by hand` when the two
+  disagree.
+- **It proves the audit event is new.** Taking the latest `UpdateCaseDetails` event would pass
+  on one an earlier edit left behind — and if this edit wrote none at all, that stale event is
+  exactly what the check would find. The newest event id is captured before the write and
+  compared after.
+
+### A correction
+
+An earlier query of contacts and web roles, joined through `powerpagecomponent`, returned
+seven role assignments and no Tax Reviewer. That reading was **wrong**: it missed six of
+`Simunye.Radingwana@ascotlloyd.co.uk`'s roles, including both reviewer roles. The registration
+tool's own `RolesOf` reads them correctly, and the plug-in uses
+`WebRoleRegistry.RolesForContact`, which is the authority. Nothing was built on the wrong
+reading — a role grant was considered and turned out to be unnecessary — but the FetchXML
+join is not a reliable way to ask this question on this site.
+
+---
+
 ## Still open
 
-- **Not exercised end to end.** The plug-in's rules are unit tested and the page renders, but
-  no Tax checker has saved a change against DEV through the portal. That is the proof, and it
-  has not been run here.
+- ~~Not exercised end to end.~~ **Done — see "Proved against DEV" above.**
 - **The Code App still edits these fields through `al_UpdateCaseDetails`**, unchanged. Two
   front ends now write the same two columns by different doors; both derive the route through
   the same method, which is what keeps them honest.
