@@ -230,9 +230,6 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
         ) : null}
 
         <div className="library__form-actions">
-          <button type="button" className="library__btn" onClick={onSave} disabled={busy}>
-            {busy ? 'Saving…' : mode === 'add' ? 'Add question' : isMove ? 'Move question' : 'Save new version'}
-          </button>
           <button
             type="button"
             className="library__btn library__btn--ghost"
@@ -240,6 +237,9 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
             disabled={busy}
           >
             Cancel
+          </button>
+          <button type="button" className="library__btn" onClick={onSave} disabled={busy}>
+            {busy ? 'Saving…' : mode === 'add' ? 'Add question' : isMove ? 'Move question' : 'Save new version'}
           </button>
         </div>
       </div>

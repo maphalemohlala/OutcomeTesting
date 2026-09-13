@@ -113,9 +113,6 @@ export function RetireModal({
         ) : null}
 
         <div className="library__form-actions">
-          <button type="button" className="library__btn" onClick={onSubmit} disabled={busy}>
-            {busy ? 'Retiring…' : `Retire ${subject}`}
-          </button>
           <button
             type="button"
             className="library__btn library__btn--ghost"
@@ -123,6 +120,9 @@ export function RetireModal({
             disabled={busy}
           >
             Cancel
+          </button>
+          <button type="button" className="library__btn" onClick={onSubmit} disabled={busy}>
+            {busy ? 'Retiring…' : `Retire ${subject}`}
           </button>
         </div>
       </div>

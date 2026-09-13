@@ -112,21 +112,39 @@
   font-size: var(--text-lg);
 }
 
+/* Fields, their labels and their controls are the ones Edit case details uses
+   (.case-edit__field), because these are the same kind of dialog and were drifting apart:
+   only the select carried any styling here, so every input and textarea in the library's
+   modals fell back to the browser's own - square, differently bordered, and in the case of
+   a textarea a monospace face - beside a select that did not. Project owner, 2026-09-13:
+   "the styling on the question library modals seems off... ensure it matches that of the
+   edit case". Keep the two in step: a change to one belongs in the other. */
 .library__field {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   font-size: var(--text-sm);
-  color: var(--colour-text-muted);
 }
 
-.library__field select {
-  padding: var(--space-1) var(--space-2);
+.library__field > span {
+  font-weight: 600;
+  color: var(--colour-text);
+}
+
+.library__field select,
+.library__field input,
+.library__field textarea {
+  padding: var(--space-2);
   font: inherit;
+  font-size: var(--text-sm);
   color: var(--colour-text);
   background: var(--colour-surface);
-  border: 1px solid var(--colour-border);
+  border: 1px solid var(--colour-border-strong);
   border-radius: var(--radius);
+}
+
+.library__field textarea {
+  resize: vertical;
 }
 
 .library__check {
@@ -138,7 +156,7 @@
 }
 
 .library__btn {
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--colour-action-text);
@@ -160,9 +178,13 @@
   cursor: not-allowed;
 }
 
+/* The secondary button is outlined in the border colour rather than the action colour, as
+   Cancel is on Edit case details: two action-coloured outlines side by side read as two
+   primary buttons. */
 .library__btn--ghost {
   color: var(--colour-action);
   background: transparent;
+  border-color: var(--colour-border-strong);
 }
 
 .library__btn--ghost:hover:not(:disabled) {
@@ -185,8 +207,10 @@
 }
 
 .library__form-actions {
+  margin-top: var(--space-3);
   display: flex;
   gap: var(--space-2);
+  justify-content: flex-end;
 }
 
 /* What saving will do, stated before it is pressed. An edit creates a new version; a move
@@ -253,7 +277,14 @@
   margin: 0;
   padding: var(--space-3);
   border: 1px solid var(--colour-border);
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius);
+}
+
+.library__questions-draft > legend {
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--colour-text);
 }
 
 .library__draft-row {
@@ -261,6 +292,17 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+}
+
+.library__draft-row input[type='text'],
+.library__draft-row select {
+  padding: var(--space-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--colour-text);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border-strong);
+  border-radius: var(--radius);
 }
 
 .library__draft-row input[type='text'] {

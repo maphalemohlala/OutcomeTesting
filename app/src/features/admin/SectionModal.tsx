@@ -307,9 +307,6 @@ export function SectionModal({ mode, section, onClose, onSaved }: Props) {
         ) : null}
 
         <div className="library__form-actions">
-          <button type="button" className="library__btn" onClick={onSave} disabled={busy}>
-            {busy ? 'Saving…' : mode === 'add' ? 'Add section' : 'Save changes'}
-          </button>
           <button
             type="button"
             className="library__btn library__btn--ghost"
@@ -317,6 +314,9 @@ export function SectionModal({ mode, section, onClose, onSaved }: Props) {
             disabled={busy}
           >
             Cancel
+          </button>
+          <button type="button" className="library__btn" onClick={onSave} disabled={busy}>
+            {busy ? 'Saving…' : mode === 'add' ? 'Add section' : 'Save changes'}
           </button>
         </div>
       </div>
