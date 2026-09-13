@@ -18,7 +18,7 @@ import type { RemediationActionRow } from './remediationMapping';
 
 /**
  * How `Remediation.Describe` opens the bracket holding the outcome: "...when the review was
- * submitted (Tax check: Insufficient evidence)." The outcome is not one of the numbered
+ * submitted (Tax check: Pass with issues)." The outcome is not one of the numbered
  * items - it is the result every item is a reason for - so it is read back out here and
  * shown as the remediation's Outcome instead (project owner, 2026-09-10).
  */

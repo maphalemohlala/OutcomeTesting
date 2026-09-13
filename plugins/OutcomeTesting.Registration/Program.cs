@@ -6348,6 +6348,33 @@ int SetOptionLabel(string orgUrl, string entity, string attribute, int value, st
 {
     using var svc = Connect(orgUrl);
 
+    // Refuse a global option set outright.
+    //
+    // The whole point of the rename this verb was written for is that it reaches ONE
+    // discipline: al_taxoutcome is local to al_outcomecase, so rewording 120910302 there
+    // leaves the same value reading "Insufficient evidence" on the shared answer-choice set
+    // that the suitability grid and the Consumer Duty overlay use. Run against a column
+    // backed by a global set, an UpdateOptionValue addressed by entity and attribute reaches
+    // the global definition - so a rename meant for one column would reword every entity
+    // that shares it. That is the exact failure the scoping exists to avoid, and it would be
+    // invisible here: the read-back below would show the label correctly changed.
+    var meta = (RetrieveAttributeResponse)svc.Execute(new RetrieveAttributeRequest
+    {
+        EntityLogicalName = entity,
+        LogicalName = attribute,
+        RetrieveAsIfPublished = false,
+    });
+
+    var optionSet = ((PicklistAttributeMetadata)meta.AttributeMetadata).OptionSet;
+    if (optionSet.IsGlobal == true)
+    {
+        Console.Error.WriteLine(
+            $"{entity}.{attribute} is backed by the GLOBAL option set '{optionSet.Name}'. " +
+            "Renaming a value there would change it for every column that shares it. " +
+            "Refusing: reword a global set deliberately, not through this verb.");
+        return 1;
+    }
+
     var before = PicklistOptions(svc, entity, attribute);
     if (!before.TryGetValue(value, out var current))
     {
