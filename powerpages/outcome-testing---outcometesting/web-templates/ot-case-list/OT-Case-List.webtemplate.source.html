@@ -186,14 +186,6 @@
 </fetch>
 {% endfetchxml %}
 
-{% fetchxml n_all %}
-<fetch aggregate="true">
-  <entity name="al_outcomecase">
-    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
-    {% if f_mine == '1' %}<link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="mine"><filter type="and"><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" /></filter></link-entity>{% endif %}
-  </entity>
-</fetch>
-{% endfetchxml %}
 
 {% comment %}
   An aggregate fetch returns no result set at all when the caller cannot read the table, and
@@ -206,50 +198,52 @@
 {% assign c_inprogress = 0 %}{% if n_inprogress.results and n_inprogress.results.entities.size > 0 %}{% assign c_inprogress = n_inprogress.results.entities[0].total %}{% endif %}
 {% assign c_submitted = 0 %}{% if n_submitted.results and n_submitted.results.entities.size > 0 %}{% assign c_submitted = n_submitted.results.entities[0].total %}{% endif %}
 {% assign c_remediation = 0 %}{% if n_remediation.results and n_remediation.results.entities.size > 0 %}{% assign c_remediation = n_remediation.results.entities[0].total %}{% endif %}
-{% assign c_all = 0 %}{% if n_all.results and n_all.results.entities.size > 0 %}{% assign c_all = n_all.results.entities[0].total %}{% endif %}
 
-<section class="ot-card" aria-labelledby="ot-cases-dashboard">
-  <h2 class="ot-card__title" id="ot-cases-dashboard">
-    {% if f_mine == '1' %}My cases by stage{% else %}Cases by stage{% endif %}
-    <span class="ot-count">{{ c_all }}</span>
-  </h2>
-  <p>
-    Where each case is waiting. Select a card to open the cases behind it.
-  </p>
+{% comment %}
+  The stage tiles, drawn as My work draws its own: the strip opens the page rather than
+  sitting inside a card. It used to be wrapped in one, with a header bar and an intro
+  paragraph, so the same component read as a bordered box inside a bordered box and did not
+  match the page it was copied from (project owner, 2026-09-13: "ensure that the cards
+  styling on cases match that of the my work page").
 
-  <ul class="ot-tiles">
-    <li>
-      <a class="ot-tile" href="/cases?{{ scope_qs }}status=120910583">
-        <span class="ot-tile__count">{{ c_queued }}</span>
-        <span class="ot-tile__label">Queued</span>
-      </a>
-    </li>
-    <li>
-      <a class="ot-tile" href="/cases?{{ scope_qs }}status=120910584">
-        <span class="ot-tile__count">{{ c_assigned }}</span>
-        <span class="ot-tile__label">Assigned</span>
-      </a>
-    </li>
-    <li>
-      <a class="ot-tile" href="/cases?{{ scope_qs }}status=120910585">
-        <span class="ot-tile__count">{{ c_inprogress }}</span>
-        <span class="ot-tile__label">Review in progress</span>
-      </a>
-    </li>
-    <li>
-      <a class="ot-tile" href="/cases?{{ scope_qs }}status=120910586">
-        <span class="ot-tile__count">{{ c_submitted }}</span>
-        <span class="ot-tile__label">Submitted</span>
-      </a>
-    </li>
-    <li>
-      <a class="ot-tile ot-tile--alert" href="/cases?{{ scope_qs }}status=120910587">
-        <span class="ot-tile__count">{{ c_remediation }}</span>
-        <span class="ot-tile__label">Awaiting remediation</span>
-      </a>
-    </li>
-  </ul>
-</section>
+  The heading went with the wrapper, and with it a count of every case. Neither is missed:
+  the card immediately below names the same scope - My cases, All cases, Filtered cases -
+  and carries its own total, and each tile still says what it counts. A bare <h2> was not
+  an option in its place; nothing in the stylesheet dresses one outside a card, so it would
+  have arrived as a browser default, which is the fault this change exists to remove.
+{% endcomment %}
+<ul class="ot-tiles">
+  <li>
+    <a class="ot-tile" href="/cases?{{ scope_qs }}status=120910583">
+      <span class="ot-tile__count">{{ c_queued }}</span>
+      <span class="ot-tile__label">Queued</span>
+    </a>
+  </li>
+  <li>
+    <a class="ot-tile" href="/cases?{{ scope_qs }}status=120910584">
+      <span class="ot-tile__count">{{ c_assigned }}</span>
+      <span class="ot-tile__label">Assigned</span>
+    </a>
+  </li>
+  <li>
+    <a class="ot-tile" href="/cases?{{ scope_qs }}status=120910585">
+      <span class="ot-tile__count">{{ c_inprogress }}</span>
+      <span class="ot-tile__label">Review in progress</span>
+    </a>
+  </li>
+  <li>
+    <a class="ot-tile" href="/cases?{{ scope_qs }}status=120910586">
+      <span class="ot-tile__count">{{ c_submitted }}</span>
+      <span class="ot-tile__label">Submitted</span>
+    </a>
+  </li>
+  <li>
+    <a class="ot-tile ot-tile--alert" href="/cases?{{ scope_qs }}status=120910587">
+      <span class="ot-tile__count">{{ c_remediation }}</span>
+      <span class="ot-tile__label">Awaiting remediation</span>
+    </a>
+  </li>
+</ul>
 
 <form class="ot-filters" method="get" action="/cases" role="search" aria-label="Filter cases">
   <div class="ot-filters__grid">
