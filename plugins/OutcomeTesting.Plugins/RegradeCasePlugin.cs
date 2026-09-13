@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -133,6 +133,10 @@ namespace OutcomeTesting.Plugins
                     "This case has no initial outcome to regrade. Record the original outcome before overriding it.");
             }
 
+            // The recheck is a step of the lifecycle, not a control available throughout it.
+            var caseRef = outcome.GetAttributeValue<EntityReference>("al_outcomecaseid");
+            EnsureCaseIsAtTheRecheck(systemService, caseRef);
+
             // Preserve the initial outcome (BR-007): only the final columns are written.
             var update = new Entity(OutcomeEntity, targetId)
             {
@@ -169,7 +173,7 @@ namespace OutcomeTesting.Plugins
                 }
             }
 
-            CloseAfterRecheck(systemService, outcome.GetAttributeValue<EntityReference>("al_outcomecaseid"));
+            CloseAfterRecheck(systemService, caseRef);
 
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService,
@@ -191,6 +195,52 @@ namespace OutcomeTesting.Plugins
                 AuditEventId = auditId,
                 Conflict = false,
             };
+        }
+
+        /// <summary>
+        /// Refuses a final outcome on a case that has not reached its recheck.
+        ///
+        /// Setting the final outcome IS the recheck (AD-057, and the reason
+        /// <see cref="CloseAfterRecheck"/> closes the case), so the only two states it means
+        /// anything in are <b>Awaiting Recheck</b> - the recheck itself - and <b>Closed</b> -
+        /// the AD-031 privileged correction of a case already finished. A case still in
+        /// remediation has nothing to recheck: its remedial actions are open, no supervisor
+        /// has attested to any of them, and a grade recorded there is a verdict on work that
+        /// has not been done.
+        ///
+        /// <see cref="SignoffProgressPlugin"/> has gated its own call on Awaiting Recheck
+        /// since the sign-off began recording the grade, and <see cref="CloseAfterRecheck"/>
+        /// moves no case that is anywhere else. The two portal-facing front ends were the
+        /// gap: the panel on OT Remediation and the Code App's recheck route both called
+        /// straight in, so a supervisor could grade a case in the middle of its remediation
+        /// and the grade would stick while the case stayed where it was. Reported on case
+        /// 254398988, which took a Pass at Awaiting Remediation with all six of its remedial
+        /// actions still unanswered. Enforced here rather than in either front end because a
+        /// page is not a boundary (NFR-SEC-01) and the Custom API is reachable on its own.
+        ///
+        /// A case the outcome does not name, or one carrying no status at all, is left to
+        /// the rest of the rules rather than refused on a guess.
+        /// </summary>
+        public static void EnsureCaseIsAtTheRecheck(IOrganizationService service, EntityReference caseRef)
+        {
+            if (caseRef == null)
+            {
+                return;
+            }
+
+            var status = CaseTransitions.CurrentStatus(service, caseRef.Id);
+            if (!status.HasValue
+                || status.Value == CaseLifecycle.AwaitingRecheck
+                || status.Value == CaseLifecycle.Closed)
+            {
+                return;
+            }
+
+            throw new InvalidPluginExecutionException(
+                CommandHelpers.PreconditionPrefix
+                + "This case is at " + CaseLifecycle.NameOf(status.Value)
+                + ". The final outcome is the recheck decision, so it is recorded once every "
+                + "remedial action has been signed off and the case reaches Awaiting Recheck.");
         }
 
         /// <summary>

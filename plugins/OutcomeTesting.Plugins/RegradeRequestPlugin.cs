@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
@@ -136,14 +136,19 @@ namespace OutcomeTesting.Plugins
                 [RequestAttr] = null,
             });
 
-            // One intent per outcome and grade, so a retry after a dropped response replays
-            // the original regrade instead of writing a second Audit Event (NFR-REL-01). The
-            // browser cannot supply a stable key across page loads, so it is derived here —
-            // the same reasoning, and the same shape, as the portal submit's key.
+            // One intent per outcome, grade and read, so a retry after a dropped response
+            // replays the original regrade instead of writing a second Audit Event
+            // (NFR-REL-01). The browser cannot supply a stable key across page loads, so it
+            // is derived here, as the portal submit's key is. A submit is one act per review,
+            // so its key is the review alone; a regrade is not one act per outcome. Until
+            // 2026-09-13 this key was the outcome alone, and every regrade of an outcome
+            // after its first - the AD-031 correction, or the real regrade after a mistaken
+            // early one - was answered with the first regrade's result while the page
+            // reported success. Found on case 254398988.
             var idempotencyKey = payload.IdempotencyKey;
             if (string.IsNullOrWhiteSpace(idempotencyKey))
             {
-                idempotencyKey = "portal-regrade-" + outcomeId.ToString("N");
+                idempotencyKey = DeriveIdempotencyKey(outcomeId, payload.FinalOutcome, payload.ExpectedRowVersion);
             }
 
             // The application user for both: it holds the privileges, and on this path there
@@ -160,6 +165,39 @@ namespace OutcomeTesting.Plugins
                 context,
                 contactId,
                 actorName);
+        }
+
+        /// <summary>
+        /// The replay key for a portal regrade the page did not key itself: the outcome, the
+        /// grade asked for, and the row version the page read before asking. The same
+        /// request sent twice - a retry after a dropped response, or the reload the page
+        /// used to make - carries all three unchanged and replays. A different grade is a
+        /// new intent and is recorded. The same grade against a later read is a new intent
+        /// too (a correction back to an earlier grade), which is why the row version is in
+        /// the key; a page that sends no row version falls back to outcome and grade, and
+        /// loses only that last case.
+        /// </summary>
+        public static string DeriveIdempotencyKey(Guid outcomeId, string finalOutcome, string expectedRowVersion)
+        {
+            var key = new StringBuilder("portal-regrade-").Append(outcomeId.ToString("N"));
+            key.Append('-').Append(KeyToken(finalOutcome));
+            if (!string.IsNullOrWhiteSpace(expectedRowVersion))
+            {
+                key.Append('-').Append(KeyToken(expectedRowVersion));
+            }
+
+            return key.ToString();
+        }
+
+        private static string KeyToken(string text)
+        {
+            var token = new StringBuilder();
+            foreach (var c in (text ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                token.Append(char.IsLetterOrDigit(c) ? c : '-');
+            }
+
+            return token.ToString();
         }
 
         /// <summary>

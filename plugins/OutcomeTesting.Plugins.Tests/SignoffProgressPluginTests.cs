@@ -246,6 +246,47 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void The_grade_recorded_with_the_last_approval_still_lands_after_the_case_moves()
+        {
+            // The order the plug-in actually runs in: MoveCase first, then the final outcome,
+            // gated on the status MoveCase left behind. AD-127 now refuses a final outcome
+            // before the case reaches its recheck, and this is the path that must still get
+            // through it - the supervisor who sets the grade as they approve (2026-09-11).
+            // Composed from the two public steps because RecordFinalOutcome is private; it is
+            // the same pair, in the same order, against the same service.
+            var svc = CaseAt(CaseLifecycle.AwaitingSignoff);
+            Route(svc, tax: false, aqs: true);
+            SubmittedReview(svc, ResponseRules.ReviewTypeAqs);
+
+            var outcomeId = Guid.Parse("dddddddd-3333-4333-8333-333333333333");
+            svc.Seed(
+                "al_outcome", outcomeId,
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_reviewinstanceid", new EntityReference("al_reviewinstance", AqsReviewId),
+                "al_initialoutcome", new OptionSetValue(OutcomeRules.OutcomeInsufficient));
+
+            SignedOff(svc, ActionOn(svc, AqsReviewId));
+
+            SignoffProgressPlugin.MoveCase(svc, CaseId, Approved, AqsReviewId);
+            Assert.Equal(CaseLifecycle.AwaitingRecheck, CaseStatus(svc));
+
+            RegradeCasePlugin.Regrade(
+                svc,
+                svc,
+                outcomeId,
+                RegradeCasePlugin.FinalOutcomeLabel(OutcomeRules.FinalOutcomePass),
+                "Approved, and graded with the approval.",
+                null,
+                "signoff-regrade-" + outcomeId.ToString("N"),
+                new FakePluginExecutionContext());
+
+            Assert.Equal(
+                OutcomeRules.FinalOutcomePass,
+                svc.Row("al_outcome", outcomeId).GetAttributeValue<OptionSetValue>("al_finaloutcome").Value);
+            Assert.Equal(CaseLifecycle.Closed, CaseStatus(svc));
+        }
+
+        [Fact]
         public void An_approval_moves_the_case_once_every_action_on_that_check_is_decided()
         {
             var svc = CaseAt(CaseLifecycle.AwaitingSignoff);

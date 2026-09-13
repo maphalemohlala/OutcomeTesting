@@ -1691,6 +1691,22 @@
             status.className = kind ? 'ot-inline-status ot-inline-status--' + kind : 'ot-inline-status';
           }
 
+          /*
+           * The reload the reader asks for, added once beside the status line. A button
+           * rather than a timer, for the reason the success branch below gives: the page
+           * cannot promise that a reload shows the new state, so it must not spring one.
+           */
+          function offerReload() {
+            if (status.parentNode.querySelector('[data-ot-reload]')) { return; }
+            var button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'ot-btn';
+            button.setAttribute('data-ot-reload', '');
+            button.textContent = 'Reload the page';
+            button.addEventListener('click', function () { window.location.reload(); });
+            status.parentNode.insertBefore(button, status.nextSibling);
+          }
+
           function friendly(body, code) {
             // The server's own words where it gave any: the refusals here are business
             // rules - the role, and the review already being submitted - and a checker can
@@ -1745,10 +1761,27 @@
                 if (request.status >= 200 && request.status < 300) {
                   initialRequired = required.value;
                   initialDisposition = disposition.value;
-                  // Reloaded rather than patched in place: changing these can re-derive the
-                  // route (BR-004), which the Review progress table above also shows.
-                  show('Saved. Reloading...', 'success');
-                  window.location.reload();
+                  /*
+                   * Confirmed in place, and the reload offered rather than taken.
+                   *
+                   * The rows this write changes are al_outcomecase and, where the route
+                   * re-derives (BR-004), the review instances - and the page wrote none of
+                   * them. It PATCHed contact.al_caseheaderrequest and CaseHeaderRequestPlugin
+                   * did the rest, so the portal's render cache is not invalidated by this
+                   * write path and learns through change tracking (AD-094), which is polled.
+                   * An immediate reload therefore re-draws the Review progress table exactly
+                   * as it was, under a success message - which is what three reports on
+                   * OT Remediation turned out to be on 2026-09-13 (AD-126, AD-127, AD-128).
+                   *
+                   * The two selects already show what was saved, because the reader chose
+                   * them. What the page cannot know is whether the route moved, so it says
+                   * that plainly instead of showing a stale answer to it.
+                   */
+                  show('Saved. The route can change with these fields, and Review progress'
+                    + ' above still shows what the page read before you saved. Reload it when'
+                    + ' you want that re-read, and if it still looks unchanged the site cache'
+                    + ' has not caught up - try again in a moment.', 'success');
+                  offerReload();
                   return;
                 }
 

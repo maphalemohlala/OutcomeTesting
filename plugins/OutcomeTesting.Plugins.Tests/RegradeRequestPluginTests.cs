@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Xunit;
@@ -192,6 +192,66 @@ namespace OutcomeTesting.Plugins.Tests
                 svc, ContactId, Request("Pass", "Regraded after remediation."), Context());
 
             Assert.Equal(first.AuditEventId, second.AuditEventId);
+        }
+
+        [Fact]
+        public void A_second_regrade_to_a_different_grade_is_recorded_rather_than_replayed()
+        {
+            var svc = Holding(CaseLifecycle.AwaitingRecheck, WebRoleRegistry.TcSupervisorRole);
+            var first = RegradeRequestPlugin.Apply(
+                svc, ContactId, Request("Pass", "Regraded after remediation."), Context());
+
+            // The supervisor comes back and corrects the grade (AD-031). That is a new
+            // intent, not a replay of the first: it has to be written and audited, not
+            // answered with the first regrade's result while the page reports success.
+            svc.Seed("contact", ContactId, RegradeRequestPlugin.RequestAttr, "{}", "fullname", "Sam Supervisor");
+            svc.FetchResults.Enqueue(new EntityCollection(new List<Entity>
+            {
+                RoleRow(WebRoleRegistry.TcSupervisorRole),
+            }));
+
+            var second = RegradeRequestPlugin.Apply(
+                svc, ContactId, Request("Pass with issues", "Corrected: one issue was left open."), Context());
+
+            Assert.NotEqual(first.AuditEventId, second.AuditEventId);
+            Assert.Equal("Pass with issues", second.FinalOutcome);
+            Assert.Equal(
+                OutcomeRules.FinalOutcomePassWithIssues,
+                svc.Row("al_outcome", OutcomeId).GetAttributeValue<OptionSetValue>("al_finaloutcome").Value);
+        }
+
+        [Theory]
+        [InlineData(CaseLifecycle.Submitted)]
+        [InlineData(CaseLifecycle.AwaitingRemediation)]
+        [InlineData(CaseLifecycle.RemediationInProgress)]
+        [InlineData(CaseLifecycle.AwaitingSignoff)]
+        public void A_final_outcome_before_the_case_reaches_the_recheck_is_refused(int status)
+        {
+            // The final outcome IS the recheck decision (AD-057), and a case still in
+            // remediation has nothing to recheck: the remedial actions are open and no
+            // supervisor has attested to any of them. Reported on case 254398988, which
+            // took a Pass while six actions sat unanswered at Awaiting Remediation.
+            var svc = Holding(status, WebRoleRegistry.TcSupervisorRole);
+
+            var ex = Assert.Throws<InvalidPluginExecutionException>(
+                () => RegradeRequestPlugin.Apply(svc, ContactId, Request("Pass", "Regraded."), Context()));
+
+            Assert.Contains("Awaiting Recheck", ex.Message);
+            Assert.Contains(CaseLifecycle.NameOf(status), ex.Message);
+            Assert.Null(svc.Row("al_outcome", OutcomeId).GetAttributeValue<OptionSetValue>("al_finaloutcome"));
+        }
+
+        [Fact]
+        public void A_closed_case_can_still_be_corrected()
+        {
+            // AD-031's privileged correction: the case is finished and the grade was wrong.
+            // The guard above must not take this away.
+            var svc = Holding(CaseLifecycle.Closed, WebRoleRegistry.TcSupervisorRole);
+
+            var result = RegradeRequestPlugin.Apply(
+                svc, ContactId, Request("Pass with issues", "Corrected after review."), Context());
+
+            Assert.Equal("Pass with issues", result.FinalOutcome);
         }
 
         private static Entity RoleRow(string name)

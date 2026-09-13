@@ -630,7 +630,7 @@
                           {% endif %}
                           <td rowspan="{{ ot_count }}">{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
                           <td rowspan="{{ ot_count }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
-                          <td rowspan="{{ ot_count }}">{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
+                          <td rowspan="{{ ot_count }}" data-ot-row-status="{{ a.al_remediationactionid }}">{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
                           <td rowspan="{{ ot_count }}">
                             {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
                             <span class="ot-age"
@@ -639,7 +639,7 @@
                                   data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
                                   data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
                           </td>
-                          <td rowspan="{{ ot_count }}">
+                          <td rowspan="{{ ot_count }}" data-ot-row-decision="{{ a.al_remediationactionid }}">
                             {% if latest %}
                               {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
                             {% elsif a.al_completedon %}
@@ -1009,11 +1009,51 @@
           same reason the sign-off above does not hide itself: hiding it by role in Liquid
           would look like access control and enforce nothing (NFR-SEC-01).
 
+          And offered only where the case has reached its recheck. Hiding by STATE is not
+          the same act as hiding by role: the role question is who you are, which Liquid
+          must not appear to decide, while this is whether the case has got to the step at
+          all. Recording the final outcome IS the recheck (AD-057), so it means something
+          in exactly two states - Awaiting Recheck, and Closed for the AD-031 correction of
+          a case already finished. Before then the remedial actions are open and nobody has
+          attested to any of them, so a grade would be a verdict on work not yet done.
+          Reported on case 254398988, which took a Pass at Awaiting Remediation with all six
+          of its actions unanswered; RegradeCasePlugin.EnsureCaseIsAtTheRecheck now refuses
+          it server-side, and this branch is so the supervisor is not offered a control that
+          would be refused. The status is read from the case, so the panel returns by itself
+          the moment the last sign-off moves it.
+
           The four options are BR-005's, in BR-005's order, and the reason is mandatory
           (AD-031) - required in the page so the supervisor is told before the request goes,
           and required again in the plug-in because a page is not a boundary.
         {% endcomment %}
-        {% if outcome and outcome.al_initialoutcome %}
+        {% assign ot_at_recheck = false %}
+        {% if c.al_casestatus.value == 120910590 %}{% assign ot_at_recheck = true %}{% endif %}
+        {% if c.al_casestatus.value == 120910591 %}{% assign ot_at_recheck = true %}{% endif %}
+        {% if outcome and outcome.al_initialoutcome %}{% unless ot_at_recheck %}
+          {% comment %}
+            The same two grades the panel reports, said where the panel would have been. A
+            case carrying a final outcome it should never have been offered - 254398988 does,
+            from before the guard - says so here rather than hiding it.
+          {% endcomment %}
+          {% capture early_initial %}{% include 'OT Outcome Label' initial: outcome.al_initialoutcome %}{% endcapture %}
+          {% assign early_initial = early_initial | strip %}
+          {% capture early_final %}{% include 'OT Outcome Label' final: outcome.al_finaloutcome %}{% endcapture %}
+          {% assign early_final = early_final | strip %}
+          <div class="ot-form-submit">
+            <h3 class="ot-form-submit__title">Regraded outcome</h3>
+            <p class="ot-form-submit__hint">
+              The initial outcome is
+              <strong>{{ early_initial | default: 'not recorded' | escape }}</strong>{% if early_final != '' %},
+              and a final outcome of <strong>{{ early_final | escape }}</strong> is recorded
+              against it{% if outcome.al_regradedon %} from {{ outcome.al_regradedon | date: 'dd MMM yyyy' }}{% endif %}{% endif %}.
+              This case is at <strong>{{ c.al_casestatus.label | default: 'an earlier step' | escape }}</strong>.
+              The final outcome is the recheck decision, so it is recorded here once every
+              remedial action above has been signed off and the case reaches Awaiting
+              Recheck.
+            </p>
+          </div>
+        {% endunless %}{% endif %}
+        {% if outcome and outcome.al_initialoutcome and ot_at_recheck %}
           <div class="ot-form-submit" data-ot-regrade
                data-outcome-id="{{ outcome.al_outcomeid }}"
                data-row-version="{{ outcome.versionnumber }}">
@@ -1027,7 +1067,7 @@
             {% assign initial_label = initial_label | strip %}
             {% capture final_label %}{% include 'OT Outcome Label' final: outcome.al_finaloutcome %}{% endcapture %}
             {% assign final_label = final_label | strip %}
-            <p class="ot-form-submit__hint">
+            <p class="ot-form-submit__hint" data-ot-regrade-hint>
               The initial outcome was
               <strong>{{ initial_label | default: 'not recorded' | escape }}</strong>{% if final_label != '' %},
               regraded to <strong>{{ final_label | escape }}</strong>{% if outcome.al_regradedon %}
@@ -1169,6 +1209,128 @@
 
 <script>
   /*
+   * Bringing the rows up to date after a write, without asking the server again.
+   *
+   * Every write on this page PATCHes a trigger column and a synchronous plug-in does the
+   * real work on OTHER tables - al_remediationaction, al_signoff, al_outcome,
+   * al_outcomecase. Those rows are committed by the time the PATCH returns, but the portal
+   * did not write them, so its render cache is not invalidated by the write path and learns
+   * through Dataverse change tracking (AD-094), which is polled. A reload inside that window
+   * re-draws the state the page already had, under a success message - which is what
+   * "the sign-off does not show the updates" was, reported on case 254398988 whose six
+   * actions were Completed and approved in Dataverse while the page kept showing them Open.
+   *
+   * So the page stops reloading and says what it knows instead. It knows exactly what it
+   * just asked for and got a 2xx on, which is enough for the two cells a write changes: the
+   * status of the action, and the decision standing against it. Anything it cannot know for
+   * certain - the supervisor's panel appearing, the case moving on - is left to a reload the
+   * reader asks for, with the cache caveat attached, rather than one the page springs.
+   *
+   * Deliberately not innerHTML: the labels come from a select the user just used, and text
+   * that reaches the DOM as text cannot be anything else.
+   */
+  window.otRemediationRows = (function () {
+    'use strict';
+
+    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // 'dd MMM yyyy', matching the Liquid date filter the cells are rendered with, so a
+    // row this rewrites cannot be told apart from a row the server drew.
+    function today() {
+      var now = new Date();
+      var day = now.getDate();
+      return (day < 10 ? '0' + day : String(day)) + ' ' + MONTHS[now.getMonth()] + ' ' + now.getFullYear();
+    }
+
+    function cells(attribute, ids) {
+      var found = [];
+      for (var i = 0; i < ids.length; i += 1) {
+        var id = (ids[i] || '').replace(/^\s+|\s+$/g, '');
+        if (!id) { continue; }
+        var cell = document.querySelector('[' + attribute + '="' + id + '"]');
+        if (cell) { found.push(cell); }
+      }
+      return found;
+    }
+
+    function setText(cell, text) {
+      cell.textContent = text;
+    }
+
+    /*
+     * The badge markup OT Status Badge produces for this label, for the two labels this
+     * page can put there: 'Completed' matches none of that template's words and falls to
+     * its default, ot-badge--waiting, while 'In progress' matches 'progress' and is
+     * ot-badge--active. Mirrored rather than improved - a row the page rewrites has to look
+     * like the rows around it, and choosing a nicer colour here would make the two
+     * disagree. Anything else falls to the default, as the include does.
+     */
+    function badge(cell, label) {
+      var name = String(label || '').toLowerCase();
+      cell.textContent = '';
+      var span = document.createElement('span');
+      span.className = 'ot-badge ot-badge--' + (name.indexOf('progress') !== -1 ? 'active' : 'waiting');
+      span.textContent = label;
+      cell.appendChild(span);
+    }
+
+    return {
+      /* The adviser has signed the form off: every action they answered is now Completed
+         and waiting on the supervisor. */
+      completed: function (ids) {
+        var status = cells('data-ot-row-status', ids);
+        for (var i = 0; i < status.length; i += 1) { badge(status[i], 'Completed'); }
+
+        var decision = cells('data-ot-row-decision', ids);
+        for (var j = 0; j < decision.length; j += 1) {
+          setText(decision[j], 'Adviser completed ' + today() + '; awaiting supervisor');
+        }
+      },
+
+      /*
+       * The supervisor has decided. The decision cell carries the label and the date, the
+       * same two things the server renders there from the al_signoff row.
+       *
+       * A rejection also moves the action: SignoffProgressPlugin puts it back to In
+       * progress for the rework (AD-125), so the status cell has to move with it or the
+       * page would show a rejected action still sitting at Completed. An approval leaves
+       * the action Completed, which is what the cell already says.
+       */
+      decided: function (ids, label, rejected) {
+        var decision = cells('data-ot-row-decision', ids);
+        for (var i = 0; i < decision.length; i += 1) {
+          setText(decision[i], label + ' ' + today());
+        }
+
+        if (!rejected) { return; }
+
+        var status = cells('data-ot-row-status', ids);
+        for (var j = 0; j < status.length; j += 1) { badge(status[j], 'In progress'); }
+      },
+
+      /*
+       * The reload the reader asks for. The page cannot draw the parts that need a server
+       * render - the supervisor's panel after an adviser sign-off, the regrade panel after
+       * the case reaches recheck - so it offers the reload instead of timing one, and says
+       * what may still be stale when it lands.
+       */
+      offerReload: function (after) {
+        if (!after || after.parentNode.querySelector('[data-ot-reload]')) { return; }
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ot-btn';
+        button.setAttribute('data-ot-reload', '');
+        button.textContent = 'Reload the page';
+        button.addEventListener('click', function () { window.location.reload(); });
+        after.parentNode.insertBefore(button, after.nextSibling);
+      }
+    };
+  })();
+</script>
+
+<script>
+  /*
    * The adviser's half of the BR-008 loop, as one form (PP-12, FR-020, FR-021).
    *
    * Path: this page -> PATCH al_remediationaction -> CompleteRequestPlugin -> Dataverse.
@@ -1302,6 +1464,34 @@
       if (draft) { draft.disabled = on; }
     }
 
+    // The actions this form answers, in the order the cells appear.
+    function ids() {
+      var found = [];
+      for (var i = 0; i < cells.length; i += 1) {
+        found.push(cells[i].getAttribute('data-action-id'));
+      }
+      return found;
+    }
+
+    /*
+     * A signed-off form is not editable again from here. RemediationResponseGuard refuses a
+     * response-column change once the action is Completed (BR-008 - that is what the
+     * supervisor attests to), so leaving the fields live would invite an edit the server
+     * would refuse. The draft button goes with them: there is no longer a draft to save.
+     */
+    function markSaved() {
+      for (var i = 0; i < cells.length; i += 1) {
+        var text = cells[i].querySelector('[data-ot-response-text]');
+        if (text) { text.readOnly = true; }
+      }
+
+      var radios = document.querySelectorAll('[data-ot-fq]');
+      for (var j = 0; j < radios.length; j += 1) { radios[j].disabled = true; }
+
+      submit.disabled = true;
+      if (draft) { draft.disabled = true; }
+    }
+
     /*
      * markComplete false is a draft: it keeps what has been written and signs nothing off.
      *
@@ -1350,25 +1540,31 @@
             }
 
             /*
-             * The reload cannot be guaranteed to show the result, which is why the message
-             * says so rather than promising it.
+             * Confirmed in place, and no reload. The rows this wrote are the adviser's
+             * remedial actions, which the page did not write itself - it PATCHed them and
+             * CompleteRequestPlugin did the rest - so the portal's render cache does not
+             * clear on this write and a reload inside the change-tracking window re-draws
+             * every action Open under a success message. That is how a remediation fully
+             * recorded in Dataverse read as one that had not saved (AD-094, AD-117, and
+             * case 254398988 on 2026-09-13).
              *
-             * Every write on this page is a PATCH to a trigger column that a synchronous
-             * plug-in turns into writes on OTHER tables - al_outcome, al_outcomecase,
-             * al_signoff, al_remediationaction. Those rows are committed by the time the
-             * PATCH returns, but the portal did not write them, so its own render cache is
-             * not invalidated by the write path. It learns through Dataverse change
-             * tracking (AD-094), which is polled and eventually consistent: change tracking
-             * makes the portal ABLE to notice, not synchronous about it.
-             *
-             * At 800ms the reload beat that consistently, so a regrade that had fully
-             * succeeded - outcome recorded, case closed, audit event written - re-rendered
-             * with every value unchanged and read as a silent failure. Reported against
-             * IO-300005 on 2026-09-11. A longer delay narrows the window but cannot close
-             * it, so the text carries the caveat.
+             * The two cells the page can be certain of are brought up to date here; the
+             * supervisor's panel needs a server render, so the reload is offered rather
+             * than timed.
              */
-            show('Signed off. Refreshing - if the page still shows the old state, the site cache has not caught up; reload again in a moment.', 'success');
-            window.setTimeout(function () { window.location.reload(); }, 2500);
+            markSaved();
+            if (window.otRemediationRows) {
+              window.otRemediationRows.completed(ids());
+            }
+            show('Signed off. ' + pending.length + ' remedial action'
+              + (pending.length === 1 ? ' is' : 's are')
+              + ' recorded against your three answers and sent to your supervisor.'
+              + ' The rows above now show what was saved. Reload the page when you want the'
+              + ' rest of it re-read, and if it still shows the old state the site cache has'
+              + ' not caught up - try again in a moment.', 'success');
+            if (window.otRemediationRows) {
+              window.otRemediationRows.offerReload(status);
+            }
             return;
           }
 
@@ -1535,6 +1731,33 @@
         status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
       }
 
+      // The words on the option the supervisor chose, for the message and for the cells.
+      function decisionLabel() {
+        var chosen = decision.options[decision.selectedIndex];
+        return chosen ? chosen.textContent.replace(/^\s+|\s+$/g, '') : 'Decision';
+      }
+
+      /*
+       * What an approval leaves to do. Approving every action moves the case to Awaiting
+       * Recheck, where the final outcome is recorded and closes it (AD-057, AD-127); a
+       * supervisor who set the grade here has already done that step.
+       */
+      function gradeNote() {
+        if (grade && grade.value) {
+          return ' The final outcome is recorded with it, which closes the case.';
+        }
+        return ' The case moves to Awaiting Recheck, where the final outcome closes it.';
+      }
+
+      // A decision made is not made again from here; the guard refuses a second one on an
+      // action already approved, so the controls go with it.
+      function settle() {
+        decision.disabled = true;
+        notes.disabled = true;
+        if (grade) { grade.disabled = true; }
+        save.disabled = true;
+      }
+
       save.addEventListener('click', function () {
         if (save.disabled) { return; }
 
@@ -1578,8 +1801,30 @@
           // firing them together would leave the supervisor guessing which ones landed.
           function next() {
             if (index >= actionIds.length) {
-              show('Sign-off recorded. Refreshing - if the page still shows the old state, the site cache has not caught up; reload again in a moment.', 'success');
-              window.setTimeout(function () { window.location.reload(); }, 2500);
+              /*
+               * Confirmed in place, for the reason the adviser's form gives above: the rows
+               * this wrote are al_signoff and al_remediationaction, the page wrote neither,
+               * and a reload inside the change-tracking window re-draws the remediation
+               * exactly as it was. Reported on case 254398988 on 2026-09-13, whose six
+               * actions were Completed and approved in Dataverse while the page still
+               * showed them awaiting a decision.
+               */
+              settle();
+              if (window.otRemediationRows) {
+                window.otRemediationRows.decided(
+                  actionIds, decisionLabel(), decision.value === REJECTED);
+              }
+              show(decisionLabel() + ', recorded against ' + actionIds.length
+                + ' remedial action' + (actionIds.length === 1 ? '' : 's') + '.'
+                + (decision.value === REJECTED
+                    ? ' The actions go back to the adviser to put right.'
+                    : gradeNote())
+                + ' Reload the page when you want the rest of it re-read, and if it still'
+                + ' shows the old state the site cache has not caught up - try again in a'
+                + ' moment.', 'success');
+              if (window.otRemediationRows) {
+                window.otRemediationRows.offerReload(status);
+              }
               return;
             }
 
@@ -1726,11 +1971,33 @@
       var reason = panel.querySelector('[data-ot-regrade-reason]');
       var save = panel.querySelector('[data-ot-regrade-save]');
       var status = panel.querySelector('[data-ot-regrade-status]');
+      var hint = panel.querySelector('[data-ot-regrade-hint]');
 
       function show(message, kind) {
         status.textContent = message;
         status.className = 'ot-response__status ot-response__status--' + (kind || 'info');
         status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+      }
+
+      // The panel's own summary line, brought up to date with what was just recorded so
+      // the page in hand agrees with Dataverse without waiting for the cache.
+      function recorded(label) {
+        grade.disabled = true;
+        reason.disabled = true;
+        save.disabled = true;
+        if (!hint) { return; }
+        var initial = hint.querySelector('strong');
+        var initialText = initial ? initial.textContent : 'not recorded';
+        hint.textContent = '';
+        hint.appendChild(document.createTextNode('The initial outcome was '));
+        var initialNode = document.createElement('strong');
+        initialNode.textContent = initialText;
+        hint.appendChild(initialNode);
+        hint.appendChild(document.createTextNode(', regraded to '));
+        var finalNode = document.createElement('strong');
+        finalNode.textContent = label;
+        hint.appendChild(finalNode);
+        hint.appendChild(document.createTextNode(' just now. Recording a final outcome does not change it — both are kept (BR-007).'));
       }
 
       save.addEventListener('click', function () {
@@ -1775,8 +2042,19 @@
             if (request.readyState !== 4) { return; }
 
             if (request.status >= 200 && request.status < 300) {
-              show('Final outcome recorded and the case closed. Refreshing - if the grade below still reads the old value, the site cache has not caught up; reload again in a moment.', 'success');
-              window.setTimeout(function () { window.location.reload(); }, 2500);
+              // Confirmed in place, and no reload. The rows a regrade writes are the
+              // outcome and the case, and this page did not write them - it wrote the
+              // request column and RegradeRequestPlugin did the rest - so the portal's
+              // render cache is not cleared by this write and learns through change
+              // tracking, which is polled (AD-094, AD-117). A reload inside that window
+              // re-drew the old grade under a success message, and was read as "it did
+              // not save" on IO-300005 and again on case 254398988. The controls stay
+              // disabled: the row version this panel holds is now stale, and a further
+              // regrade has to start from a fresh read.
+              recorded(grade.value);
+              show('Final outcome recorded as ' + grade.value + ', with your reason written to the audit history of the case.'
+                + ' A case waiting at Awaiting Recheck is now closed.'
+                + ' The rest of this page still shows what it read before you saved; reload it when you want to see the change, and if the grade has not moved yet, the site cache has not caught up - try again in a moment.', 'success');
               return;
             }
 
