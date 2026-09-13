@@ -1,6 +1,6 @@
 # Delivery status — 2026-09-13
 
-Written at commit `da4ad69` on `feat/checklist-administration`. Supersedes
+Written at commit `c81730c` on `feat/checklist-administration`. Supersedes
 `docs/2026-09-06-delivery-status.md` as the current status; that one still records how the
 contact registry and web-role model were settled. The register of what is left remains
 `docs/2026-09-04-outstanding-work.md`, read together with the "Still open" and "Left as they
@@ -10,8 +10,10 @@ Every environment claim below was verified by query against `Env_AQ_Dev` after t
 Where something did **not** land, it says so.
 
 **The day in one line: the Tax team got its header edit and the case page got the paper
-form, and the audit that followed found that the sign-off loop closed on 2026-09-12 had
-been left open in three other places.**
+form, the audit that followed found that the sign-off loop closed on 2026-09-12 had been
+left open in three other places, and an evening of testing on case 254398988 turned up
+three more defects in the remediation page - one of which had been quietly discarding
+regrades.**
 
 ---
 
@@ -27,6 +29,7 @@ been left open in three other places.**
 | `6592884` | OD-053: a Tax outcome is corrected by no command | decision log |
 | `e915a64` | The audit's first pass: seven defects, the duplication and cost findings, and the case page's remediation drawn as the form | `2026-09-13-audit-fixes-and-case-remediation-form.md` |
 | `da4ad69` | The audit's second pass: the five angles the rate limit had cut off | same note, second section |
+| `c81730c` | Three reports on case 254398988, and the sweep for more like them (§7) | `2026-09-13-regrade-replay-key.md`, `-regrade-before-recheck.md`, `-remediation-confirms-in-place.md`, `docs/audits/2026-09-13-three-bug-classes-swept.md` |
 
 ## 2. The sign-off loop, three times
 
@@ -62,16 +65,16 @@ parameter in DEV, so a reorder from the Question library would have been refused
 
 | | State |
 |---|---|
-| Plug-in assembly | 221,696 bytes, 46 types; the orphaned `CorrectTaxOutcomePlugin` and its custom API removed |
+| Plug-in assembly | **222,720 bytes** after the evening's two plug-in changes (221,696 at the audit's second pass) |
 | Steps | 0 disabled after `registerall` |
-| Web templates | OT Case Detail, OT Review Detail, OT Remediation pushed today; the case page draws remediation as the form |
+| Web templates | OT Case Detail, OT Review Detail, OT Remediation pushed today; the case page draws remediation as the form. OT Remediation pushed three more times in the evening (93822 → 108070 chars) and OT Review Detail once (→ 99982) |
 | Custom APIs | 31 registered from contracts; `DisplayOrder` on `al_RetireAndSucceedQuestion` created and in the solution |
 | Code App | pushed after each pass |
 | `src/` | manifest and assembly type list copied back from the export (AD-013); one hand-written parameter file matching the DEV row |
 
 | Suite | |
 |---|---|
-| `dotnet test` (plugins) | **804** |
+| `dotnet test` (plugins) | **816** (804 at the audit's second pass; 12 added in the evening) |
 | `npx vitest run` (app) | **484** |
 | `tsc -b`, `eslint` | clean |
 
@@ -95,6 +98,54 @@ parameter in DEV, so a reorder from the Question library would have been refused
   templates. Placement, not behaviour; listed in the audit note.
 - **`ChecklistVersionInForce`** counts the effective-to day as in force where a question
   version or section does not. One place now, documented, not changed.
+- **The claim navigation** (§7): claiming a case sends the browser straight to the review
+  page, whose editability depends on the assignment the plug-in has just written. Confirmed
+  by reading, not reproduced, and the fix needs a decision first.
+- **Case 254398988 carries a final outcome of Pass** recorded before AD-127's guard existed.
+  Nothing is stuck - it now sits at Awaiting Recheck, and recording the final outcome
+  overwrites it and closes the case.
+- **Browser proof** of the three evening fixes. Each was verified against Dataverse and, for
+  the page helper, against a fake DOM; none has been watched in a browser.
 - **`origin/main`** has not been advanced past `88e6182`; the branch carries both audit
-  commits. Merging is the project owner's call.
+  commits and the evening's. Merging is the project owner's call.
 - Everything in `docs/2026-09-04-outstanding-work.md` not closed by a later note.
+
+---
+
+## 7. The evening: three reports on one case, and the sweep
+
+Testing a remediation end to end on case **254398988** produced three reports in a row. Each
+was a different defect, and in every one Dataverse already held what the tester thought had
+been lost.
+
+| Report | What was actually true | Defect | Recorded |
+|---|---|---|---|
+| "It shows saved but it does not save" | The regrade had saved in full | The **second** regrade was discarded: the derived replay key was the outcome id alone, so it matched the first Audit Event and returned its result while writing nothing | **AD-126** |
+| "The buttons show even before it is saved; the form is still editable" | Nothing had ever been recorded on the remediation - no save had been submitted | The page offered **Record the final outcome** on a case at Awaiting Remediation with six unanswered actions, and took a Pass twice. No lifecycle guard anywhere | **AD-127** |
+| "Supervisor sign-off does not show the updates" | Six actions Completed, six approvals, the case moved to Awaiting Recheck | The page reloaded into a render cache the write does not invalidate, and re-drew the old state under a success message | **AD-128** |
+
+The third root explains the second report's lost typing: the regrade panel's reload discarded
+the form the adviser had filled in but not yet saved.
+
+### The sweep
+
+Asked for after the third report. All three classes, across the codebase:
+
+- **Reloads after a write** — three portal pages write. `OT Review Detail`'s Tax header edit
+  had the same defect, reloading *immediately*, and is fixed. `OT Review List`'s claim
+  navigates rather than reloads, and its target page decides editability from the row the
+  claim just wrote: reported, not fixed, because the remedy needs a decision.
+- **Derived replay keys** — six. One was the report; one (`portal-complete-…`) had already
+  been fixed for this exact defect, which is what makes it a class; three are sound for
+  reasons now written down; one is a timestamp that can never replay, harmless because the
+  plug-in exits early when nothing changed. One latent risk, unreachable while a closed case
+  cannot reopen.
+- **Lifecycle guards** — every front-end-callable command has one. The regrade was the only
+  gap, and each control is drawn under the condition its command enforces.
+
+The audit also closed a risk in its own session's fix: AD-127's guard sits in the shared
+`Regrade`, which the sign-off calls when a supervisor grades as they approve. That path was
+safe only because `MoveCase` runs first, and nothing tested the two together. A test now
+composes them.
+
+Full findings: `docs/audits/2026-09-13-three-bug-classes-swept.md`.
