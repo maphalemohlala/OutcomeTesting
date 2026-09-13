@@ -1252,6 +1252,14 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-checklist .ot-answer__status:empty { display: none; }
 .ot-checklist .ot-answer__status--error { color: #a4262c; font-weight: 700; }
 
+/* A row the submit refused for (an unanswered required question), marked where it is so
+   the checker does not scan the form for it. The autosave clears the mark when the row's
+   answer next saves. Cells rather than the row, because the sheet rules every cell and a
+   row background does not show through them. */
+.ot-checklist .ot-answer--missing > td,
+.ot-checklist .ot-answer--missing > th { background: #fdecea !important; }
+.ot-checklist .ot-answer--missing:not(tr) { background: #fdecea; }
+
 .ot-checklist .ot-required {
   display: inline-block;
   margin-left: 6px;

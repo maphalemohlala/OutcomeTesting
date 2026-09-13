@@ -1282,6 +1282,8 @@
 
                 function done() {
                   var now = new Date();
+                  // An answer just saved is no longer one the submit refused for.
+                  root.classList.remove('ot-answer--missing');
                   show('Saved ' + two(now.getHours()) + ':' + two(now.getMinutes()), 'saved');
                 }
 
@@ -1426,6 +1428,41 @@
           }
 
           /*
+           * The rows the plug-in refused for, marked where they are. Until 2026-09-13 the
+           * refusal said "3 of 42 required questions are unanswered" and the page showed
+           * that sentence under the button, leaving the checker to scan forty-two rows for
+           * three empty ones. The plug-in now names the question version ids; each row
+           * carries its own in data-question-version, so the mark lands on the row itself
+           * and its status line says why. The first is scrolled into view. A row clears its
+           * own mark when its answer next saves. Presentation only - the plug-in still
+           * decides (NFR-SEC-01).
+           */
+          function markUnanswered(ids) {
+            var previous = document.querySelectorAll('.ot-answer--missing');
+            for (var p = 0; p < previous.length; p += 1) { previous[p].classList.remove('ot-answer--missing'); }
+
+            var first = null;
+            for (var i = 0; i < ids.length; i += 1) {
+              var id = String(ids[i] || '').trim();
+              if (!id) { continue; }
+              var rows = document.querySelectorAll('[data-ot-answer][data-question-version="' + id + '"]');
+              for (var r = 0; r < rows.length; r += 1) {
+                rows[r].classList.add('ot-answer--missing');
+                var line = rows[r].querySelector('[data-ot-status]');
+                if (line) {
+                  line.textContent = 'Required - not answered';
+                  line.className = 'ot-answer__status ot-answer__status--error';
+                }
+                if (!first) { first = rows[r]; }
+              }
+            }
+
+            if (first && first.scrollIntoView) {
+              first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+
+          /*
            * The plug-in prefixes its failures so the client can branch without parsing
            * prose. Messages here say what happened, what is still safe, and what to do
            * next, and never expose a table name, query, id or stack trace (PP-16).
@@ -1480,9 +1517,17 @@
               return 'You do not have permission to submit this review.';
             }
             if (text.indexOf('PRECONDITION:') !== -1) {
-              // Carries the actionable detail, e.g. how many required questions remain.
+              // Carries the actionable detail: which required questions remain, by code, and
+              // in a bracketed tail their question version ids, which mark the rows below and
+              // are never shown.
               var idx = text.indexOf('PRECONDITION:');
-              return text.substring(idx + 'PRECONDITION:'.length).trim();
+              var detail = text.substring(idx + 'PRECONDITION:'.length).trim();
+              var tail = /\s*\[unanswered:([^\]]*)\]\s*$/.exec(detail);
+              if (tail) {
+                markUnanswered(tail[1].split(','));
+                detail = detail.substring(0, tail.index).trim();
+              }
+              return detail;
             }
             if (text.indexOf('UNEXPECTED:') !== -1) {
               var unexpected = text.indexOf('UNEXPECTED:');

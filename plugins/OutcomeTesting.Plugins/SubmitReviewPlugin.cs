@@ -315,13 +315,17 @@ namespace OutcomeTesting.Plugins
             // through Question -> Section, which is the single-parent chain in the model.
             var mandatoryQuery = new QueryExpression(QuestionVersionEntity)
             {
-                ColumnSet = new ColumnSet("al_questionversionid", "al_effectivefrom", "al_effectiveto"),
+                ColumnSet = new ColumnSet("al_questionversionid", "al_effectivefrom", "al_effectiveto", "al_displayorder"),
                 Criteria = new FilterExpression(),
             };
             mandatoryQuery.Criteria.AddCondition("al_ismandatory", ConditionOperator.Equal, true);
+            mandatoryQuery.AddOrder("al_displayorder", OrderType.Ascending);
 
             var questionLink = mandatoryQuery.AddLink("al_question", "al_questionid", "al_questionid");
             questionLink.EntityAlias = "q";
+            // The code is what the refusal names, so the checker is told which questions
+            // are missing rather than how many.
+            questionLink.Columns = new ColumnSet("al_questioncode");
             var sectionLink = questionLink.AddLink("al_section", "al_sectionid", "al_sectionid");
             sectionLink.EntityAlias = "s";
             sectionLink.Columns = new ColumnSet(
@@ -385,21 +389,43 @@ namespace OutcomeTesting.Plugins
                 }
             }
 
-            var missing = 0;
+            var missing = new List<Entity>();
             foreach (var questionVersion in required)
             {
                 if (!answered.Contains(questionVersion.Id))
                 {
-                    missing++;
+                    missing.Add(questionVersion);
                 }
             }
 
-            if (missing > 0)
+            if (missing.Count > 0)
             {
-                throw new InvalidPluginExecutionException(
-                    PreconditionPrefix + "Complete all questions marked Required before submitting. "
-                    + missing + " of " + required.Count + " required questions are unanswered.");
+                throw new InvalidPluginExecutionException(UnansweredRefusal(missing, required.Count));
             }
+        }
+
+        /// <summary>
+        /// The refusal for unanswered required questions: the codes for the person, and
+        /// the question version ids in a bracketed tail for the page, which marks those
+        /// rows and strips the tail before showing the text. Until 2026-09-13 this said
+        /// "3 of 42 required questions are unanswered" and nothing else, which left a
+        /// checker with forty-two rows to scan.
+        /// </summary>
+        public static string UnansweredRefusal(IList<Entity> missing, int requiredCount)
+        {
+            var codes = new List<string>();
+            var ids = new List<string>();
+            foreach (var version in missing)
+            {
+                var aliased = version.GetAttributeValue<AliasedValue>("q.al_questioncode");
+                var code = aliased == null ? null : aliased.Value as string;
+                codes.Add(string.IsNullOrWhiteSpace(code) ? "(no code)" : code.Trim());
+                ids.Add(version.Id.ToString("D"));
+            }
+
+            return PreconditionPrefix + "Complete all questions marked Required before submitting. "
+                + missing.Count + " of " + requiredCount + " required questions are unanswered: "
+                + string.Join(", ", codes.ToArray()) + ". [unanswered:" + string.Join(",", ids.ToArray()) + "]";
         }
 
         /// <summary>

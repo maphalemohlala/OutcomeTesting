@@ -266,15 +266,18 @@ namespace OutcomeTesting.Plugins
 
         public static bool IsConcurrencyFault(FaultException<OrganizationServiceFault> fault)
         {
-            // ConcurrencyVersionMismatch (0x80060892); fall back to message text in case
-            // the exact code varies by platform build.
-            if (fault.Detail != null && fault.Detail.ErrorCode == unchecked((int)0x80060892))
+            // ConcurrencyVersionMismatch is 0x80060882. This carried 0x80060892 - one digit
+            // out - and its text fallback looked for "row version" with a space where the
+            // platform writes "RowVersion", so a genuine edit conflict matched neither and
+            // surfaced as UNEXPECTED with the raw fault instead of the CONFLICT reload prompt
+            // (case 254398988, 2026-09-13). The text is compared with spaces removed.
+            if (fault.Detail != null && fault.Detail.ErrorCode == unchecked((int)0x80060882))
             {
                 return true;
             }
 
-            var message = fault.Message ?? string.Empty;
-            return message.IndexOf("row version", StringComparison.OrdinalIgnoreCase) >= 0
+            var message = (fault.Message ?? string.Empty).Replace(" ", string.Empty);
+            return message.IndexOf("rowversion", StringComparison.OrdinalIgnoreCase) >= 0
                 || message.IndexOf("concurrency", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
