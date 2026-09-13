@@ -882,8 +882,16 @@ namespace OutcomeTesting.Plugins
                 var aqsStillToCome = AqsStillToCome(service, caseRef.Id);
                 nextStatus = OutcomeRules.NextCaseStatusForTax(answer.Value, aqsStillToCome, remedialFlagged);
                 requiresRemediation = taxRequiresRemediation || remedialFlagged;
+                // Read from al_outcomecase.al_taxoutcome, not al_response.al_answerchoice,
+                // even though the two carry the same values. The answer-choice set is shared
+                // with the suitability grid and the Consumer Duty overlay, where 120910302 is
+                // still "Insufficient evidence"; the Tax check alone reads it as "Pass with
+                // issues" (AD-055 amended). al_taxoutcome is local to the case and used by
+                // nothing else, so it is the only label source scoped to this discipline.
+                // Taking the shared one here would put wording in front of the adviser that
+                // the checker never saw.
                 remediationReason = "Tax check: "
-                    + new OptionLabels(service).Label(ResponseEntity, "al_answerchoice", answer.Value);
+                    + new OptionLabels(service).Label(CaseEntity, TaxOutcomeAttr, answer.Value);
 
                 StampTaxOutcome(service, caseRef.Id, answer.Value);
             }

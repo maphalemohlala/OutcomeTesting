@@ -1244,7 +1244,7 @@
               <displayname description="Tax outcome" languagecode="1033" />
             </displaynames>
             <Descriptions>
-              <Description description="The Tax check's own grade (AD-055), stamped on the case by SubmitReviewPlugin when a Tax review is submitted. Deliberately not al_Outcome: that table carries only the BR-005 advice quality scale, which has no Fail, and a row there would populate the AD-075 export columns a Tax-only case must leave blank and stop the case closing. Values match al_response.al_answerchoice so the stamp needs no mapping." languagecode="1033" />
+              <Description description="The Tax check's own grade (AD-055), stamped on the case by SubmitReviewPlugin when a Tax review is submitted. Deliberately not al_Outcome: that table carries only the BR-005 advice quality scale, which has no Fail, and a row there would populate the AD-075 export columns a Tax-only case must leave blank and stop the case closing. Values match al_response.al_answerchoice so the stamp needs no mapping, but the LABELS deliberately do not: 120910302 reads &quot;Pass with issues&quot; here and &quot;Insufficient evidence&quot; on the shared answer-choice set, because the Tax check alone was rewritten to that wording (AD-055 amended). This local set is what every Tax-context label is read from." languagecode="1033" />
             </Descriptions>
             <options>
               <option value="120910300" IsHidden="0">
@@ -1259,7 +1259,7 @@
               </option>
               <option value="120910302" IsHidden="0">
                 <labels>
-                  <label description="Insufficient evidence" languagecode="1033" />
+                  <label description="Pass with issues" languagecode="1033" />
                 </labels>
               </option>
             </options>
@@ -1268,7 +1268,7 @@
             <displayname description="Tax outcome" languagecode="1033" />
           </displaynames>
           <Descriptions>
-            <Description description="The Tax check's own grade (AD-055), stamped on the case by SubmitReviewPlugin when a Tax review is submitted. Deliberately not al_Outcome: that table carries only the BR-005 advice quality scale, which has no Fail, and a row there would populate the AD-075 export columns a Tax-only case must leave blank and stop the case closing. Values match al_response.al_answerchoice so the stamp needs no mapping." languagecode="1033" />
+            <Description description="The Tax check's own grade (AD-055), stamped on the case by SubmitReviewPlugin when a Tax review is submitted. Deliberately not al_Outcome: that table carries only the BR-005 advice quality scale, which has no Fail, and a row there would populate the AD-075 export columns a Tax-only case must leave blank and stop the case closing. Values match al_response.al_answerchoice so the stamp needs no mapping, but the LABELS deliberately do not: 120910302 reads &quot;Pass with issues&quot; here and &quot;Insufficient evidence&quot; on the shared answer-choice set, because the Tax check alone was rewritten to that wording (AD-055 amended). This local set is what every Tax-context label is read from." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_TaxTeamDisposition">

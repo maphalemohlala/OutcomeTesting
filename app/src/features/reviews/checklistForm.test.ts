@@ -362,12 +362,27 @@ describe('inlineOptionsFor', () => {
     ]);
   });
 
-  it('orders the tax check outcome PASS, INSUFFICIENT EVIDENCE, FAIL as the document does', () => {
+  it('orders the tax check outcome PASS, PASS WITH ISSUES, FAIL as the document does', () => {
     expect(inlineOptionsFor(120910006)).toEqual([
       { value: 120910300, label: 'PASS' },
-      { value: 120910302, label: 'INSUFFICIENT EVIDENCE' },
+      { value: 120910302, label: 'PASS WITH ISSUES' },
       { value: 120910301, label: 'FAIL' },
     ]);
+  });
+
+  it('renames 120910302 for the tax check only, leaving the value it saves alone', () => {
+    // AD-055 amended: the Tax check reads 120910302 as "Pass with issues" where the
+    // suitability grid that shares 120910006 still reads it as "Insufficient evidence".
+    // Wording only - the value the checker ticks is the same one, which is what the value
+    // assertions here are for, and so the remediation it triggers is unchanged too.
+    expect(inlineOptionsFor(120910006)[1]).toEqual({
+      value: 120910302,
+      label: 'PASS WITH ISSUES',
+    });
+    expect(optionsFor(120910006)[2]).toEqual({
+      value: 120910302,
+      label: 'Insufficient evidence',
+    });
   });
 
   it('leaves the grid scales alone, so a tick column stays titled Pass, Fail, N/A', () => {

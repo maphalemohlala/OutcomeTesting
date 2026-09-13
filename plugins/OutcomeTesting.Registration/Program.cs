@@ -353,6 +353,17 @@ if (args.Length >= 6 && args[0].Equals("addoptionvalue", StringComparison.Ordina
     return AddOptionValue(args[1], args[2], args[3], optionValue, args[5], args.Length >= 7 ? args[6] : null);
 }
 
+if (args.Length >= 6 && args[0].Equals("setoptionlabel", StringComparison.OrdinalIgnoreCase))
+{
+    if (!int.TryParse(args[4], out var relabelValue))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- setoptionlabel <orgUrl> <entity> <attribute> <value> <label>");
+        return 1;
+    }
+
+    return SetOptionLabel(args[1], args[2], args[3], relabelValue, args[5]);
+}
+
 if (args.Length >= 2 && args[0].Equals("provepp15", StringComparison.OrdinalIgnoreCase))
 {
     return ProvePp15(args);
@@ -6163,6 +6174,78 @@ int AddOptionValue(string orgUrl, string entity, string attribute, int value, st
     Console.WriteLine(ok
         ? $"{entity}.{attribute} {value} = '{label}' inserted and published ({after.Count} values)."
         : $"Insert returned success, but metadata does not read back {value} = '{label}'.");
+    return ok ? 0 : 2;
+}
+
+// Rewords one value of a local choice column, leaving the value itself alone.
+//
+// The sibling of AddOptionValue, for the change that is wording rather than vocabulary: the
+// label a user reads moves, the integer every row already stores does not, so nothing needs
+// migrating and no saved answer changes meaning. Q-TAX-02's "Insufficient evidence" becoming
+// "Pass with issues" on al_outcomecase.al_taxoutcome (AD-055 amended) is the case it was
+// written for.
+//
+// The direction-of-travel argument AddOptionValue makes applies unchanged. AD-013 makes DEV
+// the source and `src/` the copy, so a label edited into an Entity.xml by hand survives only
+// until the next export overwrites it. Renaming here first puts the two in the supported
+// order: DEV is reworded, the export carries the wording back into `src/`, and the hand edit
+// is confirmed rather than clobbered.
+//
+// Two refusals rather than a blind write:
+//
+//   - An absent value is a typo, not a rename. InsertOptionValue is the verb for a value that
+//     does not exist yet, and silently adding one here would mint a value no code reads.
+//   - A label already worn by a *different* value is refused for the reason AddOptionValue
+//     refuses it: two options reading the same thing cannot be told apart by a user, and any
+//     text-to-value parse over the set - ImportRules.ColumnDef is one - becomes ambiguous.
+//     This is exactly why al_iooutcome cannot take this rename: 120910611 is already
+//     "Pass with issues" there.
+//
+// Read back from metadata afterwards, because UpdateOptionValue reports success on the
+// definition it changed, not on the publish that makes it visible.
+int SetOptionLabel(string orgUrl, string entity, string attribute, int value, string label)
+{
+    using var svc = Connect(orgUrl);
+
+    var before = PicklistOptions(svc, entity, attribute);
+    if (!before.TryGetValue(value, out var current))
+    {
+        Console.Error.WriteLine($"{entity}.{attribute} has no value {value}. Use addoptionvalue to mint one.");
+        return 1;
+    }
+
+    if (string.Equals(current, label, StringComparison.Ordinal))
+    {
+        Console.WriteLine($"{entity}.{attribute} {value} already reads '{label}'. Nothing to do.");
+        return 0;
+    }
+
+    var clash = before.FirstOrDefault(o =>
+        o.Key != value && string.Equals(o.Value, label, StringComparison.OrdinalIgnoreCase));
+    if (clash.Value != null)
+    {
+        Console.Error.WriteLine($"'{label}' is already {clash.Key} on {entity}.{attribute}. Refusing to leave two values with the same label.");
+        return 1;
+    }
+
+    svc.Execute(new UpdateOptionValueRequest
+    {
+        EntityLogicalName = entity,
+        AttributeLogicalName = attribute,
+        Value = value,
+        Label = new Label(label, 1033),
+    });
+
+    svc.Execute(new PublishXmlRequest
+    {
+        ParameterXml = $"<importexportxml><entities><entity>{entity}</entity></entities></importexportxml>",
+    });
+
+    var after = PicklistOptions(svc, entity, attribute);
+    var ok = after.TryGetValue(value, out var written) && written == label;
+    Console.WriteLine(ok
+        ? $"{entity}.{attribute} {value} = '{current}' -> '{label}', published ({after.Count} values)."
+        : $"Update returned success, but metadata does not read back {value} = '{label}'.");
     return ok ? 0 : 2;
 }
 

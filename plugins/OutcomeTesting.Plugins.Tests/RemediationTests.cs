@@ -417,7 +417,7 @@ namespace OutcomeTesting.Plugins.Tests
                 "IO-012",
                 reviewId,
                 1,
-                "Tax check: Insufficient evidence",
+                "Tax check: Pass with issues",
                 null,
                 items,
                 null,
@@ -426,7 +426,7 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Single(raised);
             Assert.Equal("REM-IO-012-1", service.Creates.Single().GetAttributeValue<string>("al_remediationactioncode"));
             Assert.Contains(
-                "(Tax check: Insufficient evidence)",
+                "(Tax check: Pass with issues)",
                 service.Creates.Single().GetAttributeValue<string>("al_description"));
         }
 
