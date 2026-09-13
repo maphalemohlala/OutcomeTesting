@@ -67,8 +67,27 @@ export const SCALE_OPTIONS: Record<number, ChoiceOption[]> = {
 /** The three-column scales that the document lays out as a tick grid. */
 const GRID_SCALES = new Set([120910005, 120910006, 120910007, 120910008, 120910009]);
 
-export function optionsFor(responseTypeValue: number | null): ChoiceOption[] {
-  return responseTypeValue == null ? [] : (SCALE_OPTIONS[responseTypeValue] ?? []);
+export function optionsFor(
+  responseTypeValue: number | null,
+  isTaxReview = false,
+): ChoiceOption[] {
+  const options = responseTypeValue == null ? [] : (SCALE_OPTIONS[responseTypeValue] ?? []);
+  if (!isTaxReview || responseTypeValue == null) return options;
+
+  // A grid on a Tax review reads 120910302 as the Tax check does (AD-055 amended). Same
+  // value, same scale, same saved answer - only the wording, and only on this discipline,
+  // because 120910006 is shared with the suitability grid.
+  //
+  // Q-TAX-02 is drawn inline and relabelled by INLINE_LABELS, so this reaches only a section
+  // added through checklist administration (AD-123) whose questions all share this scale.
+  // Keyed on the review rather than the section's owner role because "for tax checks" is what
+  // was reworded: a Both-owned section answered on a Tax review is a tax check, and a
+  // Tax-owned section never appears on an AQS review. The portal makes the same reading.
+  const overrides = INLINE_LABELS[responseTypeValue];
+  if (!overrides) return options;
+  return options.map((option) =>
+    overrides[option.value] ? { ...option, label: overrides[option.value] } : option,
+  );
 }
 
 /**
@@ -158,6 +177,7 @@ export function optionGridColumns(responseTypeValue: number | null): number | nu
  */
 export function sectionLayout(
   section: ReviewSection,
+  isTaxReview = false,
 ): { kind: 'grid'; options: ChoiceOption[] } | { kind: 'inline' } {
   const first = section.rows[0]?.responseTypeValue;
   if (
@@ -165,7 +185,7 @@ export function sectionLayout(
     GRID_SCALES.has(first) &&
     section.rows.every((row) => row.responseTypeValue === first)
   ) {
-    return { kind: 'grid', options: optionsFor(first) };
+    return { kind: 'grid', options: optionsFor(first, isTaxReview) };
   }
   return { kind: 'inline' };
 }
@@ -565,6 +585,7 @@ export type FormBlock<T extends SectionedAnswer = SectionedAnswer> =
 export function formBlocks<T extends SectionedAnswer>(
   sections: ReviewSection<T>[],
   points: FailPoint[],
+  isTaxReview = false,
 ): FormBlock<T>[] {
   const blocks: FormBlock<T>[] = [];
   const failPoints: FormBlock<T> = {
@@ -609,13 +630,13 @@ export function formBlocks<T extends SectionedAnswer>(
         intro: spec.intro ?? (spec.subsections ? null : section.helpText),
         layout: spec.layout,
         columnHeading: spec.columnHeading ?? 'Check',
-        options: spec.scale == null ? [] : optionsFor(spec.scale),
+        options: spec.scale == null ? [] : optionsFor(spec.scale, isTaxReview),
         groups: [group],
       });
       continue;
     }
 
-    const layout = sectionLayout(section);
+    const layout = sectionLayout(section, isTaxReview);
     blocks.push({
       kind: 'section',
       id: section.id,

@@ -33,7 +33,9 @@ import {
  * 3. Q-TAX-02's middle option reads PASS WITH ISSUES, where the document reads INSUFFICIENT
  *    EVIDENCE (project owner, 2026-09-13; AD-055 amended). The reference file is left as it
  *    was supplied rather than rewritten, so the provenance every other assertion here rests
- *    on is intact and the one option that moved is named in the assertion itself.
+ *    on is intact and the one option that moved is named in the assertion itself. The same
+ *    rewording reaches a grid through optionsFor(scale, isTaxReview), which covers a section
+ *    added by checklist administration rather than anything the document draws.
  */
 
 // ---------------------------------------------------------------------------------------

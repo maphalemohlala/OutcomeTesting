@@ -679,9 +679,26 @@
             The tick columns for whichever scale this block is headed by. A `case` on an
             integer is the same gamble as the one above, so this is an if chain too.
           {% endcomment %}
+          {% comment %}
+            120910302 reads "Pass with issues" on a Tax review and "Insufficient evidence"
+            everywhere else (AD-055 amended, 2026-09-13). Same value, same scale, same saved
+            answer - the Tax check alone was reworded, and 120910006 is shared with the
+            suitability grid, so the wording cannot sit on the scale.
+
+            Q-TAX-02 itself is drawn inline and takes its label from OT Answer Options, so
+            this branch reaches it only through a section added by checklist administration
+            (AD-123) whose questions all use this scale. Keyed on the REVIEW's discipline
+            rather than the section's owner role, because "for tax checks" is what was
+            reworded: a Both-owned section answered on a Tax review is a tax check, and a
+            Tax-owned section cannot appear on an AQS review at all.
+          {% endcomment %}
           {% if grid_rt == 120910006 %}
             {% assign gvalues = '120910300,120910301,120910302' | split: ',' %}
-            {% assign glabels = 'Pass,Fail,Insufficient evidence' | split: ',' %}
+            {% if rv.al_reviewtype.value == 120910200 %}
+              {% assign glabels = 'Pass,Fail,Pass with issues' | split: ',' %}
+            {% else %}
+              {% assign glabels = 'Pass,Fail,Insufficient evidence' | split: ',' %}
+            {% endif %}
           {% elsif grid_rt == 120910008 %}
             {% assign gvalues = '120910305,120910306,120910307' | split: ',' %}
             {% assign glabels = 'Yes,No,N/A' | split: ',' %}
