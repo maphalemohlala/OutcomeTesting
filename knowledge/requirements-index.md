@@ -27,7 +27,7 @@ Authoritative wording lives in the build package documents `01-Solution-Vision` 
 | BR-009 | Notify para-planners without granting operational access by default | Confirmed — **built 2026-09-04**. Delivered by the PP-15 `Review submitted` event, and **live since 2026-09-05**, when the drain was switched on and the path proved end to end (para-planners were not reached before that, because nothing sent). `SubmitReviewPlugin` resolves `al_outcomecase.al_paraplanner` to a **Contact** (never a system user), so the para-planner is emailed without a licence, a web role or any operational access to the case — the "without granting operational access" half is structural, not a setting. An ambiguous or unresolvable name leaves the row unrouted and the drain marks it `Failed`, rather than mailing a guessed address (AD-082). |
 | BR-010 | Capture structured MI including remediation ageing and accountability | Confirmed |
 | BR-011 | Produce Trail Light-compatible Excel output; automated transfer conditional | Export confirmed, transfer conditional |
-| BR-012 | Role-based security, edit protection and audit history | Confirmed |
+| BR-012 | Role-based security, edit protection and audit history | Confirmed. Gap: a Tax check outcome can be corrected by no command, so putting one right today means a direct database edit that bypasses the audit trail — **OD-053** |
 | BR-013 | Administrators maintain questions without corrupting historic data | Confirmed |
 
 ## Functional requirements
