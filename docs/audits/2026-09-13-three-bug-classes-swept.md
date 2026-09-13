@@ -126,4 +126,4 @@ No plug-in change, so no assembly push.
 - The Code App was not swept for class A: it reads Dataverse directly rather than through the
   portal's render cache, so the class does not apply to it. Classes B and C reach it through
   the shared commands, which this audit covered.
-- Committed on `feat/checklist-administration`. `origin/main` is not advanced by it; merging stays the project owner's call.
+- Committed on `feat/checklist-administration` (`c81730c`) and **merged to `main`** the same day at the project owner's direction. DEV carries it; TEST and PROD do not.

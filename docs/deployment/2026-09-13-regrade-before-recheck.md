@@ -84,4 +84,4 @@ would have returned the first regrade's result and written nothing.
   made.
 - The two sign-off writes on this page still reload after 2.5 s with the AD-117 caveat, and
   can still discard unsaved typing the same way. Same shape, separate change.
-- Committed on `feat/checklist-administration`. `origin/main` is not advanced by it; merging stays the project owner's call.
+- Committed on `feat/checklist-administration` (`c81730c`) and **merged to `main`** the same day at the project owner's direction. DEV carries it; TEST and PROD do not.

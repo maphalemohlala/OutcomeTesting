@@ -76,4 +76,4 @@ has to be cleaned up first.
 
 - The same in-place treatment has not been applied to any other portal page. The review page
   already works this way (AD-094); the case detail page has no writes.
-- Committed on `feat/checklist-administration`. `origin/main` is not advanced by it; merging stays the project owner's call.
+- Committed on `feat/checklist-administration` (`c81730c`) and **merged to `main`** the same day at the project owner's direction. DEV carries it; TEST and PROD do not.

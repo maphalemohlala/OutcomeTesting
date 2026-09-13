@@ -106,8 +106,11 @@ parameter in DEV, so a reorder from the Question library would have been refused
   overwrites it and closes the case.
 - **Browser proof** of the three evening fixes. Each was verified against Dataverse and, for
   the page helper, against a fake DOM; none has been watched in a browser.
-- **`origin/main`** has not been advanced past `88e6182`; the branch carries both audit
-  commits and the evening's. Merging is the project owner's call.
+- ~~`origin/main` behind the branch~~ — **closed.** `main` was at `757d646` when this was
+  written, and the project owner called the merge the same evening: `feat/checklist-administration`
+  fast-forwarded onto it, so `main` now stands at `d6148e3` and carries both audit passes and
+  the evening's work. The two branches are identical. Promotion to TEST or PROD is a separate
+  decision and has not been made.
 - Everything in `docs/2026-09-04-outstanding-work.md` not closed by a later note.
 
 ---

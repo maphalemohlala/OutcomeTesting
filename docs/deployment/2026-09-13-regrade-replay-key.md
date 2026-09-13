@@ -76,4 +76,4 @@ in a JS string lost its escape — and was corrected before the push).
 - The two sign-off writes on the same page still reload after 2.5 s with the AD-117 caveat.
   They have the same cache exposure, and the same in-place shape would suit them; left for a
   separate change.
-- Committed on `feat/checklist-administration`. `origin/main` is not advanced by it; merging stays the project owner's call.
+- Committed on `feat/checklist-administration` (`c81730c`) and **merged to `main`** the same day at the project owner's direction. DEV carries it; TEST and PROD do not.
