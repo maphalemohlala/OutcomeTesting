@@ -9,6 +9,7 @@ import {
 import { Al_auditeventsal_command } from '../../generated/models/Al_auditeventsModel';
 import { logTechnical } from '../../services/errors';
 import { choiceLabel } from '../../lib/choiceLabel';
+import { isRecordId } from '../../services/odata';
 
 export interface HistoryEntry {
   id: string;
@@ -34,6 +35,10 @@ const TARGET_LABELS: Record<string, string> = {
   al_signoff: 'Sign-off',
 };
 
+/**
+ * The ids whose audit events belong to this case. `caseId` is interpolated into a filter,
+ * so callers must have established it is a record id first — see the guard in the effect.
+ */
 async function relatedIds(caseId: string): Promise<string[]> {
   const filter = `_al_outcomecaseid_value eq ${caseId}`;
   const [reviews, actions, outcomes, signoffs] = await Promise.all([
@@ -75,7 +80,12 @@ export function useCaseHistory(caseId: string | undefined, reloadKey = 0): CaseH
   }
 
   useEffect(() => {
-    if (!caseId) return;
+    // The id comes from the route, so it is untrusted until it parses as a record id; an
+    // id that is not one never reaches a filter (services/odata.ts). This read builds two
+    // — the related-record filter and the `al_targetid eq '...'` clause below, where the
+    // id sits inside quotes and an apostrophe alone would close them. The unavailable
+    // state for a malformed id is derived below rather than set here.
+    if (!isRecordId(caseId)) return;
     let cancelled = false;
 
     relatedIds(caseId)
@@ -129,6 +139,10 @@ export function useCaseHistory(caseId: string | undefined, reloadKey = 0): CaseH
 
   if (!caseId) {
     return { status: 'unavailable', reason: 'No case was requested.' };
+  }
+
+  if (!isRecordId(caseId)) {
+    return { status: 'unavailable', reason: 'That case address is not valid.' };
   }
 
   return state;

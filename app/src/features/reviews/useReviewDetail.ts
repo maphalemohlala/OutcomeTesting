@@ -13,6 +13,7 @@ import {
 } from './checklistForm';
 import type { ReviewType } from '../../types/domain';
 import { isRecordId } from '../../services/odata';
+import { ownerRoleForReviewType } from '../../lib/ownerRole';
 import {
   Al_reviewinstancesService,
   Al_responsesService,
@@ -78,9 +79,6 @@ export type ReviewDetailState =
   | { status: 'unavailable'; reason: string }
   | { status: 'loading' }
   | { status: 'ready'; detail: ReviewDetail };
-
-/** The al_section owner role per review discipline (AD-020). */
-const OWNER_ROLE: Record<string, number> = { Tax: 120910100, AQS: 120910101 };
 
 /**
  * Fail reasons are a many-to-many between al_response and al_failreason through
@@ -213,8 +211,12 @@ export function useReviewDetail(
         filter: `_al_reviewinstanceid_value eq ${reviewId}`,
         top: 200,
       }),
-      Al_questionversionsService.getAll({ top: 500 }),
-      Al_questionsService.getAll({ top: 500 }),
+      // al_questionversion grows by one row per edit, for ever, and this read carries no
+      // filter - so the cap has to clear the whole table rather than the current checklist.
+      // Truncation here is silent and asymmetric: a question drops off the form while the
+      // submit gate, which pages server-side, still demands its answer (AD-122).
+      Al_questionversionsService.getAll({ top: 5000 }),
+      Al_questionsService.getAll({ top: 5000 }),
       Al_failreasonsService.getAll({ top: 500 }),
     ])
       .then(async ([review, responses, versions, questions, reasons]) => {
@@ -237,7 +239,8 @@ export function useReviewDetail(
         // Owned by this discipline or by Both, and in force on the review's reference day
         // (AD-123). The reference day is computed once here and reused for the answers
         // below, so the sections and the answers can never be read as of different days.
-        const ownerRole = OWNER_ROLE[header.type] ?? OWNER_ROLE[expectedType];
+        const ownerRole =
+          ownerRoleForReviewType(header.type) ?? ownerRoleForReviewType(expectedType);
         const referenceDayValue = referenceDay(review.data.al_submittedon);
         const sectionFilter = buildSectionFilter(
           ownerRole,

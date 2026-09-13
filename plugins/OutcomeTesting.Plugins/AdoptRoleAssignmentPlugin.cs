@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -254,18 +255,29 @@ namespace OutcomeTesting.Plugins
         /// Every al_userrolemapping row for an (email, role) pair, active or not. Unpaged
         /// TopCount would silently hide a second row and let it keep granting the role after
         /// revoke — see the fail-open comment at the revoke call site.
+        ///
+        /// "For the role" is <see cref="PermissionHelpers.MatchesRole"/>, not an al_rolecode
+        /// equality. A mapping written through al_AssignUserRole's picklist branch carries
+        /// al_approle and no role code, so matching on al_rolecode alone never saw it: revoke
+        /// removed the web role association and left that row active, and GetMappedRoles
+        /// honours any active row — the person kept a role that had just been withdrawn from
+        /// them, with nothing on any screen to say so. The query widens to reach those rows
+        /// and the precedence narrows it back, so a stray al_approle default on a code-based
+        /// row is not read as a second identity.
         /// </summary>
         private static List<Entity> FindAllMappings(IOrganizationService service, string email, string roleCode)
         {
             var query = new QueryExpression(MappingEntity)
             {
-                ColumnSet = new ColumnSet("al_useremail", "al_rolecode", "statecode"),
+                ColumnSet = new ColumnSet("al_useremail", "al_rolecode", "al_approle", "statecode"),
                 Criteria = new FilterExpression(),
             };
             query.Criteria.AddCondition("al_useremail", ConditionOperator.Equal, email);
-            query.Criteria.AddCondition("al_rolecode", ConditionOperator.Equal, roleCode);
+            PermissionHelpers.AddRoleIdentityFilter(query.Criteria, roleCode);
 
-            return CommandHelpers.RetrieveAll(service, query);
+            return CommandHelpers.RetrieveAll(service, query)
+                .Where(row => PermissionHelpers.MatchesRole(row, roleCode))
+                .ToList();
         }
 
         private static bool ParseDecision(string decision)

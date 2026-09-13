@@ -7,10 +7,11 @@ import { executeCommand, type CommandResult } from './commandClient';
  * UI code (AD-041).
  */
 
-/** Tax team, AQS checker, or Both — the three teams a section may be owned by. */
-export const OWNER_ROLE_TAX = 120910100;
-export const OWNER_ROLE_AQS = 120910101;
-export const OWNER_ROLE_BOTH = 120910105;
+/**
+ * Tax team, AQS checker, or Both — the three teams a section may be owned by. Declared in
+ * `lib/ownerRole`, which `ownerRole.test.ts` pins to the C# that enforces them.
+ */
+export { OWNER_ROLE_AQS, OWNER_ROLE_BOTH, OWNER_ROLE_TAX } from '../../lib/ownerRole';
 
 /** One question as AddSection receives it. Marshalled as JSON into a string parameter. */
 export interface SectionQuestionInput {

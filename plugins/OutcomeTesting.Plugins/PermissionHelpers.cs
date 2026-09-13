@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -339,22 +340,108 @@ namespace OutcomeTesting.Plugins
             return max;
         }
 
-        /// <summary>Maps an app-role label to its al_approle option value (AD-041).</summary>
-        public static int ParseRole(string label)
+        /// <summary>
+        /// The role code a mapping row actually grants, under the AD-044 precedence
+        /// <see cref="GetMappedRoles"/> enforces: <c>al_rolecode</c> when it carries one,
+        /// otherwise the label of the legacy <c>al_approle</c> picklist. Null when the row
+        /// names no role this application understands.
+        ///
+        /// This is the rule, in one place, because two readers disagreeing about it is a
+        /// fail-open rather than a cosmetic difference. Matching a mapping on al_rolecode
+        /// alone missed every row written through the picklist branch of
+        /// al_AssignUserRole — so AdoptRoleAssignment's revoke removed the web role
+        /// association and left the mapping active, and GetRoleHolders never listed the
+        /// holder at all. The grant survived a withdrawal nobody could see.
+        ///
+        /// The precedence is what keeps the widened match honest: al_approle carries a
+        /// schema default, so a row written with only a role code comes back ALSO carrying
+        /// a picklist value. Reading that stray default as a second identity would revoke
+        /// one role and deactivate another role's row.
+        /// </summary>
+        public static string EffectiveRoleCode(Entity mapping)
+        {
+            if (mapping == null)
+            {
+                return null;
+            }
+
+            var code = mapping.GetAttributeValue<string>("al_rolecode");
+            if (!string.IsNullOrWhiteSpace(code))
+            {
+                return code.Trim();
+            }
+
+            var role = mapping.GetAttributeValue<OptionSetValue>("al_approle");
+            return role == null ? null : AppRoleLabel(role.Value);
+        }
+
+        /// <summary>
+        /// True when a mapping row grants <paramref name="roleCode"/>. Case-insensitive:
+        /// the two sources are written by different paths and a difference of casing is not
+        /// a different role, which is the same allowance RoleHolders makes for email.
+        /// </summary>
+        public static bool MatchesRole(Entity mapping, string roleCode)
+        {
+            var effective = EffectiveRoleCode(mapping);
+            return effective != null &&
+                effective.Equals((roleCode ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Narrows a mapping query to the rows that could grant <paramref name="roleCode"/>.
+        ///
+        /// Deliberately WIDER than the answer: a row is included when its al_rolecode names
+        /// the role OR its al_approle does, and the stray-default case above means the
+        /// second arm over-matches. Callers filter the result with <see cref="MatchesRole"/>,
+        /// which applies the precedence. Widening in the query and narrowing in memory keeps
+        /// one rule rather than an approximation of it in FilterExpression form.
+        /// </summary>
+        public static void AddRoleIdentityFilter(FilterExpression criteria, string roleCode)
+        {
+            var trimmed = (roleCode ?? string.Empty).Trim();
+
+            var roleFilter = new FilterExpression(LogicalOperator.Or);
+            roleFilter.AddCondition("al_rolecode", ConditionOperator.Equal, trimmed);
+
+            int appRole;
+            if (TryParseRole(trimmed, out appRole))
+            {
+                roleFilter.AddCondition("al_approle", ConditionOperator.Equal, appRole);
+            }
+
+            criteria.AddFilter(roleFilter);
+        }
+
+        /// <summary>
+        /// <see cref="ParseRole"/> without the throw, for the callers asking whether a role
+        /// code happens to name one of the six built-in labels rather than asserting it does.
+        /// </summary>
+        public static bool TryParseRole(string label, out int value)
         {
             switch ((label ?? string.Empty).Trim())
             {
-                case "Tax Checker": return 120910760;
-                case "AQS Checker": return 120910761;
-                case "Adviser": return 120910762;
+                case "Tax Checker": value = 120910760; return true;
+                case "AQS Checker": value = 120910761; return true;
+                case "Adviser": value = 120910762; return true;
                 case "T&C Manager":
-                case "T and C Manager": return 120910763;
-                case "Outcome Testing Manager": return 120910764;
-                case "Administrator": return 120910765;
-                default:
-                    throw new InvalidPluginExecutionException(
-                        CommandHelpers.PreconditionPrefix + "Unknown app role '" + label + "'.");
+                case "T and C Manager": value = 120910763; return true;
+                case "Outcome Testing Manager": value = 120910764; return true;
+                case "Administrator": value = 120910765; return true;
+                default: value = 0; return false;
             }
+        }
+
+        /// <summary>Maps an app-role label to its al_approle option value (AD-041).</summary>
+        public static int ParseRole(string label)
+        {
+            int value;
+            if (TryParseRole(label, out value))
+            {
+                return value;
+            }
+
+            throw new InvalidPluginExecutionException(
+                CommandHelpers.PreconditionPrefix + "Unknown app role '" + label + "'.");
         }
 
         /// <summary>

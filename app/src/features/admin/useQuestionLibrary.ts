@@ -168,9 +168,12 @@ export function useQuestionLibrary(reloadKey = 0): QuestionLibraryState {
     let cancelled = false;
 
     Promise.all([
-      Al_sectionsService.getAll({ top: 500 }),
-      Al_questionsService.getAll({ top: 500 }),
-      Al_questionversionsService.getAll({ top: 500 }),
+      Al_sectionsService.getAll({ top: 5000 }),
+      Al_questionsService.getAll({ top: 5000 }),
+      // al_questionversion gains a row per edit and is never pruned, so the cap has to clear
+      // the whole table. A truncated read here is silent and wrong in both directions: a
+      // question shows an older version's wording, or drops out of the library entirely.
+      Al_questionversionsService.getAll({ top: 5000 }),
     ])
       .then(([sections, questions, versions]) => {
         if (cancelled) return;
