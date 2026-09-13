@@ -347,7 +347,7 @@
     <section class="ot-card" aria-labelledby="ot-remediation-heading">
       <h2 class="ot-card__title" id="ot-remediation-heading">
         {{ c.al_casereference | default: 'Case' | escape }}
-        {% include 'OT Status Badge' status: c.al_casestatus.label %}
+        <span data-ot-case-status>{% include 'OT Status Badge' status: c.al_casestatus.label %}</span>
       </h2>
       {% comment %}
         The outcome the remediation was raised for, read back out of the actions.
@@ -848,7 +848,7 @@
                 Regraded outcome
                 <span class="ot-remedial-form__note">(for potential harms / insufficient evidence — the supervisor signs this off)</span>
               </th>
-              <td colspan="3">
+              <td colspan="3" data-ot-regraded-cell>
                 {% comment %}
                   Through OT Outcome Label, not `.label` directly. The platform does not
                   always supply a formatted value for an option set, which renders as an
@@ -1259,18 +1259,31 @@
     }
 
     /*
-     * The badge markup OT Status Badge produces for this label, for the two labels this
-     * page can put there: 'Completed' matches none of that template's words and falls to
-     * its default, ot-badge--waiting, while 'In progress' matches 'progress' and is
-     * ot-badge--active. Mirrored rather than improved - a row the page rewrites has to look
-     * like the rows around it, and choosing a nicer colour here would make the two
-     * disagree. Anything else falls to the default, as the include does.
+     * The badge markup OT Status Badge produces for a label, mirroring that template's
+     * cascade in its own order. Mirrored rather than improved - a cell the page rewrites has
+     * to look like the ones around it, and choosing a nicer colour here would make the two
+     * disagree. Anything it does not recognise falls to the default, as the include does.
+     *
+     * The labels this page can put through it: 'Completed' (no keyword, so the default
+     * waiting), 'In progress' (active), and 'Closed', which a regrade leaves the case in.
      */
-    function badge(cell, label) {
+    function badgeClass(label) {
       var name = String(label || '').toLowerCase();
+      if (name === '') { return 'none'; }
+      if (name.indexOf('potential harm') !== -1) { return 'harm'; }
+      if (name.indexOf('insufficient') !== -1) { return 'insufficient'; }
+      if (name.indexOf('issues') !== -1) { return 'issues'; }
+      if (name.indexOf('pass') !== -1) { return 'pass'; }
+      if (name.indexOf('closed') !== -1 || name.indexOf('no check required') !== -1) { return 'closed'; }
+      if (name.indexOf('fail') !== -1 || name.indexOf('blocked') !== -1 || name.indexOf('overdue') !== -1) { return 'blocked'; }
+      if (name.indexOf('progress') !== -1 || name.indexOf('assigned') !== -1 || name.indexOf('submitted') !== -1) { return 'active'; }
+      return 'waiting';
+    }
+
+    function badge(cell, label) {
       cell.textContent = '';
       var span = document.createElement('span');
-      span.className = 'ot-badge ot-badge--' + (name.indexOf('progress') !== -1 ? 'active' : 'waiting');
+      span.className = 'ot-badge ot-badge--' + badgeClass(label);
       span.textContent = label;
       cell.appendChild(span);
     }
@@ -1307,6 +1320,38 @@
 
         var status = cells('data-ot-row-status', ids);
         for (var j = 0; j < status.length; j += 1) { badge(status[j], 'In progress'); }
+      },
+
+      /*
+       * The final outcome has just been recorded, so the two cells that report it elsewhere
+       * on the page have to move with it.
+       *
+       * The panel's own hint said so from the moment the reload was dropped, but the
+       * Regraded outcome cell in the table above and the case's status badge in the heading
+       * are server-rendered and kept saying "Not recorded yet" and "Awaiting Recheck" while
+       * Dataverse held Pass and Closed. Reported on IO-300001 on 2026-09-13, whose regrade
+       * had succeeded in full at 18:14:01. Removing a reload obliges the page to draw what
+       * the reload used to fetch, and this is the half that was missed.
+       *
+       * Closed is certain rather than assumed: the panel is only drawn at Awaiting Recheck
+       * or at Closed (AD-127), a regrade closes the first, and the second is already there.
+       */
+      regraded: function (label) {
+        var cell = document.querySelector('[data-ot-regraded-cell]');
+        if (cell) {
+          // The grade, then the regraded-on date as its own note - the two parts the server
+          // renders into this cell, in that order, so the rewritten cell matches it.
+          cell.textContent = label + ' ';
+          var when = document.createElement('span');
+          when.className = 'ot-remedial-form__note';
+          when.textContent = '\u00b7 ' + today();
+          cell.appendChild(when);
+        }
+
+        var status = document.querySelector('[data-ot-case-status]');
+        if (status) {
+          badge(status, 'Closed');
+        }
       },
 
       /*
@@ -2052,9 +2097,16 @@
               // disabled: the row version this panel holds is now stale, and a further
               // regrade has to start from a fresh read.
               recorded(grade.value);
+              if (window.otRemediationRows) {
+                window.otRemediationRows.regraded(grade.value);
+              }
               show('Final outcome recorded as ' + grade.value + ', with your reason written to the audit history of the case.'
-                + ' A case waiting at Awaiting Recheck is now closed.'
-                + ' The rest of this page still shows what it read before you saved; reload it when you want to see the change, and if the grade has not moved yet, the site cache has not caught up - try again in a moment.', 'success');
+                + ' The Regraded outcome and the case status above now show it, and the case is closed.'
+                + ' Reload the page when you want the rest of it re-read, and if it still shows the old state the site'
+                + ' cache has not caught up - try again in a moment.', 'success');
+              if (window.otRemediationRows) {
+                window.otRemediationRows.offerReload(status);
+              }
               return;
             }
 
