@@ -220,6 +220,14 @@
       <attribute name="al_clientname" />
       <attribute name="al_advisername" />
       <attribute name="al_casestatus" />
+      {% comment %}
+        The route, so the regraded-outcome cell below can say WHY it is empty on a case that
+        will never carry a grade. Outer join: a case not yet routed has none, and an inner
+        join would drop the whole case off its own remediation page.
+      {% endcomment %}
+      <link-entity name="al_reviewroute" from="al_reviewrouteid" to="al_reviewrouteid" link-type="outer" alias="rt">
+        <attribute name="al_name" />
+      </link-entity>
       <filter type="and">
         <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_param | xml_escape }}" />
       </filter>
@@ -849,7 +857,24 @@
                 {% endcomment %}
                 {% capture regraded_label %}{% include 'OT Outcome Label' final: outcome.al_finaloutcome %}{% endcapture %}
                 {% assign regraded_label = regraded_label | strip %}
-                {% if regraded_label != '' %}{{ regraded_label | escape }}{% else %}—{% endif %}
+                {% comment %}
+                  An empty cell used to read as a fault. It was reported as one on case
+                  254397454, whose regrade "did not show": the case is Tax only, and a
+                  remediated Tax-only case carries no al_outcome row at all (AD-055), so
+                  there was never a grade to show and a bare dash could not say so.
+
+                  Three states, each said plainly: the grade where one is recorded; "not
+                  applicable" with the reason where the route means none can ever exist;
+                  and "not recorded yet" where a grade is owed but has not been set - a
+                  supervisor who left the sign-off dropdown on "Leave for a separate
+                  regrade" is looking at that one, and it is genuinely still outstanding.
+
+                  The route is the test rather than the absence of the row, because the two
+                  say different things: no row on a Tax-only case is by design, and no row
+                  on a case that owes a grade is work not done.
+                {% endcomment %}
+                {% assign route_name = c['rt.al_name'] %}
+                {% if regraded_label != '' %}{{ regraded_label | escape }}{% elsif route_name == 'Tax only' %}<span class="ot-remedial-form__note">Not applicable — a Tax-only case carries no advice quality grade</span>{% else %}<span class="ot-remedial-form__note">Not recorded yet</span>{% endif %}
                 {% if outcome and outcome.al_regradedon %}<span class="ot-remedial-form__note">· {{ outcome.al_regradedon | date: 'dd MMM yyyy' }}</span>{% elsif outcome and outcome.al_finalisedon %}<span class="ot-remedial-form__note">· {{ outcome.al_finalisedon | date: 'dd MMM yyyy' }}</span>{% endif %}
               </td>
             </tr>
