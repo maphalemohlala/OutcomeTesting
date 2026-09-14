@@ -457,5 +457,59 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Equal(CaseLifecycle.AwaitingSignoff, CaseStatus(svc));
         }
-    }
+    
+        // ---- the case parked at the recheck with nobody told (2026-09-14) ---------------
+
+        [Fact]
+        public void An_approval_that_leaves_the_case_at_the_recheck_is_parked()
+        {
+            // The supervisor approved and left "Final outcome" at its default, so the case
+            // reached Awaiting Recheck carrying no grade and RecordFinalOutcome returned at
+            // its first gate. Nothing closes it and nothing prompts anyone: 254398988 sat
+            // there overnight until the project owner noticed.
+            var svc = CaseAt(CaseLifecycle.AwaitingRecheck);
+
+            Assert.True(SignoffProgressPlugin.ParkedAtRecheck(svc, CaseId, Approved));
+        }
+
+        [Fact]
+        public void An_approval_that_closed_the_case_is_not_parked()
+        {
+            // The supervisor graded as they approved, so RecordFinalOutcome regraded and
+            // CloseAfterRecheck closed it. There is nothing left for anyone to do.
+            var svc = CaseAt(CaseLifecycle.Closed);
+
+            Assert.False(SignoffProgressPlugin.ParkedAtRecheck(svc, CaseId, Approved));
+        }
+
+        [Fact]
+        public void An_approval_that_went_back_to_the_queue_is_not_parked()
+        {
+            // OD-038: the Tax leg is done and the case owes an AQS review. It is waiting for
+            // a checker to claim it, not for a final outcome, and saying otherwise would send
+            // the supervisor looking for a control that is not on the page.
+            var svc = CaseAt(CaseLifecycle.Queued);
+
+            Assert.False(SignoffProgressPlugin.ParkedAtRecheck(svc, CaseId, Approved));
+        }
+
+        [Fact]
+        public void A_rejection_is_never_parked()
+        {
+            // A rejection returns the case to Awaiting Remediation, and the adviser is already
+            // told. Even were the case somehow at the recheck, a rejection owes no regrade.
+            var svc = CaseAt(CaseLifecycle.AwaitingRecheck);
+
+            Assert.False(SignoffProgressPlugin.ParkedAtRecheck(svc, CaseId, Rejected));
+        }
+
+        [Fact]
+        public void The_parked_notice_names_the_case_and_what_is_owed()
+        {
+            var body = SignoffProgressPlugin.RecheckDueBody("254398988");
+
+            Assert.Contains("254398988", body);
+            Assert.Contains("final outcome", body, StringComparison.OrdinalIgnoreCase);
+        }
+}
 }

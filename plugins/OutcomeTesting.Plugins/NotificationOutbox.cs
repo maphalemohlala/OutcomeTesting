@@ -45,6 +45,11 @@ namespace OutcomeTesting.Plugins
         // nothing to the rows already carrying the first five.
         public const int EventCasePassed = 120910805;
 
+        // Added 2026-09-14. The supervisor approved a remediation and left the grade for a
+        // separate regrade, so the case is parked at Awaiting Recheck waiting for them to
+        // record the final outcome. Additive in the same way as the value above.
+        public const int EventRecheckDue = 120910806;
+
         public const int StatusPending = 120910810;
         public const int StatusSent = 120910811;
         public const int StatusFailed = 120910812;
@@ -91,6 +96,7 @@ namespace OutcomeTesting.Plugins
                 case EventSignoffApproved: return "Sign-off approved";
                 case EventSignoffRejected: return "Sign-off rejected";
                 case EventCasePassed: return "Case passed";
+                case EventRecheckDue: return "Recheck due";
                 default: return "Unknown";
             }
         }

@@ -166,6 +166,90 @@ namespace OutcomeTesting.Plugins
             }
 
             QueueSignoffNotification(service, context, signoff, actionRef, decision.Value);
+
+            // Read AFTER MoveCase and RecordFinalOutcome, so this asks where the case actually
+            // ended up rather than predicting it.
+            if (caseId.HasValue && ParkedAtRecheck(service, caseId.Value, decision.Value))
+            {
+                QueueRecheckDue(service, context, signoff, caseId.Value);
+            }
+        }
+
+        /// <summary>
+        /// Whether this approval has left the case waiting at the recheck with nothing to
+        /// finish it (project owner, 2026-09-14).
+        ///
+        /// "Leave for a separate regrade" is a legitimate choice on the sign-off panel, and
+        /// the case is meant to wait at Awaiting Recheck when it is made. What was wrong is
+        /// that it waited <b>silently</b>: <see cref="RecordFinalOutcome"/> returns at its
+        /// first gate when the sign-off carries no grade, so nothing closed the case and
+        /// nothing told anyone it was theirs to close. Case 254398988 sat there from 17:35Z
+        /// until the project owner noticed it the next morning, and the export collects Closed
+        /// cases only, so it had not reached Trail Light either.
+        ///
+        /// Asked of the case as it now stands rather than of the sign-off row, which is what
+        /// makes this right in every branch <see cref="MoveCase"/> has: a graded approval has
+        /// already Closed the case, a Tax leg that still owes AQS has gone back to Queued, and
+        /// a Tax-only case with no Outcome was closed without a recheck. Only the parked case
+        /// is still sitting at Awaiting Recheck by the time this runs.
+        /// </summary>
+        public static bool ParkedAtRecheck(IOrganizationService service, Guid caseId, int decision)
+        {
+            if (decision != DecisionApprovedValue)
+            {
+                return false;
+            }
+
+            return CaseTransitions.CurrentStatus(service, caseId) == CaseLifecycle.AwaitingRecheck;
+        }
+
+        /// <summary>The notice's body. Public so its wording is pinned by a test.</summary>
+        public static string RecheckDueBody(string reference)
+        {
+            return "The remediation on case " + reference + " is approved and the case is now at "
+                + "Awaiting Recheck. It is waiting for you to record the final outcome, which is "
+                + "what closes it - until then it stays open and does not reach the export. "
+                + "Open the case's remediation page and use Record the final outcome.";
+        }
+
+        /// <summary>
+        /// Tells the signatory that the case they just approved is now theirs to close.
+        ///
+        /// Sent to the person who signed off rather than to the adviser: recording the final
+        /// outcome is the T&amp;C Supervisor's step (RegradeRequestPlugin checks that role), and
+        /// the adviser's own notification already tells them the case moved on to recheck.
+        ///
+        /// Keyed on the case rather than the sign-off, because a check signs off one action at
+        /// a time and every one of them would otherwise queue this - the supervisor wants one
+        /// reminder that a case is waiting, not eighteen. The alternate key collapses them.
+        ///
+        /// A sign-off row that names no signatory still queues the row, with no recipient: the
+        /// drain refuses to send without an address, and a row a person can see in the outbox
+        /// is better than the silence this exists to end.
+        /// </summary>
+        private static void QueueRecheckDue(
+            IOrganizationService service,
+            IPluginExecutionContext context,
+            Entity signoff,
+            Guid caseId)
+        {
+            var caseRef = new EntityReference("al_outcomecase", caseId);
+            var reference = NotificationOutbox.CaseReference(service, caseRef) ?? "a case";
+
+            var signatory = SignatoryId(signoff);
+            var email = signatory.HasValue
+                ? NotificationOutbox.ContactEmail(service, new EntityReference("contact", signatory.Value))
+                : null;
+
+            NotificationOutbox.Queue(
+                service,
+                context,
+                NotificationOutbox.EventRecheckDue,
+                "al_outcomecase",
+                caseId,
+                email,
+                "Case " + reference + " is waiting for its final outcome",
+                RecheckDueBody(reference));
         }
 
         /// <summary>

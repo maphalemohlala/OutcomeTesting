@@ -14,6 +14,9 @@ have had the paraplanner and the checker the wrong way round since 2026-09-12, a
 real person a real application role revealed that the app's security roles had never granted
 anything the app is actually for — because until today nobody had ever held one.**
 
+Five decisions: AD-133 (the status re-read), AD-134 (the import mapping), AD-135 (the business
+tables), AD-136 (the rules banner), and AD-137 (the parked case prompted).
+
 ---
 
 ## 1. What went in today
@@ -75,7 +78,7 @@ a spec. The extract's own structure agrees with the correction: the checklist st
 
 | | DEV | TEST |
 |---|---|---|
-| Solution | 1.0.2.0 unmanaged | **1.0.2.0 managed**, 10:56 |
+| Solution | 1.0.3.0 unmanaged | **1.0.3.0 managed** (1.0.2.0 landed 10:56; 1.0.3.0 carries AD-137) |
 | Plugin steps | — | **51 Enabled, 0 Disabled** (baseline taken before the import) |
 | Code App | pushed 10:39Z | appversion `2026-09-14T10:48:41Z` |
 | `Webapi/error/innererror` | created, Active | created, Active |
@@ -107,13 +110,44 @@ be gated by it, so a refusal she hits is as likely to be a finding as a fault.
   before this was noticed. `scripts/round-trip-src.ps1` now does the whole round-trip and
   prunes, listing what it removes and refusing to mirror an empty unpack.
 
-## 8. Still open
+## 8. The parked case, closed off (AD-137)
 
-- **The sign-off that parks a case silently.** Leaving the grade at "Leave for a separate
-  regrade" is legitimate and leaves the case at Awaiting Recheck with nothing prompting anyone
-  to finish it. That is what happened to 254398988. Not a defect as specified; worth a decision.
+Raised in §8 of this note's first draft and fixed the same day. A sign-off that leaves the
+grade at "Leave for a separate regrade" still parks the case at Awaiting Recheck — that is
+intended — but it no longer does so silently. `SignoffProgressPlugin.ParkedAtRecheck` asks,
+**after** `MoveCase` and `RecordFinalOutcome` have run, whether the case is still sitting at
+the recheck; when it is, a `Recheck due` notification goes to the person who signed off.
+
+Read from the case after the move rather than predicted from the sign-off row, which is what
+makes it right in every branch: a graded approval has already Closed, a Tax leg owing AQS went
+back to Queued, and a Tax-only case closed without a recheck. Keyed on the case, so eighteen
+sign-offs on one check queue one reminder. A prompt rather than a refusal — forcing a grade
+would remove a choice the project owner asked for on 2026-09-11.
+
+## 9. Who holds what, and why that is a problem waiting
+
+The service account performs admin actions as **System Administrator**, in both environments —
+not through any application role. So does Simunye. That role grants every privilege *and*
+short-circuits `EnsurePermission`, so neither account ever touches the permission model.
+
+**Nobody holds `Outcome Testing App User`.** That is not harmful today — everyone who needs
+access already has System Administrator — but it carries two costs that fall due before PROD:
+
+- **Permission testing cannot be trusted.** Every tester is a sysadmin and bypasses both tiers,
+  which is exactly how a gap as large as AD-135's survived. A sysadmin reporting "permissions
+  work" is evidence of nothing.
+- **Everyone is drastically over-privileged.** System Administrator can delete data, change
+  schema and alter security. Tolerable in DEV; unacceptable in PROD, where it would let every
+  checker and adviser drop tables.
+
+Before PROD, ordinary users need `App User` **and** to lose System Administrator. That switch
+is also when AD-135's grants get their first real test, because `App User` has never been held
+by anyone either. Worth doing with one tester well ahead of go-live, not on the day.
+
+## 10. Still open
+
 - **`al_recheckrequired` means nothing to the lifecycle.** It is a form question on the
   remediation action (AD-095), read for display and by no status code. "Recheck required = No"
   cannot suppress Awaiting Recheck, which is not what the field's name leads a user to expect.
-- **`Outcome Testing App User` has no holders.** AD-135 granted it properly, but every ordinary
-  user is still a System Administrator. The model is exercised by exactly one person.
+- **Nobody has signed in as Zoe.** Her privileges are verified server-side and the app is
+  shared with her, but the permission model has still never been exercised by a human.
