@@ -14,8 +14,9 @@ have had the paraplanner and the checker the wrong way round since 2026-09-12, a
 real person a real application role revealed that the app's security roles had never granted
 anything the app is actually for — because until today nobody had ever held one.**
 
-Five decisions: AD-133 (the status re-read), AD-134 (the import mapping), AD-135 (the business
-tables), AD-136 (the rules banner), and AD-137 (the parked case prompted).
+Six decisions: AD-133 (the status re-read), AD-134 (the import mapping), AD-135 (the business
+tables), AD-136 (the rules banner), AD-137 (the parked case prompted) and AD-138 (the recheck
+waived when the form says it is not needed).
 
 ---
 
@@ -78,7 +79,7 @@ a spec. The extract's own structure agrees with the correction: the checklist st
 
 | | DEV | TEST |
 |---|---|---|
-| Solution | 1.0.3.0 unmanaged | **1.0.3.0 managed** (1.0.2.0 landed 10:56; 1.0.3.0 carries AD-137) |
+| Solution | 1.0.4.0 unmanaged | **1.0.4.0 managed**, 11:47 (1.0.2.0 at 10:56, 1.0.3.0 carrying AD-137 at 11:26, 1.0.4.0 carrying AD-138) |
 | Plugin steps | — | **51 Enabled, 0 Disabled** (baseline taken before the import) |
 | Code App | pushed 10:39Z | appversion `2026-09-14T10:48:41Z` |
 | `Webapi/error/innererror` | created, Active | created, Active |
@@ -144,10 +145,32 @@ Before PROD, ordinary users need `App User` **and** to lose System Administrator
 is also when AD-135's grants get their first real test, because `App User` has never been held
 by anyone either. Worth doing with one tester well ahead of go-live, not on the day.
 
-## 10. Still open
+## 10. "Recheck required: No" now skips the recheck (AD-138)
 
-- **`al_recheckrequired` means nothing to the lifecycle.** It is a form question on the
-  remediation action (AD-095), read for display and by no status code. "Recheck required = No"
-  cannot suppress Awaiting Recheck, which is not what the field's name leads a user to expect.
+The other item this note first listed as open, fixed the same day. `al_recheckrequired` was a
+form question read by nothing that decides anything, so answering No changed nothing — the
+complaint that opened the morning on 254398988. It now waives the recheck and the case closes
+on the approval.
+
+Waived only when **nothing asks for a recheck and something declines one**: any `Yes` keeps it,
+and an unanswered action neither asks nor declines, because every action raised before AD-095
+added the column carries no answer and a case must not close itself on a question nobody was
+asked.
+
+Evaluated after `MoveCase` and `RecordFinalOutcome` rather than inside `MoveCase` — otherwise a
+supervisor who both graded and waived would have the grade silently discarded. It composes with
+AD-137: the same branch either closes the case or queues the prompt, so a parked case is
+finished or announced, never silent.
+
+A waived case exports the grade it has: `Outcomes.EffectiveOutcomeLabel` falls back from the
+final outcome to the initial one. That was checked before the rule was written.
+
+## 11. Still open
+
 - **Nobody has signed in as Zoe.** Her privileges are verified server-side and the app is
   shared with her, but the permission model has still never been exercised by a human.
+- **No waived case has run end to end.** AD-138 is unit-tested across all five states; nothing
+  has exercised it against a real check in either environment.
+- **`OT Remediation`'s pre-recheck message over-promises slightly** now that a case can skip
+  the recheck. It renders only before sign-off, when it is not yet known, so it is imprecise
+  rather than wrong.
