@@ -35,6 +35,12 @@ namespace OutcomeTesting.Plugins
         /// <summary>BR-010: remediation is expected to complete within ten working days.</summary>
         public const int ThresholdWorkingDays = 10;
 
+        // al_recheckrequired on al_remediationaction (AD-095). The adviser's form asks whether
+        // the remediation needs checking again; from AD-138 the answer decides whether the
+        // case stops at Awaiting Recheck or closes on the approval.
+        public const int RecheckRequiredYes = 120910796;
+        public const int RecheckRequiredNo = 120910797;
+
         // al_remediationactioncode and al_name are nvarchar(100); al_description is
         // nvarchar(2000) and required. A checker's observation is free text, so the write
         // has to fit the column rather than trusting what was typed.

@@ -511,5 +511,80 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Contains("254398988", body);
             Assert.Contains("final outcome", body, StringComparison.OrdinalIgnoreCase);
         }
+
+        // ---- recheck required = No skips the recheck (AD-138) ---------------------------
+
+        private static readonly Guid ReviewId = Guid.Parse("dddddddd-4444-4444-8444-dddddddddddd");
+
+        /// <summary>One remediation action on this case's check, answering the recheck question.</summary>
+        private static void ActionAnswering(FakeOrganizationService svc, int? recheck)
+        {
+            var id = Guid.NewGuid();
+            svc.Seed(
+                "al_remediationaction", id,
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_reviewinstanceid", new EntityReference("al_reviewinstance", ReviewId));
+
+            if (recheck.HasValue)
+            {
+                svc.Row("al_remediationaction", id)["al_recheckrequired"] = new OptionSetValue(recheck.Value);
+            }
+        }
+
+        [Fact]
+        public void The_recheck_is_waived_when_every_action_says_no()
+        {
+            var svc = CaseAt(CaseLifecycle.AwaitingRecheck);
+            ActionAnswering(svc, Remediation.RecheckRequiredNo);
+            ActionAnswering(svc, Remediation.RecheckRequiredNo);
+
+            Assert.True(SignoffProgressPlugin.RecheckWaived(svc, CaseId, ReviewId));
+        }
+
+        [Fact]
+        public void One_action_asking_for_a_recheck_keeps_it()
+        {
+            // Any single thing the adviser says needs looking at again is enough. The check is
+            // remediated as a whole, so a recheck owed on one action is owed on the case.
+            var svc = CaseAt(CaseLifecycle.AwaitingRecheck);
+            ActionAnswering(svc, Remediation.RecheckRequiredNo);
+            ActionAnswering(svc, Remediation.RecheckRequiredYes);
+
+            Assert.False(SignoffProgressPlugin.RecheckWaived(svc, CaseId, ReviewId));
+        }
+
+        [Fact]
+        public void An_unanswered_form_does_not_waive_the_recheck()
+        {
+            // Absence is not a No. A case whose actions never answered the question - every
+            // action raised before AD-095 added the column - must keep the recheck rather than
+            // close itself on a question nobody was asked.
+            var svc = CaseAt(CaseLifecycle.AwaitingRecheck);
+            ActionAnswering(svc, null);
+            ActionAnswering(svc, null);
+
+            Assert.False(SignoffProgressPlugin.RecheckWaived(svc, CaseId, ReviewId));
+        }
+
+        [Fact]
+        public void A_case_with_no_actions_at_all_keeps_the_recheck()
+        {
+            var svc = CaseAt(CaseLifecycle.AwaitingRecheck);
+
+            Assert.False(SignoffProgressPlugin.RecheckWaived(svc, CaseId, ReviewId));
+        }
+
+        [Fact]
+        public void A_no_alongside_an_unanswered_action_still_waives_it()
+        {
+            // Nothing asserts a recheck is needed, and one action asserts it is not. Treating
+            // this as "keep the recheck" would make the rule unusable on any check whose older
+            // actions predate the column.
+            var svc = CaseAt(CaseLifecycle.AwaitingRecheck);
+            ActionAnswering(svc, Remediation.RecheckRequiredNo);
+            ActionAnswering(svc, null);
+
+            Assert.True(SignoffProgressPlugin.RecheckWaived(svc, CaseId, ReviewId));
+        }
 }
 }

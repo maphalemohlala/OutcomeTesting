@@ -32,6 +32,7 @@ namespace OutcomeTesting.Plugins
         private const string SignedByIdAttr = SignoffRequestPlugin.SignedByIdAttr;
         private const string SignedByNameAttr = SignoffRequestPlugin.SignedByNameAttr;
         private const string ActionLookup = "al_remediationactionid";
+        private const string RecheckRequiredAttr = "al_recheckrequired";
         private const string CaseLookup = "al_outcomecaseid";
         private const string ReviewLookup = "al_reviewinstanceid";
         private const string FinalOutcomeAttr = "al_finaloutcome";
@@ -171,8 +172,91 @@ namespace OutcomeTesting.Plugins
             // ended up rather than predicting it.
             if (caseId.HasValue && ParkedAtRecheck(service, caseId.Value, decision.Value))
             {
-                QueueRecheckDue(service, context, signoff, caseId.Value);
+                // The adviser's form said the remediation needs no checking again, so the
+                // recheck step is skipped and the case closes on the approval (AD-138).
+                //
+                // Decided HERE rather than inside MoveCase, and deliberately: RecordFinalOutcome
+                // has already run by this point. Were the case closed earlier, a supervisor who
+                // both graded and waived the recheck would have their grade silently discarded -
+                // RecordFinalOutcome gates on the case still being at Awaiting Recheck. Waiving
+                // after it has had its chance means a grade is recorded when one is given, and
+                // the case closes either way.
+                if (RecheckWaived(service, caseId.Value, reviewId))
+                {
+                    CaseTransitions.MoveThrough(service, caseId.Value, CaseLifecycle.Closed);
+                }
+                else
+                {
+                    QueueRecheckDue(service, context, signoff, caseId.Value);
+                }
             }
+        }
+
+        /// <summary>
+        /// Whether this check's remediation says no recheck is needed (AD-138, project owner
+        /// 2026-09-14), so the case closes on the approval instead of stopping at the recheck.
+        ///
+        /// <c>al_recheckrequired</c> is the adviser's answer on each remediation action
+        /// (AD-095). Until now it was captured, displayed and read by nothing that decides
+        /// anything, so "Recheck required: No" changed nothing and the case waited anyway -
+        /// which is not what the field's name leads anyone to expect.
+        ///
+        /// Waived only when **nothing asks for one and something declines one**:
+        /// <list type="bullet">
+        /// <item>any action answering <b>Yes</b> keeps the recheck, because a check is
+        /// remediated as a whole and one thing worth looking at again is enough;</item>
+        /// <item>an action that answered <b>nothing</b> neither asks nor declines. Absence is
+        /// not a No: every action raised before AD-095 added the column carries none, and a
+        /// case must not close itself on a question nobody was asked.</item>
+        /// </list>
+        ///
+        /// So a check whose actions are all unanswered keeps its recheck, and one carrying a No
+        /// beside an unanswered older action waives it. The alternative - requiring every action
+        /// to answer No - would make the rule unusable on any check that predates the column.
+        ///
+        /// A closed case keeps whatever grade it has: the export reads the final outcome and
+        /// falls back to the initial one (<c>Outcomes.EffectiveOutcomeLabel</c>), so a case
+        /// closed without a regrade exports the grade its check gave. That is what "no recheck
+        /// needed" asserts - the original grade stands.
+        /// </summary>
+        public static bool RecheckWaived(IOrganizationService service, Guid caseId, Guid? reviewId)
+        {
+            var actions = new QueryExpression(ActionEntity)
+            {
+                ColumnSet = new ColumnSet(RecheckRequiredAttr),
+                Criteria = new FilterExpression(),
+            };
+            actions.Criteria.AddCondition(CaseLookup, ConditionOperator.Equal, caseId);
+
+            // Scoped to the check when the action carries one, for the reason AnyAwaitingSignoff
+            // is: the two legs of a Tax-then-AQS route are separate remediations, and the Tax
+            // leg's answer is not this check's.
+            if (reviewId.HasValue)
+            {
+                actions.Criteria.AddCondition(ReviewLookup, ConditionOperator.Equal, reviewId.Value);
+            }
+
+            var declined = false;
+            foreach (var action in service.RetrieveMultiple(actions).Entities)
+            {
+                var answer = action.GetAttributeValue<OptionSetValue>(RecheckRequiredAttr);
+                if (answer == null)
+                {
+                    continue;
+                }
+
+                if (answer.Value == Remediation.RecheckRequiredYes)
+                {
+                    return false;
+                }
+
+                if (answer.Value == Remediation.RecheckRequiredNo)
+                {
+                    declined = true;
+                }
+            }
+
+            return declined;
         }
 
         /// <summary>
