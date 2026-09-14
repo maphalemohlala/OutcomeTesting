@@ -183,6 +183,14 @@
                   <Description description="A submit closed the case having raised no remediation, so the adviser is told it passed (project owner, 2026-09-10)." languagecode="1033" />
                 </Descriptions>
               </option>
+              <option value="120910806" IsHidden="0">
+                <labels>
+                  <label description="Recheck due" languagecode="1033" />
+                </labels>
+                <Descriptions>
+                  <Description description="The supervisor approved a remediation without recording a final outcome, so the case is parked at Awaiting Recheck waiting for one (AD-137)." languagecode="1033" />
+                </Descriptions>
+              </option>
             </options>
           </optionset>
           <displaynames>
