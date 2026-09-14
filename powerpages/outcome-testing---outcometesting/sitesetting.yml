@@ -18,7 +18,7 @@
 - adx_description: A true or false value. If set to true, the Last Successful Login field on the portal user’s contact will be updated with the date and time when they successfully signed in.
   adx_name: Authentication/LoginTrackingEnabled
   adx_sitesettingid: 16f2a5a6-cb10-490f-a2f9-33a7a620548f
-  adx_value: False
+  adx_value: true
 - adx_description: Must stay true for contact mapping to run. Mapping happens at the
     registration gate, so turning registration off refuses an unbound sign-in before the
     incoming email is ever matched against a contact. Self-registration is held shut by
@@ -38,12 +38,17 @@
 - adx_name: Authentication/OpenIdConnect/AzureAD/RebrandDisclaimerEnabled
   adx_sitesettingid: 3e56c532-99a3-f111-aaac-e4fade069307
   adx_value: false
-- adx_description: Binds a sign-in to the contact that already holds the incoming email
-    claim, instead of trying to register a new one. This site pre-provisions contacts and
-    does not let anyone self-register, so without this a seeded contact is unreachable.
+- adx_description: Left false deliberately. It was tried on 2026-09-14 to bind seeded
+    contacts by email claim and it did nothing. This site uses the built-in Entra provider
+    -- there is no OpenIdConnect provider registration, only AzureADLoginEnabled and a
+    caption -- and the setting is documented as not applying to that provider. Whether it
+    was inapplicable or merely not yet reloaded from cache was never separated, because the
+    route that does work needs no setting at all -- bindidentity, setsecuritystamp and
+    enableportallogin, per contact. Kept rather than deleted so the next person who has this
+    idea finds the result instead of repeating it.
   adx_name: Authentication/OpenIdConnect/AzureAD/AllowContactMappingWithEmail
   adx_sitesettingid: a4ca0596-0bb0-f111-aaac-002248c654cd
-  adx_value: true
+  adx_value: false
 - adx_name: Profile/ShowMarketingOptionsPanel
   adx_sitesettingid: 4fded777-3219-4165-83c2-5fae67ee1638
   adx_value: True
