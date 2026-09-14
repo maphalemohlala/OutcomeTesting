@@ -96,6 +96,36 @@ environment-variable indirection. The `environmentId` in that file is the `pa ap
 not a runtime binding. Both connection references that exist are present and Active in TEST with
 `connectionid` null, exactly as in DEV where the app works. Nothing to rebind.
 
+## TEST verified after the 1.0.2.0 import
+
+| Check | Result |
+|---|---|
+| Solution version | **1.0.2.0 Managed**, 10:56 |
+| Plugin steps | **51 Enabled, 0 Disabled** — unchanged from the pre-import baseline |
+| Code App | appversion **2026-09-14T10:48:41Z**, so AD-136's banner is in TEST |
+| Zoe's effective privileges | `prvReadal_OutcomeCase`, `prvWriteal_OutcomeCase`, `prvReadal_PagePermission`, `prvReadal_ReviewInstance`, `prvCreateal_Response`, `prvCreateal_AuditEvent` — all via `Outcome Testing App Admin` |
+| `prvWriteal_AuditEvent` | **Absent for her.** The create-only rule holds for a real user, not just in the role definition |
+| App sharing | Already shared with her: `principalobjectaccess` carries her `systemuserid` against the app with `accessrightsmask` 1 |
+
+## `pac solution import` hangs, and killing it does not cancel the import
+
+Worth knowing before someone repeats it. The command produced **no output at all** for over
+twenty minutes, and `importjob` showed no row for the new version — which reads exactly like an
+import that never reached the server. It had. The job simply had not surfaced yet.
+
+The CLI was killed and the import re-run, and the retry was refused:
+
+> Cannot start another [Import] because there is a previous [Import] running at this moment.
+
+`importjob` then showed the original at **87.93%**, started 10:42, and it completed on its own at
+10:56. So: **the server-side job is independent of the CLI process.** Killing the CLI cancels
+nothing, and a "helpful" retry is refused rather than doing damage — but only by luck of that
+guard existing.
+
+The reliable check is `importjob` filtered to the solution name and ordered by `startedon`, not
+the CLI's output and not `solution list`. Allow several minutes for the row to appear before
+concluding anything.
+
 ## Not done here
 
 - **The `src/` orphan sweep is manual.** `pac solution unpack` reports "N unnecessary files" and
