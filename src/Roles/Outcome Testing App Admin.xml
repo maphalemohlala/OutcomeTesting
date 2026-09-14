@@ -3,31 +3,102 @@
   <IsCustomizable>1</IsCustomizable>
   <IsAutoAssigned>0</IsAutoAssigned>
   <RolePrivileges>
+    <RolePrivilege name="prvAppendal_AuditEvent" level="Global" />
+    <RolePrivilege name="prvAppendal_CaseAssignment" level="Global" />
     <RolePrivilege name="prvAppendal_ExportBatch" level="Global" />
     <RolePrivilege name="prvAppendal_ExportRecord" level="Global" />
+    <RolePrivilege name="prvAppendal_FailReason" level="Global" />
+    <RolePrivilege name="prvAppendal_ImportBatch" level="Global" />
+    <RolePrivilege name="prvAppendal_ImportException" level="Global" />
+    <RolePrivilege name="prvAppendal_Notification" level="Global" />
+    <RolePrivilege name="prvAppendal_Outcome" level="Global" />
+    <RolePrivilege name="prvAppendal_OutcomeCase" level="Global" />
     <RolePrivilege name="prvAppendal_PagePermission" level="Global" />
     <RolePrivilege name="prvAppendal_QuestionVersion" level="Global" />
+    <RolePrivilege name="prvAppendal_RemediationAction" level="Global" />
+    <RolePrivilege name="prvAppendal_Response" level="Global" />
+    <RolePrivilege name="prvAppendal_ReviewInstance" level="Global" />
+    <RolePrivilege name="prvAppendal_Role" level="Global" />
+    <RolePrivilege name="prvAppendal_Section" level="Global" />
+    <RolePrivilege name="prvAppendal_Signoff" level="Global" />
     <RolePrivilege name="prvAppendal_UserRoleMapping" level="Global" />
+    <RolePrivilege name="prvAppendContact" level="Global" />
+    <RolePrivilege name="prvAppendmspp_webrole" level="Global" />
+    <RolePrivilege name="prvAppendToal_AuditEvent" level="Global" />
+    <RolePrivilege name="prvAppendToal_CaseAssignment" level="Global" />
+    <RolePrivilege name="prvAppendToal_Checklist" level="Global" />
+    <RolePrivilege name="prvAppendToal_ChecklistVersion" level="Global" />
     <RolePrivilege name="prvAppendToal_ExportBatch" level="Global" />
     <RolePrivilege name="prvAppendToal_ExportRecord" level="Global" />
+    <RolePrivilege name="prvAppendToal_FailReason" level="Global" />
+    <RolePrivilege name="prvAppendToal_ImportBatch" level="Global" />
+    <RolePrivilege name="prvAppendToal_ImportException" level="Global" />
+    <RolePrivilege name="prvAppendToal_Notification" level="Global" />
+    <RolePrivilege name="prvAppendToal_Outcome" level="Global" />
+    <RolePrivilege name="prvAppendToal_OutcomeCase" level="Global" />
     <RolePrivilege name="prvAppendToal_PagePermission" level="Global" />
     <RolePrivilege name="prvAppendToal_Question" level="Global" />
     <RolePrivilege name="prvAppendToal_QuestionVersion" level="Global" />
+    <RolePrivilege name="prvAppendToal_RemediationAction" level="Global" />
+    <RolePrivilege name="prvAppendToal_Response" level="Global" />
+    <RolePrivilege name="prvAppendToal_ReviewInstance" level="Global" />
+    <RolePrivilege name="prvAppendToal_ReviewRoute" level="Global" />
+    <RolePrivilege name="prvAppendToal_Role" level="Global" />
+    <RolePrivilege name="prvAppendToal_Section" level="Global" />
+    <RolePrivilege name="prvAppendToal_Signoff" level="Global" />
     <RolePrivilege name="prvAppendToal_UserRoleMapping" level="Global" />
+    <RolePrivilege name="prvAppendToContact" level="Global" />
+    <RolePrivilege name="prvAppendTomspp_webrole" level="Global" />
+    <RolePrivilege name="prvAppendToUser" level="Global" />
+    <RolePrivilege name="prvCreateal_AuditEvent" level="Global" />
+    <RolePrivilege name="prvCreateal_CaseAssignment" level="Global" />
     <RolePrivilege name="prvCreateal_ExportBatch" level="Global" />
     <RolePrivilege name="prvCreateal_ExportRecord" level="Global" />
+    <RolePrivilege name="prvCreateal_FailReason" level="Global" />
+    <RolePrivilege name="prvCreateal_ImportBatch" level="Global" />
+    <RolePrivilege name="prvCreateal_ImportException" level="Global" />
+    <RolePrivilege name="prvCreateal_Notification" level="Global" />
+    <RolePrivilege name="prvCreateal_Outcome" level="Global" />
+    <RolePrivilege name="prvCreateal_OutcomeCase" level="Global" />
     <RolePrivilege name="prvCreateal_PagePermission" level="Global" />
     <RolePrivilege name="prvCreateal_QuestionVersion" level="Global" />
+    <RolePrivilege name="prvCreateal_RemediationAction" level="Global" />
+    <RolePrivilege name="prvCreateal_Response" level="Global" />
+    <RolePrivilege name="prvCreateal_ReviewInstance" level="Global" />
+    <RolePrivilege name="prvCreateal_Role" level="Global" />
+    <RolePrivilege name="prvCreateal_Section" level="Global" />
+    <RolePrivilege name="prvCreateal_Signoff" level="Global" />
     <RolePrivilege name="prvCreateal_UserRoleMapping" level="Global" />
+    <RolePrivilege name="prvCreateContact" level="Global" />
+    <RolePrivilege name="prvCreatemspp_webrole" level="Global" />
     <RolePrivilege name="prvCreateSharePointData" level="Global" />
     <RolePrivilege name="prvDeleteal_PagePermission" level="Global" />
     <RolePrivilege name="prvDeleteal_UserRoleMapping" level="Global" />
+    <RolePrivilege name="prvReadal_AuditEvent" level="Global" />
+    <RolePrivilege name="prvReadal_CaseAssignment" level="Global" />
+    <RolePrivilege name="prvReadal_Checklist" level="Global" />
+    <RolePrivilege name="prvReadal_ChecklistVersion" level="Global" />
     <RolePrivilege name="prvReadal_ExportBatch" level="Global" />
     <RolePrivilege name="prvReadal_ExportRecord" level="Global" />
+    <RolePrivilege name="prvReadal_FailReason" level="Global" />
+    <RolePrivilege name="prvReadal_ImportBatch" level="Global" />
+    <RolePrivilege name="prvReadal_ImportException" level="Global" />
+    <RolePrivilege name="prvReadal_Notification" level="Global" />
+    <RolePrivilege name="prvReadal_Outcome" level="Global" />
+    <RolePrivilege name="prvReadal_OutcomeCase" level="Global" />
     <RolePrivilege name="prvReadal_PagePermission" level="Global" />
     <RolePrivilege name="prvReadal_Question" level="Global" />
     <RolePrivilege name="prvReadal_QuestionVersion" level="Global" />
+    <RolePrivilege name="prvReadal_RemediationAction" level="Global" />
+    <RolePrivilege name="prvReadal_Response" level="Global" />
+    <RolePrivilege name="prvReadal_ReviewInstance" level="Global" />
+    <RolePrivilege name="prvReadal_ReviewRoute" level="Global" />
+    <RolePrivilege name="prvReadal_Role" level="Global" />
+    <RolePrivilege name="prvReadal_Section" level="Global" />
+    <RolePrivilege name="prvReadal_Signoff" level="Global" />
     <RolePrivilege name="prvReadal_UserRoleMapping" level="Global" />
+    <RolePrivilege name="prvReadContact" level="Global" />
+    <RolePrivilege name="prvReadmspp_webrole" level="Global" />
     <RolePrivilege name="prvReadPluginAssembly" level="Global" />
     <RolePrivilege name="prvReadPluginType" level="Global" />
     <RolePrivilege name="prvReadSdkMessage" level="Global" />
@@ -35,11 +106,27 @@
     <RolePrivilege name="prvReadSdkMessageProcessingStepImage" level="Global" />
     <RolePrivilege name="prvReadSharePointData" level="Global" />
     <RolePrivilege name="prvReadSharePointDocument" level="Global" />
+    <RolePrivilege name="prvReadUser" level="Global" />
+    <RolePrivilege name="prvWriteal_CaseAssignment" level="Global" />
     <RolePrivilege name="prvWriteal_ExportBatch" level="Global" />
     <RolePrivilege name="prvWriteal_ExportRecord" level="Global" />
+    <RolePrivilege name="prvWriteal_FailReason" level="Global" />
+    <RolePrivilege name="prvWriteal_ImportBatch" level="Global" />
+    <RolePrivilege name="prvWriteal_ImportException" level="Global" />
+    <RolePrivilege name="prvWriteal_Notification" level="Global" />
+    <RolePrivilege name="prvWriteal_Outcome" level="Global" />
+    <RolePrivilege name="prvWriteal_OutcomeCase" level="Global" />
     <RolePrivilege name="prvWriteal_PagePermission" level="Global" />
     <RolePrivilege name="prvWriteal_QuestionVersion" level="Global" />
+    <RolePrivilege name="prvWriteal_RemediationAction" level="Global" />
+    <RolePrivilege name="prvWriteal_Response" level="Global" />
+    <RolePrivilege name="prvWriteal_ReviewInstance" level="Global" />
+    <RolePrivilege name="prvWriteal_Role" level="Global" />
+    <RolePrivilege name="prvWriteal_Section" level="Global" />
+    <RolePrivilege name="prvWriteal_Signoff" level="Global" />
     <RolePrivilege name="prvWriteal_UserRoleMapping" level="Global" />
+    <RolePrivilege name="prvWriteContact" level="Global" />
+    <RolePrivilege name="prvWritemspp_webrole" level="Global" />
     <RolePrivilege name="prvWriteSharePointData" level="Global" />
   </RolePrivileges>
 </Role>

@@ -252,6 +252,11 @@
                   <label description="RegradeCase" languagecode="1033" />
                 </labels>
               </option>
+              <option value="120910799" IsHidden="0">
+                <labels>
+                  <label description="CorrectTaxOutcome" languagecode="1033" />
+                </labels>
+              </option>
               <option value="120910759" IsHidden="0">
                 <labels>
                   <label description="CreateExportBatch" languagecode="1033" />

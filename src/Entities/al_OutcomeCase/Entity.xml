@@ -548,7 +548,7 @@
             <displayname description="Checker name" languagecode="1033" />
           </displaynames>
           <Descriptions>
-            <Description description="Name of the checker who performed or is performing the review." languagecode="1033" />
+            <Description description="The allocated checker, set manually and never by the import (AD-134): by allocation, by a claim from the queue, or by editing the case. The IO extract no longer writes this column at all - it used to be stamped from the task AssignedTo, which is the paraplanner, and which never proved the case was allocated to anyone (AD-113). al_caseassignment remains the source of truth for allocation." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_ChecklistCompletedBy">
@@ -788,6 +788,71 @@
           </displaynames>
           <Descriptions>
             <Description description="Target date for the case to be completed. Set and amended by a manager as an administrative update; changes are audited (BR-012)." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_InitialTaxOutcome">
+          <Type>picklist</Type>
+          <Name>al_initialtaxoutcome</Name>
+          <LogicalName>al_initialtaxoutcome</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <optionset Name="al_outcomecase_al_initialtaxoutcome">
+            <OptionSetType>picklist</OptionSetType>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Initial tax outcome" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="The Tax check outcome as the checker first submitted it, kept so a correction never erases what was originally recorded - the rule BR-007 states for the advice quality grade, which keeps its initial and final in separate columns. Stamped by al_CorrectTaxOutcome on the FIRST correction rather than at submit, so a case graded before that command existed gets the same protection without a backfill; a second correction leaves it alone." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="120910300" IsHidden="0">
+                <labels>
+                  <label description="Pass" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910301" IsHidden="0">
+                <labels>
+                  <label description="Fail" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910302" IsHidden="0">
+                <labels>
+                  <label description="Pass with issues" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Initial tax outcome" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The Tax check outcome as the checker first submitted it, kept so a correction never erases what was originally recorded - the rule BR-007 states for the advice quality grade, which keeps its initial and final in separate columns. Stamped by al_CorrectTaxOutcome on the FIRST correction rather than at submit, so a case graded before that command existed gets the same protection without a backfill; a second correction leaves it alone." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_IoCompletedBy">

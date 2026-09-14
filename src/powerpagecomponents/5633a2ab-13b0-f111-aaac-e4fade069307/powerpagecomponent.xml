@@ -1,10 +1,10 @@
-<powerpagecomponent powerpagecomponentid="1718a762-9c61-40a3-b9dc-01772bee07f3">
+<powerpagecomponent powerpagecomponentid="5633a2ab-13b0-f111-aaac-e4fade069307">
   <content>{
-  "value": "true",
+  "value": "al_casestatus",
   "source": 0
 }</content>
   <iscustomizable>1</iscustomizable>
-  <name>Authentication/Registration/Enabled</name>
+  <name>Webapi/al_outcomecase/fields</name>
   <powerpagecomponenttype>9</powerpagecomponenttype>
   <powerpagesiteid>
     <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>

@@ -443,15 +443,11 @@ footer a:focus-visible, .footer a:focus-visible {
 
 /* The check a run of remediation rows belongs to, named once above them. A
    Tax-then-AQS case remediates twice and the two are separate remediations
-   (2026-09-10); a settled check is not drawn at all, so this heading appears
-   only when more than one is genuinely live. Styled as a band rather than a
-   caption so it reads as part of the grid it divides. */
-.ot-remedial-settled {
-  color: var(--colour-text-muted);
-  font-style: italic;
-  padding: var(--space-4) var(--space-3);
-}
-
+   (2026-09-10). Every check is drawn, settled or not (2026-09-11): the
+   supervisor signing the case off needs the issue and fail reason behind each
+   remedial action, so a closed check keeps its rows and says so in the heading.
+   Styled as a band rather than a caption so it reads as part of the grid it
+   divides. */
 .ot-remedial-group th {
   background: var(--colour-surface-header);
   border-top: 1px solid var(--colour-border);
@@ -462,6 +458,14 @@ footer a:focus-visible, .footer a:focus-visible {
   text-align: left;
   padding: var(--space-2) var(--space-3);
   color: var(--colour-text);
+}
+
+/* A closed check is still fully drawn; it is set back rather than hidden, so the
+   live remediation is the one that reads first. Muted text on the heading only -
+   the rows themselves stay at full contrast, because they are the record the
+   supervisor is checking. */
+.ot-remedial-group--settled th {
+  color: var(--colour-text-muted);
 }
 
 /* ------------------------------------------------------------------
@@ -516,8 +520,27 @@ footer a:focus-visible, .footer a:focus-visible {
   color: var(--colour-text);
 }
 
+/* textarea is listed alongside input and select deliberately. It was missing, so the
+   regrade Reason and the sign-off Notes on the remediation page drew with no border,
+   no padding and no background - an unmarked area of page that did not read as a field
+   at all.
+
+   The .ot-checklist selectors below are not decoration. That component replicates a
+   paper form and deliberately strips its own fields bare - border: 0, transparent
+   background, 1px padding - and the remediation form wraps EVERYTHING in .ot-checklist,
+   including the sign-off and regrade panels. `.ot-checklist textarea` and `.ot-field
+   textarea` therefore both match the Reason box at identical specificity (0,2,0), and
+   the checklist block sits later in this file, so it won: the field drew bare at rest
+   and appeared to gain a border on click, which was only the focus outline. Naming
+   .ot-checklist here takes the specificity to (0,3,0) so a real form field keeps its
+   own styling wherever it sits, and stops the answer depending on rule order. The
+   checklist's own paper-form inputs are untouched - they carry no .ot-field. */
 .ot-field input,
-.ot-field select {
+.ot-field select,
+.ot-field textarea,
+.ot-checklist .ot-field input,
+.ot-checklist .ot-field select,
+.ot-checklist .ot-field textarea {
   font-family: var(--font-body);
   font-size: var(--text-base);
   color: var(--colour-text);
@@ -529,8 +552,21 @@ footer a:focus-visible, .footer a:focus-visible {
   width: 100%;
 }
 
+/* Only the textarea resizes, and only vertically: a horizontal drag would push it out
+   of the form's column. */
+.ot-field textarea,
+.ot-checklist .ot-field textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+  line-height: 1.45;
+}
+
 .ot-field input:focus-visible,
-.ot-field select:focus-visible {
+.ot-field select:focus-visible,
+.ot-field textarea:focus-visible,
+.ot-checklist .ot-field input:focus-visible,
+.ot-checklist .ot-field select:focus-visible,
+.ot-checklist .ot-field textarea:focus-visible {
   outline: 2px solid var(--colour-focus);
   outline-offset: 1px;
   border-color: var(--colour-focus);
@@ -1215,6 +1251,14 @@ footer a:focus-visible, .footer a:focus-visible {
 }
 .ot-checklist .ot-answer__status:empty { display: none; }
 .ot-checklist .ot-answer__status--error { color: #a4262c; font-weight: 700; }
+
+/* A row the submit refused for (an unanswered required question), marked where it is so
+   the checker does not scan the form for it. The autosave clears the mark when the row's
+   answer next saves. Cells rather than the row, because the sheet rules every cell and a
+   row background does not show through them. */
+.ot-checklist .ot-answer--missing > td,
+.ot-checklist .ot-answer--missing > th { background: #fdecea !important; }
+.ot-checklist .ot-answer--missing:not(tr) { background: #fdecea; }
 
 .ot-checklist .ot-required {
   display: inline-block;

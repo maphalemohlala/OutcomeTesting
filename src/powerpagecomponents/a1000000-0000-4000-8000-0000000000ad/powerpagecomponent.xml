@@ -1,6 +1,6 @@
-﻿<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000ad">
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000ad">
   <content>{
-  "description": "Allowlist of columns the browser may write on contact. Two trigger columns: al_claimrequest, which carries the id of the case being claimed (AD-076), al_signoffrequest, which carries the T&amp;C attestation as JSON (AD-099), al_regraderequest (AD-111), and al_caseheaderrequest, which carries a Tax checker's edit of the two Tax team header fields as JSON (2026-09-13). Each is acted on by its own plug-in, which checks the contact's web role server-side. Everything a contact record actually holds - name, email, the web roles - stays off this list, so exposing contact to the Web API grants the page these two writes and nothing else.",
+  "description": "Allowlist of columns the browser may write on contact. Three trigger columns: al_claimrequest, which carries the id of the case being claimed (AD-076); al_signoffrequest, which carries the T&amp;C attestation as JSON (AD-099); and al_regraderequest, which carries the final regraded outcome as JSON (OD-041). Each is acted on by its own plug-in, which checks the contact's web role server-side - the allowlist is per table, not per role, so a reviewer who may write the claim request cannot sign off or regrade through the others. Everything a contact record actually holds - name, email, the web roles - stays off this list, so exposing contact to the Web API grants the page these three writes and nothing else.",
   "value": "al_claimrequest,al_signoffrequest,al_regraderequest,al_caseheaderrequest",
   "source": 0
 }</content>

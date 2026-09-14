@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<CanvasApp xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>al_ascotlloydoutcometesting_72932</Name>
+  <AppVersion>2026-09-14T10:39:01Z</AppVersion>
+  <Status>Ready</Status>
+  <CreatedByClientVersion>0.0.0.0</CreatedByClientVersion>
+  <MinClientVersion>0.0.0.0</MinClientVersion>
+  <Tags>{}</Tags>
+  <IsCdsUpgraded>0</IsCdsUpgraded>
+  <GalleryItemId xsi:nil="true"></GalleryItemId>
+  <BackgroundColor>RGBA(255,255,255,1)</BackgroundColor>
+  <DisplayName>Ascot Lloyd Outcome Testing</DisplayName>
+  <Description></Description>
+  <CommitMessage xsi:nil="true"></CommitMessage>
+  <Publisher xsi:nil="true"></Publisher>
+  <AuthorizationReferences>[]</AuthorizationReferences>
+  <ConnectionReferences>{}</ConnectionReferences>
+  <DatabaseReferences>{"default.cds":{"databaseDetails":{"referenceType":"Environmental","environmentName":"default.cds","overrideValues":{"status":"NotSpecified","environmentVariableName":""}},"dataSources":{"outcomecases":{"entitySetName":"al_outcomecases","logicalName":"al_outcomecase"},"sections":{"entitySetName":"al_sections","logicalName":"al_section"},"questions":{"entitySetName":"al_questions","logicalName":"al_question"},"questionversions":{"entitySetName":"al_questionversions","logicalName":"al_questionversion"},"reviewinstances":{"entitySetName":"al_reviewinstances","logicalName":"al_reviewinstance"},"responses":{"entitySetName":"al_responses","logicalName":"al_response"},"importbatches":{"entitySetName":"al_importbatches","logicalName":"al_importbatch"},"importexceptions":{"entitySetName":"al_importexceptions","logicalName":"al_importexception"},"remediationactions":{"entitySetName":"al_remediationactions","logicalName":"al_remediationaction"},"outcomes":{"entitySetName":"al_outcomes","logicalName":"al_outcome"},"sign_offs":{"entitySetName":"al_signoffs","logicalName":"al_signoff"},"userrolemappings":{"entitySetName":"al_userrolemappings","logicalName":"al_userrolemapping"},"pagepermissions":{"entitySetName":"al_pagepermissions","logicalName":"al_pagepermission"},"exportbatches":{"entitySetName":"al_exportbatches","logicalName":"al_exportbatch"},"exportrecords":{"entitySetName":"al_exportrecords","logicalName":"al_exportrecord"},"environment_39a902ba":{"entitySetName":"Environment","logicalName":"environment_39a902ba"},"auditevents":{"entitySetName":"al_auditevents","logicalName":"al_auditevent"},"contacts":{"entitySetName":"contacts","logicalName":"contact"},"webroles":{"entitySetName":"mspp_webroles","logicalName":"mspp_webrole"},"al_al_failreason_al_response":{"entitySetName":"al_al_failreason_al_responseset","logicalName":"al_al_failreason_al_response"},"failreasons":{"entitySetName":"al_failreasons","logicalName":"al_failreason"}}}}</DatabaseReferences>
+  <AppComponents>[]</AppComponents>
+  <AppComponentDependencies>[]</AppComponentDependencies>
+  <CanConsumeAppPass>1</CanConsumeAppPass>
+  <CanvasAppType>4</CanvasAppType>
+  <BypassConsent>0</BypassConsent>
+  <AdminControlBypassConsent>0</AdminControlBypassConsent>
+  <EmbeddedApp xsi:nil="true"></EmbeddedApp>
+  <IntroducedVersion>1.0</IntroducedVersion>
+  <CdsDependencies>{"cdsdependencies":[{"logicalname":"al_outcomecase","componenttype":1},{"logicalname":"al_section","componenttype":1},{"logicalname":"al_question","componenttype":1},{"logicalname":"al_questionversion","componenttype":1},{"logicalname":"al_reviewinstance","componenttype":1},{"logicalname":"al_response","componenttype":1},{"logicalname":"al_importbatch","componenttype":1},{"logicalname":"al_importexception","componenttype":1},{"logicalname":"al_remediationaction","componenttype":1},{"logicalname":"al_outcome","componenttype":1},{"logicalname":"al_signoff","componenttype":1},{"logicalname":"al_userrolemapping","componenttype":1},{"logicalname":"al_pagepermission","componenttype":1},{"logicalname":"al_exportbatch","componenttype":1},{"logicalname":"al_exportrecord","componenttype":1},{"logicalname":"al_auditevent","componenttype":1},{"logicalname":"contact","componenttype":1},{"logicalname":"mspp_webrole","componenttype":1},{"logicalname":"al_al_failreason_al_response","componenttype":1},{"logicalname":"al_failreason","componenttype":1}]}</CdsDependencies>
+  <IsCustomizable>1</IsCustomizable>
+  <CodeAppPackageUris>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/index.html_ContentType_text/html</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/assets/index-BujN2fxm.js_ContentType_application/javascript</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/assets/index-DUtY_kmn.css_ContentType_text/css</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2_ContentType_font/woff2</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2_ContentType_font/woff2</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2_ContentType_font/woff2</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/assets/inter-greek-wght-normal-CkhJZR-_.woff2_ContentType_font/woff2</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2_ContentType_font/woff2</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/assets/inter-latin-wght-normal-Dx4kXJAl.woff2_ContentType_font/woff2</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2_ContentType_font/woff2</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2_ContentType_font/woff2</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/assets/outfit-latin-wght-normal-Bc-8i84L.woff2_ContentType_font/woff2</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/favicon.png_ContentType_image/png</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/al_ascotlloydoutcometesting_72932_CodeAppPackages/vite.svg_ContentType_image/svg+xml</CodeAppPackageUri>
+  </CodeAppPackageUris>
+</CanvasApp>
