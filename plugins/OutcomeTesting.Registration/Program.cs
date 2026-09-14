@@ -3305,12 +3305,13 @@ int SetSiteSetting(string[] a)
     {
         Console.Error.WriteLine(
             "This can change who is able to sign in. Re-run as: " +
-            "setsitesetting <orgUrl> <name> <value> --confirm <orgUrl>");
+            "setsitesetting <orgUrl> <name> <value> [--create] --confirm <orgUrl>");
         return 1;
     }
 
     var name = a[2].Trim();
     var value = a[3];
+    var create = a.Any(x => x.Equals("--create", StringComparison.OrdinalIgnoreCase));
 
     using var svc = Connect(orgUrl);
 
@@ -3323,15 +3324,41 @@ int SetSiteSetting(string[] a)
         },
     }).Entities;
 
+    if (found.Count > 1)
+    {
+        Console.Error.WriteLine(
+            $"{found.Count} site settings are named '{name}', so which one to write is not decidable here.");
+        return 1;
+    }
+
+    // Each flag state asserts which act this is, and a mismatch is refused rather than
+    // quietly becoming the other one. Adding a setting the site does not carry and writing
+    // one it does are different acts with different blast radii: the first can only be
+    // checked against the name being right, the second against a value that is already
+    // being read. Silently doing either when the caller meant the other is how a typo ends
+    // up reading as applied.
+    if (create && found.Count == 1)
+    {
+        Console.Error.WriteLine(
+            $"'{name}' already exists. Re-run without --create to write it.");
+        return 1;
+    }
+
     // Refused rather than created: a setting this site does not already carry is far more
     // likely to be a mistyped name than a new one, and a typo that silently creates a row
-    // reads as applied while changing nothing about the site's behaviour.
-    if (found.Count != 1)
+    // reads as applied while changing nothing about the site's behaviour. --create is how
+    // the caller says they have checked the spelling against the documentation.
+    if (!create && found.Count == 0)
     {
-        Console.Error.WriteLine(found.Count == 0
-            ? $"No site setting is named '{name}'. Nothing was written."
-            : $"{found.Count} site settings are named '{name}', so which one to write is not decidable here.");
+        Console.Error.WriteLine(
+            $"No site setting is named '{name}'. Nothing was written. " +
+            "Re-run with --create if this is a new setting and the name is right.");
         return 1;
+    }
+
+    if (found.Count == 0)
+    {
+        return CreateSiteSetting(svc, name, value);
     }
 
     var before = found[0].GetAttributeValue<string>("mspp_value");
@@ -3349,6 +3376,68 @@ int SetSiteSetting(string[] a)
     return 0;
 
     static string Show(string? v) => string.IsNullOrEmpty(v) ? "(empty)" : v;
+}
+
+// Adds one site setting this site does not already carry. Reached only through
+// setsitesetting --create.
+//
+// The website reference is COPIED FROM A SETTING THAT ALREADY WORKS rather than looked up
+// by name, for the same reason bindidentity copies the issuer from a working binding: a
+// site setting attached to no website, or to the wrong one, is read back perfectly and
+// changes nothing about the site's behaviour. That is the precise failure this verb's
+// refuse-unknown-names rail exists to prevent, so the create path must not reintroduce it.
+//
+// mspp_source is copied for the same reason. It is what the platform stamps on the settings
+// it writes, and a row that differs from its siblings in a column nobody thought to set is
+// the kind of difference that stays invisible until a sign-in depends on it.
+static int CreateSiteSetting(ServiceClient svc, string name, string value)
+{
+    var siblings = svc.RetrieveMultiple(new QueryExpression("mspp_sitesetting")
+    {
+        ColumnSet = new ColumnSet("mspp_websiteid", "mspp_source"),
+    }).Entities;
+
+    var websites = siblings
+        .Select(e => e.GetAttributeValue<EntityReference>("mspp_websiteid"))
+        .Where(r => r != null)
+        .GroupBy(r => r!.Id)
+        .ToList();
+
+    if (websites.Count != 1)
+    {
+        Console.Error.WriteLine(websites.Count == 0
+            ? "No existing site setting carries a website, so which site this one belongs to cannot be established. Nothing was written."
+            : $"{websites.Count} websites are in use here, so which one this setting belongs to is not decidable. Nothing was written.");
+        return 1;
+    }
+
+    var website = websites[0].First()!;
+
+    var row = new Entity("mspp_sitesetting")
+    {
+        ["mspp_name"] = name,
+        ["mspp_value"] = value.Length == 0 ? null : value,
+        ["mspp_websiteid"] = new EntityReference("mspp_website", website.Id),
+    };
+
+    var source = siblings
+        .Select(e => e.GetAttributeValue<OptionSetValue>("mspp_source"))
+        .FirstOrDefault(s => s != null);
+    if (source != null)
+    {
+        row["mspp_source"] = new OptionSetValue(source.Value);
+    }
+
+    var id = svc.Create(row);
+
+    // Read back, because on this site a successful-looking write is not evidence.
+    var after = svc.Retrieve("mspp_sitesetting", id, new ColumnSet("mspp_name", "mspp_value", "mspp_websiteid"));
+
+    Console.WriteLine($"Created {after.GetAttributeValue<string>("mspp_name")} = " +
+        $"{after.GetAttributeValue<string>("mspp_value") ?? "(empty)"}");
+    Console.WriteLine($"  website : {after.GetAttributeValue<EntityReference>("mspp_websiteid")?.Name ?? "(none)"}");
+    Console.WriteLine($"  row     : {id:D}");
+    return 0;
 }
 
 // Puts the ASP.NET Identity username for one Entra object id on the contact that object id
