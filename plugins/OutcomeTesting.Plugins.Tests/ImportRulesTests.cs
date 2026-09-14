@@ -43,7 +43,7 @@ namespace OutcomeTesting.Plugins.Tests
                 "IOA07028411",
                 client,
                 "Jane Adviser",
-                "Cara Checker",
+                "Pat Paraplanner",
                 status,
                 outcome,
                 string.Empty,
@@ -124,16 +124,34 @@ namespace OutcomeTesting.Plugins.Tests
 
 
         [Fact]
-        public void Takes_the_paraplanner_from_who_raised_the_task()
+        public void Takes_the_paraplanner_from_assigned_to()
         {
-            // AssignedBy is the paraplanner who raised the pre-advice check (project owner,
-            // 2026-09-12); AssignedTo is the name the file carried for the checker.
+            // AssignedTo carries the paraplanner (project owner, 2026-09-14), correcting the
+            // 2026-09-12 reading that took them from AssignedBy. The sample extract this was
+            // first written against is synthetic - its two names are literally "Paraplanner 1"
+            // and "Checker 4" - so the column it labelled paraplanner was a guess, and the
+            // real extract puts them the other way round.
             var result = ImportRules.ParseCsv(File(Row("1")));
 
             var row = Assert.Single(result.Valid);
-            Assert.Equal("Jessica Bell", row.Values["al_paraplanner"]);
-            Assert.Equal("Cara Checker", row.Values["al_checkername"]);
+            Assert.Equal("Pat Paraplanner", row.Values["al_paraplanner"]);
             Assert.False(row.Values.ContainsKey("al_assignedby"));
+        }
+
+        [Fact]
+        public void Does_not_import_a_checker_name()
+        {
+            // The checker is set manually (project owner, 2026-09-14) - by allocation
+            // (AssignCasePlugin), by a claim (ClaimCasePlugin), or by editing the case. The
+            // import writing it was AD-113's complaint made concrete: a name the file carried
+            // that never proved the case was allocated to anyone.
+            //
+            // It must not merely be written from a different column - it must not be written
+            // AT ALL, or a re-import of the same task would overwrite whoever was allocated.
+            var result = ImportRules.ParseCsv(File(Row("1")));
+
+            var row = Assert.Single(result.Valid);
+            Assert.False(row.Values.ContainsKey("al_checkername"));
         }
 
         // ---- route derivation (D6) ----------------------------------------------

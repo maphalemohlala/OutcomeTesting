@@ -52,7 +52,7 @@ function row(taskId: string, options: RowOptions = {}): string {
     'IOA07028411',
     client,
     'Jane Adviser',
-    'Cara Checker',
+    'Pat Paraplanner',
     status,
     outcome,
     '',
@@ -111,14 +111,24 @@ describe('the import key', () => {
 });
 
 describe('who the file names', () => {
-  it('takes the paraplanner from who raised the task', () => {
-    // AssignedBy is the paraplanner who raised the pre-advice check (project owner,
-    // 2026-09-12); AssignedTo is the name the file carried for the checker.
+  it('takes the paraplanner from AssignedTo', () => {
+    // AssignedTo carries the paraplanner (project owner, 2026-09-14), correcting the
+    // 2026-09-12 reading that took them from AssignedBy. That reading came from a synthetic
+    // sample whose names are literally "Paraplanner 1" and "Checker 4", so which column held
+    // which was a guess the real extract does not bear out.
     const [only] = parse(row('1')).valid;
 
-    expect(only.record.al_paraplanner).toBe('Jessica Bell');
-    expect(only.record.al_checkername).toBe('Cara Checker');
+    expect(only.record.al_paraplanner).toBe('Pat Paraplanner');
     expect(only.record.al_assignedby).toBeUndefined();
+  });
+
+  it('does not import a checker name', () => {
+    // The checker is set manually (project owner, 2026-09-14) - by allocation, by a claim, or
+    // by editing the case. Not written at all rather than written from another column, so a
+    // re-import of the same TaskID cannot overwrite whoever is actually allocated.
+    const [only] = parse(row('1')).valid;
+
+    expect(only.record.al_checkername).toBeUndefined();
   });
 });
 

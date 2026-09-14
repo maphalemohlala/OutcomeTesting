@@ -154,7 +154,7 @@
   adx_value: al_claimrequest,al_signoffrequest,al_regraderequest,al_caseheaderrequest
 - adx_description: "Returns the plug-in's own refusal to the browser instead of the platform's generic \"Common Data Service error occurred.\" Without it every refusal on this site reaches the page as that one sentence and a 400, whatever it was: the review submit's list of unanswered required questions, the edit-conflict prompt, the sign-off and regrade preconditions. Every friendlyError on the site reads error.innererror.message and was written for this setting, which had never been created - reported 2026-09-13, against a submit that named the one question left unanswered in the plug-in trace and told the checker nothing. Documented default is False. Safe here because these messages are written to be read by the person who hit them: they carry a VALIDATION, PRECONDITION, CONFLICT or UNAUTHORIZED prefix, say what to do next, and never expose a table name, query, id or stack trace (PP-16). The pages cap anything else at 300 characters."
   adx_name: Webapi/error/innererror
-  adx_sitesettingid: a1000000-0000-4000-8000-0000000000ae
+  adx_sitesettingid: 8dea7fe4-27b0-f111-aaac-e4fade069307
   adx_value: 'true'
 - adx_description: "Exposes al_caseassignment to the portal Web API so a checker can pick a case up out of the shared queue (AD-076). A create, like the sign-off, so it needs no trigger column and can carry its own Contact-scoped permission - which is what ties the claim to the signed-in contact, since a portal write reaches Dataverse as the site's application user and cannot be attributed to a caller (AD-053)."
   adx_name: Webapi/al_caseassignment/enabled
@@ -242,3 +242,11 @@
   adx_name: Authentication/Registration/DenyMinorsWithoutParentalConsent
   adx_sitesettingid: f78a99d0-09ce-4ddb-97e3-d6f2c5096033
   adx_value: false
+- adx_description: "Exposes al_outcomecase to the portal Web API so a page can re-read the case's own status after a write a plug-in made on its behalf. Read only: the sole permission on this table is `Outcome Case - read all` (a1000000-...-060, adx_read true and adx_write, adx_create and adx_delete all false), so enabling the Web API here grants the browser nothing it did not already have through OD-022's read-all, and no PATCH can succeed whatever the allowlist below says. Added 2026-09-14 for the AD-094 render cache: a regrade or a sign-off is written by a plug-in, not by the website, so the portal's cache is never invalidated for al_outcomecase and the status badge can go on reading Awaiting Recheck for up to fifteen minutes after the case has Closed. Reported against 254398988 on 2026-09-14, where the case page said Closed and the remediation page said Awaiting Recheck at the same moment - two Liquid queries, two cache entries, one of them stale."
+  adx_name: Webapi/al_outcomecase/enabled
+  adx_sitesettingid: a53b48a2-13b0-f111-aaac-e4fade069307
+  adx_value: 'true'
+- adx_description: "Allowlist of columns the Web API may act on for al_outcomecase: the case status alone, which is the one value a page needs to re-read to correct a stale badge. Every other column stays off the list, and the table carries no write permission at all, so this grants a read of one column and no write of anything."
+  adx_name: Webapi/al_outcomecase/fields
+  adx_sitesettingid: 5633a2ab-13b0-f111-aaac-e4fade069307
+  adx_value: al_casestatus

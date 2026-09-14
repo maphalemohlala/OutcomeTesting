@@ -175,3 +175,23 @@
     padding: var(--space-4);
   }
 }
+
+/*
+ * The banner shown when the app could not read its permission rules (AD-136). Amber rather
+ * than red: the app is usable and nothing is unsafe - the server checks every write - but
+ * what the menu offers may not be what this person has been granted.
+ *
+ * Sits above the page content inside <main>, so it is read before whatever it is qualifying,
+ * and is part of the normal flow rather than an overlay: it stays put while the reader scrolls
+ * to whatever they came for, and never covers it.
+ */
+.shell__notice {
+  margin-bottom: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--colour-outcome-issues);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  background: var(--colour-surface-sunken);
+  color: var(--colour-text);
+  line-height: 1.5;
+}

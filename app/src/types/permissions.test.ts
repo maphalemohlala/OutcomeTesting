@@ -7,6 +7,7 @@ import {
   levelFor,
   pageResourceForPath,
   resolvePermissions,
+  resolveRules,
   rulesInForce,
   type AppRole,
   type PermissionRule,
@@ -163,5 +164,37 @@ describe('rulesInForce', () => {
     const set = resolvePermissions(['AL Portal - Tax Reviewer'], rulesInForce(afterWithdrawal));
     expect(can(set, 'page.cases')).toBe(false);
     expect(can(set, 'page.reviews', 'Edit')).toBe(true);
+  });
+});
+
+describe('resolveRules', () => {
+  const stored: PermissionRule[] = [
+    { role: 'AL Portal - Tax Reviewer', resource: 'page.cases', level: 'View' },
+  ];
+
+  it('reports stored rules as in force and available', () => {
+    expect(resolveRules(true, stored)).toEqual({ rules: stored, unavailable: false });
+  });
+
+  it('treats a successful read of an unconfigured environment as available', () => {
+    // Zero stored rules is a real answer: the environment has not been configured yet, and
+    // DEFAULT_PERMISSIONS is the documented seed for exactly that. Nothing is wrong, so the
+    // app must NOT warn - a banner here would cry wolf on every fresh environment.
+    expect(resolveRules(true, [])).toEqual({ rules: DEFAULT_PERMISSIONS, unavailable: false });
+  });
+
+  it('reports a failed read as unavailable, and says so rather than guessing silently', () => {
+    // The defect this exists for (2026-09-14): a user who cannot READ al_pagepermission got
+    // an empty array, indistinguishable from "no rules stored", and was silently gated by
+    // DEFAULT_PERMISSIONS instead of the environment's configured rules. The menu looked
+    // plausible and was wrong. Found when Zoe Ramwell held Basic User in TEST and so saw
+    // different pages from two System Administrators holding "the same role".
+    expect(resolveRules(false, [])).toEqual({ rules: DEFAULT_PERMISSIONS, unavailable: true });
+  });
+
+  it('reports a failed read as unavailable even if rows somehow came back', () => {
+    // A partial read is not a rulebook. If the call did not succeed, nothing it returned is
+    // trusted to decide what the user may see.
+    expect(resolveRules(false, stored)).toEqual({ rules: DEFAULT_PERMISSIONS, unavailable: true });
   });
 });

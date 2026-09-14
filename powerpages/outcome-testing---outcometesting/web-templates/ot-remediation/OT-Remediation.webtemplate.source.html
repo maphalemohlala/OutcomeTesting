@@ -347,7 +347,7 @@
     <section class="ot-card" aria-labelledby="ot-remediation-heading">
       <h2 class="ot-card__title" id="ot-remediation-heading">
         {{ c.al_casereference | default: 'Case' | escape }}
-        <span data-ot-case-status>{% include 'OT Status Badge' status: c.al_casestatus.label %}</span>
+        <span data-ot-case-status data-ot-case-id="{{ c.al_outcomecaseid }}">{% include 'OT Status Badge' status: c.al_casestatus.label %}</span>
       </h2>
       {% comment %}
         The outcome the remediation was raised for, read back out of the actions.
@@ -1411,6 +1411,18 @@
       },
 
       /*
+       * The case status as Dataverse has just reported it, replacing whatever the server
+       * rendered from cache. Certain, because the caller read it from the Web API rather
+       * than deriving it - so it clears the "may have moved" marker the same way `regraded`
+       * does, and for the same reason.
+       */
+      caseStatusIs: function (label) {
+        var status = document.querySelector('[data-ot-case-status]');
+        if (!status || !label) { return; }
+        badge(status, label);
+      },
+
+      /*
        * The reload the reader asks for. The page cannot draw the parts that need a server
        * render - the supervisor's panel after an adviser sign-off, the regrade panel after
        * the case reaches recheck - so it offers the reload instead of timing one, and says
@@ -1427,6 +1439,82 @@
         after.parentNode.insertBefore(button, after.nextSibling);
       }
     };
+  })();
+</script>
+
+<script>
+  /*
+   * The case status, re-read from Dataverse on every load (AD-133, answering AD-094).
+   *
+   * The badge above is server-rendered from a Liquid fetchxml result, and Power Pages serves
+   * that from a cache the writes on this case never invalidate: a sign-off and a regrade are
+   * made by plug-ins, not by the website, so the only record the site clears for itself is
+   * the contact it PATCHed. Everything else waits on polled change tracking, inside a
+   * fifteen-minute SLA.
+   *
+   * `otRemediationRows.regraded` already corrects the badge, and AD-131 marks it where the
+   * page cannot recompute it - but both only in the browser session that made the write. Come
+   * back to this page afterwards and the server renders the stale value again, with no marker
+   * on it, because no write happened in THIS page load. A stale badge carrying no marker
+   * reads as authoritative, which is the half AD-131 could not cover. Reported
+   * on 254398988 on 2026-09-14: the case page said Closed and this page said Awaiting Recheck
+   * at the same moment, the case having closed two minutes earlier. Two Liquid queries, two
+   * cache entries, one refreshed and one not.
+   *
+   * So the page stops trusting its own render for this one value and asks Dataverse. The Web
+   * API is not the Liquid render cache, which is the whole point of reading through it here.
+   *
+   * Progressive enhancement, exactly like every other write on this page: a failure, a
+   * refusal, or a browser that never runs this leaves the server-rendered badge alone. A
+   * stale badge is what we already have, so there is nothing to lose by failing quietly -
+   * and nothing here is a permission decision the page is entitled to make (NFR-SEC-01).
+   */
+  (function () {
+    'use strict';
+
+    var status = document.querySelector('[data-ot-case-status]');
+    if (!status) { return; }
+
+    var caseId = status.getAttribute('data-ot-case-id');
+    if (!caseId) { return; }
+
+    var FORMATTED = '@OData.Community.Display.V1.FormattedValue';
+
+    var request = new XMLHttpRequest();
+    request.open('GET', '/_api/al_outcomecases(' + caseId + ')?$select=al_casestatus', true);
+    request.setRequestHeader('Accept', 'application/json');
+    // The label rather than the option-set number. Without this the response carries
+    // al_casestatus as an integer and the page would have to keep its own copy of the
+    // lifecycle's values - a second place for them to drift from CaseLifecycle.cs.
+    request.setRequestHeader(
+      'Prefer', 'odata.include-annotations="OData.Community.Display.V1.FormattedValue"');
+
+    request.onreadystatechange = function () {
+      if (request.readyState !== 4) { return; }
+      if (request.status < 200 || request.status >= 300) { return; }
+
+      var live;
+      try {
+        live = JSON.parse(request.responseText)['al_casestatus' + FORMATTED];
+      } catch (e) {
+        return;
+      }
+
+      if (!live) { return; }
+
+      // Only when it actually differs, so a page that was already current is not rewritten -
+      // the badge would render identically, but replacing it would also silently discard a
+      // "may have moved" marker that a write in this session had put there for another
+      // reason.
+      var shown = (status.textContent || '').replace(/^\s+|\s+$/g, '');
+      if (shown === live) { return; }
+
+      if (window.otRemediationRows) {
+        window.otRemediationRows.caseStatusIs(live);
+      }
+    };
+
+    request.send();
   })();
 </script>
 

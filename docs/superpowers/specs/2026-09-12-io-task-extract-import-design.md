@@ -62,20 +62,48 @@ Key: `TaskID` → `al_casereference` **and** `al_name`.
 |---|---|
 | `Client` | `al_clientname` |
 | `AdviserName` | `al_advisername` |
-| `AssignedTo` | `al_checkername` |
-| `AssignedBy` | `al_paraplanner` |
+| `AssignedTo` | `al_paraplanner` |
+| `AssignedBy` | *(not imported)* |
 | `DueDate` | `al_duedate` |
 
-`al_checkername` continues to mean "the name the file carried", not "the
-allocated checker" — AD-113 already established that, and `al_caseassignment`
-stays the source of truth for allocation.
+> **Corrected 2026-09-14 (AD-134).** This section previously mapped
+> `AssignedTo -> al_checkername` and `AssignedBy -> al_paraplanner`. Both were
+> wrong. The project owner reports that `AssignedTo` carries the **paraplanner**,
+> and that the **checker is set manually**. The paragraphs below are kept and
+> struck through rather than deleted, because the reasoning that produced the
+> error is worth being able to find.
 
-`AssignedBy` is the paraplanner who raised the pre-advice check task (project
+`AssignedTo` is the paraplanner. The extract's own structure agrees, which is
+what makes this more than one report: the checklist stamp equals `AssignedTo` on
+every sample row that carries one, and §"Paraplanners **select** the reasons for
+the check inside the IO task" says who does that stamping. The real 2026-09-13
+DEV import says the same — on 254471517 and 254471891, `AssignedTo`,
+`CreatedDate`'s `CreatedBy` and `CompletedBy` are all one person.
+
+So `al_checklistcompletedby` **is** normally the paraplanner, which is the exact
+opposite of what the struck-through paragraph below concluded. No code changes
+for that: the column still records whoever worked the checklist, and that happens
+to be the same person.
+
+`al_checkername` is no longer written by the import at all. It is set by
+allocation, by a claim, or by editing the case. AD-113 held that the imported
+name was never proof of allocation; not importing it is that finding carried to
+its conclusion, and it also means a re-import of the same TaskID cannot overwrite
+whoever is actually allocated.
+
+~~`AssignedBy` is the paraplanner who raised the pre-advice check task (project
 owner, 2026-09-12), which is why it feeds `al_paraplanner` rather than a column
 of its own — it is one of the header fields the client asked be pre-populated
 from IO rather than typed in. Note that the checklist stamp is `AssignedTo`, not
 `AssignedBy`, on every sample row that carries one, so `al_checklistcompletedby`
-is **not** the paraplanner.
+is **not** the paraplanner.~~
+
+**On `data/io-task-extract-sample.csv`.** The sample is synthetic and its
+placeholder names are what caused this error: the person it calls `Checker 4`
+sits in `AssignedTo` and is really the paraplanner. The file has deliberately
+**not** been rewritten — its column positions and the identity relationships
+between them (stamp = `AssignedTo`) are faithful to the real extract, and only
+the invented names mislead. Read the positions, not the names.
 
 **New columns on `al_outcomecase`**
 
@@ -155,9 +183,16 @@ others match exactly.
 kept per case (D4). If they ever disagree, the earliest completion wins and the
 row is still imported; the item list is what matters.
 
-The stamp names the task's `AssignedTo`, which is not the paraplanner who raised
-it (`AssignedBy`), so `al_checklistcompletedby` is recorded as what it is —
-whoever worked the checklist — and is not conflated with `al_paraplanner`.
+The stamp names the task's `AssignedTo`, so `al_checklistcompletedby` is recorded
+as what it is — whoever worked the checklist — in its own column rather than
+being folded into another.
+
+> **Corrected 2026-09-14 (AD-134).** This paragraph used to add "which is not the
+> paraplanner who raised it (`AssignedBy`)". That is backwards: `AssignedTo` **is**
+> the paraplanner, so `al_checklistcompletedby` normally names them. Keeping it in
+> its own column is still right — the two are separate facts that usually coincide,
+> and a row where they differ should be readable as such — but the stated reason
+> was wrong.
 
 ## 6. Routing (D6)
 

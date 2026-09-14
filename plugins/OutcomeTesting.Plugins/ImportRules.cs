@@ -164,12 +164,24 @@ namespace OutcomeTesting.Plugins
             new ColumnDef("Client", "al_clientname", ColumnKind.Text, null),
             new ColumnDef("AdviserName", "al_advisername", ColumnKind.Text, null),
             new ColumnDef("AdviserEmail", "al_adviseremail", ColumnKind.Text, null),
-            // AD-113: this is the name the file carried, not proof of allocation.
-            new ColumnDef("AssignedTo", "al_checkername", ColumnKind.Text, null),
-            // The paraplanner who raised the pre-advice check task (project owner,
-            // 2026-09-12), which is one of the header fields the client asked be
-            // pre-populated from IO rather than typed in.
-            new ColumnDef("AssignedBy", "al_paraplanner", ColumnKind.Text, null),
+            // The paraplanner, from AssignedTo (project owner, 2026-09-14). This corrects the
+            // 2026-09-12 reading, which took the paraplanner from AssignedBy and the checker
+            // from AssignedTo. That reading came from data/io-task-extract-sample.csv, which
+            // is synthetic - its names are literally "Paraplanner 1" and "Checker 4" - so
+            // which column held which was a guess the real extract does not bear out.
+            //
+            // AssignedBy is deliberately not mapped. It is whoever IO records as having
+            // assigned the task, which is not the paraplanner and not known to be the
+            // checker; importing it into a column named for either would repeat the mistake
+            // this line fixes.
+            new ColumnDef("AssignedTo", "al_paraplanner", ColumnKind.Text, null),
+            // al_checkername is deliberately absent. The checker is set manually (project
+            // owner, 2026-09-14): by allocation (AssignCasePlugin), by a claim
+            // (ClaimCasePlugin), or by editing the case. The import used to stamp it from
+            // AssignedTo, which was AD-113's complaint - a name the file carried that never
+            // proved the case was allocated to anyone. Absent from this table rather than
+            // mapped elsewhere, because only columns listed here are written: a re-import of
+            // the same TaskID must not overwrite whoever is actually allocated.
             new ColumnDef("Status", "al_iotaskstatus", ColumnKind.Choice, Options(
                 IoTaskStatusNotStarted, "Not Started",
                 IoTaskStatusInProgress, "In Progress",

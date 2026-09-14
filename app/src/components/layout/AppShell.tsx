@@ -80,6 +80,33 @@ function SignedInUser() {
   );
 }
 
+/**
+ * Says so when the menu is a guess (AD-136).
+ *
+ * `al_pagepermission` could not be read, so what is on screen is the coded defaults standing
+ * in for rules nobody has seen. The pages offered may be more, fewer or simply different from
+ * the ones this environment actually grants. Without this the app looked entirely normal and
+ * the person had no way to know — the 2026-09-14 report took an investigation to explain
+ * precisely because nothing on screen said anything was wrong.
+ *
+ * Deliberately NOT shown for an unconfigured environment with no rules stored: that is a real
+ * answer, and warning on it would cry wolf on every fresh environment.
+ */
+function RulesUnavailableNotice() {
+  const { rulesUnavailable } = usePermissions();
+  if (!rulesUnavailable) return null;
+
+  return (
+    <div className="shell__notice" role="status">
+      <strong>Your access could not be confirmed.</strong> This app could not read its
+      permission rules, so the menu shows a default set rather than the access you have
+      actually been granted — some pages may be missing, and others may refuse you when you
+      open them. Nothing you do is unsafe: every action is checked again on the server. Ask an
+      administrator to check your security role.
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const { can } = usePermissions();
@@ -152,6 +179,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
 
       <main className="shell__main" id="main" tabIndex={-1}>
+        <RulesUnavailableNotice />
         {children}
       </main>
     </div>

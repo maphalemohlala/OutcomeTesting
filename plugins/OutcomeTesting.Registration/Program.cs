@@ -6232,6 +6232,73 @@ int GrantSecurity(string orgUrl)
     GrantTable(svc, adminRole, "al_questionversion", read: true, create: true, write: true, append: true, appendTo: true);
     GrantTable(svc, adminRole, "al_question", read: true, appendTo: true);
 
+    // ---- the business tables (2026-09-14) --------------------------------------------
+    //
+    // Until now these two roles covered the app's ADMIN surface and none of its business
+    // surface: the Code App has 21 Dataverse data sources and only six were granted. Nobody
+    // noticed because nobody had ever HELD either role - every user in DEV and TEST is a
+    // System Administrator, which grants everything and, in PermissionHelpers.EnsurePermission,
+    // short-circuits the application gate as well. The first person given an application role
+    // rather than System Administrator (Zoe Ramwell in TEST, 2026-09-14) got a working menu
+    // and empty pages.
+    //
+    // Write, not just read: 50 of the 51 registered steps run as the CALLING user, so a
+    // command that updates a case does it with the caller's privileges, not the service
+    // account's. Read alone would let every page render and every action fail.
+    //
+    // Depth is Global throughout (GrantTable), which OD-022 requires: every authenticated
+    // user sees all cases and acts on what is assigned to them. The assignment boundary is
+    // enforced by the plug-ins and by the portal's Contact-scoped table permissions, not by
+    // Dataverse depth - narrowing depth here would re-introduce the case-level scoping OD-022
+    // explicitly tried and rejected.
+    string[] readForEveryone =
+    {
+        "al_outcomecase", "al_reviewinstance", "al_response", "al_remediationaction",
+        "al_signoff", "al_outcome", "al_auditevent", "al_caseassignment", "al_notification",
+        "al_failreason", "al_section", "al_question", "al_questionversion", "al_role",
+        "al_importbatch", "al_importexception", "al_checklist", "al_checklistversion",
+        "al_reviewroute",
+    };
+
+    // What the app's own commands write in the caller's context. al_auditevent is create-only
+    // by intent: BR-012 wants an immutable record, so nobody is granted write or delete on it
+    // through these roles - an audit event that can be edited is not an audit trail.
+    string[] writeForEveryone =
+    {
+        "al_outcomecase", "al_reviewinstance", "al_response", "al_remediationaction",
+        "al_signoff", "al_outcome", "al_caseassignment", "al_notification",
+        "al_importbatch", "al_importexception",
+    };
+
+    foreach (var role in new[] { userRole, adminRole })
+    {
+        foreach (var table in readForEveryone)
+        {
+            GrantTable(svc, role, table, read: true, appendTo: true);
+        }
+
+        foreach (var table in writeForEveryone)
+        {
+            GrantTable(svc, role, table, read: true, create: true, write: true, append: true, appendTo: true);
+        }
+
+        GrantTable(svc, role, "al_auditevent", read: true, create: true, append: true, appendTo: true);
+    }
+
+    // Admin-only beyond the above: the people and role tables. An ordinary user reads them
+    // (the pages name who holds what) and only an administrator writes them, which is the
+    // same escalation-safe split al_userrolemapping and al_pagepermission already have.
+    GrantTable(svc, userRole, "contact", read: true, appendTo: true);
+    GrantTable(svc, userRole, "systemuser", read: true, appendTo: true);
+    GrantTable(svc, userRole, "mspp_webrole", read: true, appendTo: true);
+
+    GrantTable(svc, adminRole, "contact", read: true, create: true, write: true, append: true, appendTo: true);
+    GrantTable(svc, adminRole, "systemuser", read: true, appendTo: true);
+    GrantTable(svc, adminRole, "mspp_webrole", read: true, create: true, write: true, append: true, appendTo: true);
+    GrantTable(svc, adminRole, "al_section", read: true, create: true, write: true, append: true, appendTo: true);
+    GrantTable(svc, adminRole, "al_role", read: true, create: true, write: true, append: true, appendTo: true);
+    GrantTable(svc, adminRole, "al_failreason", read: true, create: true, write: true, append: true, appendTo: true);
+
     // Add both roles to the solution for clean ALM promotion (component type 20 = Role).
     AddRoleToSolution(svc, userRole, "OutcomeTesting");
     AddRoleToSolution(svc, adminRole, "OutcomeTesting");
@@ -6298,11 +6365,24 @@ static void GrantTable(
     bool append = false,
     bool appendTo = false)
 {
-    var response = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    // Reported rather than thrown: this is called for ~20 tables in a row, and an exception
+    // on one would abort the rest and leave a role half-granted - the worst of the three
+    // outcomes, because it looks like it worked. A name that does not resolve is named here
+    // and the remaining tables are still granted.
+    RetrieveEntityResponse response;
+    try
     {
-        LogicalName = table,
-        EntityFilters = EntityFilters.Privileges,
-    });
+        response = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+        {
+            LogicalName = table,
+            EntityFilters = EntityFilters.Privileges,
+        });
+    }
+    catch (Exception error)
+    {
+        Console.Error.WriteLine($"  SKIPPED {table}: {error.Message}");
+        return;
+    }
 
     var wanted = new List<RolePrivilege>();
     foreach (var privilege in response.EntityMetadata.Privileges)

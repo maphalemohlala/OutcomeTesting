@@ -7,7 +7,7 @@ import {
   can as canAccess,
   levelFor,
   resolvePermissions,
-  rulesInForce,
+  resolveRules,
   type PermissionRule,
   type PermissionSet,
   type ResourceKey,
@@ -23,6 +23,8 @@ import { PermissionContext, type PermissionContextValue } from './permissionCont
 interface Resolved {
   roles: string[];
   permissions: PermissionSet;
+  /** True when al_pagepermission could not be read, so `permissions` is a stand-in (AD-136). */
+  rulesUnavailable: boolean;
 }
 
 /**
@@ -52,7 +54,7 @@ async function loadPermissions(email: string): Promise<Resolved> {
   const registered = userResult.success ? userResult.data : [];
   const deactivated = registered.length > 0 && Number(registered[0].statecode) !== 0;
   if (deactivated) {
-    return { roles: [], permissions: resolvePermissions([]) };
+    return { roles: [], permissions: resolvePermissions([]), rulesUnavailable: false };
   }
 
   // Bootstrap / fail-open: the trigger is no longer "the mapping table is unreadable or has
@@ -83,7 +85,16 @@ async function loadPermissions(email: string): Promise<Resolved> {
     })
     .filter((rule): rule is PermissionRule => Boolean(rule));
 
-  return { roles, permissions: resolvePermissions(roles, rulesInForce(dataRules)) };
+  // `permResult.success` is the distinction that matters: a read that FAILED and a read that
+  // legitimately found no rules both arrive as an empty array, and treating them alike is what
+  // gated a mis-provisioned user by the coded defaults while telling nobody (AD-136).
+  const { rules, unavailable } = resolveRules(permResult.success, dataRules);
+
+  return {
+    roles,
+    permissions: resolvePermissions(roles, rules),
+    rulesUnavailable: unavailable,
+  };
 }
 
 export function PermissionProvider({ children }: { children: React.ReactNode }) {
@@ -100,7 +111,15 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       })
       .catch(() => {
         // On an unexpected failure, stay permissive for view; server still gates writes.
-        if (!cancelled) setResolved({ roles: [...APP_ROLES], permissions: resolvePermissions(APP_ROLES) });
+        // Flagged unavailable for the same reason as a failed rules read: what is on screen
+        // is a stand-in, and the app says so rather than letting it pass for the real thing.
+        if (!cancelled) {
+          setResolved({
+            roles: [...APP_ROLES],
+            permissions: resolvePermissions(APP_ROLES),
+            rulesUnavailable: true,
+          });
+        }
       });
     return () => {
       cancelled = true;
@@ -117,6 +136,9 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       ready: resolved !== null,
       roles,
       permissions,
+      // False while still resolving: nothing is known to be wrong yet, and a banner that
+      // flashes on every load would be noise the reader learns to ignore.
+      rulesUnavailable: resolved ? resolved.rulesUnavailable : false,
       can: (resource, need) => canAccess(permissions, resource, need),
       level: (resource) => levelFor(permissions, resource),
     };

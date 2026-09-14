@@ -6,6 +6,12 @@ export interface PermissionContextValue {
   ready: boolean;
   roles: readonly string[];
   permissions: PermissionSet;
+  /**
+   * True when al_pagepermission could not be READ, so `permissions` is the coded defaults
+   * standing in for rules nobody has seen — not the environment's configured rules (AD-136).
+   * An unconfigured environment with no rules stored is NOT this: that is a real answer.
+   */
+  rulesUnavailable: boolean;
   can: (resource: ResourceKey, need?: AccessLevel) => boolean;
   level: (resource: ResourceKey) => AccessLevel;
 }

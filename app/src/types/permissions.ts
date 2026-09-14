@@ -247,6 +247,45 @@ export function rulesInForce(stored: readonly PermissionRule[]): readonly Permis
   return stored.length > 0 ? stored : DEFAULT_PERMISSIONS;
 }
 
+/** The rules to gate the UI with, and whether they are the real ones. */
+export interface RuleResolution {
+  rules: readonly PermissionRule[];
+  /** True when the rules could not be READ, so `rules` is a stand-in and not the truth. */
+  unavailable: boolean;
+}
+
+/**
+ * Separates the two states `rulesInForce` alone cannot tell apart: **"there are no stored
+ * rules"** and **"the stored rules could not be read"** (AD-136).
+ *
+ * Both used to arrive as an empty array, and both fell back to DEFAULT_PERMISSIONS. The first
+ * is correct — an unconfigured environment is meant to be seeded by the coded defaults. The
+ * second is a lie: a user who lacks read privilege on al_pagepermission was gated by the
+ * defaults rather than by the environment's configured rules, and got a menu that looked
+ * entirely plausible and was wrong, with nothing anywhere saying so.
+ *
+ * Found on 2026-09-14: Zoe Ramwell held only `Basic User` in TEST and so saw different pages
+ * from two System Administrators holding the same application role. The access problem was
+ * real; what made it take an investigation rather than a glance was that the app reported
+ * nothing unusual.
+ *
+ * The defaults are still what gates the UI in the failed case — there is nothing better to
+ * gate it with, and every write is enforced server-side regardless — but the caller is told,
+ * so it can say so.
+ */
+export function resolveRules(
+  readSucceeded: boolean,
+  stored: readonly PermissionRule[],
+): RuleResolution {
+  // A read that failed carries no authority, whatever it returned: a partial result is not a
+  // rulebook, so `stored` is deliberately ignored here rather than merged.
+  if (!readSucceeded) {
+    return { rules: DEFAULT_PERMISSIONS, unavailable: true };
+  }
+
+  return { rules: rulesInForce(stored), unavailable: false };
+}
+
 /** The access level a permission set grants on a resource (None when absent). */
 export function levelFor(set: PermissionSet, resource: ResourceKey): AccessLevel {
   return set[resource] ?? 'None';

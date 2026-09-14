@@ -45,9 +45,18 @@ const COLUMNS: ColumnDef[] = [
   { header: 'AdviserName', field: 'al_advisername', kind: 'text' },
   { header: 'AdviserEmail', field: 'al_adviseremail', kind: 'text' },
   // AD-113: the name the file carried, not proof of allocation.
-  { header: 'AssignedTo', field: 'al_checkername', kind: 'text' },
-  // The paraplanner who raised the pre-advice check task (project owner, 2026-09-12).
-  { header: 'AssignedBy', field: 'al_paraplanner', kind: 'text' },
+  // The paraplanner, from AssignedTo (project owner, 2026-09-14), correcting the 2026-09-12
+  // reading that took them from AssignedBy and the checker from AssignedTo. That reading came
+  // from data/io-task-extract-sample.csv, which is synthetic - its names are literally
+  // "Paraplanner 1" and "Checker 4" - so which column held which was a guess.
+  //
+  // AssignedBy is deliberately not mapped: it is whoever IO records as having assigned the
+  // task, which is neither the paraplanner nor known to be the checker.
+  //
+  // al_checkername is deliberately absent. The checker is set manually (project owner,
+  // 2026-09-14) - by allocation, by a claim, or by editing the case - and only the columns
+  // listed here are written, so a re-import cannot overwrite whoever is allocated.
+  { header: 'AssignedTo', field: 'al_paraplanner', kind: 'text' },
   {
     header: 'Status',
     field: 'al_iotaskstatus',
