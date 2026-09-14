@@ -559,6 +559,11 @@ if (args.Length >= 2 && args[0].Equals("setsecuritystamp", StringComparison.Ordi
     return SetSecurityStamp(args);
 }
 
+if (args.Length >= 2 && args[0].Equals("enableportallogin", StringComparison.OrdinalIgnoreCase))
+{
+    return EnablePortalLogin(args);
+}
+
 if (args.Length < 1)
 {
     Console.Error.WriteLine("Usage: dotnet run -- <orgUrl> [<pluginDllPath>]   |   dotnet run -- verify <orgUrl>");
@@ -2749,6 +2754,82 @@ int SetSecurityStamp(string[] a)
     Console.WriteLine($"{contact.GetAttributeValue<string>("fullname")} <{email}>: stamp set.");
     Console.WriteLine($"  read back: {(string.IsNullOrWhiteSpace(after) ? "(still empty — the write did not land)" : after)}");
     return string.IsNullOrWhiteSpace(after) ? 1 : 0;
+}
+
+// Turns on web authentication for one contact: adx_identity_logonenabled.
+//
+// THE STAMP WAS NOT THE WHOLE GAP. setsecuritystamp was written deliberately narrow while
+// what the stamp actually causes was still being established, and its own comment says the
+// lockout column was left alone because changing two at once would make the test
+// unreadable. Reading a working contact against a failing one in TEST finished that job:
+// a contact Power Pages created has logonenabled, emailaddress1confirmed and
+// lockoutenabled all true, and a contact made by hand has all three false. A binding, a
+// username and a stamp are not enough — with logonenabled false the sign-in is turned away
+// and the browser lands back on /Register, which reads exactly like an unbound account and
+// is why hand-binding looked like it had failed for a fourth reason.
+//
+// --confirmemail is separate rather than bundled for the reason the stamp was separate:
+// EmailConfirmationEnabled is true on this site, so the confirmed flag is a second
+// candidate cause, and setting both at once would leave which one mattered unknown. One
+// flag per variable keeps the next result readable.
+int EnablePortalLogin(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 3 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This grants a real person portal sign-in. Re-run as: " +
+            "enableportallogin <orgUrl> <contactEmail> [--confirmemail] --confirm <orgUrl>");
+        return 1;
+    }
+
+    var email = a[2].Trim();
+    var confirmEmail = a.Any(x => x.Equals("--confirmemail", StringComparison.OrdinalIgnoreCase));
+
+    using var svc = Connect(orgUrl);
+
+    var contactId = FindId(svc, "contact", ("emailaddress1", email));
+    if (contactId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No contact has the email {email}.");
+        return 1;
+    }
+
+    var columns = new ColumnSet(
+        "fullname", "adx_identity_logonenabled", "adx_identity_emailaddress1confirmed");
+    var before = svc.Retrieve("contact", contactId, columns);
+    var name = before.GetAttributeValue<string>("fullname");
+
+    var update = new Entity("contact", contactId) { ["adx_identity_logonenabled"] = true };
+    if (confirmEmail)
+    {
+        update["adx_identity_emailaddress1confirmed"] = true;
+    }
+
+    svc.Update(update);
+
+    // Read back, because on this site a successful-looking write is not evidence.
+    var after = svc.Retrieve("contact", contactId, columns);
+
+    Console.WriteLine($"{name} <{email}>:");
+    Console.WriteLine($"  logon enabled   : {Show(before)} -> {Show(after)}");
+    if (confirmEmail)
+    {
+        Console.WriteLine($"  email confirmed : {ShowConfirmed(before)} -> {ShowConfirmed(after)}");
+    }
+    else
+    {
+        Console.WriteLine(
+            $"  email confirmed : {ShowConfirmed(after)} (left alone — pass --confirmemail to set it)");
+    }
+
+    return after.GetAttributeValue<bool?>("adx_identity_logonenabled") == true ? 0 : 1;
+
+    static string Show(Entity e) =>
+        e.GetAttributeValue<bool?>("adx_identity_logonenabled") == true ? "yes" : "no";
+
+    static string ShowConfirmed(Entity e) =>
+        e.GetAttributeValue<bool?>("adx_identity_emailaddress1confirmed") == true ? "yes" : "no";
 }
 
 // Sets one site setting to one value, and reads it back.
