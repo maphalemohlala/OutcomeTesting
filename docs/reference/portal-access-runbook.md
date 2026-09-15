@@ -2,10 +2,58 @@
 
 Living reference. Written 2026-09-14 after Env_AQ_Test was provisioned from empty, where
 each of the four requirements below was found the hard way, one failed sign-in at a time.
+Extended 2026-09-15 with **gate 0**, which sits above all four and was missing from the first
+version of this page -- its absence sent a reported failure straight at the bindings, which
+were already correct.
 
 Entra is the only sign-in method on this site. `LocalLoginEnabled` is `false`, there is no
 OpenIdConnect provider registration, and the built-in Entra provider is enabled through
 `Authentication/Registration/AzureADLoginEnabled`.
+
+---
+
+## Gate 0 -- site visibility
+
+**Both sites are Private.** A private Power Pages site refuses everyone except the people
+explicitly granted access, and that check runs *before* Power Pages authentication -- before
+contacts, bindings, stamps and web roles are consulted at all. Someone can pass every one of
+the four requirements below and still never reach the site.
+
+| What they see | URL |
+|---|---|
+| "You don't have access to this / You do not have permissions to access this site." | `/private-mode-access-denied` |
+
+Note the wording: it refuses them from the **site**, not from a sign-in. A registration or
+binding fault never produces this page.
+
+Access is granted in the Power Pages design studio under **Set up -> Site visibility ->
+Manage access**. It lives in the Power Pages management service, **not in Dataverse**, so:
+
+- Nothing in `sitesetting.yml` controls it, and no `mspp_` table records it.
+- No `pac` command and no verb of the registration tool can read or write it.
+- The `identities` report cannot see it, and neither can any FetchXML in this document.
+
+It has to be done in the maker portal by hand. Prefer granting **one Entra security group**
+and managing membership in Entra, so provisioning a person becomes group membership plus the
+four requirements below, with no per-person portal step.
+
+### The trap: administrators bypass it
+
+Holders of the Dataverse **System Administrator** role, and environment admins, reach a
+private site without appearing in Manage access at all. They are not on the list; they do not
+need to be.
+
+That makes an admin account a **useless test subject**, and this is how gate 0 stayed hidden.
+On 2026-09-15 a reported failure for Zoe Ramwell was investigated against Simunye Radingwana,
+who could see the site -- but Simunye holds System Administrator and Zoe does not, so the two
+accounts were never running the same gauntlet. Zoe's four requirements were already identical
+to his.
+
+Holders of System Administrator in TEST as at 2026-09-15, excluding Microsoft service
+principals: `Simunye.Radingwana`, `Jordan.Starling`, `HarrisonS.admin`, and the
+`svc.automate.aq` service account the tooling itself authenticates as.
+
+**Test with an account that holds no admin role**, or the test proves nothing.
 
 ---
 
@@ -36,7 +84,8 @@ Nothing to run, and nothing for them to fill in.
 
 They go to the site and sign in with their Ascot Lloyd account. There is no registration
 step, no invitation code and no email to confirm. If they land on a page asking them to
-register, they are **not** provisioned — go to the next section.
+register, they are **not** provisioned — go to the next section. If instead they are told
+they have no access to the **site**, that is gate 0 and no amount of provisioning fixes it.
 
 Test: `https://outcometestingtest.powerappsportals.com`
 
@@ -111,6 +160,7 @@ clears it.
 
 | What they see | What it means |
 |---|---|
+| "You don't have access to this", at `/private-mode-access-denied` | **Gate 0.** Site visibility is Private and they have not been granted access. Nothing to do with contacts |
 | "Registration has been disabled. Invalid sign-in attempt." | Registration is off and they are unbound, **or** `ExternalLoginEnabled` is off |
 | Redirected to `/Register`, or "Register your external account" | Unbound, **or** bound with `logonenabled` false — these look identical |
 | "The email ... is already taken" | Open registration is on and their contact already exists. Bind instead |
@@ -119,8 +169,15 @@ clears it.
 The second row is the trap. A correct binding with `logonenabled` false presents exactly like
 no binding at all, so confirm gate 4 before concluding the binding is wrong.
 
-**The best diagnostic is a working contact.** Read one that signs in against one that does
-not, in the same environment, and let the differing column name itself.
+**The best diagnostic is a working contact -- but only a comparable one.** Read one that
+signs in against one that does not, in the same environment, and let the differing column
+name itself.
+
+The comparison is only valid if both accounts hold the **same Dataverse security role**. An
+administrator passes gate 0 for free, so comparing a normal user against one tells you
+nothing about site visibility and the differing column will not be a contact column at all.
+Check `systemuserroles` before trusting the comparison -- on 2026-09-15 this exact mistake
+cost an investigation, because the two contacts really were identical.
 
 ---
 
@@ -133,6 +190,7 @@ not, in the same environment, and let the differing column name itself.
 | `Registration/OpenRegistrationEnabled` | `false` | `true` lets any tenant account mint a contact |
 | `Registration/LocalLoginEnabled` | `false` | Entra is the only method |
 | `Registration/LoginButtonAuthenticationType` | *(empty)* | A wrong issuer here has bitten this project twice |
+| `LoginTrackingEnabled` | `true` | **`false` silently breaks the verification below** -- see that section |
 
 `sitesetting.yml` is the source of truth and `setsitesetting` writes the same value the next
 upload would. **This site serves settings from a cache**: a change can take effect well after
@@ -142,10 +200,22 @@ it reads back correctly, so a setting that appears to do nothing has not been di
 
 ## Verifying without a screenshot
 
-`Authentication/LoginTrackingEnabled` is `true`, so a successful sign-in stamps
-`contact.adx_identity_lastsuccessfullogin`. Query that rather than asking what the screen
-said. Subject to the caching caveat above — a null reading shortly after a settings change
-is not proof of failure.
+`Authentication/LoginTrackingEnabled` must be `true` for this to work at all. When it is
+true a successful sign-in stamps `contact.adx_identity_lastsuccessfullogin`, and querying
+that column beats asking what the screen said.
+
+**It was `false` in both environments until 2026-09-15**, which made this whole section a
+trap rather than a check. With it false the column stays null for *everyone* -- including
+accounts that demonstrably sign in every day -- so a working sign-in and a broken one read
+exactly alike, and the natural conclusion from a null is the wrong one. It was set `true` in
+DEV and TEST on 2026-09-15.
+
+Two consequences worth keeping in mind:
+
+- **A null reading dated before 2026-09-15 means nothing.** It is not evidence of a failed
+  sign-in. Every contact in both environments read null on that date.
+- A null shortly after any settings change is still not proof of failure, for the caching
+  reason above.
 
 All four requirements, everyone at once:
 
@@ -173,7 +243,9 @@ contacts nothing can reach.
   provider, which the setting is documented not to apply to. Whether it was genuinely
   inapplicable or only ever read from a stale cache was never separated — but the four
   commands above need no setting at all.
-- **Invitations.** `InvitationEnabled` is `true` and the path is untested here.
+- **Invitations.** `InvitationEnabled` is `false` in both environments as at 2026-09-15 and
+  the path is untested here. It read `true` in `sitesetting.yml` until that date, so an
+  upload would have switched it on unasked; the yml was reconciled down to the environments.
 - **Turning registration off** to stop the `/Register` redirect. It does not stop it, it
   changes the wording. The redirect means the sign-in is landing on the registration path,
   not being refused at it.
@@ -184,5 +256,7 @@ contacts nothing can reach.
 
 Prod has had none of this done. Contacts there will need all four requirements each, and the
 first one needs the open-registration bootstrap because Prod has no binding to copy an issuer
-from. The settings table above is carried by `sitesetting.yml`, so an upload covers the
+from. **Gate 0 applies there too** and is not carried by any deployment -- if the Prod site is
+private, its Manage access list has to be populated by hand before a single contact matters.
+The settings table above is carried by `sitesetting.yml`, so an upload covers the
 settings — it does not cover a single contact.

@@ -15,7 +15,12 @@
   adx_name: Authentication/Registration/LocalLoginDeprecated
   adx_sitesettingid: 10534071-5d3c-4846-b6c4-15eeed3947ef
   adx_value: False
-- adx_description: A true or false value. If set to true, the Last Successful Login field on the portal user’s contact will be updated with the date and time when they successfully signed in.
+- adx_description: A true or false value. If set to true, the Last Successful Login field
+    on the portal user's contact is stamped when they sign in. Both environments were found
+    false on 2026-09-15 and set true. It is not cosmetic. The runbook's whole verification
+    step is to read adx_identity_lastsuccessfullogin, and with this false that column stays
+    null for everyone -- including accounts that demonstrably sign in -- so a working
+    sign-in and a broken one read identically. Do not turn it off.
   adx_name: Authentication/LoginTrackingEnabled
   adx_sitesettingid: 16f2a5a6-cb10-490f-a2f9-33a7a620548f
   adx_value: true
@@ -45,9 +50,15 @@
     was inapplicable or merely not yet reloaded from cache was never separated, because the
     route that does work needs no setting at all -- bindidentity, setsecuritystamp and
     enableportallogin, per contact. Kept rather than deleted so the next person who has this
-    idea finds the result instead of repeating it.
+    idea finds the result instead of repeating it. The row did not exist in DEV at all until
+    2026-09-15 and was created there then, so the two environments hold this setting under
+    different ids -- DEV 51468c4f-eeb0-f111-aaac-e4fade069307, TEST
+    a4ca0596-0bb0-f111-aaac-002248c654cd. This file is a DEV round-trip and carries the DEV
+    id. A pac pages upload aimed at TEST would therefore create a second row of this name
+    there; delete TEST's row first, or leave TEST to setsitesetting as every deployment so
+    far has done.
   adx_name: Authentication/OpenIdConnect/AzureAD/AllowContactMappingWithEmail
-  adx_sitesettingid: a4ca0596-0bb0-f111-aaac-002248c654cd
+  adx_sitesettingid: 51468c4f-eeb0-f111-aaac-e4fade069307
   adx_value: false
 - adx_name: Profile/ShowMarketingOptionsPanel
   adx_sitesettingid: 4fded777-3219-4165-83c2-5fae67ee1638
@@ -70,10 +81,14 @@
 - adx_name: Metadata/Template-Version
   adx_sitesettingid: 6ca61f89-c811-45ab-9a94-e37aba20189a
   adx_value: 3.0.2511.1
-- adx_description: Sets whether or not the portal can redirect the user to the profile page after successful sign-in. By default, it is set to true.
+- adx_description: Sets whether or not the portal can redirect the user to the profile page
+    after successful sign-in. Stock default is true and this file carried true until
+    2026-09-15, but both environments have held false since a hand edit on 2026-09-09 and
+    the yml was the thing that was wrong. Reconciled down to the environments rather than
+    up, by owner direction, so the next upload stops silently re-enabling the redirect.
   adx_name: Authentication/Registration/ProfileRedirectEnabled
   adx_sitesettingid: 7a80175d-1490-4d1e-8afa-4ca6383f130e
-  adx_value: true
+  adx_value: false
 - adx_description: 'The amount of time the Authentication/LoginThrottling/MaxInvaildAttemptsFromIPAddress are to be within before the IP address has to wait Authentication/LoginThrottling/IpAddressTimeoutTimeSpan. Default: 00:05:00 (5 mins)'
   adx_name: Authentication/LoginThrottling/MaxAttemptsTimeLimitTimeSpan
   adx_sitesettingid: 7f21a881-4752-4c24-bad1-c1daf34e0b33
@@ -96,9 +111,15 @@
   adx_name: Authentication/LoginThrottling/IpAddressTimeoutTimeSpan
   adx_sitesettingid: 8af975c7-ddda-473a-b349-565f6a6e7060
   adx_value: 00:15:00
-- adx_name: Authentication/Registration/InvitationEnabled
+- adx_description: Left false to match both environments, which is where it actually sits.
+    The value moved to false on 2026-09-15 at 07:23Z under the service account and the
+    reason was never recorded; this file still said true, so an upload would have turned
+    the invitation path back on without anyone asking for it. The path is untested here
+    (see docs/reference/portal-access-runbook.md), so the environments win until someone
+    deliberately enables it.
+  adx_name: Authentication/Registration/InvitationEnabled
   adx_sitesettingid: 8f8c702e-3b39-41a8-9573-21786df9ac73
-  adx_value: true
+  adx_value: false
 - adx_name: Search/Enabled
   adx_sitesettingid: 8fc477ba-08f6-400c-8a3c-a5312bc46a26
   adx_value: false
