@@ -68,8 +68,8 @@ the evidence, and confirmed by the project owner:
 
 | What | Why it is still open |
 |---|---|
-| **Manage access for the six, in TEST** | Maker portal only. **This is what is blocking them right now** — the contact work is done |
-| Duplicate `Webapi/error/innererror` row in TEST | Two rows since 2026-09-14, both `true`. No verb deletes a site setting; needs the Portal Management app |
+| ~~Manage access for the six, in TEST~~ | **Closed** by the project owner, 2026-09-15 |
+| ~~Duplicate `Webapi/error/innererror` row in TEST~~ | **Closed.** A `deletesitesetting` verb was written — deletes by id, guards the last row of a name, verifies by re-query |
 | `emailaddress1confirmed` `No` for all six | Probably common cause, not a fifth gate. If they still fail once gate 0 opens, `enableportallogin --confirmemail` first |
 | `pac pages upload` to TEST | Would duplicate `AllowContactMappingWithEmail` there; TEST has been served by `setsitesetting` throughout |
 | Prod | Has had none of this. Gate 0 applies there too and no deployment carries it |

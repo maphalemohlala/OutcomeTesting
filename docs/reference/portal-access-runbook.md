@@ -196,6 +196,28 @@ cost an investigation, because the two contacts really were identical.
 upload would. **This site serves settings from a cache**: a change can take effect well after
 it reads back correctly, so a setting that appears to do nothing has not been disproved yet.
 
+**A setting can exist twice.** `setsitesetting` resolves a name to a row and updates it; if two
+rows share a name it can neither see nor clear the other, and which one the site reads is not
+something to rely on. TEST carried two `Webapi/error/innererror` rows from 2026-09-14 until
+2026-09-15 and stayed consistent only because both said `true`. Duplicates arise when a row is
+created in one environment and then an upload or a `--create` supplies a different id for the
+same name, so **check the count, not just the value**:
+
+```
+<fetch><entity name="mspp_sitesetting"><attribute name="mspp_name"/>
+  <attribute name="mspp_value"/><order attribute="mspp_name"/></entity></fetch>
+```
+
+Compare the row count against the number of distinct names. Remove a duplicate **by id**:
+
+```bash
+dotnet $DLL deletesitesetting $ORG <sitesettingid> --confirm $ORG
+```
+
+It prints every row of that name and marks which it will delete, and it refuses to delete the
+only row of a name unless you also pass `--last` — deleting a setting outright is a different
+act from de-duplicating one.
+
 ---
 
 ## Verifying without a screenshot

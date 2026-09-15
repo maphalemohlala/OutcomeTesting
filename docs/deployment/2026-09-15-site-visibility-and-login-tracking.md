@@ -116,18 +116,29 @@ repo is a DEV round-trip. The yml now carries the DEV id
 (`51468c4f-…-e4fade069307`) and both ids are recorded in its description. **A
 `pac pages upload` aimed at TEST would create a second row of this name there.**
 
-**Pre-existing, and still open.** `Webapi/error/innererror` already has **two rows in TEST** —
+**Pre-existing, and now closed.** `Webapi/error/innererror` had **two rows in TEST** —
 `ecc746ed-…-002248c654cd` and `8dea7fe4-…-e4fade069307`, both `true`, both created 2026-09-14.
-The yml carries the second. Behaviour is consistent today because the values agree; they will
-not always. Deleting the duplicate needs the Portal Management app — no verb of the
-registration tool deletes a site setting, which is why it is still there.
+Behaviour was consistent only because the values happened to agree.
+
+There was no verb that deletes a site setting, so one was written rather than reaching for the
+maker portal: **`deletesitesetting <orgUrl> <sitesettingid> [--last] --confirm <orgUrl>`**. It
+deletes **by id, not by name**, because two rows sharing a name is precisely the case a name
+lookup cannot resolve — and it is why `setsitesetting` could neither see nor clear the second
+row. It prints every row of that name, marking which goes and which stays, before deleting;
+and removing the *only* row of a name additionally requires `--last`, since that is deleting a
+setting rather than de-duplicating one. The delete is confirmed by re-query, not by the call
+returning, like every other portal write in this tool.
+
+`ecc746ed-…` was deleted and `8dea7fe4-…` kept — the id `sitesetting.yml` carries and the one
+DEV uses, so TEST now agrees with both. The `--last` guard was exercised against the surviving
+row and correctly refused.
 
 All 68 settings common to both environments otherwise share identical ids.
 
 ## 7. What was not done
 
-- **Manage access grants.** Maker portal only. This is what currently blocks all six.
-- **The duplicate `Webapi/error/innererror` row in TEST.** Needs a manual delete.
+- ~~Manage access grants.~~ **Done by the project owner, 2026-09-15.**
+- ~~The duplicate `Webapi/error/innererror` row in TEST.~~ **Done** — see §6.
 - **`adx_identity_emailaddress1confirmed`** is `No` for all six and `Yes` for the three
   accounts known to sign in. With `EmailConfirmationEnabled` `true` that looks like a fifth
   gate, but the likelier reading is common cause — those three were created by Power Pages

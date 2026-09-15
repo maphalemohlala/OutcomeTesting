@@ -321,6 +321,11 @@ if (args.Length >= 3 && args[0].Equals("deletewebrole", StringComparison.Ordinal
     return DeleteWebRole(args);
 }
 
+if (args.Length >= 2 && args[0].Equals("deletesitesetting", StringComparison.OrdinalIgnoreCase))
+{
+    return DeleteSiteSetting(args);
+}
+
 if (args.Length >= 3 && args[0].Equals("deleteplugintype", StringComparison.OrdinalIgnoreCase))
 {
     return DeletePluginType(args);
@@ -5927,6 +5932,84 @@ static string? PluginSourceFile(string shortName)
     }
 
     return null;
+}
+
+// Deletes ONE site setting row BY ID, not by name -- the case this exists for is two rows
+// sharing a name, where a name lookup is exactly what cannot tell them apart. `setsitesetting`
+// updates whichever row a name resolves to and can neither see nor clear the other, which is
+// how TEST carried two `Webapi/error/innererror` rows from 2026-09-14 to 2026-09-15.
+//
+// Guarded twice. `--confirm <orgUrl>` is the same guard every destructive verb here takes, and
+// deleting the *only* row of a name additionally needs `--last`, because removing a setting
+// entirely is a different act from de-duplicating one and should not happen by a mistyped id.
+int DeleteSiteSetting(string[] a)
+{
+    var orgUrl = a[1];
+    var idText = a.Length > 2 ? a[2] : string.Empty;
+    var confirmIndex = Array.FindIndex(a, x => x.Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+    var allowLast = a.Any(x => x.Equals("--last", StringComparison.OrdinalIgnoreCase));
+
+    if (!Guid.TryParse(idText, out var id)
+        || confirmIndex < 0 || confirmIndex + 1 >= a.Length
+        || !a[confirmIndex + 1].TrimEnd('/').Equals(orgUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
+    {
+        Console.Error.WriteLine("This PERMANENTLY DELETES one site setting row.");
+        Console.Error.WriteLine(
+            "Usage: dotnet run -- deletesitesetting <orgUrl> <sitesettingid> [--last] --confirm <orgUrl>");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    Entity row;
+    try
+    {
+        row = svc.Retrieve("mspp_sitesetting", id,
+            new ColumnSet("mspp_name", "mspp_value", "mspp_websiteid"));
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"No site setting with id {id:D}. Nothing to delete.");
+        Console.WriteLine($"  ({ex.GetType().Name})");
+        return 0;
+    }
+
+    var name = row.GetAttributeValue<string>("mspp_name");
+    Console.WriteLine($"Site setting '{name}' ({id:D})");
+    Console.WriteLine($"  value   : {row.GetAttributeValue<string>("mspp_value")}");
+    // Retrieve does not return formatted values, so Formatted() reports "(none)" here even
+    // for a row that has a website. Read the reference itself.
+    var site = row.GetAttributeValue<EntityReference>("mspp_websiteid");
+    Console.WriteLine($"  website : {(site == null ? "(none)" : site.Name ?? site.Id.ToString("D"))}");
+
+    // Every row of this name, so the operator sees what survives before anything goes.
+    var sameName = PortalRows(svc, "mspp_sitesetting", "mspp_name", name,
+        "mspp_name", "mspp_value");
+    Console.WriteLine($"  rows of this name in this environment: {sameName.Count}");
+    foreach (var other in sameName)
+    {
+        var marker = other.Id == id ? "-> deleting" : "   keeping ";
+        Console.WriteLine($"    {marker} {other.Id:D} = {other.GetAttributeValue<string>("mspp_value")}");
+    }
+
+    if (sameName.Count <= 1 && !allowLast)
+    {
+        Console.Error.WriteLine(
+            $"This is the only row named '{name}'. Deleting it removes the setting from the site, "
+            + "which is not de-duplication. Pass --last if that is genuinely what you want.");
+        return 1;
+    }
+
+    svc.Delete("mspp_sitesetting", id);
+
+    // Verified by re-query, not by the delete returning -- the same rule every portal write in
+    // this tool follows, because an exit code has been shown to say nothing about what landed.
+    var after = PortalRows(svc, "mspp_sitesetting", "mspp_name", name, "mspp_name", "mspp_value");
+    var gone = after.All(x => x.Id != id);
+    Console.WriteLine(gone
+        ? $"Deleted. {after.Count} row(s) named '{name}' remain."
+        : $"Delete returned success but {id:D} is still present.");
+    return gone ? 0 : 2;
 }
 
 int DeleteWebRole(string[] a)
