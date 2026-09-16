@@ -14,9 +14,10 @@ because it only ever read the AQS question. Both fixed and deployed to DEV. What
 mostly not code: a Trail Light contract with no Tax column, accountability flags with nowhere
 to live on a Tax case, and no way for anyone to record accountability at all.**
 
-Three code changes across two deploys, both to DEV. Two deployment notes:
-`docs/deployment/2026-09-16-regrade-pass-export-gate.md` and
-`docs/deployment/2026-09-16-tax-file-quality-and-html-letters.md`.
+Four code changes across three deploys, all to DEV. Three deployment notes:
+`docs/deployment/2026-09-16-regrade-pass-export-gate.md`,
+`docs/deployment/2026-09-16-tax-file-quality-and-html-letters.md` and
+`docs/deployment/2026-09-16-derived-fail-accountability.md`.
 
 Reading the export that the morning's fix let through produced the afternoon's two: the
 owner spotted that the File Quality column was blank, and was right that Tax cases carry a
@@ -31,9 +32,10 @@ file quality outcome of their own.
 | `plugins/OutcomeTesting.Plugins` | `OutcomeRules.ToGradeScale`; `Outcomes.EffectiveOutcome` returns the grade on one scale. Commit `a1fe9e7` |
 | `plugins/OutcomeTesting.Plugins` | Export column 10 falls back to `Q-FQTAX-01`, the Tax file quality outcome. Commit `5093f69` |
 | `plugins/OutcomeTesting.Plugins` | The three adviser letters are HTML, with the case link as an escaped, styled anchor. Commit `80ba8b5` |
-| `Env_AQ_Dev` | Two assembly pushes, 224768 then 225280 bytes, each built `-c Release` immediately before |
+| `plugins/OutcomeTesting.Plugins` | Fail accountability derives from the case's own adviser and paraplanner; the OD-024 gate retires. Commit `b38e0e1` |
+| `Env_AQ_Dev` | Three assembly pushes, 224768 then 225280 then 226304 bytes, each built `-c Release` immediately before |
 | `docs/reference/portal-access-runbook.md` | Step 1 corrected: it does not work for a portal-only person |
-| Tests | 845 passed, 0 failed (827 at the start of the day) |
+| Tests | 848 passed, 0 failed (827 at the start of the day) |
 
 ## 2. The export bug
 
@@ -100,20 +102,18 @@ So "access on first try" needs both, and the issuer is available to copy
   the export contract to put it. Column 15 is the *Advice Quality* grade on the four-value
   BR-005 scale, and the tax result is the three-value PassFailInsufficient scale (AD-055), so
   it was deliberately not written there. Adding a column is an agreement with Trail Light.
-- **Tax fail accountability has nowhere to live.** The four flags are on `al_outcome` and a
-  Tax review creates no such row. 254397454 exports a tax Insufficient evidence and a file
-  quality Fail with nobody accountable, and the gate cannot object without blocking the batch.
-  Needs a tax outcome column on `al_outcome`, the flags moved off it, or a separate record.
-- **Whether a File Quality fail requires accountability in its own right.** Four rows export
-  File Quality Fail against an Advice Quality Pass with all eight accountability columns
-  blank. The gate only ever inspects the advice quality outcome.
+**Settled today:** Tax fail accountability, and whether a File Quality fail is attributable in
+its own right. Both are answered by deriving the pair from the case — paraplanner for the file,
+adviser for the advice — which needs no `al_outcome` row and so works on a Tax case. The OD-024
+gate retired with it. See `docs/deployment/2026-09-16-derived-fail-accountability.md`.
 
 **Needs building:**
 
-- **`al_SetFailAccountability` has no caller in the app.** Every outcome row in DEV has all
-  four flags false because the only way to set them is to call the API directly. This is the
-  prerequisite for any of the gate work above: tightening a gate that nobody can satisfy turns
-  a working export into a permanently blocked one.
+- **`al_SetFailAccountability` has no caller in the app.** No longer a prerequisite for the
+  export, which now attributes without it, but still the only way to override a derived pair.
+- **The override cannot be recorded for a file-quality-only fail.** The command refuses a case
+  whose outcome is a Pass, and five of the seven closed cases in DEV are exactly that. It needs
+  to consult the file quality answer as well as the outcome.
 
 **Operational:**
 
