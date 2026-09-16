@@ -7,13 +7,20 @@ here" sections of the deployment notes since.
 Every environment claim below was verified by query after the fact. **`Env_AQ_Dev` took the
 one deployment; `Env_AQ_Test` was read but not written.**
 
-**The day in one line: the export refused a case that had passed, because the initial and
-final outcome columns are different option sets and nothing translated between them — fixed
-and deployed to DEV, while the two other requests of the day both stopped on something that
-cannot be done from here.**
+**The day in one line: the export was wrong twice over — it refused cases that had passed,
+because the initial and final outcome columns are different option sets with nothing
+translating between them, and it then reported blank File Quality for every Tax-only case
+because it only ever read the AQS question. Both fixed and deployed to DEV. What is left is
+mostly not code: a Trail Light contract with no Tax column, accountability flags with nowhere
+to live on a Tax case, and no way for anyone to record accountability at all.**
 
-One code change, deployed. One deployment note:
-`docs/deployment/2026-09-16-regrade-pass-export-gate.md`.
+Three code changes across two deploys, both to DEV. Two deployment notes:
+`docs/deployment/2026-09-16-regrade-pass-export-gate.md` and
+`docs/deployment/2026-09-16-tax-file-quality-and-html-letters.md`.
+
+Reading the export that the morning's fix let through produced the afternoon's two: the
+owner spotted that the File Quality column was blank, and was right that Tax cases carry a
+file quality outcome of their own.
 
 ---
 
@@ -21,10 +28,12 @@ One code change, deployed. One deployment note:
 
 | Where | What |
 |---|---|
-| `plugins/OutcomeTesting.Plugins` | `OutcomeRules.ToGradeScale`; `Outcomes.EffectiveOutcome` now returns the grade on one scale. Commit `a1fe9e7` |
-| `Env_AQ_Dev` | Assembly pushed, 224768 bytes, built `-c Release` immediately before |
+| `plugins/OutcomeTesting.Plugins` | `OutcomeRules.ToGradeScale`; `Outcomes.EffectiveOutcome` returns the grade on one scale. Commit `a1fe9e7` |
+| `plugins/OutcomeTesting.Plugins` | Export column 10 falls back to `Q-FQTAX-01`, the Tax file quality outcome. Commit `5093f69` |
+| `plugins/OutcomeTesting.Plugins` | The three adviser letters are HTML, with the case link as an escaped, styled anchor. Commit `80ba8b5` |
+| `Env_AQ_Dev` | Two assembly pushes, 224768 then 225280 bytes, each built `-c Release` immediately before |
 | `docs/reference/portal-access-runbook.md` | Step 1 corrected: it does not work for a portal-only person |
-| Tests | 834 passed, 0 failed (827 before) |
+| Tests | 845 passed, 0 failed (827 at the start of the day) |
 
 ## 2. The export bug
 
@@ -85,10 +94,33 @@ So "access on first try" needs both, and the issuer is available to copy
 
 ## 5. Still open
 
-- IO-300001 has not been re-exported. The gate will pass it now; generating a batch writes a
-  record for every closed case and marks the batch Generated, so it was left to be run
-  deliberately.
-- `Env_AQ_Test` does not have this fix. Any regraded-to-Pass case there will still block its
-  export batch.
+**Needs a decision, not code:**
+
+- **AD-039 has no Tax outcome column.** `Q-TAX-02` is the tax verdict and there is nowhere in
+  the export contract to put it. Column 15 is the *Advice Quality* grade on the four-value
+  BR-005 scale, and the tax result is the three-value PassFailInsufficient scale (AD-055), so
+  it was deliberately not written there. Adding a column is an agreement with Trail Light.
+- **Tax fail accountability has nowhere to live.** The four flags are on `al_outcome` and a
+  Tax review creates no such row. 254397454 exports a tax Insufficient evidence and a file
+  quality Fail with nobody accountable, and the gate cannot object without blocking the batch.
+  Needs a tax outcome column on `al_outcome`, the flags moved off it, or a separate record.
+- **Whether a File Quality fail requires accountability in its own right.** Four rows export
+  File Quality Fail against an Advice Quality Pass with all eight accountability columns
+  blank. The gate only ever inspects the advice quality outcome.
+
+**Needs building:**
+
+- **`al_SetFailAccountability` has no caller in the app.** Every outcome row in DEV has all
+  four flags false because the only way to set them is to call the API directly. This is the
+  prerequisite for any of the gate work above: tightening a gate that nobody can satisfy turns
+  a working export into a permanently blocked one.
+
+**Operational:**
+
+- The batch generated at 12:47 predates the column 10 fix and still holds the blanks. A re-run
+  is a new batch by design (AD-042).
+- `Env_AQ_Test` has none of today's three fixes.
+- Is IO-300001 meant to be on a Tax-only route while carrying an AQS review and a `Q-FQ-01`
+  answer? No other Tax-only case does.
 - `RegradeCasePlugin.ParseOutcome` hardcodes `120910710`-`713` rather than referencing the
   `OutcomeRules.FinalOutcome*` constants. Values agree; nothing is broken.
