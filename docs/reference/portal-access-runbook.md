@@ -118,6 +118,14 @@ about to write it is one fewer assumption:
 Run it with `pac env fetch --environment $ORG --xmlFile <file>`. Pass the query as a **file**;
 inline `--xml` crashes with an XmlException.
 
+**This only works for someone who is also a Dataverse user.** A portal-only person has a
+contact and no `systemuser` row, so Dataverse does not hold their object id anywhere and this
+query returns nothing — in either environment. Found on 2026-09-16 with Adam Strumidlo, whose
+five web roles were already mapped and whose contact was already in TEST, but who has no
+`systemuser` row in TEST or DEV. There is no query in this document that can recover the id
+for such a person: it has to come from the Entra admin centre, or they have to be given a
+Dataverse licence. `bindidentity` takes the object id as an argument and cannot look it up.
+
 **2. The contact must already exist** with their email in `emailaddress1`. `bindidentity`
 refuses an email no contact has, and it will not create one.
 
