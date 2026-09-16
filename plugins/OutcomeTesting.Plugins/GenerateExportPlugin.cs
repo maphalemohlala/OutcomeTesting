@@ -34,8 +34,6 @@ namespace OutcomeTesting.Plugins
         private const string CaseReviewRouteAttr = "al_reviewrouteid";
         private const string RouteRequiresAqsAttr = "al_requiresaqsreview";
         private const string AnswerChoiceAttr = "al_answerchoice";
-        private const string FileQualityQuestionCode = "Q-FQ-01";
-        private const string TaxFileQualityQuestionCode = "Q-FQTAX-01";
 
         public const string FqAdviserFlag = "al_fqadviseraccountable";
         public const string FqParaplannerFlag = "al_fqparaplanneraccountable";
@@ -115,8 +113,11 @@ namespace OutcomeTesting.Plugins
                 var adviceGrade = outcomeRow == null
                     ? null
                     : Outcomes.EffectiveOutcomeLabel(outcomeRow);
-                var fileQualityGrade = ResolveFileQualityGrade(userService, outcomeCase.Id);
-                var fileQualityChoice = ResolveFileQualityChoice(userService, outcomeCase.Id);
+                // One resolution, both values. Asking twice ran the same query twice per
+                // case for no gain.
+                var fileQualityAnswer = FileQuality.Resolve(userService, outcomeCase.Id);
+                var fileQualityGrade = FileQuality.Label(fileQualityAnswer);
+                var fileQualityChoice = FileQuality.Choice(fileQualityAnswer);
                 var effectiveOutcome = Outcomes.EffectiveOutcome(outcomeRow);
                 var code = "EXR-" + batchCode + "-" + caseRef;
 
@@ -371,7 +372,7 @@ namespace OutcomeTesting.Plugins
 
             if (flag == FqParaplannerFlag)
             {
-                return FileQualityFailed(fileQualityChoice);
+                return FileQuality.Failed(fileQualityChoice);
             }
 
             if (flag == AqAdviserFlag)
@@ -382,122 +383,6 @@ namespace OutcomeTesting.Plugins
             // The adviser does not carry the file and the paraplanner does not carry the
             // advice, so neither is derived; a judgement can still name them.
             return false;
-        }
-
-        /// <summary>
-        /// Whether the file quality answer is a Fail, read from the answer value rather
-        /// than its label so renaming the option cannot quietly stop attributing anyone.
-        /// </summary>
-        public static bool FileQualityFailed(int? fileQualityChoice)
-        {
-            return fileQualityChoice.HasValue && fileQualityChoice.Value == ResponseRules.ChoiceFail;
-        }
-
-        /// <summary>
-        /// The file quality answer value, with the same precedence <see cref="FileQualityGrade"/>
-        /// applies to the label: the AQS leg where it graded the file, otherwise the Tax leg.
-        /// </summary>
-        public static int? FileQualityChoice(int? aqsChoice, int? taxChoice)
-        {
-            return aqsChoice ?? taxChoice;
-        }
-
-        /// <summary>
-        /// AD-039 column 10, from whichever discipline graded the file.
-        ///
-        /// Q-FQ-01 is the AQS file quality outcome and Q-FQTAX-01 the Tax one. They are the
-        /// same question asked by the two checklists, on the same Pass/Fail scale, and the
-        /// column is "File Quality grade" without qualification - so a Tax-only case has a
-        /// grade to report and was exporting a blank. Reading only the AQS code sent
-        /// 254397454 to Trail Light with an empty column 10 over an answered Fail.
-        ///
-        /// The AQS answer wins where both exist, which is every Tax-then-AQS case: it is
-        /// the grade column 10 has always carried there, and the AQS leg is the later
-        /// check. Pure so the precedence can be read off a test rather than off a query.
-        /// </summary>
-        public static string FileQualityGrade(string aqsAnswer, string taxAnswer)
-        {
-            if (!string.IsNullOrWhiteSpace(aqsAnswer))
-            {
-                return aqsAnswer;
-            }
-
-            return string.IsNullOrWhiteSpace(taxAnswer) ? null : taxAnswer;
-        }
-
-        // AD-039 col 10 File Quality grade = the answer to Q-FQ-01 "File quality outcome",
-        // the one PassFail question in Checker Checklist V8 (knowledge/checklist-v8.md,
-        // section S-FQOUT). It is held as a Response on the case's review, not on
-        // al_Outcome, which carries only the BR-005 advice quality scale.
-        //
-        // Matched on the question's business code rather than its GUID so the export does
-        // not break when the question is retired and succeeded (BR-013, AD-004): a
-        // successor version keeps the code and stays the same question.
-        private static string ResolveFileQualityGrade(IOrganizationService service, Guid caseId)
-        {
-            // The Tax code is only asked for when the AQS leg did not grade the file, so a
-            // case that has both still costs one query.
-            var aqs = ResolveAnswer(service, caseId, FileQualityQuestionCode);
-            var tax = aqs == null ? ResolveAnswer(service, caseId, TaxFileQualityQuestionCode) : null;
-
-            return FileQualityGrade(AnswerLabel(aqs), AnswerLabel(tax));
-        }
-
-        private static int? ResolveFileQualityChoice(IOrganizationService service, Guid caseId)
-        {
-            var aqs = ResolveAnswer(service, caseId, FileQualityQuestionCode);
-            var tax = aqs == null ? ResolveAnswer(service, caseId, TaxFileQualityQuestionCode) : null;
-
-            return FileQualityChoice(AnswerChoice(aqs), AnswerChoice(tax));
-        }
-
-        private static string AnswerLabel(Entity answer)
-        {
-            if (answer == null)
-            {
-                return null;
-            }
-
-            return answer.FormattedValues.ContainsKey(AnswerChoiceAttr)
-                ? answer.FormattedValues[AnswerChoiceAttr]
-                : null;
-        }
-
-        private static int? AnswerChoice(Entity answer)
-        {
-            if (answer == null)
-            {
-                return null;
-            }
-
-            var value = answer.GetAttributeValue<OptionSetValue>(AnswerChoiceAttr);
-            return value == null ? (int?)null : value.Value;
-        }
-
-        private static Entity ResolveAnswer(IOrganizationService service, Guid caseId, string questionCode)
-        {
-            var query = new QueryExpression(ResponseEntity)
-            {
-                ColumnSet = new ColumnSet(AnswerChoiceAttr),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-
-            var review = query.AddLink(ReviewEntity, "al_reviewinstanceid", "al_reviewinstanceid");
-            review.LinkCriteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
-
-            var version = query.AddLink(QuestionVersionEntity, "al_questionversionid", "al_questionversionid");
-            var question = version.AddLink(QuestionEntity, "al_questionid", "al_questionid");
-            question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.Equal, questionCode);
-
-            // The case may hold several reviews, and a succeeded question (BR-013, AD-004)
-            // several versions, so this can match more than one response. The latest is the
-            // grade in force; without an order the exported File Quality grade would be
-            // whichever row came back first.
-            query.AddOrder("modifiedon", OrderType.Descending);
-
-            var found = service.RetrieveMultiple(query).Entities;
-            return found.Count == 0 ? null : found[0];
         }
 
         private static void SetResponse(IPluginExecutionContext context, string batchId, string rowCount, string status, Guid auditId, bool conflict)

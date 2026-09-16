@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -27,6 +27,7 @@ namespace OutcomeTesting.Plugins
         private const string OutAuditEventId = "AuditEventId";
 
         private const string OutcomeEntity = "al_outcome";
+        private const string CaseAttr = "al_outcomecaseid";
         // Its own value since 2026-09-05 (OD-032). It previously reused 120910788, which the
         // option set labels SetRoleAssignmentActive, so every row this command wrote was
         // labelled as a role change and CommandHelpers.FindAuditByKey could not keep the two
@@ -68,20 +69,16 @@ namespace OutcomeTesting.Plugins
             }
 
             var outcome = userService.Retrieve(
-                OutcomeEntity, targetId, new ColumnSet(Outcomes.InitialOutcomeAttr, Outcomes.FinalOutcomeAttr));
+                OutcomeEntity, targetId,
+                new ColumnSet(Outcomes.InitialOutcomeAttr, Outcomes.FinalOutcomeAttr, CaseAttr));
 
-            // Accountability describes a fail. Recording it against a Pass would put a
-            // name in a Trail Light column that AD-039 only ever fills for a fail.
-            var effective = Outcomes.EffectiveOutcome(outcome);
-            if (!effective.HasValue)
+            var caseRef = outcome.GetAttributeValue<EntityReference>(CaseAttr);
+            var fileQualityFailed = caseRef != null && FileQuality.FailedOn(userService, caseRef.Id);
+
+            var refusal = RefusalFor(Outcomes.EffectiveOutcome(outcome), fileQualityFailed);
+            if (refusal != null)
             {
-                throw new InvalidPluginExecutionException(
-                    CommandHelpers.PreconditionPrefix + "This case has no outcome recorded, so there is no fail to attribute.");
-            }
-            if (!OutcomeRules.RequiresRemediation(effective.Value))
-            {
-                throw new InvalidPluginExecutionException(
-                    CommandHelpers.PreconditionPrefix + "This case passed, so there is no fail to attribute.");
+                throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + refusal);
             }
 
             userService.Update(new Entity(OutcomeEntity, targetId)
@@ -100,6 +97,41 @@ namespace OutcomeTesting.Plugins
                 null, details, idempotencyKey, context);
 
             SetResponse(context, "Recorded", auditId);
+        }
+
+        /// <summary>
+        /// Why there is no fail on this case to attribute, or null when there is one.
+        ///
+        /// Accountability describes a fail: recording it against a clean case would put a
+        /// name in a Trail Light column that AD-039 only ever fills for a fail.
+        ///
+        /// A file quality fail counts on its own. The guard used to read the advice quality
+        /// outcome alone, which refused every case that passed on advice and failed on the
+        /// file - five of the seven closed cases in DEV, and exactly the population the
+        /// export now names the paraplanner for. Refusing to override a pair the export had
+        /// already derived is the wrong way round.
+        ///
+        /// Pure so the decision can be read off a test without a fake organisation service,
+        /// as GenerateExportPlugin.IsAccountable is.
+        /// </summary>
+        public static string RefusalFor(int? effectiveOutcome, bool fileQualityFailed)
+        {
+            if (fileQualityFailed)
+            {
+                return null;
+            }
+
+            if (!effectiveOutcome.HasValue)
+            {
+                return "This case has no outcome recorded, so there is no fail to attribute.";
+            }
+
+            if (!OutcomeRules.RequiresRemediation(effectiveOutcome.Value))
+            {
+                return "This case passed, so there is no fail to attribute.";
+            }
+
+            return null;
         }
 
         private static void SetResponse(IPluginExecutionContext context, string status, Guid auditId)

@@ -277,10 +277,10 @@ namespace OutcomeTesting.Plugins
         {
             switch ((label ?? string.Empty).Trim().ToLowerInvariant())
             {
-                case "pass": return 120910710;
-                case "pass with issues": return 120910711;
-                case "insufficient evidence": return 120910712;
-                case "potential harm": return 120910713;
+                case "pass": return OutcomeRules.FinalOutcomePass;
+                case "pass with issues": return OutcomeRules.FinalOutcomePassWithIssues;
+                case "insufficient evidence": return OutcomeRules.FinalOutcomeInsufficient;
+                case "potential harm": return OutcomeRules.FinalOutcomePotentialHarm;
                 default:
                     throw new InvalidPluginExecutionException(
                         CommandHelpers.PreconditionPrefix + "FinalOutcome must be Pass, Pass with issues, Insufficient evidence or Potential harm.");
