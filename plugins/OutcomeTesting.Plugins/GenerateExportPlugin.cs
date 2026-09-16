@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -35,6 +35,7 @@ namespace OutcomeTesting.Plugins
         private const string RouteRequiresAqsAttr = "al_requiresaqsreview";
         private const string AnswerChoiceAttr = "al_answerchoice";
         private const string FileQualityQuestionCode = "Q-FQ-01";
+        private const string TaxFileQualityQuestionCode = "Q-FQTAX-01";
         private const int CaseStatusClosed = 120910591;
         private const int BatchStatusDraft = 120910770;
         private const int BatchStatusGenerated = 120910771;
@@ -317,6 +318,29 @@ namespace OutcomeTesting.Plugins
             return outcomeCase.GetAttributeValue<string>(caseAttribute) ?? string.Empty;
         }
 
+        /// <summary>
+        /// AD-039 column 10, from whichever discipline graded the file.
+        ///
+        /// Q-FQ-01 is the AQS file quality outcome and Q-FQTAX-01 the Tax one. They are the
+        /// same question asked by the two checklists, on the same Pass/Fail scale, and the
+        /// column is "File Quality grade" without qualification - so a Tax-only case has a
+        /// grade to report and was exporting a blank. Reading only the AQS code sent
+        /// 254397454 to Trail Light with an empty column 10 over an answered Fail.
+        ///
+        /// The AQS answer wins where both exist, which is every Tax-then-AQS case: it is
+        /// the grade column 10 has always carried there, and the AQS leg is the later
+        /// check. Pure so the precedence can be read off a test rather than off a query.
+        /// </summary>
+        public static string FileQualityGrade(string aqsAnswer, string taxAnswer)
+        {
+            if (!string.IsNullOrWhiteSpace(aqsAnswer))
+            {
+                return aqsAnswer;
+            }
+
+            return string.IsNullOrWhiteSpace(taxAnswer) ? null : taxAnswer;
+        }
+
         // AD-039 col 10 File Quality grade = the answer to Q-FQ-01 "File quality outcome",
         // the one PassFail question in Checker Checklist V8 (knowledge/checklist-v8.md,
         // section S-FQOUT). It is held as a Response on the case's review, not on
@@ -326,6 +350,18 @@ namespace OutcomeTesting.Plugins
         // not break when the question is retired and succeeded (BR-013, AD-004): a
         // successor version keeps the code and stays the same question.
         private static string ResolveFileQualityGrade(IOrganizationService service, Guid caseId)
+        {
+            // The Tax code is only asked for when the AQS leg did not grade the file, so a
+            // case that has both still costs one query.
+            var aqs = ResolveAnswerLabel(service, caseId, FileQualityQuestionCode);
+            var tax = string.IsNullOrWhiteSpace(aqs)
+                ? ResolveAnswerLabel(service, caseId, TaxFileQualityQuestionCode)
+                : null;
+
+            return FileQualityGrade(aqs, tax);
+        }
+
+        private static string ResolveAnswerLabel(IOrganizationService service, Guid caseId, string questionCode)
         {
             var query = new QueryExpression(ResponseEntity)
             {
@@ -339,7 +375,7 @@ namespace OutcomeTesting.Plugins
 
             var version = query.AddLink(QuestionVersionEntity, "al_questionversionid", "al_questionversionid");
             var question = version.AddLink(QuestionEntity, "al_questionid", "al_questionid");
-            question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.Equal, FileQualityQuestionCode);
+            question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.Equal, questionCode);
 
             // The case may hold several reviews, and a succeeded question (BR-013, AD-004)
             // several versions, so this can match more than one response. The latest is the

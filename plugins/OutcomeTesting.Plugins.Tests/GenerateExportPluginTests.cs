@@ -246,5 +246,36 @@ namespace OutcomeTesting.Plugins.Tests
                 [Outcomes.FinalOutcomeAttr] = new OptionSetValue(final),
             };
         }
+        [Fact]
+        public void Uses_the_AQS_file_quality_answer_where_the_case_has_one()
+        {
+            Assert.Equal("Fail", GenerateExportPlugin.FileQualityGrade("Fail", null));
+        }
+
+        [Fact]
+        public void Falls_back_to_the_tax_file_quality_answer_on_a_tax_only_case()
+        {
+            // Q-FQTAX-01 is the Tax checklist's file quality outcome and answers the same
+            // question on the same Pass/Fail scale as Q-FQ-01. Reading only the AQS code
+            // exported a blank column 10 for every Tax-only case that had in fact been
+            // graded - 254397454 shipped a Fail as a blank.
+            Assert.Equal("Pass", GenerateExportPlugin.FileQualityGrade(null, "Pass"));
+            Assert.Equal("Fail", GenerateExportPlugin.FileQualityGrade(null, "Fail"));
+        }
+
+        [Fact]
+        public void Prefers_the_AQS_answer_where_both_disciplines_graded_the_file()
+        {
+            // A Tax-then-AQS case answers both. Column 10 has always reported the AQS
+            // grade there, and the AQS leg is the later and fuller check.
+            Assert.Equal("Fail", GenerateExportPlugin.FileQualityGrade("Fail", "Pass"));
+        }
+
+        [Fact]
+        public void Reports_no_file_quality_grade_when_neither_discipline_answered()
+        {
+            Assert.Null(GenerateExportPlugin.FileQualityGrade(null, null));
+            Assert.Null(GenerateExportPlugin.FileQualityGrade("   ", null));
+        }
     }
 }
