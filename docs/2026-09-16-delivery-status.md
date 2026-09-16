@@ -72,29 +72,40 @@ mailbox be approved and tested for server-side email (OD-030); pointing the step
 that is not will land every notification at `Failed` rather than sending it. The drain step was
 left exactly as it was.
 
-## 4. Not done: Adam Strumidlo's TEST sign-in
+## 4. Adam Strumidlo bound in TEST — and nobody has ever signed in
 
-His contact is in TEST (`c63a64aa-cab1-f111-aaac-002248c654cd`) and **his web roles are already
-mapped** — Tax Reviewer, AQS Reviewer, Adviser Remediation, T&C Supervisor, Administrators. The
-`identities` report lists him under *"Contacts with no binding — their roles are unreachable by
-Entra sign-in"*. He has none of the four identity requirements: no `adx_externalidentity` row,
-no identity username, no security stamp, and `adx_identity_logonenabled` is `No`.
+The project owner supplied the Entra object id, which is the one thing no query in this
+environment could recover: he has no `systemuser` row, so Dataverse did not hold it.
 
-Two things block the binding, and neither can be done from the tooling:
+`bindidentity`, `setsecuritystamp`, `enableportallogin` against
+`adam.strumidlo@ascotlloyd.co.uk`, contact `c63a64aa-cab1-f111-aaac-002248c654cd`. Identity row
+`daddb587-d5b1-f111-aaac-6045bd0aeb46`, issuer copied from a working binding
+(`https://sts.windows.net/4abde4fc-.../`). The `identities` report now lists him among the
+bound, with Tax Reviewer, AQS Reviewer, Adviser Remediation, T&C Supervisor and
+Administrators, and **its "contacts with no binding" section is now empty**.
 
-1. **His Entra object id is not in Dataverse.** `bindidentity` takes it as an argument, and the
-   runbook's way of reading it — `systemuser.azureactivedirectoryobjectid` — returns nothing,
-   because he has no `systemuser` row in TEST or in DEV. It has to come from the Entra admin
-   centre. The runbook has been corrected; this case was not covered.
-2. **Gate 0, site visibility.** Both sites are Private, and that check runs before any
-   Power Pages authentication. Only Dataverse System Administrator holders bypass it, and he is
-   not a Dataverse user at all — so unless he is inside whichever Entra group holds Manage
-   access, binding him produces `/private-mode-access-denied` and nothing else. It lives in the
-   Power Pages management service; no `pac` command, no verb and no FetchXML can read or write
-   it.
+Compared against two contacts considered correctly provisioned, he is identical:
 
-So "access on first try" needs both, and the issuer is available to copy
-(`https://sts.windows.net/4abde4fc-.../`) as soon as the object id is.
+| | username | stamp | logon enabled | email confirmed |
+|---|---|---|---|---|
+| Zoe Ramwell | set | set | Yes | No |
+| Clare Hook | set | set | Yes | No |
+| Adam Strumidlo | set | set | Yes | No |
+
+**That is not enough to promise him a first-try sign-in, and the evidence says it will not be.**
+`Authentication/LoginTrackingEnabled` has been `true` in TEST since 2026-09-15 10:14, and
+**no contact in the environment has a recorded successful sign-in** — the query for a non-null
+`adx_identity_lastsuccessfullogin` returns nothing at all. Zoe Ramwell is the person who was
+found on 2026-09-15 to pass all four requirements and still reach
+`/private-mode-access-denied`; Adam is now provisioned exactly as she is.
+
+Gate 0 — site visibility — remains the thing keeping everyone out, and it lives in the
+Power Pages management service where no `pac` command, no verb and no FetchXML can reach it.
+
+Note what this column can and cannot show: it records **successes**. A failed Entra sign-in
+writes nothing, and a gate 0 refusal happens before Dataverse is consulted at all, so there is
+no way from here to tell whether anyone has *attempted* access — only that nobody has
+succeeded.
 
 ## 5. Still open
 
