@@ -73,17 +73,34 @@ modified 2026-09-16 13:41:22Z, version 1.0.0.0
 Built `-c Release` immediately before pushing, byte count checked. Suite: **848 passed, 0
 failed**.
 
-## 6. Known incoherence, not fixed here
+## 6. The override now reaches a file-quality-only fail
 
-`SetFailAccountabilityPlugin` still refuses a case whose effective outcome is a Pass —
+Closed the same day, in a second deploy (226304 bytes, modified 2026-09-16 14:04:28Z, DEV).
+
+`SetFailAccountabilityPlugin` refused any case whose effective outcome was a Pass —
 *"This case passed, so there is no fail to attribute."* With the pairing above, a case can fail
 on file quality while passing on advice quality, and that is **five of the seven closed cases
-in DEV**. For those, the derived paraplanner is correct but an override cannot be recorded,
-because the command refuses the case outright.
+in DEV**: exactly the population the export now names the paraplanner for. The command was
+refusing to override a pair the export had already derived, which is the wrong way round.
 
-Closing it means the command consulting the file quality answer as well as the outcome, which
-means sharing the Q-FQ-01 / Q-FQTAX-01 resolution that currently sits private to
-`GenerateExportPlugin`. It has no practical effect while nothing in the app calls the command.
+`RefusalFor` is pure and takes the file quality fail alongside the outcome, so the decision is
+read off a test rather than a fake organisation service, as `IsAccountable` is.
+
+The `Q-FQ-01` / `Q-FQTAX-01` resolution moved to a shared `FileQuality`, because two callers
+now ask the same question of the same data — answering it two different ways would let the
+command refuse a fail the export had already attributed. Moving it also fixed a duplicated
+query: adding the choice lookup alongside the label had the export running the same query
+twice per case for no gain. The precedence is now covered against a real query rather than a
+string helper, the fake service handling the four-table join, so the Tax fallback is proven
+rather than asserted.
+
+`RegradeCasePlugin.ParseOutcome` also stopped writing `120910710`-`713` as literals rather
+than the `OutcomeRules.FinalOutcome*` constants. The values agreed, so nothing changed.
+
+**What remains unreachable:** an override on a **Tax-only** case. The four flags live on an
+`al_outcome` row, the command addresses one by id, and a Tax review creates none. Deriving
+works there because it needs no row; recording an exception still has nowhere to go. That is
+the schema question, unchanged.
 
 ## 7. Still open
 

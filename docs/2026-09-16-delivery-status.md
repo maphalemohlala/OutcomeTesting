@@ -37,7 +37,7 @@ file quality outcome of their own.
 | `plugins/OutcomeTesting.Plugins` | Fail accountability derives from the case's own adviser and paraplanner; the OD-024 gate retires. Commit `b38e0e1` |
 | `Env_AQ_Dev` | Three assembly pushes, 224768 then 225280 then 226304 bytes, each built `-c Release` immediately before |
 | `docs/reference/portal-access-runbook.md` | Step 1 corrected: it does not work for a portal-only person |
-| Tests | 848 passed, 0 failed (827 at the start of the day) |
+| Tests | 855 passed, 0 failed (827 at the start of the day) |
 
 ## 2. The export bug
 
@@ -145,9 +145,13 @@ gate retired with it. See `docs/deployment/2026-09-16-derived-fail-accountabilit
 
 - **`al_SetFailAccountability` has no caller in the app.** No longer a prerequisite for the
   export, which now attributes without it, but still the only way to override a derived pair.
-- **The override cannot be recorded for a file-quality-only fail.** The command refuses a case
-  whose outcome is a Pass, and five of the seven closed cases in DEV are exactly that. It needs
-  to consult the file quality answer as well as the outcome.
+  Building it needs a decision on where in the case UI it belongs and who may use it.
+- **An override on a Tax-only case has nowhere to be stored.** The flags live on an
+  `al_outcome` row and a Tax review creates none, so the command cannot address one. Deriving
+  works there; recording an exception does not. Unchanged schema question.
+
+*Closed since: the override now reaches a file-quality-only fail, and the Tax file quality
+answer is shared between the export and the command rather than resolved two ways.*
 
 **Operational:**
 
