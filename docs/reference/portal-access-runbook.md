@@ -198,7 +198,7 @@ cost an investigation, because the two contacts really were identical.
 | `Registration/OpenRegistrationEnabled` | `false` | `true` lets any tenant account mint a contact |
 | `Registration/LocalLoginEnabled` | `false` | Entra is the only method |
 | `Registration/LoginButtonAuthenticationType` | *(empty)* | A wrong issuer here has bitten this project twice |
-| `LoginTrackingEnabled` | `true` | **`false` silently breaks the verification below** -- see that section |
+| `LoginTrackingEnabled` | `true` | Set true 2026-09-15, but it records nothing even so -- see "Verifying without a screenshot" |
 
 `sitesetting.yml` is the source of truth and `setsitesetting` writes the same value the next
 upload would. **This site serves settings from a cache**: a change can take effect well after
@@ -228,24 +228,44 @@ act from de-duplicating one.
 
 ---
 
-## Verifying without a screenshot
+## Verifying without a screenshot -- you cannot
 
-`Authentication/LoginTrackingEnabled` must be `true` for this to work at all. When it is
-true a successful sign-in stamps `contact.adx_identity_lastsuccessfullogin`, and querying
-that column beats asking what the screen said.
+**This does not work on this site. Do not use `adx_identity_lastsuccessfullogin` to decide
+whether anyone can sign in.** The section below is kept because the reasoning is what matters,
+not because the check works.
 
-**It was `false` in both environments until 2026-09-15**, which made this whole section a
-trap rather than a check. With it false the column stays null for *everyone* -- including
-accounts that demonstrably sign in every day -- so a working sign-in and a broken one read
-exactly alike, and the natural conclusion from a null is the wrong one. It was set `true` in
-DEV and TEST on 2026-09-15.
+The claim it used to make was that `Authentication/LoginTrackingEnabled` being `true` makes a
+successful sign-in stamp `contact.adx_identity_lastsuccessfullogin`, so querying that column
+beats asking what the screen said. That is false here, and it was disproven the only way it
+could be -- by someone signing in.
 
-Two consequences worth keeping in mind:
+**Evidence, 2026-09-16.** `Authentication/LoginTrackingEnabled` had been `true` in TEST since
+2026-09-15 10:14. Zoe Ramwell signed in successfully that afternoon, confirmed by the project
+owner. Her contact still read `adx_identity_lastsuccessfullogin` null, and her `modifiedon` was
+still 2026-09-14 08:51 -- untouched, two days stale, older than the setting itself. A
+demonstrably working sign-in left no trace in Dataverse at all.
 
-- **A null reading dated before 2026-09-15 means nothing.** It is not evidence of a failed
-  sign-in. Every contact in both environments read null on that date.
-- A null shortly after any settings change is still not proof of failure, for the caching
-  reason above.
+It is not one environment and not one account. **Every contact in TEST and every contact in
+DEV reads null**, with the setting `true` in both since 2026-09-15 10:14 -- including the
+`svc.automate.aq` service account, whose portal contact has been bound since 2026-09-14. The
+column has never held a value for anybody, under any configuration this project has run.
+
+Why is not established. The untested candidates are that login tracking covers local (forms)
+authentication only and never fires for an external Entra identity -- `LocalLoginEnabled` is
+`false` here and nobody signs in any other way -- or that the site needs a restart the setting
+change never triggered. Neither has been checked, so neither should be repeated as fact.
+
+**What this means in practice:**
+
+- **A null reading is not evidence of anything, on any date.** Not before 2026-09-15 when the
+  setting was off, and not after it, when it is on and still records nothing. A working
+  sign-in and a broken one read exactly alike, and always have.
+- **The only reliable verification is a person signing in and telling you.** That is not a
+  weaker check than a query; on this site it is the only one. The 2026-09-15 investigation and
+  this one were both settled by a human report, never by a column.
+- The four requirements below are still worth querying. They tell you whether provisioning is
+  *complete*, which is a different question from whether a sign-in *works* -- gate 0 sits above
+  them and is invisible to all of it.
 
 All four requirements, everyone at once:
 

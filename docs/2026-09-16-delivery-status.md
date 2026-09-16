@@ -107,6 +107,26 @@ writes nothing, and a gate 0 refusal happens before Dataverse is consulted at al
 no way from here to tell whether anyone has *attempted* access — only that nobody has
 succeeded.
 
+## 4b. Gate 0 was the blocker, and the verification never worked
+
+The project owner granted site access under **Set up -> Site visibility -> Manage access**,
+and **Zoe Ramwell then signed in successfully** -- the first confirmed sign-in this project
+has had. Gate 0 was what had been keeping everyone out, exactly as the 2026-09-15
+investigation concluded, and the grant is the fix. Adam is provisioned identically and was
+granted at the same time.
+
+The second finding is the durable one. That sign-in **left no trace in Dataverse**. Zoe's
+`adx_identity_lastsuccessfullogin` is still null and her contact `modifiedon` is still
+2026-09-14 08:51, older than the `LoginTrackingEnabled` change itself. Checked across both
+environments: every contact in TEST and every contact in DEV reads null, with the setting
+`true` in both since 2026-09-15, the service account included.
+
+So the runbook's "Verifying without a screenshot" section was wrong, and wrong in the
+dangerous direction -- it told the reader a null reading after 2026-09-15 was evidence of a
+failed sign-in. It has been rewritten to say the check does not work here and that the only
+reliable verification is a person signing in and saying so. Why it does not work is not
+established; the untested candidates are recorded as untested.
+
 ## 5. Still open
 
 **Needs a decision, not code:**
