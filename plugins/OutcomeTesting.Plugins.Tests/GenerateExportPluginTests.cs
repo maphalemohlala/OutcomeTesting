@@ -216,5 +216,35 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.NotNull(reason);
             Assert.Contains("fail accountability", reason);
         }
+        [Fact]
+        public void Does_not_ask_a_case_regraded_to_a_pass_for_accountability()
+        {
+            // A regrade writes al_finaloutcome on the final scale (1209107_1_x), which the
+            // gate measured against the initial scale. A final Pass matched nothing, read as
+            // a non-pass, and blocked the whole batch on a case that had passed on review.
+            Assert.Null(GenerateExportPlugin.DescribeIncompleteRow(
+                Regraded(OutcomeRules.OutcomeInsufficient, OutcomeRules.FinalOutcomePass), "Pass", true));
+        }
+
+        [Fact]
+        public void Still_asks_a_case_regraded_to_a_non_pass_for_accountability()
+        {
+            // The mirror of the above: a regrade that lands on a fail still owes AD-039 the
+            // accountability columns, so the fix must not clear the gate for every regrade.
+            var reason = GenerateExportPlugin.DescribeIncompleteRow(
+                Regraded(OutcomeRules.OutcomePass, OutcomeRules.FinalOutcomePotentialHarm), "Fail", true);
+
+            Assert.NotNull(reason);
+            Assert.Contains("fail accountability", reason);
+        }
+
+        private static Entity Regraded(int initial, int final)
+        {
+            return new Entity("al_outcome")
+            {
+                [Outcomes.InitialOutcomeAttr] = new OptionSetValue(initial),
+                [Outcomes.FinalOutcomeAttr] = new OptionSetValue(final),
+            };
+        }
     }
 }

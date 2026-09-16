@@ -21,7 +21,8 @@ namespace OutcomeTesting.Plugins
         public const string FinalOutcomeAttr = "al_finaloutcome";
 
         /// <summary>
-        /// The outcome value in force: final where recorded, otherwise initial (BR-007).
+        /// The outcome value in force, on the common grade scale: final where recorded,
+        /// otherwise initial (BR-007).
         /// Null where the row carries neither, which is a case with no outcome recorded
         /// rather than a pass — callers must not treat it as one.
         /// </summary>
@@ -32,10 +33,18 @@ namespace OutcomeTesting.Plugins
                 return null;
             }
 
-            var effective = outcome.GetAttributeValue<OptionSetValue>(FinalOutcomeAttr)
-                ?? outcome.GetAttributeValue<OptionSetValue>(InitialOutcomeAttr);
+            // The final grade wins, but it is recorded on its own option set, so it is
+            // brought onto the common grade scale before it leaves here. Callers compare
+            // this against the OutcomeRules grade constants and cannot tell which column
+            // the value came from.
+            var final = outcome.GetAttributeValue<OptionSetValue>(FinalOutcomeAttr);
+            if (final != null)
+            {
+                return OutcomeRules.ToGradeScale(final.Value);
+            }
 
-            return effective != null ? effective.Value : (int?)null;
+            var initial = outcome.GetAttributeValue<OptionSetValue>(InitialOutcomeAttr);
+            return initial != null ? initial.Value : (int?)null;
         }
 
         /// <summary>

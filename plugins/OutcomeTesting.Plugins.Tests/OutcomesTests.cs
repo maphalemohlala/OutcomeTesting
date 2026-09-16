@@ -43,7 +43,7 @@ namespace OutcomeTesting.Plugins.Tests
             // to Trail Light.
             Assert.Equal(
                 OutcomeRules.OutcomePass,
-                Outcomes.EffectiveOutcome(Outcome(OutcomeRules.OutcomePotentialHarm, OutcomeRules.OutcomePass)));
+                Outcomes.EffectiveOutcome(Outcome(OutcomeRules.OutcomePotentialHarm, OutcomeRules.FinalOutcomePass)));
         }
 
         [Fact]
@@ -80,6 +80,29 @@ namespace OutcomeTesting.Plugins.Tests
             e.FormattedValues[Outcomes.InitialOutcomeAttr] = "Potential harm";
 
             Assert.Equal("Potential harm", Outcomes.EffectiveOutcomeLabel(e));
+        }
+
+        [Theory]
+        [InlineData(OutcomeRules.FinalOutcomePass, OutcomeRules.OutcomePass)]
+        [InlineData(OutcomeRules.FinalOutcomePassWithIssues, OutcomeRules.OutcomePassWithIssues)]
+        [InlineData(OutcomeRules.FinalOutcomeInsufficient, OutcomeRules.OutcomeInsufficient)]
+        [InlineData(OutcomeRules.FinalOutcomePotentialHarm, OutcomeRules.OutcomePotentialHarm)]
+        public void Resolves_a_final_grade_onto_the_common_grade_scale(int final, int expected)
+        {
+            // al_initialoutcome and al_finaloutcome are separate option sets - 1209107_0_x
+            // is the grade a check gave, 1209107_1_x the grade it ended on. Every caller
+            // compares this result against the OutcomeRules grade constants, which are the
+            // 1209107_0_x band, so returning a final value raw measured it against the wrong
+            // scale and matched nothing. That read a regraded Pass as a non-pass.
+            Assert.Equal(expected, Outcomes.EffectiveOutcome(Outcome(OutcomeRules.OutcomeInsufficient, final)));
+        }
+
+        [Fact]
+        public void Leaves_a_value_that_is_not_on_the_final_scale_alone()
+        {
+            // An unrecognised value is not quietly mapped to the most favourable grade;
+            // TryGradeFromAnswer refuses to default for the same reason.
+            Assert.Equal(999, Outcomes.EffectiveOutcome(Outcome(OutcomeRules.OutcomeInsufficient, 999)));
         }
     }
 }

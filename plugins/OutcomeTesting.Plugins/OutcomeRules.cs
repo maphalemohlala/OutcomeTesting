@@ -37,6 +37,36 @@ namespace OutcomeTesting.Plugins
         public const int OutcomePotentialHarm = 120910703;
 
         /// <summary>
+        /// A grade expressed on the common scale the OutcomeRules grade constants use.
+        ///
+        /// The two columns carry the same four grades on different option sets, so a value
+        /// read off al_finaloutcome cannot be compared against OutcomePass and friends until
+        /// it is brought onto their band. Skipping that made a final Pass (120910710) differ
+        /// from OutcomePass (120910700) and read as a non-pass, which blocked the AD-039
+        /// export on every case a regrade had cleared.
+        ///
+        /// A value on neither scale is returned untouched rather than mapped to a default,
+        /// for the reason TryGradeFromAnswer refuses to default: the most favourable grade
+        /// is the one least likely to be questioned.
+        /// </summary>
+        public static int ToGradeScale(int value)
+        {
+            switch (value)
+            {
+                case FinalOutcomePass:
+                    return OutcomePass;
+                case FinalOutcomePassWithIssues:
+                    return OutcomePassWithIssues;
+                case FinalOutcomeInsufficient:
+                    return OutcomeInsufficient;
+                case FinalOutcomePotentialHarm:
+                    return OutcomePotentialHarm;
+                default:
+                    return value;
+            }
+        }
+
+        /// <summary>
         /// Maps the Q-GR-01 "Advice Quality Grade" answer to the outcome it records.
         ///
         /// Returns false rather than a default for any value outside the grade scale.
