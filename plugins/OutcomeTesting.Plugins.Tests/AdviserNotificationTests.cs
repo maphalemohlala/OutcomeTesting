@@ -98,7 +98,7 @@ namespace OutcomeTesting.Plugins.Tests
             var queued = Queued(svc);
             Assert.Equal("Remedial needed - insufficient evidence/ potential harm: IO-TEST-100",
                 queued.GetAttributeValue<string>("al_subject"));
-            Assert.Contains("liaise with your T&C Manager", queued.GetAttributeValue<string>("al_body"));
+            Assert.Contains("liaise with your T&amp;C Manager", queued.GetAttributeValue<string>("al_body"));
         }
 
         [Fact]

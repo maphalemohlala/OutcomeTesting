@@ -37,15 +37,11 @@ namespace OutcomeTesting.Plugins
         public static string Pass(string adviserName, string clientName, string caseLink)
         {
             var body = new StringBuilder();
-            body.Append("Dear ").Append(Salutation(adviserName)).AppendLine(",");
-            body.AppendLine();
-            body.Append(Subject(clientName, "has been checked and graded a Pass."));
-            body.AppendLine();
-            body.AppendLine();
-            body.AppendLine("No further action is required.");
-            AppendLink(body, "You can view the case here: ", caseLink);
-            body.AppendLine();
-            body.Append("Kind regards");
+            Paragraph(body, "Dear " + Salutation(adviserName) + ",");
+            Paragraph(body, Subject(clientName, "has been checked and graded a Pass."));
+            Paragraph(body, "No further action is required.");
+            AppendButton(body, "View the case", caseLink);
+            Paragraph(body, "Kind regards");
             return body.ToString();
         }
 
@@ -70,32 +66,22 @@ namespace OutcomeTesting.Plugins
             }
 
             var harm = outcome != OutcomeRules.OutcomePassWithIssues;
+            var hasLink = !string.IsNullOrWhiteSpace(caseLink);
 
             var body = new StringBuilder();
-            body.Append("Dear ").Append(Salutation(adviserName)).AppendLine(",");
-            body.AppendLine();
-            body.Append(Subject(clientName,
+            Paragraph(body, "Dear " + Salutation(adviserName) + ",");
+            Paragraph(body, Subject(clientName,
                 "has been subject to an AQS file check and a need for remedial work has been identified due to the case receiving "
-                    + grading + "."));
-            body.Append(dueText ?? string.Empty);
-            body.AppendLine();
-            body.AppendLine();
+                    + grading + ".") + (dueText ?? string.Empty));
 
-            body.Append("The case summary in the portal details the remedial actions.");
-            if (harm)
-            {
-                body.Append(" Please liaise with your T&C Manager to move this case forward.");
-            }
+            Paragraph(body, "The case summary in the portal details the remedial actions."
+                + (harm ? " Please liaise with your T&C Manager to move this case forward." : string.Empty));
 
-            body.AppendLine();
-            body.AppendLine();
-            body.Append("Please follow the link to confirm that the ");
-            body.Append(harm ? "required remedial action" : "remedial action");
-            body.Append(" has been taken");
-            body.Append(caseLink == null ? " in the portal." : ": " + caseLink);
-            body.AppendLine();
-            body.AppendLine();
-            body.Append("Many thanks");
+            Paragraph(body, "Please follow the link to confirm that the "
+                + (harm ? "required remedial action" : "remedial action")
+                + " has been taken" + (hasLink ? "." : " in the portal."));
+            AppendButton(body, "Confirm remedial action", caseLink);
+            Paragraph(body, "Many thanks");
             return body.ToString();
         }
 
@@ -172,19 +158,55 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Adds the link sentence, or nothing at all when the environment has no portal.
-        /// <see cref="NotificationOutbox.CaseLink"/> returns null there rather than a bare
-        /// path, and a sentence that offers a link and then shows none reads as a fault.
+        /// One paragraph of the letter.
+        ///
+        /// Every word that reaches a reader goes through here, so the escaping has one home
+        /// rather than sitting at each interpolation where a later edit forgets it. That
+        /// matters for the copy as much as for the data: "T&amp;C Manager" is an
+        /// unterminated entity if it is written raw, and the adviser and client names are
+        /// copied off the case.
         /// </summary>
-        private static void AppendLink(StringBuilder body, string lead, string caseLink)
+        private static void Paragraph(StringBuilder body, string text)
+        {
+            body.Append("<p>").Append(Html(text)).Append("</p>");
+        }
+
+        /// <summary>
+        /// The call to action, or nothing at all when the environment has no portal.
+        /// <see cref="NotificationOutbox.CaseLink"/> returns null there rather than a bare
+        /// path, and a button that opens nothing reads as a fault.
+        ///
+        /// The style is inline because email clients drop a style element, and the href is
+        /// escaped like any other value: a portal link joins its parameters with an
+        /// ampersand, which starts an entity inside an attribute. The address itself is
+        /// built from the Power Pages site row rather than from anything a person typed, so
+        /// the escaping is about correctness rather than about the scheme.
+        /// </summary>
+        private static void AppendButton(StringBuilder body, string label, string caseLink)
         {
             if (string.IsNullOrWhiteSpace(caseLink))
             {
                 return;
             }
 
-            body.AppendLine();
-            body.Append(lead).AppendLine(caseLink);
+            body.Append("<p><a href=\"").Append(Html(caseLink)).Append("\" style=\"")
+                .Append("background-color:#0b5394;color:#ffffff;display:inline-block;")
+                .Append("padding:12px 22px;border-radius:4px;text-decoration:none;")
+                .Append("font-family:Segoe UI,Arial,sans-serif;font-size:14px;font-weight:600;")
+                .Append("\">").Append(Html(label)).Append("</a></p>");
+        }
+
+        /// <summary>
+        /// Text as HTML. The ampersand is replaced first: doing it last would re-escape the
+        /// entities the other replacements had just written.
+        /// </summary>
+        private static string Html(string text)
+        {
+            return (text ?? string.Empty)
+                .Replace("&", "&amp;")
+                .Replace("<", "&lt;")
+                .Replace(">", "&gt;")
+                .Replace("\"", "&quot;");
         }
     }
 }

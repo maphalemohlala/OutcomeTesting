@@ -22,7 +22,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var body = NotificationBodies.Pass("Jane Adviser", "Mr and Mrs Smith", Link);
 
-            Assert.StartsWith("Dear Jane Adviser", body);
+            Assert.StartsWith("<p>Dear Jane Adviser,</p>", body);
             Assert.Contains("Mr and Mrs Smith has been checked and graded a Pass", body);
             Assert.Contains("No further action is required.", body);
             Assert.Contains("Kind regards", body);
@@ -43,7 +43,7 @@ namespace OutcomeTesting.Plugins.Tests
             // offers a link and then shows nothing is worse than no sentence at all.
             var body = NotificationBodies.Pass("Jane Adviser", "Mr and Mrs Smith", null);
 
-            Assert.DoesNotContain("view the case", body);
+            Assert.DoesNotContain("<a href", body);
             Assert.Contains("No further action is required.", body);
         }
 
@@ -53,7 +53,7 @@ namespace OutcomeTesting.Plugins.Tests
             var body = NotificationBodies.Remediation(
                 OutcomeRules.OutcomePassWithIssues, "Jane Adviser", "Mr and Mrs Smith", Link, null);
 
-            Assert.StartsWith("Dear Jane Adviser", body);
+            Assert.StartsWith("<p>Dear Jane Adviser,</p>", body);
             Assert.Contains("Mr and Mrs Smith has been subject to an AQS file check", body);
             Assert.Contains("pass with issues grading", body);
             Assert.Contains("confirm that the remedial action has been taken", body);
@@ -81,7 +81,7 @@ namespace OutcomeTesting.Plugins.Tests
                 OutcomeRules.OutcomeInsufficient, "Jane Adviser", "Mr and Mrs Smith", Link, null);
 
             Assert.Contains("insufficient evidence/ potential harm grading", body);
-            Assert.Contains("liaise with your T&C Manager", body);
+            Assert.Contains("liaise with your T&amp;C Manager", body);
             Assert.Contains(Link, body);
         }
 
@@ -127,7 +127,7 @@ namespace OutcomeTesting.Plugins.Tests
             // case may name nobody at all. The letter still has to read as a letter.
             var body = NotificationBodies.Pass(null, "Mr and Mrs Smith", Link);
 
-            Assert.StartsWith("Dear Adviser", body);
+            Assert.StartsWith("<p>Dear Adviser,</p>", body);
         }
 
         [Fact]
@@ -154,6 +154,76 @@ namespace OutcomeTesting.Plugins.Tests
         public void An_uncovered_grading_has_no_subject_either()
         {
             Assert.Null(NotificationBodies.RemediationSubject(OutcomeRules.OutcomePass, "OT-1001"));
+        }
+        [Fact]
+        public void Pass_renders_the_link_as_an_anchor()
+        {
+            var body = NotificationBodies.Pass("Jane Adviser", "Mr and Mrs Smith", Link);
+
+            Assert.Contains("<a href=\"" + Link + "\"", body);
+            Assert.Contains("</a>", body);
+        }
+
+        [Fact]
+        public void Remediation_renders_the_confirmation_link_as_an_anchor()
+        {
+            var body = NotificationBodies.Remediation(
+                OutcomeRules.OutcomePassWithIssues, "Jane Adviser", "Mr and Mrs Smith", Link, null);
+
+            Assert.Contains("<a href=\"" + Link + "\"", body);
+        }
+
+        [Fact]
+        public void A_client_name_carrying_markup_cannot_reach_the_reader_as_markup()
+        {
+            // The body is HTML now, and the client name is copied off the case. Anything
+            // that is not escaped here is markup in somebody else's mailbox.
+            var body = NotificationBodies.Pass("Jane Adviser", "<b>Smith & Co</b>", Link);
+
+            Assert.DoesNotContain("<b>", body);
+            Assert.Contains("&lt;b&gt;", body);
+            Assert.Contains("Smith &amp; Co", body);
+        }
+
+        [Fact]
+        public void An_adviser_name_carrying_markup_is_escaped_too()
+        {
+            var body = NotificationBodies.Pass("Jane <script>alert(1)</script>", "Mr and Mrs Smith", Link);
+
+            Assert.DoesNotContain("<script>", body);
+            Assert.Contains("&lt;script&gt;", body);
+        }
+
+        [Fact]
+        public void The_manager_sentence_escapes_its_ampersand()
+        {
+            // "T&C Manager" is the supplied copy. Left raw it is an unterminated entity.
+            var body = NotificationBodies.Remediation(
+                OutcomeRules.OutcomeInsufficient, "Jane Adviser", "Mr and Mrs Smith", Link, null);
+
+            Assert.Contains("T&amp;C Manager", body);
+        }
+
+        [Fact]
+        public void A_link_carrying_a_query_string_is_escaped_for_the_attribute()
+        {
+            // A real portal link joins its parameters with &, which is an entity start
+            // inside an href.
+            var body = NotificationBodies.Pass(
+                "Jane Adviser", "Mr and Mrs Smith", "https://p.example.com/c?id=abc&mode=view");
+
+            Assert.Contains("id=abc&amp;mode=view", body);
+            Assert.DoesNotContain("id=abc&mode=view", body);
+        }
+
+        [Fact]
+        public void Line_breaks_are_markup_rather_than_newlines()
+        {
+            // A newline is whitespace in HTML. Without paragraphs the whole letter arrives
+            // as one run-on line.
+            var body = NotificationBodies.Pass("Jane Adviser", "Mr and Mrs Smith", Link);
+
+            Assert.Contains("<p>", body);
         }
     }
 }
