@@ -1,11 +1,12 @@
-using Microsoft.Xrm.Sdk;
+﻿using Microsoft.Xrm.Sdk;
 using OutcomeTesting.Plugins;
 using Xunit;
 
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// GenerateExportPlugin.FlaggedText (AD-039 fail accountability columns). Pure and
+    /// GenerateExportPlugin.FlaggedText and IsAccountable (AD-039 fail accountability
+    /// columns). Pure and
     /// takes plain Entity objects, so it is testable without a fake IOrganizationService —
     /// the exact locus of the "silent wrong column" risk: a transposed FQ/AQ or
     /// adviser/paraplanner pair would attribute a fail to the wrong discipline or the
@@ -14,80 +15,44 @@ namespace OutcomeTesting.Plugins.Tests
     public class GenerateExportPluginTests
     {
         [Fact]
-        public void Returns_the_case_value_when_the_flag_is_true()
+        public void Names_the_person_a_recorded_judgement_flags()
         {
             var outcomeRow = new Entity("al_outcome")
             {
-                ["al_fqadviseraccountable"] = true,
+                [GenerateExportPlugin.FqAdviserFlag] = true,
             };
             var outcomeCase = new Entity("al_outcomecase")
             {
                 ["al_advisername"] = "A. Adviser",
             };
 
-            Assert.Equal(
-                "A. Adviser",
-                GenerateExportPlugin.FlaggedText(outcomeRow, "al_fqadviseraccountable", outcomeCase, "al_advisername"));
+            Assert.Equal("A. Adviser", GenerateExportPlugin.FlaggedText(
+                GenerateExportPlugin.IsAccountable(
+                    outcomeRow, GenerateExportPlugin.FqAdviserFlag, ResponseRules.ChoiceFail, null),
+                outcomeCase, "al_advisername"));
         }
 
         [Fact]
-        public void Returns_empty_when_the_flag_is_false()
+        public void Writes_an_empty_pair_for_someone_who_is_not_accountable()
         {
-            var outcomeRow = new Entity("al_outcome")
-            {
-                ["al_fqadviseraccountable"] = false,
-            };
+            // AD-039 is a fixed-position contract: a pair that does not carry the fail is
+            // written empty rather than filled in with a name that is merely on the case.
             var outcomeCase = new Entity("al_outcomecase")
             {
                 ["al_advisername"] = "A. Adviser",
             };
 
-            Assert.Equal(
-                string.Empty,
-                GenerateExportPlugin.FlaggedText(outcomeRow, "al_fqadviseraccountable", outcomeCase, "al_advisername"));
+            Assert.Equal(string.Empty, GenerateExportPlugin.FlaggedText(false, outcomeCase, "al_advisername"));
         }
 
         [Fact]
-        public void Returns_empty_when_the_flag_is_absent()
+        public void Writes_empty_when_the_case_does_not_name_that_person()
         {
-            // An unset flag is not accountable: AD-039 writes a pair empty unless its
-            // flag is explicitly true.
-            var outcomeRow = new Entity("al_outcome");
-            var outcomeCase = new Entity("al_outcomecase")
-            {
-                ["al_advisername"] = "A. Adviser",
-            };
-
-            Assert.Equal(
-                string.Empty,
-                GenerateExportPlugin.FlaggedText(outcomeRow, "al_fqadviseraccountable", outcomeCase, "al_advisername"));
-        }
-
-        [Fact]
-        public void Returns_empty_when_the_outcome_row_is_null()
-        {
-            var outcomeCase = new Entity("al_outcomecase")
-            {
-                ["al_advisername"] = "A. Adviser",
-            };
-
-            Assert.Equal(
-                string.Empty,
-                GenerateExportPlugin.FlaggedText(null, "al_fqadviseraccountable", outcomeCase, "al_advisername"));
-        }
-
-        [Fact]
-        public void Returns_empty_when_the_case_attribute_is_missing()
-        {
-            var outcomeRow = new Entity("al_outcome")
-            {
-                ["al_fqadviseraccountable"] = true,
-            };
+            // Being accountable is not the same as being identifiable. A case that names
+            // no paraplanner exports the pair empty rather than the word "null".
             var outcomeCase = new Entity("al_outcomecase");
 
-            Assert.Equal(
-                string.Empty,
-                GenerateExportPlugin.FlaggedText(outcomeRow, "al_fqadviseraccountable", outcomeCase, "al_advisername"));
+            Assert.Equal(string.Empty, GenerateExportPlugin.FlaggedText(true, outcomeCase, "al_paraplanner"));
         }
     }
 
@@ -143,29 +108,6 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Refuses_a_non_pass_with_no_accountability_recorded()
-        {
-            // OD-024: four blank accountability pairs read as "nobody is responsible"
-            // rather than "nobody has said yet".
-            var reason = GenerateExportPlugin.DescribeIncompleteRow(
-                Outcome(OutcomeRules.OutcomePotentialHarm), "Fail", true);
-
-            Assert.NotNull(reason);
-            Assert.Contains("fail accountability", reason);
-        }
-
-        [Theory]
-        [InlineData("al_fqadviseraccountable")]
-        [InlineData("al_fqparaplanneraccountable")]
-        [InlineData("al_aqadviseraccountable")]
-        [InlineData("al_aqparaplanneraccountable")]
-        public void Allows_a_non_pass_once_any_one_of_the_four_flags_is_set(string flag)
-        {
-            Assert.Null(GenerateExportPlugin.DescribeIncompleteRow(
-                Outcome(OutcomeRules.OutcomePotentialHarm, flag), "Fail", true));
-        }
-
-        [Fact]
         public void Does_not_ask_a_pass_for_accountability()
         {
             // BR-006 attaches accountability to a non-pass only, so requiring it on a pass
@@ -206,15 +148,15 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Still_refuses_a_tax_only_case_whose_outcome_is_an_ungraded_non_pass()
+        public void A_tax_only_case_carrying_a_non_pass_outcome_exports_and_is_attributed()
         {
-            // An Outcome that exists is a fact about the case whatever its route, so the
-            // OD-024 accountability rule is not relaxed with the missing-value rules.
-            var reason = GenerateExportPlugin.DescribeIncompleteRow(
-                Outcome(OutcomeRules.OutcomePotentialHarm), null, false);
+            // An Outcome that exists is a fact about the case whatever its route. It no
+            // longer blocks the batch, and the adviser carries the advice quality fail.
+            var row = Outcome(OutcomeRules.OutcomePotentialHarm);
 
-            Assert.NotNull(reason);
-            Assert.Contains("fail accountability", reason);
+            Assert.Null(GenerateExportPlugin.DescribeIncompleteRow(row, null, false));
+            Assert.True(GenerateExportPlugin.IsAccountable(
+                row, GenerateExportPlugin.AqAdviserFlag, null, Outcomes.EffectiveOutcome(row)));
         }
         [Fact]
         public void Does_not_ask_a_case_regraded_to_a_pass_for_accountability()
@@ -227,15 +169,14 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Still_asks_a_case_regraded_to_a_non_pass_for_accountability()
+        public void A_regrade_that_lands_on_a_fail_is_attributed_to_the_adviser()
         {
-            // The mirror of the above: a regrade that lands on a fail still owes AD-039 the
-            // accountability columns, so the fix must not clear the gate for every regrade.
-            var reason = GenerateExportPlugin.DescribeIncompleteRow(
-                Regraded(OutcomeRules.OutcomePass, OutcomeRules.FinalOutcomePotentialHarm), "Fail", true);
+            // A regrade down to a fail owes AD-039 its accountability columns just as a
+            // first-time fail does, and the grade it is judged on is the final one.
+            var row = Regraded(OutcomeRules.OutcomePass, OutcomeRules.FinalOutcomePotentialHarm);
 
-            Assert.NotNull(reason);
-            Assert.Contains("fail accountability", reason);
+            Assert.True(GenerateExportPlugin.IsAccountable(
+                row, GenerateExportPlugin.AqAdviserFlag, null, Outcomes.EffectiveOutcome(row)));
         }
 
         private static Entity Regraded(int initial, int final)
@@ -276,6 +217,122 @@ namespace OutcomeTesting.Plugins.Tests
         {
             Assert.Null(GenerateExportPlugin.FileQualityGrade(null, null));
             Assert.Null(GenerateExportPlugin.FileQualityGrade("   ", null));
+        }
+        // ---- Derived accountability (project owner, 2026-09-16) ----
+        //
+        // "The assigned paraplanner and adviser should be accountable respectively":
+        // the paraplanner compiles the file so a File Quality fail is theirs, the adviser
+        // gives the advice so an Advice Quality fail is theirs. Derived as a default and
+        // still overridable by a recorded judgement.
+
+        private static Entity CaseWithBoth()
+        {
+            return new Entity("al_outcomecase")
+            {
+                ["al_advisername"] = "Jane Adviser",
+                ["al_advisercode"] = "ADV-1",
+                ["al_paraplanner"] = "Paul Paraplanner",
+                ["al_paraplannercode"] = "PP-1",
+            };
+        }
+
+        [Fact]
+        public void A_file_quality_fail_makes_the_paraplanner_accountable()
+        {
+            Assert.True(GenerateExportPlugin.IsAccountable(
+                null, GenerateExportPlugin.FqParaplannerFlag, ResponseRules.ChoiceFail, null));
+        }
+
+        [Fact]
+        public void A_file_quality_fail_does_not_make_the_adviser_accountable()
+        {
+            Assert.False(GenerateExportPlugin.IsAccountable(
+                null, GenerateExportPlugin.FqAdviserFlag, ResponseRules.ChoiceFail, null));
+        }
+
+        [Fact]
+        public void An_advice_quality_fail_makes_the_adviser_accountable()
+        {
+            Assert.True(GenerateExportPlugin.IsAccountable(
+                null, GenerateExportPlugin.AqAdviserFlag, null, OutcomeRules.OutcomePotentialHarm));
+        }
+
+        [Fact]
+        public void An_advice_quality_fail_does_not_make_the_paraplanner_accountable()
+        {
+            Assert.False(GenerateExportPlugin.IsAccountable(
+                null, GenerateExportPlugin.AqParaplannerFlag, null, OutcomeRules.OutcomePotentialHarm));
+        }
+
+        [Fact]
+        public void A_clean_case_makes_nobody_accountable()
+        {
+            foreach (var flag in new[]
+            {
+                GenerateExportPlugin.FqAdviserFlag, GenerateExportPlugin.FqParaplannerFlag,
+                GenerateExportPlugin.AqAdviserFlag, GenerateExportPlugin.AqParaplannerFlag,
+            })
+            {
+                Assert.False(GenerateExportPlugin.IsAccountable(
+                    null, flag, ResponseRules.ChoicePass, OutcomeRules.OutcomePass));
+            }
+        }
+
+        [Fact]
+        public void A_tax_only_case_still_attributes_its_file_quality_fail()
+        {
+            // No al_outcome row exists on a Tax-only case, which is why nothing could be
+            // recorded against one. Deriving from the case needs no such row.
+            Assert.True(GenerateExportPlugin.IsAccountable(
+                null, GenerateExportPlugin.FqParaplannerFlag, ResponseRules.ChoiceFail, null));
+            Assert.False(GenerateExportPlugin.IsAccountable(
+                null, GenerateExportPlugin.AqAdviserFlag, ResponseRules.ChoiceFail, null));
+        }
+
+        [Fact]
+        public void A_recorded_judgement_overrides_the_derived_pair()
+        {
+            // Someone looked and decided the adviser was responsible for the file, not the
+            // paraplanner. The recorded set is taken exactly as it was recorded.
+            var recorded = new Entity("al_outcome")
+            {
+                ["al_fqadviseraccountable"] = true,
+            };
+
+            Assert.True(GenerateExportPlugin.IsAccountable(
+                recorded, GenerateExportPlugin.FqAdviserFlag, ResponseRules.ChoiceFail, null));
+            Assert.False(GenerateExportPlugin.IsAccountable(
+                recorded, GenerateExportPlugin.FqParaplannerFlag, ResponseRules.ChoiceFail, null));
+        }
+
+        [Fact]
+        public void An_outcome_row_with_nothing_recorded_still_derives()
+        {
+            // An AQS case has an al_outcome row whether or not anyone judged it. A row of
+            // four falses is "nobody has said yet", which is exactly when to derive.
+            var untouched = new Entity("al_outcome");
+
+            Assert.True(GenerateExportPlugin.IsAccountable(
+                untouched, GenerateExportPlugin.AqAdviserFlag, null, OutcomeRules.OutcomeInsufficient));
+        }
+
+        [Fact]
+        public void The_accountable_person_is_named_from_the_case()
+        {
+            Assert.Equal("Paul Paraplanner",
+                GenerateExportPlugin.FlaggedText(true, CaseWithBoth(), "al_paraplanner"));
+            Assert.Equal(string.Empty,
+                GenerateExportPlugin.FlaggedText(false, CaseWithBoth(), "al_paraplanner"));
+        }
+
+        [Fact]
+        public void A_non_pass_no_longer_blocks_the_export()
+        {
+            // The OD-024 gate refused a non-pass that recorded no accountability. With a
+            // derived default the columns are never blank on a fail, so the gate can only
+            // refuse rows that are in fact complete.
+            Assert.Null(GenerateExportPlugin.DescribeIncompleteRow(
+                Outcome(OutcomeRules.OutcomePotentialHarm), "Fail", true));
         }
     }
 }

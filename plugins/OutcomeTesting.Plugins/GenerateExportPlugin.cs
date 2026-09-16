@@ -36,6 +36,11 @@ namespace OutcomeTesting.Plugins
         private const string AnswerChoiceAttr = "al_answerchoice";
         private const string FileQualityQuestionCode = "Q-FQ-01";
         private const string TaxFileQualityQuestionCode = "Q-FQTAX-01";
+
+        public const string FqAdviserFlag = "al_fqadviseraccountable";
+        public const string FqParaplannerFlag = "al_fqparaplanneraccountable";
+        public const string AqAdviserFlag = "al_aqadviseraccountable";
+        public const string AqParaplannerFlag = "al_aqparaplanneraccountable";
         private const int CaseStatusClosed = 120910591;
         private const int BatchStatusDraft = 120910770;
         private const int BatchStatusGenerated = 120910771;
@@ -111,6 +116,8 @@ namespace OutcomeTesting.Plugins
                     ? null
                     : Outcomes.EffectiveOutcomeLabel(outcomeRow);
                 var fileQualityGrade = ResolveFileQualityGrade(userService, outcomeCase.Id);
+                var fileQualityChoice = ResolveFileQualityChoice(userService, outcomeCase.Id);
+                var effectiveOutcome = Outcomes.EffectiveOutcome(outcomeRow);
                 var code = "EXR-" + batchCode + "-" + caseRef;
 
                 var incomplete = DescribeIncompleteRow(outcomeRow, fileQualityGrade, AqsExpected(userService, outcomeCase));
@@ -136,14 +143,30 @@ namespace OutcomeTesting.Plugins
                     ["al_preorpostcheck"] = CommandHelpers.Formatted(outcomeCase, "al_preorpostcheck"),
                     ["al_advicequalitygrade"] = adviceGrade,
                     ["al_filequalitygrade"] = fileQualityGrade,
-                    ["al_fqfailadvisername"] = FlaggedText(outcomeRow, "al_fqadviseraccountable", outcomeCase, "al_advisername"),
-                    ["al_fqfailadvisercode"] = FlaggedText(outcomeRow, "al_fqadviseraccountable", outcomeCase, "al_advisercode"),
-                    ["al_fqfailparaplannername"] = FlaggedText(outcomeRow, "al_fqparaplanneraccountable", outcomeCase, "al_paraplanner"),
-                    ["al_fqfailparaplannercode"] = FlaggedText(outcomeRow, "al_fqparaplanneraccountable", outcomeCase, "al_paraplannercode"),
-                    ["al_aqfailadvisername"] = FlaggedText(outcomeRow, "al_aqadviseraccountable", outcomeCase, "al_advisername"),
-                    ["al_aqfailadvisercode"] = FlaggedText(outcomeRow, "al_aqadviseraccountable", outcomeCase, "al_advisercode"),
-                    ["al_aqfailparaplannername"] = FlaggedText(outcomeRow, "al_aqparaplanneraccountable", outcomeCase, "al_paraplanner"),
-                    ["al_aqfailparaplannercode"] = FlaggedText(outcomeRow, "al_aqparaplanneraccountable", outcomeCase, "al_paraplannercode"),
+                    ["al_fqfailadvisername"] = FlaggedText(
+                        IsAccountable(outcomeRow, FqAdviserFlag, fileQualityChoice, effectiveOutcome),
+                        outcomeCase, "al_advisername"),
+                    ["al_fqfailadvisercode"] = FlaggedText(
+                        IsAccountable(outcomeRow, FqAdviserFlag, fileQualityChoice, effectiveOutcome),
+                        outcomeCase, "al_advisercode"),
+                    ["al_fqfailparaplannername"] = FlaggedText(
+                        IsAccountable(outcomeRow, FqParaplannerFlag, fileQualityChoice, effectiveOutcome),
+                        outcomeCase, "al_paraplanner"),
+                    ["al_fqfailparaplannercode"] = FlaggedText(
+                        IsAccountable(outcomeRow, FqParaplannerFlag, fileQualityChoice, effectiveOutcome),
+                        outcomeCase, "al_paraplannercode"),
+                    ["al_aqfailadvisername"] = FlaggedText(
+                        IsAccountable(outcomeRow, AqAdviserFlag, fileQualityChoice, effectiveOutcome),
+                        outcomeCase, "al_advisername"),
+                    ["al_aqfailadvisercode"] = FlaggedText(
+                        IsAccountable(outcomeRow, AqAdviserFlag, fileQualityChoice, effectiveOutcome),
+                        outcomeCase, "al_advisercode"),
+                    ["al_aqfailparaplannername"] = FlaggedText(
+                        IsAccountable(outcomeRow, AqParaplannerFlag, fileQualityChoice, effectiveOutcome),
+                        outcomeCase, "al_paraplanner"),
+                    ["al_aqfailparaplannercode"] = FlaggedText(
+                        IsAccountable(outcomeRow, AqParaplannerFlag, fileQualityChoice, effectiveOutcome),
+                        outcomeCase, "al_paraplannercode"),
                     ["al_separator"] = string.Empty,
                     ["statecode"] = new OptionSetValue(0),
                     ["statuscode"] = new OptionSetValue(1),
@@ -245,14 +268,12 @@ namespace OutcomeTesting.Plugins
                     : null;
             }
 
-            // A non-pass with no accountability recorded would export four blank
-            // accountability pairs, which reads as "nobody is responsible" rather
-            // than "nobody has said yet" (AD-039, OD-024).
-            if (OutcomeRules.RequiresRemediation(effective.Value) && !AnyAccountability(outcomeRow))
-            {
-                return "has a non-pass outcome with no fail accountability recorded. "
-                    + "Record accountability before generating the export.";
-            }
+            // The OD-024 gate stood here. It refused a non-pass that recorded no
+            // accountability, because four blank pairs read as "nobody is responsible"
+            // rather than "nobody has said yet". Accountability is now derived from the
+            // people the case already names (project owner, 2026-09-16), so a fail can no
+            // longer export blank and the gate could only refuse rows that are complete.
+            // See IsAccountable.
 
             if (aqsExpected && string.IsNullOrWhiteSpace(fileQualityGrade))
             {
@@ -297,25 +318,88 @@ namespace OutcomeTesting.Plugins
 
         private static bool AnyAccountability(Entity outcomeRow)
         {
-            return (outcomeRow.GetAttributeValue<bool?>("al_fqadviseraccountable") ?? false)
-                || (outcomeRow.GetAttributeValue<bool?>("al_fqparaplanneraccountable") ?? false)
-                || (outcomeRow.GetAttributeValue<bool?>("al_aqadviseraccountable") ?? false)
-                || (outcomeRow.GetAttributeValue<bool?>("al_aqparaplanneraccountable") ?? false);
+            if (outcomeRow == null)
+            {
+                return false;
+            }
+
+            return (outcomeRow.GetAttributeValue<bool?>(FqAdviserFlag) ?? false)
+                || (outcomeRow.GetAttributeValue<bool?>(FqParaplannerFlag) ?? false)
+                || (outcomeRow.GetAttributeValue<bool?>(AqAdviserFlag) ?? false)
+                || (outcomeRow.GetAttributeValue<bool?>(AqParaplannerFlag) ?? false);
         }
 
         /// <summary>
-        /// The case value when the Outcome flags that person accountable, otherwise empty.
-        /// AD-039 attributes a fail to the adviser and/or the paraplanner, so a pair whose
-        /// flag is false is written empty rather than filled in.
+        /// The case value when that person is accountable, otherwise empty. AD-039
+        /// attributes a fail to the adviser and/or the paraplanner, so a pair who is not
+        /// accountable is written empty rather than filled in.
         /// </summary>
-        public static string FlaggedText(Entity outcomeRow, string flag, Entity outcomeCase, string caseAttribute)
+        public static string FlaggedText(bool accountable, Entity outcomeCase, string caseAttribute)
         {
-            if (outcomeRow == null || !(outcomeRow.GetAttributeValue<bool?>(flag) ?? false))
+            if (!accountable)
             {
                 return string.Empty;
             }
 
             return outcomeCase.GetAttributeValue<string>(caseAttribute) ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Whether the person that <paramref name="flag"/> names carries this fail.
+        ///
+        /// A recorded judgement wins outright. Where nothing has been recorded the pair is
+        /// derived from the people the case already names (project owner, 2026-09-16): the
+        /// paraplanner compiles the file, so a File Quality fail is theirs; the adviser
+        /// gives the advice, so an Advice Quality fail is theirs.
+        ///
+        /// Deriving is what makes a Tax case attributable at all. The four flags live on
+        /// al_outcome and a Tax review creates no such row, so before this there was
+        /// nowhere to record who was accountable for a Tax fail - 254397454 exported a
+        /// file quality Fail with nobody named and nothing able to object.
+        ///
+        /// A row whose four flags are all false is "nobody has said yet", not "nobody is
+        /// responsible", so it derives. Recording a deliberate nobody is therefore not
+        /// expressible - it was not expressible before either, the OD-024 gate having
+        /// refused a row that named no one.
+        /// </summary>
+        public static bool IsAccountable(Entity outcomeRow, string flag, int? fileQualityChoice, int? effectiveOutcome)
+        {
+            if (AnyAccountability(outcomeRow))
+            {
+                return outcomeRow.GetAttributeValue<bool?>(flag) ?? false;
+            }
+
+            if (flag == FqParaplannerFlag)
+            {
+                return FileQualityFailed(fileQualityChoice);
+            }
+
+            if (flag == AqAdviserFlag)
+            {
+                return effectiveOutcome.HasValue && OutcomeRules.RequiresRemediation(effectiveOutcome.Value);
+            }
+
+            // The adviser does not carry the file and the paraplanner does not carry the
+            // advice, so neither is derived; a judgement can still name them.
+            return false;
+        }
+
+        /// <summary>
+        /// Whether the file quality answer is a Fail, read from the answer value rather
+        /// than its label so renaming the option cannot quietly stop attributing anyone.
+        /// </summary>
+        public static bool FileQualityFailed(int? fileQualityChoice)
+        {
+            return fileQualityChoice.HasValue && fileQualityChoice.Value == ResponseRules.ChoiceFail;
+        }
+
+        /// <summary>
+        /// The file quality answer value, with the same precedence <see cref="FileQualityGrade"/>
+        /// applies to the label: the AQS leg where it graded the file, otherwise the Tax leg.
+        /// </summary>
+        public static int? FileQualityChoice(int? aqsChoice, int? taxChoice)
+        {
+            return aqsChoice ?? taxChoice;
         }
 
         /// <summary>
@@ -353,15 +437,44 @@ namespace OutcomeTesting.Plugins
         {
             // The Tax code is only asked for when the AQS leg did not grade the file, so a
             // case that has both still costs one query.
-            var aqs = ResolveAnswerLabel(service, caseId, FileQualityQuestionCode);
-            var tax = string.IsNullOrWhiteSpace(aqs)
-                ? ResolveAnswerLabel(service, caseId, TaxFileQualityQuestionCode)
-                : null;
+            var aqs = ResolveAnswer(service, caseId, FileQualityQuestionCode);
+            var tax = aqs == null ? ResolveAnswer(service, caseId, TaxFileQualityQuestionCode) : null;
 
-            return FileQualityGrade(aqs, tax);
+            return FileQualityGrade(AnswerLabel(aqs), AnswerLabel(tax));
         }
 
-        private static string ResolveAnswerLabel(IOrganizationService service, Guid caseId, string questionCode)
+        private static int? ResolveFileQualityChoice(IOrganizationService service, Guid caseId)
+        {
+            var aqs = ResolveAnswer(service, caseId, FileQualityQuestionCode);
+            var tax = aqs == null ? ResolveAnswer(service, caseId, TaxFileQualityQuestionCode) : null;
+
+            return FileQualityChoice(AnswerChoice(aqs), AnswerChoice(tax));
+        }
+
+        private static string AnswerLabel(Entity answer)
+        {
+            if (answer == null)
+            {
+                return null;
+            }
+
+            return answer.FormattedValues.ContainsKey(AnswerChoiceAttr)
+                ? answer.FormattedValues[AnswerChoiceAttr]
+                : null;
+        }
+
+        private static int? AnswerChoice(Entity answer)
+        {
+            if (answer == null)
+            {
+                return null;
+            }
+
+            var value = answer.GetAttributeValue<OptionSetValue>(AnswerChoiceAttr);
+            return value == null ? (int?)null : value.Value;
+        }
+
+        private static Entity ResolveAnswer(IOrganizationService service, Guid caseId, string questionCode)
         {
             var query = new QueryExpression(ResponseEntity)
             {
@@ -384,14 +497,7 @@ namespace OutcomeTesting.Plugins
             query.AddOrder("modifiedon", OrderType.Descending);
 
             var found = service.RetrieveMultiple(query).Entities;
-            if (found.Count == 0)
-            {
-                return null;
-            }
-
-            return found[0].FormattedValues.ContainsKey(AnswerChoiceAttr)
-                ? found[0].FormattedValues[AnswerChoiceAttr]
-                : null;
+            return found.Count == 0 ? null : found[0];
         }
 
         private static void SetResponse(IPluginExecutionContext context, string batchId, string rowCount, string status, Guid auditId, bool conflict)
