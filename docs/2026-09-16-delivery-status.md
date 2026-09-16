@@ -4,15 +4,17 @@ Supersedes `docs/2026-09-15-delivery-status.md` as the current status. The regis
 left remains `docs/2026-09-04-outstanding-work.md`, read with the "Still open" and "Not done
 here" sections of the deployment notes since.
 
-Every environment claim below was verified by query after the fact. **`Env_AQ_Dev` took the
-one deployment; `Env_AQ_Test` was read but not written.**
+Every environment claim below was verified by query after the fact. **`Env_AQ_Dev` took all
+three deployments; `Env_AQ_Test` was read but not written.**
 
 **The day in one line: the export was wrong twice over — it refused cases that had passed,
 because the initial and final outcome columns are different option sets with nothing
 translating between them, and it then reported blank File Quality for every Tax-only case
-because it only ever read the AQS question. Both fixed and deployed to DEV. What is left is
-mostly not code: a Trail Light contract with no Tax column, accountability flags with nowhere
-to live on a Tax case, and no way for anyone to record accountability at all.**
+because it only ever read the AQS question. Both fixed and deployed to DEV, and fail
+accountability now derives from the adviser and paraplanner the case already names — which
+answers the Tax question that had no answer, and retires OD-024's gate with it. What is left is
+mostly not code: a Trail Light contract with no Tax column, and no way for anyone to override a
+derived pair.**
 
 Four code changes across three deploys, all to DEV. Three deployment notes:
 `docs/deployment/2026-09-16-regrade-pass-export-gate.md`,
@@ -102,6 +104,7 @@ So "access on first try" needs both, and the issuer is available to copy
   the export contract to put it. Column 15 is the *Advice Quality* grade on the four-value
   BR-005 scale, and the tax result is the three-value PassFailInsufficient scale (AD-055), so
   it was deliberately not written there. Adding a column is an agreement with Trail Light.
+
 **Settled today:** Tax fail accountability, and whether a File Quality fail is attributable in
 its own right. Both are answered by deriving the pair from the case — paraplanner for the file,
 adviser for the advice — which needs no `al_outcome` row and so works on a Tax case. The OD-024
@@ -117,9 +120,9 @@ gate retired with it. See `docs/deployment/2026-09-16-derived-fail-accountabilit
 
 **Operational:**
 
-- The batch generated at 12:47 predates the column 10 fix and still holds the blanks. A re-run
+- The batch generated at 12:47 predates all three deploys and still holds the blanks. A re-run
   is a new batch by design (AD-042).
-- `Env_AQ_Test` has none of today's three fixes.
+- `Env_AQ_Test` has none of today's four changes.
 - Is IO-300001 meant to be on a Tax-only route while carrying an AQS review and a `Q-FQ-01`
   answer? No other Tax-only case does.
 - `RegradeCasePlugin.ParseOutcome` hardcodes `120910710`-`713` rather than referencing the
