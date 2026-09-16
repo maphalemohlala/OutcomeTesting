@@ -1,7 +1,8 @@
 # Fail accountability derives from the case, and OD-024's gate retires — DEV, 2026-09-16
 
-Target: `Env_AQ_Dev` (`https://org0b075da8.crm11.dynamics.com/`), as
-`svc.automate.aq@ascotlloyd.co.uk`. Third deploy of the day. **TEST was not touched.**
+Targets: `Env_AQ_Dev` (`https://org0b075da8.crm11.dynamics.com/`) and `Env_AQ_Test`
+(`https://org37995f36.crm11.dynamics.com/`), as `svc.automate.aq@ascotlloyd.co.uk`. Third and
+fourth deploys of the day; both environments ended it carrying the same assembly.
 
 Project owner, asked how to close the two accountability gaps:
 *"The assigned paraplanner and adviser should be accountable respectively."*
@@ -75,7 +76,8 @@ failed**.
 
 ## 6. The override now reaches a file-quality-only fail
 
-Closed the same day, in a second deploy (226304 bytes, modified 2026-09-16 14:04:28Z, DEV).
+Closed the same day, in a fourth deploy: 226304 bytes, DEV at 14:04:28Z and TEST at
+14:12:23Z, both verified by query afterwards.
 
 `SetFailAccountabilityPlugin` refused any case whose effective outcome was a Pass —
 *"This case passed, so there is no fail to attribute."* With the pairing above, a case can fail
@@ -109,4 +111,4 @@ the schema question, unchanged.
 - `al_SetFailAccountability` has no caller in the app. It is no longer a prerequisite for the
   export, which now attributes without it, but it remains the only way to override.
 - AD-039 has no Tax outcome column, so `Q-TAX-02` still reaches Trail Light nowhere.
-- `Env_AQ_Test` has none of today's four changes.
+- An override on a Tax-only case has nowhere to be stored; see above.

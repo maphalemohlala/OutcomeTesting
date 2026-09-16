@@ -4,8 +4,8 @@ Supersedes `docs/2026-09-15-delivery-status.md` as the current status. The regis
 left remains `docs/2026-09-04-outstanding-work.md`, read with the "Still open" and "Not done
 here" sections of the deployment notes since.
 
-Every environment claim below was verified by query after the fact. **`Env_AQ_Dev` took all
-three deployments; `Env_AQ_Test` was read but not written.**
+Every environment claim below was verified by query after the fact. **Both `Env_AQ_Dev` and
+`Env_AQ_Test` end the day on the same assembly** — DEV at 14:04:28Z, TEST at 14:12:23Z.
 
 **The day in one line: the export was wrong twice over — it refused cases that had passed,
 because the initial and final outcome columns are different option sets with nothing
@@ -35,7 +35,9 @@ file quality outcome of their own.
 | `plugins/OutcomeTesting.Plugins` | Export column 10 falls back to `Q-FQTAX-01`, the Tax file quality outcome. Commit `5093f69` |
 | `plugins/OutcomeTesting.Plugins` | The three adviser letters are HTML, with the case link as an escaped, styled anchor. Commit `80ba8b5` |
 | `plugins/OutcomeTesting.Plugins` | Fail accountability derives from the case's own adviser and paraplanner; the OD-024 gate retires. Commit `b38e0e1` |
-| `Env_AQ_Dev` | Three assembly pushes, 224768 then 225280 then 226304 bytes, each built `-c Release` immediately before |
+| `plugins/OutcomeTesting.Plugins` | An override reaches a file-quality-only fail; `FileQuality` shared between the export and the command. Commit `ffeed12` |
+| `Env_AQ_Dev` | Four assembly pushes, ending 226304 bytes at 14:04:28Z, each built `-c Release` immediately before |
+| `Env_AQ_Test` | Same assembly, 226304 bytes at 14:12:23Z |
 | `docs/reference/portal-access-runbook.md` | Step 1 corrected: it does not work for a portal-only person |
 | Tests | 855 passed, 0 failed (827 at the start of the day) |
 
@@ -157,7 +159,6 @@ answer is shared between the export and the command rather than resolved two way
 
 - The batch generated at 12:47 predates all three deploys and still holds the blanks. A re-run
   is a new batch by design (AD-042).
-- `Env_AQ_Test` has none of today's four changes.
 - Is IO-300001 meant to be on a Tax-only route while carrying an AQS review and a `Q-FQ-01`
   answer? No other Tax-only case does.
 - `RegradeCasePlugin.ParseOutcome` hardcodes `120910710`-`713` rather than referencing the
