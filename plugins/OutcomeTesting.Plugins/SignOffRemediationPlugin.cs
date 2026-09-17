@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -8,10 +8,16 @@ namespace OutcomeTesting.Plugins
     /// Server-side command SignOffRemediation (AD-003). Registered against the Custom API
     /// message <c>al_SignOffRemediation</c>. The T&amp;C Manager validates a completed
     /// remediation action (BR-008, FR-023), recording an Approved or Rejected sign-off; a
-    /// Rejected sign-off requires notes and returns the action to the adviser. Authorization
-    /// is enforced by Dataverse: the sign-off is created as the initiating user, so a caller
-    /// without the create-<c>al_signoff</c> privilege is refused by the platform (the
-    /// T&amp;C Manager team is granted that privilege in the security configuration).
+    /// Rejected sign-off requires notes and returns the action to the adviser.
+    ///
+    /// Authorization is the <c>command.signoff</c> rule (AD-143). This comment used to say it
+    /// was "enforced by Dataverse: a caller without the create-al_signoff privilege is refused
+    /// by the platform (the T&amp;C Manager team is granted that privilege in the security
+    /// configuration)". That privilege refused nobody: <c>GrantSecurity</c> puts
+    /// <c>al_signoff</c> in <c>writeForEveryone</c>, so both application roles hold create on
+    /// it at Global depth. AD-031 gives sign-off to the T&amp;C Supervisor so the adviser who
+    /// completed the work is not the person attesting to it, and until AD-143 only the
+    /// portal half (<see cref="SignoffRequestPlugin"/>) actually enforced that.
     ///
     /// This command records the decision and nothing else. Creating the <c>al_signoff</c>
     /// row is what fires <see cref="SignoffGuardPlugin"/> (validation and stamping) and
@@ -29,6 +35,13 @@ namespace OutcomeTesting.Plugins
     public class SignOffRemediationPlugin : PluginBase
     {
         public const string MessageName = "al_SignOffRemediation";
+
+        /// <summary>
+        /// The permission rule this command enforces (AD-143). Public for the same reason as
+        /// <see cref="RegradeCasePlugin.RegradeResource"/>: the client gates the sign-off
+        /// button on this key, and the two tiers have to read the same rulebook.
+        /// </summary>
+        public const string SignOffResource = "command.signoff";
 
         private const string InTargetId = "TargetId";
         private const string InDecision = "Decision";
@@ -68,8 +81,21 @@ namespace OutcomeTesting.Plugins
             }
 
             var context = localPluginContext.PluginExecutionContext;
-            var userService = localPluginContext.InitiatingUserService; // caller privileges gate authorization
+            var userService = localPluginContext.InitiatingUserService; // the create still runs as the caller
             var systemService = localPluginContext.PluginUserService;   // audit always writes
+
+            // AD-143. "A caller without create-al_signoff privilege is refused" was the whole
+            // of the authorization here, and that privilege does not discriminate: both
+            // application roles hold create on al_signoff at Global depth, so any app user
+            // could sign off any remediation by calling this API directly. AD-031 gives
+            // sign-off to the T&C Supervisor so that the adviser who completed the work is
+            // not the person attesting to it.
+            //
+            // SignoffRequestPlugin already enforces the same thing on the portal side, against
+            // the contact's web roles, because a Power Pages write arrives as the site's
+            // application user (AD-053). This closes the Code App route.
+            PermissionHelpers.EnsureAppPermission(
+                systemService, context, SignOffResource, PermissionHelpers.AccessEdit);
 
             var targetId = CommandHelpers.ParseRequiredGuid(context, InTargetId);
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);

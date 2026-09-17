@@ -20,6 +20,9 @@ namespace OutcomeTesting.Plugins.Tests
 
         private static readonly Guid UserId = Guid.Parse("aaaaaaaa-1111-4111-8111-111111111111");
         private static readonly Guid ContactId = Guid.Parse("bbbbbbbb-2222-4222-8222-222222222222");
+        private static readonly Guid BasicUserRole = Guid.Parse("cccccccc-3333-4333-8333-333333333331");
+        private static readonly Guid AppUserRole = Guid.Parse("cccccccc-3333-4333-8333-333333333332");
+        private static readonly Guid AdminRole = Guid.Parse("cccccccc-3333-4333-8333-333333333333");
 
         private static FakeOrganizationService Both()
         {
@@ -89,6 +92,64 @@ namespace OutcomeTesting.Plugins.Tests
                 () => AssignCasePlugin.ResolveAssignee(svc, Email));
 
             Assert.Contains("disabled", ex.Message);
+        }
+
+
+        /// <summary>
+        /// AD-144. The allocation stamps <c>ownerid</c> on the review instance, so Dataverse
+        /// runs its "Read Privilege Check For Owner" against the ASSIGNEE - not the caller.
+        /// An assignee holding only Basic User fails that check with a raw SecLib fault
+        /// naming them as the "Principal user", which reads as though the person clicking
+        /// Save is the one without access. Reported 2026-09-17: Adam Strumidlo, fully
+        /// provisioned, allocating a Tax check to Clare Hook, who held Basic User alone.
+        /// </summary>
+        [Fact]
+        public void Refuses_an_assignee_who_holds_no_outcome_testing_security_role()
+        {
+            var svc = Both();
+            svc.Seed("role", BasicUserRole, "name", "Basic User");
+            svc.Seed("systemuserroles", Guid.NewGuid(), "systemuserid", UserId, "roleid", BasicUserRole);
+
+            var ex = Assert.Throws<InvalidPluginExecutionException>(
+                () => AssignCasePlugin.ResolveAssignee(svc, Email));
+
+            Assert.Contains("PRECONDITION:", ex.Message);
+            Assert.Contains("Ada Checker", ex.Message);
+            Assert.Contains("Outcome Testing App User", ex.Message);
+        }
+
+        [Fact]
+        public void Allows_an_assignee_holding_the_app_user_role()
+        {
+            var svc = Both();
+            svc.Seed("role", BasicUserRole, "name", "Basic User");
+            svc.Seed("role", AppUserRole, "name", "Outcome Testing App User");
+            svc.Seed("systemuserroles", Guid.NewGuid(), "systemuserid", UserId, "roleid", BasicUserRole);
+            svc.Seed("systemuserroles", Guid.NewGuid(), "systemuserid", UserId, "roleid", AppUserRole);
+
+            Assert.Equal(UserId, AssignCasePlugin.ResolveAssignee(svc, Email).UserId);
+        }
+
+        [Fact]
+        public void Allows_a_system_administrator_assignee()
+        {
+            var svc = Both();
+            svc.Seed("role", AdminRole, "name", "System Administrator");
+            svc.Seed("systemuserroles", Guid.NewGuid(), "systemuserid", UserId, "roleid", AdminRole);
+
+            Assert.Equal(UserId, AssignCasePlugin.ResolveAssignee(svc, Email).UserId);
+        }
+
+        /// <summary>
+        /// Fail-open when the role tables say nothing at all. "Cannot see any role" is not
+        /// "holds no role" - a caller whose own privileges cannot read the intersect would
+        /// otherwise lose the ability to allocate to anyone, which is strictly worse than
+        /// the platform fault this check exists to replace.
+        /// </summary>
+        [Fact]
+        public void Allows_when_the_role_tables_are_empty()
+        {
+            Assert.Equal(UserId, AssignCasePlugin.ResolveAssignee(Both(), Email).UserId);
         }
 
         [Fact]

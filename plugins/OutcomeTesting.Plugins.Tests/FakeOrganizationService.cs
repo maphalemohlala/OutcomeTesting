@@ -54,6 +54,48 @@ namespace OutcomeTesting.Plugins.Tests
         /// <summary>Every Retrieve issued, so a test can assert one was never asked for.</summary>
         public int RetrieveCount { get; private set; }
 
+        /// <summary>
+        /// Every table the code under test read from, joins included, so a test can ask what
+        /// read privileges the caller actually needs.
+        ///
+        /// Seeding nothing is NOT the same as being unable to read: an unseeded table answers
+        /// "no rows", which looks like a clean negative, while a table the caller holds no
+        /// read privilege on answers with a fault that aborts the command. That difference is
+        /// what hid AD-142 from 859 passing tests — the gate's very first read was of a table
+        /// no shipped security role granted, and the fake answered it happily.
+        /// </summary>
+        public HashSet<string> ReadEntities { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        private static readonly System.Text.RegularExpressions.Regex FetchEntityName =
+            new System.Text.RegularExpressions.Regex(
+                "<(?:entity|link-entity)\\s+name='([^']+)'",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        private void RecordRead(string logicalName)
+        {
+            if (!string.IsNullOrEmpty(logicalName))
+            {
+                ReadEntities.Add(logicalName);
+            }
+        }
+
+        private void RecordReads(DataCollection<LinkEntity> links)
+        {
+            foreach (var link in links)
+            {
+                RecordRead(link.LinkToEntityName);
+                RecordReads(link.LinkEntities);
+            }
+        }
+
+        private void RecordFetchReads(string fetchXml)
+        {
+            foreach (System.Text.RegularExpressions.Match match in FetchEntityName.Matches(fetchXml ?? string.Empty))
+            {
+                RecordRead(match.Groups[1].Value);
+            }
+        }
+
         /// <summary>Seeds a row directly, bypassing the Create log.</summary>
         public Entity Seed(string logicalName, Guid id, params object[] attributePairs)
         {
@@ -102,6 +144,7 @@ namespace OutcomeTesting.Plugins.Tests
         public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet)
         {
             RetrieveCount += 1;
+            RecordRead(entityName);
             var row = Row(entityName, id);
             if (row == null)
             {
@@ -182,6 +225,7 @@ namespace OutcomeTesting.Plugins.Tests
             {
                 // Always record the fetch first.
                 FetchXml.Add(fetch.Query);
+                RecordFetchReads(fetch.Query);
 
                 // Flat FetchXML (no joins) always executes against the seeded table, and the
                 // queue is consulted only for a joined fetch. This handles
@@ -212,6 +256,9 @@ namespace OutcomeTesting.Plugins.Tests
             {
                 throw new NotSupportedException("Only QueryExpression is supported.");
             }
+
+            RecordRead(q.EntityName);
+            RecordReads(q.LinkEntities);
 
             IEnumerable<Entity> rows = Table(q.EntityName).Values;
 

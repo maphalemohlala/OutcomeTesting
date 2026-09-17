@@ -224,6 +224,21 @@ if (args.Length >= 2 && args[0].Equals("grantsecurity", StringComparison.Ordinal
     return GrantSecurity(args[1]);
 }
 
+if (args.Length >= 2 && args[0].Equals("checkassignable", StringComparison.OrdinalIgnoreCase))
+{
+    return CheckAssignable(args[1]);
+}
+
+if (args.Length >= 2 && args[0].Equals("grantapprole", StringComparison.OrdinalIgnoreCase))
+{
+    return GrantAppRole(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("fixpermissions", StringComparison.OrdinalIgnoreCase))
+{
+    return FixPermissions(args[1]);
+}
+
 if (args.Length >= 3 && args[0].Equals("registertype", StringComparison.OrdinalIgnoreCase))
 {
     return RegisterType(args[1], args[2]);
@@ -6292,6 +6307,341 @@ static Guid FindId(ServiceClient svc, string table, params (string attr, object 
 // privileges the RBAC layer needs, so real users resolve their roles and the command
 // plug-ins can write on their behalf. Idempotent. Assign "App User" to everyone and
 // "App Admin" to administrators (or add both roles to the relevant Dataverse teams).
+// ---- grantapprole (AD-144) -----------------------------------------------------------
+//
+// Grants the Outcome Testing Dataverse security role to everyone `checkassignable` reports
+// as blocked, over the Dataverse connection.
+//
+// `pac admin assign-user` is the documented route and it resolves the email through Graph
+// first - "Failed to get user id for <email>" - so it dies on a revoked Graph token even
+// while the Dataverse connection is perfectly healthy. That happened on 2026-09-17: the
+// service account's tokens were invalidated at 11:22:45Z, `pac env fetch` kept working and
+// all four grants failed with AADSTS50173.
+//
+// There is no Graph lookup to do. Everyone who can be allocated work already has a
+// `systemuser` row - that is the precondition being fixed - so the association is
+// systemuser -> role, both ids readable from Dataverse. This is the same write
+// `pac admin assign-user` ends up making, minus the detour.
+//
+// Additive, and never a replacement: Basic User stays, per the 2026-09-16 standing rule.
+// Idempotent - a role already held is reported and skipped, not re-associated.
+//
+//   dotnet run -- grantapprole <orgUrl> [<email> ...] --confirm <orgUrl>
+//
+// With no emails, it grants to everyone `checkassignable` would flag for the one reason this
+// verb can fix: holding no Outcome Testing security role. It deliberately does NOT touch a
+// disabled user or one with no contact - those are different problems with different fixes.
+int GrantAppRole(string[] a)
+{
+    var orgUrl = a[1];
+    if (!ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine("Refusing: repeat the environment after --confirm.");
+        Console.Error.WriteLine($"  dotnet run -- grantapprole {orgUrl} [<email> ...] --confirm {orgUrl}");
+        return 1;
+    }
+
+    const string RoleName = "Outcome Testing App User";
+    var carriesWork = new HashSet<string>(
+        new[] { "Outcome Testing App User", "Outcome Testing App Admin", "System Administrator" },
+        StringComparer.OrdinalIgnoreCase);
+
+    // Explicit emails, if any were named before --confirm.
+    var named = new List<string>();
+    for (var i = 2; i < a.Length; i++)
+    {
+        if (a[i].Equals("--confirm", StringComparison.OrdinalIgnoreCase)) { break; }
+        named.Add(a[i].Trim());
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var roleId = FindId(svc, "role", ("name", RoleName));
+    if (roleId == Guid.Empty)
+    {
+        Console.Error.WriteLine($"No security role named \"{RoleName}\" in this environment. Run grantsecurity first.");
+        return 1;
+    }
+
+    // Who to consider: the named people, or every active application-role holder.
+    var candidates = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+    if (named.Count > 0)
+    {
+        foreach (var email in named) { candidates.Add(email); }
+    }
+    else
+    {
+        var mappings = svc.RetrieveMultiple(new QueryExpression("al_userrolemapping")
+        {
+            ColumnSet = new ColumnSet("al_useremail"),
+            Criteria = { Conditions = { new ConditionExpression("statecode", ConditionOperator.Equal, 0) } },
+        }).Entities;
+
+        foreach (var mapping in mappings)
+        {
+            var email = mapping.GetAttributeValue<string>("al_useremail");
+            if (!string.IsNullOrWhiteSpace(email)) { candidates.Add(email.Trim()); }
+        }
+    }
+
+    var granted = 0;
+    var skipped = 0;
+    var failed = 0;
+
+    foreach (var email in candidates)
+    {
+        var users = svc.RetrieveMultiple(new QueryExpression("systemuser")
+        {
+            ColumnSet = new ColumnSet("fullname", "isdisabled"),
+            Criteria = new FilterExpression(LogicalOperator.Or)
+            {
+                Conditions =
+                {
+                    new ConditionExpression("internalemailaddress", ConditionOperator.Equal, email),
+                    new ConditionExpression("domainname", ConditionOperator.Equal, email),
+                },
+            },
+        }).Entities;
+
+        if (users.Count == 0)
+        {
+            // Only worth saying when the caller asked for this person by name; in a sweep it
+            // is the ordinary state of a portal-only contact and not news.
+            if (named.Count > 0)
+            {
+                Console.Error.WriteLine($"  FAILED   {email} - no Dataverse user; they need a licence first.");
+                failed++;
+            }
+
+            continue;
+        }
+
+        var user = users[0];
+        var name = user.GetAttributeValue<string>("fullname") ?? email;
+
+        if (user.GetAttributeValue<bool>("isdisabled"))
+        {
+            Console.WriteLine($"  skipped  {name} - Dataverse user is disabled.");
+            skipped++;
+            continue;
+        }
+
+        var held = svc.RetrieveMultiple(new QueryExpression("role")
+        {
+            ColumnSet = new ColumnSet("name"),
+            LinkEntities =
+            {
+                new LinkEntity("role", "systemuserroles", "roleid", "roleid", JoinOperator.Inner)
+                {
+                    LinkCriteria = new FilterExpression
+                    {
+                        Conditions = { new ConditionExpression("systemuserid", ConditionOperator.Equal, user.Id) },
+                    },
+                },
+            },
+        }).Entities;
+
+        var heldNames = held
+            .Select(r => (r.GetAttributeValue<string>("name") ?? string.Empty).Trim())
+            .Where(n => n.Length > 0)
+            .ToList();
+
+        if (heldNames.Any(carriesWork.Contains))
+        {
+            Console.WriteLine($"  skipped  {name} - already holds {string.Join(", ", heldNames.Where(carriesWork.Contains))}.");
+            skipped++;
+            continue;
+        }
+
+        try
+        {
+            svc.Associate(
+                "systemuser",
+                user.Id,
+                new Relationship("systemuserroles_association"),
+                new EntityReferenceCollection { new EntityReference("role", roleId) });
+
+            Console.WriteLine($"  granted  {name} <{email}> -> {RoleName}");
+            granted++;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"  FAILED   {name} <{email}> - {ex.Message}");
+            failed++;
+        }
+    }
+
+    Console.WriteLine();
+    Console.WriteLine($"granted {granted}, skipped {skipped}, failed {failed}");
+
+    if (granted > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine("Read back with: checkassignable " + orgUrl);
+        Console.WriteLine("Each person may need a fresh sign-in for the privilege cache to pick the role up.");
+    }
+
+    return failed > 0 ? 1 : 0;
+}
+
+// ---- checkassignable (AD-144) --------------------------------------------------------
+//
+// Of the people carrying an application role, who can actually be allocated a case?
+//
+// Allocation stamps `ownerid` on the review instance, and Dataverse will not make somebody
+// the owner of a row they cannot read. That check runs against the ASSIGNEE, so a person
+// provisioned on the portal side alone - contact active, web roles mapped,
+// al_userrolemapping correct - still cannot be given work, and the refusal arrives as a
+// SecLib fault naming THEM as the principal rather than the manager who tried. A caller
+// holding System Administrator does not bypass it.
+//
+// Found 2026-09-17: Adam Strumidlo, fully provisioned, could not allocate a Tax check to
+// Clare Hook, who held Basic User alone. Four of the eight people with application roles in
+// TEST were in that state, all of them reviewers.
+//
+// The three planes have to agree, and nothing else reconciles them: al_AssignUserRole writes
+// the application plane only, and deliberately so - granting Dataverse security roles from a
+// command gated by an application rule would let permission.manage escalate into platform
+// privileges (the escalation-safe split GrantSecurity documents).
+//
+// Run after each batch of people is onboarded. Exit code 1 when anyone is blocked, so it can
+// gate a batch rather than only describe one.
+int CheckAssignable(string orgUrl)
+{
+    using var svc = Connect(orgUrl);
+
+    var mappings = svc.RetrieveMultiple(new QueryExpression("al_userrolemapping")
+    {
+        ColumnSet = new ColumnSet("al_useremail"),
+        Criteria = { Conditions = { new ConditionExpression("statecode", ConditionOperator.Equal, 0) } },
+    }).Entities;
+
+    var emails = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var mapping in mappings)
+    {
+        var email = mapping.GetAttributeValue<string>("al_useremail");
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            emails.Add(email.Trim());
+        }
+    }
+
+    if (emails.Count == 0)
+    {
+        Console.WriteLine("No active role mappings, so nobody to check.");
+        return 0;
+    }
+
+    // The roles that carry read on al_reviewinstance, which is what the owner check needs.
+    // Same list as AssignCasePlugin.EnsureCanHoldWork, and it has to stay that way.
+    var carriesWork = new HashSet<string>(
+        new[] { "Outcome Testing App User", "Outcome Testing App Admin", "System Administrator" },
+        StringComparer.OrdinalIgnoreCase);
+
+    Console.WriteLine($"{emails.Count} people carry an application role in {orgUrl}");
+    Console.WriteLine();
+
+    var blocked = new List<string>();
+
+    foreach (var email in emails)
+    {
+        // Both address columns, mirroring AssignCasePlugin.ResolveAssignee: a user licensed
+        // through Entra often carries domainname and no internalemailaddress.
+        var users = svc.RetrieveMultiple(new QueryExpression("systemuser")
+        {
+            ColumnSet = new ColumnSet("fullname", "isdisabled"),
+            Criteria = new FilterExpression(LogicalOperator.Or)
+            {
+                Conditions =
+                {
+                    new ConditionExpression("internalemailaddress", ConditionOperator.Equal, email),
+                    new ConditionExpression("domainname", ConditionOperator.Equal, email),
+                },
+            },
+        }).Entities;
+
+        var contactId = FindId(svc, "contact", ("emailaddress1", email));
+
+        if (users.Count == 0)
+        {
+            // Not a defect on its own - a portal-only person has a contact and no
+            // systemuser, and cannot be allocated work until they are licensed.
+            Console.WriteLine($"  BLOCKED  {email}");
+            Console.WriteLine($"           no Dataverse user - portal-only, or not licensed yet");
+            blocked.Add(email);
+            continue;
+        }
+
+        var user = users[0];
+        var name = user.GetAttributeValue<string>("fullname") ?? email;
+        var disabled = user.GetAttributeValue<bool>("isdisabled");
+
+        var heldRoles = svc.RetrieveMultiple(new QueryExpression("role")
+        {
+            ColumnSet = new ColumnSet("name"),
+            LinkEntities =
+            {
+                new LinkEntity("role", "systemuserroles", "roleid", "roleid", JoinOperator.Inner)
+                {
+                    LinkCriteria = new FilterExpression
+                    {
+                        Conditions = { new ConditionExpression("systemuserid", ConditionOperator.Equal, user.Id) },
+                    },
+                },
+            },
+        }).Entities;
+
+        var roleNames = heldRoles
+            .Select(r => (r.GetAttributeValue<string>("name") ?? string.Empty).Trim())
+            .Where(n => n.Length > 0)
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var reasons = new List<string>();
+        if (disabled) { reasons.Add("Dataverse user is disabled"); }
+        if (contactId == Guid.Empty) { reasons.Add("no portal contact on this email"); }
+        if (!roleNames.Any(carriesWork.Contains))
+        {
+            reasons.Add("no Outcome Testing security role - assign \"Outcome Testing App User\"");
+        }
+
+        var roleList = roleNames.Count == 0 ? "(none)" : string.Join(", ", roleNames);
+
+        if (reasons.Count == 0)
+        {
+            Console.WriteLine($"  ok       {name} <{email}>");
+            Console.WriteLine($"           roles: {roleList}");
+            continue;
+        }
+
+        Console.WriteLine($"  BLOCKED  {name} <{email}>");
+        Console.WriteLine($"           roles: {roleList}");
+        foreach (var reason in reasons)
+        {
+            Console.WriteLine($"           - {reason}");
+        }
+
+        blocked.Add(email);
+    }
+
+    Console.WriteLine();
+    if (blocked.Count == 0)
+    {
+        Console.WriteLine($"All {emails.Count} can be allocated work.");
+        return 0;
+    }
+
+    Console.WriteLine($"{blocked.Count} of {emails.Count} cannot be allocated work.");
+    Console.WriteLine();
+    Console.WriteLine("Fix each with (Basic User stays, this is additive):");
+    foreach (var email in blocked)
+    {
+        Console.WriteLine($"  pac admin assign-user --environment {orgUrl} --user {email} --role \"Outcome Testing App User\"");
+    }
+
+    return 1;
+}
+
 int GrantSecurity(string orgUrl)
 {
     using var svc = Connect(orgUrl);
@@ -6366,6 +6716,27 @@ int GrantSecurity(string orgUrl)
         }
 
         GrantTable(svc, role, "al_auditevent", read: true, create: true, append: true, appendTo: true);
+    }
+
+    // ---- what the permission gate itself reads (AD-142, 2026-09-16) -------------------
+    //
+    // PermissionHelpers.EnsureAppPermission reads these AS THE CALLER, because every command
+    // behind it is a Custom API and a Custom API plug-in type has no run-as user. Its FIRST
+    // act is the break-glass System Administrator probe, which queries the platform `role`
+    // table; `powerpagecomponent` is the contact-to-web-role join one read later.
+    //
+    // Neither was granted, so all 27 gated commands refused everyone who was not already a
+    // System Administrator - with a platform privilege fault, before any application rule
+    // ran. Same root as the 2026-09-14 note above: the roles were written from what the
+    // PAGES read, and nobody had ever held one, so what the GATE reads went unnoticed.
+    //
+    // Read-only, and deliberately so: this widens what a caller can see to the names of
+    // security roles, never what they can do. AD-109 forbids the plug-in catch that would
+    // have made the missing privilege survivable, so the grant is the only available fix.
+    foreach (var role in new[] { userRole, adminRole })
+    {
+        GrantTable(svc, role, "role", read: true);
+        GrantTable(svc, role, "powerpagecomponent", read: true);
     }
 
     // Admin-only beyond the above: the people and role tables. An ordinary user reads them
@@ -8035,6 +8406,182 @@ int AddMetadataToSolution(string orgUrl, string entityName, string? attributeNam
 }
 
 /// <summary>What a registered step is set to do, so a check can report it rather than restate it.</summary>
+
+/// <summary>
+/// AD-143. Brings al_pagepermission into line with the documented model, idempotently.
+///
+/// Three corrections, and deliberately nothing else. The model (DEFAULT_PERMISSIONS in
+/// app/src/types/permissions.ts) is a SEED, not a ceiling: an environment that grants an
+/// administrator more than the seed is configured, not broken, so this never reduces a
+/// grant it did not come to fix.
+///
+///   1. Every documented (role, resource) ends as exactly ONE active row. For the two
+///      administrator roles the documented level is a floor - a higher one is kept, because
+///      lowering a live administrator to the seed would take away access nobody asked to
+///      remove. For every other role it is exact, which is what collapses the DEV duplicates
+///      that carried two different levels for one pair.
+///   2. The adviser role holds neither sign-off, nor regrade, nor Manage on reviews. AD-031
+///      gives corrections and attestation to the T&C Supervisor precisely so the person who
+///      did the work is not the person who signs it off, and DEV and TEST had each drifted
+///      into a different half of that.
+///   3. Rows carrying NO role code are deactivated. They grant nothing - the server matches
+///      on al_rolecode IN (...) and the client skips a rule whose role is not held - but they
+///      are what makes `stored.length > 0`, which is what switches DEFAULT_PERMISSIONS off,
+///      and the Security page renders them as though they granted Manage.
+/// </summary>
+int FixPermissions(string orgUrl)
+{
+    const int None = 120910766, View = 120910767, Edit = 120910768, Manage = 120910769;
+    var levelName = new Dictionary<int, string>
+    {
+        [None] = "None", [View] = "View", [Edit] = "Edit", [Manage] = "Manage",
+    };
+
+    const string Tax = "AL Portal - Tax Reviewer";
+    const string Aqs = "AL Portal - AQS Reviewer";
+    const string Adviser = "AL Portal - Adviser Remediation";
+    const string Tc = "AL Portal - T&C Supervisor";
+    const string Otm = "AL Portal - Outcome Testing Manager";
+    const string Planner = "AL Portal - Planner";
+    const string PortalAdmin = "AL Portal - Portal Administrator";
+    const string Admins = "Administrators";
+
+    var appRoles = new[] { Tax, Aqs, Adviser, Tc, Otm, Planner, PortalAdmin, Admins };
+    var model = new List<(string Role, string Resource, int Level)>();
+    foreach (var r in appRoles) model.Add((r, "page.dashboard", View));
+    foreach (var r in new[] { Tax, Aqs })
+    {
+        model.Add((r, "page.cases", Edit));
+        model.Add((r, "page.reviews", Edit));
+    }
+    model.Add((Adviser, "page.remediation", Edit));
+    model.Add((Adviser, "remediation.complete", Edit));
+    foreach (var pair in new[] { ("page.cases", Edit), ("page.remediation", Edit), ("page.reports", View),
+                                 ("command.regrade", Edit), ("command.signoff", Edit), ("command.assign", Edit) })
+        model.Add((Tc, pair.Item1, pair.Item2));
+    foreach (var pair in new[] { ("page.cases", Edit), ("page.imports", Edit), ("page.remediation", View),
+                                 ("page.reports", View), ("page.exports", Manage), ("command.assign", Edit),
+                                 ("export.generate", Edit) })
+        model.Add((Otm, pair.Item1, pair.Item2));
+    foreach (var pair in new[] { ("page.cases", View), ("page.remediation", Edit), ("remediation.complete", Edit) })
+        model.Add((Planner, pair.Item1, pair.Item2));
+    foreach (var role in new[] { PortalAdmin, Admins })
+        foreach (var pair in new[] { ("page.cases", View), ("page.imports", Edit), ("page.remediation", View),
+                                     ("page.reports", View), ("page.exports", Manage), ("page.admin.questions", Manage),
+                                     ("page.admin.security", Manage), ("page.admin.users", Manage),
+                                     ("question.retire", Edit), ("export.generate", Edit), ("permission.manage", Manage) })
+            model.Add((role, pair.Item1, pair.Item2));
+
+    // Roles whose documented level is a floor rather than an exact value.
+    var floorRoles = new HashSet<string>(new[] { PortalAdmin, Admins }, StringComparer.OrdinalIgnoreCase);
+
+    // AD-031 segregation of duties: never the adviser.
+    var forbidden = new[]
+    {
+        new[] { Adviser, "command.signoff" },
+        new[] { Adviser, "command.regrade" },
+        new[] { Adviser, "page.reviews" },
+    };
+
+    using var svc = Connect(orgUrl);
+
+    var query = new QueryExpression("al_pagepermission")
+    {
+        ColumnSet = new ColumnSet("al_resourcekey", "al_rolecode", "al_accesslevel", "statecode"),
+    };
+    var rows = svc.RetrieveMultiple(query).Entities.ToList();
+    Console.WriteLine($"{rows.Count} al_pagepermission rows read.");
+
+    Func<Entity, string> RoleOf = e => (e.GetAttributeValue<string>("al_rolecode") ?? string.Empty).Trim();
+    Func<Entity, int> LevelOf = e =>
+    {
+        var v = e.GetAttributeValue<OptionSetValue>("al_accesslevel");
+        return v == null ? None : v.Value;
+    };
+    Func<Entity, bool> IsActive = e =>
+    {
+        var v = e.GetAttributeValue<OptionSetValue>("statecode");
+        return (v == null ? 0 : v.Value) == 0;
+    };
+
+    var deactivated = 0;
+    var created = 0;
+    var relevelled = 0;
+
+    Action<Entity, string> Deactivate = (row, why) =>
+    {
+        if (!IsActive(row)) return;
+        svc.Update(new Entity("al_pagepermission", row.Id)
+        {
+            ["statecode"] = new OptionSetValue(1),
+            ["statuscode"] = new OptionSetValue(2),
+        });
+        deactivated++;
+        row["statecode"] = new OptionSetValue(1);
+        Console.WriteLine($"  deactivated [{RoleOf(row)}] {row.GetAttributeValue<string>("al_resourcekey")} " +
+                          $"({levelName[LevelOf(row)]}) - {why}");
+    };
+
+    // 3. Rows with no role code grant nothing but suppress the coded defaults.
+    foreach (var row in rows.Where(r => RoleOf(r).Length == 0).ToList())
+    {
+        Deactivate(row, "no role code, so it grants nothing");
+    }
+
+    // 2. The adviser holds none of these.
+    foreach (var pair in forbidden)
+    {
+        foreach (var row in rows.Where(r =>
+                     string.Equals(RoleOf(r), pair[0], StringComparison.OrdinalIgnoreCase) &&
+                     string.Equals(r.GetAttributeValue<string>("al_resourcekey"), pair[1], StringComparison.OrdinalIgnoreCase)).ToList())
+        {
+            Deactivate(row, "AD-031: the adviser does not correct or attest to their own work");
+        }
+    }
+
+    // 1. One active row per documented pair, at the documented level.
+    foreach (var wanted in model)
+    {
+        var matches = rows.Where(r =>
+            string.Equals(RoleOf(r), wanted.Role, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(r.GetAttributeValue<string>("al_resourcekey"), wanted.Resource, StringComparison.OrdinalIgnoreCase) &&
+            IsActive(r)).OrderByDescending(LevelOf).ToList();
+
+        if (matches.Count == 0)
+        {
+            svc.Create(new Entity("al_pagepermission")
+            {
+                ["al_name"] = wanted.Role + " - " + wanted.Resource,
+                ["al_resourcekey"] = wanted.Resource,
+                ["al_rolecode"] = wanted.Role,
+                ["al_accesslevel"] = new OptionSetValue(wanted.Level),
+            });
+            created++;
+            Console.WriteLine($"  created     [{wanted.Role}] {wanted.Resource} = {levelName[wanted.Level]}");
+            continue;
+        }
+
+        // Keep the highest and retire the rest, so one pair never carries two answers.
+        var keep = matches[0];
+        foreach (var extra in matches.Skip(1))
+        {
+            Deactivate(extra, "duplicate of a rule for the same role and resource");
+        }
+
+        var have = LevelOf(keep);
+        var want = floorRoles.Contains(wanted.Role) ? Math.Max(have, wanted.Level) : wanted.Level;
+        if (have != want)
+        {
+            svc.Update(new Entity("al_pagepermission", keep.Id) { ["al_accesslevel"] = new OptionSetValue(want) });
+            relevelled++;
+            Console.WriteLine($"  set         [{wanted.Role}] {wanted.Resource} = {levelName[want]} (was {levelName[have]})");
+        }
+    }
+
+    Console.WriteLine($"Done. created={created} relevelled={relevelled} deactivated={deactivated}");
+    return 0;
+}
+
 sealed record StepFacts(bool Enabled, int Mode, int Stage, Guid RunAs)
 {
     public string Describe() =>

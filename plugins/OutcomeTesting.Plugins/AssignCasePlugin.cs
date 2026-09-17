@@ -46,6 +46,14 @@ namespace OutcomeTesting.Plugins
         private const string ReviewEntity = "al_reviewinstance";
         private const string UserEntity = "systemuser";
         private const string ContactEntity = "contact";
+        private const string RoleEntity = "role";
+
+        // AD-144: the security roles that carry read on al_reviewinstance, which is what
+        // Dataverse's owner check requires of an assignee. Named, not derived - see
+        // EnsureCanHoldWork for why the privilege cannot be resolved from inside the gate.
+        private const string AppUserRoleName = "Outcome Testing App User";
+        private const string AppAdminRoleName = "Outcome Testing App Admin";
+        private const string SystemAdministratorRoleName = "System Administrator";
 
         private const string AssignedUserAttr = "al_assigneduserid";
         private const string AssignedContactAttr = "al_assignedcontactid";
@@ -206,12 +214,92 @@ namespace OutcomeTesting.Plugins
                     "No portal contact has the work email " + email + ". Allocating without one would leave them unable to open the review.");
             }
 
+            var userName = user.GetAttributeValue<string>("fullname") ?? email;
+            EnsureCanHoldWork(service, user.Id, userName);
+
             return new Assignee
             {
                 UserId = user.Id,
                 ContactId = contact.Id,
-                UserName = user.GetAttributeValue<string>("fullname") ?? email,
+                UserName = userName,
             };
+        }
+
+        /// <summary>
+        /// AD-144. Refuses an assignee who has not been provisioned in Dataverse, with a
+        /// message naming them and the role they need.
+        ///
+        /// <para>The allocation stamps <c>ownerid</c> on the review instance, and Dataverse
+        /// will not make somebody the owner of a row they cannot read. That check runs
+        /// against the ASSIGNEE, so an unprovisioned checker fails it however well
+        /// privileged the caller is - a System Administrator allocating to them is refused
+        /// exactly the same way. The platform's own fault names the assignee as the
+        /// "Principal user" and the allocator only as <c>context.Caller</c>, which reads as
+        /// though the person clicking Save is the one lacking access; 2026-09-17 was spent
+        /// auditing the caller's permissions before the assignee's were looked at.</para>
+        ///
+        /// <para>Checked by role NAME rather than by privilege. Resolving
+        /// <c>prvReadal_ReviewInstance</c> properly means reading <c>roleprivileges</c> and
+        /// <c>privilege</c>, and neither app role grants those - so the check itself would
+        /// throw the platform fault it exists to prevent, and AD-109 forbids the catch that
+        /// would make it survivable. <c>role</c> and <c>systemuserroles</c> are both readable
+        /// at Global depth by AD-142's grant, so this query answers rather than faults.
+        /// <see cref="PermissionHelpers"/> hard-codes "System Administrator" for the same
+        /// reason.</para>
+        ///
+        /// <para>Fail-open on an empty result, deliberately. "Cannot see any role" and "holds
+        /// no role" arrive identically, and refusing on the first would break allocation for
+        /// every caller whose privileges cannot read the intersect - strictly worse than the
+        /// platform fault this replaces. A user with genuinely no role cannot be allocated to
+        /// anyway; they simply get the original fault.</para>
+        /// </summary>
+        private static void EnsureCanHoldWork(IOrganizationService service, Guid userId, string userName)
+        {
+            var query = new QueryExpression(RoleEntity)
+            {
+                ColumnSet = new ColumnSet("name"),
+                LinkEntities =
+                {
+                    new LinkEntity(RoleEntity, "systemuserroles", "roleid", "roleid", JoinOperator.Inner)
+                    {
+                        LinkCriteria = new FilterExpression
+                        {
+                            Conditions =
+                            {
+                                new ConditionExpression("systemuserid", ConditionOperator.Equal, userId),
+                            },
+                        },
+                    },
+                },
+            };
+
+            var held = service.RetrieveMultiple(query).Entities;
+            if (held.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var role in held)
+            {
+                var name = role.GetAttributeValue<string>("name");
+                if (name == null)
+                {
+                    continue;
+                }
+
+                var trimmed = name.Trim();
+                if (trimmed.Equals(AppUserRoleName, StringComparison.OrdinalIgnoreCase)
+                    || trimmed.Equals(AppAdminRoleName, StringComparison.OrdinalIgnoreCase)
+                    || trimmed.Equals(SystemAdministratorRoleName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+
+            throw new InvalidPluginExecutionException(
+                CommandHelpers.PreconditionPrefix +
+                userName + " has no Outcome Testing security role in Dataverse, so they cannot be made the owner of a review. " +
+                "Ask an administrator to assign \"" + AppUserRoleName + "\" alongside Basic User, then allocate again.");
         }
 
         /// <summary>

@@ -8,15 +8,28 @@ namespace OutcomeTesting.Plugins
     /// Server-side command RegradeCase (AD-003, OD-007/AD-031). Registered against the
     /// Custom API message <c>al_RegradeCase</c>. The T&amp;C Manager reopens, overrides or
     /// regrades a graded outcome by setting the final outcome with a mandatory reason. The
-    /// initial outcome is never edited, so both survive (BR-007). Authorization is enforced
-    /// by Dataverse: the outcome update runs as the initiating user, so a caller without the
-    /// write-<c>al_outcome</c> privilege is refused by the platform (the T&amp;C Manager team
-    /// is granted that privilege in the security configuration). The command also enforces
+    /// initial outcome is never edited, so both survive (BR-007). The command also enforces
     /// optimistic concurrency and idempotency, and writes an immutable Audit Event
     /// (BR-012, NFR-AUD-01).
+    ///
+    /// Authorization is the <c>command.regrade</c> rule (AD-143). This comment used to say it
+    /// was "enforced by Dataverse: a caller without the write-al_outcome privilege is refused
+    /// by the platform (the T&amp;C Manager team is granted that privilege in the security
+    /// configuration)". No team was ever granted it selectively — <c>GrantSecurity</c> puts
+    /// <c>al_outcome</c> in <c>writeForEveryone</c>, so BOTH application roles hold create and
+    /// write on it at Global depth and the privilege refused nobody. The write still runs as
+    /// the caller, so the platform remains the last word; it is simply not the first one.
     /// </summary>
     public class RegradeCasePlugin : PluginBase
     {
+        /// <summary>
+        /// The permission rule this command enforces (AD-143). Public so the test that keeps
+        /// the two tiers reading the same rulebook can assert on it: the client gates the
+        /// regrade button on this same key, and a drift between them is the failure AD-136
+        /// describes - a UI offering work the command then refuses.
+        /// </summary>
+        public const string RegradeResource = "command.regrade";
+
         private const string InTargetId = "TargetId";
         private const string InFinalOutcome = "FinalOutcome";
         private const string InReason = "Reason";
@@ -47,8 +60,22 @@ namespace OutcomeTesting.Plugins
             }
 
             var context = localPluginContext.PluginExecutionContext;
-            var userService = localPluginContext.InitiatingUserService; // caller privileges gate authorization
+            var userService = localPluginContext.InitiatingUserService; // the write still runs as the caller
             var systemService = localPluginContext.PluginUserService;   // audit always writes
+
+            // AD-143. Dataverse privilege alone authorised this until 2026-09-16, and it
+            // does not discriminate: both application roles hold create on al_outcome at
+            // Global depth, so every app user could regrade any outcome by calling this API
+            // directly while the client showed the button only to a T&C Supervisor. AD-031
+            // gives outcome corrections to the supervisor precisely so the person who did
+            // the work is not the person who overturns it.
+            //
+            // The portal half was never open: RegradeRequestPlugin checks the contact's web
+            // roles, because a Power Pages write arrives as the site's application user
+            // (AD-053). This is the Code App half, which OD-041 records as the only route
+            // to this API.
+            PermissionHelpers.EnsureAppPermission(
+                systemService, context, RegradeResource, PermissionHelpers.AccessEdit);
 
             var targetId = CommandHelpers.ParseRequiredGuid(context, InTargetId);
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);

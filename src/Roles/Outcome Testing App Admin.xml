@@ -101,6 +101,8 @@
     <RolePrivilege name="prvReadmspp_webrole" level="Global" />
     <RolePrivilege name="prvReadPluginAssembly" level="Global" />
     <RolePrivilege name="prvReadPluginType" level="Global" />
+    <RolePrivilege name="prvReadpowerpagecomponent" level="Global" />
+    <RolePrivilege name="prvReadRole" level="Global" />
     <RolePrivilege name="prvReadSdkMessage" level="Global" />
     <RolePrivilege name="prvReadSdkMessageProcessingStep" level="Global" />
     <RolePrivilege name="prvReadSdkMessageProcessingStepImage" level="Global" />

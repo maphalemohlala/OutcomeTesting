@@ -1,0 +1,1311 @@
+<entities>
+  <entity name="al_reviewroute" displayname="Review Route">
+    <records>
+      <record id="98fbce8f-7ea4-f111-aaac-e4fade069307">
+        <field name="al_name" value="Tax only" />
+        <field name="al_routecode" value="ROUTE-TAX" />
+        <field name="al_requirestaxreview" value="True" />
+        <field name="al_requiresaqsreview" value="False" />
+        <field name="al_displayorder" value="1" />
+      </record>
+      <record id="99fbce8f-7ea4-f111-aaac-e4fade069307">
+        <field name="al_name" value="Tax then AQS" />
+        <field name="al_routecode" value="ROUTE-TAX-AQS" />
+        <field name="al_requirestaxreview" value="True" />
+        <field name="al_requiresaqsreview" value="True" />
+        <field name="al_displayorder" value="3" />
+      </record>
+      <record id="9afbce8f-7ea4-f111-aaac-e4fade069307">
+        <field name="al_name" value="AQS only" />
+        <field name="al_routecode" value="ROUTE-AQS" />
+        <field name="al_requirestaxreview" value="False" />
+        <field name="al_requiresaqsreview" value="True" />
+        <field name="al_displayorder" value="2" />
+      </record>
+    </records>
+  </entity>
+  <entity name="al_failreason" displayname="Fail Reason">
+    <records>
+      <record id="f2fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="AML - CRA highlighted a High Risk, with no supporting form completed" />
+        <field name="al_failreasoncode" value="FR-AML-05" />
+        <field name="al_displayorder" value="5" />
+        <field name="al_category" value="120910400" />
+      </record>
+      <record id="f3fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Record Keeping - Concession required but not on file" />
+        <field name="al_failreasoncode" value="FR-REC-02" />
+        <field name="al_displayorder" value="9" />
+        <field name="al_category" value="120910402" />
+      </record>
+      <record id="f4fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="AML - ID verification issue" />
+        <field name="al_failreasoncode" value="FR-AML-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_category" value="120910400" />
+      </record>
+      <record id="f5fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Record Keeping - LPA/EPA not on file or has not been registered" />
+        <field name="al_failreasoncode" value="FR-REC-06" />
+        <field name="al_displayorder" value="13" />
+        <field name="al_category" value="120910402" />
+      </record>
+      <record id="f6fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Record Keeping - Standard of file quality" />
+        <field name="al_failreasoncode" value="FR-REC-03" />
+        <field name="al_displayorder" value="10" />
+        <field name="al_category" value="120910402" />
+      </record>
+      <record id="f7fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Breach - Any other process breach has been identified" />
+        <field name="al_failreasoncode" value="FR-BRE-01" />
+        <field name="al_displayorder" value="6" />
+        <field name="al_category" value="120910401" />
+      </record>
+      <record id="f8fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Record Keeping - Service &amp; Charges brochure not issued or out of date" />
+        <field name="al_failreasoncode" value="FR-REC-10" />
+        <field name="al_displayorder" value="17" />
+        <field name="al_category" value="120910402" />
+      </record>
+      <record id="f9fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Record Keeping - Missing documents (provided when requested)" />
+        <field name="al_failreasoncode" value="FR-REC-07" />
+        <field name="al_displayorder" value="14" />
+        <field name="al_category" value="120910402" />
+      </record>
+      <record id="fafe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Breach - Any other regulatory breach has been identified" />
+        <field name="al_failreasoncode" value="FR-BRE-02" />
+        <field name="al_displayorder" value="7" />
+        <field name="al_category" value="120910401" />
+      </record>
+      <record id="fbfe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Record Keeping - File chronology does not align with the advice process" />
+        <field name="al_failreasoncode" value="FR-REC-04" />
+        <field name="al_displayorder" value="11" />
+        <field name="al_category" value="120910402" />
+      </record>
+      <record id="fcfe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Record Keeping - Missing documents (unable to provide)" />
+        <field name="al_failreasoncode" value="FR-REC-08" />
+        <field name="al_displayorder" value="15" />
+        <field name="al_category" value="120910402" />
+      </record>
+      <record id="fdfe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="AML - No CRA completed or missing data fields" />
+        <field name="al_failreasoncode" value="FR-AML-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_category" value="120910400" />
+      </record>
+      <record id="fefe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Record Keeping - Information given relating to the recommendation/advice is incorrect" />
+        <field name="al_failreasoncode" value="FR-REC-05" />
+        <field name="al_displayorder" value="12" />
+        <field name="al_category" value="120910402" />
+      </record>
+      <record id="fffe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Record Keeping - Client consent not evident on file" />
+        <field name="al_failreasoncode" value="FR-REC-01" />
+        <field name="al_displayorder" value="8" />
+        <field name="al_category" value="120910402" />
+      </record>
+      <record id="00ff33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Record Keeping - TOB not provided or out of date" />
+        <field name="al_failreasoncode" value="FR-REC-11" />
+        <field name="al_displayorder" value="18" />
+        <field name="al_category" value="120910402" />
+      </record>
+      <record id="01ff33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Record Keeping - No client agreement or client acceptance in place" />
+        <field name="al_failreasoncode" value="FR-REC-09" />
+        <field name="al_displayorder" value="16" />
+        <field name="al_category" value="120910402" />
+      </record>
+      <record id="02ff33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="AML - CRA information not recorded on FactFind" />
+        <field name="al_failreasoncode" value="FR-AML-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_category" value="120910400" />
+      </record>
+      <record id="eca83afe-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Tax check - not completed when this should have been" />
+        <field name="al_failreasoncode" value="FR-TAX-01" />
+        <field name="al_displayorder" value="19" />
+        <field name="al_category" value="120910403" />
+      </record>
+      <record id="eda83afe-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="AML - CDD not completed in line with standards" />
+        <field name="al_failreasoncode" value="FR-AML-04" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_category" value="120910400" />
+      </record>
+      <record id="eea83afe-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Tax check – insufficient evidence to complete the check or to pass" />
+        <field name="al_failreasoncode" value="FR-TAX-02" />
+        <field name="al_displayorder" value="20" />
+        <field name="al_category" value="120910403" />
+      </record>
+    </records>
+  </entity>
+  <entity name="al_checklist" displayname="Checklist">
+    <records>
+      <record id="4ab84eef-68a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Checker Checklist" />
+        <field name="al_checklistcode" value="CHK-CHECKER" />
+        <field name="al_displayorder" value="1" />
+      </record>
+    </records>
+  </entity>
+  <entity name="al_checklistversion" displayname="Checklist Version">
+    <records>
+      <record id="d68d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Checker Checklist V8" />
+        <field name="al_checklistversioncode" value="CHK-CHECKER-V8" />
+        <field name="al_versionnumber" value="8" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_checklistid" value="4ab84eef-68a1-f111-b8dd-e4fade069307" />
+      </record>
+    </records>
+  </entity>
+  <entity name="al_section" displayname="Section">
+    <records>
+      <record id="33330000-0000-4c00-8000-000000000090">
+        <field name="al_name" value="File Quality: Tax" />
+        <field name="al_sectioncode" value="S-FQTAX" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_ownerrole" value="120910100" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="4d48613f-91ae-f111-aaac-e4fade069307">
+        <field name="al_name" value="Scratch verification section (amended)" />
+        <field name="al_sectioncode" value="S-SCRATCH" />
+        <field name="al_displayorder" value="12" />
+        <field name="al_ownerrole" value="120910101" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="24bb40dc-91ae-f111-aaac-e4fade069307">
+        <field name="al_name" value="Scratch move target" />
+        <field name="al_sectioncode" value="S-SCRATCH2" />
+        <field name="al_displayorder" value="13" />
+        <field name="al_ownerrole" value="120910101" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="0bc3d9e6-9aae-f111-aaac-e4fade069307">
+        <field name="al_name" value="Both-team proof section" />
+        <field name="al_sectioncode" value="S-BOTHPROOF" />
+        <field name="al_displayorder" value="14" />
+        <field name="al_ownerrole" value="120910105" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="d60a559d-a3af-f111-aaac-e4fade069307">
+        <field name="al_name" value="Test Section" />
+        <field name="al_sectioncode" value="sex-code" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_ownerrole" value="120910100" />
+        <field name="al_helptext" value="Test Section" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="d78d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Tax check" />
+        <field name="al_sectioncode" value="S-TAX" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_ownerrole" value="120910100" />
+        <field name="al_isconditional" value="True" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="d88d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Centralised Retirement Proposition" />
+        <field name="al_sectioncode" value="S-CRP" />
+        <field name="al_displayorder" value="9" />
+        <field name="al_ownerrole" value="120910101" />
+        <field name="al_helptext" value="Complete this section where retirement income planning or decumulation advice is in scope." />
+        <field name="al_isconditional" value="True" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="d98d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Client Objectives &amp; Information (COBS 9.2)" />
+        <field name="al_sectioncode" value="S-E1" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_ownerrole" value="120910101" />
+        <field name="al_helptext" value="Does the evidence support that the advice was built around the client’s actual needs and circumstances?" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="da8d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Risk, Capacity &amp; Loss (COBS 9.2 / FG)" />
+        <field name="al_sectioncode" value="S-E2" />
+        <field name="al_displayorder" value="5" />
+        <field name="al_ownerrole" value="120910101" />
+        <field name="al_helptext" value="Would a reasonable third party conclude the client was not exposed to foreseeable harm?" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="db8d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Consumer Duty overlay" />
+        <field name="al_sectioncode" value="S-CD" />
+        <field name="al_displayorder" value="10" />
+        <field name="al_ownerrole" value="120910101" />
+        <field name="al_helptext" value="Short yes/no judgements only. Record any detail once in section H." />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="dc8d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Suitability Report &amp; Client Communication (COBS 9.4 / CD Understanding)" />
+        <field name="al_sectioncode" value="S-E5" />
+        <field name="al_displayorder" value="8" />
+        <field name="al_ownerrole" value="120910101" />
+        <field name="al_helptext" value="Could a reasonable client understand what they were agreeing to and why?" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="dd8d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="AML and CRA checking points" />
+        <field name="al_sectioncode" value="S-AMLCRA" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_ownerrole" value="120910101" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="de8d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Research &amp; Recommendation Rationale (COBS 9.3)" />
+        <field name="al_sectioncode" value="S-E3" />
+        <field name="al_displayorder" value="6" />
+        <field name="al_ownerrole" value="120910101" />
+        <field name="al_helptext" value="Is the recommendation clearly suitable, not just technically admissible?" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="df8d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Checker judgement and grading" />
+        <field name="al_sectioncode" value="S-GRADE" />
+        <field name="al_displayorder" value="11" />
+        <field name="al_ownerrole" value="120910101" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e08d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Costs, Charges &amp; Value (COBS / Consumer Duty - Price &amp; Value)" />
+        <field name="al_sectioncode" value="S-E4" />
+        <field name="al_displayorder" value="7" />
+        <field name="al_ownerrole" value="120910101" />
+        <field name="al_helptext" value="Is there credible evidence the client received fair value?" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e18d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="File Quality: AQS" />
+        <field name="al_sectioncode" value="S-FQOUT" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_ownerrole" value="120910101" />
+        <field name="al_isconditional" value="False" />
+        <field name="al_checklistversionid" value="d68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+    </records>
+  </entity>
+  <entity name="al_question" displayname="Question">
+    <records>
+      <record id="44440000-0000-4c00-8000-000000000091">
+        <field name="al_name" value="File quality outcome" />
+        <field name="al_questioncode" value="Q-FQTAX-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="33330000-0000-4c00-8000-000000000090" />
+      </record>
+      <record id="44440000-0000-4c00-8000-000000000092">
+        <field name="al_name" value="Fail observation" />
+        <field name="al_questioncode" value="Q-FQTAX-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="33330000-0000-4c00-8000-000000000090" />
+      </record>
+      <record id="44440000-0000-4c00-8000-000000000093">
+        <field name="al_name" value="Remedial action required?" />
+        <field name="al_questioncode" value="Q-FQTAX-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="33330000-0000-4c00-8000-000000000090" />
+      </record>
+      <record id="44440000-0000-4c00-8000-000000000094">
+        <field name="al_name" value="Would a reasonable third party conclude the client was not exposed to foreseeable harm?" />
+        <field name="al_questioncode" value="Q-E2-LENS" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_sectionid" value="da8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="4e48613f-91ae-f111-aaac-e4fade069307">
+        <field name="al_name" value="Scratch one" />
+        <field name="al_questioncode" value="Q-SCRATCH-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="4d48613f-91ae-f111-aaac-e4fade069307" />
+      </record>
+      <record id="5048613f-91ae-f111-aaac-e4fade069307">
+        <field name="al_name" value="Scratch two" />
+        <field name="al_questioncode" value="Q-SCRATCH-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="4d48613f-91ae-f111-aaac-e4fade069307" />
+      </record>
+      <record id="0c139f50-91ae-f111-aaac-e4fade069307">
+        <field name="al_name" value="Scratch three" />
+        <field name="al_questioncode" value="Q-SCRATCH-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="4d48613f-91ae-f111-aaac-e4fade069307" />
+      </record>
+      <record id="93dd3d0d-92ae-f111-aaac-e4fade069307">
+        <field name="al_name" value="Scratch three" />
+        <field name="al_questioncode" value="Q-SCRATCH2-01" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="24bb40dc-91ae-f111-aaac-e4fade069307" />
+      </record>
+      <record id="0cc3d9e6-9aae-f111-aaac-e4fade069307">
+        <field name="al_name" value="Both proof" />
+        <field name="al_questioncode" value="Q-BOTHPROOF-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="0bc3d9e6-9aae-f111-aaac-e4fade069307" />
+      </record>
+      <record id="d70a559d-a3af-f111-aaac-e4fade069307">
+        <field name="al_name" value="Q1" />
+        <field name="al_questioncode" value="Q1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="d60a559d-a3af-f111-aaac-e4fade069307" />
+      </record>
+      <record id="d90a559d-a3af-f111-aaac-e4fade069307">
+        <field name="al_name" value="Q2" />
+        <field name="al_questioncode" value="Q2" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="d60a559d-a3af-f111-aaac-e4fade069307" />
+      </record>
+      <record id="db0a559d-a3af-f111-aaac-e4fade069307">
+        <field name="al_name" value="Q3 Notes" />
+        <field name="al_questioncode" value="Q3 Notes" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="d60a559d-a3af-f111-aaac-e4fade069307" />
+      </record>
+      <record id="e28d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Tax check reason" />
+        <field name="al_questioncode" value="Q-TAX-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="d78d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e38d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="File quality outcome" />
+        <field name="al_questioncode" value="Q-FQ-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="e18d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e48d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="CRA completed with mandatory fields and risk rating recorded." />
+        <field name="al_questioncode" value="Q-AML-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="dd8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e58d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Financial situation and needs sufficiently captured" />
+        <field name="al_questioncode" value="Q-E1-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="d98d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e68d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Tax check outcome" />
+        <field name="al_questioncode" value="Q-TAX-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="d78d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e78d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Fail observation" />
+        <field name="al_questioncode" value="Q-FQ-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="e18d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e88d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="CRA outcome recorded on FactFind/KYC and aligns to the file." />
+        <field name="al_questioncode" value="Q-AML-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="dd8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e98d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Inconsistencies or gaps identified and resolved" />
+        <field name="al_questioncode" value="Q-E1-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="d98d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="ea8d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Case notes" />
+        <field name="al_questioncode" value="Q-TAX-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="d78d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="eb8d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Remedial action required?" />
+        <field name="al_questioncode" value="Q-FQ-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="e18d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="ec8d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="CDD, source of funds/wealth and ongoing monitoring requirements met where applicable." />
+        <field name="al_questioncode" value="Q-AML-04" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_sectionid" value="dd8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="ed8d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Vulnerability indicators identified and considered (if applicable)" />
+        <field name="al_questioncode" value="Q-E1-04" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_sectionid" value="d98d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="ee8d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Capacity for loss assessed and referenced in recommendation" />
+        <field name="al_questioncode" value="Q-E2-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="da8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="ef8d0eec-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Any concessions / off-tariff pricing approved and recorded" />
+        <field name="al_questioncode" value="Q-E4-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="e08d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="1fe90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Product / portfolio risks explicitly addressed" />
+        <field name="al_questioncode" value="Q-E3-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="de8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="20e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Language is clear, fair and not misleading" />
+        <field name="al_questioncode" value="Q-E5-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="dc8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="21e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Any mismatch clearly explained and justified" />
+        <field name="al_questioncode" value="Q-E2-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="da8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="22e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Overall value conclusion coherent" />
+        <field name="al_questioncode" value="Q-E4-04" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_sectionid" value="e08d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="23e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Switches / transfers justified (where applicable)" />
+        <field name="al_questioncode" value="Q-E3-04" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_sectionid" value="de8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="24e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Material disadvantages explicitly highlighted" />
+        <field name="al_questioncode" value="Q-E5-04" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_sectionid" value="dc8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="25e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Recommended solution aligns to objectives and constraints" />
+        <field name="al_questioncode" value="Q-E3-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="de8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="26e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Report explains why the recommendation is suitable" />
+        <field name="al_questioncode" value="Q-E5-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="dc8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="27e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Adviser charges clearly disclosed and evidenced" />
+        <field name="al_questioncode" value="Q-E4-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="e08d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="28e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Cashflow model stress tests on file" />
+        <field name="al_questioncode" value="Q-CRP-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="d88d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="29e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Derisking discussed / discounted" />
+        <field name="al_questioncode" value="Q-CRP-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="d88d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="2ae90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Case Notes" />
+        <field name="al_questioncode" value="Q-GR-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="df8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="2be90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Consumer Understanding outcome" />
+        <field name="al_questioncode" value="Q-CD-03" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_sectionid" value="db8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="2ce90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Attitude to risk recorded and internally consistent" />
+        <field name="al_questioncode" value="Q-E2-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="da8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="2de90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Client objectives clearly evidenced and specific" />
+        <field name="al_questioncode" value="Q-E1-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="d98d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="2ee90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="ID verification completed and retained for all relevant clients/parties." />
+        <field name="al_questioncode" value="Q-AML-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="dd8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="2fe90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Sequencing risk discussed with client" />
+        <field name="al_questioncode" value="Q-CRP-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="d88d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="30e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="High Risk CRA cases have supporting form, approval and rationale on file." />
+        <field name="al_questioncode" value="Q-AML-05" />
+        <field name="al_displayorder" value="5" />
+        <field name="al_sectionid" value="dd8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="31e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Annuity / drawdown discussion completed, including the option of securing required/basic income needs through an annuity" />
+        <field name="al_questioncode" value="Q-CRP-04" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_sectionid" value="d88d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="32e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Even Better If..." />
+        <field name="al_questioncode" value="Q-GR-04" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_sectionid" value="df8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="33e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Consumer Support outcome" />
+        <field name="al_questioncode" value="Q-CD-04" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_sectionid" value="db8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="34e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Key risks and trade-offs are clear and balanced" />
+        <field name="al_questioncode" value="Q-E5-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="dc8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="35e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Products &amp; Services outcome" />
+        <field name="al_questioncode" value="Q-CD-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="db8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="36e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Reasonable alternatives considered or explained" />
+        <field name="al_questioncode" value="Q-E3-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="de8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="37e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Advice Quality Grade" />
+        <field name="al_questioncode" value="Q-GR-01" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_sectionid" value="df8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="38e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Ongoing charges justified relative to service provided" />
+        <field name="al_questioncode" value="Q-E4-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="e08d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="39e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Price &amp; Value outcome" />
+        <field name="al_questioncode" value="Q-CD-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="db8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="3ae90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Primary root cause" />
+        <field name="al_questioncode" value="Q-GR-02" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_sectionid" value="df8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+    </records>
+  </entity>
+  <entity name="al_questionversion" displayname="Question Version">
+    <records>
+      <record id="55550000-0000-4c00-8000-000000000091">
+        <field name="al_name" value="Q-FQTAX-01 v1" />
+        <field name="al_questionversioncode" value="Q-FQTAX-01-V1" />
+        <field name="al_questiontext" value="File quality outcome" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_effectiveto" value="2026-09-14T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910005" />
+        <field name="al_questionid" value="44440000-0000-4c00-8000-000000000091" />
+      </record>
+      <record id="55550000-0000-4c00-8000-000000000092">
+        <field name="al_name" value="Q-FQTAX-02 v1" />
+        <field name="al_questionversioncode" value="Q-FQTAX-02-V1" />
+        <field name="al_questiontext" value="Fail observation" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="False" />
+        <field name="al_responsetype" value="120910001" />
+        <field name="al_questionid" value="44440000-0000-4c00-8000-000000000092" />
+      </record>
+      <record id="55550000-0000-4c00-8000-000000000093">
+        <field name="al_name" value="Q-FQTAX-03 v1" />
+        <field name="al_questionversioncode" value="Q-FQTAX-03-V1" />
+        <field name="al_questiontext" value="Remedial action required?" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910007" />
+        <field name="al_questionid" value="44440000-0000-4c00-8000-000000000093" />
+      </record>
+      <record id="55550000-0000-4c00-8000-000000000094">
+        <field name="al_name" value="Q-E2-LENS v1" />
+        <field name="al_questionversioncode" value="Q-E2-LENS-V1" />
+        <field name="al_questiontext" value="Would a reasonable third party conclude the client was not exposed to foreseeable harm?" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="False" />
+        <field name="al_responsetype" value="120910007" />
+        <field name="al_questionid" value="44440000-0000-4c00-8000-000000000094" />
+      </record>
+      <record id="48920efa-8fab-f111-aaac-e4fade069307">
+        <field name="al_name" value="Question version v2" />
+        <field name="al_questionversioncode" value="QV-e68d0eec64a1f111b8dde4fade069307-v2" />
+        <field name="al_questiontext" value="Tax check outcome" />
+        <field name="al_versionnumber" value="2" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-09-08T00:00:00" />
+        <field name="al_effectiveto" value="2026-09-08T00:00:00" />
+        <field name="al_ismandatory" value="False" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="e68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="4a920efa-8fab-f111-aaac-e4fade069307">
+        <field name="al_name" value="Question version v3" />
+        <field name="al_questionversioncode" value="QV-e68d0eec64a1f111b8dde4fade069307-v3" />
+        <field name="al_questiontext" value="Tax check outcome" />
+        <field name="al_versionnumber" value="3" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-09-08T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="e68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="4f48613f-91ae-f111-aaac-e4fade069307">
+        <field name="al_name" value="Question version v1" />
+        <field name="al_questionversioncode" value="QV-4e48613f91aef111aaace4fade069307-v1" />
+        <field name="al_questiontext" value="Is the scratch question answerable?" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-09-12T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="4e48613f-91ae-f111-aaac-e4fade069307" />
+      </record>
+      <record id="5148613f-91ae-f111-aaac-e4fade069307">
+        <field name="al_name" value="Question version v1" />
+        <field name="al_questionversioncode" value="QV-5048613f91aef111aaace4fade069307-v1" />
+        <field name="al_questiontext" value="Does the second one render?" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-09-12T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="5048613f-91ae-f111-aaac-e4fade069307" />
+      </record>
+      <record id="0d139f50-91ae-f111-aaac-e4fade069307">
+        <field name="al_name" value="Question version v1" />
+        <field name="al_questionversioncode" value="QV-0c139f5091aef111aaace4fade069307-v1" />
+        <field name="al_questiontext" value="Was this one added on its own?" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-09-12T00:00:00" />
+        <field name="al_effectiveto" value="2026-09-12T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="0c139f50-91ae-f111-aaac-e4fade069307" />
+      </record>
+      <record id="bfdf4413-92ae-f111-aaac-e4fade069307">
+        <field name="al_name" value="Question version v1" />
+        <field name="al_questionversioncode" value="QV-93dd3d0d92aef111aaace4fade069307-v1" />
+        <field name="al_questiontext" value="Was this one added on its own?" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-09-12T00:00:00" />
+        <field name="al_effectiveto" value="2026-09-12T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="93dd3d0d-92ae-f111-aaac-e4fade069307" />
+      </record>
+      <record id="0dc3d9e6-9aae-f111-aaac-e4fade069307">
+        <field name="al_name" value="Question version v1" />
+        <field name="al_questionversioncode" value="QV-0cc3d9e69aaef111aaace4fade069307-v1" />
+        <field name="al_questiontext" value="Does this render to both disciplines?" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-09-12T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="0cc3d9e6-9aae-f111-aaac-e4fade069307" />
+      </record>
+      <record id="d80a559d-a3af-f111-aaac-e4fade069307">
+        <field name="al_name" value="Question version v1" />
+        <field name="al_questionversioncode" value="QV-d70a559da3aff111aaace4fade069307-v1" />
+        <field name="al_questiontext" value="Q1" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-09-13T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910007" />
+        <field name="al_questionid" value="d70a559d-a3af-f111-aaac-e4fade069307" />
+      </record>
+      <record id="da0a559d-a3af-f111-aaac-e4fade069307">
+        <field name="al_name" value="Question version v1" />
+        <field name="al_questionversioncode" value="QV-d90a559da3aff111aaace4fade069307-v1" />
+        <field name="al_questiontext" value="Q2" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-09-13T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910005" />
+        <field name="al_questionid" value="d90a559d-a3af-f111-aaac-e4fade069307" />
+      </record>
+      <record id="dc0a559d-a3af-f111-aaac-e4fade069307">
+        <field name="al_name" value="Question version v1" />
+        <field name="al_questionversioncode" value="QV-db0a559da3aff111aaace4fade069307-v1" />
+        <field name="al_questiontext" value="Q3 Notes" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-09-13T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910000" />
+        <field name="al_questionid" value="db0a559d-a3af-f111-aaac-e4fade069307" />
+      </record>
+      <record id="40530fa6-3fb0-f111-aaac-e4fade069307">
+        <field name="al_name" value="Question version v2" />
+        <field name="al_questionversioncode" value="QV-4444000000004c008000000000000091-v2" />
+        <field name="al_questiontext" value="File quality outcome new" />
+        <field name="al_versionnumber" value="2" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-09-14T00:00:00" />
+        <field name="al_effectiveto" value="2026-09-14T00:00:00" />
+        <field name="al_ismandatory" value="False" />
+        <field name="al_responsetype" value="120910005" />
+        <field name="al_questionid" value="44440000-0000-4c00-8000-000000000091" />
+      </record>
+      <record id="42530fa6-3fb0-f111-aaac-e4fade069307">
+        <field name="al_name" value="Question version v3" />
+        <field name="al_questionversioncode" value="QV-4444000000004c008000000000000091-v3" />
+        <field name="al_questiontext" value="File quality outcome" />
+        <field name="al_versionnumber" value="3" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-09-14T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910005" />
+        <field name="al_questionid" value="44440000-0000-4c00-8000-000000000091" />
+      </record>
+      <record id="c531269d-e4a2-f111-b8dc-e4fade069307">
+        <field name="al_name" value="Question version v2" />
+        <field name="al_questionversioncode" value="QV-e28d0eec64a1f111b8dde4fade069307-v2" />
+        <field name="al_questiontext" value="Tax check reason" />
+        <field name="al_versionnumber" value="2" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-28T00:00:00" />
+        <field name="al_effectiveto" value="2026-08-28T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910003" />
+        <field name="al_questionid" value="e28d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="656acaa3-e4a2-f111-b8dc-e4fade069307">
+        <field name="al_name" value="Question version v3" />
+        <field name="al_questionversioncode" value="QV-e28d0eec64a1f111b8dde4fade069307-v3" />
+        <field name="al_questiontext" value="Tax check reason" />
+        <field name="al_versionnumber" value="3" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-28T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910004" />
+        <field name="al_questionid" value="e28d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="3be90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-AML-05 v1" />
+        <field name="al_questionversioncode" value="Q-AML-05-V1" />
+        <field name="al_questiontext" value="High Risk CRA cases have supporting form, approval and rationale on file." />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="5" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910008" />
+        <field name="al_questionid" value="30e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="3ce90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-AML-01 v1" />
+        <field name="al_questionversioncode" value="Q-AML-01-V1" />
+        <field name="al_questiontext" value="ID verification completed and retained for all relevant clients/parties." />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910008" />
+        <field name="al_questionid" value="2ee90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="3de90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E1-02 v1" />
+        <field name="al_questionversioncode" value="Q-E1-02-V1" />
+        <field name="al_questiontext" value="Financial situation and needs sufficiently captured" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="e58d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="3ee90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E1-01 v1" />
+        <field name="al_questionversioncode" value="Q-E1-01-V1" />
+        <field name="al_questiontext" value="Client objectives clearly evidenced and specific" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="2de90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="3fe90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-AML-02 v1" />
+        <field name="al_questionversioncode" value="Q-AML-02-V1" />
+        <field name="al_questiontext" value="CRA completed with mandatory fields and risk rating recorded." />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910008" />
+        <field name="al_questionid" value="e48d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="40e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-TAX-01 v1" />
+        <field name="al_questionversioncode" value="Q-TAX-01-V1" />
+        <field name="al_questiontext" value="Tax check reason" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_effectiveto" value="2026-08-28T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910004" />
+        <field name="al_questionid" value="e28d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="41e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-FQ-01 v1" />
+        <field name="al_questionversioncode" value="Q-FQ-01-V1" />
+        <field name="al_questiontext" value="File quality outcome" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910005" />
+        <field name="al_questionid" value="e38d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="42e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E5-03 v1" />
+        <field name="al_questionversioncode" value="Q-E5-03-V1" />
+        <field name="al_questiontext" value="Language is clear, fair and not misleading" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="20e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="43e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E2-02 v1" />
+        <field name="al_questionversioncode" value="Q-E2-02-V1" />
+        <field name="al_questiontext" value="Capacity for loss assessed and referenced in recommendation" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="ee8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="44e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E3-03 v1" />
+        <field name="al_questionversioncode" value="Q-E3-03-V1" />
+        <field name="al_questiontext" value="Product / portfolio risks explicitly addressed" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="1fe90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="45e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E4-03 v1" />
+        <field name="al_questionversioncode" value="Q-E4-03-V1" />
+        <field name="al_questiontext" value="Any concessions / off-tariff pricing approved and recorded" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="ef8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="46e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E1-04 v1" />
+        <field name="al_questionversioncode" value="Q-E1-04-V1" />
+        <field name="al_questiontext" value="Vulnerability indicators identified and considered (if applicable)" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="ed8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="48e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-CD-03 v1" />
+        <field name="al_questionversioncode" value="Q-CD-03-V1" />
+        <field name="al_questiontext" value="Consumer Understanding outcome" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910009" />
+        <field name="al_questionid" value="2be90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="49e90bf2-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-CRP-03 v1" />
+        <field name="al_questionversioncode" value="Q-CRP-03-V1" />
+        <field name="al_questiontext" value="Derisking discussed / discounted" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="29e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="d4fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-CRP-01 v1" />
+        <field name="al_questionversioncode" value="Q-CRP-01-V1" />
+        <field name="al_questiontext" value="Cashflow model stress tests on file" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="28e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="d5fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-GR-03 v1" />
+        <field name="al_questionversioncode" value="Q-GR-03-V1" />
+        <field name="al_questiontext" value="Case Notes" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="False" />
+        <field name="al_responsetype" value="120910001" />
+        <field name="al_questionid" value="2ae90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="d6fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-AML-04 v1" />
+        <field name="al_questionversioncode" value="Q-AML-04-V1" />
+        <field name="al_questiontext" value="CDD, source of funds/wealth and ongoing monitoring requirements met where applicable." />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910008" />
+        <field name="al_questionid" value="ec8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="d7fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-TAX-03 v1" />
+        <field name="al_questionversioncode" value="Q-TAX-03-V1" />
+        <field name="al_questiontext" value="Case notes" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="False" />
+        <field name="al_responsetype" value="120910001" />
+        <field name="al_questionid" value="ea8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="d9fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E2-01 v1" />
+        <field name="al_questionversioncode" value="Q-E2-01-V1" />
+        <field name="al_questiontext" value="Attitude to risk recorded and internally consistent" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="2ce90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="dafe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-FQ-03 v1" />
+        <field name="al_questionversioncode" value="Q-FQ-03-V1" />
+        <field name="al_questiontext" value="Remedial action required?" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910007" />
+        <field name="al_questionid" value="eb8d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="dbfe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E4-01 v1" />
+        <field name="al_questionversioncode" value="Q-E4-01-V1" />
+        <field name="al_questiontext" value="Adviser charges clearly disclosed and evidenced" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="27e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="dcfe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E3-01 v1" />
+        <field name="al_questionversioncode" value="Q-E3-01-V1" />
+        <field name="al_questiontext" value="Recommended solution aligns to objectives and constraints" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="25e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="ddfe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E5-01 v1" />
+        <field name="al_questionversioncode" value="Q-E5-01-V1" />
+        <field name="al_questiontext" value="Report explains why the recommendation is suitable" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="26e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="defe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E1-03 v1" />
+        <field name="al_questionversioncode" value="Q-E1-03-V1" />
+        <field name="al_questiontext" value="Inconsistencies or gaps identified and resolved" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="e98d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="dffe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-GR-01 v1" />
+        <field name="al_questionversioncode" value="Q-GR-01-V1" />
+        <field name="al_questiontext" value="Advice Quality Grade" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910010" />
+        <field name="al_questionid" value="37e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e0fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-CD-01 v1" />
+        <field name="al_questionversioncode" value="Q-CD-01-V1" />
+        <field name="al_questiontext" value="Products &amp; Services outcome" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="1" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910009" />
+        <field name="al_questionid" value="35e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e1fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-CRP-02 v1" />
+        <field name="al_questionversioncode" value="Q-CRP-02-V1" />
+        <field name="al_questiontext" value="Sequencing risk discussed with client" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="2fe90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e2fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-AML-03 v1" />
+        <field name="al_questionversioncode" value="Q-AML-03-V1" />
+        <field name="al_questiontext" value="CRA outcome recorded on FactFind/KYC and aligns to the file." />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910008" />
+        <field name="al_questionid" value="e88d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e3fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-FQ-02 v1" />
+        <field name="al_questionversioncode" value="Q-FQ-02-V1" />
+        <field name="al_questiontext" value="Fail observation" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="False" />
+        <field name="al_responsetype" value="120910001" />
+        <field name="al_questionid" value="e78d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e4fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E5-04 v1" />
+        <field name="al_questionversioncode" value="Q-E5-04-V1" />
+        <field name="al_questiontext" value="Material disadvantages explicitly highlighted" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="24e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e5fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-TAX-02 v1" />
+        <field name="al_questionversioncode" value="Q-TAX-02-V1" />
+        <field name="al_questiontext" value="Tax check outcome" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_effectiveto" value="2026-09-08T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="e68d0eec-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e6fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E4-02 v1" />
+        <field name="al_questionversioncode" value="Q-E4-02-V1" />
+        <field name="al_questiontext" value="Ongoing charges justified relative to service provided" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="38e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e7fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E5-02 v1" />
+        <field name="al_questionversioncode" value="Q-E5-02-V1" />
+        <field name="al_questiontext" value="Key risks and trade-offs are clear and balanced" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="34e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="e9fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E3-02 v1" />
+        <field name="al_questionversioncode" value="Q-E3-02-V1" />
+        <field name="al_questiontext" value="Reasonable alternatives considered or explained" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="36e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="eafe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E4-04 v1" />
+        <field name="al_questionversioncode" value="Q-E4-04-V1" />
+        <field name="al_questiontext" value="Overall value conclusion coherent" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="22e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="ebfe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E3-04 v1" />
+        <field name="al_questionversioncode" value="Q-E3-04-V1" />
+        <field name="al_questiontext" value="Switches / transfers justified (where applicable)" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="23e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="ecfe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-GR-04 v1" />
+        <field name="al_questionversioncode" value="Q-GR-04-V1" />
+        <field name="al_questiontext" value="Even Better If..." />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="False" />
+        <field name="al_responsetype" value="120910001" />
+        <field name="al_questionid" value="32e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="edfe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-E2-03 v1" />
+        <field name="al_questionversioncode" value="Q-E2-03-V1" />
+        <field name="al_questiontext" value="Any mismatch clearly explained and justified" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="3" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="21e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="eefe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-GR-02 v1" />
+        <field name="al_questionversioncode" value="Q-GR-02-V1" />
+        <field name="al_questiontext" value="Primary root cause" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910003" />
+        <field name="al_questionid" value="3ae90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="effe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-CD-02 v1" />
+        <field name="al_questionversioncode" value="Q-CD-02-V1" />
+        <field name="al_questiontext" value="Price &amp; Value outcome" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910009" />
+        <field name="al_questionid" value="39e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="f0fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-CD-04 v1" />
+        <field name="al_questionversioncode" value="Q-CD-04-V1" />
+        <field name="al_questiontext" value="Consumer Support outcome" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910009" />
+        <field name="al_questionid" value="33e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+      <record id="f1fe33f8-64a1-f111-b8dd-e4fade069307">
+        <field name="al_name" value="Q-CRP-04 v1" />
+        <field name="al_questionversioncode" value="Q-CRP-04-V1" />
+        <field name="al_questiontext" value="Annuity / drawdown discussion completed, including the option of securing required/basic income needs through an annuity" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_effectivefrom" value="2026-08-26T00:00:00" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910006" />
+        <field name="al_questionid" value="31e90bf2-64a1-f111-b8dd-e4fade069307" />
+      </record>
+    </records>
+  </entity>
+</entities>
