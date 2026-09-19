@@ -455,6 +455,7 @@
           <attribute name="al_responseid" />
           <attribute name="al_questionversionid" />
           <attribute name="al_answertext" />
+          <attribute name="al_answerrichtext" />
           <attribute name="al_answerchoice" />
           <attribute name="al_answerchoices" />
           <attribute name="al_answerdate" />
@@ -862,6 +863,7 @@
           {% endfor %}
 
           {% if rt == 120910000 or rt == 120910001 %}{% assign column = 'text' %}
+          {% elsif rt == 120910011 %}{% assign column = 'richtext' %}
           {% elsif rt == 120910002 %}{% assign column = 'date' %}
           {% elsif rt == 120910004 %}{% assign column = 'choices' %}
           {% else %}{% assign column = 'choice' %}
@@ -948,6 +950,49 @@
                   <textarea data-ot-input{% unless editable %} disabled{% endunless %} aria-label="{{ qv.al_questiontext | escape }}">{{ existing.al_answertext | escape }}</textarea>
                 {% else %}
                   <input type="text" data-ot-input{% unless editable %} disabled{% endunless %} value="{{ existing.al_answertext | escape }}" aria-label="{{ qv.al_questiontext | escape }}" />
+                {% endif %}
+
+              {% elsif column == 'richtext' %}
+                {% comment %}
+                  A Rich text answer (item 7, 2026-09-19). contenteditable with a small
+                  toolbar rather than an editor library: this site loads no third-party
+                  script and carries no JS web file at all, so a CDN would be a first here
+                  and a new thing for its content security policy to allow. The vocabulary
+                  the toolbar offers is exactly the vocabulary HtmlSanitiser keeps, so
+                  nothing a checker can press produces markup the save then discards.
+
+                  The stored value is emitted as markup deliberately. It is the one value on
+                  this page that is not escaped, and that is safe because it cannot reach the
+                  column unsanitised: ResponseGuardPlugin cleans al_answerrichtext
+                  pre-operation on al_response itself, so every write is reduced to the
+                  allow-list whatever sent it - this page, the Code App, or a PATCH made by
+                  hand at an existing row.
+
+                  Read-only renders the same markup without the toolbar, so a submitted
+                  answer reads as it did while it was being written.
+                {% endcomment %}
+                {% if editable %}
+                <div class="ot-rte">
+                  <div class="ot-rte__bar" role="toolbar" aria-label="Formatting">
+                    <button type="button" class="ot-rte__btn" data-ot-rte-cmd="bold" title="Bold" aria-label="Bold"><strong>B</strong></button>
+                    <button type="button" class="ot-rte__btn" data-ot-rte-cmd="italic" title="Italic" aria-label="Italic"><em>I</em></button>
+                    <button type="button" class="ot-rte__btn" data-ot-rte-cmd="underline" title="Underline" aria-label="Underline"><u>U</u></button>
+                    <span class="ot-rte__sep" aria-hidden="true"></span>
+                    <button type="button" class="ot-rte__btn" data-ot-rte-cmd="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list">&bull; List</button>
+                    <button type="button" class="ot-rte__btn" data-ot-rte-cmd="insertOrderedList" title="Numbered list" aria-label="Numbered list">1. List</button>
+                    <span class="ot-rte__sep" aria-hidden="true"></span>
+                    <button type="button" class="ot-rte__btn" data-ot-rte-cmd="removeFormat" title="Clear formatting" aria-label="Clear formatting">Clear</button>
+                  </div>
+                  <div class="ot-rte__area"
+                       contenteditable="true"
+                       data-ot-input
+                       data-ot-rich
+                       role="textbox"
+                       aria-multiline="true"
+                       aria-label="{{ qv.al_questiontext | escape }}">{{ existing.al_answerrichtext }}</div>
+                </div>
+                {% else %}
+                <div class="ot-rte__read">{{ existing.al_answerrichtext | default: '&mdash;' }}</div>
                 {% endif %}
 
               {% elsif column == 'date' %}
@@ -1222,6 +1267,15 @@
 
                 if (column === 'text') {
                   body.al_answertext = inputs[0].value || null;
+                } else if (column === 'richtext') {
+                  // What the editor holds, as markup. Sent as it stands: ResponseGuardPlugin
+                  // reduces it to the allow-list pre-operation on al_response, so the
+                  // cleaning that matters happens where no caller can skip it. Markup with
+                  // no words is sent as null, so an emptied editor clears the answer rather
+                  // than storing a paragraph holding a line break.
+                  var markup = inputs[0].innerHTML;
+                  var words = markup.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+                  body.al_answerrichtext = words === '' ? null : markup;
                 } else if (column === 'date') {
                   body.al_answerdate = inputs[0].value || null;
                 } else if (column === 'choice') {
@@ -1252,6 +1306,7 @@
                 var request = {
                   questionVersionId: questionVersion,
                   answerText: answer.al_answertext === undefined ? null : answer.al_answertext,
+                  answerRichText: answer.al_answerrichtext === undefined ? null : answer.al_answerrichtext,
                   answerChoice: answer.al_answerchoice === undefined ? null : answer.al_answerchoice,
                   answerChoices: answer.al_answerchoices === undefined ? null : answer.al_answerchoices,
                   answerDate: answer.al_answerdate === undefined ? null : answer.al_answerdate,
@@ -1338,6 +1393,48 @@
                 if (inputs[i].tagName === 'TEXTAREA' || inputs[i].type === 'text') {
                   inputs[i].addEventListener('input', queue);
                 }
+                // contenteditable fires no change event at all, so without this a rich-text
+                // answer would save only when something else on the row did.
+                if (inputs[i].hasAttribute('data-ot-rich')) {
+                  inputs[i].addEventListener('input', queue);
+                  inputs[i].addEventListener('blur', queue);
+                }
+              }
+
+              /*
+               * execCommand is deprecated and is still the only thing every browser here
+               * implements: there is no replacement API for "bold the selection". The
+               * commands offered are the ones HtmlSanitiser keeps, so the toolbar cannot
+               * produce formatting the save would discard. mousedown rather than click, and
+               * prevented, so pressing a button does not take the selection out of the
+               * editor before the command runs on it.
+               */
+              var area = root.querySelector('[data-ot-rich]');
+              if (area) {
+                var buttons = root.querySelectorAll('[data-ot-rte-cmd]');
+                for (var b = 0; b < buttons.length; b++) {
+                  buttons[b].addEventListener('mousedown', function (event) {
+                    event.preventDefault();
+                    area.focus();
+                    try {
+                      document.execCommand(this.getAttribute('data-ot-rte-cmd'), false, null);
+                    } catch (e) {
+                      return; // A browser that refuses the command leaves the text as it was.
+                    }
+                    queue();
+                  });
+                }
+
+                // A paste arrives as whatever the source page was. Taking the plain text
+                // keeps a paste from Word or a web page out of an answer that would only be
+                // stripped back to words on the way in anyway.
+                area.addEventListener('paste', function (event) {
+                  var clip = event.clipboardData || window.clipboardData;
+                  if (!clip) { return; }
+                  event.preventDefault();
+                  document.execCommand('insertText', false, clip.getData('text/plain') || '');
+                  queue();
+                });
               }
 
               // No closure over the box is needed any more: toggleReason() no longer takes

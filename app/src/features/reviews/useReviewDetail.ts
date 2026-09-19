@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isVersionEffective } from './versionEffective';
 import { buildSectionFilter, referenceDay } from './sectionFilter';
-import { answerOf } from './reviewAnswer';
+import { answerOf, richTextOf } from './reviewAnswer';
 import { date, text } from '../../lib/format';
 import { buildSections, type ReviewSection } from './reviewSections';
 import {
@@ -44,6 +44,8 @@ import { choiceLabel } from '../../lib/choiceLabel';
 
 export interface ReviewResponse extends TickedAnswer {
   answer: string | null;
+  /** The markup of a Rich text answer, drawn as markup rather than as words. */
+  answerRichText: string | null;
   answeredOn: string | null;
 }
 
@@ -149,6 +151,7 @@ function toResponse(
     answerChoice: record.al_answerchoice ?? null,
     answerChoices: record.al_answerchoices ?? [],
     answer: answerOf(record),
+    answerRichText: richTextOf(record),
     answeredOn: date(record.al_answerdate) ?? date(record.modifiedon),
   };
 }

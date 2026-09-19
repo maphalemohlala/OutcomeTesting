@@ -120,6 +120,7 @@ namespace OutcomeTesting.Plugins
             }
 
             EnsureSectionBelongsToReview(service, questionVersion, review);
+            SanitiseRichText(target);
             EnsureAnswerShape(target, pre, responseType.Value);
 
             // Stamped server-side, never accepted from the client: al_ResponseCodeKey is what
@@ -226,6 +227,33 @@ namespace OutcomeTesting.Plugins
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Replaces the rich-text answer on the Target with its allow-listed form, so the
+        /// row that reaches the database is clean whatever wrote it (item 7, 2026-09-19).
+        ///
+        /// AnswerWriter already sanitises, and the portal's editor sanitises before it
+        /// sends. Neither is the guarantee. This step is pre-operation on al_response
+        /// itself, so it is the last thing to touch the row before it is stored, and it
+        /// therefore covers the path those two do not: a PATCH straight at an existing
+        /// al_response from a browser that holds write permission on the table. That path
+        /// reaches here without passing AnswerWriter at all, and until this ran the shape
+        /// check would have waved a script through - it asks whether the answer is markup,
+        /// not what the markup says.
+        ///
+        /// Mutating the Target in a pre-operation step is how a plug-in changes what gets
+        /// written, and is the same mechanism al_ResponseCodeKey is stamped by below.
+        /// </summary>
+        private static void SanitiseRichText(Entity target)
+        {
+            if (target == null || !target.Contains("al_answerrichtext"))
+            {
+                return;
+            }
+
+            target["al_answerrichtext"] = HtmlSanitiser.Clean(
+                target.GetAttributeValue<string>("al_answerrichtext"));
         }
 
         private static void EnsureAnswerShape(Entity target, Entity pre, int responseType)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Al_responses } from '../../generated/models/Al_responsesModel';
-import { answerOf } from './reviewAnswer';
+import { answerOf, plainTextOf, richTextOf } from './reviewAnswer';
 
 /**
  * The SDK returns an empty column as null, not undefined, so a text answer arrives with
@@ -52,5 +52,43 @@ describe('answerOf', () => {
 
   it('reports nothing when every answer column is null', () => {
     expect(answerOf(response({}))).toBeNull();
+  });
+});
+
+describe('a Rich text answer', () => {
+  // Item 7, 2026-09-19. The markup is what the page draws; the words are what everything
+  // asking for a string gets, so a rich-text answer does not read as "Not answered".
+  it('gives the markup back for drawing', () => {
+    const record = response({ al_answerrichtext: '<p>Recalculate the <strong>LSA</strong></p>' });
+
+    expect(richTextOf(record)).toBe('<p>Recalculate the <strong>LSA</strong></p>');
+  });
+
+  it('reduces the same answer to words', () => {
+    const record = response({ al_answerrichtext: '<p>Recalculate the <strong>LSA</strong></p>' });
+
+    expect(plainTextOf(record)).toBe('Recalculate the LSA');
+  });
+
+  it('decodes the entities the sanitiser stored', () => {
+    const record = response({ al_answerrichtext: '<p>Jones &amp; Co</p>' });
+
+    expect(plainTextOf(record)).toBe('Jones & Co');
+  });
+
+  it('answers with the words when there is no other answer', () => {
+    const record = response({ al_answerrichtext: '<p>Reissue the report</p>' });
+
+    expect(answerOf(record)).toBe('Reissue the report');
+  });
+
+  it('is absent when the markup carries no words', () => {
+    // Belt and braces: the column should never hold this, because the sanitiser returns
+    // null for it. If one ever does, it must not read as an answer.
+    const record = response({ al_answerrichtext: '<p><br /></p>' });
+
+    expect(richTextOf(record)).toBe('<p><br /></p>');
+    expect(plainTextOf(record)).toBeNull();
+    expect(answerOf(record)).toBeNull();
   });
 });

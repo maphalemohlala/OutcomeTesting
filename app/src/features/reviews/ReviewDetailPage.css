@@ -61,3 +61,28 @@
 }
 
 
+
+/* ------------------------------------------------------------------
+   A Rich text answer, drawn as markup (item 7, 2026-09-19). The
+   document's value cells are single-line spans, so this one becomes a
+   block: a paragraph or a list inside an inline span collapses onto
+   one line and loses the formatting the checker was given an editor
+   for.
+   ------------------------------------------------------------------ */
+.value--rich {
+  display: block;
+}
+
+.value--rich p {
+  margin: 0 0 var(--space-2);
+}
+
+.value--rich p:last-child {
+  margin-bottom: 0;
+}
+
+.value--rich ul,
+.value--rich ol {
+  margin: 0 0 var(--space-2);
+  padding-left: 1.4em;
+}

@@ -63,6 +63,25 @@ function Options({ row, options }: { row: FormRow<ReviewResponse>; options: Choi
 
 /** A free-text or date answer; the empty cell the document leaves for it when unanswered. */
 function Value({ row }: { row: FormRow<ReviewResponse> }) {
+  const markup = row.response?.answerRichText ?? null;
+
+  /*
+   * A Rich text answer is drawn as markup (item 7, 2026-09-19). It is the one value this
+   * page does not escape, and that is safe because it cannot reach the column unsanitised:
+   * ResponseGuardPlugin cleans al_answerrichtext pre-operation on al_response itself, so
+   * every write is reduced to HtmlSanitiser's allow-list whatever wrote it - the portal's
+   * editor, this app, or a PATCH made by hand at an existing row. Rendering it as words
+   * instead would lose the formatting the checker was given an editor for.
+   */
+  if (markup !== null) {
+    return (
+      <span
+        className="value value--rich"
+        dangerouslySetInnerHTML={{ __html: markup }}
+      />
+    );
+  }
+
   const answer = row.response?.answer ?? null;
   return (
     <span className="value" data-empty={answer === null ? 'true' : undefined}>

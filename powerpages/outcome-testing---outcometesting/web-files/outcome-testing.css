@@ -1448,6 +1448,112 @@ footer a:focus-visible, .footer a:focus-visible {
    of its check. */
 
 /* ------------------------------------------------------------------
+   Rich text answers (item 7, 2026-09-19).
+
+   A contenteditable box with a small toolbar, styled to sit inside the
+   V8 sheet: Calibri at the sheet's size, ruled like the cells around
+   it. The toolbar is the vocabulary HtmlSanitiser keeps and no more.
+   ------------------------------------------------------------------ */
+
+.ot-rte {
+  border: 1px solid var(--line, #b7bcbc);
+  background: #fff;
+}
+
+.ot-rte__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-bottom: 1px solid var(--line, #b7bcbc);
+  background: var(--band, #eceff0);
+}
+
+.ot-rte__btn {
+  font: inherit;
+  font-size: 10pt;
+  line-height: 1;
+  min-width: 2rem;
+  padding: 4px 7px;
+  color: var(--ink, #1a1a1a);
+  background: #fff;
+  border: 1px solid var(--line, #b7bcbc);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.ot-rte__btn:hover { background: var(--subband, #f4f6f6); }
+
+.ot-rte__btn:focus-visible {
+  outline: 2px solid #005a9e;
+  outline-offset: 1px;
+}
+
+.ot-rte__sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--line, #b7bcbc);
+}
+
+/* The editing surface. min-height so an empty answer is obviously a box
+   to type in rather than a thin line, and overflow-y so a long remedial
+   note scrolls inside the sheet instead of stretching the page. */
+.ot-rte__area,
+.ot-rte__read {
+  min-height: 7rem;
+  max-height: 24rem;
+  overflow-y: auto;
+  padding: 6px 8px;
+  font-size: 10.5pt;
+  line-height: 1.45;
+}
+
+.ot-rte__area:focus-visible {
+  outline: 2px solid #005a9e;
+  outline-offset: -2px;
+}
+
+/* The same markup read-only, so a submitted answer reads as it did
+   while it was being written. No box: on a submitted review every other
+   answer is bare text in a cell, and a framed one would look editable. */
+.ot-rte__read {
+  min-height: 0;
+  padding: 0;
+}
+
+/* Lists inside an answer keep their markers clear of the cell edge; the
+   sheet's own reset flattens ul and ol everywhere else. */
+.ot-rte__area ul,
+.ot-rte__area ol,
+.ot-rte__read ul,
+.ot-rte__read ol {
+  margin: 0 0 6px;
+  padding-left: 1.6em;
+}
+
+.ot-rte__area p,
+.ot-rte__read p { margin: 0 0 6px; }
+
+.ot-rte__area p:last-child,
+.ot-rte__read p:last-child { margin-bottom: 0; }
+
+/* Printed, an answer is words on the page: no frame, no toolbar, and
+   nothing clipped by a scroll box. */
+@media print {
+  .ot-rte { border: 0; }
+  .ot-rte__bar { display: none; }
+  .ot-rte__area,
+  .ot-rte__read {
+    max-height: none;
+    overflow: visible;
+    min-height: 0;
+    padding: 0;
+  }
+}
+
+/* ------------------------------------------------------------------
    Tax check notes, surfaced on pages that are not the Tax review
    itself (project owner, 2026-09-19). Read-only, so it is styled as
    prose rather than as a field: no border, no input affordance.

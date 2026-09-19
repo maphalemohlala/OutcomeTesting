@@ -45,6 +45,7 @@ export interface Al_responsesBase {
   al_answerchoice?: Al_responsesal_answerchoice;
   al_answerchoices?: Al_responsesal_answerchoices[];
   al_answerdate?: string;
+  al_answerrichtext?: string;
   al_answertext?: string;
   al_name: string;
   "al_questionversionid@odata.bind": string;

@@ -133,6 +133,14 @@
           "x-ms-dataverse-type": "DateTimeType",
           "x-ms-schema-name": "al_AnswerDate"
         },
+        "al_answerrichtext": {
+          "type": "string",
+          "title": "Answer (rich text)",
+          "x-ms-dataverse-attribute": "al_answerrichtext",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "al_AnswerRichText",
+          "maxLength": 32000
+        },
         "al_answertext": {
           "type": "string",
           "title": "Answer text",
