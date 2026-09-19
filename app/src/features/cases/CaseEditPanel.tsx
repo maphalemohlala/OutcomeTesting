@@ -316,7 +316,12 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
     const found = validateSubmit({
       changedCount: Object.keys(changed).length,
       allocationCount: chosen.length,
-      adviceDate: typeof form.al_advicedate === 'string' ? form.al_advicedate : null,
+      // Only when it was actually changed, which is what the command validates: ApplyFields
+      // walks the changed fields alone, so a case already carrying a future date - one
+      // imported or entered before this rule - stays editable, and fixing that date is one
+      // of the edits it stays editable for. Reading it off the form instead would refuse a
+      // change to an unrelated field over a value nobody had touched.
+      adviceDate: 'al_advicedate' in changed ? changed.al_advicedate : null,
     });
     setErrors(found);
     if (found.length > 0) return;

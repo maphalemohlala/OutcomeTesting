@@ -115,6 +115,28 @@ describe('case edit validation', () => {
     expect(validateSubmit({ changedCount: 0, allocationCount: 1 })).toEqual([]);
   });
 
+  it('refuses a date of meeting in the future', () => {
+    expect(
+      validateSubmit({ changedCount: 1, allocationCount: 0, adviceDate: '2099-01-01' }),
+    ).toEqual(['Date of meeting - Client contact cannot be in the future.']);
+  });
+
+  it('accepts a date of meeting in the past', () => {
+    expect(
+      validateSubmit({ changedCount: 1, allocationCount: 0, adviceDate: '2020-01-01' }),
+    ).toEqual([]);
+  });
+
+  it('says nothing about a date of meeting that was not changed', () => {
+    // The panel passes the date only when it is among the changed fields, because
+    // ApplyFields validates the changed fields alone. A case already carrying a future date
+    // - imported or entered before this rule - must stay editable, and fixing that date is
+    // one of the edits it stays editable for. Reading it off the form would refuse a change
+    // to an unrelated field over a value nobody had touched.
+    expect(validateSubmit({ changedCount: 1, allocationCount: 0 })).toEqual([]);
+    expect(validateSubmit({ changedCount: 1, allocationCount: 0, adviceDate: null })).toEqual([]);
+  });
+
   it('asks for one or the other when the form is untouched', () => {
     expect(validateSubmit({ changedCount: 0, allocationCount: 0 })).toEqual([
       'Change at least one field, or choose a checker to allocate a check to.',
