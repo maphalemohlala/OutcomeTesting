@@ -74,12 +74,30 @@
     {% assign labels = 'FactFind quality,Risk / capacity mismatch,Research / rationale,Charges / value,Client communication,Process / documentation,AML / CRA,Retirement Proposition,Adviser judgement' | split: ',' %}
 {% endcase %}
 
+{% comment %}
+  `locked` is an optional pipe-delimited list of values this question may not currently take,
+  e.g. '|120910300|120910303|'. It is what item 10 (2026-09-19) uses to take PASS and PASS
+  WITH ISSUES off the advice quality grade once a Suitability core check has been answered
+  Insufficient evidence.
+
+  Delimited rather than compared as a bare substring, the same way the multi-select above
+  builds optkey: none of these values is a substring of another today, and a list that
+  depends on that staying true is a list that breaks quietly.
+
+  Rendering only. GradingRules.SuitabilityGradeRefusal is the authority and refuses the write
+  itself, in ResponseGuardPlugin and again in the command that completes the review, so a
+  value locked here and not there would still be saveable and a value locked there and not
+  here is simply refused with a sentence.
+{% endcomment %}
 <div class="opts">
   {% for value in values %}
-    <label class="opt"><input type="radio" class="cc-box"
+    {% assign valuekey = '|' | append: value | append: '|' %}
+    {% assign is_locked = false %}
+    {% if locked and locked contains valuekey %}{% assign is_locked = true %}{% endif %}
+    <label class="opt{% if is_locked %} opt--locked{% endif %}"><input type="radio" class="cc-box"
              name="q-{{ question }}"
              value="{{ value }}"
-             data-ot-input{% unless editable %} disabled{% endunless %}
+             data-ot-input{% if is_locked %} data-ot-lockable{% endif %}{% unless editable %} disabled{% endunless %}{% if is_locked %} disabled{% endif %}
              {% if selected and selected == value %}checked{% endif %} /> {{ labels[forloop.index0] }}</label>
   {% endfor %}
 </div>

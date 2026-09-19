@@ -122,6 +122,8 @@ namespace OutcomeTesting.Plugins
             EnsureSectionBelongsToReview(service, questionVersion, review);
             SanitiseRichText(target);
             EnsureAnswerShape(target, pre, responseType.Value);
+            EnsureGradeAgreesWithSuitability(
+                service, target, responseType.Value, questionVersion, reviewRef.Id);
 
             // Stamped server-side, never accepted from the client: al_ResponseCodeKey is what
             // makes a replayed create collide instead of writing a rival answer.
@@ -132,6 +134,68 @@ namespace OutcomeTesting.Plugins
                 {
                     target["al_name"] = questionVersionRef.Name ?? "Answer";
                 }
+            }
+        }
+
+        /// <summary>
+        /// A Suitability core check answered Insufficient evidence takes Pass and Pass with
+        /// issues off the advice quality grade (item 10, 2026-09-19). This is the "must not be
+        /// saveable" half: the page stops offering them, and this stops a PATCH made by hand,
+        /// a stale tab, or any other front end from writing one anyway (NFR-SEC-01).
+        ///
+        /// Guarded cheaply then exactly, as ClearRootCauseOnPass is. Only an incoming Pass or
+        /// Pass with issues is looked at, and only on the grade's own scale, which belongs to
+        /// Q-GR-01 alone (AD-055); the question code is then confirmed, because a response type
+        /// is a convention checklist administration could reassign and the code is the AD-122
+        /// contract. Only then is the review's Suitability evidence read.
+        ///
+        /// Note which way round this runs. Writing the GRADE against existing Insufficient
+        /// answers is refused; writing an Insufficient ANSWER against an existing grade is not
+        /// - that clears the grade instead, in ResponseProgressPlugin. The checker is recording
+        /// what they found on the file, and the finding is not the thing to argue with.
+        ///
+        /// Public and static so it can be driven with plain Entities, as SectionRefusal is:
+        /// the assembly is signed and deliberately carries no InternalsVisibleTo.
+        /// </summary>
+        public static void EnsureGradeAgreesWithSuitability(
+            IOrganizationService service,
+            Entity target,
+            int responseType,
+            Entity questionVersion,
+            Guid reviewId)
+        {
+            if (responseType != GradingRules.GradeResponseType || !target.Contains("al_answerchoice"))
+            {
+                return;
+            }
+
+            var choice = target.GetAttributeValue<OptionSetValue>("al_answerchoice");
+            if (choice == null || GradingRules.GradeAllowedWithInsufficientEvidence(choice.Value))
+            {
+                return;
+            }
+
+            var questionRef = questionVersion.GetAttributeValue<EntityReference>("al_questionid");
+            if (questionRef == null)
+            {
+                return;
+            }
+
+            var question = service.Retrieve(
+                "al_question", questionRef.Id, new ColumnSet("al_questioncode"));
+            var code = question == null ? null : question.GetAttributeValue<string>("al_questioncode");
+            if (code == null
+                || !code.Trim().Equals(
+                    GradingRules.GradeQuestionCode, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var refusal = GradingRules.SuitabilityGradeRefusal(
+                choice.Value, ChecklistQueries.HasSuitabilityInsufficient(service, reviewId));
+            if (refusal != null)
+            {
+                throw new InvalidPluginExecutionException(PreconditionPrefix + refusal);
             }
         }
 

@@ -674,6 +674,17 @@
         {% assign grade_seen = false %}
         {% assign grade_value = '' %}
         {% comment %}
+          Whether any Suitability core check has been answered Insufficient evidence, which
+          takes PASS and PASS WITH ISSUES off the advice quality grade (item 10, 2026-09-19).
+
+          Accumulated as the loop passes E1 to E5, which it does before Judgement and grading
+          - S-GRADE is the last section in display order, and the grade is the only thing this
+          feeds. GradingRules.SuitabilityGradeRefusal is the authority: it refuses the write in
+          ResponseGuardPlugin and again in the submit command, so what this drives is which
+          options the page offers, never which ones can be saved.
+        {% endcomment %}
+        {% assign suitability_insufficient = false %}
+        {% comment %}
           Sections outer, that section's questions inner. The rows are matched on the section
           CODE rather than the section id, because the code is a plain string on both sides
           while an aliased guid's type through Liquid is not something to bet the whole form
@@ -712,6 +723,15 @@
           {% if qv['s.al_sectioncode'] == sec.al_sectioncode %}
           {% assign sid = qv['s.al_sectionid'] %}
           {% assign scode = qv['s.al_sectioncode'] %}
+          {% comment %}
+            The Suitability core checks, by section code rather than by display name, as the
+            batch asked. This is a substring test because this site's Liquid has no prefix
+            filter to rely on (see the filter limits recorded for OT Case List); the server's
+            GradingRules.IsSuitabilitySection is the exact rule - S-E followed by a digit -
+            and it is the one that decides. The two agree on every section that exists.
+          {% endcomment %}
+          {% assign is_suitability = false %}
+          {% if scode contains 'S-E' %}{% assign is_suitability = true %}{% endif %}
           {% assign sname = qv['s.al_name'] %}
           {% assign shelp = qv['s.al_helptext'] %}
           {% assign soptional = qv['s.al_isoptional'] %}
@@ -1020,6 +1040,10 @@
             {% assign grade_value = chosen_value %}
           {% endif %}
 
+          {% if is_suitability and chosen_value == '120910302' %}
+            {% assign suitability_insufficient = true %}
+          {% endif %}
+
           {% assign qcode = qv['q.al_questioncode'] %}
           {% if qcode contains '-LENS' %}
             {% comment %}
@@ -1033,7 +1057,7 @@
             {% capture lens_tick_cell %}<td class="optcell"><input type="checkbox" class="cc-box" value="120910305" data-ot-input aria-label="{{ qv.al_questiontext | escape }}"{% unless editable %} disabled{% endunless %}{% if chosen_value == '120910305' %} checked{% endif %} /></td>{% endcapture %}
 
           {% elsif blk_layout == 'grid' and rt == blk_rt %}
-            <tr data-ot-answer
+            <tr data-ot-answer{% if is_suitability %} data-ot-suitability{% endif %}
                 data-question-version="{{ qv_id }}"
                 data-response-id="{{ existing.al_responseid }}"
                 data-response-type="{{ rt }}"
@@ -1094,7 +1118,12 @@
               <tbody>
 
           {% else %}
-            <tr data-ot-answer
+            {% comment %}
+              A Suitability core check reaches this branch too, where AD-146 has taken its
+              block off the grid. The marker goes on both paths, so the grade restriction does
+              not quietly stop watching a section because a question in it was retyped.
+            {% endcomment %}
+            <tr data-ot-answer{% if is_suitability %} data-ot-suitability{% endif %}
                 data-question-version="{{ qv_id }}"
                 data-response-id="{{ existing.al_responseid }}"
                 data-response-type="{{ rt }}"
@@ -1177,7 +1206,17 @@
                 </div>
 
               {% else %}
-                {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id editable: editable is_tax: is_tax_review %}
+                {% comment %}
+                  PASS and PASS WITH ISSUES come off the grade once a Suitability core check
+                  reads Insufficient evidence (item 10, 2026-09-19). Decided here as well as in
+                  script so the page arrives right, and so a submitted review - which renders no
+                  script - shows what was actually available.
+                {% endcomment %}
+                {% assign locked_values = '' %}
+                {% if rt == 120910010 and suitability_insufficient %}
+                  {% assign locked_values = '|120910300|120910303|' %}
+                {% endif %}
+                {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id editable: editable is_tax: is_tax_review locked: locked_values %}
               {% endif %}
               </td>
             </tr>
@@ -1619,7 +1658,12 @@
             var gradeRow = document.querySelector('[data-ot-answer][data-response-type="120910010"]');
             var rootCause = document.querySelector('[data-ot-rootcause]');
 
-            if (gradeRow && rootCause) {
+            /*
+             * Guarded on the grade alone. The two rules below both hang off it, and only one
+             * of them needs the root cause block to be on the page - a review whose root cause
+             * is hidden must still have its grade options restricted.
+             */
+            if (gradeRow) {
               var gradeInputs = gradeRow.querySelectorAll('[data-ot-input]');
 
               // Function expressions rather than declarations: this script runs in strict
@@ -1633,6 +1677,7 @@
               };
 
               var syncRootCause = function () {
+                if (!rootCause) { return; }
                 var grade = gradeChosen();
                 var owed = grade !== '' && grade !== '120910300';
                 rootCause.hidden = !owed;
@@ -1656,6 +1701,94 @@
               for (var h = 0; h < gradeInputs.length; h++) {
                 gradeInputs[h].addEventListener('change', syncRootCause);
               }
+
+              /*
+               * Insufficient evidence on a Suitability core check takes PASS and PASS WITH
+               * ISSUES off the grade (item 10, 2026-09-19), as soon as the condition is met
+               * rather than at submit.
+               *
+               * The server is where this is enforced: ResponseGuardPlugin refuses either value
+               * on the way in, ResponseProgressPlugin clears one already saved when a core
+               * check turns Insufficient, and the submit command refuses a review still
+               * carrying one. This is the AD-041 half - it stops a checker recording a grade
+               * that is about to be taken back off them.
+               *
+               * The template has already locked the two options where the stored answers meet
+               * the condition, so this only has to keep up with what changes on the page.
+               */
+              var GRADE_PASS = '120910300';
+              var GRADE_PASS_WITH_ISSUES = '120910303';
+              var INSUFFICIENT = '120910302';
+
+              var suitabilityRows = document.querySelectorAll('[data-ot-suitability]');
+              var gradeStatus = gradeRow.querySelector('[data-ot-status]');
+
+              var suitabilityInsufficient = function () {
+                for (var r = 0; r < suitabilityRows.length; r++) {
+                  var ticks = suitabilityRows[r].querySelectorAll('[data-ot-input]');
+                  for (var t = 0; t < ticks.length; t++) {
+                    if (ticks[t].checked && ticks[t].value === INSUFFICIENT) { return true; }
+                  }
+                }
+                return false;
+              };
+
+              var syncGradeOptions = function () {
+                var locked = suitabilityInsufficient();
+                var cleared = false;
+
+                for (var g = 0; g < gradeInputs.length; g++) {
+                  var input = gradeInputs[g];
+                  if (input.value !== GRADE_PASS && input.value !== GRADE_PASS_WITH_ISSUES) {
+                    continue;
+                  }
+
+                  /*
+                   * Unticked before it is disabled. A disabled radio keeps its checked state,
+                   * so a grade left selected would still read as chosen to anyone looking at
+                   * the page - and would still be sent by the next save of this answer.
+                   */
+                  if (locked && input.checked) {
+                    input.checked = false;
+                    cleared = true;
+                  }
+
+                  input.disabled = locked;
+                  var label = input.parentNode;
+                  if (label && label.classList) {
+                    if (locked) {
+                      label.classList.add('opt--locked');
+                    } else {
+                      label.classList.remove('opt--locked');
+                    }
+                  }
+                }
+
+                /*
+                 * Prompted, because a grade disappearing without a word is the kind of thing a
+                 * checker reports as data loss. Nothing is sent from here: the suitability
+                 * answer's own save is what clears the stored grade server-side, and a second
+                 * request racing it would decide which write landed last.
+                 */
+                if (cleared && gradeStatus) {
+                  gradeStatus.textContent =
+                    'Grade cleared \u2014 a Suitability core check reads Insufficient evidence, '
+                    + 'so the grade can only be Insufficient evidence or Potential harm.';
+                  gradeStatus.className = 'ot-answer__status ot-answer__status--error';
+                }
+
+                // The root cause follows the grade, and the grade may have just been cleared.
+                syncRootCause();
+              };
+
+              for (var sr = 0; sr < suitabilityRows.length; sr++) {
+                var ticks = suitabilityRows[sr].querySelectorAll('[data-ot-input]');
+                for (var st = 0; st < ticks.length; st++) {
+                  ticks[st].addEventListener('change', syncGradeOptions);
+                }
+              }
+
+              syncGradeOptions();
             }
           })();
         </script>

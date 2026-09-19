@@ -10,11 +10,12 @@ namespace OutcomeTesting.Plugins
     /// Post-operation on al_response Create and Update: what saving an answer does to things
     /// other than that answer.
     ///
-    /// Two effects, both of which have to happen whatever wrote the answer. The first saved
+    /// Three effects, all of which have to happen whatever wrote the answer. The first saved
     /// answer moves the review from Assigned to Review In Progress, which is the FR-010
     /// lifecycle step the checker never performs explicitly (AD-053), and dates the case with
     /// it. A grade of Pass clears any primary root cause already recorded (item 3,
-    /// 2026-09-19).
+    /// 2026-09-19). A Suitability core check answered Insufficient evidence clears a grade of
+    /// Pass or Pass with issues, which can no longer stand beside it (item 10, 2026-09-19).
     ///
     /// This runs server-side because the portal holds no write permission on
     /// al_reviewinstance and must not be given one: a checker who could write the review
@@ -69,6 +70,7 @@ namespace OutcomeTesting.Plugins
             // and the only one that matters - putting it below the gate would mean the root
             // cause was cleared only on a review whose very first answer was its grade.
             ClearRootCauseOnPass(service, target, pre, reviewRef.Id);
+            ClearGradeOnSuitabilityInsufficient(service, target, pre, reviewRef.Id);
 
             var review = service.Retrieve(
                 ReviewEntity,
@@ -170,7 +172,8 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            foreach (var recorded in RootCauseAnswers(service, reviewId))
+            foreach (var recorded in ChecklistQueries.ChoiceAnswersTo(
+                service, reviewId, GradingRules.RootCauseQuestionCode))
             {
                 service.Update(new Entity("al_response", recorded.Id)
                 {
@@ -180,32 +183,71 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Every answer this review holds against the primary root cause that actually
-        /// records a cause. Matched on the question code through Question Version -> Question,
-        /// the same chain SubmitReviewPlugin's gate walks, so the two agree on which row the
-        /// rule is about.
+        /// Clears the advice quality grade when the answer just saved is a Suitability core
+        /// check of Insufficient evidence and the grade recorded is one that can no longer
+        /// stand beside it (item 10, 2026-09-19).
         ///
-        /// Rows already holding nothing are left out rather than cleared again: an Update
-        /// that changes no value still writes a modified-on stamp and still fires every step
-        /// registered on the table.
+        /// The batch asked for a now-invalid outcome to be cleared and the user prompted,
+        /// rather than for the tick to be refused, and that is the right way round: the
+        /// checker is recording what they found on the file, and what they found is not the
+        /// thing to argue with. The grade they must now re-make is between Insufficient
+        /// evidence and Potential harm, and ResponseGuardPlugin refuses anything else from
+        /// this moment on.
+        ///
+        /// Only Pass and Pass with issues are cleared - never a grade already Insufficient
+        /// evidence or Potential harm, which still stand, and never an unanswered one.
+        ///
+        /// The clearing Update re-enters this plug-in and stops at the first test, as the root
+        /// cause clearing does: the row it writes holds no choice, so it is not an Insufficient
+        /// evidence answer.
         /// </summary>
-        private static IEnumerable<Entity> RootCauseAnswers(IOrganizationService service, Guid reviewId)
+        public static void ClearGradeOnSuitabilityInsufficient(
+            IOrganizationService service,
+            Entity target,
+            Entity pre,
+            Guid reviewId)
         {
-            var query = new QueryExpression("al_response")
+            if (service == null || target == null || !target.Contains("al_answerchoice"))
             {
-                ColumnSet = new ColumnSet("al_answerchoice"),
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
-            query.Criteria.AddCondition("al_answerchoice", ConditionOperator.NotNull);
+                return;
+            }
 
-            var versionLink = query.AddLink(
-                "al_questionversion", "al_questionversionid", "al_questionversionid");
-            var questionLink = versionLink.AddLink("al_question", "al_questionid", "al_questionid");
-            questionLink.LinkCriteria.AddCondition(
-                "al_questioncode", ConditionOperator.Equal, GradingRules.RootCauseQuestionCode);
+            var choice = target.GetAttributeValue<OptionSetValue>("al_answerchoice");
+            if (choice == null || choice.Value != ResponseRules.ChoiceInsufficient)
+            {
+                return;
+            }
 
-            return service.RetrieveMultiple(query).Entities;
+            var questionVersionRef = target.GetAttributeValue<EntityReference>("al_questionversionid")
+                ?? (pre == null ? null : pre.GetAttributeValue<EntityReference>("al_questionversionid"));
+            if (questionVersionRef == null)
+            {
+                return;
+            }
+
+            // Insufficient evidence sits on the Consumer Duty and Centralised Retirement
+            // Proposition scales too, and neither is a Suitability core check. The section
+            // code is what tells them apart, and GradingRules owns what counts as one.
+            var sectionCode = ChecklistQueries.SectionCodeForVersion(service, questionVersionRef.Id);
+            if (!GradingRules.IsSuitabilitySection(sectionCode))
+            {
+                return;
+            }
+
+            foreach (var recorded in ChecklistQueries.ChoiceAnswersTo(
+                service, reviewId, GradingRules.GradeQuestionCode))
+            {
+                var grade = recorded.GetAttributeValue<OptionSetValue>("al_answerchoice");
+                if (!GradingRules.GradeClearedBySuitability(grade == null ? (int?)null : grade.Value))
+                {
+                    continue;
+                }
+
+                service.Update(new Entity("al_response", recorded.Id)
+                {
+                    ["al_answerchoice"] = null,
+                });
+            }
         }
 
         /// <summary>

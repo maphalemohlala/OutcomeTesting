@@ -953,6 +953,19 @@ namespace OutcomeTesting.Plugins
                         PreconditionPrefix + "The advice quality grade holds a value this solution does not recognise (" + answer.Value + ").");
                 }
 
+                // A Suitability core check answered Insufficient evidence leaves only
+                // Insufficient evidence and Potential harm available (item 10, 2026-09-19).
+                // ResponseGuardPlugin already refuses a contradicting grade on the way in and
+                // the page stops offering it; this is the command that completes the review,
+                // and it is what catches answers written before the rule existed - deploying a
+                // guard cannot reach back and re-guard rows already saved.
+                var suitabilityRefusal = GradingRules.SuitabilityGradeRefusal(
+                    answer.Value, ChecklistQueries.HasSuitabilityInsufficient(service, targetId));
+                if (suitabilityRefusal != null)
+                {
+                    throw new InvalidPluginExecutionException(PreconditionPrefix + suitabilityRefusal);
+                }
+
                 CreateOutcome(service, targetId, caseRef, caseReference, sequence, outcomeValue);
                 nextStatus = OutcomeRules.NextCaseStatusForAqs(outcomeValue, remedialFlagged);
                 requiresRemediation = OutcomeRules.RequiresRemediation(outcomeValue, remedialFlagged);

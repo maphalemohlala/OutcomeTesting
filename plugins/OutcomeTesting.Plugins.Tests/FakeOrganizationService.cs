@@ -267,11 +267,34 @@ namespace OutcomeTesting.Plugins.Tests
                 rows = rows.Where(r => Matches(r, q.Criteria));
             }
 
-            foreach (var link in q.LinkEntities)
+            // Filtered and, where a link asks for one, projected. A link that declares an
+            // EntityAlias and Columns is asking for aliased values back - the shape the real
+            // service returns and the shape GetAttributeValue<AliasedValue> reads. Rows are
+            // cloned only when there is something to add to them, so a query that asks for no
+            // aliases still gets the stored entity it has always been handed.
+            var projected = new List<Entity>();
+            foreach (var row in rows)
             {
-                var captured = link;
-                rows = rows.Where(r => SatisfiesLink(r, captured));
+                var aliases = new Dictionary<string, object>();
+                var satisfied = true;
+                foreach (var link in q.LinkEntities)
+                {
+                    if (!SatisfiesLink(row, link, aliases))
+                    {
+                        satisfied = false;
+                        break;
+                    }
+                }
+
+                if (!satisfied)
+                {
+                    continue;
+                }
+
+                projected.Add(aliases.Count == 0 ? row : WithAliases(row, aliases));
             }
+
+            rows = projected;
 
             foreach (var order in Enumerable.Reverse(q.Orders))
             {
@@ -294,6 +317,11 @@ namespace OutcomeTesting.Plugins.Tests
         // LinkCriteria along the way. The plug-ins reach a question's section and a
         // response's review this way, so the chain is followed, not just the first hop.
         private bool SatisfiesLink(Entity row, LinkEntity link)
+        {
+            return SatisfiesLink(row, link, null);
+        }
+
+        private bool SatisfiesLink(Entity row, LinkEntity link, Dictionary<string, object> aliases)
         {
             object fromValue;
             if (row.Contains(link.LinkFromAttributeName))
@@ -340,7 +368,7 @@ namespace OutcomeTesting.Plugins.Tests
                 var childrenSatisfied = true;
                 foreach (var child in link.LinkEntities)
                 {
-                    if (!SatisfiesLink(candidate, child))
+                    if (!SatisfiesLink(candidate, child, aliases))
                     {
                         childrenSatisfied = false;
                         break;
@@ -349,11 +377,66 @@ namespace OutcomeTesting.Plugins.Tests
 
                 if (childrenSatisfied)
                 {
+                    Project(candidate, link, aliases);
                     return true;
                 }
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Records the columns a matched link row was asked for, keyed as the real service
+        /// keys them: "alias.attribute".
+        ///
+        /// Only the FIRST related row to satisfy the chain is projected, which is what a fake
+        /// can honestly promise. The real service returns one result row per match, so a query
+        /// whose link matches several rows and whose caller reads an aliased column off it is
+        /// a query this fake describes imperfectly - every such query in this solution reaches
+        /// a single parent through the model's one-parent chain, where there is nothing to
+        /// choose between.
+        /// </summary>
+        private static void Project(Entity candidate, LinkEntity link, Dictionary<string, object> aliases)
+        {
+            if (aliases == null
+                || string.IsNullOrEmpty(link.EntityAlias)
+                || link.Columns == null
+                || link.Columns.Columns.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var column in link.Columns.Columns)
+            {
+                if (!candidate.Contains(column))
+                {
+                    continue;
+                }
+
+                var key = link.EntityAlias + "." + column;
+                if (!aliases.ContainsKey(key))
+                {
+                    aliases[key] = new AliasedValue(
+                        link.LinkToEntityName, column, candidate[column]);
+                }
+            }
+        }
+
+        /// <summary>A copy of the row carrying the aliased values, so the store keeps none.</summary>
+        private static Entity WithAliases(Entity row, Dictionary<string, object> aliases)
+        {
+            var clone = new Entity(row.LogicalName, row.Id);
+            foreach (var attribute in row.Attributes)
+            {
+                clone[attribute.Key] = attribute.Value;
+            }
+
+            foreach (var alias in aliases)
+            {
+                clone[alias.Key] = alias.Value;
+            }
+
+            return clone;
         }
 
         private static bool Matches(Entity row, FilterExpression filter)
