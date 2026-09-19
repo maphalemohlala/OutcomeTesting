@@ -176,7 +176,7 @@
     <ReferencingAttributeName>OwnerId</ReferencingAttributeName>
     <RelationshipDescription>
       <Descriptions>
-        <Description description="Owner Id" languagecode="1033" />
+        <Description description="The user who imported the case. Record owner; nothing in the solution reassigns it (AD-152)." languagecode="1033" />
       </Descriptions>
     </RelationshipDescription>
   </EntityRelationship>
