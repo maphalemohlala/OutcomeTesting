@@ -133,7 +133,10 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.ValidationPrefix + "A case header edit must name the case it applies to.");
             }
 
-            if (payload.TaxCheckRequired == 0 && payload.TaxTeamDisposition == 0)
+            var fields = payload.ParsedFields();
+            var editsTaxFields = payload.TaxCheckRequired != 0 || payload.TaxTeamDisposition != 0;
+
+            if (!editsTaxFields && fields.Count == 0)
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.ValidationPrefix + "A case header edit must change at least one field.");
@@ -145,11 +148,24 @@ namespace OutcomeTesting.Plugins
                 throw new InvalidPluginExecutionException(CommandHelpers.ValidationPrefix + unknown);
             }
 
+            EnsureCheckerEditable(fields);
+
             // The role is the contact's, read from the platform, never a claim in the
             // payload. The contact permission the page writes through is shared with the
             // sign-off and the claim (one allowlist per table), so the check has to be here.
-            EnsureTaxReviewerRole(service, contactId);
-            EnsureTaxReviewOpen(service, caseId);
+            //
+            // Gated on what the edit actually touches. A checker editing the client's name
+            // is not doing the Tax team's work and must not need the Tax team's role.
+            if (editsTaxFields)
+            {
+                EnsureTaxReviewerRole(service, contactId);
+                EnsureTaxReviewOpen(service, caseId);
+            }
+
+            if (fields.Count > 0)
+            {
+                EnsureAssignedToCase(service, contactId, caseId);
+            }
 
             // Cleared before the case is updated, so the column never keeps a request after
             // it has been acted on and a repeat of the same edit is a real second write
@@ -160,8 +176,19 @@ namespace OutcomeTesting.Plugins
                 [RequestAttr] = null,
             });
 
-            var before = service.Retrieve(
-                CaseEntity, caseId, new ColumnSet(TaxRequiredAttr, DispositionAttr, "al_reviewrouteid", "al_casestatus"));
+            var columns = new List<string>
+            {
+                TaxRequiredAttr, DispositionAttr, "al_reviewrouteid", "al_casestatus",
+            };
+            foreach (var field in fields.Keys)
+            {
+                if (!columns.Contains(field))
+                {
+                    columns.Add(field);
+                }
+            }
+
+            var before = service.Retrieve(CaseEntity, caseId, new ColumnSet(columns.ToArray()));
 
             var update = new Entity(CaseEntity, caseId);
             var changes = new List<string>();
@@ -174,6 +201,14 @@ namespace OutcomeTesting.Plugins
             if (payload.TaxTeamDisposition != 0)
             {
                 Record(before, update, changes, DispositionAttr, "For Tax team usage", payload.TaxTeamDisposition);
+            }
+
+            if (fields.Count > 0)
+            {
+                // The Custom API's own applier, so a field coerces and reads the same way
+                // whichever front end sent it.
+                UpdateCaseDetailsPlugin.ApplyFields(
+                    fields, before, update, changes, new OptionLabels(service));
             }
 
             if (changes.Count == 0)
@@ -204,7 +239,7 @@ namespace OutcomeTesting.Plugins
                 CaseEntity,
                 caseId,
                 null,
-                "Tax team header edited from the portal: " + string.Join("; ", changes.ToArray()) + ".",
+                "Case header edited from the portal: " + string.Join("; ", changes.ToArray()) + ".",
                 "caseheader-" + caseId.ToString("N") + "-" + DateTime.UtcNow.Ticks.ToString(),
                 context,
                 contactId,
@@ -255,6 +290,112 @@ namespace OutcomeTesting.Plugins
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// The header fields a checker may edit from the portal (project owner, 2026-09-19:
+        /// "other fields should be editable by the checkers excluding the references and
+        /// IDs").
+        ///
+        /// What is deliberately NOT here, and why:
+        ///
+        ///   references and IDs   al_casereference and al_ioreference identify the case to
+        ///                        the business and key the import (BR-001). They are not in
+        ///                        the Custom API's editable map either, so nothing anywhere
+        ///                        can move them.
+        ///   al_duedate           derived from the upload and locked for everyone.
+        ///   al_casestatus        the lifecycle, moved by the commands that own each
+        ///   al_priority          transition, and by a manager - not a field on the check.
+        ///   the two Tax fields   edited on their own path above, which is role-gated,
+        ///                        because they decide the route rather than describe the case.
+        ///
+        /// Checked against this set BEFORE the caller's own permissions, so a checker naming
+        /// a field they may never edit is told that, rather than being told they are not
+        /// assigned to a case they may well be assigned to.
+        /// </summary>
+        private static readonly HashSet<string> CheckerEditable =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "al_clientname",
+                "al_advisername",
+                "al_advisercode",
+                "al_adviserstatus",
+                "al_paraplanner",
+                "al_paraplannercode",
+                "al_products",
+                "al_casetype",
+                "al_advicedate",
+                "al_productsolutiontype",
+                "al_samplesource",
+                "al_checkername",
+                "al_checkdate",
+                "al_preorpostcheck",
+                "al_vulnerableclient",
+            };
+
+        /// <summary>
+        /// Refuses a field the portal has no business editing, naming it.
+        /// </summary>
+        public static void EnsureCheckerEditable(Dictionary<string, string> fields)
+        {
+            if (fields == null)
+            {
+                return;
+            }
+
+            foreach (var field in fields.Keys)
+            {
+                if (CheckerEditable.Contains(field))
+                {
+                    continue;
+                }
+
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.ValidationPrefix +
+                    "'" + field + "' is not a field that can be edited from the portal.");
+            }
+        }
+
+        /// <summary>
+        /// Refuses a header edit on a case the caller is not checking (item 5, 2026-09-19).
+        ///
+        /// "Assigned to them" means holding an open review on the case: al_reviewinstance
+        /// carries al_assignedcontactid, and an unsubmitted one is work still in this
+        /// checker's hands. Deliberately NOT al_checkername - that column comes from the
+        /// upload file and names whoever the paraplanner expected, so it never proves the
+        /// case was allocated to anyone.
+        ///
+        /// Server-side and not merely hidden on the page: the portal writes through a
+        /// contact permission shared with the sign-off and the claim, so a request can be
+        /// made by hand for any case id. Without this a signed-in checker could edit the
+        /// header of a case they had never been given.
+        ///
+        /// Once their review is submitted the assignment stops counting, which is the same
+        /// line BR-012 draws for the answers: a checker's work is done, and what they
+        /// recorded is no longer theirs to move.
+        /// </summary>
+        public static void EnsureAssignedToCase(IOrganizationService service, Guid contactId, Guid caseId)
+        {
+            var query = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition(ReviewCaseAttr, ConditionOperator.Equal, caseId);
+            query.Criteria.AddCondition("al_assignedcontactid", ConditionOperator.Equal, contactId);
+            query.Criteria.AddCondition("al_submittedon", ConditionOperator.Null);
+
+            if (service.RetrieveMultiple(query).Entities.Count > 0)
+            {
+                return;
+            }
+
+            throw new InvalidPluginExecutionException(
+                CommandHelpers.PreconditionPrefix +
+                "You can only edit the header of a case you are checking. This case is not assigned to you, " +
+                "or your check on it has already been submitted.");
         }
 
         /// <summary>
@@ -327,6 +468,34 @@ namespace OutcomeTesting.Plugins
 
         [DataMember(Name = "taxTeamDisposition")]
         public int TaxTeamDisposition { get; set; }
+
+        /// <summary>
+        /// The rest of the header, as a flat JSON object of logical name to value - the
+        /// same shape al_UpdateCaseDetails takes for its Fields parameter (item 5,
+        /// 2026-09-19), so the portal and the Code App send a header edit the same way.
+        /// Absent or empty means "this edit is only about the Tax fields above".
+        /// </summary>
+        [DataMember(Name = "fields")]
+        public string Fields { get; set; }
+
+        /// <summary>The Fields payload as a dictionary, empty when none was sent.</summary>
+        public Dictionary<string, string> ParsedFields()
+        {
+            if (string.IsNullOrWhiteSpace(Fields))
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            try
+            {
+                return UpdateCaseDetailsPlugin.SimpleJson.ParseObject(Fields);
+            }
+            catch (FormatException)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.ValidationPrefix + "The case header edit could not be read.");
+            }
+        }
 
         public static CaseHeaderRequestPayload Parse(string json)
         {

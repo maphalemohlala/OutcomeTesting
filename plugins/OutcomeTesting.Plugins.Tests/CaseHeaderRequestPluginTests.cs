@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.Xrm.Sdk;
 using OutcomeTesting.Plugins;
 using Xunit;
 
@@ -53,13 +57,92 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void Carries_no_field_the_page_has_no_business_setting()
         {
-            // The payload names the case and the two Tax team options and nothing else. A
-            // signatory, a status or a route in here would be a value the browser could
-            // choose; the plug-in reads the contact from PrimaryEntityId and derives the
-            // route itself for exactly that reason.
-            var properties = typeof(CaseHeaderRequestPayload).GetProperties();
+            // The payload names the case, the two Tax team options and the rest of the
+            // header, and nothing else. A signatory, a status or a route in here would be a
+            // value the browser could choose; the plug-in reads the contact from
+            // PrimaryEntityId and derives the route itself for exactly that reason.
+            //
+            // Named rather than counted (item 5, 2026-09-19). Counting said "3" and told a
+            // reader nothing about WHICH three, so widening the payload failed the test
+            // without saying what had been added or whether it was safe.
+            var properties = typeof(CaseHeaderRequestPayload)
+                .GetProperties()
+                .Select(property => property.Name)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray();
 
-            Assert.Equal(3, properties.Length);
+            Assert.Equal(
+                new[] { "CaseId", "Fields", "TaxCheckRequired", "TaxTeamDisposition" },
+                properties);
+        }
+
+        [Fact]
+        public void Reads_the_header_fields_the_portal_sends()
+        {
+            var payload = new CaseHeaderRequestPayload
+            {
+                CaseId = "x",
+                Fields = "{\"al_clientname\":\"A. Client\",\"al_advicedate\":\"2026-09-01\"}",
+            };
+
+            var fields = payload.ParsedFields();
+
+            Assert.Equal(2, fields.Count);
+            Assert.Equal("A. Client", fields["al_clientname"]);
+            Assert.Equal("2026-09-01", fields["al_advicedate"]);
+        }
+
+        [Fact]
+        public void Reads_an_absent_field_payload_as_no_fields()
+        {
+            // A Tax-only edit sends none, which is the shape this page sent before item 5
+            // and must keep working.
+            Assert.Empty(new CaseHeaderRequestPayload { CaseId = "x" }.ParsedFields());
+            Assert.Empty(new CaseHeaderRequestPayload { CaseId = "x", Fields = "" }.ParsedFields());
+        }
+
+        [Theory]
+        [InlineData("al_casereference")]
+        [InlineData("al_ioreference")]
+        [InlineData("al_duedate")]
+        [InlineData("al_casestatus")]
+        [InlineData("al_priority")]
+        [InlineData("al_taxcheckrequired")]
+        [InlineData("ownerid")]
+        public void Refuses_a_field_the_portal_has_no_business_editing(string field)
+        {
+            // References and IDs identify the case and key the import; the due date is
+            // derived from the upload; status and priority are the lifecycle and a
+            // manager's call; the Tax fields have their own role-gated path above.
+            var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { field, "anything" },
+            };
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => CaseHeaderRequestPlugin.EnsureCheckerEditable(fields));
+
+            Assert.Contains(field, error.Message);
+        }
+
+        [Theory]
+        [InlineData("al_clientname")]
+        [InlineData("al_advisername")]
+        [InlineData("al_advisercode")]
+        [InlineData("al_paraplanner")]
+        [InlineData("al_products")]
+        [InlineData("al_advicedate")]
+        [InlineData("al_checkername")]
+        [InlineData("al_checkdate")]
+        [InlineData("al_vulnerableclient")]
+        public void Allows_the_header_fields_a_checker_owns(string field)
+        {
+            var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { field, "anything" },
+            };
+
+            CaseHeaderRequestPlugin.EnsureCheckerEditable(fields);
         }
 
         [Fact]

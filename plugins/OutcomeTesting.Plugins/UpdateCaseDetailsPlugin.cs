@@ -680,7 +680,19 @@ namespace OutcomeTesting.Plugins
             return true;
         }
 
-        private static void ApplyFields(
+        /// <summary>
+        /// Coerces each named field onto the update and describes the move for the audit.
+        ///
+        /// Public because CaseHeaderRequestPlugin applies the same fields from the portal
+        /// (item 5, 2026-09-19). One reader of Editables, one set of coercion rules and one
+        /// phrasing of "Adviser 'x' -> 'y'", so the two front ends cannot come to disagree
+        /// about what a header edit means or how it reads in the audit.
+        ///
+        /// It does NOT decide who may edit what. Editables says which fields are editable at
+        /// all; the caller decides which of those THIS caller may touch, which is how the
+        /// portal offers a checker a narrower set than an administrator gets here.
+        /// </summary>
+        public static void ApplyFields(
             Dictionary<string, string> fields,
             Entity before,
             Entity update,
@@ -758,7 +770,11 @@ namespace OutcomeTesting.Plugins
         // Minimal reader for a flat JSON object of string values, used because the plugin
         // sandbox (net462) carries no JSON dependency. Values are read as strings; unquoted
         // numbers, booleans and null are accepted and returned as their literal text.
-        private static class SimpleJson
+        /// <summary>
+        /// Public because CaseHeaderRequestPlugin reads the portal's Fields payload with it
+        /// (item 5, 2026-09-19), so both front ends parse a header edit with one reader.
+        /// </summary>
+        public static class SimpleJson
         {
             public static Dictionary<string, string> ParseObject(string text)
             {
