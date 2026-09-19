@@ -72,15 +72,15 @@ disagreeing rather than as a rule holding on one surface only.
 
 ---
 
-## 4. The batch: 2 of 10 done
+## 4. The batch: 4 of 10 done
 
 | # | Item | State |
 |---|---|---|
 | 1 | Wrong options after a type change | **Done** — `a9a757a`, `6a8111f`, `309ce88` |
 | 9 | Rename Advice date, block future dates | **Done** — `18b390e`, `8f679da` |
-| 8 | Advice date ≤ Due date | Next. Extends `CaseHeaderRules`; the project owner confirmed one rule, no Submission date field |
-| 3 | Conditional Primary root cause | Not started. Both are checklist questions in S-GRADE, not form fields |
-| 10 | Insufficient Evidence on Suitability core checks | Not started. The stable key is the **set** S-E1…S-E5, not one section |
+| 8 | Advice date ≤ Due date | **Done** — `a03eb69` |
+| 3 | Conditional Primary root cause | **Done** — `f1f9755`. AD-149; `GradingRules`, the submit gate, and post-operation clearing on `al_response` |
+| 10 | Insufficient Evidence on Suitability core checks | Next. The stable key is the **set** S-E1…S-E5, not one section |
 | 2 | Split Checker into Tax and AQS | Not started. To derive from `al_reviewinstance.al_assignedcontactid`; no schema change |
 | 4 | Rename Owner to Uploaded by | Not started. Premise verified: no plug-in ever reassigns the case's `ownerid` |
 | 6 | Due date editable by T&C Manager | Not started. The 72-hour derivation already exists; this is editability only |
