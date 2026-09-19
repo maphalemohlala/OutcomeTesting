@@ -237,6 +237,21 @@
     {% endif %}
 
     {% comment %}
+      The Tax check's notes (project owner, 2026-09-19).
+
+      On a submitted review only, and only where this review is not itself the Tax one.
+      The Tax review renders Q-TAX-03 in its own questionnaire already, so repeating it
+      above the form would show the same answer twice; what was missing is the AQS
+      checker's view of it, which AD-020 filters out of their form by design.
+
+      Submitted only, because before submission the page is the working form and the Tax
+      note belongs to a check that is still the reviewer's own to change.
+    {% endcomment %}
+    {% if rv.al_submittedon and rv.al_reviewtype.value != 120910200 %}
+      {% include 'OT Tax Notes' case_id: rv['case.al_outcomecaseid'] %}
+    {% endif %}
+
+    {% comment %}
       The document's header block (AD-098): the case fields in the order the Checker
       Checklist lays them out. Outcome Case columns captured at intake, not questions; read
       only here, as on the checklist itself. Choice columns come through the alias as

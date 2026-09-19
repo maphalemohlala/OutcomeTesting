@@ -344,6 +344,17 @@
       are not deducted, so an age spanning one reads a day high.
     </div>
 
+    {% comment %}
+      The Tax check's notes (project owner, 2026-09-19). What the Tax checker wrote is
+      context for putting the case right, and an adviser had no way to reach it: the
+      remediation action carries the checker's fail observation through
+      Remediation.Describe, but not the case notes, and the review pages are closed to them.
+
+      Above the actions rather than beside them, because it describes the check as a whole
+      and not any one thing the adviser owes.
+    {% endcomment %}
+    {% include 'OT Tax Notes' case_id: c.al_outcomecaseid %}
+
     <section class="ot-card" aria-labelledby="ot-remediation-heading">
       <h2 class="ot-card__title" id="ot-remediation-heading">
         {{ c.al_casereference | default: 'Case' | escape }}

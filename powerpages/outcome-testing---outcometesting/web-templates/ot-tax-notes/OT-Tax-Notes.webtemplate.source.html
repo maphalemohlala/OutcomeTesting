@@ -1,0 +1,90 @@
+{% comment %}
+  The Tax check's notes, read-only, for a page that is not the Tax review itself
+  (project owner, 2026-09-19). Include with:
+
+    (% include 'OT Tax Notes' case_id: cid %)
+
+  Q-TAX-03 "Case notes" is what the business calls the Tax notes. It is a question in a
+  Tax-owned section, and AD-020 filters every review page to its own discipline, so an AQS
+  checker reading a completed check and an adviser reading a remediation could not see it
+  at all. Both are people the Tax checker was writing for.
+
+  Nothing here is editable. A response belongs to the review that recorded it, and the Tax
+  review is submitted and locked (BR-012, PP-11) by the time either of these pages is read.
+
+  Only SUBMITTED Tax reviews are read. A draft Tax check is work in progress, and putting a
+  half-written note in front of an adviser as though it were the finding would be worse than
+  showing nothing.
+
+  Every matching review is rendered, not just one. A case can carry more than one submitted
+  Tax review - a recheck, or a regrade - and this Liquid applies no cross-entity order, so
+  picking "the latest" would be picking an arbitrary one and calling it the latest. Each is
+  labelled with its submission date instead, which is both honest and more useful; the
+  ordinary case has exactly one.
+
+  Renders nothing at all when there is no Tax note: a case may be AQS-only, or the Tax
+  checker may simply have left the box empty, and an empty panel headed "Tax check notes"
+  reads as a fault.
+{% endcomment %}
+
+{% if case_id and case_id != '' %}
+  {% fetchxml ot_tax_notes %}
+  <fetch>
+    <entity name="al_response">
+      <attribute name="al_responseid" />
+      <attribute name="al_answertext" />
+      <link-entity name="al_questionversion" from="al_questionversionid" to="al_questionversionid" alias="qv">
+        <link-entity name="al_question" from="al_questionid" to="al_questionid" alias="q">
+          <filter type="and">
+            <condition attribute="al_questioncode" operator="eq" value="Q-TAX-03" />
+          </filter>
+        </link-entity>
+      </link-entity>
+      <link-entity name="al_reviewinstance" from="al_reviewinstanceid" to="al_reviewinstanceid" alias="ri">
+        <attribute name="al_submittedon" />
+        <attribute name="al_sequence" />
+        <filter type="and">
+          <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
+          <condition attribute="al_reviewtype" operator="eq" value="120910200" />
+          <condition attribute="al_submittedon" operator="not-null" />
+        </filter>
+      </link-entity>
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+
+  {% comment %}
+    Counted before anything is drawn, so a case whose Tax checker left the box empty opens
+    no panel. A response row can exist carrying a blank answer - the form writes one as soon
+    as a question is touched - so the test is on the text, not on the row.
+  {% endcomment %}
+  {% assign ot_tax_note_count = 0 %}
+  {% for r in ot_tax_notes.results.entities %}
+    {% assign ot_note_text = r.al_answertext | strip %}
+    {% if ot_note_text != '' %}
+      {% assign ot_tax_note_count = ot_tax_note_count | plus: 1 %}
+    {% endif %}
+  {% endfor %}
+
+  {% if ot_tax_note_count > 0 %}
+  <section class="ot-card ot-tax-notes" aria-labelledby="ot-tax-notes-heading">
+    <h2 class="ot-card__title" id="ot-tax-notes-heading">Tax check notes</h2>
+    <p class="ot-tax-notes__intro">
+      Recorded by the Tax checker when the Tax check was submitted. Read-only here.
+    </p>
+    {% for r in ot_tax_notes.results.entities %}
+      {% assign ot_note_text = r.al_answertext | strip %}
+      {% if ot_note_text != '' %}
+      <div class="ot-tax-notes__item">
+        {% if ot_tax_note_count > 1 %}
+        <p class="ot-tax-notes__meta">
+          Tax check submitted {{ r['ri.al_submittedon'] | date: 'dd MMM yyyy' | default: 'date not recorded' }}
+        </p>
+        {% endif %}
+        <p class="ot-tax-notes__text">{{ ot_note_text | escape | newline_to_br }}</p>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </section>
+  {% endif %}
+{% endif %}
