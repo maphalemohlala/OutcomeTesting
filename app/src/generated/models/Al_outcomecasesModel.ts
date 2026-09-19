@@ -32,6 +32,25 @@ export const Al_outcomecasesal_casetype = {
   120910513: 'Switch/Transfer'
 } as const;
 export type Al_outcomecasesal_casetype = keyof typeof Al_outcomecasesal_casetype;
+export const Al_outcomecasesal_initialtaxoutcome = {
+  120910300: 'Pass',
+  120910301: 'Fail',
+  120910302: 'Pass with issues'
+} as const;
+export type Al_outcomecasesal_initialtaxoutcome = keyof typeof Al_outcomecasesal_initialtaxoutcome;
+export const Al_outcomecasesal_iooutcome = {
+  120910610: 'Pass',
+  120910611: 'Pass with issues',
+  120910612: 'Insufficient evidence',
+  120910613: 'Potential harm'
+} as const;
+export type Al_outcomecasesal_iooutcome = keyof typeof Al_outcomecasesal_iooutcome;
+export const Al_outcomecasesal_iotaskstatus = {
+  120910620: 'Not Started',
+  120910621: 'In Progress',
+  120910622: 'Complete'
+} as const;
+export type Al_outcomecasesal_iotaskstatus = keyof typeof Al_outcomecasesal_iotaskstatus;
 export const Al_outcomecasesal_preorpostcheck = {
   120910540: 'Pre',
   120910541: 'Post'
@@ -96,6 +115,7 @@ export type Al_outcomecasesstatuscode = keyof typeof Al_outcomecasesstatuscode;
 export interface Al_outcomecasesBase {
   al_advicedate?: string;
   al_advisercode?: string;
+  al_adviseremail?: string;
   al_advisername?: string;
   al_adviserstatus?: Al_outcomecasesal_adviserstatus;
   al_casereference: string;
@@ -103,8 +123,20 @@ export interface Al_outcomecasesBase {
   al_casetype?: Al_outcomecasesal_casetype;
   al_checkdate?: string;
   al_checkername?: string;
+  al_checklistcompletedby?: string;
+  al_checklistcompleteddate?: string;
+  al_checklistitems?: string;
   al_clientname?: string;
+  al_clientref?: string;
   al_duedate?: string;
+  al_initialtaxoutcome?: Al_outcomecasesal_initialtaxoutcome;
+  al_iocompletedby?: string;
+  al_iocompleteddate?: string;
+  al_iocreatedby?: string;
+  al_iocreateddate?: string;
+  al_iooutcome?: Al_outcomecasesal_iooutcome;
+  al_ioreference?: string;
+  al_iotaskstatus?: Al_outcomecasesal_iotaskstatus;
   al_name: string;
   al_outcomecaseid: string;
   al_paraplanner?: string;
@@ -116,10 +148,15 @@ export interface Al_outcomecasesBase {
   al_productsolutiontype?: Al_outcomecasesal_productsolutiontype;
   "al_reviewrouteid@odata.bind"?: string;
   al_samplesource?: Al_outcomecasesal_samplesource;
+  al_servicecaseref?: string;
+  al_servicestatus?: string;
+  al_taskstartdate?: string;
+  al_tasktype?: string;
   al_taxcheckrequired?: Al_outcomecasesal_taxcheckrequired;
   al_taxoutcome?: Al_outcomecasesal_taxoutcome;
   al_taxteamdisposition?: Al_outcomecasesal_taxteamdisposition;
   al_vulnerableclient?: Al_outcomecasesal_vulnerableclient;
+  al_workflowname?: string;
   importsequencenumber?: number;
   overriddencreatedon?: string;
   statecode: Al_outcomecasesstatecode;
@@ -132,6 +169,9 @@ export interface Al_outcomecases extends Al_outcomecasesBase {
   al_adviserstatusname?: string;
   al_casestatusname?: string;
   al_casetypename?: string;
+  al_initialtaxoutcomename?: string;
+  al_iooutcomename?: string;
+  al_iotaskstatusname?: string;
   al_preorpostcheckname?: string;
   al_previouscaseidname?: string;
   al_priorityname?: string;

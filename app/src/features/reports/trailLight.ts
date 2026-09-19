@@ -4,12 +4,11 @@ import type { Al_exportrecords } from '../../generated/models/Al_exportrecordsMo
 /**
  * The export record as the file builder needs it.
  *
- * `al_adviseremail` was added to al_exportrecord on 2026-09-19 and the generated model is
- * regenerated from the environment, so it will not appear in `Al_exportrecords` until the
- * column is deployed and the models are rebuilt. Declaring it here lets the column be
- * written and tested now; the intersection can be dropped once regeneration catches up.
+ * A plain alias since 2026-09-19: the generated model now carries `al_adviseremail`, the
+ * column having been created in DEV and the data source regenerated. The name is kept so
+ * the file builder and its tests name what they consume rather than the whole table.
  */
-export type ExportRecord = Al_exportrecords & { al_adviseremail?: string };
+export type ExportRecord = Al_exportrecords;
 
 /**
  * The Trail Light contract fixed by AD-039 (source: `Trailight - Outcome Testing Map.xlsx`):

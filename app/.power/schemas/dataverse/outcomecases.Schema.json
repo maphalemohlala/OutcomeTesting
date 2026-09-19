@@ -25,6 +25,14 @@
           "x-ms-schema-name": "al_AdviserCode",
           "maxLength": 100
         },
+        "al_adviseremail": {
+          "type": "string",
+          "title": "Adviser email",
+          "x-ms-dataverse-attribute": "al_adviseremail",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_AdviserEmail",
+          "maxLength": 200
+        },
         "al_advisername": {
           "type": "string",
           "title": "Adviser name",
@@ -196,6 +204,29 @@
           "x-ms-schema-name": "al_CheckerName",
           "maxLength": 100
         },
+        "al_checklistcompletedby": {
+          "type": "string",
+          "title": "Checklist completed by",
+          "x-ms-dataverse-attribute": "al_checklistcompletedby",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_ChecklistCompletedBy",
+          "maxLength": 100
+        },
+        "al_checklistcompleteddate": {
+          "type": "string",
+          "title": "Checklist completed",
+          "x-ms-dataverse-attribute": "al_checklistcompleteddate",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "al_ChecklistCompletedDate"
+        },
+        "al_checklistitems": {
+          "type": "string",
+          "title": "Checklist items",
+          "x-ms-dataverse-attribute": "al_checklistitems",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "al_ChecklistItems",
+          "maxLength": 2000
+        },
         "al_clientname": {
           "type": "string",
           "title": "Client name",
@@ -204,12 +235,163 @@
           "x-ms-schema-name": "al_ClientName",
           "maxLength": 100
         },
+        "al_clientref": {
+          "type": "string",
+          "title": "Client reference",
+          "x-ms-dataverse-attribute": "al_clientref",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_ClientRef",
+          "maxLength": 100
+        },
         "al_duedate": {
           "type": "string",
           "title": "Due date",
           "x-ms-dataverse-attribute": "al_duedate",
           "x-ms-dataverse-type": "DateTimeType",
           "x-ms-schema-name": "al_DueDate"
+        },
+        "al_initialtaxoutcome": {
+          "type": "string",
+          "title": "Initial tax outcome",
+          "x-ms-dataverse-attribute": "al_initialtaxoutcome",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "al_InitialTaxOutcome",
+          "enum": [
+            "Pass",
+            "Fail",
+            "Pass with issues"
+          ],
+          "x-ms-enum-values": [
+            120910300,
+            120910301,
+            120910302
+          ],
+          "Color": [
+            null,
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "8db443fc-5caf-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Initial tax outcome",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "al_initialtaxoutcomename": {
+          "type": "string",
+          "title": "al_initialtaxoutcomename",
+          "x-ms-dataverse-attribute": "al_initialtaxoutcomename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_initialtaxoutcomeName",
+          "x-ms-read-only": true
+        },
+        "al_iocompletedby": {
+          "type": "string",
+          "title": "IO completed by",
+          "x-ms-dataverse-attribute": "al_iocompletedby",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_IoCompletedBy",
+          "maxLength": 100
+        },
+        "al_iocompleteddate": {
+          "type": "string",
+          "title": "IO completed date",
+          "x-ms-dataverse-attribute": "al_iocompleteddate",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "al_IoCompletedDate"
+        },
+        "al_iocreatedby": {
+          "type": "string",
+          "title": "IO created by",
+          "x-ms-dataverse-attribute": "al_iocreatedby",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_IoCreatedBy",
+          "maxLength": 100
+        },
+        "al_iocreateddate": {
+          "type": "string",
+          "title": "IO created date",
+          "x-ms-dataverse-attribute": "al_iocreateddate",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "al_IoCreatedDate"
+        },
+        "al_iooutcome": {
+          "type": "string",
+          "title": "IO outcome",
+          "x-ms-dataverse-attribute": "al_iooutcome",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "al_IoOutcome",
+          "enum": [
+            "Pass",
+            "Pass with issues",
+            "Insufficient evidence",
+            "Potential harm"
+          ],
+          "x-ms-enum-values": [
+            120910610,
+            120910611,
+            120910612,
+            120910613
+          ],
+          "Color": [
+            null,
+            null,
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "97fe8fff-4daf-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "IO outcome",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "al_iooutcomename": {
+          "type": "string",
+          "title": "al_iooutcomename",
+          "x-ms-dataverse-attribute": "al_iooutcomename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_iooutcomeName",
+          "x-ms-read-only": true
+        },
+        "al_ioreference": {
+          "type": "string",
+          "title": "IO reference",
+          "x-ms-dataverse-attribute": "al_ioreference",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_IoReference",
+          "maxLength": 100
+        },
+        "al_iotaskstatus": {
+          "type": "string",
+          "title": "IO task status",
+          "x-ms-dataverse-attribute": "al_iotaskstatus",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "al_IoTaskStatus",
+          "enum": [
+            "Not Started",
+            "In Progress",
+            "Complete"
+          ],
+          "x-ms-enum-values": [
+            120910620,
+            120910621,
+            120910622
+          ],
+          "Color": [
+            null,
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "3fb2a3f3-4daf-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "IO task status",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "al_iotaskstatusname": {
+          "type": "string",
+          "title": "al_iotaskstatusname",
+          "x-ms-dataverse-attribute": "al_iotaskstatusname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_iotaskstatusName",
+          "x-ms-read-only": true
         },
         "al_name": {
           "type": "string",
@@ -432,6 +614,37 @@
           "x-ms-schema-name": "al_samplesourceName",
           "x-ms-read-only": true
         },
+        "al_servicecaseref": {
+          "type": "string",
+          "title": "Service case reference",
+          "x-ms-dataverse-attribute": "al_servicecaseref",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_ServiceCaseRef",
+          "maxLength": 100
+        },
+        "al_servicestatus": {
+          "type": "string",
+          "title": "Service status",
+          "x-ms-dataverse-attribute": "al_servicestatus",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_ServiceStatus",
+          "maxLength": 100
+        },
+        "al_taskstartdate": {
+          "type": "string",
+          "title": "Task start date",
+          "x-ms-dataverse-attribute": "al_taskstartdate",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "al_TaskStartDate"
+        },
+        "al_tasktype": {
+          "type": "string",
+          "title": "Task type",
+          "x-ms-dataverse-attribute": "al_tasktype",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_TaskType",
+          "maxLength": 100
+        },
         "al_taxcheckrequired": {
           "type": "string",
           "title": "Tax check required",
@@ -564,6 +777,14 @@
           "x-ms-dataverse-type": "VirtualType",
           "x-ms-schema-name": "al_vulnerableclientName",
           "x-ms-read-only": true
+        },
+        "al_workflowname": {
+          "type": "string",
+          "title": "Workflow name",
+          "x-ms-dataverse-attribute": "al_workflowname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_WorkflowName",
+          "maxLength": 100
         },
         "createdby": {
           "type": "string",

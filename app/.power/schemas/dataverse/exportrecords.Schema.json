@@ -26,6 +26,14 @@
           "x-ms-schema-name": "al_Advisercode",
           "maxLength": 100
         },
+        "al_adviseremail": {
+          "type": "string",
+          "title": "Adviser email",
+          "x-ms-dataverse-attribute": "al_adviseremail",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_Adviseremail",
+          "maxLength": 200
+        },
         "al_advisername": {
           "type": "string",
           "title": "Adviser name",
