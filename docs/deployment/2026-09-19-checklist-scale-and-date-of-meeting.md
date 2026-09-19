@@ -144,29 +144,50 @@ since then. Anything else configured that way is still only in DEV, and the next
 overwrite it the same way. Found by diffing the round-trip, not by the upload, which reported
 success.
 
-**`outcome-testing.css` has not been deploying.** Every upload fails one record:
+**`outcome-testing.css` — corrected, and it was never broken.** Every upload failed one
+record:
 
 ```
 Updating table powerpagecomponent with record ID:f065878a-… FAILED
 due to Entity 'powerpagecomponent' With Id = f065878a-… Does Not Exist
 ```
 
-The local manifest holds a record id the environment no longer has. Any CSS change since that
-id went stale never reached DEV. Not touched here; unrelated to these commits.
+This note first read that as the stylesheet never reaching DEV. **That was wrong.** The
+manifest carried *two* entries for `outcome-testing.css`: the web file record itself, under
+`adx_webfile` (`a1000000-…0050`), which uploads cleanly; and an orphan under `annotation`
+(`f065878a-…`) pointing at a note that no longer exists.
 
-**`OT Tax Notes` is missing from DEV.** The template's source is still in this repo and both
-`OT Review Detail` (line 262) and `OT Remediation` (line 356) include it by name, so the Tax
-notes panel renders as nothing. It was already absent before this deployment — uploads do not
-delete.
+Under the Standard Data Model a web file's bytes lived in an `annotation`. Under the
+**Enhanced Data Model** they live in `fileattachment`, and the annotation became a leftover
+that fails on every upload while blocking nothing. The content in DEV is **53,724 bytes —
+byte-for-byte the local file**, so no CSS change was ever lost.
 
-The cause: its yml claims seeded id `…000022`, which the site manifest assigns to **OT Case
+The orphan entry is removed. An upload now processes all 300 records with **no FAILED line**.
+
+**`OT Tax Notes` — fixed.** The template was absent from DEV while both `OT Review Detail`
+(line 262) and `OT Remediation` (line 356) included it by name, so the Tax notes panel
+rendered as nothing. It was already absent before this deployment; uploads do not delete.
+
+The cause: its yml claimed seeded id `…000022`, which the site manifest assigns to **OT Case
 Detail Page**. Under the Standard Data Model web pages and web templates were separate tables,
 so the same seeded GUID was legal in each; under the **Enhanced Data Model both are rows in
-`powerpagecomponent`** and collide. No record holds `…022` now, and the upload will not create
-it — `--forceUploadAll` processed 300 records and still did not. The fix is one line: give it
-a fresh id in `OT-Tax-Notes.webtemplate.yml`. Every id in the seeded `a1000000-…` range is
-taken, so the choice breaks a convention the project maintains deliberately and is left for
-the project owner.
+`powerpagecomponent`** and collide. `--forceUploadAll` processed 300 records and would not
+create it.
+
+Given a free id in the template block — `a1000000-0000-4000-8000-00000000001f`, verified
+unused in the repo and in DEV — it now exists, Active, and the two includes resolve. Templates
+are included by name, so the id change costs nothing.
+
+**Both AML/CRA questions have been retyped.** All five now carry a current version on
+`120910006`, so the section is uniform again and renders as a grid headed Pass / Fail /
+Insufficient evidence — the AD-146 derive path, since the block still declares `120910008`.
+
+**Two components were in DEV but not in the solution.** Recreating the template exposed it:
+the export carried neither `OT Tax Notes` nor the **`Contact - directory read (global)`**
+table permission the portal's people pickers depend on, so neither would have reached TEST or
+PROD. `addsitetosolution` added both — 261 components before, 263 after. The same drift as the
+allowlist, one layer down: configured in the environment, never captured where a managed
+deployment would look.
 
 **`app/.power/schemas/dataverse/outcomecases.Schema.json` still reads "Advice date".** A
 generated build artifact; nothing renders from its `title`. It will correct itself the next

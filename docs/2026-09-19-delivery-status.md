@@ -101,16 +101,39 @@ DEV and never written back to `powerpages/`**. Anything else configured that way
 in DEV, and the next upload will overwrite it the same way. It was found by diffing the
 round-trip; the upload itself reported success.
 
-**`outcome-testing.css` has not been deploying.** Every upload fails on one record whose
-manifest id the environment no longer has, so any CSS change since that id went stale never
-reached DEV. Pre-existing and untouched.
+### Fixed after the first write-up
 
-**`OT Tax Notes` is missing from DEV** while two live templates include it by name, so the Tax
-notes panel renders as nothing. Its seeded id collides with a web page's under the Enhanced
-Data Model, where both live in one table; `--forceUploadAll` will not create it. One line to
-fix, but every id in the seeded range is taken, so the choice is the project owner's.
+**`outcome-testing.css` — this status first said it had not been deploying. That was wrong.**
+The manifest carried two entries for it: the web file record under `adx_webfile`, which
+uploads cleanly, and an orphan under `annotation` pointing at a note that no longer exists.
+Web file bytes lived in annotations under the Standard Data Model; under the Enhanced Data
+Model they live in `fileattachment`, where DEV holds **53,724 bytes — byte-for-byte the local
+file**. No CSS was ever lost. The orphan is removed and an upload now processes all 300
+records with no FAILED line.
 
-**Two AML/CRA questions are still on the old scale**, so that section currently renders as a
-meta table with no headers — correct for a mixed section, not the end state asked for.
+**`OT Tax Notes` is back.** Its seeded id `…000022` collided with a web page's under the
+Enhanced Data Model, where both live in one table, which is why `--forceUploadAll` would not
+create it. Given a free id in the template block — `…00001f`, verified unused in repo and
+environment — it exists, is Active, and the two includes that name it resolve again.
+
+**All five AML/CRA questions now carry a current version on `120910006`**, so that section is
+uniform and heads itself Pass / Fail / Insufficient evidence through the AD-146 derive path.
+
+**Two components were in DEV but not in the solution**, so neither would have promoted to TEST
+or PROD. The recreated `OT Tax Notes`, and — found by the same run — the **`Contact -
+directory read (global)`** table permission, which the portal's people pickers depend on.
+`addsitetosolution` carried both. This is the same drift as the allowlist: configured in the
+environment, never captured where a managed deployment would find it.
+
+**The test project did not compile at HEAD.** `96d37e3` renamed
+`Remediation.AssignUnassignedActions` to `AssignOpenActions` and left five call sites behind;
+it built only for whoever carried the fix in their working tree, which is how the branch came
+to be pushed that way. Fixed, along with the one lint warning the project raised, and the
+`repointremediation` verb written in a previous session is committed rather than left loose.
+
+### Still open
 
 **The item 1 data audit has not been run.**
+
+**Anything configured directly in DEV and never written back to `powerpages/` is still only in
+DEV**, and the next upload will overwrite it the way this one overwrote the allowlist.
