@@ -178,3 +178,74 @@ describe('the outcome lens tick', () => {
   });
 });
 
+
+/**
+ * A seeded block names its own scale and tick columns rather than deriving them, so that the
+ * reference document pins them (AD-098, AD-104). AD-123 checklist administration can retype
+ * the questions underneath it, and the declared scale then describes nothing: S-AMLCRA had
+ * three of its five retyped to 120910006 and went on heading itself Yes / No / N/A.
+ */
+describe('a seeded block whose questions have left its declared scale', () => {
+  const amlcra = (rows: FormRow[]) =>
+    formBlocks([section('S-AMLCRA', 'AML and CRA checking points', rows)], points).find(
+      (block) => block.id === 'amlcra',
+    );
+
+  it('heads itself on the questions’ scale once they have all moved to it', () => {
+    const block = amlcra([row('aml1', 120910006), row('aml2', 120910006)]);
+    expect(block?.kind).toBe('section');
+    if (block?.kind !== 'section') return;
+
+    // Still a grid - the questions agree with each other, they just no longer agree with
+    // 120910008 - and headed by what they actually answer.
+    expect(block.layout).toBe('grid');
+    expect(block.options.map((option) => option.label)).toEqual([
+      'Pass',
+      'Fail',
+      'Insufficient evidence',
+    ]);
+  });
+
+  it('draws no tick columns at all while its questions disagree with each other', () => {
+    // The state the screenshot caught: three retyped, two not. A column header can only
+    // describe one scale, so a block spanning two heads neither and each row draws its own
+    // options inline.
+    const block = amlcra([
+      row('aml1', 120910006),
+      row('aml2', 120910006),
+      row('aml3', 120910006),
+      row('aml4', 120910008),
+      row('aml5', 120910008),
+    ]);
+    if (block?.kind !== 'section') return;
+
+    expect(block.layout).toBe('inline');
+    expect(block.options).toEqual([]);
+  });
+
+  it('leaves a block whose questions still answer on its declared scale alone', () => {
+    const block = amlcra([row('aml1', 120910008), row('aml2', 120910008)]);
+    if (block?.kind !== 'section') return;
+
+    expect(block.layout).toBe('grid');
+    expect(block.options.map((option) => option.label)).toEqual(['Yes', 'No', 'N/A']);
+  });
+
+  it('takes the whole Suitability block off its scale when one subsection leaves it', () => {
+    // E1 to E5 are five sections drawn as one table, so the disagreement need not be inside
+    // a single section for the block to be unable to head itself.
+    const blocks = formBlocks(
+      [
+        section('S-E1', 'Client Objectives', [row('e1', 120910006)], 'Lens one'),
+        section('S-E2', 'Risk and Capacity', [row('e2', 120910008)], 'Lens two'),
+      ],
+      points,
+    );
+    const suitability = blocks.find((block) => block.id === 'suitability');
+    if (suitability?.kind !== 'section') return;
+
+    expect(suitability.groups).toHaveLength(2);
+    expect(suitability.layout).toBe('inline');
+    expect(suitability.options).toEqual([]);
+  });
+});

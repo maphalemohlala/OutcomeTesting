@@ -681,6 +681,7 @@
         {% endcomment %}
         {% assign sec_rt = 0 %}
         {% assign sec_mixed = false %}
+        {% assign sec_other = false %}
         {% for q in qrows %}
           {% if q['s.al_sectioncode'] == sec.al_sectioncode %}
             {% assign qrt = q.al_responsetype.value %}
@@ -690,6 +691,14 @@
               {% elsif sec_rt != qrt %}
                 {% assign sec_mixed = true %}
               {% endif %}
+            {% else %}
+              {% comment %}
+                A question answering on no tick scale at all - written, dated or formatted.
+                A grid cannot hold one: its row has no cell under any column the block is
+                headed by. Counted so a section carrying one is read as a meta table, which
+                is the reading formBlocks makes in the app.
+              {% endcomment %}
+              {% assign sec_other = true %}
             {% endif %}
           {% endif %}
         {% endfor %}
@@ -800,11 +809,37 @@
             would redraw two seeded blocks the reference file pins (AD-098, AD-104).
           {% endcomment %}
           {% unless known %}
-            {% if sec_rt != 0 and sec_mixed == false %}
+            {% if sec_rt != 0 and sec_mixed == false and sec_other == false %}
               {% assign layout = 'grid' %}
               {% assign grid_rt = sec_rt %}
             {% endif %}
           {% endunless %}
+
+          {% comment %}
+            A KNOWN block declares its scale above rather than deriving it, so the reference
+            document can pin its columns. That holds only while its questions still answer on
+            it, and AD-123 checklist administration can retype them: S-AMLCRA had three of
+            its five moved to 120910006 and went on heading itself Yes / No / N/A, describing
+            the two it had left. Where a declared grid no longer matches its questions, the
+            questions win - they are what a checker is actually ticking.
+
+            Only a declared GRID is re-read. S-TAX and S-GRADE declare no scale and are meta
+            on the document, so the guard above still protects what it was written to
+            protect: neither can reach this, and the reference blocks stay pinned.
+
+            Agreeing questions re-head the grid; disagreeing ones, or any question answering
+            on no scale at all, take the block to a meta table where each row draws its own
+            options and no column header can misdescribe it. formBlocks makes the same
+            reading in the app, on the same two tests.
+          {% endcomment %}
+          {% if known and layout == 'grid' %}
+            {% if sec_mixed or sec_other or sec_rt == 0 %}
+              {% assign layout = 'inline' %}
+              {% assign grid_rt = 0 %}
+            {% elsif sec_rt != grid_rt %}
+              {% assign grid_rt = sec_rt %}
+            {% endif %}
+          {% endif %}
 
           {% comment %}
             The tick columns for whichever scale this block is headed by. A `case` on an

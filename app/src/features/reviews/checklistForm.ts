@@ -638,21 +638,56 @@ export function formBlocks<T extends SectionedAnswer>(
       lensTick,
     };
 
+    /**
+     * Whether the section still answers on the scale its block declares.
+     *
+     * A seeded block names its own scale and tick columns above rather than deriving them,
+     * so that the reference document pins them (AD-098, AD-104). That holds only while the
+     * questions still answer on it, and AD-123 checklist administration can retype them:
+     * S-AMLCRA had three of its five retyped to 120910006 and went on heading itself
+     * Yes / No / N/A, describing the two it had left. The declared scale is a default, not
+     * a promise about questions an administrator may since have changed.
+     *
+     * Read off `group.rows`, which is what the block actually draws - the lens tick is
+     * held apart and is not a question answered on the scale.
+     */
+    const declared = spec?.layout === 'grid' ? (spec.scale ?? null) : null;
+    const fitsDeclared =
+      declared == null || group.rows.every((row) => row.responseTypeValue === declared);
+
     const last = blocks[blocks.length - 1];
     if (spec && last && last.kind === 'section' && last.id === spec.id) {
       last.groups.push(group);
+      // One block draws one set of tick columns, so it cannot head half of itself: a later
+      // subsection that has left the scale takes the whole block off it. Suitability core
+      // checks is the only block built from more than one section.
+      if (!fitsDeclared && last.layout === 'grid') {
+        last.layout = 'inline';
+        last.options = [];
+      }
       continue;
     }
 
     if (spec) {
+      // Off its declared scale, the block heads itself from its own questions on exactly
+      // the terms an added section is read on: one shared scale is a grid of that scale,
+      // and a section mixing two is a meta table, where each row draws its own options and
+      // no column header can misdescribe it.
+      const derived = fitsDeclared ? null : sectionLayout(section, isTaxReview);
       blocks.push({
         kind: 'section',
         id: spec.id,
         title: spec.title,
         intro: spec.intro ?? (spec.subsections ? null : section.helpText),
-        layout: spec.layout,
+        layout: derived ? derived.kind : spec.layout,
         columnHeading: spec.columnHeading ?? 'Check',
-        options: spec.scale == null ? [] : optionsFor(spec.scale, isTaxReview),
+        options: derived
+          ? derived.kind === 'grid'
+            ? derived.options
+            : []
+          : spec.scale == null
+            ? []
+            : optionsFor(spec.scale, isTaxReview),
         groups: [group],
         isTaxReview,
       });
