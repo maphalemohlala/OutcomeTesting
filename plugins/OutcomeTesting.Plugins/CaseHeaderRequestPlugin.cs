@@ -303,7 +303,12 @@ namespace OutcomeTesting.Plugins
         ///                        the business and key the import (BR-001). They are not in
         ///                        the Custom API's editable map either, so nothing anywhere
         ///                        can move them.
-        ///   al_duedate           derived from the upload and locked for everyone.
+        ///   al_duedate           derived from the upload, and movable only by a manager in
+        ///                        the Code App (item 6, 2026-09-19: "3 days, only editable
+        ///                        by managers in codeapps"). "In codeapps" is half the
+        ///                        instruction, so the portal refuses it whoever is asking -
+        ///                        a T&C Manager signed into the portal is refused here and
+        ///                        allowed in the app, which is the point.
         ///   al_casestatus        the lifecycle, moved by the commands that own each
         ///   al_priority          transition, and by a manager - not a field on the check.
         ///   the two Tax fields   edited on their own path above, which is role-gated,

@@ -15,7 +15,7 @@
  * when the fields were refused.
  */
 
-import { adviceDateRefusal } from './caseHeaderDates';
+import { adviceDateRefusal, dueDateRefusal } from './caseHeaderDates';
 
 /** What became of one command. */
 export type CommandOutcome =
@@ -140,6 +140,17 @@ export interface SubmitFields {
    * value the case already holds.
    */
   dueDate?: string | null;
+  /**
+   * The due date as the form holds it, when the user actually moved it. Undefined when they
+   * did not, or when they may not - which is not the same as clearing it.
+   */
+  dueDateChanged?: string | null;
+  /**
+   * The date of meeting the save leaves behind, whether or not this save is writing it. The
+   * due date is compared against the case's own meeting date, not only against one being
+   * typed in the same breath.
+   */
+  adviceDateOnRecord?: string | null;
 }
 
 /**
@@ -157,5 +168,15 @@ export function validateSubmit(input: SubmitFields): string[] {
   // `al_UpdateCaseDetails` refuses it too, through the same rule CaseHeaderRules holds; this
   // is here so it costs a keystroke rather than a round trip (AD-041).
   const refusal = adviceDateRefusal(input.adviceDate, undefined, input.dueDate);
-  return refusal ? [refusal] : [];
+  if (refusal) return [refusal];
+
+  // The same invariant from the deadline's end (item 6, 2026-09-19). Only when the due date
+  // was moved: a case whose stored dates already disagree is not something to refuse an
+  // unrelated edit over, and the server takes the same view - ApplyFields walks the changed
+  // fields alone.
+  const dueRefusal = dueDateRefusal(
+    input.dueDateChanged,
+    input.adviceDate ?? input.adviceDateOnRecord,
+  );
+  return dueRefusal ? [dueRefusal] : [];
 }

@@ -55,9 +55,15 @@ public static class WebRoleSeed
             yield return (role, "page.dashboard", AccessView);
         }
 
-        yield return (TaxReviewer, "page.cases", AccessView);
+        // Edit, not View (project owner, 2026-09-12): the IO extract carries none of the
+        // case-header fields and the client's direction is that Tax and AQS complete them by
+        // hand as part of doing the check. DEFAULT_PERMISSIONS was changed that day and this
+        // seed was not, so the two had drifted and a re-run would have quietly withdrawn an
+        // access DEV has been granting for a week. Corrected 2026-09-19 alongside item 6,
+        // which is what made a stale seed worth running again.
+        yield return (TaxReviewer, "page.cases", AccessEdit);
         yield return (TaxReviewer, "page.reviews", AccessEdit);
-        yield return (AqsReviewer, "page.cases", AccessView);
+        yield return (AqsReviewer, "page.cases", AccessEdit);
         yield return (AqsReviewer, "page.reviews", AccessEdit);
 
         yield return (AdviserRemediation, "page.remediation", AccessEdit);
@@ -69,6 +75,7 @@ public static class WebRoleSeed
         yield return (TcSupervisor, "command.regrade", AccessEdit);
         yield return (TcSupervisor, "command.signoff", AccessEdit);
         yield return (TcSupervisor, "command.assign", AccessEdit);
+        yield return (TcSupervisor, "case.duedate", AccessEdit);
 
         yield return (OutcomeTestingManager, "page.cases", AccessEdit);
         yield return (OutcomeTestingManager, "page.imports", AccessEdit);
@@ -77,6 +84,7 @@ public static class WebRoleSeed
         yield return (OutcomeTestingManager, "page.exports", AccessManage);
         yield return (OutcomeTestingManager, "command.assign", AccessEdit);
         yield return (OutcomeTestingManager, "export.generate", AccessEdit);
+        yield return (OutcomeTestingManager, "case.duedate", AccessEdit);
 
         // Planner and Adviser Remediation share remediation routing (OD-019, implemented
         // 2026-08-31): the portal binds both to the same Contact-scoped remediation
@@ -99,6 +107,11 @@ public static class WebRoleSeed
             yield return (admin, "export.generate", AccessEdit);
             yield return (admin, "permission.manage", AccessManage);
         }
+
+        // Moving a due date (item 6, 2026-09-19). Administrators only of the two, because
+        // Portal Administrator holds page.cases at View and so cannot reach the command that
+        // would use this.
+        yield return (Administrators, "case.duedate", AccessEdit);
     }
 
     public static int Run(IOrganizationService svc)

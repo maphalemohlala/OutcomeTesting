@@ -74,20 +74,67 @@ export function adviceDateRefusal(
   return null;
 }
 
+/** The label the business gives `al_duedate`, wherever a message names it. */
+export const DUE_DATE_LABEL = 'Due date';
+
+/**
+ * Why this due date cannot be saved, or null when it can.
+ *
+ * `adviceDateRefusal`'s second rule read from the other end (item 6, 2026-09-19). The due
+ * date became editable, so the invariant can now be broken by moving the DEADLINE rather
+ * than the meeting, and a save that changes only the due date never reaches the other
+ * check. Mirrors `CaseHeaderRules.ValidateDueDate` to the character.
+ *
+ * Only the one comparison, deliberately: `adviceDateRefusal` would also refuse a meeting in
+ * the future, and reporting that to someone editing the due date would send them to a field
+ * they have not touched.
+ *
+ * Either date empty passes. Clearing a date is a legitimate edit, and a case with no meeting
+ * recorded has nothing for a deadline to contradict.
+ */
+export function dueDateRefusal(
+  value: string | null | undefined,
+  adviceDate?: string | null,
+): string | null {
+  const due = (value ?? '').slice(0, 10).trim();
+  const day = (adviceDate ?? '').slice(0, 10).trim();
+  if (due.length === 0 || day.length === 0) return null;
+
+  if (day > due) {
+    return `${DUE_DATE_LABEL} cannot be earlier than ${ADVICE_DATE_LABEL} (${humanDay(day)}).`;
+  }
+
+  return null;
+}
+
+/**
+ * The month names .NET's "MMM" produces under the invariant culture, which is what
+ * `CaseHeaderRules` formats these dates with.
+ *
+ * Spelled out rather than taken from `Intl`, which was what this used until 2026-09-19.
+ * `en-GB` abbreviates September as **"Sept"** and .NET as **"Sep"**, so the two tiers worded
+ * the same refusal differently for one month of the year - and the tests that pinned the
+ * wording all used January, where the two happen to agree. `Intl` output also moves with the
+ * browser's ICU version, so a table is the only way the two stay identical.
+ */
+const SHORT_MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+] as const;
+
 /**
  * `yyyy-MM-dd` as the refusal reads it, e.g. "10 Jan 2026" - the same wording
  * CaseHeaderRules builds server-side, so the two messages are one message.
  *
- * Formatted in UTC deliberately: the value is a plain day, and letting the browser's zone
- * interpret its midnight would move it by one in either direction.
+ * Parsed by hand rather than through `Date`, because the value is a plain day and letting
+ * any zone interpret its midnight would move it by one in either direction.
  */
 function humanDay(day: string): string {
-  const parsed = new Date(`${day}T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) return day;
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(parsed);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!match) return day;
+
+  const month = SHORT_MONTHS[Number(match[2]) - 1];
+  if (!month) return day;
+
+  return `${Number(match[3])} ${month} ${match[1]}`;
 }

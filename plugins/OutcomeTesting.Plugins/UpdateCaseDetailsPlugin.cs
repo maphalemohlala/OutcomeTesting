@@ -51,6 +51,18 @@ namespace OutcomeTesting.Plugins
 
         public const int CommandUpdateCaseDetails = 120910778;
 
+        /// <summary>
+        /// The capability a caller needs, on top of page.cases Edit, to move a case's due
+        /// date (item 6, 2026-09-19: "3 days, only editable by managers in codeapps").
+        ///
+        /// Its own key rather than a higher level on page.cases, because page.cases Edit is
+        /// what lets a Tax or AQS reviewer fill in the header fields the extract does not
+        /// carry (project owner, 2026-09-12) - four roles hold it in DEV, two of them
+        /// checkers. Raising the bar on page.cases would have taken the header away from the
+        /// people who are meant to complete it; a separate key moves one field instead.
+        /// </summary>
+        public const string DueDateResource = "case.duedate";
+
         public UpdateCaseDetailsPlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(UpdateCaseDetailsPlugin))
         {
@@ -90,6 +102,19 @@ namespace OutcomeTesting.Plugins
             var dueDate = ParseOptionalDate(context, InDueDate);
             var fields = ParseFields(context);
 
+            // The legacy DueDate scalar is folded into the Fields payload rather than
+            // applied beside it (item 6, 2026-09-19). al_duedate is an editable field now,
+            // so two parameters wrote the same column: two audit lines worded differently,
+            // two places to gate, and a due date the date-of-meeting comparison could not
+            // see because EffectiveDueDate reads the payload. One door instead.
+            //
+            // An explicit Fields entry wins over the scalar. A caller that sends both has
+            // said the same thing twice, and the newer parameter is the one the app uses.
+            if (dueDate.HasValue && !fields.ContainsKey(DueDateAttr))
+            {
+                fields[DueDateAttr] = dueDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            }
+
             // Idempotency: a replay with the same key returns the original result (NFR-REL-01).
             var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandUpdateCaseDetails);
             if (existingAudit != null)
@@ -100,6 +125,17 @@ namespace OutcomeTesting.Plugins
 
             // Application RBAC gate (AD-041): manager-level edit on the case worklist.
             PermissionHelpers.EnsureAppPermission(systemService, context, "page.cases", PermissionHelpers.AccessEdit);
+
+            // A second gate for one field. The due date is derived at import and is a
+            // deadline the business manages, not a detail of the check, so moving it is a
+            // manager's act even though everything beside it on the same form is not.
+            // Checked before the record is read so a caller who may not move it is told
+            // that, rather than being told the row version is stale.
+            if (TouchesDueDate(fields))
+            {
+                PermissionHelpers.EnsureAppPermission(
+                    systemService, context, DueDateResource, PermissionHelpers.AccessEdit);
+            }
 
             // Capture the before-values of every attribute we may touch, so the Audit Event
             // records a true before/after and the caller's read privilege gates the command.
@@ -133,12 +169,6 @@ namespace OutcomeTesting.Plugins
                 update[PriorityAttr] = new OptionSetValue(priority.Value);
                 changes.Add("Priority " + labels.Describe(CaseEntity, PriorityAttr, before.GetAttributeValue<OptionSetValue>(PriorityAttr))
                     + " -> " + labels.Label(CaseEntity, PriorityAttr, priority.Value));
-            }
-
-            if (dueDate.HasValue)
-            {
-                update[DueDateAttr] = dueDate.Value;
-                changes.Add("Due date " + Describe(before.GetAttributeValue<DateTime?>(DueDateAttr)) + " -> " + dueDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
             }
 
             // General editable case fields, addressed by logical name via the Fields payload.
@@ -496,16 +526,38 @@ namespace OutcomeTesting.Plugins
                 { "al_casestatus", new EditableField(EditableKind.Option, "Status") },
                 { "al_priority", new EditableField(EditableKind.Option, "Priority") },
 
-                // al_duedate is deliberately absent (project owner, 2026-09-19: "due date
-                // should not be edited and should always be set to 72 hours after the
-                // upload"). It is derived by ImportRules.DueDateFor at import and is not a
-                // field anyone may move afterwards - not a checker, not a manager, not an
-                // administrator. An edit naming it is refused as an unknown field, which is
-                // what this map's absence already means.
+                // al_duedate is editable, and its own capability decides by whom (item 6,
+                // 2026-09-19: "3 days, only editable by managers in codeapps"). See
+                // DueDateResource and TouchesDueDate.
                 //
-                // BuildBeforeColumnSet still reads it, because the before-image records what
-                // the case looked like; it just never appears among the changes.
+                // This SUPERSEDES the earlier direction on the same day - "due date should
+                // not be edited and should always be set to 72 hours after the upload" -
+                // which took the column out of this map altogether. The default is unchanged
+                // and still ImportRules.DueDateFor; what changed is that a manager may move
+                // a deadline afterwards. Recorded rather than quietly replaced because the
+                // two instructions are a day apart and the narrower one came second.
+                //
+                // Being in this map is what makes EffectiveDueDate work: it reads the
+                // payload for the due date this save leaves behind, and until now the only
+                // payload that could carry one was a payload about to be refused.
+                { "al_duedate", new EditableField(EditableKind.DateOnly, CaseHeaderRules.DueDateLabel) },
             };
+
+        /// <summary>
+        /// Whether this save moves the due date, and so needs the manager's grant.
+        ///
+        /// Public and pure so the rule can be tested without a permission gate behind it.
+        /// Reads the payload AFTER the legacy scalar has been folded in, which is why it
+        /// takes one argument and not two.
+        ///
+        /// Presence, not change: a payload naming al_duedate asks to write it, and a caller
+        /// who may not move the deadline may not write today's value back either - that
+        /// would be an edit whose audit line says nothing happened.
+        /// </summary>
+        public static bool TouchesDueDate(Dictionary<string, string> fields)
+        {
+            return fields != null && fields.ContainsKey(DueDateAttr);
+        }
 
         private static ColumnSet BuildBeforeColumnSet()
         {
@@ -783,6 +835,22 @@ namespace OutcomeTesting.Plugins
                                 }
                             }
 
+                            // The same invariant from the other end (item 6, 2026-09-19).
+                            // Moving the deadline under a meeting that already happened
+                            // after it would break item 8's rule without ever touching the
+                            // date item 8 guards, and a save that changes only the due date
+                            // never reaches the branch above.
+                            if (string.Equals(attr, DueDateAttr, StringComparison.OrdinalIgnoreCase))
+                            {
+                                var refusal = CaseHeaderRules.ValidateDueDate(
+                                    parsed.Date, EffectiveAdviceDate(fields, before));
+                                if (refusal != null)
+                                {
+                                    throw new InvalidPluginExecutionException(
+                                        CommandHelpers.ValidationPrefix + refusal);
+                                }
+                            }
+
                             update[attr] = parsed.Date;
                             changes.Add(def.Label + " " + Describe(before.GetAttributeValue<DateTime?>(attr)) + " -> " + parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
                             break;
@@ -819,6 +887,36 @@ namespace OutcomeTesting.Plugins
             }
 
             return before == null ? null : before.GetAttributeValue<DateTime?>(DueDateAttr);
+        }
+
+        /// <summary>
+        /// The date of meeting this save leaves behind: the one being written where the
+        /// payload carries it, otherwise the one the case already holds.
+        ///
+        /// EffectiveDueDate's mirror, and needed for the same reason. A save that moves the
+        /// due date and the meeting together must compare the two values it is writing, not
+        /// one of them against a value it is replacing - whichever of the pair ApplyFields
+        /// happens to walk first.
+        /// </summary>
+        private static DateTime? EffectiveAdviceDate(Dictionary<string, string> fields, Entity before)
+        {
+            string raw;
+            if (fields != null
+                && fields.TryGetValue("al_advicedate", out raw)
+                && !string.IsNullOrWhiteSpace(raw))
+            {
+                DateTime written;
+                if (DateTime.TryParse(
+                        raw,
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                        out written))
+                {
+                    return written.Date;
+                }
+            }
+
+            return before == null ? null : before.GetAttributeValue<DateTime?>("al_advicedate");
         }
 
         // Minimal reader for a flat JSON object of string values, used because the plugin

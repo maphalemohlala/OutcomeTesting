@@ -397,6 +397,13 @@ if (args.Length >= 2 && args[0].Equals("backfillcheckernames", StringComparison.
     return BackfillCheckerNames(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
 }
 
+if (args.Length >= 5 && args[0].Equals("setpagepermission", StringComparison.OrdinalIgnoreCase))
+{
+    return SetPagePermissionRule(
+        args[1], args[2], args[3], args[4],
+        args.Length > 5 && args[5].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+}
+
 if (args.Length >= 5 && args[0].Equals("setattributedescription", StringComparison.OrdinalIgnoreCase))
 {
     return SetAttributeDescription(args[1], args[2], args[3], args[4]);
@@ -8129,6 +8136,98 @@ int BackfillIoReference(string orgUrl, bool confirm)
 /// is what a portal claim stamps and what a checker sees themselves called - falling back to
 /// the owning user where a review carries no contact.
 /// </summary>
+/// <summary>
+/// Writes ONE al_pagepermission rule, keyed on al_rolecode, and leaves every other rule
+/// alone.
+///
+/// Deliberately not `seedwebroles`, which rewrites the whole matrix. The stored rules have
+/// moved on from that seed - DEV grants AQS Reviewer page.cases Edit through a row nobody
+/// wrote from code - so re-running it to add one capability would quietly restate fifty
+/// others, and any that had been deliberately changed or withdrawn would come back.
+///
+/// al_pagepermission rows are DATA, not solution components. They do not promote: TEST and
+/// PROD each need this run against them when the change reaches those environments.
+///
+/// Dry run unless --confirm, like every other verb here that writes.
+/// </summary>
+int SetPagePermissionRule(string orgUrl, string role, string resourceKey, string level, bool confirm)
+{
+    var levelValue = level.Trim().ToLowerInvariant() switch
+    {
+        "none" => 120910766,
+        "view" => 120910767,
+        "edit" => 120910768,
+        "manage" => 120910769,
+        _ => 0,
+    };
+
+    if (levelValue == 0)
+    {
+        Console.Error.WriteLine("Level must be one of None, View, Edit, Manage.");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    // The role name RAW, which is what al_SetPagePermission builds its code from - not the
+    // slug WebRoleSeed uses. The two writers disagree, and DEV carries the consequence: T&C
+    // Supervisor has TWO command.signoff rows, `PP-AL-PORTAL--T-C-SUPERVISOR-command.signoff`
+    // from the seed and `PP-AL Portal - T&C Supervisor-command.signoff` from the security
+    // page, because the page's upsert could not see the seeded one.
+    //
+    // Raw is the right side to be on. The security page is how a permission is actually
+    // changed afterwards, and a row it can find is a row an administrator can withdraw;
+    // MaxLevel takes the HIGHEST level across active rows, so a shadow row it cannot see
+    // would quietly keep granting what they thought they had just revoked.
+    var code = "PP-" + role.Trim() + "-" + resourceKey;
+
+    var existing = svc.RetrieveMultiple(new QueryExpression("al_pagepermission")
+    {
+        ColumnSet = new ColumnSet("al_accesslevel", "statecode"),
+        TopCount = 1,
+        Criteria = new FilterExpression { Conditions = { new ConditionExpression("al_pagepermissioncode", ConditionOperator.Equal, code) } },
+    }).Entities;
+
+    var before = existing.Count == 0
+        ? "(no rule)"
+        : existing[0].GetAttributeValue<OptionSetValue>("al_accesslevel")?.Value.ToString() ?? "(no level)";
+
+    Console.WriteLine($"{code}");
+    Console.WriteLine($"   {before} -> {levelValue} ({level})");
+
+    if (!confirm)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"Dry run. Re-run as: setpagepermission <orgUrl> \"{role}\" {resourceKey} {level} --confirm");
+        return 0;
+    }
+
+    var rule = new Entity("al_pagepermission")
+    {
+        ["al_name"] = role + " / " + resourceKey,
+        ["al_pagepermissioncode"] = code,
+        ["al_rolecode"] = role,
+        ["al_resourcekey"] = resourceKey,
+        ["al_accesslevel"] = new OptionSetValue(levelValue),
+    };
+
+    if (existing.Count == 0)
+    {
+        rule["statecode"] = new OptionSetValue(0);
+        rule["statuscode"] = new OptionSetValue(1);
+        svc.Create(rule);
+        Console.WriteLine("   created.");
+    }
+    else
+    {
+        rule.Id = existing[0].Id;
+        svc.Update(rule);
+        Console.WriteLine("   updated.");
+    }
+
+    return 0;
+}
+
 int BackfillCheckerNames(string orgUrl, bool confirm)
 {
     using var svc = Connect(orgUrl);

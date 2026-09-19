@@ -84,6 +84,7 @@ export const RESOURCE_KEYS = [
   'command.assign',
   'command.regrade',
   'command.signoff',
+  'case.duedate',
   'remediation.complete',
   'question.retire',
   'export.generate',
@@ -158,7 +159,8 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   // them in could not.
   //
   // This is the whole of page.cases, not just those fields: it also admits al_casestatus,
-  // al_priority, al_duedate and al_taxcheckrequired, and that last one re-derives the route.
+  // al_priority and al_taxcheckrequired, and that last one re-derives the route. NOT the
+  // due date, since item 6 (2026-09-19) gave that its own key -- see `case.duedate` below.
   { role: 'AL Portal - Tax Reviewer', resource: 'page.cases', level: 'Edit' },
   { role: 'AL Portal - Tax Reviewer', resource: 'page.reviews', level: 'Edit' },
   { role: 'AL Portal - AQS Reviewer', resource: 'page.cases', level: 'Edit' },
@@ -192,6 +194,20 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   { role: 'AL Portal - Planner', resource: 'page.cases', level: 'View' },
   { role: 'AL Portal - Planner', resource: 'page.remediation', level: 'Edit' },
   { role: 'AL Portal - Planner', resource: 'remediation.complete', level: 'Edit' },
+
+  // Moving a case's due date is a manager's act (project owner, 2026-09-19: "3 days, only
+  // editable by managers in codeapps"). Its own key rather than a higher level on
+  // page.cases, because page.cases Edit is what lets a Tax or AQS reviewer complete the
+  // header fields the extract does not carry -- raising that bar would have taken the whole
+  // header away from the people who are meant to fill it in.
+  //
+  // The two manager roles and the break-glass administrator, and nobody else. Portal
+  // Administrator is deliberately absent: it holds page.cases at View, so it cannot reach
+  // al_UpdateCaseDetails at all, and a grant that can never be exercised reads as an
+  // authority somebody has.
+  { role: 'AL Portal - T&C Supervisor', resource: 'case.duedate', level: 'Edit' },
+  { role: 'AL Portal - Outcome Testing Manager', resource: 'case.duedate', level: 'Edit' },
+  { role: 'Administrators', resource: 'case.duedate', level: 'Edit' },
 
   // Portal Administrator and Administrators both manage configuration and the permission
   // model. Two roles carry it because Administrators is the Power Pages built-in that real

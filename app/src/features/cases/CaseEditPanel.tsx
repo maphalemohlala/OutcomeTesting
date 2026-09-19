@@ -67,7 +67,12 @@ const SECTIONS: Section[] = [
     fields: [
       { attr: 'al_casestatus', label: 'Status', kind: 'choice', options: Al_outcomecasesal_casestatus },
       { attr: 'al_priority', label: 'Priority', kind: 'choice', options: Al_outcomecasesal_priority },
-      { attr: 'al_duedate', label: 'Due date', kind: 'date' },
+      {
+        attr: 'al_duedate',
+        label: 'Due date',
+        kind: 'date',
+        help: 'Three days after the case was uploaded. Editable by a manager.',
+      },
     ],
   },
   {
@@ -152,6 +157,12 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
   const [checkerBy, setCheckerBy] = useState<Record<Discipline, string>>({ Tax: '', AQS: '' });
 
   const mayAssign = can('command.assign', 'Edit');
+
+  // Moving a deadline is a manager's act (item 6, 2026-09-19), and page.cases Edit is not
+  // the right question: Tax and AQS reviewers hold it so they can complete the header
+  // fields the extract does not carry. An affordance, not a boundary - al_UpdateCaseDetails
+  // re-checks case.duedate and refuses the write (AD-041).
+  const mayMoveDueDate = can('case.duedate', 'Edit');
   const reviews = useCaseReviews(detail.id);
   const directory = useUserDirectory();
 
@@ -238,6 +249,12 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
   function changedFields(): Record<string, string> {
     const changed: Record<string, string> = {};
     for (const field of allFields()) {
+      // A field this user was never offered cannot be one they changed. Belt and braces:
+      // the control is read-only, so `form` holds what the record holds - but the command
+      // refuses a payload naming al_duedate whether or not the value moved, and losing a
+      // whole save to a field nobody touched is exactly the failure item 6 fixed.
+      if (field.attr === 'al_duedate' && !mayMoveDueDate) continue;
+
       const current = form[field.attr];
       const original = detail.edit[field.attr];
       if (current === original) continue;
@@ -322,10 +339,18 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
       // of the edits it stays editable for. Reading it off the form instead would refuse a
       // change to an unrelated field over a value nobody had touched.
       adviceDate: 'al_advicedate' in changed ? changed.al_advicedate : null,
-      // The due date the save leaves behind, which is the form's: it is not editable today,
-      // so this is the stored value, and it stays right if a manager is ever allowed to move
-      // it. EffectiveDueDate reads the same thing server-side.
+      // The due date the save leaves behind, which is the form's - the value being written
+      // where this save moves it, otherwise the one the case already holds. EffectiveDueDate
+      // reads the same thing server-side.
       dueDate: typeof form.al_duedate === 'string' ? form.al_duedate : null,
+      // The deadline's own end of the same rule (item 6, 2026-09-19), and only when this
+      // save moves it. A case whose stored dates already disagree stays editable, which is
+      // what makes fixing them possible.
+      dueDateChanged: 'al_duedate' in changed ? changed.al_duedate : null,
+      // ...compared against the meeting the case will still hold, not only one being typed
+      // in the same breath. A due date pulled back under a meeting recorded weeks ago is the
+      // ordinary way to break this.
+      adviceDateOnRecord: typeof form.al_advicedate === 'string' ? form.al_advicedate : null,
     });
     setErrors(found);
     if (found.length > 0) return;
@@ -373,6 +398,24 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
   function renderField(field: FieldDef) {
     const value = form[field.attr];
     const inputId = `case-edit-${field.attr}`;
+
+    // Shown and explained rather than hidden, which is how this panel treats a check it
+    // cannot reallocate too: a deadline somebody cannot move is still a deadline they need
+    // to see, and an empty space would read as a case with no due date.
+    if (field.attr === 'al_duedate' && !mayMoveDueDate) {
+      return (
+        <div key={field.attr} className="case-edit__field">
+          <span>{field.label}</span>
+          <p className="case-edit__only-check">
+            {typeof value === 'string' && value.length > 0 ? value : 'Not set'}
+          </p>
+          <small className="case-edit__help">
+            Set to three days after the case was uploaded. Only a manager can move it.
+          </small>
+        </div>
+      );
+    }
+
     return (
       <label key={field.attr} className="case-edit__field" htmlFor={inputId}>
         <span>{field.label}</span>

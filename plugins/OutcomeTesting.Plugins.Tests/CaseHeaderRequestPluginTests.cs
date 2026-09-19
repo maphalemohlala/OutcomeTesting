@@ -111,9 +111,12 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData("ownerid")]
         public void Refuses_a_field_the_portal_has_no_business_editing(string field)
         {
-            // References and IDs identify the case and key the import; the due date is
-            // derived from the upload; status and priority are the lifecycle and a
-            // manager's call; the Tax fields have their own role-gated path above.
+            // References and IDs identify the case and key the import; the due date is a
+            // manager's field IN THE CODE APP (item 6, 2026-09-19: "only editable by
+            // managers in codeapps"), so the portal refuses it whoever is asking - a T&C
+            // Manager signed in here is refused and allowed in the app; status and priority
+            // are the lifecycle and a manager's call; the Tax fields have their own
+            // role-gated path above.
             var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 { field, "anything" },

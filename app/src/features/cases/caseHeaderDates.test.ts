@@ -82,4 +82,31 @@ describe('adviceDateRefusal', () => {
   it('words the refusal exactly as the label reads', () => {
     expect(adviceDateRefusal('2099-01-01', today)).toContain(ADVICE_DATE_LABEL);
   });
+
+  it('abbreviates every month the way .NET does', () => {
+    // Found on 2026-09-19. This formatted the date through `Intl` with `en-GB`, which
+    // abbreviates September as "Sept" where .NET's invariant "MMM" gives "Sep" - so the two
+    // tiers worded the same refusal differently, for one month of the year. Every test that
+    // pinned this wording used January, where the two happen to agree.
+    //
+    // All twelve, because the next divergence will not announce itself either, and because
+    // `Intl` output moves with the browser's ICU version.
+    const expected = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+
+    expected.forEach((month, index) => {
+      const mm = String(index + 1).padStart(2, '0');
+      // Not the file's own `today`, which is in January: every month after it would read
+      // as the future and never reach the comparison being pinned.
+      expect(adviceDateRefusal(`2026-${mm}-11`, '2026-12-31', `2026-${mm}-10`)).toBe(
+        `${ADVICE_DATE_LABEL} cannot be later than the due date (10 ${month} 2026).`,
+      );
+    });
+  });
+
+  it('drops a leading zero from the day, as "d MMM yyyy" does', () => {
+    expect(adviceDateRefusal('2026-03-09', '2026-12-31', '2026-03-08')).toContain('(8 Mar 2026)');
+  });
 });

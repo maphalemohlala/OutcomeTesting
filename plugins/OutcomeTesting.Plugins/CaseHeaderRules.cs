@@ -119,5 +119,45 @@ namespace OutcomeTesting.Plugins
 
             return null;
         }
+
+        /// <summary>
+        /// The label the business gives al_duedate, used in every message about it so the
+        /// two front ends cannot word the same refusal differently.
+        /// </summary>
+        public const string DueDateLabel = "Due date";
+
+        /// <summary>
+        /// Whether a due date being written is one the case may carry, given the date of
+        /// meeting it will hold - or null when it is. No failure prefix; the caller adds it.
+        ///
+        /// This is ValidateAdviceDate's second refusal read from the other end (item 6,
+        /// 2026-09-19). The due date became editable on that date, so the invariant "the
+        /// meeting cannot be later than the deadline" can now be broken by moving the
+        /// DEADLINE rather than the meeting. Checking one end only is not checking.
+        ///
+        /// Deliberately only the due-date comparison. ValidateAdviceDate would also refuse a
+        /// meeting in the future, and reporting that to somebody who is editing the due date
+        /// would send them to look at a field they have not touched - the same reason that
+        /// method orders its own two messages the way it does.
+        ///
+        /// Either date absent passes. Clearing a date is a legitimate edit, and a case with
+        /// no meeting recorded has nothing for a deadline to contradict.
+        /// </summary>
+        public static string ValidateDueDate(DateTime? dueDate, DateTime? adviceDate)
+        {
+            if (!dueDate.HasValue || !adviceDate.HasValue)
+            {
+                return null;
+            }
+
+            if (adviceDate.Value.Date <= dueDate.Value.Date)
+            {
+                return null;
+            }
+
+            return DueDateLabel + " cannot be earlier than " + AdviceDateLabel + " ("
+                + adviceDate.Value.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)
+                + ").";
+        }
     }
 }
