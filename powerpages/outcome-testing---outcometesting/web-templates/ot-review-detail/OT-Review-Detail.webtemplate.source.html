@@ -681,7 +681,6 @@
         {% endcomment %}
         {% assign sec_rt = 0 %}
         {% assign sec_mixed = false %}
-        {% assign sec_other = false %}
         {% for q in qrows %}
           {% if q['s.al_sectioncode'] == sec.al_sectioncode %}
             {% assign qrt = q.al_responsetype.value %}
@@ -691,14 +690,6 @@
               {% elsif sec_rt != qrt %}
                 {% assign sec_mixed = true %}
               {% endif %}
-            {% else %}
-              {% comment %}
-                A question answering on no tick scale at all - written, dated or formatted.
-                A grid cannot hold one: its row has no cell under any column the block is
-                headed by. Counted so a section carrying one is read as a meta table, which
-                is the reading formBlocks makes in the app.
-              {% endcomment %}
-              {% assign sec_other = true %}
             {% endif %}
           {% endif %}
         {% endfor %}
@@ -809,7 +800,7 @@
             would redraw two seeded blocks the reference file pins (AD-098, AD-104).
           {% endcomment %}
           {% unless known %}
-            {% if sec_rt != 0 and sec_mixed == false and sec_other == false %}
+            {% if sec_rt != 0 and sec_mixed == false %}
               {% assign layout = 'grid' %}
               {% assign grid_rt = sec_rt %}
             {% endif %}
@@ -827,13 +818,19 @@
             on the document, so the guard above still protects what it was written to
             protect: neither can reach this, and the reference blocks stay pinned.
 
-            Agreeing questions re-head the grid; disagreeing ones, or any question answering
-            on no scale at all, take the block to a meta table where each row draws its own
-            options and no column header can misdescribe it. formBlocks makes the same
-            reading in the app, on the same two tests.
+            Read over the questions that answer on a tick scale, and those alone. A section
+            may also carry a written, dated or formatted question - S-E2 carries its lens
+            tick on 120910007 - and such a row has never had a cell under these columns
+            anyway: it is drawn inline by the row chain below, on both surfaces. Counting it
+            here would have taken Suitability off its grid on the strength of a row that was
+            never in it. formBlocks reads the same rows in the app.
+
+            Agreeing questions re-head the grid; disagreeing ones take the block to a meta
+            table where each row draws its own options and no column header can misdescribe
+            it.
           {% endcomment %}
           {% if known and layout == 'grid' %}
-            {% if sec_mixed or sec_other or sec_rt == 0 %}
+            {% if sec_mixed or sec_rt == 0 %}
               {% assign layout = 'inline' %}
               {% assign grid_rt = 0 %}
             {% elsif sec_rt != grid_rt %}

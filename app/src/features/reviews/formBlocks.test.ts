@@ -231,6 +231,18 @@ describe('a seeded block whose questions have left its declared scale', () => {
     expect(block.options.map((option) => option.label)).toEqual(['Yes', 'No', 'N/A']);
   });
 
+  it('keeps its grid when a question that answers on no tick scale sits in it', () => {
+    // S-E2 carries its outcome-lens tick on 120910007, so a section is not off its scale
+    // merely for holding a row that was never in the grid: such a row has no cell under
+    // these columns and is drawn inline either way. Reading it as a disagreement would take
+    // Suitability off its grid on the strength of a row that never belonged to it.
+    const block = amlcra([row('aml1', 120910008), row('note', 120910001)]);
+    if (block?.kind !== 'section') return;
+
+    expect(block.layout).toBe('grid');
+    expect(block.options.map((option) => option.label)).toEqual(['Yes', 'No', 'N/A']);
+  });
+
   it('takes the whole Suitability block off its scale when one subsection leaves it', () => {
     // E1 to E5 are five sections drawn as one table, so the disagreement need not be inside
     // a single section for the block to be unable to head itself.

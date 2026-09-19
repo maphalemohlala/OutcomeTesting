@@ -648,12 +648,20 @@ export function formBlocks<T extends SectionedAnswer>(
      * Yes / No / N/A, describing the two it had left. The declared scale is a default, not
      * a promise about questions an administrator may since have changed.
      *
-     * Read off `group.rows`, which is what the block actually draws - the lens tick is
-     * held apart and is not a question answered on the scale.
+     * Read over the rows that answer on a tick scale, and those alone. A section may also
+     * carry a written, dated or formatted question, and such a row has never had a cell
+     * under these columns anyway - it is drawn inline by `onScale` either way. Counting it
+     * here would take a block off its grid on the strength of a row that was never in it.
+     * The portal reads the same rows.
      */
     const declared = spec?.layout === 'grid' ? (spec.scale ?? null) : null;
+    const scaled = group.rows.filter(
+      (row) => row.responseTypeValue != null && GRID_SCALES.has(row.responseTypeValue),
+    );
     const fitsDeclared =
-      declared == null || group.rows.every((row) => row.responseTypeValue === declared);
+      declared == null ||
+      scaled.length === 0 ||
+      scaled.every((row) => row.responseTypeValue === declared);
 
     const last = blocks[blocks.length - 1];
     if (spec && last && last.kind === 'section' && last.id === spec.id) {
