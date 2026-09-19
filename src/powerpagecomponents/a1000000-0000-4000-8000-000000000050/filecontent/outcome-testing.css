@@ -1475,6 +1475,12 @@ footer a:focus-visible, .footer a:focus-visible {
 
 .ot-checklist select.ot-hdr-input { padding: 1px 2px; }
 
+/* The header's status row carries only the autosave message, so it stays
+   out of the way until there is one: a permanent "Header" row with an
+   empty cell reads as a field somebody forgot to fill in. :has is
+   already relied on for the sticky footer above. */
+#ot-header-statusrow:has(#ot-header-status:empty) { display: none; }
+
 .ot-checklist .ot-hdr-input:focus-visible {
   outline: 2px solid #005a9e;
   outline-offset: -1px;

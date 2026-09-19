@@ -389,18 +389,24 @@
           {% endif %}
 
           {% comment %}
-            One Save for the whole header, in its own row rather than tucked into the Tax
-            cell it used to share. It saved the Tax team's two fields and was rendered only
-            on a Tax review; the header is now editable on an AQS review too, where that
-            row does not exist and the button went with it.
+            No Save button (project owner, 2026-09-19). A header edit saves itself as it is
+            made, the way an answer already does, and the submit is what finishes the
+            review - so a button that said "Save header" was a second thing to remember on
+            a form where nothing else has to be saved by hand.
+
+            The row carries only the status line, and hides itself while there is nothing to
+            say: an always-visible "Header" row with an empty cell reads as a field someone
+            forgot to fill in. :has is already used for the sticky footer in this stylesheet.
+
+            data-case-id lives here because the script needs the case whether or not the Tax
+            row above it was rendered.
           {% endcomment %}
           {% if locked == false %}
-          <tr>
+          <tr id="ot-header-statusrow">
             <td class="lbl">Header</td>
             <td class="val" colspan="3">
-              <button type="button" class="ot-btn ot-btn--secondary" id="ot-header-save"
-                      data-case-id="{{ cid }}">Save header</button>
-              <span id="ot-header-status" role="status" aria-live="polite"></span>
+              <span id="ot-header-status" role="status" aria-live="polite"
+                    data-case-id="{{ cid }}"></span>
             </td>
           </tr>
           {% endif %}
@@ -1851,6 +1857,36 @@
               return;
             }
 
+            /*
+             * Any outstanding header edit first (project owner, 2026-09-19).
+             *
+             * The header saves itself as it is edited, so there is usually nothing waiting -
+             * but a field changed a moment before the click can still be inside its
+             * debounce, and submitting on top of it would store the review against a header
+             * the checker had already corrected. A header edit that will not save stops the
+             * submit rather than being lost under it: the review is the thing that cannot be
+             * taken back (BR-012).
+             */
+            if (window.otHeader && typeof window.otHeader.flush === 'function') {
+              setBusy(true);
+              show('Saving your header changes...', 'info');
+              window.otHeader.flush(function (ok) {
+                if (!ok) {
+                  show('Your header changes could not be saved, so the review was not'
+                    + ' submitted. Fix that first - the message beside the header says why.',
+                    'error');
+                  setBusy(false);
+                  return;
+                }
+                submit();
+              });
+              return;
+            }
+
+            submit();
+          });
+
+          function submit() {
             setBusy(true);
             show('Submitting your review...', 'info');
 
@@ -1899,7 +1935,7 @@
 
               request.send(JSON.stringify({ al_submitrequested: true }));
             }).fail(unreachable);
-          });
+          }
         })();
       </script>
     {% endif %}
@@ -1928,9 +1964,12 @@
     {% if locked == false %}
       <script>
         (function () {
-          var save = document.getElementById('ot-header-save');
           var status = document.getElementById('ot-header-status');
-          if (!save || !status) { return; }
+          if (!status) { return; }
+
+          var DEBOUNCE_MS = 900;
+          var timer = null;
+          var saving = false;
 
           /*
            * The Tax team's two selects exist only on an unsubmitted Tax review. Everything
@@ -2004,27 +2043,38 @@
             return 'The change could not be saved (' + code + ').';
           }
 
-          save.addEventListener('click', function () {
+          /*
+           * Saves whatever has moved, or reports that nothing has.
+           *
+           * `done` is called with true when there was nothing to save or the save
+           * succeeded, and false when it failed. The submit waits on it, so a header edit
+           * that could not be stored stops the review being submitted on top of it rather
+           * than being lost quietly.
+           */
+          function saveNow(done) {
+            done = done || function () {};
+
+            if (timer) { window.clearTimeout(timer); timer = null; }
+            if (saving) { done(true); return; }
+
             var fields = changedFields();
             var taxMoved = (required && required.value !== initialRequired)
               || (disposition && disposition.value !== initialDisposition);
 
-            if (!fields && !taxMoved) {
-              show('Nothing has changed.', null);
-              return;
-            }
+            if (!fields && !taxMoved) { done(true); return; }
 
-            save.disabled = true;
+            saving = true;
             show('Saving...', null);
 
             if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
               show('This page did not load completely. Refresh and try again.', 'error');
-              save.disabled = false;
+              saving = false;
+              done(false);
               return;
             }
 
             var request_body = {
-              caseId: save.getAttribute('data-case-id'),
+              caseId: status.getAttribute('data-case-id'),
               taxCheckRequired: (required && required.value !== initialRequired)
                 ? parseInt(required.value || '0', 10) : 0,
               taxTeamDisposition: (disposition && disposition.value !== initialDisposition)
@@ -2045,13 +2095,26 @@
 
               request.onreadystatechange = function () {
                 if (request.readyState !== 4) { return; }
-                save.disabled = false;
+                saving = false;
 
                 if (request.status >= 200 && request.status < 300) {
+                  var routeMayHaveMoved = (required && required.value !== initialRequired)
+                    || (disposition && disposition.value !== initialDisposition);
+
                   if (required) { initialRequired = required.value; }
                   if (disposition) { initialDisposition = disposition.value; }
                   for (var k = 0; k < headerInputs.length; k++) {
                     headerInputs[k].initial = headerInputs[k].el.value;
+                  }
+
+                  if (!routeMayHaveMoved) {
+                    // An ordinary header field. Nothing else on the page depends on it, so
+                    // it is confirmed the way a saved answer is and nothing is offered.
+                    var now = new Date();
+                    show('Saved ' + ('0' + now.getHours()).slice(-2) + ':'
+                      + ('0' + now.getMinutes()).slice(-2), 'success');
+                    done(true);
+                    return;
                   }
                   /*
                    * Confirmed in place, and the reload offered rather than taken.
@@ -2074,23 +2137,57 @@
                     + ' you want that re-read, and if it still looks unchanged the site cache'
                     + ' has not caught up - try again in a moment.', 'success');
                   offerReload();
+                  done(true);
                   return;
                 }
 
                 show(friendly(request.responseText, request.status), 'error');
+                done(false);
               };
 
               request.onerror = function () {
-                save.disabled = false;
+                saving = false;
                 show('The change could not be saved. Check your connection and try again.', 'error');
+                done(false);
               };
 
               request.send(JSON.stringify(payload));
             }).fail(function () {
-              save.disabled = false;
+              saving = false;
               show('This page did not load completely. Refresh and try again.', 'error');
+              done(false);
             });
-          });
+          }
+
+          /** Saves shortly after typing stops, so a half-typed name is not sent per keystroke. */
+          function queue() {
+            if (timer) { window.clearTimeout(timer); }
+            timer = window.setTimeout(function () { saveNow(); }, DEBOUNCE_MS);
+          }
+
+          for (var b = 0; b < headerInputs.length; b++) {
+            var control = headerInputs[b].el;
+            control.addEventListener('change', queue);
+            if (control.tagName === 'INPUT' && control.type === 'text') {
+              control.addEventListener('input', queue);
+            }
+            // Leaving a field is a decision. Saving on blur as well as on the timer means a
+            // checker who edits and immediately submits does not race the debounce.
+            control.addEventListener('blur', function () { saveNow(); });
+          }
+
+          if (required) { required.addEventListener('change', function () { saveNow(); }); }
+          if (disposition) { disposition.addEventListener('change', function () { saveNow(); }); }
+
+          /*
+           * What the submit waits on. The header saves itself as it is edited, so by the
+           * time anyone submits there is usually nothing outstanding - but a field changed a
+           * moment earlier can still be inside the debounce, and submitting on top of it
+           * would store the review against a header the checker had already corrected.
+           */
+          window.otHeader = {
+            flush: function (done) { saveNow(done); }
+          };
         })();
       </script>
     {% endif %}
