@@ -47,7 +47,7 @@
           <CanChangeDateTimeBehavior>0</CanChangeDateTimeBehavior>
           <Behavior>2</Behavior>
           <displaynames>
-            <displayname description="Advice date" languagecode="1033" />
+            <displayname description="Date of meeting - Client contact" languagecode="1033" />
           </displaynames>
           <Descriptions>
             <Description description="Date the advice was given." languagecode="1033" />

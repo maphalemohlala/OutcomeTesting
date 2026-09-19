@@ -1,4 +1,5 @@
 import type { CellValue } from '../../lib/tabular';
+import { ADVICE_DATE_LABEL } from './caseHeaderDates';
 import type { CaseSummary } from './caseWorklistMapping';
 
 /**
@@ -21,7 +22,7 @@ export const CASE_EXPORT_HEADERS = [
   'Case type',
   'Product / solution type',
   'Products',
-  'Advice date',
+  ADVICE_DATE_LABEL,
   'Check date',
   'Pre or post check',
   'Imported on',

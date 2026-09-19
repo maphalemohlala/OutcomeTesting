@@ -62,7 +62,7 @@ Every displayed answerable question is mandatory before its section can be submi
 | Paraplanner code | Text | |
 | Product(s) | Text | |
 | Case type | SingleSelect | New advice, Ongoing, Review, Switch/Transfer |
-| Advice date | Date | |
+| Date of meeting - Client contact | Date | Display name only; the column is still al_advicedate (item 9, 2026-09-19) |
 | Product / solution type | SingleSelect | Accumulation investment, Accumulation Pension, IHT, Protection, No change reviews |
 | Sample source | SingleSelect | Random, Mandatory, High Risk, Thematic |
 | Checker name | Text | |

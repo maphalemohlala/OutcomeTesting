@@ -475,7 +475,11 @@ namespace OutcomeTesting.Plugins
                 { "al_paraplannercode", new EditableField(EditableKind.Text, "Paraplanner code") },
                 { "al_products", new EditableField(EditableKind.Text, "Products") },
                 { "al_casetype", new EditableField(EditableKind.Option, "Case type") },
-                { "al_advicedate", new EditableField(EditableKind.DateOnly, "Advice date") },
+                // Display name only (item 9, 2026-09-19). The schema name is unchanged, so
+                // every reader of the column is untouched; this is the wording the audit
+                // trail and the refusals use, and it comes from CaseHeaderRules so the
+                // portal's own header edit words it identically.
+                { "al_advicedate", new EditableField(EditableKind.DateOnly, CaseHeaderRules.AdviceDateLabel) },
                 { "al_productsolutiontype", new EditableField(EditableKind.Option, "Product/solution type") },
                 { "al_samplesource", new EditableField(EditableKind.Option, "Sample source") },
                 { "al_checkername", new EditableField(EditableKind.Text, "Checker") },
@@ -757,6 +761,20 @@ namespace OutcomeTesting.Plugins
                             {
                                 throw new InvalidPluginExecutionException(
                                     CommandHelpers.ValidationPrefix + def.Label + " must be a valid date (yyyy-MM-dd).");
+                            }
+
+                            // A meeting that has not happened yet cannot have been checked
+                            // (item 9, 2026-09-19). Compared on the UK day, not UTC's, and
+                            // refused here as well as in the page so a payload sent by hand
+                            // cannot get round it.
+                            if (string.Equals(attr, "al_advicedate", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var refusal = CaseHeaderRules.ValidateAdviceDate(parsed.Date, DateTime.UtcNow);
+                                if (refusal != null)
+                                {
+                                    throw new InvalidPluginExecutionException(
+                                        CommandHelpers.ValidationPrefix + refusal);
+                                }
                             }
 
                             update[attr] = parsed.Date;

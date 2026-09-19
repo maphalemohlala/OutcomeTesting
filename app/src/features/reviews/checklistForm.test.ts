@@ -165,7 +165,7 @@ describe('caseHeaderFields', () => {
       'Paraplanner code',
       'Product(s)',
       'Case type',
-      'Advice date',
+      'Date of meeting - Client contact',
       'Product / solution type',
       'Sample source',
       'Checker name',
@@ -183,7 +183,7 @@ describe('caseHeaderFields', () => {
     const byLabel = new Map(caseHeaderFields(record).map((f) => [f.label, f.value]));
     expect(byLabel.get('Adviser status')).toBe('CAS');
     expect(byLabel.get('Case type')).toBe('New advice');
-    expect(byLabel.get('Advice date')).toBe('01 Aug 2026');
+    expect(byLabel.get('Date of meeting - Client contact')).toBe('01 Aug 2026');
     expect(byLabel.get('Vulnerable client?')).toBe('Potentially vulnerable');
     expect(byLabel.get('IO reference')).toBe('IO-100001');
     expect(byLabel.get('For Tax team usage')).toBe('Submit to AQS');
@@ -197,7 +197,7 @@ describe('caseHeaderFields', () => {
       al_casestatus: 120910580,
     } as unknown as Al_outcomecases);
     expect(fields.find((f) => f.label === 'Adviser status')?.value).toBeNull();
-    expect(fields.find((f) => f.label === 'Advice date')?.value).toBeNull();
+    expect(fields.find((f) => f.label === 'Date of meeting - Client contact')?.value).toBeNull();
   });
 });
 

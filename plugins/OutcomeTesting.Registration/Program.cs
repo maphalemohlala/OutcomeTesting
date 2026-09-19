@@ -279,6 +279,11 @@ if (args.Length >= 2 && args[0].Equals("addboolcolumn", StringComparison.Ordinal
     return AddBoolColumn(args);
 }
 
+if (args.Length >= 2 && args[0].Equals("setcolumnlabel", StringComparison.OrdinalIgnoreCase))
+{
+    return SetColumnLabel(args);
+}
+
 if (args.Length >= 2 && args[0].Equals("setstepfilter", StringComparison.OrdinalIgnoreCase))
 {
     return SetStepFilter(args);
@@ -3263,6 +3268,85 @@ int AddTextColumn(string[] a)
 // Worth stating plainly because the cost of getting it wrong is not a re-run: DateTimeBehavior
 // is IMMUTABLE once the column exists. A column created DateOnly by mistake can only be put
 // right by deleting and recreating it, taking any data with it.
+/// <summary>
+/// Changes a column's DISPLAY NAME, and nothing else.
+///
+/// The schema name, type, behaviour and required level are left exactly as they are, so
+/// every plug-in, query, template and generated model that names the column keeps working:
+/// this moves the words a person reads, not the identifier anything is written against
+/// (item 9, 2026-09-19 - al_advicedate became "Date of meeting - Client contact").
+///
+/// The existing metadata is retrieved and sent back with only the label replaced, rather
+/// than a fresh DateTimeAttributeMetadata being posted: an UpdateAttributeRequest carrying
+/// a partly-filled attribute overwrites what it omits, which would silently reset the
+/// behaviour or the required level. MergeLabels keeps labels in languages this call does
+/// not supply.
+/// </summary>
+int SetColumnLabel(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 5 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This writes metadata to a live environment. Re-run as: setcolumnlabel <orgUrl> " +
+            "<entityLogicalName> <columnLogicalName> <newDisplayName> [<newDescription>] " +
+            "--confirm <orgUrl>");
+        return 1;
+    }
+
+    var entity = a[2].Trim();
+    var logicalName = a[3].Trim().ToLowerInvariant();
+    var displayName = a[4];
+    var description = a.Length > 5 && !a[5].StartsWith("--", StringComparison.Ordinal) ? a[5] : null;
+
+    using var svc = Connect(orgUrl);
+
+    var retrieved = (RetrieveAttributeResponse)svc.Execute(new RetrieveAttributeRequest
+    {
+        EntityLogicalName = entity,
+        LogicalName = logicalName,
+    });
+
+    var attribute = retrieved.AttributeMetadata;
+    var before = attribute.DisplayName?.UserLocalizedLabel?.Label ?? "(none)";
+
+    attribute.DisplayName = NotificationTable.Text(displayName);
+    if (description != null)
+    {
+        attribute.Description = NotificationTable.Text(description);
+    }
+
+    svc.Execute(new UpdateAttributeRequest
+    {
+        SolutionUniqueName = SolutionUniqueName,
+        EntityName = entity,
+        Attribute = attribute,
+        MergeLabels = true,
+    });
+
+    svc.Execute(new PublishXmlRequest
+    {
+        ParameterXml = $"<importexportxml><entities><entity>{entity}</entity></entities></importexportxml>",
+    });
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    var after = (RetrieveAttributeResponse)svc.Execute(new RetrieveAttributeRequest
+    {
+        EntityLogicalName = entity,
+        LogicalName = logicalName,
+    });
+
+    var now = after.AttributeMetadata.DisplayName?.UserLocalizedLabel?.Label ?? "(none)";
+    if (!string.Equals(now, displayName, StringComparison.Ordinal))
+    {
+        Console.Error.WriteLine($"{entity}.{logicalName}: label still reads '{now}'. Nothing to rely on.");
+        return 1;
+    }
+
+    Console.WriteLine($"{entity}.{logicalName}: '{before}' -> '{now}'. Schema name unchanged.");
+    return 0;
+}
+
 int AddDateColumn(string[] a)
 {
     var orgUrl = a[1];

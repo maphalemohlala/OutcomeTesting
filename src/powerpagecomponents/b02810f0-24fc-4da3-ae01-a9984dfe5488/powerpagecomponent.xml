@@ -1,8 +1,5 @@
 <powerpagecomponent powerpagecomponentid="b02810f0-24fc-4da3-ae01-a9984dfe5488">
-  <content>{
-  "filecontent": null,
-  "source": 0
-}</content>
+  <content>{}</content>
   <iscustomizable>1</iscustomizable>
   <name>Authentication/Registration/LoginButtonAuthenticationType</name>
   <powerpagecomponenttype>9</powerpagecomponenttype>

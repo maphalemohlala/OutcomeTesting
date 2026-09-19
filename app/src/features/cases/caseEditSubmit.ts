@@ -15,6 +15,8 @@
  * when the fields were refused.
  */
 
+import { adviceDateRefusal } from './caseHeaderDates';
+
 /** What became of one command. */
 export type CommandOutcome =
   | { kind: 'skipped' }
@@ -127,6 +129,11 @@ export interface SubmitFields {
   changedCount: number;
   /** How many checks have a new checker chosen. */
   allocationCount: number;
+  /**
+   * The date of meeting as the form holds it, `yyyy-MM-dd` or empty. Undefined when the
+   * field was not touched, which is not the same as cleared.
+   */
+  adviceDate?: string | null;
 }
 
 /**
@@ -140,5 +147,9 @@ export function validateSubmit(input: SubmitFields): string[] {
     return ['Change at least one field, or choose a checker to allocate a check to.'];
   }
 
-  return [];
+  // A meeting that has not happened yet cannot have been checked (item 9, 2026-09-19).
+  // `al_UpdateCaseDetails` refuses it too, through the same rule CaseHeaderRules holds; this
+  // is here so it costs a keystroke rather than a round trip (AD-041).
+  const refusal = adviceDateRefusal(input.adviceDate);
+  return refusal ? [refusal] : [];
 }

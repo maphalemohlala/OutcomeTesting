@@ -15,6 +15,7 @@ import {
   type AllocationOutcome,
   type CommandOutcome,
 } from './caseEditSubmit';
+import { ADVICE_DATE_LABEL, ukToday } from './caseHeaderDates';
 import { useCaseReviews } from './useCaseReviews';
 import { useUserDirectory } from '../../hooks/useUserDirectory';
 import {
@@ -92,7 +93,7 @@ const SECTIONS: Section[] = [
       { attr: 'al_casetype', label: 'Case type', kind: 'choice', options: Al_outcomecasesal_casetype },
       { attr: 'al_productsolutiontype', label: 'Product/solution type', kind: 'choice', options: Al_outcomecasesal_productsolutiontype },
       { attr: 'al_products', label: 'Products', kind: 'text' },
-      { attr: 'al_advicedate', label: 'Advice date', kind: 'date' },
+      { attr: 'al_advicedate', label: ADVICE_DATE_LABEL, kind: 'date' },
       { attr: 'al_samplesource', label: 'Sample source', kind: 'choice', options: Al_outcomecasesal_samplesource },
       { attr: 'al_preorpostcheck', label: 'Check point', kind: 'choice', options: Al_outcomecasesal_preorpostcheck },
     ],
@@ -315,6 +316,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
     const found = validateSubmit({
       changedCount: Object.keys(changed).length,
       allocationCount: chosen.length,
+      adviceDate: typeof form.al_advicedate === 'string' ? form.al_advicedate : null,
     });
     setErrors(found);
     if (found.length > 0) return;
@@ -391,6 +393,13 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
           <input
             id={inputId}
             type={field.kind === 'date' ? 'date' : 'text'}
+            /*
+             * The date of meeting cannot be in the future (item 9, 2026-09-19), so the
+             * picker will not offer one. An affordance only - the save re-checks it, and so
+             * does al_UpdateCaseDetails - because a typed date gets past a max on some
+             * browsers.
+             */
+            max={field.attr === 'al_advicedate' ? ukToday() : undefined}
             value={typeof value === 'string' ? value : ''}
             onChange={(e) => setField(field.attr, field.kind, e.target.value)}
           />

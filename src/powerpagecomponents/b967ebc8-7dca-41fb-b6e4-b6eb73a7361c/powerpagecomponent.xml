@@ -1,8 +1,7 @@
 <powerpagecomponent powerpagecomponentid="b967ebc8-7dca-41fb-b6e4-b6eb73a7361c">
   <content>{
   "description": "A true or false value. If set to true, the portal will display the terms and conditions of the site. Users must agree to the terms and conditions before they are considered authenticated and can use the site.",
-  "value": "false",
-  "source": 0
+  "value": "false"
 }</content>
   <iscustomizable>1</iscustomizable>
   <name>Authentication/Registration/TermsAgreementEnabled</name>

@@ -9,6 +9,7 @@ import {
   Al_outcomecasesal_vulnerableclient,
   type Al_outcomecases,
 } from '../../generated/models/Al_outcomecasesModel';
+import { ADVICE_DATE_LABEL } from '../cases/caseHeaderDates';
 import { choiceLabel } from '../../lib/choiceLabel';
 import { date, text } from '../../lib/format';
 import type { FormRow, ReviewSection, SectionedAnswer } from './reviewSections';
@@ -266,7 +267,7 @@ export function caseHeaderFields(record: Al_outcomecases): HeaderField[] {
       label: 'Case type',
       value: choiceLabel(Al_outcomecasesal_casetype, record.al_casetype, record.al_casetypename),
     },
-    { label: 'Advice date', value: date(record.al_advicedate) },
+    { label: ADVICE_DATE_LABEL, value: date(record.al_advicedate) },
     {
       label: 'Product / solution type',
       value: choiceLabel(

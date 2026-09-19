@@ -49,16 +49,6 @@ namespace OutcomeTesting.Plugins
         private const int DescriptionMaxLength = 2000;
 
         /// <summary>
-        /// The UK time zone the BR-010 clock runs in (OD-018).
-        ///
-        /// Dataverse hands back UTC, and a submission at 23:30 UTC on a British Summer Time
-        /// evening belongs to the next UK day. Taking the UTC date would set the due date a
-        /// day early for those, and disagree with the age app/src/lib/workingDays.ts renders
-        /// on the very same row.
-        /// </summary>
-        private const string UkTimeZoneId = "GMT Standard Time";
-
-        /// <summary>
         /// The business code for the action a review raises. Derived from the case
         /// reference and the review's sequence so a replayed submit resolves to the row
         /// that already exists rather than raising a second action (NFR-REL-01) - the same
@@ -928,30 +918,19 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// The UK calendar date of a timestamp, at midnight.
+        /// The UK calendar date of a timestamp, at midnight - the clock the BR-010 due date
+        /// is counted in (OD-018). A submission at 23:30 UTC on a British Summer Time
+        /// evening belongs to the next UK day; taking the UTC date would set the due date a
+        /// day early for those, and disagree with the age app/src/lib/workingDays.ts renders
+        /// on the very same row.
         ///
-        /// The time zone lookup is guarded rather than left to throw: a missing zone id
-        /// would fail the whole submission over a date, and falling back to UTC is at worst
-        /// a day out on a summer evening. This is not an OrganizationService call, so
-        /// catching it does not put the transaction into the state OptionLabels warns about.
+        /// The rule itself lives on CaseHeaderRules, which needs the same UK day to decide
+        /// whether a date of meeting is in the future. One definition, so the two cannot
+        /// disagree about when a day ends.
         /// </summary>
         private static DateTime UkDate(DateTime value)
         {
-            var utc = value.Kind == DateTimeKind.Utc ? value : value.ToUniversalTime();
-
-            try
-            {
-                var uk = TimeZoneInfo.FindSystemTimeZoneById(UkTimeZoneId);
-                return TimeZoneInfo.ConvertTimeFromUtc(utc, uk).Date;
-            }
-            catch (TimeZoneNotFoundException)
-            {
-                return utc.Date;
-            }
-            catch (InvalidTimeZoneException)
-            {
-                return utc.Date;
-            }
+            return CaseHeaderRules.UkDate(value);
         }
     }
 }
