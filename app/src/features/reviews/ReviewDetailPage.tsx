@@ -91,8 +91,8 @@ function Value({ row }: { row: FormRow<ReviewResponse> }) {
 }
 
 /** Whatever control the row's response type calls for, inside a value cell. */
-function Control({ row }: { row: FormRow<ReviewResponse> }) {
-  const options = inlineOptionsFor(row.responseTypeValue);
+function Control({ row, isTaxReview }: { row: FormRow<ReviewResponse>; isTaxReview: boolean }) {
+  const options = inlineOptionsFor(row.responseTypeValue, isTaxReview);
   return options.length > 0 ? <Options row={row} options={options} /> : <Value row={row} />;
 }
 
@@ -116,8 +116,8 @@ function onScale(row: FormRow<ReviewResponse>, block: SectionBlock): boolean {
  * Primary root cause, in the 3x3 the document lays it out in, under its own heading rather
  * than in a value cell of the block's table.
  */
-function RootCause({ row }: { row: FormRow<ReviewResponse> }) {
-  const options = inlineOptionsFor(row.responseTypeValue);
+function RootCause({ row, isTaxReview }: { row: FormRow<ReviewResponse>; isTaxReview: boolean }) {
+  const options = inlineOptionsFor(row.responseTypeValue, isTaxReview);
   const groups: ChoiceOption[][] = [];
   for (let i = 0; i < options.length; i += 3) groups.push(options.slice(i, i + 3));
 
@@ -168,7 +168,7 @@ function GridGroup({ group, block }: { group: FormGroup<ReviewResponse>; block: 
             ))
           ) : (
             <td colSpan={columns - 1}>
-              <Control row={row} />
+              <Control row={row} isTaxReview={block.isTaxReview} />
             </td>
           )}
         </tr>
@@ -212,7 +212,7 @@ function InlineBlock({ block }: { block: SectionBlock }) {
     <>
       {chunks.map((chunk) =>
         chunk.kind === 'rootcause' ? (
-          <RootCause key={chunk.rows[0].key} row={chunk.rows[0]} />
+          <RootCause key={chunk.rows[0].key} row={chunk.rows[0]} isTaxReview={block.isTaxReview} />
         ) : (
           <table className="meta" key={chunk.rows[0].key}>
             <tbody>
@@ -220,7 +220,7 @@ function InlineBlock({ block }: { block: SectionBlock }) {
                 <tr key={row.key}>
                   <td className="lbl">{row.question}</td>
                   <td colSpan={3}>
-                    <Control row={row} />
+                    <Control row={row} isTaxReview={block.isTaxReview} />
                   </td>
                 </tr>
               ))}

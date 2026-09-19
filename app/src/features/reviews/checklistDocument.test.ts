@@ -184,7 +184,11 @@ function form(ownerRole: string) {
     [],
   );
 
-  return formBlocks(sections, failPoints(seedFailReasons, new Set()));
+  // The Tax form is the one built from Tax-owned sections, so the owner role being
+  // filtered on is also the discipline of the review that would be answering it. The
+  // inline path reads that flag to decide whether 120910302 is the tax check's "Pass with
+  // issues" or the scale's "Insufficient evidence".
+  return formBlocks(sections, failPoints(seedFailReasons, new Set()), ownerRole === TAX);
 }
 
 const AQS = '120910101';
@@ -308,7 +312,11 @@ describe('the checklist the app draws matches the reference document', () => {
       const row = block.groups
         .flatMap((group) => group.rows)
         .find((candidate) => candidate.question === question);
-      return inlineOptionsFor(row?.responseTypeValue ?? null).map((option) => option.label);
+      // The discipline comes off the block, which is how ReviewDetailPage reads it too:
+      // the tax check's reorder and rename apply to a Tax review and to nothing else.
+      return inlineOptionsFor(row?.responseTypeValue ?? null, block.isTaxReview).map(
+        (option) => option.label,
+      );
     };
 
     const tax = form(TAX);

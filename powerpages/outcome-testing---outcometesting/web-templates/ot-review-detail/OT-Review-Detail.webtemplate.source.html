@@ -119,6 +119,16 @@
     {% assign cv_id = rv.al_checklistversionid.id %}
 
     {% comment %}
+      The review's discipline, resolved once. 120910006 reads its third option differently
+      on a Tax review (AD-055 amended), and both paths that draw that scale - the grid
+      headings below and the OT Answer Options include - have to make the same reading. Held
+      in one variable so they cannot drift apart, which is how the inline path came to draw
+      an AQS question as a tax check.
+    {% endcomment %}
+    {% assign is_tax_review = false %}
+    {% if rv.al_reviewtype.value == 120910200 %}{% assign is_tax_review = true %}{% endif %}
+
+    {% comment %}
       AD-020 section ownership, keyed by the review's discipline. Filtering in the query
       rather than in the loop is what makes the Tax/AQS split structural: a Tax checker's
       page never receives an AQS section's questions at all, which is what PP-08's
@@ -815,7 +825,7 @@
           {% endcomment %}
           {% if grid_rt == 120910006 %}
             {% assign gvalues = '120910300,120910301,120910302' | split: ',' %}
-            {% if rv.al_reviewtype.value == 120910200 %}
+            {% if is_tax_review %}
               {% assign glabels = 'Pass,Fail,Pass with issues' | split: ',' %}
             {% else %}
               {% assign glabels = 'Pass,Fail,Insufficient evidence' | split: ',' %}
@@ -1097,7 +1107,7 @@
                 </div>
 
               {% else %}
-                {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id editable: editable %}
+                {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id editable: editable is_tax: is_tax_review %}
               {% endif %}
               </td>
             </tr>

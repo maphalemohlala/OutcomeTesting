@@ -364,11 +364,36 @@ describe('inlineOptionsFor', () => {
   });
 
   it('orders the tax check outcome PASS, PASS WITH ISSUES, FAIL as the document does', () => {
-    expect(inlineOptionsFor(120910006)).toEqual([
+    expect(inlineOptionsFor(120910006, true)).toEqual([
       { value: 120910300, label: 'PASS' },
       { value: 120910302, label: 'PASS WITH ISSUES' },
       { value: 120910301, label: 'FAIL' },
     ]);
+  });
+
+  it('reads an inline 120910006 off a Tax review as the scale, not as the tax check', () => {
+    // The reorder and the relabel above are the Tax check's, not the scale's (AD-055
+    // amended). Until now the inline path applied them to every 120910006 question it drew,
+    // on the reading that it was Q-TAX-02's alone - which AD-123 checklist administration
+    // made false. Retyping a question to this scale breaks its section's uniform grid, the
+    // section falls to the inline path, and an AQS question was drawn as a tax check:
+    // "PASS / PASS WITH ISSUES / FAIL" over the suitability scale's own values.
+    //
+    // A tick on what read "PASS WITH ISSUES" saved 120910302 - Insufficient evidence, a
+    // non-pass that raises remediation. The values were never wrong; the wording over them
+    // was, which is the worse half to get wrong.
+    expect(inlineOptionsFor(120910006, false)).toEqual([
+      { value: 120910300, label: 'PASS' },
+      { value: 120910301, label: 'FAIL' },
+      { value: 120910302, label: 'INSUFFICIENT EVIDENCE' },
+    ]);
+  });
+
+  it('defaults to the scale rather than to the tax check when no discipline is given', () => {
+    // The safe default of the pair: optionsFor already reads an absent discipline as "not a
+    // tax check", and a caller that forgets to say gets the wording six AQS sections share
+    // rather than the one question's rename.
+    expect(inlineOptionsFor(120910006)).toEqual(inlineOptionsFor(120910006, false));
   });
 
   it('renames 120910302 for the tax check only, leaving the value it saves alone', () => {
@@ -376,7 +401,7 @@ describe('inlineOptionsFor', () => {
     // suitability grid that shares 120910006 still reads it as "Insufficient evidence".
     // Wording only - the value the checker ticks is the same one, which is what the value
     // assertions here are for, and so the remediation it triggers is unchanged too.
-    expect(inlineOptionsFor(120910006)[1]).toEqual({
+    expect(inlineOptionsFor(120910006, true)[1]).toEqual({
       value: 120910302,
       label: 'PASS WITH ISSUES',
     });

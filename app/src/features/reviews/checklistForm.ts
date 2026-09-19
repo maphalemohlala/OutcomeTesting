@@ -119,12 +119,15 @@ const INLINE_ORDER: Record<number, number[]> = {
  * value: what the checker ticks, what is saved, and what sends the case to remediation are
  * all exactly what they were.
  *
- * It belongs to the inline path rather than to the option because the inline path is
- * Q-TAX-02's alone. 120910006 is shared with the suitability grid (S-E1 to S-E5, S-CRP),
- * which is drawn as a grid and heads its third column from SCALE_OPTIONS - so renaming the
- * option itself would have relabelled six AQS sections that were never asked to change.
- * ResponseRules.PermittedChoices is still the authority on which values may be saved, and
- * it is untouched.
+ * It belongs here rather than to the option because 120910006 is shared with the
+ * suitability grid (S-E1 to S-E5, S-CRP), which heads its third column from SCALE_OPTIONS -
+ * so renaming the option itself would have relabelled six AQS sections that were never
+ * asked to change. ResponseRules.PermittedChoices is still the authority on which values
+ * may be saved, and it is untouched.
+ *
+ * Applied only on a Tax review. This map was once described as the inline path's alone, on
+ * the reading that only Q-TAX-02 was ever drawn inline at this scale; `inlineOptionsFor`
+ * says what went wrong with that. Both readers of this map now test the discipline.
  */
 const INLINE_LABELS: Record<number, Record<number, string>> = {
   120910006: { 120910302: 'Pass with issues' },
@@ -134,12 +137,24 @@ const INLINE_LABELS: Record<number, Record<number, string>> = {
  * The options of a row as the document draws them inline - a row of tick boxes beside the
  * question rather than a column of a grid. Same options, same values; the document's own
  * casing and order.
+ *
+ * The reorder and the rename below are the TAX CHECK's, not the scale's, so they are keyed
+ * on the review's discipline exactly as `optionsFor` and the grid path key theirs. This
+ * used to apply them to every 120910006 question drawn inline, on the reading that the
+ * inline path was Q-TAX-02's alone. AD-123 checklist administration made that false: a
+ * question retyped to this scale breaks its section's uniform grid, the section falls to
+ * this path, and an AQS question was drawn as a tax check - "PASS / PASS WITH ISSUES /
+ * FAIL" over the suitability scale's own values. The value saved was always right and the
+ * wording over it was wrong, which is the worse half to get wrong.
  */
-export function inlineOptionsFor(responseTypeValue: number | null): ChoiceOption[] {
+export function inlineOptionsFor(
+  responseTypeValue: number | null,
+  isTaxReview = false,
+): ChoiceOption[] {
   const options = optionsFor(responseTypeValue);
   if (responseTypeValue == null || options.length === 0) return options;
 
-  const order = INLINE_ORDER[responseTypeValue];
+  const order = isTaxReview ? INLINE_ORDER[responseTypeValue] : undefined;
   const ordered = order
     ? order
         .map((value) => options.find((option) => option.value === value))
@@ -148,7 +163,7 @@ export function inlineOptionsFor(responseTypeValue: number | null): ChoiceOption
 
   // Rename before upper-casing, so an override is cased by the same rule as the label it
   // replaces rather than having to be written in the document's case itself.
-  const overrides = INLINE_LABELS[responseTypeValue];
+  const overrides = isTaxReview ? INLINE_LABELS[responseTypeValue] : undefined;
   const relabelled = overrides
     ? ordered.map((option) =>
         overrides[option.value] ? { ...option, label: overrides[option.value] } : option,
@@ -573,6 +588,13 @@ export type FormBlock<T extends SectionedAnswer = SectionedAnswer> =
       columnHeading: string;
       options: ChoiceOption[];
       groups: FormGroup<T>[];
+      /**
+       * The review's discipline, carried on the block so the inline path can read it off
+       * what it is already given. `options` above is already discipline-aware; the rows an
+       * inline block draws are not built here, so without this the renderer would have to
+       * thread the flag down four component layers to reach `inlineOptionsFor`.
+       */
+      isTaxReview: boolean;
     }
   | { kind: 'failpoints'; id: 'failpoints'; title: string; points: FailPoint[] };
 
@@ -632,6 +654,7 @@ export function formBlocks<T extends SectionedAnswer>(
         columnHeading: spec.columnHeading ?? 'Check',
         options: spec.scale == null ? [] : optionsFor(spec.scale, isTaxReview),
         groups: [group],
+        isTaxReview,
       });
       continue;
     }
@@ -646,6 +669,7 @@ export function formBlocks<T extends SectionedAnswer>(
       columnHeading: 'Check',
       options: layout.kind === 'grid' ? layout.options : [],
       groups: [group],
+      isTaxReview,
     });
   }
 

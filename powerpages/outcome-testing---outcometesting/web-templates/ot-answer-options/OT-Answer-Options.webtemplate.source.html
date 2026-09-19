@@ -1,6 +1,10 @@
 {% comment %}
   Radio group for one single-choice question. Include with:
-  (% include 'OT Answer Options' response_type: 120910005 selected: 120910301 question: '<guid>' %)
+  (% include 'OT Answer Options' response_type: 120910005 selected: 120910301 question: '<guid>' is_tax: false %)
+
+  `is_tax` is the REVIEW's discipline, and 120910006 is the one scale that reads differently
+  by it. Pass it on every include: an omitted one is falsy, which renders the scale's own
+  wording - the safe half of the pair, and the one six AQS sections share.
 
   The permitted subset per response type is the AD-023 rule; it is mirrored here for
   rendering and enforced server-side by ResponseRules.PermittedChoices, which is the
@@ -15,30 +19,39 @@
   Labels and order here are the document's INLINE ones, which are not always the grid's.
   Where the Checker Checklist draws an outcome scale beside its question rather than as a
   tick column it sets it in upper case - PASS / FAIL, YES / NO, PASS / PASS WITH ISSUES /
-  ... - and it orders the tax check outcome PASS, PASS WITH ISSUES, FAIL, not the
-  Pass / Fail / Insufficient evidence its suitability grid heads columns with. This include
-  only ever renders the inline form (the review page's grid path builds its own columns from
-  its own labels), so the casing and the order belong here. Primary root cause is title case
-  on the document and stays as it is. The app makes the same reading in checklistForm.ts,
-  inlineOptionsFor.
+  ... - and it orders the tax check outcome PASS, PASS WITH ISSUES, FAIL. Primary root cause
+  is title case on the document and stays as it is. The app makes the same reading in
+  checklistForm.ts, inlineOptionsFor.
 
-  The tax check's third option is the one place the two readings differ in WORDING and not
-  only in case: 120910302 is "PASS WITH ISSUES" here and "Insufficient evidence" on the
-  suitability grid, which heads the same scale (AD-055 amended). That is why the rename sits
-  on this inline-only include rather than on the scale - 120910006 is shared with S-E1 to
-  S-E5 and S-CRP, and renaming the option itself would have relabelled six AQS sections
-  nobody asked to change.
+  120910006's third option is the one place two readings differ in WORDING and not only in
+  case: on a TAX review 120910302 reads "PASS WITH ISSUES", and everywhere else it reads
+  "INSUFFICIENT EVIDENCE" as the suitability grid heads it (AD-055 amended). The rename sits
+  here rather than on the scale because 120910006 is shared with S-E1 to S-E5 and S-CRP, and
+  renaming the option itself would have relabelled six AQS sections nobody asked to change.
 
-  Only the labels move. The values are unchanged, and ResponseRules.PermittedChoices is
-  still the authority on which of them may be saved.
+  Until 2026-09-19 that rename and that reorder were applied to EVERY 120910006 question
+  this include drew, on the reading that only Q-TAX-02 was ever drawn inline at this scale.
+  AD-123 checklist administration made that false. Retyping a question to this scale breaks
+  its section's uniform grid, the section falls to this include, and an AQS question was
+  drawn as a tax check: a checker ticking what read "PASS WITH ISSUES" saved 120910302,
+  Insufficient evidence, which is a non-pass that raises remediation. The grid path above
+  had always tested the discipline; this one now does too.
+
+  Only the labels and their order move. The values are unchanged, and
+  ResponseRules.PermittedChoices is still the authority on which of them may be saved.
 {% endcomment %}
 {% case response_type %}
   {% when 120910005 %}
     {% assign values = '120910300,120910301' | split: ',' %}
     {% assign labels = 'PASS,FAIL' | split: ',' %}
   {% when 120910006 %}
-    {% assign values = '120910300,120910302,120910301' | split: ',' %}
-    {% assign labels = 'PASS,PASS WITH ISSUES,FAIL' | split: ',' %}
+    {% if is_tax %}
+      {% assign values = '120910300,120910302,120910301' | split: ',' %}
+      {% assign labels = 'PASS,PASS WITH ISSUES,FAIL' | split: ',' %}
+    {% else %}
+      {% assign values = '120910300,120910301,120910302' | split: ',' %}
+      {% assign labels = 'PASS,FAIL,INSUFFICIENT EVIDENCE' | split: ',' %}
+    {% endif %}
   {% when 120910007 %}
     {% assign values = '120910305,120910306' | split: ',' %}
     {% assign labels = 'YES,NO' | split: ',' %}
