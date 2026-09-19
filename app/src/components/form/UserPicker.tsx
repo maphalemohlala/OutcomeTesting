@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useUserDirectory, type DirectoryUser } from '../../hooks/useUserDirectory';
 import './UserPicker.css';
 
@@ -7,64 +7,81 @@ interface Props {
   /** Stored value. What it means depends on `field`. */
   value: string;
   onChange: (value: string) => void;
-  /** Shown as the empty option. */
+  /** Shown as the empty-state hint. */
   placeholder?: string;
   /**
    * Which registry column the stored value is. A person field on a case holds the display
    * name (AD-029); a role assignment is keyed on work email (AD-010); an accountability
    * lookup holds the contact's id. All three are a choice of one person from the same
-   * registry, so all three use this control and differ only in what they store. Every
-   * option is labelled with the name and the email whichever it is, so the three forms read
-   * identically to the person choosing.
+   * registry, so all three use this control and differ only in what they store.
    */
   field?: 'name' | 'email' | 'id';
 }
 
 /**
- * Person selector sourced from the application user registry (contact). Replaces free text
- * so a person field is chosen from known users rather than typed. The current value is kept
- * selectable even when it is not (yet) a registered user, so imported names are never lost
- * (AD-029: the user lookups on the case remain text). When the directory cannot load, this
- * degrades to a plain text input so editing is never blocked.
+ * Person selector sourced from the application user registry (contact).
  *
- * Searchable (project owner, 2026-09-19). A filter box above the list narrows it by name or
- * email as you type; the list itself stays a native select, so keyboard and screen-reader
- * behaviour is the platform's own rather than something reimplemented. A datalist combobox
- * was the other option and was not taken: it stores the text a person typed, which cannot
- * carry a contact's id, and it silently accepts a name that matches nobody.
+ * The list itself is searchable (project owner, 2026-09-19): one control, typed into
+ * directly, narrowing as you type. It was briefly a filter box ABOVE a select - two
+ * controls for one field - which is what that instruction corrected.
  *
- * The chosen person is never filtered out of the list. Narrowing the options under a
- * selection would blank the control and quietly change what is about to be saved.
+ * Built on a native datalist rather than a hand-rolled listbox. The browser owns the
+ * filtering, the keyboard, the scrolling and the screen-reader semantics, none of which a
+ * reimplementation gets right for free, and this codebase carries no UI dependency to do it
+ * with.
+ *
+ * What a datalist costs is that it yields TEXT, not a record: it cannot carry a contact's
+ * id. So each option's text is unique - name and email together where an id is wanted - and
+ * `resolve` maps it back. Text matching nobody is kept for a name field, where imported
+ * names that were never registered must survive (AD-029), and refused for an id field,
+ * where a guess is not a person.
  */
 export function UserPicker({
   id,
   value,
   onChange,
-  placeholder = 'Select a person',
+  placeholder = 'Search for a person',
   field = 'name',
 }: Props) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
-  const filterId = `${inputId}-filter`;
+  const listId = `${inputId}-list`;
   const directory = useUserDirectory();
-  const [filter, setFilter] = useState('');
-
-  const storedValue = (user: DirectoryUser) =>
-    field === 'email' ? user.email : field === 'id' ? user.id : user.name;
 
   const active = useMemo(
     () => (directory.status === 'ready' ? directory.users.filter((u) => u.active) : []),
     [directory],
   );
 
-  const matches = useMemo(() => {
-    const needle = filter.trim().toLowerCase();
-    if (needle === '') return active;
-    return active.filter(
-      (user) =>
-        user.name.toLowerCase().includes(needle) || user.email.toLowerCase().includes(needle),
-    );
-  }, [active, filter]);
+  /** What the person sees for one user, and what they type to choose them. */
+  const optionText = (user: DirectoryUser) =>
+    field === 'name'
+      ? user.name
+      : field === 'email'
+        ? user.email
+        : `${user.name} — ${user.email}`;
+
+  const stored = (user: DirectoryUser) =>
+    field === 'email' ? user.email : field === 'id' ? user.id : user.name;
+
+  /** The text that stands for the value currently held. */
+  const textFor = (held: string): string => {
+    if (held === '') return '';
+    const match = active.find((user) => stored(user) === held);
+    // An id with no match shows empty rather than a raw guid: the person is gone from the
+    // directory, and a guid in a text box reads as corruption.
+    return match ? optionText(match) : field === 'id' ? '' : held;
+  };
+
+  const [text, setText] = useState(() => textFor(value));
+
+  // The held value can change under the control - a save completes, a row reloads - and the
+  // text has to follow it. Keyed on the value and the directory, so a value that arrives
+  // before the directory does gets its name as soon as the names are known.
+  useEffect(() => {
+    setText(textFor(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, active]);
 
   if (directory.status !== 'ready') {
     return (
@@ -79,49 +96,57 @@ export function UserPicker({
     );
   }
 
-  const known = new Set(active.map(storedValue));
-  const hasUnlistedValue = value.trim().length > 0 && !known.has(value);
+  const resolve = (typed: string): string | null => {
+    const needle = typed.trim().toLowerCase();
+    if (needle === '') return '';
+    const match = active.find((user) => optionText(user).toLowerCase() === needle);
+    return match ? stored(match) : null;
+  };
 
-  // The selection survives the filter: a narrowed list that excludes the current value
-  // would leave the select showing nothing and change what a save would write.
-  const selected = active.find((user) => storedValue(user) === value);
-  const shown =
-    selected && !matches.includes(selected) ? [selected, ...matches] : matches;
+  const unresolved = text.trim() !== '' && resolve(text) === null;
 
   return (
-    <div className="user-picker__group">
+    <>
       <input
-        id={filterId}
-        type="search"
-        className="user-picker__filter"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        placeholder="Search by name or email"
-        aria-label="Search people"
-        aria-controls={inputId}
-        autoComplete="off"
-      />
-      <select
         id={inputId}
+        type="text"
+        role="combobox"
+        list={listId}
         className="user-picker"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">{placeholder}</option>
-        {hasUnlistedValue ? (
-          <option value={value}>{value} (not in the people directory)</option>
-        ) : null}
-        {shown.map((user) => (
-          <option key={user.id} value={storedValue(user)}>
-            {user.name} — {user.email}
+        value={text}
+        placeholder={placeholder}
+        autoComplete="off"
+        aria-invalid={unresolved && field === 'id' ? true : undefined}
+        aria-describedby={unresolved && field === 'id' ? `${inputId}-note` : undefined}
+        onChange={(e) => {
+          const typed = e.target.value;
+          setText(typed);
+
+          const resolved = resolve(typed);
+          if (resolved !== null) {
+            onChange(resolved);
+            return;
+          }
+
+          // Nobody matched. A name field keeps what was typed - that is how an imported
+          // name nobody registered survives an edit. An id field cannot: there is no
+          // contact to point at, so the field is cleared until one is chosen.
+          onChange(field === 'id' ? '' : typed);
+        }}
+      />
+      <datalist id={listId}>
+        {active.map((user) => (
+          <option key={user.id} value={optionText(user)}>
+            {field === 'name' ? user.email : field === 'email' ? user.name : ''}
           </option>
         ))}
-      </select>
-      <p className="user-picker__count" role="status">
-        {filter.trim() === ''
-          ? `${active.length} ${active.length === 1 ? 'person' : 'people'}`
-          : `${matches.length} of ${active.length} match “${filter.trim()}”`}
-      </p>
-    </div>
+      </datalist>
+      {unresolved && field === 'id' ? (
+        <p id={`${inputId}-note`} className="user-picker__note" role="status">
+          Nobody in the directory matches that, so nobody is recorded. Pick a name from the
+          list.
+        </p>
+      ) : null}
+    </>
   );
 }

@@ -1626,14 +1626,10 @@
             <label class="opt"><input type="checkbox" data-ot-acc="fqAdviser" /> The adviser ({{ rv['case.al_advisername'] | default: 'not named' | escape }})</label>
             <label class="ot-accountability__person">
               <span>Or someone else</span>
-              <input type="search" class="ot-hdr-input" data-ot-acc-filter="fq"
-                     placeholder="Search by name or email" aria-label="Search people for File Quality" autocomplete="off" />
-              <select class="ot-hdr-input" data-ot-acc-person="fq" aria-label="Person carrying the File Quality fail">
-                <option value="">The case's own person</option>
-                {% for c in directory.results.entities %}
-                <option value="{{ c.contactid }}" data-search="{{ c.fullname | escape | downcase }} {{ c.emailaddress1 | escape | downcase }}">{{ c.fullname | escape }} &mdash; {{ c.emailaddress1 | escape }}</option>
-                {% endfor %}
-              </select>
+              <input type="text" class="ot-hdr-input" list="ot-acc-people"
+                     data-ot-acc-person="fq" placeholder="Search for a person"
+                     autocomplete="off" role="combobox"
+                     aria-label="Person carrying the File Quality fail" />
             </label>
           </fieldset>
 
@@ -1643,17 +1639,28 @@
             <label class="opt"><input type="checkbox" data-ot-acc="aqParaplanner" /> The paraplanner ({{ rv['case.al_paraplanner'] | default: 'not named' | escape }})</label>
             <label class="ot-accountability__person">
               <span>Or someone else</span>
-              <input type="search" class="ot-hdr-input" data-ot-acc-filter="aq"
-                     placeholder="Search by name or email" aria-label="Search people for Advice Quality" autocomplete="off" />
-              <select class="ot-hdr-input" data-ot-acc-person="aq" aria-label="Person carrying the Advice Quality fail">
-                <option value="">The case's own person</option>
-                {% for c in directory.results.entities %}
-                <option value="{{ c.contactid }}" data-search="{{ c.fullname | escape | downcase }} {{ c.emailaddress1 | escape | downcase }}">{{ c.fullname | escape }} &mdash; {{ c.emailaddress1 | escape }}</option>
-                {% endfor %}
-              </select>
+              <input type="text" class="ot-hdr-input" list="ot-acc-people"
+                     data-ot-acc-person="aq" placeholder="Search for a person"
+                     autocomplete="off" role="combobox"
+                     aria-label="Person carrying the Advice Quality fail" />
             </label>
           </fieldset>
         </div>
+
+        {% comment %}
+          One datalist for both boxes: a datalist is a list of suggestions, not a control,
+          so two inputs can point at the same one and it is rendered once rather than twice.
+
+          The option's text is what someone types to choose a person, so it has to identify
+          them on its own - name and email together, since two people can share a name. The
+          contact's id rides on data-id, because a datalist yields TEXT and cannot carry a
+          record; the script maps the text back.
+        {% endcomment %}
+        <datalist id="ot-acc-people">
+          {% for c in directory.results.entities %}
+          <option value="{{ c.fullname | escape }} - {{ c.emailaddress1 | escape }}" data-id="{{ c.contactid }}"></option>
+          {% endfor %}
+        </datalist>
 
         <p class="ot-accountability__status" data-ot-acc-status role="status" aria-live="polite"></p>
       </section>
@@ -1676,30 +1683,19 @@
           }
 
           /*
-           * Searchable (project owner, 2026-09-19). The filter hides options rather than
-           * rebuilding the list, so the chosen person survives a search that does not match
-           * them and the select never silently loses its value.
+           * The box IS the search (project owner, 2026-09-19). A native datalist: the
+           * browser filters as you type and owns the keyboard, the scrolling and the
+           * screen-reader semantics, none of which a hand-rolled list gets right for free.
+           *
+           * What it costs is that it yields TEXT, not a record, so the text has to identify
+           * one person on its own and be mapped back to an id. Anything that matches nobody
+           * records nobody, and says so rather than failing at the server.
            */
-          function wireFilter(which) {
-            var filter = root.querySelector('[data-ot-acc-filter="' + which + '"]');
-            var select = root.querySelector('[data-ot-acc-person="' + which + '"]');
-            if (!filter || !select) { return; }
-
-            filter.addEventListener('input', function () {
-              var needle = filter.value.trim().toLowerCase();
-              var options = select.options;
-              for (var i = 0; i < options.length; i++) {
-                var option = options[i];
-                var haystack = option.getAttribute('data-search') || '';
-                var keep = needle === '' || haystack.indexOf(needle) >= 0
-                  || option.value === '' || option.selected;
-                option.hidden = !keep;
-              }
-            });
+          var byText = {};
+          var options = document.querySelectorAll('#ot-acc-people option');
+          for (var o = 0; o < options.length; o++) {
+            byText[options[o].value.trim().toLowerCase()] = options[o].getAttribute('data-id');
           }
-
-          wireFilter('fq');
-          wireFilter('aq');
 
           function value(name) {
             var box = root.querySelector('[data-ot-acc="' + name + '"]');
@@ -1707,8 +1703,24 @@
           }
 
           function person(which) {
-            var select = root.querySelector('[data-ot-acc-person="' + which + '"]');
-            return select ? select.value : '';
+            var box = root.querySelector('[data-ot-acc-person="' + which + '"]');
+            if (!box) { return ''; }
+            var typed = box.value.trim().toLowerCase();
+            if (typed === '') { return ''; }
+            return byText[typed] || '';
+          }
+
+          /** Names anyone the boxes hold text for but could not match. */
+          function unmatched() {
+            var stray = [];
+            var which = ['fq', 'aq'];
+            for (var i = 0; i < which.length; i++) {
+              var box = root.querySelector('[data-ot-acc-person="' + which[i] + '"]');
+              if (box && box.value.trim() !== '' && person(which[i]) === '') {
+                stray.push(box.value.trim());
+              }
+            }
+            return stray;
           }
 
           function save() {
@@ -1716,6 +1728,13 @@
             if (saving) { return; }
             if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
               show('This page did not load completely. Refresh and try again.', 'error');
+              return;
+            }
+
+            var stray = unmatched();
+            if (stray.length > 0) {
+              show('Nobody in the directory matches "' + stray[0] + '", so nobody was'
+                + ' recorded for it. Pick a name from the list.', 'error');
               return;
             }
 
@@ -1775,8 +1794,14 @@
           }
 
           for (var i = 0; i < boxes.length; i++) { boxes[i].addEventListener('change', queue); }
-          root.querySelector('[data-ot-acc-person="fq"]').addEventListener('change', queue);
-          root.querySelector('[data-ot-acc-person="aq"]').addEventListener('change', queue);
+
+          // change fires when a suggestion is picked; input covers typing the whole thing
+          // out, which a datalist also allows.
+          var people = root.querySelectorAll('[data-ot-acc-person]');
+          for (var q = 0; q < people.length; q++) {
+            people[q].addEventListener('change', queue);
+            people[q].addEventListener('input', queue);
+          }
 
           // The submit waits on this the way it waits on the header: a choice made a moment
           // before pressing Submit must reach the review before the outcome is created from it.

@@ -1688,6 +1688,11 @@ footer a:focus-visible, .footer a:focus-visible {
   color: var(--colour-text-muted);
 }
 
+/* A datalist's own arrow is drawn by the browser; the box is otherwise
+   an ordinary sheet input. Nothing to style for the list itself - that
+   popup belongs to the browser, which is the point of using one. */
+.ot-accountability__person .ot-hdr-input { width: 100%; }
+
 .ot-accountability__status {
   margin: var(--space-3) 0 0;
   font-size: var(--text-sm);
