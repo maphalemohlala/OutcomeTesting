@@ -5,8 +5,10 @@ import { answerOf } from './reviewAnswer';
 import { date, text } from '../../lib/format';
 import { buildSections, type ReviewSection } from './reviewSections';
 import {
+  caseChecklist,
   caseHeaderFields,
   failPoints,
+  type CaseChecklist,
   type FailPoint,
   type HeaderField,
   type TickedAnswer,
@@ -66,6 +68,12 @@ export interface ReviewDetail {
   header: ReviewHeader;
   /** The document's case header block; null when the case could not be read. */
   caseHeader: HeaderField[] | null;
+  /**
+   * Why this case was selected for checking: the items the paraplanner ticked in the
+   * Intelligent Office task. Null when the case could not be read, and carries an empty
+   * item list when it was read but names none - the page draws nothing in either event.
+   */
+  checklist: CaseChecklist | null;
   /**
    * The team's sections with every question in force, in the sections' display order -
    * which is the order of the Checker Checklist document - each with its answer or none.
@@ -294,6 +302,10 @@ export function useReviewDetail(
             header,
             caseHeader:
               outcomeCase?.success && outcomeCase.data ? caseHeaderFields(outcomeCase.data) : null,
+            // Off the case read the header block already makes, not a read of its own: the
+            // columns are on the record that was fetched.
+            checklist:
+              outcomeCase?.success && outcomeCase.data ? caseChecklist(outcomeCase.data) : null,
             sections: buildSections(
               sections.success
                 ? sections.data.map((section) => ({

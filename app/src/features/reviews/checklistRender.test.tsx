@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
+import type { CaseChecklist } from './checklistForm';
 import { describe, expect, it, vi } from 'vitest';
 import reference from '../../../../docs/reference/checker-checklist.html?raw';
 import seedXml from '../../../../data/v8-seed/data.xml?raw';
@@ -101,7 +102,11 @@ function form(ownerRole: string) {
 }
 
 /** The page's markup for one discipline, rendered off the seed. */
-function render(reviewType: 'Tax' | 'AQS', ownerRole: string): string {
+function render(
+  reviewType: 'Tax' | 'AQS',
+  ownerRole: string,
+  checklist: CaseChecklist | null = null,
+): string {
   const built = form(ownerRole);
   detailState.current = {
     status: 'ready',
@@ -123,6 +128,7 @@ function render(reviewType: 'Tax' | 'AQS', ownerRole: string): string {
         typeMismatch: false,
       },
       caseHeader: [],
+      checklist,
       sections: built.sections,
       failPoints: built.failPoints,
     },
@@ -207,5 +213,49 @@ describe('the Code App review page draws the document’s headings', () => {
       ['Centralised Retirement Proposition test point', 'Pass', 'Fail', 'Insufficient evidence'],
       ['Outcome', 'Yes', 'No', 'Insufficient evidence'],
     ]);
+  });
+});
+
+
+describe('the Checklist section', () => {
+  const checklist = (over: Partial<CaseChecklist> = {}): CaseChecklist => ({
+    items: ['Tax Check', 'High Risk Item 1'],
+    completedBy: null,
+    completedOn: null,
+    ...over,
+  });
+
+  it('lists the items the paraplanner ticked', () => {
+    const html = render('Tax', TAX, checklist());
+
+    expect(html).toContain('Checklist');
+    expect(html).toContain('Tax Check');
+    expect(html).toContain('High Risk Item 1');
+  });
+
+  it('draws nothing when the case names no items', () => {
+    // A case imported before the extract carried the columns. A heading over an empty
+    // list reads as a fault, so the section is absent rather than empty.
+    const html = render('Tax', TAX, checklist({ items: [] }));
+
+    expect(html).not.toContain('review__checklist-items');
+  });
+
+  it('draws nothing when the case could not be read', () => {
+    expect(render('Tax', TAX, null)).not.toContain('review__checklist-items');
+  });
+
+  it('names who completed the checklist when the case records it', () => {
+    const html = render('Tax', TAX, checklist({ completedBy: 'Miko Stewart' }));
+
+    expect(html).toContain('Miko Stewart');
+  });
+
+  it('sits above the checklist document rather than inside it', () => {
+    // The section is orientation for the form, not one of the document's own blocks -
+    // putting it inside checklist-doc would place it in the printed Checker Checklist.
+    const html = render('Tax', TAX, checklist());
+
+    expect(html.indexOf('review__checklist-items')).toBeLessThan(html.indexOf('checklist-doc'));
   });
 });

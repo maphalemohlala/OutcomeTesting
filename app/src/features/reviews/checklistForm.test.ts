@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Al_outcomecases } from '../../generated/models/Al_outcomecasesModel';
 import {
+  caseChecklist,
   caseHeaderFields,
   failPoints,
   inlineOptionsFor,
@@ -443,5 +444,61 @@ describe('optionGridColumns', () => {
     expect(optionGridColumns(120910010)).toBeNull();
     expect(optionGridColumns(120910004)).toBeNull();
     expect(optionGridColumns(null)).toBeNull();
+  });
+});
+
+
+describe('caseChecklist', () => {
+  const caseRecord = (overrides: Partial<Al_outcomecases> = {}): Al_outcomecases =>
+    ({ al_outcomecaseid: 'case-1', ...overrides }) as Al_outcomecases;
+
+  it('reads the ticked items, one per line', () => {
+    const result = caseChecklist(
+      caseRecord({ al_checklistitems: 'Tax Check\nHigh Risk Item 1\nEnhanced Supervision' }),
+    );
+
+    expect(result.items).toEqual(['Tax Check', 'High Risk Item 1', 'Enhanced Supervision']);
+  });
+
+  it('keeps the order the import wrote', () => {
+    const result = caseChecklist(caseRecord({ al_checklistitems: 'Leaver\nTax Check' }));
+
+    expect(result.items).toEqual(['Leaver', 'Tax Check']);
+  });
+
+  it('drops blank lines rather than rendering empty bullets', () => {
+    // A trailing newline is ordinary in a memo column: the import joins with "\n" and
+    // does not trim what it stores.
+    const result = caseChecklist(caseRecord({ al_checklistitems: 'Tax Check\n\n  \nLeaver\n' }));
+
+    expect(result.items).toEqual(['Tax Check', 'Leaver']);
+  });
+
+  it('reads no items when the case carries none', () => {
+    expect(caseChecklist(caseRecord()).items).toEqual([]);
+    expect(caseChecklist(caseRecord({ al_checklistitems: '' })).items).toEqual([]);
+    expect(caseChecklist(caseRecord({ al_checklistitems: '   ' })).items).toEqual([]);
+  });
+
+  it('carries who completed the checklist and when', () => {
+    const result = caseChecklist(
+      caseRecord({
+        al_checklistitems: 'Tax Check',
+        al_checklistcompletedby: 'Miko Stewart',
+        al_checklistcompleteddate: '2026-09-04T13:54:00Z',
+      }),
+    );
+
+    expect(result.completedBy).toBe('Miko Stewart');
+    expect(result.completedOn).toBe('2026-09-04T13:54:00Z');
+  });
+
+  it('reports a missing or blank stamp as absent rather than empty', () => {
+    const result = caseChecklist(
+      caseRecord({ al_checklistitems: 'Tax Check', al_checklistcompletedby: '  ' }),
+    );
+
+    expect(result.completedBy).toBeNull();
+    expect(result.completedOn).toBeNull();
   });
 });

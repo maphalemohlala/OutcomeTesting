@@ -8,14 +8,56 @@ import {
   inlineOptionsFor,
   isTicked,
   optionsFor,
+  type CaseChecklist,
   type ChoiceOption,
   type FailPoint,
   type FormBlock,
   type FormGroup,
 } from './checklistForm';
+import { date } from '../../lib/format';
 import { CaseHeaderTable } from './CaseHeaderTable';
 import '../../styles/document.css';
 import './ReviewDetailPage.css';
+
+/**
+ * Why this case was selected for checking: the items the paraplanner ticked in the
+ * Intelligent Office task (project owner, 2026-09-19). The case has carried them since
+ * import and nothing displayed them, so a checker opened a case with no way of knowing
+ * what had put it in front of them.
+ *
+ * Read-only, and only the ticked items: the case stores what was selected, not the
+ * vocabulary it was selected from, so there is no "not applicable" row to draw.
+ *
+ * Renders nothing when the case names none. That is a real state - a case imported before
+ * the extract carried the columns - and a heading over an empty list reads as a fault.
+ * Mirrors the portal's OT Review Detail section of the same name.
+ */
+function ChecklistSection({ checklist }: { checklist: CaseChecklist }) {
+  if (checklist.items.length === 0) return null;
+
+  const stamp = [
+    checklist.completedBy ? `by ${checklist.completedBy}` : null,
+    checklist.completedOn ? date(checklist.completedOn) : null,
+  ].filter(Boolean);
+
+  return (
+    <section className="review__checklist" aria-labelledby="review-checklist">
+      <h2 id="review-checklist" className="review__checklist-heading">
+        Checklist
+      </h2>
+      <p className="review__checklist-intro">
+        Why this case was selected for checking. Recorded by the paraplanner in Intelligent
+        Office and carried in on import.
+      </p>
+      <ul className="review__checklist-items">
+        {checklist.items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+      {stamp.length > 0 && <p className="review__checklist-meta">Completed {stamp.join(', ')}.</p>}
+    </section>
+  );
+}
 
 interface ReviewDetailPageProps {
   reviewType: ReviewType;
@@ -377,6 +419,8 @@ export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
               </span>
             </div>
           </section>
+
+          {state.detail.checklist && <ChecklistSection checklist={state.detail.checklist} />}
 
           {/*
             * The Checker Checklist, drawn as the document draws it and in its order: the

@@ -59,3 +59,45 @@
 .review__summary-value a:hover {
   text-decoration: underline;
 }
+
+/* ------------------------------------------------------------------
+   The Checklist section: the items the paraplanner ticked in the
+   Intelligent Office task, which is why the case is being checked
+   (project owner, 2026-09-19). Mirrors the portal's section of the
+   same name. Read-only, so it borrows the summary card's shape rather
+   than any of the form controls' affordances.
+   ------------------------------------------------------------------ */
+
+.review__checklist {
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-left: 3px solid var(--colour-action);
+}
+
+.review__checklist-heading {
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-2);
+}
+
+.review__checklist-intro {
+  color: var(--colour-text-muted);
+  margin: 0 0 var(--space-3);
+}
+
+.review__checklist-items {
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+.review__checklist-items li + li {
+  margin-top: var(--space-1);
+}
+
+/* Who ticked them and when: provenance, subordinate to the items. */
+.review__checklist-meta {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}

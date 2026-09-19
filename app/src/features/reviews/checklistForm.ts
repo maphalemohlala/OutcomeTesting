@@ -652,3 +652,42 @@ export function formBlocks<T extends SectionedAnswer>(
   if (!placed) blocks.push(failPoints);
   return blocks;
 }
+
+
+/**
+ * What the paraplanner ticked in the Intelligent Office task, and who stamped it.
+ *
+ * `al_checklistitems` is written by the import as the selected item names, one per line
+ * (`ImportRules.ReadChecklist`), and is the only input to the BR-004 route. It is the
+ * answer to "why is this case being checked at all", which nothing displayed until now.
+ *
+ * Only the ticked items are stored, so only the ticked items can be shown: the seven-item
+ * vocabulary lives in the plug-in assembly and the case does not record which of them were
+ * offered and declined.
+ *
+ * Blank lines are dropped rather than rendered as empty bullets - a trailing newline is
+ * ordinary in a memo column, and the import joins with "\n" without trimming the result.
+ */
+export interface CaseChecklist {
+  /** The ticked items, in the order the import wrote them. */
+  items: string[];
+  completedBy: string | null;
+  completedOn: string | null;
+}
+
+export function caseChecklist(record: Al_outcomecases): CaseChecklist {
+  const raw = record.al_checklistitems;
+  const items =
+    typeof raw === 'string'
+      ? raw
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line !== '')
+      : [];
+
+  return {
+    items,
+    completedBy: record.al_checklistcompletedby?.trim() || null,
+    completedOn: record.al_checklistcompleteddate ?? null,
+  };
+}
