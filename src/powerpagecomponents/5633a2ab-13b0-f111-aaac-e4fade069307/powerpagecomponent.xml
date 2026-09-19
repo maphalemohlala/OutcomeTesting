@@ -1,7 +1,7 @@
 <powerpagecomponent powerpagecomponentid="5633a2ab-13b0-f111-aaac-e4fade069307">
   <content>{
-  "value": "al_casestatus",
-  "source": 0
+  "description": "Allowlist of columns the Web API may act on for al_outcomecase: the case status alone, which is the one value a page needs to re-read to correct a stale badge. Every other column stays off the list, and the table carries no write permission at all, so this grants a read of one column and no write of anything.",
+  "value": "al_casestatus"
 }</content>
   <iscustomizable>1</iscustomizable>
   <name>Webapi/al_outcomecase/fields</name>

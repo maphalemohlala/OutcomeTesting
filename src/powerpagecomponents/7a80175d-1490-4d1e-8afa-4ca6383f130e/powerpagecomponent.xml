@@ -1,8 +1,7 @@
 <powerpagecomponent powerpagecomponentid="7a80175d-1490-4d1e-8afa-4ca6383f130e">
   <content>{
-  "description": "Sets whether or not the portal can redirect the user to the profile page after successful sign-in. By default, it is set to true.",
-  "value": "false",
-  "source": 0
+  "description": "Sets whether or not the portal can redirect the user to the profile page after successful sign-in. Stock default is true and this file carried true until 2026-09-15, but both environments have held false since a hand edit on 2026-09-09 and the yml was the thing that was wrong. Reconciled down to the environments rather than up, by owner direction, so the next upload stops silently re-enabling the redirect.",
+  "value": "false"
 }</content>
   <iscustomizable>1</iscustomizable>
   <name>Authentication/Registration/ProfileRedirectEnabled</name>

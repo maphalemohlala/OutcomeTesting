@@ -1,6 +1,7 @@
 <powerpagecomponent powerpagecomponentid="8f8c702e-3b39-41a8-9573-21786df9ac73">
   <content>{
-  "value": "true"
+  "description": "Left false to match both environments, which is where it actually sits. The value moved to false on 2026-09-15 at 07:23Z under the service account and the reason was never recorded; this file still said true, so an upload would have turned the invitation path back on without anyone asking for it. The path is untested here (see docs/reference/portal-access-runbook.md), so the environments win until someone deliberately enables it.",
+  "value": "false"
 }</content>
   <iscustomizable>1</iscustomizable>
   <name>Authentication/Registration/InvitationEnabled</name>

@@ -1,7 +1,7 @@
 <powerpagecomponent powerpagecomponentid="1718a762-9c61-40a3-b9dc-01772bee07f3">
   <content>{
-  "value": "true",
-  "source": 0
+  "description": "Must stay true for contact mapping to run. Mapping happens at the registration gate, so turning registration off refuses an unbound sign-in before the incoming email is ever matched against a contact. Self-registration is held shut by OpenRegistrationEnabled being false, not by this.",
+  "value": "true"
 }</content>
   <iscustomizable>1</iscustomizable>
   <name>Authentication/Registration/Enabled</name>
