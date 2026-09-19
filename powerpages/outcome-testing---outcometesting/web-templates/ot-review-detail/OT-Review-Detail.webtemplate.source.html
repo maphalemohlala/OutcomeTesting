@@ -1572,12 +1572,27 @@
       is PATCHed onto.
     {% endcomment %}
     {% if editable %}
+      {% comment %}
+        The opening state only, not the decision.
+
+        This card is rendered on every editable review and hidden until the check records a
+        non-pass; the script below shows and hides it as the answers change. It used to be
+        wrapped in this condition instead, which meant the server decided at PAGE LOAD
+        whether the card existed - so a checker who ticked Fail saw nothing, because ticking
+        an answer autosaves and never re-renders the page. It appeared only after a reload.
+        Reported on IO-SEED-TAX-01, 2026-09-19.
+
+        The rule here and the rule in the script are the same one: any answer on the
+        outcome scale that is not a plain Pass.
+      {% endcomment %}
       {% assign ot_fq_failed = false %}
       {% for a in arows %}
-        {% if a.al_answerchoice.value == 120910301 %}{% assign ot_fq_failed = true %}{% endif %}
+        {% assign ot_ans = a.al_answerchoice.value %}
+        {% if ot_ans == 120910301 or ot_ans == 120910302 or ot_ans == 120910303 or ot_ans == 120910304 %}
+          {% assign ot_fq_failed = true %}
+        {% endif %}
       {% endfor %}
 
-      {% if ot_fq_failed %}
       {% fetchxml directory %}
       <fetch>
         <entity name="contact">
@@ -1595,6 +1610,7 @@
       <section class="ot-card ot-accountability"
                data-ot-accountability
                data-review-id="{{ rv.al_reviewinstanceid }}"
+               {% unless ot_fq_failed %}hidden{% endunless %}
                aria-labelledby="ot-accountability-heading">
         <h2 class="ot-card__title" id="ot-accountability-heading">Who carries this fail</h2>
         <p>
@@ -1764,10 +1780,40 @@
 
           // The submit waits on this the way it waits on the header: a choice made a moment
           // before pressing Submit must reach the review before the outcome is created from it.
+          /*
+           * Shown and hidden as the answers change (2026-09-19). A non-pass anywhere on the
+           * outcome scale means this check recorded a fail and somebody carries it.
+           *
+           * Bound to the questionnaire rather than to each answer's own save, because an
+           * answer is saved on a debounce and the card should appear the moment the option
+           * is ticked, not a second later.
+           */
+          var NON_PASS = ['120910301', '120910302', '120910303', '120910304'];
+
+          function failed() {
+            var ticked = document.querySelectorAll('[data-ot-questionnaire] input:checked');
+            for (var i = 0; i < ticked.length; i++) {
+              for (var n = 0; n < NON_PASS.length; n++) {
+                if (ticked[i].value === NON_PASS[n]) { return true; }
+              }
+            }
+            return false;
+          }
+
+          function refresh() {
+            root.hidden = !failed();
+          }
+
+          var questionnaire = document.querySelector('[data-ot-questionnaire]');
+          if (questionnaire) {
+            questionnaire.addEventListener('change', refresh);
+          }
+
+          refresh();
+
           window.otAccountability = { flush: function (done) { save(); if (done) { done(true); } } };
         })();
       </script>
-      {% endif %}
     {% endif %}
 
     {% if editable %}

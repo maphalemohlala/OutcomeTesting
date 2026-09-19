@@ -1638,6 +1638,12 @@ footer a:focus-visible, .footer a:focus-visible {
    review, just before Submit, and only when the check recorded a fail.
    ------------------------------------------------------------------ */
 
+/* Explicit, not inherited from the browser default: the card is shown
+   and hidden by script as the answers change, and this site also loads
+   Bootstrap - a display rule from anywhere would beat [hidden] and leave
+   the card on screen for a clean check. */
+.ot-accountability[hidden] { display: none; }
+
 .ot-accountability__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
