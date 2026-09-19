@@ -1431,6 +1431,19 @@ footer a:focus-visible, .footer a:focus-visible {
   margin-top: var(--space-2);
 }
 
+/* The same list inside the V8 document, where the card's own padding
+   does not apply (project owner, 2026-09-19 - bullets there too, not
+   the ruled table this first drew). The sheet is Calibri at 10.5pt and
+   every other block in it is full-bleed, so the list takes no side
+   gutter of its own: the padding is only what carries the markers
+   clear of the left edge. Out-specifies Bootstrap's `ol,ul` reset,
+   which is a single element selector. */
+.ot-checklist .ot-checklist-overview-items {
+  margin: 0 0 6px;
+  padding-left: 1.4em;
+  font-size: 10.5pt;
+}
+
 /* Kept in print: why a case was selected belongs on a printed record
    of its check. */
 

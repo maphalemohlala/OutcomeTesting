@@ -24,11 +24,14 @@
 
   Parameters:
     items    the raw column value, newline separated.
-    variant  'card' for a standalone card, as the review page draws it around the form;
-             'sheet' for a section of the V8 document, as the case record page draws it.
-             A ruled table rather than a bulleted list in the sheet, because the sheet
-             rules everything and a flowing list inside it reads as a foreign element -
-             the same reason the case page's definition lists became meta tables.
+    variant  'card' wraps the list in a standalone card, as the review page draws it
+             around the form. Anything else - the case record page passes 'sheet' - is a
+             plain section that takes the styling of whatever contains it.
+
+  A bulleted list in both (project owner, 2026-09-19). The case page first drew a ruled
+  table on the reasoning that .ot-checklist rules everything and a flowing list inside it
+  reads as a foreign element; the owner asked for bullets there too, so the list is now
+  the single shape and only the wrapper differs.
 
   The line break is turned into a single character before the split: this Liquid rejects
   a multi-character split, and newline_to_br writes a tag it understands whatever line
@@ -50,26 +53,15 @@
   {% endfor %}
 
   {% if ot_cl_count > 0 %}
-    {% if variant == 'sheet' %}
+    {% assign ot_cl_wrap = 'ot-checklist-overview' %}
+    {% assign ot_cl_head = 'ot-checklist-overview__heading' %}
+    {% if variant == 'card' %}
+      {% assign ot_cl_wrap = 'ot-card ot-checklist-overview' %}
+      {% assign ot_cl_head = 'ot-card__title' %}
+    {% endif %}
 
-    <section aria-labelledby="ot-checklist-overview-heading">
-      <h2 id="ot-checklist-overview-heading">Checklist Items</h2>
-      <table class="ot-checklist-overview-rows">
-        <tbody>
-          {% for l in ot_cl_lines %}
-            {% assign ot_cl_item = l | strip %}
-            {% if ot_cl_item != '' %}
-            <tr><td>{{ ot_cl_item | escape }}</td></tr>
-            {% endif %}
-          {% endfor %}
-        </tbody>
-      </table>
-    </section>
-
-    {% else %}
-
-    <section class="ot-card ot-checklist-overview" aria-labelledby="ot-checklist-overview-heading">
-      <h2 class="ot-card__title" id="ot-checklist-overview-heading">Checklist Items</h2>
+    <section class="{{ ot_cl_wrap }}" aria-labelledby="ot-checklist-overview-heading">
+      <h2 class="{{ ot_cl_head }}" id="ot-checklist-overview-heading">Checklist Items</h2>
       <ul class="ot-checklist-overview-items">
         {% for l in ot_cl_lines %}
           {% assign ot_cl_item = l | strip %}
@@ -79,7 +71,5 @@
         {% endfor %}
       </ul>
     </section>
-
-    {% endif %}
   {% endif %}
 {% endif %}
