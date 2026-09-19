@@ -244,6 +244,46 @@
             <Description description="Supervisory status of the adviser: PreCAS, CAS, Enhanced or Watchlist." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_AqsCheckerName">
+          <Type>nvarchar</Type>
+          <Name>al_aqscheckername</Name>
+          <LogicalName>al_aqscheckername</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.4.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>text</Format>
+          <MaxLength>100</MaxLength>
+          <Length>200</Length>
+          <displaynames>
+            <displayname description="AQS Checker" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The checker allocated to this case's AQS review, stamped by al_AssignCase and by a portal claim (item 2, 2026-09-19). Replaces the single al_checkername, which named whichever discipline was allocated second. Derived - not edited by hand." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_CaseReference">
           <Type>nvarchar</Type>
           <Name>al_casereference</Name>
@@ -1902,6 +1942,46 @@
           </displaynames>
           <Descriptions>
             <Description description="TaskType from the extract, such as Pre-Advice Check Required. Derives whether the case is a pre or post check." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_TaxCheckerName">
+          <Type>nvarchar</Type>
+          <Name>al_taxcheckername</Name>
+          <LogicalName>al_taxcheckername</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.4.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>text</Format>
+          <MaxLength>100</MaxLength>
+          <Length>200</Length>
+          <displaynames>
+            <displayname description="Tax Checker" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The checker allocated to this case's Tax review, stamped by al_AssignCase and by a portal claim (item 2, 2026-09-19). Replaces the single al_checkername, which named whichever discipline was allocated second. Derived - not edited by hand." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_TaxCheckRequired">
