@@ -39,6 +39,14 @@ namespace OutcomeTesting.Plugins
         public const string FqParaplannerFlag = "al_fqparaplanneraccountable";
         public const string AqAdviserFlag = "al_aqadviseraccountable";
         public const string AqParaplannerFlag = "al_aqparaplanneraccountable";
+
+        /// <summary>
+        /// The contact named as carrying a fail, where someone other than the case's own
+        /// adviser or paraplanner was chosen (item 8, 2026-09-19). The four flags still say
+        /// WHICH of AD-039's two slots they fill; these say whose name goes in it.
+        /// </summary>
+        public const string FqAccountableContactAttr = "al_fqaccountablecontactid";
+        public const string AqAccountableContactAttr = "al_aqaccountablecontactid";
         private const int CaseStatusClosed = 120910591;
         private const int BatchStatusDraft = 120910770;
         private const int BatchStatusGenerated = 120910771;
@@ -120,6 +128,12 @@ namespace OutcomeTesting.Plugins
                 var fileQualityGrade = FileQuality.Label(fileQualityAnswer);
                 var fileQualityChoice = FileQuality.Choice(fileQualityAnswer);
                 var effectiveOutcome = Outcomes.EffectiveOutcome(outcomeRow);
+
+                // Someone named in place of the case's own adviser or paraplanner (project
+                // owner, 2026-09-19). Read once per case; FlaggedText decides per column
+                // whether it applies, since only the slot the flags point at is filled.
+                var fqNamedPerson = NamedPerson(outcomeRow, FqAccountableContactAttr);
+                var aqNamedPerson = NamedPerson(outcomeRow, AqAccountableContactAttr);
                 var code = "EXR-" + batchCode + "-" + caseRef;
 
                 var incomplete = DescribeIncompleteRow(outcomeRow, fileQualityGrade, AqsExpected(userService, outcomeCase));
@@ -152,28 +166,28 @@ namespace OutcomeTesting.Plugins
                     ["al_filequalitygrade"] = fileQualityGrade,
                     ["al_fqfailadvisername"] = FlaggedText(
                         IsAccountable(outcomeRow, FqAdviserFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_advisername"),
+                        outcomeCase, "al_advisername", fqNamedPerson),
                     ["al_fqfailadvisercode"] = FlaggedText(
                         IsAccountable(outcomeRow, FqAdviserFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_advisercode"),
+                        outcomeCase, "al_advisercode", fqNamedPerson),
                     ["al_fqfailparaplannername"] = FlaggedText(
                         IsAccountable(outcomeRow, FqParaplannerFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_paraplanner"),
+                        outcomeCase, "al_paraplanner", fqNamedPerson),
                     ["al_fqfailparaplannercode"] = FlaggedText(
                         IsAccountable(outcomeRow, FqParaplannerFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_paraplannercode"),
+                        outcomeCase, "al_paraplannercode", fqNamedPerson),
                     ["al_aqfailadvisername"] = FlaggedText(
                         IsAccountable(outcomeRow, AqAdviserFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_advisername"),
+                        outcomeCase, "al_advisername", aqNamedPerson),
                     ["al_aqfailadvisercode"] = FlaggedText(
                         IsAccountable(outcomeRow, AqAdviserFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_advisercode"),
+                        outcomeCase, "al_advisercode", aqNamedPerson),
                     ["al_aqfailparaplannername"] = FlaggedText(
                         IsAccountable(outcomeRow, AqParaplannerFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_paraplanner"),
+                        outcomeCase, "al_paraplanner", aqNamedPerson),
                     ["al_aqfailparaplannercode"] = FlaggedText(
                         IsAccountable(outcomeRow, AqParaplannerFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_paraplannercode"),
+                        outcomeCase, "al_paraplannercode", aqNamedPerson),
                     ["al_separator"] = string.Empty,
                     ["statecode"] = new OptionSetValue(0),
                     ["statuscode"] = new OptionSetValue(1),
@@ -215,7 +229,8 @@ namespace OutcomeTesting.Plugins
                 ColumnSet = new ColumnSet(
                     "al_finaloutcome", "al_initialoutcome",
                     "al_fqadviseraccountable", "al_fqparaplanneraccountable",
-                    "al_aqadviseraccountable", "al_aqparaplanneraccountable"),
+                    "al_aqadviseraccountable", "al_aqparaplanneraccountable",
+                    FqAccountableContactAttr, AqAccountableContactAttr),
                 TopCount = 1,
                 Criteria = new FilterExpression(),
             };
@@ -343,12 +358,60 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string FlaggedText(bool accountable, Entity outcomeCase, string caseAttribute)
         {
+            return FlaggedText(accountable, outcomeCase, caseAttribute, null);
+        }
+
+        /// <summary>
+        /// The text AD-039 wants in an accountability column: empty when the person that
+        /// column names does not carry this fail, and otherwise their name or code.
+        ///
+        /// <paramref name="namedPerson"/> overrides the case's own value (project owner,
+        /// 2026-09-19). Accountability can now be given to any contact, not only the adviser
+        /// or paraplanner the case names, and the extract has no column of its own for them -
+        /// columns 11-20 are fixed as "fail adviser" and "fail paraplanner" pairs. So the
+        /// chosen person is written into whichever of those slots the flags say they fill,
+        /// in place of the case's own name.
+        ///
+        /// A CODE column is left empty when a person was named. A contact carries no adviser
+        /// or paraplanner code, and emitting the case's code beside someone else's name
+        /// would attribute the fail to a name and a code belonging to two different people -
+        /// worse than a blank, because it reads as complete.
+        /// </summary>
+        public static string FlaggedText(
+            bool accountable, Entity outcomeCase, string caseAttribute, string namedPerson)
+        {
             if (!accountable)
             {
                 return string.Empty;
             }
 
+            if (!string.IsNullOrWhiteSpace(namedPerson))
+            {
+                return IsCodeColumn(caseAttribute) ? string.Empty : namedPerson.Trim();
+            }
+
             return outcomeCase.GetAttributeValue<string>(caseAttribute) ?? string.Empty;
+        }
+
+        private static bool IsCodeColumn(string caseAttribute)
+        {
+            return caseAttribute != null
+                && caseAttribute.EndsWith("code", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// The name of the contact named as accountable for a discipline, or null where the
+        /// export should use the people the case itself names.
+        /// </summary>
+        public static string NamedPerson(Entity outcomeRow, string lookupAttribute)
+        {
+            if (outcomeRow == null)
+            {
+                return null;
+            }
+
+            var reference = outcomeRow.GetAttributeValue<EntityReference>(lookupAttribute);
+            return reference == null ? null : reference.Name;
         }
 
         /// <summary>

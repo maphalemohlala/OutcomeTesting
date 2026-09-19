@@ -21,6 +21,11 @@ namespace OutcomeTesting.Plugins
         private const string InFqParaplanner = "FqParaplanner";
         private const string InAqAdviser = "AqAdviser";
         private const string InAqParaplanner = "AqParaplanner";
+        // Optional (item 8, 2026-09-19): the contact carrying the fail, where it is
+        // someone other than the adviser or paraplanner the case names. An empty string
+        // clears it and puts the case's own person back in the extract.
+        private const string InFqContactId = "FqContactId";
+        private const string InAqContactId = "AqContactId";
         private const string InIdempotencyKey = "IdempotencyKey";
 
         private const string OutStatus = "Status";
@@ -58,6 +63,8 @@ namespace OutcomeTesting.Plugins
             var fqParaplanner = CommandHelpers.GetRequiredBool(context, InFqParaplanner);
             var aqAdviser = CommandHelpers.GetRequiredBool(context, InAqAdviser);
             var aqParaplanner = CommandHelpers.GetRequiredBool(context, InAqParaplanner);
+            var fqContactId = ParseOptionalContact(context, InFqContactId);
+            var aqContactId = ParseOptionalContact(context, InAqContactId);
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "page.cases", PermissionHelpers.AccessEdit);
 
@@ -87,10 +94,17 @@ namespace OutcomeTesting.Plugins
                 ["al_fqparaplanneraccountable"] = fqParaplanner,
                 ["al_aqadviseraccountable"] = aqAdviser,
                 ["al_aqparaplanneraccountable"] = aqParaplanner,
+
+                // Written on every save, including as null, so choosing "the case's own
+                // adviser" after naming someone else actually clears them rather than
+                // leaving a stale name the extract would keep using.
+                ["al_fqaccountablecontactid"] = fqContactId,
+                ["al_aqaccountablecontactid"] = aqContactId,
             });
 
             var details = "FQ adviser " + fqAdviser + ", FQ paraplanner " + fqParaplanner
-                + ", AQ adviser " + aqAdviser + ", AQ paraplanner " + aqParaplanner;
+                + ", AQ adviser " + aqAdviser + ", AQ paraplanner " + aqParaplanner
+                + ", FQ named " + Describe(fqContactId) + ", AQ named " + Describe(aqContactId);
 
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandSetFailAccountability, "SetFailAccountability", OutcomeEntity, targetId,
@@ -114,6 +128,37 @@ namespace OutcomeTesting.Plugins
         /// Pure so the decision can be read off a test without a fake organisation service,
         /// as GenerateExportPlugin.IsAccountable is.
         /// </summary>
+        /// <summary>
+        /// The contact a parameter names, or null where none was sent or it was cleared.
+        ///
+        /// Optional and string-typed, like every other parameter these commands take, so
+        /// the portal and the Code App can send one the same way. An unparseable value is
+        /// refused rather than ignored: silently dropping it would record the flags without
+        /// the person and put the case's own adviser back in the extract.
+        /// </summary>
+        private static EntityReference ParseOptionalContact(IPluginExecutionContext context, string parameter)
+        {
+            var raw = CommandHelpers.GetOptionalString(context, parameter);
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return null;
+            }
+
+            Guid id;
+            if (!Guid.TryParse(raw.Trim(), out id) || id == Guid.Empty)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.ValidationPrefix + parameter + " must name a contact.");
+            }
+
+            return new EntityReference("contact", id);
+        }
+
+        private static string Describe(EntityReference contact)
+        {
+            return contact == null ? "(the case's own)" : contact.Id.ToString("D");
+        }
+
         public static string RefusalFor(int? effectiveOutcome, bool fileQualityFailed)
         {
             if (fileQualityFailed)
