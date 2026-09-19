@@ -245,10 +245,16 @@ describe('the Checklist section', () => {
     expect(render('Tax', TAX, null)).not.toContain('review__checklist-items');
   });
 
-  it('names who completed the checklist when the case records it', () => {
-    const html = render('Tax', TAX, checklist({ completedBy: 'Miko Stewart' }));
+  it('shows the items and nothing else', () => {
+    // Project owner, 2026-09-19. The section carried an explanatory line and a
+    // "completed by" stamp; both were scaffolding around the one thing it is opened for.
+    // CaseChecklist still parses the stamp - the hook reads it off a record it already
+    // holds - so this guards the rendering rather than the parsing.
+    const html = render('Tax', TAX, checklist({ completedBy: 'Miko Stewart', completedOn: '2026-08-24T00:00:00Z' }));
 
-    expect(html).toContain('Miko Stewart');
+    expect(html).toContain('Checklist Items');
+    expect(html).not.toContain('Miko Stewart');
+    expect(html).not.toContain('Why this case was selected');
   });
 
   it('sits above the checklist document rather than inside it', () => {

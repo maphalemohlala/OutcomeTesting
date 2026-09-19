@@ -1405,38 +1405,34 @@ footer a:focus-visible, .footer a:focus-visible {
 
 
 /* ------------------------------------------------------------------
-   The Checklist header section: the items the paraplanner ticked in
-   the Intelligent Office task, which is why the case is being checked
-   (project owner, 2026-09-19). Read-only, so it carries none of the
-   answer controls' affordances - no hover states, no focus rings,
-   nothing that suggests a thing to click.
+   Checklist Items: what the paraplanner ticked in the Intelligent
+   Office task, which is why the case is being checked (project owner,
+   2026-09-19). The items and nothing else - no explanatory line, no
+   "completed by" stamp. Read-only, so it carries none of the answer
+   controls' affordances.
    ------------------------------------------------------------------ */
 
-.ot-checklist-overview-intro {
-  color: var(--colour-text-muted);
-  margin: 0 0 var(--space-3);
-}
+/* Padded against the card rather than inheriting its default.
+   `.ot-card > *:not(.ot-card__title)` sets `padding: 0 var(--space-4)`,
+   which leaves a list with no room above it at all - and this list is
+   now the card's first child after the title, so it sat against the
+   header band. The child selector matches that rule's specificity and
+   wins on order.
 
-.ot-checklist-overview-items {
+   The left padding clears the card's gutter AND the markers: `ul` puts
+   its bullets inside its own padding box, so the gutter alone leaves
+   them sitting on the border. */
+.ot-card > .ot-checklist-overview-items {
   margin: 0;
-  padding-left: 1.4em;
+  padding: var(--space-4) var(--space-4) var(--space-4) calc(var(--space-4) + 1.25em);
 }
 
 .ot-checklist-overview-items li + li {
-  margin-top: var(--space-1);
+  margin-top: var(--space-2);
 }
 
-/* Who ticked them and when. Subordinate to the items themselves: it is
-   provenance, not the point. */
-.ot-checklist-overview-meta {
-  margin: var(--space-3) 0 0;
-  font-size: 9.5pt;
-  color: var(--colour-text-muted);
-}
-
-/* Kept in print, unlike the question list this replaced. Why a case was
-   selected belongs on a printed record of its check; a list of the
-   questions that were about to be asked did not. */
+/* Kept in print: why a case was selected belongs on a printed record
+   of its check. */
 
 /* ------------------------------------------------------------------
    Tax check notes, surfaced on pages that are not the Tax review

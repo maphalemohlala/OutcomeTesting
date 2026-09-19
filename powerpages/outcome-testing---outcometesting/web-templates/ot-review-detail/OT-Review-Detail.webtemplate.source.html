@@ -105,8 +105,6 @@
         <attribute name="al_taxcheckrequired" />
         <attribute name="al_taxteamdisposition" />
         <attribute name="al_checklistitems" />
-        <attribute name="al_checklistcompletedby" />
-        <attribute name="al_checklistcompleteddate" />
       </link-entity>
     </entity>
   </fetch>
@@ -534,6 +532,11 @@
         BR-004 route (ImportRules.ReadChecklist), so it is a record of what the paraplanner
         selected rather than anything a checker may revise.
 
+        The items and nothing else (project owner, 2026-09-19). The section carried an
+        explanatory line and a "completed by" stamp; both were scaffolding around the one
+        thing a checker opens it for, so al_checklistcompletedby and al_checklistcompleteddate
+        are no longer read either.
+
         The line break is turned into a single character before the split, the same way
         OT Case Detail does it: this Liquid rejects a multi-character split, and
         newline_to_br writes a tag it understands whatever line endings the column stores.
@@ -555,11 +558,7 @@
 
       {% if ot_cl_count > 0 %}
       <section class="ot-card ot-checklist-overview" aria-labelledby="ot-checklist-overview-heading">
-        <h2 class="ot-card__title" id="ot-checklist-overview-heading">Checklist</h2>
-        <p class="ot-checklist-overview-intro">
-          Why this case was selected for checking. Recorded by the paraplanner in Intelligent
-          Office and carried in on import; read-only here.
-        </p>
+        <h2 class="ot-card__title" id="ot-checklist-overview-heading">Checklist Items</h2>
         <ul class="ot-checklist-overview-items">
           {% for l in ot_cl_lines %}
             {% assign ot_cl_item = l | strip %}
@@ -568,11 +567,6 @@
             {% endif %}
           {% endfor %}
         </ul>
-        {% if rv['case.al_checklistcompletedby'] or rv['case.al_checklistcompleteddate'] %}
-        <p class="ot-checklist-overview-meta">
-          Completed{% if rv['case.al_checklistcompletedby'] %} by {{ rv['case.al_checklistcompletedby'] | escape }}{% endif %}{% if rv['case.al_checklistcompleteddate'] %}, {{ rv['case.al_checklistcompleteddate'] | date: 'dd MMM yyyy' }}{% endif %}.
-        </p>
-        {% endif %}
       </section>
       {% endif %}
       {% endif %}

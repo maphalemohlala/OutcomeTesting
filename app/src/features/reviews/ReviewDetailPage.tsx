@@ -14,7 +14,6 @@ import {
   type FormBlock,
   type FormGroup,
 } from './checklistForm';
-import { date } from '../../lib/format';
 import { CaseHeaderTable } from './CaseHeaderTable';
 import '../../styles/document.css';
 import './ReviewDetailPage.css';
@@ -28,6 +27,11 @@ import './ReviewDetailPage.css';
  * Read-only, and only the ticked items: the case stores what was selected, not the
  * vocabulary it was selected from, so there is no "not applicable" row to draw.
  *
+ * The items and nothing else (project owner, 2026-09-19). It carried an explanatory line
+ * and a "completed by" stamp; both were scaffolding around the one thing a checker opens
+ * it for. `CaseChecklist` still parses the stamp, because the hook reads it off a record
+ * it already holds and a later screen may want it - it is simply not drawn here.
+ *
  * Renders nothing when the case names none. That is a real state - a case imported before
  * the extract carried the columns - and a heading over an empty list reads as a fault.
  * Mirrors the portal's OT Review Detail section of the same name.
@@ -35,26 +39,16 @@ import './ReviewDetailPage.css';
 function ChecklistSection({ checklist }: { checklist: CaseChecklist }) {
   if (checklist.items.length === 0) return null;
 
-  const stamp = [
-    checklist.completedBy ? `by ${checklist.completedBy}` : null,
-    checklist.completedOn ? date(checklist.completedOn) : null,
-  ].filter(Boolean);
-
   return (
     <section className="review__checklist" aria-labelledby="review-checklist">
       <h2 id="review-checklist" className="review__checklist-heading">
-        Checklist
+        Checklist Items
       </h2>
-      <p className="review__checklist-intro">
-        Why this case was selected for checking. Recorded by the paraplanner in Intelligent
-        Office and carried in on import.
-      </p>
       <ul className="review__checklist-items">
         {checklist.items.map((item) => (
           <li key={item}>{item}</li>
         ))}
       </ul>
-      {stamp.length > 0 && <p className="review__checklist-meta">Completed {stamp.join(', ')}.</p>}
     </section>
   );
 }
