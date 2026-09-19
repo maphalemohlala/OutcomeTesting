@@ -7,6 +7,7 @@ import {
   type Al_outcomes,
 } from '../../generated/models/Al_outcomesModel';
 import { date } from '../../lib/format';
+import { recordedFlags, type AccountabilityFlags } from './failAccountability';
 
 export interface CaseOutcomeRow {
   id: string;
@@ -16,6 +17,14 @@ export interface CaseOutcomeRow {
   finalOutcome: string | null;
   regraded: boolean;
   finalisedOn: string | null;
+  /**
+   * Who has been recorded as carrying a fail, exactly as the row holds it (item 8,
+   * 2026-09-19). Four falses means nobody has said yet, and the export derives the pair -
+   * effectiveAccountability is what turns that into what the extract will actually carry.
+   */
+  accountability: AccountabilityFlags;
+  /** Needed by al_SetFailAccountability, which targets the outcome. */
+  rowVersion: string | null;
 }
 
 export type CaseOutcomeState =
@@ -40,6 +49,8 @@ function toOutcome(record: Al_outcomes): CaseOutcomeRow {
         : null),
     regraded: Boolean(record.al_regradedon),
     finalisedOn: date(record.al_finalisedon),
+    accountability: recordedFlags(record),
+    rowVersion: record.versionnumber != null ? String(record.versionnumber) : null,
   };
 }
 
@@ -48,7 +59,7 @@ function toOutcome(record: Al_outcomes): CaseOutcomeRow {
  * per graded review. Read-only; the regrade and sign-off write paths are server-side
  * commands (AD-003). Row visibility is enforced by Dataverse security (BR-012).
  */
-export function useCaseOutcome(caseId: string | undefined): CaseOutcomeState {
+export function useCaseOutcome(caseId: string | undefined, reloadKey = 0): CaseOutcomeState {
   const [state, setState] = useState<CaseOutcomeState>({ status: 'loading' });
   const [loadedFor, setLoadedFor] = useState<string | undefined>(caseId);
 
@@ -63,6 +74,7 @@ export function useCaseOutcome(caseId: string | undefined): CaseOutcomeState {
     // is derived below rather than set here.
     if (!isRecordId(caseId)) return;
     let cancelled = false;
+    void reloadKey; // named in the dependency list below; recording accountability re-reads.
 
     Al_outcomesService.getAll({
       filter: `_al_outcomecaseid_value eq ${caseId}`,
@@ -84,7 +96,7 @@ export function useCaseOutcome(caseId: string | undefined): CaseOutcomeState {
     return () => {
       cancelled = true;
     };
-  }, [caseId]);
+  }, [caseId, reloadKey]);
 
   if (caseId && !isRecordId(caseId)) {
     return { status: 'unavailable' };

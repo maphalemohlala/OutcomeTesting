@@ -23,6 +23,7 @@ export * as Al_ResolveImportExceptionModel from './models/Al_ResolveImportExcept
 export * as Al_RetireAndSucceedQuestionModel from './models/Al_RetireAndSucceedQuestionModel';
 export * as Al_RetireQuestionModel from './models/Al_RetireQuestionModel';
 export * as Al_RetireSectionModel from './models/Al_RetireSectionModel';
+export * as Al_SetFailAccountabilityModel from './models/Al_SetFailAccountabilityModel';
 export * as Al_SetPagePermissionModel from './models/Al_SetPagePermissionModel';
 export * as Al_SetPermissionRuleActiveModel from './models/Al_SetPermissionRuleActiveModel';
 export * as Al_SetRoleAssignmentActiveModel from './models/Al_SetRoleAssignmentActiveModel';
@@ -73,6 +74,7 @@ export * from './services/Al_ResolveImportExceptionService';
 export * from './services/Al_RetireAndSucceedQuestionService';
 export * from './services/Al_RetireQuestionService';
 export * from './services/Al_RetireSectionService';
+export * from './services/Al_SetFailAccountabilityService';
 export * from './services/Al_SetPagePermissionService';
 export * from './services/Al_SetPermissionRuleActiveService';
 export * from './services/Al_SetRoleAssignmentActiveService';

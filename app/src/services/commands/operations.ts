@@ -24,6 +24,7 @@ export const COMMAND_OPERATIONS = [
   'al_RetireQuestion',
   'al_RetireSection',
   'al_RetireAndSucceedQuestion',
+  'al_SetFailAccountability',
   'al_SetPagePermission',
   'al_SetPermissionRuleActive',
   'al_SetRoleAssignmentActive',

@@ -9,6 +9,7 @@ import { CaseHeaderTable } from '../reviews/CaseHeaderTable';
 import { ChecklistSection } from '../reviews/ChecklistSection';
 import { useCaseReviews } from './useCaseReviews';
 import { CaseOutcomeSummary } from './CaseOutcomeSummary';
+import { FailAccountabilityPanel } from './FailAccountabilityPanel';
 import { CaseHistoryPanel } from './CaseHistoryPanel';
 import { CaseEditPanel } from './CaseEditPanel';
 import './CaseDetailPage.css';
@@ -166,6 +167,20 @@ export function CaseDetailPage() {
                     </section>
 
                     <CaseOutcomeSummary caseId={state.detail.id} />
+
+                    {/*
+                      Directly under the grades it describes (item 8, 2026-09-19).
+                      Accountability only means anything beside the outcome that produced
+                      the fail, and the names it offers are this case's own adviser and
+                      paraplanner, which the header above already shows.
+                    */}
+                    <FailAccountabilityPanel
+                      caseId={state.detail.id}
+                      people={{
+                        adviser: state.detail.edit.al_advisername || null,
+                        paraplanner: state.detail.edit.al_paraplanner || null,
+                      }}
+                    />
 
                     <PermissionGate resource="page.remediation">
                       <section className="case-detail__related" aria-label="Related records">

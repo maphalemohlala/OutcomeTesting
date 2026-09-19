@@ -1,0 +1,101 @@
+/*
+ * Who carries a fail (item 8, 2026-09-19). Sits with the case's other
+ * panels, so it borrows their frame rather than inventing one.
+ */
+
+.accountability {
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+}
+
+.accountability h2 {
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-3);
+}
+
+.accountability__list,
+.accountability__flags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.accountability__outcome + .accountability__outcome {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--colour-border);
+}
+
+.accountability__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.accountability__check { font-weight: 600; }
+
+/* Says which of the two states the row is in, in words. A derived row and
+   a recorded row can show identical ticks and mean different things: the
+   first changes if the grade changes, the second never does. */
+.accountability__source {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: var(--radius);
+  background: var(--colour-surface-sunken);
+  color: var(--colour-text-muted);
+}
+
+.accountability__source[data-source='recorded'] {
+  background: var(--colour-surface-header);
+  color: var(--colour-text);
+}
+
+.accountability__note {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+  max-width: 60ch;
+}
+
+.accountability__flags li + li { margin-top: var(--space-2); }
+
+.accountability__flags label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.accountability__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+}
+
+.accountability__save {
+  font: inherit;
+  padding: var(--space-2) var(--space-4);
+  color: var(--colour-text-inverse);
+  background: var(--colour-action);
+  border: 1px solid var(--colour-action);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.accountability__save:hover:not(:disabled) { background: var(--colour-action-hover); }
+
+.accountability__save:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.accountability__message { font-size: var(--text-sm); }
+.accountability__message[data-kind='error'] { color: var(--colour-outcome-harm); }
+.accountability__message[data-kind='success'] { color: var(--colour-text-muted); }

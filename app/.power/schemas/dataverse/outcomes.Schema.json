@@ -10,6 +10,68 @@
       "x-ms-dataverse-primary-id": "al_outcomeid",
       "x-ms-dataverse-primary-name": "al_name",
       "properties": {
+        "al_aqadviseraccountable": {
+          "type": "string",
+          "title": "AQ adviser accountable",
+          "x-ms-dataverse-attribute": "al_aqadviseraccountable",
+          "x-ms-dataverse-type": "BooleanType",
+          "x-ms-schema-name": "al_Aqadviseraccountable",
+          "enum": [
+            "No",
+            "Yes"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "7af73bef-7da4-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "AQ adviser accountable",
+          "x-ms-optionSetType": "Boolean"
+        },
+        "al_aqadviseraccountablename": {
+          "type": "string",
+          "title": "al_aqadviseraccountablename",
+          "x-ms-dataverse-attribute": "al_aqadviseraccountablename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_aqadviseraccountableName",
+          "x-ms-read-only": true
+        },
+        "al_aqparaplanneraccountable": {
+          "type": "string",
+          "title": "AQ paraplanner accountable",
+          "x-ms-dataverse-attribute": "al_aqparaplanneraccountable",
+          "x-ms-dataverse-type": "BooleanType",
+          "x-ms-schema-name": "al_Aqparaplanneraccountable",
+          "enum": [
+            "No",
+            "Yes"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "7df73bef-7da4-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "AQ paraplanner accountable",
+          "x-ms-optionSetType": "Boolean"
+        },
+        "al_aqparaplanneraccountablename": {
+          "type": "string",
+          "title": "al_aqparaplanneraccountablename",
+          "x-ms-dataverse-attribute": "al_aqparaplanneraccountablename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_aqparaplanneraccountableName",
+          "x-ms-read-only": true
+        },
         "al_finalisedon": {
           "type": "string",
           "title": "Finalised on",
@@ -52,6 +114,68 @@
           "x-ms-dataverse-attribute": "al_finaloutcomename",
           "x-ms-dataverse-type": "VirtualType",
           "x-ms-schema-name": "al_finaloutcomeName",
+          "x-ms-read-only": true
+        },
+        "al_fqadviseraccountable": {
+          "type": "string",
+          "title": "FQ adviser accountable",
+          "x-ms-dataverse-attribute": "al_fqadviseraccountable",
+          "x-ms-dataverse-type": "BooleanType",
+          "x-ms-schema-name": "al_Fqadviseraccountable",
+          "enum": [
+            "No",
+            "Yes"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "80f73bef-7da4-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "FQ adviser accountable",
+          "x-ms-optionSetType": "Boolean"
+        },
+        "al_fqadviseraccountablename": {
+          "type": "string",
+          "title": "al_fqadviseraccountablename",
+          "x-ms-dataverse-attribute": "al_fqadviseraccountablename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_fqadviseraccountableName",
+          "x-ms-read-only": true
+        },
+        "al_fqparaplanneraccountable": {
+          "type": "string",
+          "title": "FQ paraplanner accountable",
+          "x-ms-dataverse-attribute": "al_fqparaplanneraccountable",
+          "x-ms-dataverse-type": "BooleanType",
+          "x-ms-schema-name": "al_Fqparaplanneraccountable",
+          "enum": [
+            "No",
+            "Yes"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "83f73bef-7da4-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "FQ paraplanner accountable",
+          "x-ms-optionSetType": "Boolean"
+        },
+        "al_fqparaplanneraccountablename": {
+          "type": "string",
+          "title": "al_fqparaplanneraccountablename",
+          "x-ms-dataverse-attribute": "al_fqparaplanneraccountablename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_fqparaplanneraccountableName",
           "x-ms-read-only": true
         },
         "al_initialoutcome": {

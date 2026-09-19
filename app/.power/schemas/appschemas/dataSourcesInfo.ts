@@ -952,6 +952,61 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "al_setfailaccountability": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_SetFailAccountability": {
+        "path": "/api/data/v9.2/al_SetFailAccountability",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "TargetId",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "FqAdviser",
+            "in": "body",
+            "required": true,
+            "type": "boolean"
+          },
+          {
+            "name": "FqParaplanner",
+            "in": "body",
+            "required": true,
+            "type": "boolean"
+          },
+          {
+            "name": "AqAdviser",
+            "in": "body",
+            "required": true,
+            "type": "boolean"
+          },
+          {
+            "name": "AqParaplanner",
+            "in": "body",
+            "required": true,
+            "type": "boolean"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
   "al_setpagepermission": {
     "tableId": "",
     "version": "",
