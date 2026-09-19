@@ -134,6 +134,12 @@ export interface SubmitFields {
    * field was not touched, which is not the same as cleared.
    */
   adviceDate?: string | null;
+  /**
+   * The due date the save leaves behind, `yyyy-MM-dd` or empty. The command compares against
+   * the same thing - the value being written where the payload carries one, otherwise the
+   * value the case already holds.
+   */
+  dueDate?: string | null;
 }
 
 /**
@@ -150,6 +156,6 @@ export function validateSubmit(input: SubmitFields): string[] {
   // A meeting that has not happened yet cannot have been checked (item 9, 2026-09-19).
   // `al_UpdateCaseDetails` refuses it too, through the same rule CaseHeaderRules holds; this
   // is here so it costs a keystroke rather than a round trip (AD-041).
-  const refusal = adviceDateRefusal(input.adviceDate);
+  const refusal = adviceDateRefusal(input.adviceDate, undefined, input.dueDate);
   return refusal ? [refusal] : [];
 }

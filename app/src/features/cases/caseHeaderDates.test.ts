@@ -48,6 +48,37 @@ describe('adviceDateRefusal', () => {
     expect(adviceDateRefusal(undefined, today)).toBeNull();
   });
 
+  it('accepts a meeting on the due date itself', () => {
+    // The deadline is a day, not an instant.
+    expect(adviceDateRefusal('2026-01-10', today, '2026-01-10')).toBeNull();
+  });
+
+  it('refuses a meeting after the due date and says when that was', () => {
+    // Worded to the character as CaseHeaderRules words it, so the two rules are one message.
+    expect(adviceDateRefusal('2026-01-12', today, '2026-01-10')).toBe(
+      'Date of meeting - Client contact cannot be later than the due date (10 Jan 2026).',
+    );
+  });
+
+  it('reports the future before the due date when both are wrong', () => {
+    expect(adviceDateRefusal('2099-01-01', today, '2026-01-10')).toBe(
+      'Date of meeting - Client contact cannot be in the future.',
+    );
+  });
+
+  it('accepts any past meeting when the case carries no due date', () => {
+    expect(adviceDateRefusal('2026-01-10', today, null)).toBeNull();
+    expect(adviceDateRefusal('2026-01-10', today, '')).toBeNull();
+  });
+
+  it('reads a due date that arrives as a timestamp', () => {
+    // al_duedate is stamped 72 hours after the upload, so the app may hold it with a time.
+    expect(adviceDateRefusal('2026-01-10', today, '2026-01-10T09:00:00Z')).toBeNull();
+    expect(adviceDateRefusal('2026-01-11', today, '2026-01-10T09:00:00Z')).toBe(
+      'Date of meeting - Client contact cannot be later than the due date (10 Jan 2026).',
+    );
+  });
+
   it('words the refusal exactly as the label reads', () => {
     expect(adviceDateRefusal('2099-01-01', today)).toContain(ADVICE_DATE_LABEL);
   });

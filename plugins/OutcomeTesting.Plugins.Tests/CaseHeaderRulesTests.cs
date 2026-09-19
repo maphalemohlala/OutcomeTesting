@@ -76,6 +76,56 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void Accepts_a_meeting_on_the_due_date_itself()
+        {
+            // The deadline is a day, not an instant: a meeting held on the day the case falls
+            // due is in time.
+            Assert.Null(CaseHeaderRules.ValidateAdviceDate(
+                new DateTime(2026, 1, 10), WinterEvening, new DateTime(2026, 1, 10)));
+        }
+
+        [Fact]
+        public void Refuses_a_meeting_after_the_due_date_and_says_when_that_was()
+        {
+            var message = CaseHeaderRules.ValidateAdviceDate(
+                new DateTime(2026, 1, 12), WinterEvening, new DateTime(2026, 1, 10));
+
+            Assert.Equal(
+                "Date of meeting - Client contact cannot be later than the due date (10 Jan 2026).",
+                message);
+        }
+
+        [Fact]
+        public void Reports_the_future_before_the_due_date_when_both_are_wrong()
+        {
+            // A date beyond today is usually a typo in the year. Naming the due date instead
+            // would send someone to look at the wrong field, so only one message comes back
+            // and it is that one.
+            var message = CaseHeaderRules.ValidateAdviceDate(
+                new DateTime(2027, 1, 1), WinterEvening, new DateTime(2026, 1, 10));
+
+            Assert.Equal("Date of meeting - Client contact cannot be in the future.", message);
+        }
+
+        [Fact]
+        public void Accepts_any_past_meeting_when_the_case_carries_no_due_date()
+        {
+            // Every imported case carries one, but a case created another way may not, and
+            // inventing a deadline to refuse against would be worse than not checking.
+            Assert.Null(CaseHeaderRules.ValidateAdviceDate(
+                new DateTime(2026, 1, 10), WinterEvening, null));
+        }
+
+        [Fact]
+        public void Ignores_a_time_of_day_on_the_due_date()
+        {
+            // al_duedate is a timestamp - ImportRules stamps it 72 hours after the upload - so
+            // the same day at a later hour must not read as "after".
+            Assert.Null(CaseHeaderRules.ValidateAdviceDate(
+                new DateTime(2026, 1, 10), WinterEvening, new DateTime(2026, 1, 10, 9, 0, 0)));
+        }
+
+        [Fact]
         public void UkDate_takes_a_summer_evening_into_the_next_day()
         {
             Assert.Equal(new DateTime(2026, 7, 1), CaseHeaderRules.UkDate(SummerEvening));

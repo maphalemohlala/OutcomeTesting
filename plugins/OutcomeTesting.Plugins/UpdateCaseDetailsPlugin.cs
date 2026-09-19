@@ -769,7 +769,8 @@ namespace OutcomeTesting.Plugins
                             // cannot get round it.
                             if (string.Equals(attr, "al_advicedate", StringComparison.OrdinalIgnoreCase))
                             {
-                                var refusal = CaseHeaderRules.ValidateAdviceDate(parsed.Date, DateTime.UtcNow);
+                                var refusal = CaseHeaderRules.ValidateAdviceDate(
+                                    parsed.Date, DateTime.UtcNow, EffectiveDueDate(fields, before));
                                 if (refusal != null)
                                 {
                                     throw new InvalidPluginExecutionException(
@@ -783,6 +784,36 @@ namespace OutcomeTesting.Plugins
                         }
                 }
             }
+        }
+
+        /// <summary>
+        /// The due date this save leaves behind: the one being written where the payload
+        /// carries it, otherwise the one the case already holds.
+        ///
+        /// al_duedate is not in the editable set today - it is derived at import and locked -
+        /// so in practice this reads the before-image. It is written this way so the rule
+        /// stays right on the day a manager is allowed to move the deadline, rather than
+        /// comparing the new meeting date against a due date the same save is replacing.
+        /// </summary>
+        private static DateTime? EffectiveDueDate(Dictionary<string, string> fields, Entity before)
+        {
+            string raw;
+            if (fields != null
+                && fields.TryGetValue(DueDateAttr, out raw)
+                && !string.IsNullOrWhiteSpace(raw))
+            {
+                DateTime written;
+                if (DateTime.TryParse(
+                        raw,
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                        out written))
+                {
+                    return written.Date;
+                }
+            }
+
+            return before == null ? null : before.GetAttributeValue<DateTime?>(DueDateAttr);
         }
 
         // Minimal reader for a flat JSON object of string values, used because the plugin

@@ -322,6 +322,10 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
       // of the edits it stays editable for. Reading it off the form instead would refuse a
       // change to an unrelated field over a value nobody had touched.
       adviceDate: 'al_advicedate' in changed ? changed.al_advicedate : null,
+      // The due date the save leaves behind, which is the form's: it is not editable today,
+      // so this is the stored value, and it stays right if a manager is ever allowed to move
+      // it. EffectiveDueDate reads the same thing server-side.
+      dueDate: typeof form.al_duedate === 'string' ? form.al_duedate : null,
     });
     setErrors(found);
     if (found.length > 0) return;

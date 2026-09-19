@@ -78,14 +78,46 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string ValidateAdviceDate(DateTime? adviceDate, DateTime utcNow)
         {
+            return ValidateAdviceDate(adviceDate, utcNow, null);
+        }
+
+        /// <summary>
+        /// As above, and also that the meeting is not after the case was due (item 8,
+        /// 2026-09-19).
+        ///
+        /// The two refusals are ordered, and the future one is first deliberately: a date
+        /// beyond today is usually a typo in the year, and telling someone their meeting is
+        /// after the due date would send them to look at the wrong field. Only one message
+        /// is returned, so it is the one worth reading.
+        ///
+        /// An absent due date passes. Every imported case carries one - ImportRules stamps
+        /// it - but a case created another way may not, and inventing a deadline to refuse
+        /// against would be worse than not checking.
+        ///
+        /// The project owner settled this as ONE comparison on 2026-09-19: the batch asked
+        /// for "not later than the Submission date, and not later than the Due date", and
+        /// there is no submission date on the case - the due date is what was meant.
+        /// </summary>
+        public static string ValidateAdviceDate(DateTime? adviceDate, DateTime utcNow, DateTime? dueDate)
+        {
             if (!adviceDate.HasValue)
             {
                 return null;
             }
 
-            return adviceDate.Value.Date > UkDate(utcNow)
-                ? AdviceDateLabel + " cannot be in the future."
-                : null;
+            if (adviceDate.Value.Date > UkDate(utcNow))
+            {
+                return AdviceDateLabel + " cannot be in the future.";
+            }
+
+            if (dueDate.HasValue && adviceDate.Value.Date > dueDate.Value.Date)
+            {
+                return AdviceDateLabel + " cannot be later than the due date ("
+                    + dueDate.Value.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)
+                    + ").";
+            }
+
+            return null;
         }
     }
 }

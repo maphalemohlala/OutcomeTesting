@@ -51,9 +51,43 @@ export function ukToday(now: Date = new Date()): string {
 export function adviceDateRefusal(
   value: string | null | undefined,
   today: string = ukToday(),
+  dueDate?: string | null,
 ): string | null {
   const day = (value ?? '').trim();
   if (day.length === 0) return null;
 
-  return day > today ? `${ADVICE_DATE_LABEL} cannot be in the future.` : null;
+  if (day > today) return `${ADVICE_DATE_LABEL} cannot be in the future.`;
+
+  // A meeting cannot be later than the day the case fell due (item 8, 2026-09-19). The
+  // project owner settled this as ONE comparison: the batch asked for "not later than the
+  // Submission date, and not later than the Due date", and there is no submission date on the
+  // case - the due date is what was meant.
+  //
+  // Ordered after the future check, and only one message comes back, because a date beyond
+  // today is usually a typo in the year and naming the due date would send the user to look
+  // at the wrong field. CaseHeaderRules orders them the same way.
+  const due = (dueDate ?? '').slice(0, 10).trim();
+  if (due.length > 0 && day > due) {
+    return `${ADVICE_DATE_LABEL} cannot be later than the due date (${humanDay(due)}).`;
+  }
+
+  return null;
+}
+
+/**
+ * `yyyy-MM-dd` as the refusal reads it, e.g. "10 Jan 2026" - the same wording
+ * CaseHeaderRules builds server-side, so the two messages are one message.
+ *
+ * Formatted in UTC deliberately: the value is a plain day, and letting the browser's zone
+ * interpret its midnight would move it by one in either direction.
+ */
+function humanDay(day: string): string {
+  const parsed = new Date(`${day}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return day;
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(parsed);
 }
