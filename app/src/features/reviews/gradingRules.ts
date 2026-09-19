@@ -82,16 +82,16 @@ function isQuestion(
 }
 
 /**
- * The rows to draw, with the primary root cause taken out when the grade says the file
- * passed.
+ * The rows to draw, with the primary root cause taken out unless this review owes one.
  *
- * Keyed on `rootCauseCleared` and NOT on `rootCauseRequired`, and the difference is the
- * ungraded review. The gate may not demand a cause before it knows the grade, but the page
- * must still show the question: this is the Checker Checklist as the document lays it out,
- * and an in-progress review that has not been graded yet is owed the row it is about to
- * answer. `checklistDocument.test.ts` compares what is drawn here against the reference
- * document, and it is what caught this: hiding the row until a grade arrived took a
- * question off a blank checklist that the source document asks.
+ * Keyed on `rootCauseRequired`, so an **ungraded** review does not draw it either. The
+ * batch's wording is "visible and required only when the Advice quality grade is anything
+ * other than Pass", and nothing is not anything: the question appears when the grade
+ * arrives, and only if that grade is not a Pass.
+ *
+ * `checklistDocument.test.ts` compares what is drawn here against the reference Checker
+ * Checklist, and its fixture answers the grade for exactly this reason - a blank form has no
+ * grade, so a conditional row cannot be read off one.
  *
  * Applied to a section's own rows, because the grade and the cause sit in the same section
  * and a grade found anywhere else would not be this section's. A section holding no grade
@@ -104,7 +104,7 @@ export function withoutUnaskedRootCause<T extends SectionedAnswer>(
   const grade = rows.find((row) => isQuestion(row, GRADE_RESPONSE_TYPE, GRADE_QUESTION_CODE));
   if (!grade) return rows;
 
-  if (!rootCauseCleared(choiceOn(grade))) return rows;
+  if (rootCauseRequired(choiceOn(grade))) return rows;
 
   return rows.filter(
     (row) => !isQuestion(row, ROOT_CAUSE_RESPONSE_TYPE, ROOT_CAUSE_QUESTION_CODE),

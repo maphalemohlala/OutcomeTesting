@@ -77,14 +77,19 @@ AD-055) stops them there. Only then is the **question code** read, because a res
 a convention checklist administration could hand to another question tomorrow, and the code is
 the AD-122 contract. A saved case note costs no retrieve at all.
 
-### One correction the tests forced
+### One correction, made the same day
 
-The first attempt keyed the Code App's drawing on `RootCauseRequired`, which hides the row on
-an **ungraded** review too. `checklistDocument.test.ts` — which compares what the app draws
-against the reference Checker Checklist — failed, correctly: that took a question off a blank
-checklist the source document asks. The document now draws the row unless the grade is a Pass,
-while the gate keeps its own (looser) rule. The divergence is deliberate and tested on both
-sides.
+`checklistDocument.test.ts` compares what the app draws against the reference Checker Checklist
+using a form built from **no answers at all**. A conditional row cannot be read off a form with
+no grade, so that test failed — and the first fix was the wrong one: I made both front ends
+draw the row on an ungraded review, which kept the fixture untouched but is not what the batch
+asked for. The wording is "visible and required only when the grade is anything other than
+Pass", and nothing is not anything.
+
+Corrected: both front ends now draw the row only once a grade is given and it is not a Pass,
+and the fixture answers the grade **Potential harm**, which is what that test needed in the
+first place. `gradingRules.test.ts` is where the condition is tested; the document test only
+satisfies it.
 
 ---
 
@@ -114,8 +119,9 @@ standing precaution before any portal upload.
 
 1. Sign in as an AQS checker and open a review assigned to you that is **not** submitted.
 2. Scroll to **Checker judgement and grading**.
-3. With **Advice Quality Grade** unanswered, the **Primary root cause** 3×3 **is shown**. This
-   is deliberate — the checklist asks the question.
+3. With **Advice Quality Grade** unanswered, the **Primary root cause** 3×3 is **not shown**.
+   The batch's wording is "visible and required only when the grade is anything other than
+   Pass", and nothing is not anything.
 4. Tick **PASS**. The root cause block **disappears**, and any cause that was ticked is
    unticked as it goes.
 5. Tick **POTENTIAL HARM** (or Pass with issues, or Insufficient evidence). The block **comes
@@ -162,7 +168,7 @@ standing precaution before any portal upload.
     shows the grade, Case Notes and Even Better If…, and **no root cause row**.
 16. Open one graded **Insufficient evidence**. The root cause row **is** there, with the ticked
     cause.
-17. Open one that is in progress and **ungraded**. The root cause row **is** there, empty.
+17. Open one that is in progress and **ungraded**. The root cause row is **not** there.
 
 ### Checklist administration — the new guard
 

@@ -169,6 +169,23 @@ const seedFailReasons: FailReasonRef[] = seedRecords('al_failreason').map((recor
   order: Number(record.fields.al_displayorder),
 }));
 
+/**
+ * The grade the fixture answers, and why it answers one at all.
+ *
+ * Primary root cause is drawn only when the grade is something other than Pass (AD-149), so
+ * a form built from no answers at all cannot show it - and this test is about whether the
+ * app draws the document's questions, not about what a blank form looks like. Potential harm
+ * is used because it is the grade furthest from Pass, so the conditional row is unambiguously
+ * owed. `gradingRules.test.ts` is where the condition itself is tested; here it is only
+ * satisfied, so the document comparison has every row to compare.
+ */
+const GRADE_QUESTION_CODE = 'Q-GR-01';
+const POTENTIAL_HARM = 120910304;
+
+interface DocumentAnswer extends SectionedAnswer {
+  answerChoice: number | null;
+}
+
 /** The AQS form as the app builds it: every section that team owns, in seed order. */
 function form(ownerRole: string) {
   const owned = new Set(
@@ -177,11 +194,36 @@ function form(ownerRole: string) {
       .map((record) => record.id),
   );
 
-  const sections = buildSections<SectionedAnswer>(
+  // Only where this team owns the grading section. Handing the Tax form an AQS answer
+  // would put it in the unplaced bucket and add an 'Other answers' block that is not on
+  // the document.
+  const gradeQuestion = seedRecords('al_question').find(
+    (record) => record.fields.al_questioncode === GRADE_QUESTION_CODE,
+  );
+  const gradeQuestionId =
+    gradeQuestion && owned.has(gradeQuestion.fields.al_sectionid) ? gradeQuestion.id : null;
+  const gradeVersion = gradeQuestionId
+    ? seedVersions.find((version) => version.questionId === gradeQuestionId)
+    : undefined;
+
+  const answers: DocumentAnswer[] = gradeVersion
+    ? [
+        {
+          id: 'fixture-grade',
+          versionId: gradeVersion.id,
+          question: gradeVersion.text,
+          responseTypeValue: gradeVersion.responseTypeValue,
+          responseType: gradeVersion.responseType,
+          answerChoice: POTENTIAL_HARM,
+        },
+      ]
+    : [];
+
+  const sections = buildSections<DocumentAnswer>(
     seedSections.filter((section) => owned.has(section.id)),
     seedQuestions.filter((question) => question.sectionId && owned.has(question.sectionId)),
     seedVersions,
-    [],
+    answers,
   );
 
   // The Tax form is the one built from Tax-owned sections, so the owner role being

@@ -120,15 +120,12 @@ describe('withoutUnaskedRootCause', () => {
     ).toEqual([GRADE_QUESTION_CODE, ROOT_CAUSE_QUESTION_CODE, 'Q-GR-03']);
   });
 
-  it('still draws it while the grade is unanswered', () => {
-    // The gate may not demand a cause before it knows the grade, but the page must still
-    // show the question: this is the Checker Checklist as the document lays it out, and an
-    // ungraded review is owed the row it is about to answer. checklistDocument.test.ts
-    // compares what is drawn against the reference document and caught the first attempt,
-    // which keyed this on rootCauseRequired and took the row off a blank checklist.
+  it('does not draw it while the grade is unanswered', () => {
+    // "Visible and required only when the grade is anything other than Pass" - and nothing
+    // is not anything. The question appears when the grade arrives, and only if that grade
+    // is not a Pass.
     expect(codes(withoutUnaskedRootCause([grade(null), rootCause(), caseNotes()]))).toEqual([
       GRADE_QUESTION_CODE,
-      ROOT_CAUSE_QUESTION_CODE,
       'Q-GR-03',
     ]);
   });

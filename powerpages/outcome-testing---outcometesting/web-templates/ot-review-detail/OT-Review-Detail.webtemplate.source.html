@@ -1057,16 +1057,22 @@
             {% assign rcvalues = '120910320,120910321,120910322,120910323,120910324,120910325,120910326,120910327,120910328' | split: ',' %}
             {% assign rclabels = 'FactFind quality,Risk / capacity mismatch,Research / rationale,Charges / value,Client communication,Process / documentation,AML / CRA,Retirement Proposition,Adviser judgement' | split: ',' %}
             {% comment %}
-              Hidden when the grade already says the file passed, so the page arrives right
-              rather than showing the block and taking it away once the script runs - and so
-              a submitted review, which runs no script at all, reads the same way.
+              Shown only once the grade says the file did not pass - "visible and required
+              only when the Advice quality grade is anything other than Pass", and nothing is
+              not anything, so an ungraded review does not draw it either.
 
-              An ungraded review still draws it. The gate may not demand a cause before it
-              knows the grade, but the checklist asks the question, and checklistForm.ts
-              draws it on the same terms.
+              Decided here rather than left to the script so the page arrives right, and so a
+              submitted review, which renders no script at all, reads the same way.
+
+              grade_seen is separate from grade_value because an unanswered grade and an
+              unreached one are not the same thing: if the two questions were ever reordered
+              the grade would be unreached here, and the block is drawn in that case, which is
+              the direction that leaves a checker able to answer.
             {% endcomment %}
             {% assign hide_rootcause = false %}
-            {% if grade_seen and grade_value == '120910300' %}{% assign hide_rootcause = true %}{% endif %}
+            {% if grade_seen %}
+              {% if grade_value == '' or grade_value == '120910300' %}{% assign hide_rootcause = true %}{% endif %}
+            {% endif %}
             <table class="rootcause"
                    data-ot-answer
                    data-ot-rootcause
@@ -1627,16 +1633,21 @@
               };
 
               var syncRootCause = function () {
-                var passed = gradeChosen() === '120910300';
-                rootCause.hidden = passed;
+                var grade = gradeChosen();
+                var owed = grade !== '' && grade !== '120910300';
+                rootCause.hidden = !owed;
 
                 /*
                  * Untick on the way out, so the page stops showing a cause the server is
-                 * clearing on this very save. Nothing is sent from here: the grade's own save
-                 * is what clears the row, and a second request racing it would be the one to
-                 * decide which write landed last.
+                 * clearing on this very save. Only on a Pass: that is the grade the server
+                 * clears for, and unticking when the grade merely went back to unanswered
+                 * would throw away an answer nothing else is removing.
+                 *
+                 * Nothing is sent from here either way. The grade's own save is what clears
+                 * the row, and a second request racing it would be the one to decide which
+                 * write landed last.
                  */
-                if (passed) {
+                if (grade === '120910300') {
                   var causes = rootCause.querySelectorAll('[data-ot-input]');
                   for (var c = 0; c < causes.length; c++) { causes[c].checked = false; }
                 }
