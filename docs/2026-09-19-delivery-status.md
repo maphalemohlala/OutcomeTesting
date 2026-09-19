@@ -72,7 +72,7 @@ disagreeing rather than as a rule holding on one surface only.
 
 ---
 
-## 4. The batch: 7 of 10 done
+## 4. The batch: 8 of 10 done
 
 | # | Item | State |
 |---|---|---|
@@ -83,8 +83,8 @@ disagreeing rather than as a rule holding on one surface only.
 | 10 | Insufficient Evidence on Suitability core checks | **Done** — `21f545f`. AD-150; keyed on `al_sectioncode` (`S-E` + digit), guard + clearing + submit gate, portal restricts live. **Audit: no review in DEV violates it** |
 | 2 | Split Checker into Tax and AQS | **Done** — `9536b9e`. AD-151; two stamped columns on the case, not editable, three empty states. Schema change after all — both columns are in the solution. Backfilled 12 cases |
 | 4 | Rename Owner to Uploaded by | **Done** — `d9141cb`. AD-152; four app surfaces plus the Dataverse display name. Four other "Owner" columns left alone — they are the checker and the adviser |
-| 6 | Due date editable by T&C Manager | Next. The 72-hour derivation already exists; this is editability only |
-| 7 | Paraplanner email and recipient | Not started. `AssignedTo` stays mapped; the remap is off |
+| 6 | Due date: 3 days, manager-editable | **Done** - `ccf71be`. AD-153, AD-154; calendar time confirmed, new `case.duedate` key seeded to the two manager roles. **Three defects found on the way**: the panel's Due date box failed the whole save, the legacy `DueDate` scalar let anyone move it, and item 8's refusal said "Sept" in the app and "Sep" on the server |
+| 7 | Paraplanner email and recipient | Next. `AssignedTo` stays mapped; the remap is off |
 | 5 | T&C Manager mapping | Not started. Per-adviser on Contact, defaulted onto the case by adviser email |
 
 ---
