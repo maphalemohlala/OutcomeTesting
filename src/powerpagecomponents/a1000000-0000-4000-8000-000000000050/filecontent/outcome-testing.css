@@ -1235,6 +1235,13 @@ footer a:focus-visible, .footer a:focus-visible {
    on screen for a file that passed. */
 .ot-checklist .rootcause[hidden] { display: none; }
 
+/* An option the answers have taken away (item 10, 2026-09-19). Greyed rather
+   than removed: a checker who expected PASS needs to see that it is gone and
+   that something took it, not find a shorter list than the one they remember.
+   The status line beside the question says what. */
+.ot-checklist .opt--locked { opacity: 0.45; }
+.ot-checklist .opt--locked input { cursor: not-allowed; }
+
 .ot-checklist .sr-only {
   position: absolute;
   width: 1px; height: 1px;
