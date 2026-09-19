@@ -1402,3 +1402,59 @@ footer a:focus-visible, .footer a:focus-visible {
   font-size: 9.5pt;
   font-style: italic;
 }
+
+
+/* ------------------------------------------------------------------
+   The Checklist header section: what the case is checked against,
+   listed before the form (project owner, 2026-09-19). Read-only, so it
+   carries none of the answer controls' affordances - no hover states,
+   no focus rings, nothing that suggests a thing to click.
+   ------------------------------------------------------------------ */
+
+.ot-checklist-overview-intro {
+  color: var(--colour-text-muted, #5a6a6a);
+  margin: 0 0 var(--space-3);
+}
+
+.ot-checklist-overview-section + .ot-checklist-overview-section {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--colour-border);
+}
+
+.ot-checklist-overview-section h3 {
+  font-family: var(--font-heading);
+  font-size: var(--text-base, 1rem);
+  font-weight: 600;
+  margin: 0 0 var(--space-2);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.ot-checklist-overview-optional {
+  font-weight: 400;
+  font-size: 9.5pt;
+  font-style: italic;
+  color: var(--colour-text-muted, #5a6a6a);
+}
+
+.ot-checklist-overview-items {
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+.ot-checklist-overview-items li + li {
+  margin-top: var(--space-1);
+}
+
+/* The mandatory marker is .ot-required, the same span the questionnaire
+   below uses, rather than a second vocabulary for the same fact. */
+
+/* The overview is orientation, not a record of the check. Printing a
+   submitted review (the Save as PDF button) should produce what was
+   answered, and the list of what could have been asked would double the
+   pages for no added meaning. */
+@media print {
+  .ot-checklist-overview { display: none; }
+}

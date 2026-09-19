@@ -500,6 +500,134 @@
       {% assign qrows = questions.results.entities %}
       {% assign arows = responses.results.entities %}
 
+      {% comment %}
+        The Checklist header section (project owner, 2026-09-19): every item on the
+        checklist version issued to this review, listed before the form so a checker can
+        see up front what the check covers.
+
+        Read-only and driven by the same checklist version the questionnaire below is
+        driven by, so the two cannot describe different checks. Date-scoped to as_of like
+        every other read on this page, which is the submission day once submitted - a
+        question retired afterwards does not change what a submitted review says it
+        covered.
+
+        Deliberately NOT filtered to the reviewer's own discipline, unlike the
+        questionnaire below. The questionnaire is the work this person does, and AD-020
+        keeps an AQS section off a Tax checker's form; this is what the case is being
+        checked for as a whole, which is the question the section was asked to answer.
+        Flipping it is a one-line change - add the ownerrole condition the sections fetch
+        above carries.
+
+        Grouped by section, in the section display order, which is the grouping the
+        requirement named. The document's AD-098 blocks are deliberately not reproduced
+        here: that mapping is a chain of section codes in the questionnaire below, and a
+        second copy of it would be a second thing to keep in step for no gain - the
+        section order already brings E1 to E5 together the way the sheets do.
+      {% endcomment %}
+      {% fetchxml allsections %}
+      <fetch>
+        <entity name="al_section">
+          <attribute name="al_sectionid" />
+          <attribute name="al_sectioncode" />
+          <attribute name="al_name" />
+          <attribute name="al_displayorder" />
+          <attribute name="al_isoptional" />
+          <filter type="and">
+            <condition attribute="al_checklistversionid" operator="eq" value="{{ cv_id | xml_escape }}" />
+            <filter type="or">
+              <condition attribute="al_effectivefrom" operator="null" />
+              <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ as_of }}" />
+            </filter>
+            <filter type="or">
+              <condition attribute="al_effectiveto" operator="null" />
+              <condition attribute="al_effectiveto" operator="gt" value="{{ as_of }}" />
+            </filter>
+          </filter>
+          <order attribute="al_displayorder" />
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+
+      {% fetchxml allquestions %}
+      <fetch>
+        <entity name="al_questionversion">
+          <attribute name="al_questionversionid" />
+          <attribute name="al_questiontext" />
+          <attribute name="al_ismandatory" />
+          <attribute name="al_displayorder" />
+          <filter type="and">
+            <filter type="or">
+              <condition attribute="al_effectivefrom" operator="null" />
+              <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ as_of }}" />
+            </filter>
+            <filter type="or">
+              <condition attribute="al_effectiveto" operator="null" />
+              <condition attribute="al_effectiveto" operator="gt" value="{{ as_of }}" />
+            </filter>
+          </filter>
+          <link-entity name="al_question" from="al_questionid" to="al_questionid" alias="q">
+            <attribute name="al_displayorder" />
+            <attribute name="al_questioncode" />
+            <link-entity name="al_section" from="al_sectionid" to="al_sectionid" alias="s">
+              <attribute name="al_sectioncode" />
+              <filter type="and">
+                <condition attribute="al_checklistversionid" operator="eq" value="{{ cv_id | xml_escape }}" />
+                <filter type="or">
+                  <condition attribute="al_effectivefrom" operator="null" />
+                  <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ as_of }}" />
+                </filter>
+                <filter type="or">
+                  <condition attribute="al_effectiveto" operator="null" />
+                  <condition attribute="al_effectiveto" operator="gt" value="{{ as_of }}" />
+                </filter>
+              </filter>
+            </link-entity>
+          </link-entity>
+          <order entityname="q" attribute="al_displayorder" />
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+
+      {% assign all_qrows = allquestions.results.entities %}
+
+      {% if all_qrows.size > 0 %}
+      <section class="ot-card ot-checklist-overview" aria-labelledby="ot-checklist-overview-heading">
+        <h2 class="ot-card__title" id="ot-checklist-overview-heading">Checklist</h2>
+        <p class="ot-checklist-overview-intro">
+          What this case is checked against, from the checklist version issued to this
+          review. Shown for reference; answers are recorded on the form below.
+        </p>
+
+        {% for sec in allsections.results.entities %}
+          {% assign sec_count = 0 %}
+          {% for q in all_qrows %}
+            {% if q['s.al_sectioncode'] == sec.al_sectioncode %}
+              {% assign sec_count = sec_count | plus: 1 %}
+            {% endif %}
+          {% endfor %}
+
+          {% if sec_count > 0 %}
+          <div class="ot-checklist-overview-section">
+            <h3>
+              {{ sec.al_name | escape }}
+              {% if sec.al_isoptional %}<span class="ot-checklist-overview-optional">Optional</span>{% endif %}
+            </h3>
+            <ol class="ot-checklist-overview-items">
+              {% for q in all_qrows %}
+                {% if q['s.al_sectioncode'] == sec.al_sectioncode %}
+                <li>
+                  {{ q.al_questiontext | escape }}
+                  {% if q.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}
+                </li>
+                {% endif %}
+              {% endfor %}
+            </ol>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </section>
+      {% endif %}
+
       {% if qrows.size == 0 %}
         {% include 'OT Empty State' title: 'No questions in this version' message: 'The checklist version issued to this review has no sections or questions.' %}
       {% else %}
