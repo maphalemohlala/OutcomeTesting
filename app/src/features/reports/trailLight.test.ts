@@ -1,23 +1,42 @@
 import { describe, expect, it } from 'vitest';
-import { TRAIL_LIGHT_HEADERS, trailLightRow } from './trailLight';
-import type { Al_exportrecords } from '../../generated/models/Al_exportrecordsModel';
+import { TRAIL_LIGHT_HEADERS, trailLightRow, type ExportRecord } from './trailLight';
 
-function record(overrides: Partial<Al_exportrecords> = {}): Al_exportrecords {
+function record(overrides: Partial<ExportRecord> = {}): ExportRecord {
   return {
     al_exportrecordid: 'rec-1',
     al_exportrecordcode: 'EXP-1',
     al_name: 'EXP-1',
     ...overrides,
-  } as Al_exportrecords;
+  } as ExportRecord;
 }
 
 describe('Trail Light contract (AD-039)', () => {
-  it('is exactly twenty columns with the blank separator at position 16', () => {
-    expect(TRAIL_LIGHT_HEADERS).toHaveLength(20);
-    expect(TRAIL_LIGHT_HEADERS[15]).toBe('');
+  it('holds the AD-039 twenty in their fixed positions', () => {
+    // The receiving system reads by position, so these five are the contract. A column
+    // added to the end may not move any of them.
     expect(TRAIL_LIGHT_HEADERS[0]).toBe('Adviser name');
+    expect(TRAIL_LIGHT_HEADERS[9]).toBe('File Quality Grade');
     expect(TRAIL_LIGHT_HEADERS[14]).toBe('Advice Quality Grade');
+    expect(TRAIL_LIGHT_HEADERS[15]).toBe('');
     expect(TRAIL_LIGHT_HEADERS[19]).toBe('Advice Quality Fail Accountable Paraplanner Code');
+  });
+
+  it('carries the adviser email appended at position 21', () => {
+    // Project owner, 2026-09-19. Appended rather than inserted: anywhere inside the
+    // twenty would shift every column after it, including the blank separator at 16.
+    expect(TRAIL_LIGHT_HEADERS).toHaveLength(21);
+    expect(TRAIL_LIGHT_HEADERS[20]).toBe('Adviser Email');
+  });
+
+  it('writes the adviser email into column 21', () => {
+    const row = trailLightRow(record({ al_adviseremail: 'jane.adviser@example.com' }));
+
+    expect(row).toHaveLength(21);
+    expect(row[20]).toBe('jane.adviser@example.com');
+  });
+
+  it('writes an empty column 21 when the case carried no adviser email', () => {
+    expect(trailLightRow(record())[20]).toBe('');
   });
 
   it('writes one value per header, in the header order', () => {

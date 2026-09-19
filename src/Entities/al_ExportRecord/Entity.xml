@@ -93,6 +93,46 @@
             <Description description="AD-039 col 2. Stored as text to preserve non-numeric codes." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_Adviseremail">
+          <Type>nvarchar</Type>
+          <Name>al_adviseremail</Name>
+          <LogicalName>al_adviseremail</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>1</IsSearchable>
+          <IsFilterable>1</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>email</Format>
+          <MaxLength>200</MaxLength>
+          <Length>400</Length>
+          <displaynames>
+            <displayname description="Adviser email" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Trail Light col 21, appended 2026-09-19. Snapshotted from al_outcomecase.al_adviseremail at generation, like every other column on this table, so a later change to the case cannot alter what was delivered. Appended after the AD-039 twenty rather than inserted, because the receiving system reads by position." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_Advisername">
           <Type>nvarchar</Type>
           <Name>al_advisername</Name>

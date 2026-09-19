@@ -2,11 +2,27 @@ import type { CellValue } from '../../lib/tabular';
 import type { Al_exportrecords } from '../../generated/models/Al_exportrecordsModel';
 
 /**
+ * The export record as the file builder needs it.
+ *
+ * `al_adviseremail` was added to al_exportrecord on 2026-09-19 and the generated model is
+ * regenerated from the environment, so it will not appear in `Al_exportrecords` until the
+ * column is deployed and the models are rebuilt. Declaring it here lets the column be
+ * written and tested now; the intersection can be dropped once regeneration catches up.
+ */
+export type ExportRecord = Al_exportrecords & { al_adviseremail?: string };
+
+/**
  * The Trail Light contract fixed by AD-039 (source: `Trailight - Outcome Testing Map.xlsx`):
- * one row per case, twenty columns in this exact order. Column 16 is an intentional blank
- * separator in the supplied template and is preserved so every downstream column position
- * matches. Do not add, remove or reorder a column here without a decision-log entry — the
+ * one row per case. Columns 1-20 are the supplied template in its exact order, and column 16
+ * is an intentional blank separator preserved so every downstream position matches. Do not
+ * add, remove or reorder a column *within* that twenty without a decision-log entry — the
  * receiving system reads by position.
+ *
+ * Column 21 (Adviser Email) was appended on 2026-09-19 at the project owner's request.
+ * Appending is what keeps the file compatible: a reader that takes the first twenty columns
+ * by position is unaffected by anything after them, whereas inserting the adviser's email
+ * next to the adviser's name — the obvious place for it — would have shifted eighteen
+ * columns including the separator.
  */
 export const TRAIL_LIGHT_HEADERS = [
   'Adviser name',
@@ -29,6 +45,7 @@ export const TRAIL_LIGHT_HEADERS = [
   'Advice Quality Fail Accountable Adviser Code',
   'Advice Quality Fail Accountable Paraplanner Name',
   'Advice Quality Fail Accountable Paraplanner Code',
+  'Adviser Email',
 ];
 
 /**
@@ -50,7 +67,7 @@ function day(value: string | undefined): string {
   return value ? value.slice(0, 10) : '';
 }
 
-export function trailLightRow(record: Al_exportrecords): CellValue[] {
+export function trailLightRow(record: ExportRecord): CellValue[] {
   return [
     text(record.al_advisername),
     code(record.al_advisercode),
@@ -72,5 +89,6 @@ export function trailLightRow(record: Al_exportrecords): CellValue[] {
     code(record.al_aqfailadvisercode),
     text(record.al_aqfailparaplannername),
     code(record.al_aqfailparaplannercode),
+    text(record.al_adviseremail),
   ];
 }

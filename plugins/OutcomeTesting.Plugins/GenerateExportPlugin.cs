@@ -94,7 +94,8 @@ namespace OutcomeTesting.Plugins
             var cases = new QueryExpression(CaseEntity)
             {
                 ColumnSet = new ColumnSet(
-                    "al_casereference", "al_advisername", "al_advisercode", "al_paraplanner", "al_paraplannercode",
+                    "al_casereference", "al_advisername", "al_advisercode", "al_adviseremail",
+                    "al_paraplanner", "al_paraplannercode",
                     "al_casetype", "al_productsolutiontype", "al_checkdate", "al_clientname", "al_preorpostcheck",
                     CaseReviewRouteAttr),
                 Criteria = new FilterExpression(),
@@ -136,6 +137,11 @@ namespace OutcomeTesting.Plugins
                     ["al_outcomecaseid"] = new EntityReference(CaseEntity, outcomeCase.Id),
                     ["al_advisername"] = outcomeCase.GetAttributeValue<string>("al_advisername"),
                     ["al_advisercode"] = outcomeCase.GetAttributeValue<string>("al_advisercode"),
+                    // Trail Light col 21 (project owner, 2026-09-19). Snapshotted like every
+                    // other column here rather than read live at file-build time, so a later
+                    // correction to the case cannot change what an already-delivered batch
+                    // says it sent.
+                    ["al_adviseremail"] = outcomeCase.GetAttributeValue<string>("al_adviseremail"),
                     ["al_paraplannername"] = outcomeCase.GetAttributeValue<string>("al_paraplanner"),
                     ["al_paraplannercode"] = outcomeCase.GetAttributeValue<string>("al_paraplannercode"),
                     ["al_casetype"] = CommandHelpers.Formatted(outcomeCase, "al_casetype"),
