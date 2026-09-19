@@ -123,7 +123,7 @@
           <IsFilterable>1</IsFilterable>
           <IsRetrievable>1</IsRetrievable>
           <IsLocalizable>0</IsLocalizable>
-          <Format>email</Format>
+          <Format>text</Format>
           <MaxLength>200</MaxLength>
           <Length>400</Length>
           <displaynames>
