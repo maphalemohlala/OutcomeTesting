@@ -377,6 +377,11 @@ if (args.Length >= 4 && args[0].Equals("setcasepeople", StringComparison.Ordinal
     return SetCasePeople(args[1], args[2], args[3], ConfirmedFor(args, args[1]));
 }
 
+if (args.Length >= 3 && args[0].Equals("repointremediation", StringComparison.OrdinalIgnoreCase))
+{
+    return RepointRemediation(args[1], args[2], ConfirmedFor(args, args[1]));
+}
+
 if (args.Length >= 2 && args[0].Equals("backfilltaxoutcome", StringComparison.OrdinalIgnoreCase))
 {
     return BackfillTaxOutcome(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
@@ -7899,6 +7904,115 @@ int SetCasePeople(string orgUrl, string referenceLike, string personName, bool c
     }
 
     Console.WriteLine($"Set adviser, para-planner and checker name to '{name}' on {cases.Count} case(s).");
+    return 0;
+}
+
+// Points a case's OPEN remediation actions at the adviser now named on it, for cases whose
+// adviser changed before AssignOpenActions moved with it.
+//
+// Remediation is routed by matching al_outcomecase.al_advisername to contact.fullname, and
+// until 2026-09-18 a header edit only filled a NULL assignee — so a case reassigned after its
+// actions were raised left them pinned to the previous adviser, with nobody on the case able
+// to answer them and no supported way to move them. The plug-in now moves them; this moves the
+// ones stranded before it did.
+//
+// The same three rules the plug-in applies, so a repair cannot diverge from the behaviour it
+// is repairing to: an ambiguous or unmatched name writes nothing (AD-082), a completed action
+// keeps whoever did the work (BR-007), and an action already held by the named adviser is left
+// untouched rather than rewritten.
+//
+// No notification is queued. The plug-in tells an adviser when the work reaches them as it
+// happens; a repair run replaying "Remediation assigned" for rows that have been sitting there
+// would date-stamp old work as new. Tell the adviser out of band.
+int RepointRemediation(string orgUrl, string caseReference, bool confirm)
+{
+    using var svc = Connect(orgUrl);
+
+    var cases = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_outcomecase\"><attribute name=\"al_outcomecaseid\"/>" +
+        "<attribute name=\"al_casereference\"/><attribute name=\"al_advisername\"/><filter>" +
+        "<condition attribute=\"al_casereference\" operator=\"eq\" value=\"" +
+        System.Security.SecurityElement.Escape(caseReference) + "\"/>" +
+        "</filter></entity></fetch>")).Entities;
+
+    if (cases.Count != 1)
+    {
+        Console.Error.WriteLine($"'{caseReference}' matched {cases.Count} case(s), not one.");
+        return 1;
+    }
+
+    var outcomeCase = cases[0];
+    var adviserName = outcomeCase.GetAttributeValue<string>("al_advisername");
+    if (string.IsNullOrWhiteSpace(adviserName))
+    {
+        Console.Error.WriteLine("The case names no adviser, so there is nobody to point the actions at.");
+        return 1;
+    }
+
+    var contacts = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch top=\"5\"><entity name=\"contact\"><attribute name=\"contactid\"/>" +
+        "<attribute name=\"emailaddress1\"/><filter>" +
+        "<condition attribute=\"fullname\" operator=\"eq\" value=\"" +
+        System.Security.SecurityElement.Escape(adviserName.Trim()) + "\"/>" +
+        "<condition attribute=\"statecode\" operator=\"eq\" value=\"0\"/>" +
+        "</filter></entity></fetch>")).Entities;
+
+    if (contacts.Count != 1)
+    {
+        Console.Error.WriteLine(
+            $"Adviser '{adviserName}' resolves to {contacts.Count} active contact(s), not one. " +
+            "Remediation refuses to guess between two people with the same name (AD-082).");
+        return 1;
+    }
+
+    var adviser = contacts[0];
+    Console.WriteLine($"Case {outcomeCase.GetAttributeValue<string>("al_casereference")}: adviser '{adviserName}' " +
+                      $"-> {adviser.GetAttributeValue<string>("emailaddress1")}.");
+
+    var actions = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_remediationaction\"><attribute name=\"al_remediationactionid\"/>" +
+        "<attribute name=\"al_name\"/><attribute name=\"al_actionstatus\"/>" +
+        "<attribute name=\"al_assignedcontactid\"/><filter>" +
+        "<condition attribute=\"al_outcomecaseid\" operator=\"eq\" value=\"" + outcomeCase.Id.ToString("D") + "\"/>" +
+        "<condition attribute=\"al_actionstatus\" operator=\"ne\" value=\"120910602\"/>" +
+        "</filter></entity></fetch>")).Entities;
+
+    var moving = new List<Entity>();
+    foreach (var action in actions)
+    {
+        var holder = action.GetAttributeValue<EntityReference>("al_assignedcontactid");
+        if (holder != null && holder.Id == adviser.Id)
+        {
+            Console.WriteLine($"   already held by the named adviser, leaving: {action.Id:D}");
+            continue;
+        }
+
+        Console.WriteLine($"   {action.Id:D} {(holder == null ? "(unassigned)" : holder.Name)} -> {adviserName}");
+        moving.Add(action);
+    }
+
+    Console.WriteLine($"{moving.Count} open action(s) to move of {actions.Count} not completed.");
+
+    if (moving.Count == 0)
+    {
+        return 0;
+    }
+
+    if (!confirm)
+    {
+        Console.WriteLine("Dry run. Re-run with --confirm <orgUrl> to write.");
+        return 0;
+    }
+
+    foreach (var action in moving)
+    {
+        svc.Update(new Entity("al_remediationaction", action.Id)
+        {
+            ["al_assignedcontactid"] = adviser.ToEntityReference(),
+        });
+    }
+
+    Console.WriteLine($"Moved {moving.Count} open remediation action(s) to '{adviserName}'.");
     return 0;
 }
 
