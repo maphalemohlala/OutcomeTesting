@@ -1,0 +1,85 @@
+{% comment %}
+  Checklist Items (project owner, 2026-09-19).
+
+  The items the paraplanner ticked inside the Intelligent Office task - Tax Check, High
+  Risk Item 1, Enhanced Supervision and so on - which is WHY the case is being checked at
+  all. The case has carried them since the extract was imported and nothing displayed
+  them, so a checker opened a case with no way of knowing what had put it in front of
+  them.
+
+  NOT the checklist version's questions. Those are the check itself and the review form
+  renders them directly; listing them here said the same thing twice.
+
+  Read-only. al_checklistitems is written by the import and is the only input to the
+  BR-004 route (ImportRules.ReadChecklist), so it records what the paraplanner selected
+  rather than anything a checker may revise. Only the ticked items are stored - the case
+  does not carry the vocabulary they were selected from - so there is no unticked row to
+  draw, and a case naming none draws no heading either.
+
+  Shared rather than copied (project owner, 2026-09-19): the review page showed this
+  first and the case page shows it too, and the parsing below is the part that would
+  drift. Usage:
+
+    include 'OT Checklist Items' items: some.al_checklistitems variant: 'card'
+
+  Parameters:
+    items    the raw column value, newline separated.
+    variant  'card' for a standalone card, as the review page draws it around the form;
+             'sheet' for a section of the V8 document, as the case record page draws it.
+             A ruled table rather than a bulleted list in the sheet, because the sheet
+             rules everything and a flowing list inside it reads as a foreign element -
+             the same reason the case page's definition lists became meta tables.
+
+  The line break is turned into a single character before the split: this Liquid rejects
+  a multi-character split, and newline_to_br writes a tag it understands whatever line
+  endings the column happens to store.
+{% endcomment %}
+
+{% if items and items != '' %}
+  {% assign ot_cl_flat = items | newline_to_br | replace: '<br />', '|' | replace: '<br>', '|' %}
+  {% assign ot_cl_lines = ot_cl_flat | split: '|' %}
+
+  {% comment %}
+    Counted before anything is drawn. A case whose column holds only blank lines opens no
+    section, rather than a heading over an empty list.
+  {% endcomment %}
+  {% assign ot_cl_count = 0 %}
+  {% for l in ot_cl_lines %}
+    {% assign ot_cl_item = l | strip %}
+    {% if ot_cl_item != '' %}{% assign ot_cl_count = ot_cl_count | plus: 1 %}{% endif %}
+  {% endfor %}
+
+  {% if ot_cl_count > 0 %}
+    {% if variant == 'sheet' %}
+
+    <section aria-labelledby="ot-checklist-overview-heading">
+      <h2 id="ot-checklist-overview-heading">Checklist Items</h2>
+      <table class="ot-checklist-overview-rows">
+        <tbody>
+          {% for l in ot_cl_lines %}
+            {% assign ot_cl_item = l | strip %}
+            {% if ot_cl_item != '' %}
+            <tr><td>{{ ot_cl_item | escape }}</td></tr>
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    {% else %}
+
+    <section class="ot-card ot-checklist-overview" aria-labelledby="ot-checklist-overview-heading">
+      <h2 class="ot-card__title" id="ot-checklist-overview-heading">Checklist Items</h2>
+      <ul class="ot-checklist-overview-items">
+        {% for l in ot_cl_lines %}
+          {% assign ot_cl_item = l | strip %}
+          {% if ot_cl_item != '' %}
+          <li>{{ ot_cl_item | escape }}</li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </section>
+
+    {% endif %}
+  {% endif %}
+{% endif %}

@@ -5,7 +5,12 @@ import {
   Al_outcomecasesal_priority,
   type Al_outcomecases,
 } from '../../generated/models/Al_outcomecasesModel';
-import { caseHeaderFields, type HeaderField } from '../reviews/checklistForm';
+import {
+  caseChecklist,
+  caseHeaderFields,
+  type CaseChecklist,
+  type HeaderField,
+} from '../reviews/checklistForm';
 import { choiceLabel as choice } from '../../lib/choiceLabel';
 import { lookupLabel } from './lookupLabel';
 import { date, text } from '../../lib/format';
@@ -67,6 +72,13 @@ export interface CaseDetail {
    * screens cannot drift on which fields the header carries or what they are called.
    */
   header: HeaderField[];
+  /**
+   * The IO task's checklist items, drawn by the shared ChecklistSection the review page
+   * uses (project owner, 2026-09-19). The case has carried them since import; the review
+   * page showed them first, and the case page is where a manager looks the case up, so it
+   * shows them too. Read off the record the page already holds, so no extra fetch.
+   */
+  checklist: CaseChecklist;
   edit: CaseEditValues;
 }
 
@@ -115,6 +127,7 @@ export function toDetail(record: Al_outcomecases): CaseDetail {
     rowVersion: record.versionnumber != null ? String(record.versionnumber) : null,
     previousCase: lookupLabel(record, 'al_previouscaseid', record.al_previouscaseidname),
     header: caseHeaderFields(record),
+    checklist: caseChecklist(record),
     edit: {
       al_clientname: text(record.al_clientname) ?? '',
       al_advisername: text(record.al_advisername) ?? '',

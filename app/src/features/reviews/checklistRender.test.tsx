@@ -238,11 +238,11 @@ describe('the Checklist section', () => {
     // list reads as a fault, so the section is absent rather than empty.
     const html = render('Tax', TAX, checklist({ items: [] }));
 
-    expect(html).not.toContain('review__checklist-items');
+    expect(html).not.toContain('checklist-items__list');
   });
 
   it('draws nothing when the case could not be read', () => {
-    expect(render('Tax', TAX, null)).not.toContain('review__checklist-items');
+    expect(render('Tax', TAX, null)).not.toContain('checklist-items__list');
   });
 
   it('shows the items and nothing else', () => {
@@ -262,6 +262,6 @@ describe('the Checklist section', () => {
     // putting it inside checklist-doc would place it in the printed Checker Checklist.
     const html = render('Tax', TAX, checklist());
 
-    expect(html.indexOf('review__checklist-items')).toBeLessThan(html.indexOf('checklist-doc'));
+    expect(html.indexOf('checklist-items__list')).toBeLessThan(html.indexOf('checklist-doc'));
   });
 });

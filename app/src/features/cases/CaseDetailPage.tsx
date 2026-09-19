@@ -6,6 +6,7 @@ import { Tabs } from '../../components/navigation/Tabs';
 import { PermissionGate } from '../../app/permissions/PermissionGate';
 import { useCaseDetail } from './useCaseDetail';
 import { CaseHeaderTable } from '../reviews/CaseHeaderTable';
+import { ChecklistSection } from '../reviews/ChecklistSection';
 import { useCaseReviews } from './useCaseReviews';
 import { CaseOutcomeSummary } from './CaseOutcomeSummary';
 import { CaseHistoryPanel } from './CaseHistoryPanel';
@@ -103,6 +104,14 @@ export function CaseDetailPage() {
                       <h2 id="panel-header">Case details</h2>
                       <CaseHeaderTable fields={state.detail.header} variant="case" />
                     </section>
+
+                    {/*
+                      What the paraplanner ticked in the IO task, under the header it
+                      belongs to (project owner, 2026-09-19). The same section the review
+                      page draws, from the same component: a manager looking a case up here
+                      sees what a checker opening it sees.
+                    */}
+                    <ChecklistSection checklist={state.detail.checklist} />
 
                     <section className="case-detail__checks" aria-labelledby="panel-checks">
                       <h2 id="panel-checks">Checks on this case</h2>

@@ -1,0 +1,24 @@
+.checklist-items {
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-left: 3px solid var(--colour-action);
+}
+
+.checklist-items__heading {
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-3);
+}
+
+/* The left padding carries the markers clear of the border: a `ul`
+   draws its bullets inside its own padding box, so a list with only
+   the section's own padding leaves them sitting on it. */
+.checklist-items__list {
+  margin: 0;
+  padding-left: 1.25em;
+}
+
+.checklist-items__list li + li {
+  margin-top: var(--space-2);
+}

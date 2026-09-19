@@ -66,3 +66,31 @@ describe('toDetail choice labels', () => {
     expect(valueOf(detail.header, 'Tax check required')).toBe('Yes');
   });
 });
+
+
+describe('toDetail checklist items', () => {
+  // The IO task's items, which the case page draws through the same ChecklistSection the
+  // review page uses (project owner, 2026-09-19). The column is a newline-separated list
+  // written by the import, so blank lines and stray whitespace are the import's own
+  // formatting rather than items.
+  it('splits the column into the items the paraplanner ticked', () => {
+    const detail = toDetail(
+      record({ al_checklistitems: 'High Risk Item 1\nTax Check' } as Partial<Al_outcomecases>),
+    );
+
+    expect(detail.checklist.items).toEqual(['High Risk Item 1', 'Tax Check']);
+  });
+
+  it('names no items when the case carries none', () => {
+    // A case imported before the extract carried the columns. The section draws nothing.
+    expect(toDetail(record({})).checklist.items).toEqual([]);
+  });
+
+  it('ignores blank lines and surrounding whitespace', () => {
+    const detail = toDetail(
+      record({ al_checklistitems: ' Tax Check \n\n' } as Partial<Al_outcomecases>),
+    );
+
+    expect(detail.checklist.items).toEqual(['Tax Check']);
+  });
+});

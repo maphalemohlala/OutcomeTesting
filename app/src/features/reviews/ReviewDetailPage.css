@@ -60,35 +60,4 @@
   text-decoration: underline;
 }
 
-/* ------------------------------------------------------------------
-   Checklist Items: what the paraplanner ticked in the Intelligent
-   Office task, which is why the case is being checked (project owner,
-   2026-09-19). The items and nothing else. Mirrors the portal's
-   section of the same name. Read-only, so it borrows the summary
-   card's shape rather than any form control's affordances.
-   ------------------------------------------------------------------ */
 
-.review__checklist {
-  padding: var(--space-4);
-  margin-bottom: var(--space-5);
-  background: var(--colour-surface);
-  border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-action);
-}
-
-.review__checklist-heading {
-  font-size: var(--text-lg);
-  margin: 0 0 var(--space-3);
-}
-
-/* The left padding carries the markers clear of the border: a `ul`
-   draws its bullets inside its own padding box, so a list with only
-   the section's padding sits them on the edge. */
-.review__checklist-items {
-  margin: 0;
-  padding-left: 1.25em;
-}
-
-.review__checklist-items li + li {
-  margin-top: var(--space-2);
-}

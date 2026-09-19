@@ -39,6 +39,7 @@
       <attribute name="al_taxcheckrequired" />
       <attribute name="al_taxteamdisposition" />
       <attribute name="al_checkername" />
+      <attribute name="al_checklistitems" />
       <filter type="and">
         <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
       </filter>
@@ -290,6 +291,20 @@
         </tbody>
       </table>
     </section>
+
+    {% comment %}
+      Checklist Items (project owner, 2026-09-19). What the paraplanner ticked in the
+      Intelligent Office task, which is why the case was raised for checking at all.
+
+      Under the case header, inside the document, because these are fields of the case
+      record rather than a control of the page around it - unlike Save as PDF above, which
+      is a control and sits outside. They belong on the printed record for the same reason.
+
+      The same OT Checklist Items template the review page includes, asked for in the
+      sheet's own idiom: a ruled table, not a bulleted list, because .ot-checklist rules
+      everything and a flowing list inside it reads as a foreign element.
+    {% endcomment %}
+    {% include 'OT Checklist Items' items: c.al_checklistitems variant: 'sheet' %}
 
     {% comment %}
       One line per check the case owes, in BR-004 order — Tax first, then AQS — rather than
