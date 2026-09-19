@@ -141,5 +141,62 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.True(code.Length <= 100);
             Assert.Contains("|", code);
         }
+
+        /// <summary>
+        /// Rich text (item 7, 2026-09-19). Its own column, and its own shape: an answer is
+        /// the markup or it is nothing, so a rich-text question cannot also carry plain
+        /// text, and no other question may carry markup.
+        /// </summary>
+        [Fact]
+        public void RichTextAnswersInItsOwnColumn()
+        {
+            Assert.Equal(
+                ResponseRules.AnswerColumn.RichText,
+                ResponseRules.ColumnFor(ResponseRules.TypeRichText));
+        }
+
+        [Fact]
+        public void AcceptsMarkupOnARichTextQuestion()
+        {
+            Assert.Null(ResponseRules.ValidateAnswer(
+                ResponseRules.TypeRichText, false, false, null, null, hasRichText: true));
+        }
+
+        [Fact]
+        public void AcceptsARichTextQuestionLeftUnanswered()
+        {
+            // Q-TAX-04 is optional, and an optional question with no answer is a legal
+            // shape. Whether an answer is REQUIRED is the submit gate's business.
+            Assert.Null(ResponseRules.ValidateAnswer(
+                ResponseRules.TypeRichText, false, false, null, null));
+        }
+
+        [Theory]
+        [InlineData(true, false, null)]
+        [InlineData(false, true, null)]
+        [InlineData(false, false, 120910300)]
+        public void RefusesAnythingElseOnARichTextQuestion(bool hasText, bool hasDate, int? choice)
+        {
+            Assert.Equal(
+                "This question takes a formatted answer only.",
+                ResponseRules.ValidateAnswer(
+                    ResponseRules.TypeRichText, hasText, hasDate, choice, null, hasRichText: true));
+        }
+
+        [Theory]
+        [InlineData(120910000)]
+        [InlineData(120910001)]
+        [InlineData(120910002)]
+        [InlineData(120910005)]
+        [InlineData(120910004)]
+        public void RefusesMarkupOnEveryOtherQuestion(int responseType)
+        {
+            // The guard is on the COLUMN, not on a list of types, so a response type added
+            // later is refused markup without anyone remembering to add it here.
+            Assert.Equal(
+                "This question does not take a formatted answer.",
+                ResponseRules.ValidateAnswer(
+                    responseType, false, false, null, null, hasRichText: true));
+        }
     }
 }

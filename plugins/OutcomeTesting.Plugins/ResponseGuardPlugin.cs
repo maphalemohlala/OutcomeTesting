@@ -232,6 +232,10 @@ namespace OutcomeTesting.Plugins
         {
             var hasText = !string.IsNullOrWhiteSpace(Resolve<string>(target, pre, "al_answertext"));
 
+            // HasText, not IsNullOrWhiteSpace: markup is never whitespace even when it says
+            // nothing, so "<p><br></p>" would otherwise count as an answer.
+            var hasRichText = HtmlSanitiser.HasText(Resolve<string>(target, pre, "al_answerrichtext"));
+
             var dateValue = Resolve<object>(target, pre, "al_answerdate");
             var hasDate = dateValue is DateTime;
 
@@ -243,7 +247,8 @@ namespace OutcomeTesting.Plugins
                 ? new int[0]
                 : choicesValue.Select(value => value.Value).ToArray();
 
-            var failure = ResponseRules.ValidateAnswer(responseType, hasText, hasDate, choice, choices);
+            var failure = ResponseRules.ValidateAnswer(
+                responseType, hasText, hasDate, choice, choices, hasRichText);
             if (failure != null)
             {
                 throw new InvalidPluginExecutionException(PreconditionPrefix + failure);

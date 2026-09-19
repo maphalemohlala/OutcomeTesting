@@ -241,6 +241,12 @@ namespace OutcomeTesting.Plugins
         {
             row["al_answertext"] = string.IsNullOrWhiteSpace(payload.AnswerText) ? null : payload.AnswerText;
 
+            // Sanitised here rather than at the surfaces, because this is the one path every
+            // write takes. HtmlSanitiser returns null for markup carrying no words, so an
+            // editor that was opened and emptied clears the answer instead of storing
+            // "<p><br></p>" and making an unanswered question look answered.
+            row["al_answerrichtext"] = HtmlSanitiser.Clean(payload.AnswerRichText);
+
             row["al_answerchoice"] = payload.AnswerChoice.HasValue
                 ? new OptionSetValue(payload.AnswerChoice.Value)
                 : null;

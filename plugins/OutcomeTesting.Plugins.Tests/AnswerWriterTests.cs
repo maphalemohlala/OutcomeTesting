@@ -161,5 +161,58 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.DoesNotContain(svc.Disassociations, d => d.RelatedId == linked);
         }
+
+        private static AnswerRequestPayload RichText(string markup)
+        {
+            return new AnswerRequestPayload
+            {
+                QuestionVersionId = VersionId.ToString("D"),
+                AnswerRichText = markup,
+            };
+        }
+
+        /// <summary>
+        /// The markup is sanitised BY THE WRITE, not by the surface that sent it (item 7,
+        /// 2026-09-19). HtmlSanitiser is tested on its own; what these prove is that the
+        /// one path every answer takes actually calls it, so a request made by hand against
+        /// the Web API is reduced by the same allow-list as the portal's editor.
+        /// </summary>
+        [Fact]
+        public void Sanitises_rich_text_on_the_way_in()
+        {
+            var svc = new FakeOrganizationService();
+
+            var id = AnswerWriter.Save(svc, ReviewId, RichText("<p onclick=\"alert(1)\">keep</p><script>alert(2)</script>"));
+
+            var row = svc.Retrieve("al_response", id, new Microsoft.Xrm.Sdk.Query.ColumnSet(true));
+            Assert.Equal("<p>keep</p>", row.GetAttributeValue<string>("al_answerrichtext"));
+        }
+
+        [Fact]
+        public void Stores_nothing_for_an_editor_that_was_opened_and_emptied()
+        {
+            // contenteditable leaves this behind. Stored, it would satisfy a mandatory
+            // question and count as an answer everywhere that reads one.
+            var svc = new FakeOrganizationService();
+
+            var id = AnswerWriter.Save(svc, ReviewId, RichText("<p><br></p>"));
+
+            var row = svc.Retrieve("al_response", id, new Microsoft.Xrm.Sdk.Query.ColumnSet(true));
+            Assert.Null(row.GetAttributeValue<string>("al_answerrichtext"));
+        }
+
+        [Fact]
+        public void Clears_rich_text_when_a_later_save_carries_none()
+        {
+            // Every answer column is written on every save, including as null, so clearing
+            // an answer clears it.
+            var svc = new FakeOrganizationService();
+            var id = AnswerWriter.Save(svc, ReviewId, RichText("<p>first</p>"));
+
+            AnswerWriter.Save(svc, ReviewId, RichText(null));
+
+            var row = svc.Retrieve("al_response", id, new Microsoft.Xrm.Sdk.Query.ColumnSet(true));
+            Assert.Null(row.GetAttributeValue<string>("al_answerrichtext"));
+        }
     }
 }

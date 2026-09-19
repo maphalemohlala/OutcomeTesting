@@ -370,7 +370,7 @@ namespace OutcomeTesting.Plugins
             {
                 ColumnSet = new ColumnSet(
                     "al_questionversionid", "al_answertext", "al_answerchoice",
-                    "al_answerchoices", "al_answerdate"),
+                    "al_answerchoices", "al_answerdate", "al_answerrichtext"),
                 Criteria = new FilterExpression(),
             };
             responseQuery.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, targetId);
@@ -1097,6 +1097,14 @@ namespace OutcomeTesting.Plugins
         {
             var text = response.GetAttributeValue<string>("al_answertext");
             if (!string.IsNullOrWhiteSpace(text))
+            {
+                return true;
+            }
+
+            // HtmlSanitiser.HasText rather than a null check: markup is never whitespace
+            // even when it says nothing, so an editor opened and emptied would otherwise
+            // satisfy a mandatory rich-text question with "<p><br></p>".
+            if (HtmlSanitiser.HasText(response.GetAttributeValue<string>("al_answerrichtext")))
             {
                 return true;
             }

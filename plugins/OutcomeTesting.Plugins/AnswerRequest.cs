@@ -27,6 +27,15 @@ namespace OutcomeTesting.Plugins
         [DataMember(Name = "answerText")]
         public string AnswerText { get; set; }
 
+        /// <summary>
+        /// The markup for a Rich text question (item 7, 2026-09-19), as the editor produced
+        /// it. NOT trusted: AnswerWriter passes it through HtmlSanitiser before it is
+        /// stored, so whatever sent it - the portal, the Code App, or a request made by
+        /// hand against the Web API - is reduced to the same allow-list.
+        /// </summary>
+        [DataMember(Name = "answerRichText")]
+        public string AnswerRichText { get; set; }
+
         [DataMember(Name = "answerChoice")]
         public int? AnswerChoice { get; set; }
 

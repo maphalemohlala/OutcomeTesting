@@ -13,7 +13,7 @@ namespace OutcomeTesting.Plugins
     /// </summary>
     public static class ResponseRules
     {
-        public enum AnswerColumn { Text, Date, Choice, Choices }
+        public enum AnswerColumn { Text, Date, Choice, Choices, RichText }
 
         // al_questionversion.al_responsetype
         public const int TypeText = 120910000;
@@ -27,6 +27,14 @@ namespace OutcomeTesting.Plugins
         public const int TypeYesNoNa = 120910008;
         public const int TypeYesNoInsufficient = 120910009;
         public const int TypeGrade = 120910010;
+
+        /// <summary>
+        /// A formatted answer, stored as the allow-listed HTML HtmlSanitiser produces
+        /// (item 7, 2026-09-19). Its own column rather than al_answertext: that column is
+        /// plain text everywhere it is read, and turning it into markup for one question
+        /// would make every other answer's renderer wrong.
+        /// </summary>
+        public const int TypeRichText = 120910011;
 
         // al_response.al_answerchoice
         public const int ChoicePass = 120910300;
@@ -68,6 +76,8 @@ namespace OutcomeTesting.Plugins
                 case TypeText:
                 case TypeMultilineText:
                     return AnswerColumn.Text;
+                case TypeRichText:
+                    return AnswerColumn.RichText;
                 case TypeDate:
                     return AnswerColumn.Date;
                 case TypeMultiSelect:
@@ -197,10 +207,18 @@ namespace OutcomeTesting.Plugins
             bool hasText,
             bool hasDate,
             int? choice,
-            IReadOnlyCollection<int> choices)
+            IReadOnlyCollection<int> choices,
+            bool hasRichText = false)
         {
             var selected = choices ?? (IReadOnlyCollection<int>)new int[0];
             var column = ColumnFor(responseType);
+
+            // Optional so the callers that predate Rich text still compile and still mean
+            // what they meant: no rich text is the shape every other question has.
+            if (hasRichText && column != AnswerColumn.RichText)
+            {
+                return "This question does not take a formatted answer.";
+            }
 
             switch (column)
             {
@@ -226,6 +244,13 @@ namespace OutcomeTesting.Plugins
                     if (choice.HasValue && !PermittedChoices(responseType).Contains(choice.Value))
                     {
                         return "That option is not available for this question.";
+                    }
+                    return null;
+
+                case AnswerColumn.RichText:
+                    if (hasText || hasDate || choice.HasValue || selected.Count > 0)
+                    {
+                        return "This question takes a formatted answer only.";
                     }
                     return null;
 
