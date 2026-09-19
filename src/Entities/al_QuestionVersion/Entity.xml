@@ -432,6 +432,14 @@
               <Description description="Answer shapes permitted for a checklist question. See AD-022." languagecode="1033" />
             </Descriptions>
             <options>
+              <option value="120910011" IsHidden="0">
+                <labels>
+                  <label description="Rich text" languagecode="1033" />
+                </labels>
+                <Descriptions>
+                  <Description description="A formatted answer, stored as the allow-listed HTML HtmlSanitiser produces (item 7, 2026-09-19)." languagecode="1033" />
+                </Descriptions>
+              </option>
               <option value="120910000" IsHidden="0">
                 <labels>
                   <label description="Text" languagecode="1033" />

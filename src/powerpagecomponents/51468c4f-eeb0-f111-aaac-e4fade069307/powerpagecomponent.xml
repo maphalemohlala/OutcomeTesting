@@ -1,0 +1,14 @@
+<powerpagecomponent powerpagecomponentid="51468c4f-eeb0-f111-aaac-e4fade069307">
+  <content>{
+  "description": "Left false deliberately. It was tried on 2026-09-14 to bind seeded contacts by email claim and it did nothing. This site uses the built-in Entra provider -- there is no OpenIdConnect provider registration, only AzureADLoginEnabled and a caption -- and the setting is documented as not applying to that provider. Whether it was inapplicable or merely not yet reloaded from cache was never separated, because the route that does work needs no setting at all -- bindidentity, setsecuritystamp and enableportallogin, per contact. Kept rather than deleted so the next person who has this idea finds the result instead of repeating it. The row did not exist in DEV at all until 2026-09-15 and was created there then, so the two environments hold this setting under different ids -- DEV 51468c4f-eeb0-f111-aaac-e4fade069307, TEST a4ca0596-0bb0-f111-aaac-002248c654cd. This file is a DEV round-trip and carries the DEV id. A pac pages upload aimed at TEST would therefore create a second row of this name there; delete TEST's row first, or leave TEST to setsitesetting as every deployment so far has done.",
+  "value": "false"
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Authentication/OpenIdConnect/AzureAD/AllowContactMappingWithEmail</name>
+  <powerpagecomponenttype>9</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

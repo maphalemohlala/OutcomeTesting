@@ -264,6 +264,45 @@
             <Description description="Answer for Date response types. Date-only, so it does not shift across time zones." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_AnswerRichText">
+          <Type>ntext</Type>
+          <Name>al_answerrichtext</Name>
+          <LogicalName>al_answerrichtext</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.4.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>textarea</Format>
+          <MaxLength>32000</MaxLength>
+          <displaynames>
+            <displayname description="Answer (rich text)" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The answer to a Rich text question, as allow-listed HTML. Written only by AnswerWriter, which passes it through HtmlSanitiser first (item 7, 2026-09-19)." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_AnswerText">
           <Type>nvarchar</Type>
           <Name>al_answertext</Name>
