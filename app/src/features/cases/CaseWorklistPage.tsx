@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
+import { UPLOADED_BY_LABEL } from '../../types/domain';
 import { OutcomeIndicator, TaxOutcomeIndicator } from '../../components/status/OutcomeIndicator';
 import { StageLabel } from '../../components/status/StageLabel';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
@@ -242,7 +243,7 @@ export function CaseWorklistPage() {
                   <th scope="col">Adviser</th>
                   <th scope="col">Route</th>
                   <th scope="col">Status</th>
-                  <th scope="col">Owner</th>
+                  <th scope="col">{UPLOADED_BY_LABEL}</th>
                   <th scope="col">Priority</th>
                   <th scope="col" className="worklist__numeric">
                     Age

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
+import { UPLOADED_BY_LABEL } from '../../types/domain';
 import { StageLabel } from '../../components/status/StageLabel';
 import { Tabs } from '../../components/navigation/Tabs';
 import { PermissionGate } from '../../app/permissions/PermissionGate';
@@ -65,7 +66,7 @@ export function CaseDetailPage() {
               </span>
             </div>
             <div className="case-detail__summary-item">
-              <span className="case-detail__summary-label">Owner</span>
+              <span className="case-detail__summary-label">{UPLOADED_BY_LABEL}</span>
               <span className="case-detail__summary-value">
                 {state.detail.owner ?? 'Unassigned'}
               </span>

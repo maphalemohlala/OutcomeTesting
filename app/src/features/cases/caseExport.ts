@@ -1,5 +1,6 @@
 import type { CellValue } from '../../lib/tabular';
 import { ADVICE_DATE_LABEL } from './caseHeaderDates';
+import { UPLOADED_BY_LABEL } from '../../types/domain';
 import type { CaseSummary } from './caseWorklistMapping';
 
 /**
@@ -12,7 +13,7 @@ export const CASE_EXPORT_HEADERS = [
   'Status',
   'Review route',
   'Priority',
-  'Owner',
+  UPLOADED_BY_LABEL,
   'Client name',
   'Adviser name',
   'Adviser code',

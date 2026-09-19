@@ -118,6 +118,20 @@ export const REVIEW_TYPES = ['Tax', 'AQS'] as const;
 
 export type ReviewType = (typeof REVIEW_TYPES)[number];
 
+/**
+ * What `al_outcomecase.ownerid` is called wherever it is shown (item 4, 2026-09-19).
+ *
+ * A label change and nothing else: the column is the Dataverse record owner, and it reads as
+ * the uploader because nothing in the solution ever reassigns it - every `ownerid` write
+ * targets `al_reviewinstance` or `al_remediationaction`. The Dataverse display name was
+ * changed to match, so advanced find and any model-driven view agree with the app.
+ *
+ * Deliberately NOT applied to the other "Owner" columns, which are different people: the
+ * reviews table on a case shows the review's owner (the checker), and the remediation tables
+ * show the action's owner (the adviser). Renaming those would be a lie rather than a fix.
+ */
+export const UPLOADED_BY_LABEL = 'Uploaded by';
+
 /** AD-020, AD-031. The elevated role that owns outcome corrections. */
 export const OUTCOME_CORRECTION_ROLE = 'T&C Manager' as const;
 

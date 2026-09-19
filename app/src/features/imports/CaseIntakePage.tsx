@@ -1,6 +1,7 @@
 import { Fragment, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
+import { UPLOADED_BY_LABEL } from '../../types/domain';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import { useCaseIntake } from './useCaseIntake';
 import { useCaseUpload } from './useCaseUpload';
@@ -148,7 +149,7 @@ export function CaseIntakePage() {
                     <th scope="col" className="intake__numeric">
                       Exceptions
                     </th>
-                    <th scope="col">Owner</th>
+                    <th scope="col">{UPLOADED_BY_LABEL}</th>
                   </tr>
                 </thead>
                 <tbody>
