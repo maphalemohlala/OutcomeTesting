@@ -28,10 +28,12 @@ export const Al_outcomesstatuscode = {
 export type Al_outcomesstatuscode = keyof typeof Al_outcomesstatuscode;
 
 export interface Al_outcomesBase {
+  "al_AqAccountableContactId@odata.bind"?: string;
   al_aqadviseraccountable?: boolean;
   al_aqparaplanneraccountable?: boolean;
   al_finalisedon?: string;
   al_finaloutcome?: Al_outcomesal_finaloutcome;
+  "al_FqAccountableContactId@odata.bind"?: string;
   al_fqadviseraccountable?: boolean;
   al_fqparaplanneraccountable?: boolean;
   al_initialoutcome: Al_outcomesal_initialoutcome;
@@ -51,9 +53,13 @@ export interface Al_outcomesBase {
 }
 
 export interface Al_outcomes extends Al_outcomesBase {
+  al_aqaccountablecontactidname?: string;
+  al_aqaccountablecontactidyominame?: string;
   al_aqadviseraccountablename?: string;
   al_aqparaplanneraccountablename?: string;
   al_finaloutcomename?: string;
+  al_fqaccountablecontactidname?: string;
+  al_fqaccountablecontactidyominame?: string;
   al_fqadviseraccountablename?: string;
   al_fqparaplanneraccountablename?: string;
   al_initialoutcomename?: string;
@@ -77,6 +83,10 @@ export interface Al_outcomes extends Al_outcomesBase {
   statecodename?: string;
   statuscodename?: string;
   versionnumber?: number;
+  al_aqaccountablecontactid?: object;
+  _al_aqaccountablecontactid_value?: string;
+  al_fqaccountablecontactid?: object;
+  _al_fqaccountablecontactid_value?: string;
   al_outcomecaseid?: object;
   _al_outcomecaseid_value?: string;
   al_reviewinstanceid?: object;

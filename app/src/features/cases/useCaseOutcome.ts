@@ -23,6 +23,13 @@ export interface CaseOutcomeRow {
    * effectiveAccountability is what turns that into what the extract will actually carry.
    */
   accountability: AccountabilityFlags;
+  /**
+   * The contact named as carrying each fail, where someone other than the case's own
+   * adviser or paraplanner was chosen (item 8, 2026-09-19). Null means the extract uses
+   * the person the case itself names.
+   */
+  fqAccountable: { id: string; name: string } | null;
+  aqAccountable: { id: string; name: string } | null;
   /** Needed by al_SetFailAccountability, which targets the outcome. */
   rowVersion: string | null;
 }
@@ -32,6 +39,12 @@ export type CaseOutcomeState =
   | { status: 'loading' }
   | { status: 'ready'; outcomes: CaseOutcomeRow[] };
 
+
+/** A lookup as the panel needs it: the id to send back, and a name to show. */
+function namedContact(id?: string, name?: string): { id: string; name: string } | null {
+  if (!id) return null;
+  return { id, name: name?.trim() || 'Someone not in the directory' };
+}
 
 function toOutcome(record: Al_outcomes): CaseOutcomeRow {
   return {
@@ -50,6 +63,14 @@ function toOutcome(record: Al_outcomes): CaseOutcomeRow {
     regraded: Boolean(record.al_regradedon),
     finalisedOn: date(record.al_finalisedon),
     accountability: recordedFlags(record),
+    fqAccountable: namedContact(
+      record._al_fqaccountablecontactid_value,
+      record.al_fqaccountablecontactidname,
+    ),
+    aqAccountable: namedContact(
+      record._al_aqaccountablecontactid_value,
+      record.al_aqaccountablecontactidname,
+    ),
     rowVersion: record.versionnumber != null ? String(record.versionnumber) : null,
   };
 }

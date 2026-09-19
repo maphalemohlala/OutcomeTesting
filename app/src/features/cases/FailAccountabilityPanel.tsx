@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PermissionGate } from '../../app/permissions/PermissionGate';
 import { setFailAccountability } from '../../services/commands/setFailAccountability';
 import { useIntentKeys } from '../../hooks/useIntentKey';
+import { UserPicker } from '../../components/form/UserPicker';
 import { useCaseOutcome, type CaseOutcomeRow } from './useCaseOutcome';
 import {
   adviceQualityFailedFrom,
@@ -67,6 +68,11 @@ function OutcomeAccountability({
 
   const intent = useIntentKeys();
   const [draft, setDraft] = useState<AccountabilityFlags>(effective);
+
+  // Who carries it, where that is someone the case does not name. Empty means the case's
+  // own adviser or paraplanner, which is what the extract falls back to.
+  const [fqPerson, setFqPerson] = useState(outcome.fqAccountable?.id ?? '');
+  const [aqPerson, setAqPerson] = useState(outcome.aqAccountable?.id ?? '');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; kind: 'error' | 'success' } | null>(null);
 
@@ -74,7 +80,9 @@ function OutcomeAccountability({
     draft.fqAdviser !== effective.fqAdviser ||
     draft.fqParaplanner !== effective.fqParaplanner ||
     draft.aqAdviser !== effective.aqAdviser ||
-    draft.aqParaplanner !== effective.aqParaplanner;
+    draft.aqParaplanner !== effective.aqParaplanner ||
+    fqPerson !== (outcome.fqAccountable?.id ?? '') ||
+    aqPerson !== (outcome.aqAccountable?.id ?? '');
 
   function nameFor(who: 'adviser' | 'paraplanner'): string {
     const name = who === 'adviser' ? people.adviser : people.paraplanner;
@@ -91,6 +99,8 @@ function OutcomeAccountability({
       fqParaplanner: draft.fqParaplanner,
       aqAdviser: draft.aqAdviser,
       aqParaplanner: draft.aqParaplanner,
+      fqContactId: fqPerson,
+      aqContactId: aqPerson,
       /*
        * One key per intent, not per attempt. The token names the outcome AND what is being
        * recorded, so a retry after a timeout replays rather than writing twice, while
@@ -100,7 +110,8 @@ function OutcomeAccountability({
         'accountability-' +
           outcome.id +
           '-' +
-          [draft.fqAdviser, draft.fqParaplanner, draft.aqAdviser, draft.aqParaplanner].join('-'),
+          [draft.fqAdviser, draft.fqParaplanner, draft.aqAdviser, draft.aqParaplanner].join('-') +
+          '-' + fqPerson + '-' + aqPerson,
       ),
     });
 
@@ -153,6 +164,33 @@ function OutcomeAccountability({
           </li>
         ))}
       </ul>
+
+      {/*
+        Naming someone the case does not (project owner, 2026-09-19). The extract has only
+        an "adviser" slot and a "paraplanner" slot, so the ticks above still say WHICH of
+        them this person fills; this says whose name goes in it. Left empty, the extract
+        uses the case's own adviser or paraplanner.
+      */}
+      <div className="accountability__people">
+        <label className="accountability__person">
+          <span>File Quality &mdash; named person</span>
+          <UserPicker
+            field="id"
+            value={fqPerson}
+            onChange={setFqPerson}
+            placeholder="The case's own adviser or paraplanner"
+          />
+        </label>
+        <label className="accountability__person">
+          <span>Advice Quality &mdash; named person</span>
+          <UserPicker
+            field="id"
+            value={aqPerson}
+            onChange={setAqPerson}
+            placeholder="The case's own adviser or paraplanner"
+          />
+        </label>
+      </div>
 
       <div className="accountability__actions">
         <button

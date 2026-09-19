@@ -5,6 +5,9 @@
   <IntroducedVersion>1.0</IntroducedVersion>
   <FileName>/PluginAssemblies/OutcomeTestingPlugins-7B51D0D1-F5A1-F111-B8DD-E4FADE069307/OutcomeTestingPlugins.dll</FileName>
   <PluginTypes>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.AccountabilityRequestPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="94448185-1db4-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.AccountabilityRequestPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.AccountabilityRequestPlugin</FriendlyName>
+    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.AddQuestionPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="c5bc1385-8eae-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.AddQuestionPlugin">
       <FriendlyName>OutcomeTesting.Plugins.AddQuestionPlugin</FriendlyName>
     </PluginType>

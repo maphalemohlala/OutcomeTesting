@@ -259,6 +259,11 @@ if (args.Length >= 2 && args[0].Equals("addtextcolumn", StringComparison.Ordinal
     return AddTextColumn(args);
 }
 
+if (args.Length >= 2 && args[0].Equals("addlookupcolumn", StringComparison.OrdinalIgnoreCase))
+{
+    return AddLookupColumn(args);
+}
+
 if (args.Length >= 2 && args[0].Equals("addchoicecolumn", StringComparison.OrdinalIgnoreCase))
 {
     return AddChoiceColumn(args);
@@ -3071,6 +3076,100 @@ int AddMemoColumn(string[] a)
 // Format is Text rather than TextArea (the memo default) because these are single-line
 // values - an IO reference, an adviser email, a task type - and the format decides how every
 // form and view renders the column.
+/// <summary>
+/// Creates a lookup column, which needs a RELATIONSHIP rather than an attribute: a lookup
+/// is one end of a one-to-many, so CreateAttributeRequest cannot make one and the tool had
+/// no verb for it before item 8 (2026-09-19).
+///
+/// The relationship name is derived rather than asked for, because it has to be unique
+/// across the environment and a hand-typed one is a collision waiting to happen.
+/// </summary>
+int AddLookupColumn(string[] a)
+{
+    var orgUrl = a[1];
+    if (a.Length < 6 || !ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This writes metadata to a live environment. Re-run as: addlookupcolumn <orgUrl> " +
+            "<entityLogicalName> <SchemaName> <displayName> <targetEntityLogicalName> [<description>] --confirm <orgUrl>");
+        return 1;
+    }
+
+    var entity = a[2].Trim();
+    var schemaName = a[3].Trim();
+    var displayName = a[4];
+    var target = a[5].Trim();
+    var description = a.Length > 6 && !a[6].StartsWith("--", StringComparison.Ordinal) ? a[6] : string.Empty;
+    var logicalName = schemaName.ToLowerInvariant();
+
+    using var svc = Connect(orgUrl);
+
+    var existing = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    if (existing.EntityMetadata.Attributes.Any(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)))
+    {
+        Console.Error.WriteLine($"'{entity}' already has a column '{logicalName}'. Nothing was changed.");
+        return 1;
+    }
+
+    var relationshipName = target + "_" + logicalName + "_" + entity;
+
+    svc.Execute(new CreateOneToManyRequest
+    {
+        SolutionUniqueName = SolutionUniqueName,
+        OneToManyRelationship = new OneToManyRelationshipMetadata
+        {
+            SchemaName = relationshipName,
+            ReferencedEntity = target,
+            ReferencingEntity = entity,
+            // Removing the referenced row must not take the referencing one with it: an
+            // outcome is a record of a check and outlives anyone's contact row.
+            CascadeConfiguration = new CascadeConfiguration
+            {
+                Assign = CascadeType.NoCascade,
+                Delete = CascadeType.RemoveLink,
+                Merge = CascadeType.NoCascade,
+                Reparent = CascadeType.NoCascade,
+                Share = CascadeType.NoCascade,
+                Unshare = CascadeType.NoCascade,
+            },
+        },
+        Lookup = new LookupAttributeMetadata
+        {
+            SchemaName = schemaName,
+            LogicalName = logicalName,
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+            DisplayName = NotificationTable.Text(displayName),
+            Description = NotificationTable.Text(description),
+        },
+    });
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    var after = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = entity,
+        EntityFilters = EntityFilters.Attributes,
+    });
+
+    var created = after.EntityMetadata.Attributes.FirstOrDefault(x =>
+        string.Equals(x.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase)) as LookupAttributeMetadata;
+
+    if (created == null)
+    {
+        Console.Error.WriteLine($"'{logicalName}' was not found on '{entity}' after the create returned. Investigate before relying on it.");
+        return 1;
+    }
+
+    Console.WriteLine(
+        $"Created {entity}.{created.LogicalName} (lookup to {target}, relationship {relationshipName}) in solution {SolutionUniqueName}.");
+    return 0;
+}
+
 int AddTextColumn(string[] a)
 {
     var orgUrl = a[1];

@@ -27,6 +27,14 @@ export interface SetFailAccountabilityInput {
   fqParaplanner: boolean;
   aqAdviser: boolean;
   aqParaplanner: boolean;
+  /**
+   * The contact carrying the File Quality fail, where it is someone other than the adviser
+   * or paraplanner the case names. Empty clears it and puts the case's own person back in
+   * the extract. The flags above still say which of AD-039's two slots they fill.
+   */
+  fqContactId?: string;
+  /** The same for Advice Quality. */
+  aqContactId?: string;
   /** Stable idempotency key for this intent; reuse across retries. */
   idempotencyKey: string;
 }
@@ -45,6 +53,10 @@ export function setFailAccountability(
     FqParaplanner: input.fqParaplanner,
     AqAdviser: input.aqAdviser,
     AqParaplanner: input.aqParaplanner,
+    // Always sent, including as empty: the command writes both lookups on every save, so
+    // clearing a named person here is what puts the case's own back in the extract.
+    FqContactId: input.fqContactId ?? '',
+    AqContactId: input.aqContactId ?? '',
     IdempotencyKey: input.idempotencyKey,
   });
 }

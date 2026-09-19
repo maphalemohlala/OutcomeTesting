@@ -13,6 +13,45 @@
         <Description description="The recorded outcome of a review. Preserves both the initial outcome captured at submission and the final outcome after remediation, recheck or regrade, so both survive under BR-007. A final outcome that differs from the initial is a reopen, override or regrade owned by the T&amp;C Manager and requires a mandatory reason (OD-007, AD-031)." languagecode="1033" />
       </Descriptions>
       <attributes>
+        <attribute PhysicalName="al_AqAccountableContactId">
+          <Type>lookup</Type>
+          <Name>al_aqaccountablecontactid</Name>
+          <LogicalName>al_aqaccountablecontactid</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>0</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.4.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <ExternalName>al_aqaccountablecontactid</ExternalName>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <LookupStyle>single</LookupStyle>
+          <LookupTypes />
+          <displaynames>
+            <displayname description="Accountable (Advice Quality)" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The person who carries the Advice Quality fail, where someone other than the case's own adviser or paraplanner was named (item 8, 2026-09-19). The four accountable flags say which slot they fill." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_Aqadviseraccountable">
           <Type>bit</Type>
           <Name>al_aqadviseraccountable</Name>
@@ -244,6 +283,45 @@
           </displaynames>
           <Descriptions>
             <Description description="The outcome after remediation, recheck or regrade (BR-005), preserved separately from the initial outcome under BR-007." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_FqAccountableContactId">
+          <Type>lookup</Type>
+          <Name>al_fqaccountablecontactid</Name>
+          <LogicalName>al_fqaccountablecontactid</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>0</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.4.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <ExternalName>al_fqaccountablecontactid</ExternalName>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <LookupStyle>single</LookupStyle>
+          <LookupTypes />
+          <displaynames>
+            <displayname description="Accountable (File Quality)" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The person who carries the File Quality fail, where someone other than the case's own adviser or paraplanner was named (item 8, 2026-09-19). The four accountable flags say which slot they fill." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_Fqadviseraccountable">

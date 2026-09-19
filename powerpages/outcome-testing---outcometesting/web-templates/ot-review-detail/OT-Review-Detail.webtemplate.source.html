@@ -1555,6 +1555,221 @@
       mandatory question and the Tax-before-AQS rule server-side, so moving, hiding or
       showing it changes nothing about what is permitted (NFR-SEC-01).
     {% endcomment %}
+    {% comment %}
+      Who carries the fail (project owner, 2026-09-19), at the end of the check and before
+      the Submit button, which is where the checker is when they know the answer.
+
+      Only when this check has failed. Accountability describes a fail: on a clean check
+      there is nobody to name, and the server refuses one anyway.
+
+      The four flags live on al_outcome, and that row does not exist yet - SubmitReviewPlugin
+      creates it when this review is submitted. So the choice is parked on the review and
+      applied to the outcome the submit creates, in the same write as the grade.
+
+      The people come from the contact directory, which checkers can now read: a global
+      read-only table permission was added for it (Contact - directory read). They can see
+      the directory and still write only their own row, which is the row the request below
+      is PATCHed onto.
+    {% endcomment %}
+    {% if editable %}
+      {% assign ot_fq_failed = false %}
+      {% for a in arows %}
+        {% if a.al_answerchoice.value == 120910301 %}{% assign ot_fq_failed = true %}{% endif %}
+      {% endfor %}
+
+      {% if ot_fq_failed %}
+      {% fetchxml directory %}
+      <fetch>
+        <entity name="contact">
+          <attribute name="contactid" />
+          <attribute name="fullname" />
+          <attribute name="emailaddress1" />
+          <filter type="and">
+            <condition attribute="statecode" operator="eq" value="0" />
+          </filter>
+          <order attribute="fullname" />
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+
+      <section class="ot-card ot-accountability"
+               data-ot-accountability
+               data-review-id="{{ rv.al_reviewinstanceid }}"
+               aria-labelledby="ot-accountability-heading">
+        <h2 class="ot-card__title" id="ot-accountability-heading">Who carries this fail</h2>
+        <p>
+          This check records a fail. Say who carries it before you submit. Left alone, the
+          extract names the people the case itself does: the paraplanner for a File Quality
+          fail, the adviser for an Advice Quality fail.
+        </p>
+
+        <div class="ot-accountability__grid">
+          <fieldset class="ot-accountability__set">
+            <legend>File Quality</legend>
+            <label class="opt"><input type="checkbox" data-ot-acc="fqParaplanner" /> The paraplanner ({{ rv['case.al_paraplanner'] | default: 'not named' | escape }})</label>
+            <label class="opt"><input type="checkbox" data-ot-acc="fqAdviser" /> The adviser ({{ rv['case.al_advisername'] | default: 'not named' | escape }})</label>
+            <label class="ot-accountability__person">
+              <span>Or someone else</span>
+              <input type="search" class="ot-hdr-input" data-ot-acc-filter="fq"
+                     placeholder="Search by name or email" aria-label="Search people for File Quality" autocomplete="off" />
+              <select class="ot-hdr-input" data-ot-acc-person="fq" aria-label="Person carrying the File Quality fail">
+                <option value="">The case's own person</option>
+                {% for c in directory.results.entities %}
+                <option value="{{ c.contactid }}" data-search="{{ c.fullname | escape | downcase }} {{ c.emailaddress1 | escape | downcase }}">{{ c.fullname | escape }} &mdash; {{ c.emailaddress1 | escape }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </fieldset>
+
+          <fieldset class="ot-accountability__set">
+            <legend>Advice Quality</legend>
+            <label class="opt"><input type="checkbox" data-ot-acc="aqAdviser" /> The adviser ({{ rv['case.al_advisername'] | default: 'not named' | escape }})</label>
+            <label class="opt"><input type="checkbox" data-ot-acc="aqParaplanner" /> The paraplanner ({{ rv['case.al_paraplanner'] | default: 'not named' | escape }})</label>
+            <label class="ot-accountability__person">
+              <span>Or someone else</span>
+              <input type="search" class="ot-hdr-input" data-ot-acc-filter="aq"
+                     placeholder="Search by name or email" aria-label="Search people for Advice Quality" autocomplete="off" />
+              <select class="ot-hdr-input" data-ot-acc-person="aq" aria-label="Person carrying the Advice Quality fail">
+                <option value="">The case's own person</option>
+                {% for c in directory.results.entities %}
+                <option value="{{ c.contactid }}" data-search="{{ c.fullname | escape | downcase }} {{ c.emailaddress1 | escape | downcase }}">{{ c.fullname | escape }} &mdash; {{ c.emailaddress1 | escape }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </fieldset>
+        </div>
+
+        <p class="ot-accountability__status" data-ot-acc-status role="status" aria-live="polite"></p>
+      </section>
+
+      <script>
+        (function () {
+          'use strict';
+          var root = document.querySelector('[data-ot-accountability]');
+          if (!root) { return; }
+
+          var status = root.querySelector('[data-ot-acc-status]');
+          var reviewId = root.getAttribute('data-review-id');
+          var boxes = root.querySelectorAll('[data-ot-acc]');
+          var timer = null;
+          var saving = false;
+
+          function show(message, kind) {
+            status.textContent = message;
+            status.className = 'ot-accountability__status' + (kind ? ' ot-inline-status--' + kind : '');
+          }
+
+          /*
+           * Searchable (project owner, 2026-09-19). The filter hides options rather than
+           * rebuilding the list, so the chosen person survives a search that does not match
+           * them and the select never silently loses its value.
+           */
+          function wireFilter(which) {
+            var filter = root.querySelector('[data-ot-acc-filter="' + which + '"]');
+            var select = root.querySelector('[data-ot-acc-person="' + which + '"]');
+            if (!filter || !select) { return; }
+
+            filter.addEventListener('input', function () {
+              var needle = filter.value.trim().toLowerCase();
+              var options = select.options;
+              for (var i = 0; i < options.length; i++) {
+                var option = options[i];
+                var haystack = option.getAttribute('data-search') || '';
+                var keep = needle === '' || haystack.indexOf(needle) >= 0
+                  || option.value === '' || option.selected;
+                option.hidden = !keep;
+              }
+            });
+          }
+
+          wireFilter('fq');
+          wireFilter('aq');
+
+          function value(name) {
+            var box = root.querySelector('[data-ot-acc="' + name + '"]');
+            return box ? box.checked : false;
+          }
+
+          function person(which) {
+            var select = root.querySelector('[data-ot-acc-person="' + which + '"]');
+            return select ? select.value : '';
+          }
+
+          function save() {
+            if (timer) { window.clearTimeout(timer); timer = null; }
+            if (saving) { return; }
+            if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
+              show('This page did not load completely. Refresh and try again.', 'error');
+              return;
+            }
+
+            saving = true;
+            show('Saving...', null);
+
+            var body = {
+              al_accountabilityrequest: JSON.stringify({
+                reviewId: reviewId,
+                fqAdviser: value('fqAdviser'),
+                fqParaplanner: value('fqParaplanner'),
+                aqAdviser: value('aqAdviser'),
+                aqParaplanner: value('aqParaplanner'),
+                fqContactId: person('fq'),
+                aqContactId: person('aq')
+              })
+            };
+
+            window.shell.getTokenDeferred().done(function (token) {
+              var request = new XMLHttpRequest();
+              request.open('PATCH', '/_api/contacts({{ user.id }})', true);
+              request.setRequestHeader('Content-Type', 'application/json');
+              request.setRequestHeader('__RequestVerificationToken', token);
+
+              request.onreadystatechange = function () {
+                if (request.readyState !== 4) { return; }
+                saving = false;
+
+                if (request.status >= 200 && request.status < 300) {
+                  var now = new Date();
+                  show('Saved ' + ('0' + now.getHours()).slice(-2) + ':'
+                    + ('0' + now.getMinutes()).slice(-2), 'success');
+                  return;
+                }
+
+                var message = 'That could not be saved (' + request.status + ').';
+                try {
+                  var parsed = JSON.parse(request.responseText);
+                  if (parsed && parsed.error && parsed.error.message) {
+                    message = parsed.error.message
+                      .replace('PRECONDITION: ', '').replace('VALIDATION: ', '').replace('UNAUTHORIZED: ', '');
+                  }
+                } catch (e) { /* the status code is all there is */ }
+                show(message, 'error');
+              };
+
+              request.send(JSON.stringify(body));
+            }).fail(function () {
+              saving = false;
+              show('This page did not load completely. Refresh and try again.', 'error');
+            });
+          }
+
+          function queue() {
+            if (timer) { window.clearTimeout(timer); }
+            timer = window.setTimeout(save, 700);
+          }
+
+          for (var i = 0; i < boxes.length; i++) { boxes[i].addEventListener('change', queue); }
+          root.querySelector('[data-ot-acc-person="fq"]').addEventListener('change', queue);
+          root.querySelector('[data-ot-acc-person="aq"]').addEventListener('change', queue);
+
+          // The submit waits on this the way it waits on the header: a choice made a moment
+          // before pressing Submit must reach the review before the outcome is created from it.
+          window.otAccountability = { flush: function (done) { save(); if (done) { done(true); } } };
+        })();
+      </script>
+      {% endif %}
+    {% endif %}
+
     {% if editable %}
       <section class="ot-card ot-submit"
                data-ot-submit
@@ -1867,6 +2082,13 @@
              * submit rather than being lost under it: the review is the thing that cannot be
              * taken back (BR-012).
              */
+            // The accountability choice, if the checker made one a moment ago: it is parked
+            // on the review and the submit is what turns it into part of the outcome, so it
+            // has to land first.
+            if (window.otAccountability && typeof window.otAccountability.flush === 'function') {
+              window.otAccountability.flush(null);
+            }
+
             if (window.otHeader && typeof window.otHeader.flush === 'function') {
               setBusy(true);
               show('Saving your header changes...', 'info');

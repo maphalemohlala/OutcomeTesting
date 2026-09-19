@@ -10,6 +10,31 @@
       "x-ms-dataverse-primary-id": "al_outcomeid",
       "x-ms-dataverse-primary-name": "al_name",
       "properties": {
+        "al_aqaccountablecontactid": {
+          "type": "string",
+          "title": "Accountable (Advice Quality)",
+          "x-ms-dataverse-attribute": "al_aqaccountablecontactid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_AqAccountableContactId"
+        },
+        "al_aqaccountablecontactidname": {
+          "type": "string",
+          "title": "al_aqaccountablecontactidname",
+          "x-ms-dataverse-attribute": "al_aqaccountablecontactidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_AqAccountableContactIdName",
+          "x-ms-read-only": true,
+          "maxLength": 160
+        },
+        "al_aqaccountablecontactidyominame": {
+          "type": "string",
+          "title": "al_aqaccountablecontactidyominame",
+          "x-ms-dataverse-attribute": "al_aqaccountablecontactidyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_AqAccountableContactIdYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 450
+        },
         "al_aqadviseraccountable": {
           "type": "string",
           "title": "AQ adviser accountable",
@@ -115,6 +140,31 @@
           "x-ms-dataverse-type": "VirtualType",
           "x-ms-schema-name": "al_finaloutcomeName",
           "x-ms-read-only": true
+        },
+        "al_fqaccountablecontactid": {
+          "type": "string",
+          "title": "Accountable (File Quality)",
+          "x-ms-dataverse-attribute": "al_fqaccountablecontactid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_FqAccountableContactId"
+        },
+        "al_fqaccountablecontactidname": {
+          "type": "string",
+          "title": "al_fqaccountablecontactidname",
+          "x-ms-dataverse-attribute": "al_fqaccountablecontactidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_FqAccountableContactIdName",
+          "x-ms-read-only": true,
+          "maxLength": 160
+        },
+        "al_fqaccountablecontactidyominame": {
+          "type": "string",
+          "title": "al_fqaccountablecontactidyominame",
+          "x-ms-dataverse-attribute": "al_fqaccountablecontactidyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_FqAccountableContactIdYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 450
         },
         "al_fqadviseraccountable": {
           "type": "string",

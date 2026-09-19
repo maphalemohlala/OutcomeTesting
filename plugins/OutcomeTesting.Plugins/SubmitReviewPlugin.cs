@@ -985,7 +985,33 @@ namespace OutcomeTesting.Plugins
                 ["al_initialoutcome"] = new OptionSetValue(outcomeValue),
             };
 
+            /*
+             * Who the checker said carries the fail, chosen on the form before they pressed
+             * Submit (item 8, 2026-09-19). It could not be written to the outcome then,
+             * because this line is where the outcome first exists - so the portal parked it
+             * on the review and this is the moment it becomes part of the record.
+             *
+             * Applied to the entity BEFORE the upsert, so the flags and the outcome are one
+             * write: a checker's judgement and the grade it attaches to cannot end up in
+             * separate transactions, one of which failed.
+             */
+            var review = service.Retrieve(
+                ReviewEntity, reviewId, new ColumnSet("al_pendingaccountability"));
+
+            var applied = AccountabilityRequestPlugin.ApplyParked(service, review, outcome);
+
             AssignUserRolePlugin.Upsert(service, OutcomeEntity, "al_outcomecode", code, outcome);
+
+            if (applied)
+            {
+                // Cleared once it has been applied, so a later regrade of the same review
+                // cannot silently re-apply a judgement its checker made about a grade that
+                // no longer stands.
+                service.Update(new Entity(ReviewEntity, reviewId)
+                {
+                    ["al_pendingaccountability"] = null,
+                });
+            }
         }
 
         /// <summary>

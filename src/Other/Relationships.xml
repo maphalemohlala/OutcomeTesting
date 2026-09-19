@@ -38,7 +38,9 @@
   <EntityRelationship Name="business_unit_al_role" />
   <EntityRelationship Name="business_unit_al_signoff" />
   <EntityRelationship Name="business_unit_al_userrolemapping" />
+  <EntityRelationship Name="contact_al_aqaccountablecontactid_al_outcome" />
   <EntityRelationship Name="contact_al_caseassignment" />
+  <EntityRelationship Name="contact_al_fqaccountablecontactid_al_outcome" />
   <EntityRelationship Name="contact_al_remediationaction" />
   <EntityRelationship Name="contact_al_reviewinstance" />
   <EntityRelationship Name="lk_al_auditevent_createdby" />

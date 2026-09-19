@@ -123,9 +123,10 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>
         /// Tells the assigned adviser a remediation action is theirs. Called on the create,
-        /// and again by <see cref="Remediation.AssignUnassignedActions"/> when an action
-        /// raised unassigned is later assigned — the adviser hears about it either way, and
-        /// the wording lives once.
+        /// and again by <see cref="Remediation.AssignOpenActions"/> when an action reaches a
+        /// new adviser — raised unassigned and later filled, or moved by a change to the
+        /// adviser on the case. The adviser hears about it however it arrived, and the
+        /// wording lives once.
         /// </summary>
         internal static void QueueRemediationAssigned(IOrganizationService service, Guid correlationId, Guid actionId)
         {

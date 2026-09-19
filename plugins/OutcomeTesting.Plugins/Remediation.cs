@@ -850,19 +850,30 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Assigns the case's open, unassigned remediation actions to the adviser now named
-        /// on the case, and tells them (PP-15 "Remediation assigned"). Returns how many.
+        /// Points the case's open remediation actions at the adviser now named on the case,
+        /// and tells them (PP-15 "Remediation assigned"). Returns how many moved.
         ///
-        /// <see cref="Raise"/> leaves an action unassigned when <c>al_advisername</c> matches
-        /// no contact or two, and nothing could assign it afterwards: the portal's response
-        /// panel opens only for the assigned contact, so such an action sat on the worklist
-        /// with nobody able to answer it. Correcting the adviser's name on the case
-        /// (al_UpdateCaseDetails) is the natural repair — the name was the problem — and this
-        /// is what makes the correction reach the action. Only open actions with no assignee
-        /// are touched: an action already assigned, or already completed, is not moved to a
-        /// different person by a header edit.
+        /// Two repairs, one rule. <see cref="Raise"/> leaves an action unassigned when
+        /// <c>al_advisername</c> matches no contact or two, and nothing could assign it
+        /// afterwards: the portal's response panel opens only for the assigned contact, so
+        /// such an action sat on the worklist with nobody able to answer it. Separately, a
+        /// case whose adviser changes after the actions were raised left them pinned to the
+        /// person who has just been taken off the case — which is the same failure with a
+        /// different cause, and the one that blocked case 254397454 on 2026-09-18.
+        ///
+        /// This used to fill only a null assignee, on the reading that "a header edit is not
+        /// a reassignment". That reading does not survive contact with a reassigned case:
+        /// the adviser field IS how remediation is routed (see <see cref="AdviserContact"/>),
+        /// so changing it and having the work stay put leaves an action nobody on the case
+        /// can answer and no supported way to move it. Changing the adviser now moves the
+        /// open actions with it.
+        ///
+        /// Two things still never move. A <b>completed</b> action is history (BR-007), so it
+        /// keeps the name of whoever actually did the work. An action <b>already held by the
+        /// adviser now named</b> is left untouched rather than rewritten, so a header edit
+        /// that does not change the adviser cannot re-notify them.
         /// </summary>
-        public static int AssignUnassignedActions(IOrganizationService service, EntityReference caseRef, Guid correlationId)
+        public static int AssignOpenActions(IOrganizationService service, EntityReference caseRef, Guid correlationId)
         {
             var adviser = AdviserContact(service, caseRef);
             if (adviser == null)
@@ -870,18 +881,26 @@ namespace OutcomeTesting.Plugins
                 return 0;
             }
 
+            // The assignee is read rather than filtered on, because "not this adviser" has to
+            // admit a null: a Dataverse NotEqual on a lookup excludes rows where the column is
+            // null, which would drop the unassigned actions this exists to repair.
             var query = new QueryExpression(ActionEntity)
             {
-                ColumnSet = new ColumnSet(false),
+                ColumnSet = new ColumnSet("al_assignedcontactid"),
                 Criteria = new FilterExpression(),
             };
             query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseRef.Id);
-            query.Criteria.AddCondition("al_assignedcontactid", ConditionOperator.Null);
             query.Criteria.AddCondition("al_actionstatus", ConditionOperator.NotEqual, StatusCompleted);
 
             var assigned = 0;
             foreach (var action in CommandHelpers.RetrieveAll(service, query))
             {
+                var holder = action.GetAttributeValue<EntityReference>("al_assignedcontactid");
+                if (holder != null && holder.Id == adviser.Id)
+                {
+                    continue;
+                }
+
                 service.Update(new Entity(ActionEntity, action.Id)
                 {
                     ["al_assignedcontactid"] = adviser,

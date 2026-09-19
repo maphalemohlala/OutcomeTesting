@@ -14,3 +14,35 @@
   outline: 2px solid var(--colour-action);
   outline-offset: 1px;
 }
+
+/* Searchable (project owner, 2026-09-19): a filter box above the list.
+   The two controls read as one field, so they stack with no gap and the
+   count sits quietly underneath. */
+.user-picker__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.user-picker__filter {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--colour-border);
+  border-radius: var(--radius);
+  background: var(--colour-surface);
+  color: var(--colour-text);
+  font: inherit;
+}
+
+.user-picker__filter:focus-visible {
+  outline: 2px solid var(--colour-action);
+  outline-offset: 1px;
+}
+
+/* Says how many the filter left, so an empty-looking list is explained
+   rather than read as a directory that failed to load. */
+.user-picker__count {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--colour-text-muted);
+}

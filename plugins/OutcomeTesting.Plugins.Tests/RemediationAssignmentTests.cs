@@ -6,9 +6,10 @@ using Xunit;
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// An action raised unassigned — the adviser's name on the case matched no contact —
-    /// is picked up by the adviser once the case names one that does. Correcting the name
-    /// is the repair; this is what makes the correction reach the action.
+    /// Remediation follows the adviser named on the case. That covers two repairs: an
+    /// action raised unassigned because the name matched no contact, and an action left
+    /// with the previous adviser when the case was reassigned. Completed actions, and
+    /// actions the named adviser already holds, stay where they are.
     /// </summary>
     public class RemediationAssignmentTests
     {
@@ -51,7 +52,7 @@ namespace OutcomeTesting.Plugins.Tests
             var svc = Case("Sam Adviser");
             var actionId = Action(svc, Remediation.StatusOpen);
 
-            var count = Remediation.AssignUnassignedActions(svc, Ref(), Correlation);
+            var count = Remediation.AssignOpenActions(svc, Ref(), Correlation);
 
             Assert.Equal(1, count);
             Assert.Equal(AdviserId, svc.Row("al_remediationaction", actionId)
@@ -64,7 +65,7 @@ namespace OutcomeTesting.Plugins.Tests
             var svc = Case("Sam Adviser");
             Action(svc, Remediation.StatusOpen);
 
-            Remediation.AssignUnassignedActions(svc, Ref(), Correlation);
+            Remediation.AssignOpenActions(svc, Ref(), Correlation);
 
             var queued = svc.Creates.Single(c => c.Contains("al_event"));
             Assert.Equal(NotificationOutbox.EventRemediationAssigned, queued.GetAttributeValue<OptionSetValue>("al_event").Value);
@@ -72,15 +73,43 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Leaves_an_action_that_already_has_an_adviser_alone()
+        public void Moves_an_action_held_by_the_previous_adviser_to_the_one_now_named()
         {
-            // A header edit is not a reassignment: someone already holds this one.
-            var other = Guid.NewGuid();
+            // Reassigning the case is how remediation is reassigned: the work follows the
+            // adviser named on it, or it strands on someone who has left the case.
+            var previous = Guid.NewGuid();
             var svc = Case("Sam Adviser");
-            var actionId = Action(svc, Remediation.StatusOpen, assignedTo: other);
+            var actionId = Action(svc, Remediation.StatusOpen, assignedTo: previous);
 
-            Assert.Equal(0, Remediation.AssignUnassignedActions(svc, Ref(), Correlation));
-            Assert.Equal(other, svc.Row("al_remediationaction", actionId)
+            Assert.Equal(1, Remediation.AssignOpenActions(svc, Ref(), Correlation));
+            Assert.Equal(AdviserId, svc.Row("al_remediationaction", actionId)
+                .GetAttributeValue<EntityReference>("al_assignedcontactid").Id);
+        }
+
+        [Fact]
+        public void Leaves_an_action_the_named_adviser_already_holds_alone()
+        {
+            // An edit that does not change the adviser must not rewrite the row or tell them
+            // a second time about work they already have.
+            var svc = Case("Sam Adviser");
+            Action(svc, Remediation.StatusOpen, assignedTo: AdviserId);
+
+            Assert.Equal(0, Remediation.AssignOpenActions(svc, Ref(), Correlation));
+            Assert.Empty(svc.Updates);
+            Assert.DoesNotContain(svc.Creates, c => c.Contains("al_event"));
+        }
+
+        [Fact]
+        public void Leaves_a_completed_action_with_the_adviser_who_did_the_work()
+        {
+            // BR-007: a completed action is history. Reassigning the case does not rewrite
+            // who answered the ones already answered.
+            var previous = Guid.NewGuid();
+            var svc = Case("Sam Adviser");
+            var actionId = Action(svc, Remediation.StatusCompleted, assignedTo: previous);
+
+            Assert.Equal(0, Remediation.AssignOpenActions(svc, Ref(), Correlation));
+            Assert.Equal(previous, svc.Row("al_remediationaction", actionId)
                 .GetAttributeValue<EntityReference>("al_assignedcontactid").Id);
         }
 
@@ -90,7 +119,7 @@ namespace OutcomeTesting.Plugins.Tests
             var svc = Case("Sam Adviser");
             Action(svc, Remediation.StatusCompleted);
 
-            Assert.Equal(0, Remediation.AssignUnassignedActions(svc, Ref(), Correlation));
+            Assert.Equal(0, Remediation.AssignOpenActions(svc, Ref(), Correlation));
             Assert.Empty(svc.Updates);
         }
 
@@ -100,7 +129,7 @@ namespace OutcomeTesting.Plugins.Tests
             var svc = Case("Nobody Known");
             Action(svc, Remediation.StatusOpen);
 
-            Assert.Equal(0, Remediation.AssignUnassignedActions(svc, Ref(), Correlation));
+            Assert.Equal(0, Remediation.AssignOpenActions(svc, Ref(), Correlation));
             Assert.Empty(svc.Updates);
         }
 
@@ -111,7 +140,7 @@ namespace OutcomeTesting.Plugins.Tests
             svc.Seed("contact", Guid.NewGuid(), "fullname", "Sam Adviser", "emailaddress1", "sam2@example.com", "statecode", new OptionSetValue(0));
             Action(svc, Remediation.StatusOpen);
 
-            Assert.Equal(0, Remediation.AssignUnassignedActions(svc, Ref(), Correlation));
+            Assert.Equal(0, Remediation.AssignOpenActions(svc, Ref(), Correlation));
         }
     }
 }
