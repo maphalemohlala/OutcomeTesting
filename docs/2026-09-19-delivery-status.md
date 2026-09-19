@@ -72,7 +72,7 @@ disagreeing rather than as a rule holding on one surface only.
 
 ---
 
-## 4. The batch: 5 of 10 done
+## 4. The batch: 6 of 10 done
 
 | # | Item | State |
 |---|---|---|
@@ -81,8 +81,8 @@ disagreeing rather than as a rule holding on one surface only.
 | 8 | Advice date ≤ Due date | **Done** — `a03eb69` |
 | 3 | Conditional Primary root cause | **Done** — `f1f9755`, corrected in `7c1633a`. AD-149; `GradingRules`, the submit gate, and post-operation clearing on `al_response` |
 | 10 | Insufficient Evidence on Suitability core checks | **Done** — `21f545f`. AD-150; keyed on `al_sectioncode` (`S-E` + digit), guard + clearing + submit gate, portal restricts live. **Audit: no review in DEV violates it** |
-| 2 | Split Checker into Tax and AQS | Next. To derive from `al_reviewinstance.al_assignedcontactid`; no schema change |
-| 4 | Rename Owner to Uploaded by | Not started. Premise verified: no plug-in ever reassigns the case's `ownerid` |
+| 2 | Split Checker into Tax and AQS | **Done** — `9536b9e`. AD-151; two stamped columns on the case, not editable, three empty states. Schema change after all — both columns are in the solution. Backfilled 12 cases |
+| 4 | Rename Owner to Uploaded by | Next. Premise verified: no plug-in ever reassigns the case's `ownerid` |
 | 6 | Due date editable by T&C Manager | Not started. The 72-hour derivation already exists; this is editability only |
 | 7 | Paraplanner email and recipient | Not started. `AssignedTo` stays mapped; the remap is off |
 | 5 | T&C Manager mapping | Not started. Per-adviser on Contact, defaulted onto the case by adviser email |
