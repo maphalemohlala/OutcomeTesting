@@ -454,6 +454,11 @@ if (args.Length >= 4 && args[0].Equals("pushwebtemplate", StringComparison.Ordin
     return PushWebTemplate(args[1], args[2], args[3]);
 }
 
+if (args.Length >= 5 && args[0].Equals("createwebtemplate", StringComparison.OrdinalIgnoreCase))
+{
+    return CreateWebTemplate(args[1], args[2], args[3], args[4]);
+}
+
 if (args.Length >= 4 && args[0].Equals("pushwebfile", StringComparison.OrdinalIgnoreCase))
 {
     return PushWebFile(args[1], args[2], args[3], args.Length > 4 ? args[4] : null);
@@ -1757,6 +1762,97 @@ int PushWebTemplate(string orgUrl, string componentIdArg, string sourcePath)
     Console.WriteLine(
         $"pushed web template '{row.GetAttributeValue<string>("name")}' ({componentId:D}): "
         + $"{before.Length} -> {source.Length} chars, modified {after.GetAttributeValue<DateTime>("modifiedon"):yyyy-MM-dd HH:mm:ss}Z");
+    return 0;
+}
+
+// A NEW web template, which pushwebtemplate cannot make: that verb updates the content of a
+// component that already exists, and refuses anything else.
+//
+// `pac pages upload` is the normal path and it does not create one either, on this Enhanced
+// site. It works from .portalconfig/<org>-manifest.yml, which records a RecordId, a
+// DisplayName and a CheckSum per component it has downloaded; a folder the manifest does not
+// list is passed over in silence. Adding an entry by hand means inventing a checksum for a
+// scheme pac owns, so the row is created here instead and the manifest picks it up on the
+// next download.
+//
+// The content column is JSON with a single "source" key - verified against OT Empty State in
+// DEV before this was written - so a new row is a create with that one key, not a copy of
+// some larger shape. The id is supplied rather than generated, because these templates carry
+// hand-allocated ids (a1000000-0000-4000-8000-0000000000nn) that the .webtemplate.yml files
+// and every include depend on.
+//
+// CRLF is folded to LF and the BOM dropped, the same normalisation pushwebtemplate applies,
+// so a template created here and one later pushed by the CLI store identical text.
+int CreateWebTemplate(string orgUrl, string componentIdArg, string name, string sourcePath)
+{
+    if (!Guid.TryParse(componentIdArg, out var componentId))
+    {
+        Console.Error.WriteLine(
+            "Usage: createwebtemplate <orgUrl> <powerpagecomponentid> <name> <path to .webtemplate.source.html>");
+        return 1;
+    }
+
+    if (!File.Exists(sourcePath))
+    {
+        Console.Error.WriteLine($"Source file not found: {sourcePath}");
+        return 1;
+    }
+
+    var source = File.ReadAllText(sourcePath, Encoding.UTF8).Replace("\r\n", "\n");
+
+    using var svc = Connect(orgUrl);
+
+    // Refused rather than upserted. A create over an existing id would replace a template
+    // someone else's page includes, and pushwebtemplate is the verb for changing one.
+    var clash = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch top='1'><entity name='powerpagecomponent'><attribute name='name'/>" +
+        "<filter><condition attribute='powerpagecomponentid' operator='eq' value='" +
+        componentId.ToString("D") + "'/></filter></entity></fetch>")).Entities;
+
+    if (clash.Count > 0)
+    {
+        Console.Error.WriteLine(
+            $"Component {componentId:D} already exists ('{clash[0].GetAttributeValue<string>("name")}'). " +
+            "Use pushwebtemplate to change its source. Nothing was changed.");
+        return 1;
+    }
+
+    // The site the template belongs to. Read rather than passed in: this repository's portal
+    // is one site per environment, and asking the caller for a guid they would have to look
+    // up is how the wrong one gets typed.
+    var sites = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name='powerpagesite'><attribute name='name'/>" +
+        "<filter><condition attribute='statecode' operator='eq' value='0'/></filter></entity></fetch>")).Entities;
+
+    if (sites.Count != 1)
+    {
+        Console.Error.WriteLine($"Expected exactly one active Power Pages site, found {sites.Count}. Nothing was changed.");
+        return 1;
+    }
+
+    var content = new JsonObject { ["source"] = source };
+
+    svc.Create(new Entity("powerpagecomponent", componentId)
+    {
+        ["powerpagecomponentid"] = componentId,
+        ["name"] = name,
+        ["powerpagecomponenttype"] = new OptionSetValue(8),
+        ["powerpagesiteid"] = new EntityReference("powerpagesite", sites[0].Id),
+        ["content"] = content.ToJsonString(new JsonSerializerOptions { WriteIndented = true }),
+    });
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    var after = svc.Retrieve("powerpagecomponent", componentId, new ColumnSet("name", "content", "powerpagecomponenttype"));
+    var stored = (JsonNode.Parse(after.GetAttributeValue<string>("content") ?? "{}") as JsonObject)?["source"]?.GetValue<string>();
+    if (stored != source)
+    {
+        Console.Error.WriteLine("FAILED: the source read back does not match the file.");
+        return 2;
+    }
+
+    Console.WriteLine(
+        $"Created web template '{after.GetAttributeValue<string>("name")}' ({componentId:D}) on site " +
+        $"'{sites[0].GetAttributeValue<string>("name")}': {source.Length} characters, verified by read-back.");
     return 0;
 }
 
