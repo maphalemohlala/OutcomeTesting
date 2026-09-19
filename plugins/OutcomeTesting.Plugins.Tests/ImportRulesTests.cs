@@ -545,5 +545,39 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal(2, shared.Count);
             Assert.Equal(2, shared.Select(row => row.Reference).Distinct().Count());
         }
+
+        /// <summary>
+        /// The check's deadline (project owner, 2026-09-19). Derived from the upload, not
+        /// read from the sheet: the extract's DueDate is Intelligent Office's deadline for
+        /// the paraplanner's task, and letting it through would have the spreadsheet
+        /// overriding this system's rule.
+        /// </summary>
+        [Fact]
+        public void Due_seventy_two_hours_after_the_upload()
+        {
+            var uploadedAt = new DateTime(2026, 9, 19, 9, 30, 0, DateTimeKind.Utc);
+
+            Assert.Equal(
+                new DateTime(2026, 9, 22, 9, 30, 0, DateTimeKind.Utc),
+                ImportRules.DueDateFor(uploadedAt));
+        }
+
+        [Fact]
+        public void Counts_clock_hours_straight_through_a_weekend()
+        {
+            // Friday to Monday. Clock hours, not working days - which is what "72 hours"
+            // says, and differs from remediation, where the clock counts working days.
+            var friday = new DateTime(2026, 9, 18, 16, 0, 0, DateTimeKind.Utc);
+
+            Assert.Equal(new DateTime(2026, 9, 21, 16, 0, 0, DateTimeKind.Utc), ImportRules.DueDateFor(friday));
+        }
+
+        [Fact]
+        public void Does_not_map_the_sheets_own_due_date()
+        {
+            Assert.DoesNotContain(
+                ImportRules.Columns,
+                column => string.Equals(column.Attribute, "al_duedate", StringComparison.OrdinalIgnoreCase));
+        }
     }
 }

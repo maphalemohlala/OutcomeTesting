@@ -201,12 +201,14 @@ namespace OutcomeTesting.Plugins
             // moving the case are the command's consequences rather than the caller's edit.
             RequeueAfterRouteChange(systemService, before, update, changes);
 
-            // A corrected adviser name reaches the remediation actions raised while the old
-            // one matched no contact (BR-006): they were on the worklist with nobody able to
-            // answer them, and the name was the fault. Only open, unassigned actions move.
+            // The adviser named on the case is how remediation is routed (BR-006), so a change
+            // to that name takes the case's open actions with it — whether they were raised
+            // unassigned because the old name matched no contact, or assigned to the adviser
+            // who has just been replaced. Completed actions keep the name of whoever did the
+            // work, and an action already held by this adviser is not rewritten.
             if (update.Contains("al_advisername"))
             {
-                var assigned = Remediation.AssignUnassignedActions(
+                var assigned = Remediation.AssignOpenActions(
                     systemService, new EntityReference(CaseEntity, targetId), context.CorrelationId);
                 if (assigned > 0)
                 {
@@ -484,7 +486,16 @@ namespace OutcomeTesting.Plugins
                 { "al_taxteamdisposition", new EditableField(EditableKind.Option, "Tax team disposition") },
                 { "al_casestatus", new EditableField(EditableKind.Option, "Status") },
                 { "al_priority", new EditableField(EditableKind.Option, "Priority") },
-                { "al_duedate", new EditableField(EditableKind.DateOnly, "Due date") },
+
+                // al_duedate is deliberately absent (project owner, 2026-09-19: "due date
+                // should not be edited and should always be set to 72 hours after the
+                // upload"). It is derived by ImportRules.DueDateFor at import and is not a
+                // field anyone may move afterwards - not a checker, not a manager, not an
+                // administrator. An edit naming it is refused as an unknown field, which is
+                // what this map's absence already means.
+                //
+                // BuildBeforeColumnSet still reads it, because the before-image records what
+                // the case looked like; it just never appears among the changes.
             };
 
         private static ColumnSet BuildBeforeColumnSet()

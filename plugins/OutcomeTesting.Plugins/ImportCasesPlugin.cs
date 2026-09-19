@@ -118,13 +118,18 @@ namespace OutcomeTesting.Plugins
             }
 
             var batchCode = BuildBatchCode(context);
+
+            // One moment for the whole upload, shared by the batch's own stamp and by every
+            // case's due date, so the two can never disagree about when this file arrived.
+            var uploadedAt = DateTime.UtcNow;
+
             var batchId = systemService.Create(new Entity(BatchEntity)
             {
                 ["al_name"] = CommandHelpers.Truncate(fileName, 100),
                 ["al_importbatchcode"] = batchCode,
                 ["al_batchstatus"] = new OptionSetValue(BatchStatusValidating),
                 ["al_source"] = CommandHelpers.Truncate(fileName, 400),
-                ["al_importedon"] = DateTime.UtcNow,
+                ["al_importedon"] = uploadedAt,
                 ["al_totalrows"] = parsed.Total,
                 ["al_importedcount"] = 0,
                 ["al_exceptioncount"] = 0,
@@ -162,6 +167,12 @@ namespace OutcomeTesting.Plugins
                 }
 
                 record["al_casestatus"] = new OptionSetValue(ImportRules.CaseStatusImported);
+
+                // Set here rather than read from the sheet (project owner, 2026-09-19). The
+                // deadline is this system's, so it is derived from the upload and cannot be
+                // moved by what Intelligent Office put in the DueDate column - nor, once
+                // al_duedate left the editable set, by anyone editing the case afterwards.
+                record["al_duedate"] = ImportRules.DueDateFor(uploadedAt);
 
                 try
                 {

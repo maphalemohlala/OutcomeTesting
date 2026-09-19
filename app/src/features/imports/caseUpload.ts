@@ -83,7 +83,9 @@ const COLUMNS: ColumnDef[] = [
   { header: 'CompletedBy', field: 'al_iocompletedby', kind: 'text' },
   { header: 'CompletedDate', field: 'al_iocompleteddate', kind: 'date' },
   { header: 'StartDate', field: 'al_taskstartdate', kind: 'date' },
-  { header: 'DueDate', field: 'al_duedate', kind: 'date' },
+  // DueDate is deliberately not mapped, mirroring ImportRules (project owner,
+  // 2026-09-19): the extract carries Intelligent Office's deadline for the paraplanner's
+  // task, and the check is due 72 hours after the upload whatever the sheet says.
   { header: 'CreatedDate', field: 'al_iocreateddate', kind: 'date' },
   { header: 'CreatedBy', field: 'al_iocreatedby', kind: 'text' },
   { header: 'TaskType', field: 'al_tasktype', kind: 'text' },

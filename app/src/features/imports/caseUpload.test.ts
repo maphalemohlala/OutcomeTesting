@@ -30,6 +30,14 @@ interface RowOptions {
   status?: string;
   outcome?: string;
   client?: string;
+  /**
+   * Feeds CompletedDate, which the date-parsing cases below use as their vehicle. They
+   * rode on DueDate until 2026-09-19, when that column stopped being mapped: the check's
+   * deadline is derived from the upload, so the sheet's own due date is ignored. The
+   * parsing rules they pin are unchanged, so they only needed a column still being read.
+   */
+  completedDate?: string;
+  /** Feeds DueDate, which is deliberately ignored. Only the case below passes one. */
   dueDate?: string;
 }
 
@@ -45,6 +53,7 @@ function row(taskId: string, options: RowOptions = {}): string {
     status = 'Complete',
     outcome = '',
     client = 'A. Client',
+    completedDate = '',
     dueDate = '',
   } = options;
   return [
@@ -56,7 +65,7 @@ function row(taskId: string, options: RowOptions = {}): string {
     status,
     outcome,
     '',
-    '',
+    completedDate,
     dueDate,
     'Pre-Advice Check Required',
     'Jessica Bell',
@@ -298,30 +307,47 @@ describe('the IO outcome is reference data, not a grade', () => {
 
 describe('dates and derived values', () => {
   it('reads the ISO dates the workbook reader emits', () => {
-    expect(parse(row('1', { dueDate: '2026-08-06' })).valid[0].record.al_duedate).toBe('2026-08-06');
+    expect(parse(row('1', { completedDate: '2026-08-06' })).valid[0].record.al_iocompleteddate).toBe('2026-08-06');
   });
 
   it('still reads a UK date, for a hand-edited file', () => {
-    expect(parse(row('1', { dueDate: '06/08/2026' })).valid[0].record.al_duedate).toBe('2026-08-06');
+    expect(parse(row('1', { completedDate: '06/08/2026' })).valid[0].record.al_iocompleteddate).toBe('2026-08-06');
   });
 
   it('rejects a month-first date rather than misreading it, as ImportRules.ParseDate does', () => {
-    expect(parse(row('1', { dueDate: '01/13/2026' })).valid).toHaveLength(0);
+    expect(parse(row('1', { completedDate: '01/13/2026' })).valid).toHaveLength(0);
   });
 
   it('accepts a written-out date, which cannot be misread', () => {
-    expect(parse(row('1', { dueDate: '31 Jan 2026' })).valid[0].record.al_duedate).toBe('2026-01-31');
+    expect(parse(row('1', { completedDate: '31 Jan 2026' })).valid[0].record.al_iocompleteddate).toBe('2026-01-31');
   });
 
   it('reads an ISO timestamp as its date', () => {
-    expect(parse(row('1', { dueDate: '2026-08-06T09:30:00Z' })).valid[0].record.al_duedate).toBe('2026-08-06');
+    expect(parse(row('1', { completedDate: '2026-08-06T09:30:00Z' })).valid[0].record.al_iocompleteddate).toBe('2026-08-06');
   });
 
   it('rejects a date that does not exist', () => {
-    const result = parse(row('1', { dueDate: '31/02/2026' }));
+    const result = parse(row('1', { completedDate: '31/02/2026' }));
 
     expect(result.valid).toHaveLength(0);
     expect(result.invalid[0].reason).toContain('not a valid date');
+  });
+
+  it('ignores the due date the sheet carries', () => {
+    // Project owner, 2026-09-19. DueDate is Intelligent Office's deadline for the
+    // paraplanner's task; the check is due 72 hours after the upload, which
+    // ImportCasesPlugin stamps server-side. Reading the column would let the spreadsheet
+    // override the rule.
+    const result = parse(row('1', { dueDate: '2026-08-06' }));
+
+    expect(result.valid).toHaveLength(1);
+    expect(result.valid[0].record.al_duedate).toBeUndefined();
+  });
+
+  it('does not reject a row whose due date is unreadable', () => {
+    // The column is not read at all, so nothing in it can make a row invalid. Before
+    // 2026-09-19 this row failed validation on a date nobody was going to use.
+    expect(parse(row('1', { dueDate: 'not a date at all' })).valid).toHaveLength(1);
   });
 
   it('marks a pre-advice task as a pre-check', () => {

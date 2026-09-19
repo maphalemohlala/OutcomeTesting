@@ -203,13 +203,43 @@ namespace OutcomeTesting.Plugins
             new ColumnDef("CompletedBy", "al_iocompletedby", ColumnKind.Text, null),
             new ColumnDef("CompletedDate", "al_iocompleteddate", ColumnKind.Date, null),
             new ColumnDef("StartDate", "al_taskstartdate", ColumnKind.Date, null),
-            new ColumnDef("DueDate", "al_duedate", ColumnKind.Date, null),
+            // DueDate is deliberately NOT mapped (project owner, 2026-09-19). The extract
+            // carries Intelligent Office's own due date, which is IO's deadline for the
+            // paraplanner's task, not this system's deadline for the check. The check is
+            // due DueWithinHours after the upload, whatever the sheet says, and
+            // ImportCasesPlugin stamps that. Reading the column here would have the
+            // spreadsheet quietly overriding the rule.
             new ColumnDef("CreatedDate", "al_iocreateddate", ColumnKind.Date, null),
             new ColumnDef("CreatedBy", "al_iocreatedby", ColumnKind.Text, null),
             new ColumnDef("TaskType", "al_tasktype", ColumnKind.Text, null),
             new ColumnDef("WorkflowName", "al_workflowname", ColumnKind.Text, null),
             new ColumnDef("ServiceStatus", "al_servicestatus", ColumnKind.Text, null),
         };
+
+        /// <summary>
+        /// How long a checker has, from the upload, before the case is due (project owner,
+        /// 2026-09-19: "72 hours after the upload").
+        ///
+        /// Clock hours, not working days. That differs from remediation, where an action is
+        /// due ThresholdWorkingDays after it is raised - the two deadlines belong to
+        /// different people and were set by different rules, so they are not reconciled
+        /// here. If the business ever means three working days by this, it is one change,
+        /// in DueDateFor.
+        /// </summary>
+        public const int DueWithinHours = 72;
+
+        /// <summary>
+        /// When a case uploaded at <paramref name="uploadedAt"/> falls due.
+        ///
+        /// Taken from the upload rather than from each row, so every case in one file shares
+        /// a due date: they arrived together and the checker was given them together, and a
+        /// per-row clock would make two cases from the same upload due at different minutes
+        /// for no reason anyone could see.
+        /// </summary>
+        public static DateTime DueDateFor(DateTime uploadedAt)
+        {
+            return uploadedAt.AddHours(DueWithinHours);
+        }
 
         /// <summary>
         /// The reasons a paraplanner can select inside the IO task, and the discipline each
