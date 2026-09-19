@@ -100,18 +100,20 @@ export function CaseDetailPage() {
                 label: 'Details',
                 render: () => (
                   <>
+                    {/*
+                      What the paraplanner ticked in the IO task, first on the tab (project
+                      owner, 2026-09-19): it is why the case was raised for checking at all,
+                      so it is read before the case's own fields rather than after them. The
+                      portal's case record page orders it the same way. The same section the
+                      review page draws, from the same component, so a manager looking a case
+                      up here sees what a checker opening it sees.
+                    */}
+                    <ChecklistSection checklist={state.detail.checklist} />
+
                     <section className="case-detail__panel" aria-labelledby="panel-header">
                       <h2 id="panel-header">Case details</h2>
                       <CaseHeaderTable fields={state.detail.header} variant="case" />
                     </section>
-
-                    {/*
-                      What the paraplanner ticked in the IO task, under the header it
-                      belongs to (project owner, 2026-09-19). The same section the review
-                      page draws, from the same component: a manager looking a case up here
-                      sees what a checker opening it sees.
-                    */}
-                    <ChecklistSection checklist={state.detail.checklist} />
 
                     <section className="case-detail__checks" aria-labelledby="panel-checks">
                       <h2 id="panel-checks">Checks on this case</h2>

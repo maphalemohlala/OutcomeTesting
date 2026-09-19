@@ -206,6 +206,21 @@
       {% include 'OT Status Badge' status: c.al_casestatus.label %}
     </h1>
 
+    {% comment %}
+      Checklist Items, first in the document (project owner, 2026-09-19). What the
+      paraplanner ticked in the Intelligent Office task, which is why the case was raised
+      for checking at all - so it is read before the case's own fields, not after them.
+
+      Inside the document rather than above it, because these are fields of the case record
+      rather than a control of the page around it - unlike Save as PDF above, which is a
+      control and sits outside. They belong on the printed record for the same reason.
+
+      The same OT Checklist Items template the review page includes, asked for in the
+      sheet's own idiom: a ruled table, not a bulleted list, because .ot-checklist rules
+      everything and a flowing list inside it reads as a foreign element.
+    {% endcomment %}
+    {% include 'OT Checklist Items' items: c.al_checklistitems variant: 'sheet' %}
+
     <section aria-labelledby="ot-case-mgmt">
       <h2 id="ot-case-mgmt">Case management</h2>
       <table class="meta">
@@ -291,20 +306,6 @@
         </tbody>
       </table>
     </section>
-
-    {% comment %}
-      Checklist Items (project owner, 2026-09-19). What the paraplanner ticked in the
-      Intelligent Office task, which is why the case was raised for checking at all.
-
-      Under the case header, inside the document, because these are fields of the case
-      record rather than a control of the page around it - unlike Save as PDF above, which
-      is a control and sits outside. They belong on the printed record for the same reason.
-
-      The same OT Checklist Items template the review page includes, asked for in the
-      sheet's own idiom: a ruled table, not a bulleted list, because .ot-checklist rules
-      everything and a flowing list inside it reads as a foreign element.
-    {% endcomment %}
-    {% include 'OT Checklist Items' items: c.al_checklistitems variant: 'sheet' %}
 
     {% comment %}
       One line per check the case owes, in BR-004 order — Tax first, then AQS — rather than
