@@ -1448,6 +1448,52 @@ footer a:focus-visible, .footer a:focus-visible {
    of its check. */
 
 /* ------------------------------------------------------------------
+   Editable case header fields (item 5, 2026-09-19).
+
+   Their own class, not .ot-field: that one is a flex COLUMN wrapper
+   meant to hold a label above a control, and putting it on the control
+   itself makes a flex container of an input.
+
+   Styled to disappear into the sheet. The header is a ruled table of
+   label and value cells, so an editable value should read as the value
+   it replaced - same face, same size, filling its cell - with just
+   enough of a border to say it can be typed in.
+   ------------------------------------------------------------------ */
+
+.ot-checklist .ot-hdr-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 10.5pt;
+  line-height: 1.3;
+  color: var(--ink, #1a1a1a);
+  background: #fff;
+  border: 1px solid var(--line, #b7bcbc);
+  border-radius: 2px;
+  padding: 2px 4px;
+}
+
+.ot-checklist select.ot-hdr-input { padding: 1px 2px; }
+
+.ot-checklist .ot-hdr-input:focus-visible {
+  outline: 2px solid #005a9e;
+  outline-offset: -1px;
+  border-color: #005a9e;
+}
+
+/* Printed, the header is a record rather than a form: the control's own
+   frame would read as an empty box around a value that is filled in. */
+@media print {
+  .ot-checklist .ot-hdr-input {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+}
+
+/* ------------------------------------------------------------------
    Rich text answers (item 7, 2026-09-19).
 
    A contenteditable box with a small toolbar, styled to sit inside the

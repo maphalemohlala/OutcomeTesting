@@ -276,6 +276,61 @@
     {% capture case_header %}
       <table class="meta">
         <tbody>
+          {% comment %}
+            The header a checker may correct (item 5, 2026-09-19: "other fields should be
+            editable by the checkers excluding the references and IDs").
+
+            Editable while this checker's own review is open, read-only once it is
+            submitted - the same line the Tax row below draws, and the same line BR-012
+            draws for the answers.
+
+            IO reference stays read-only in BOTH branches. It identifies the case to the
+            business and keys the import (BR-001), and it is not in the server's editable
+            set either, so an edit naming it is refused whatever this page renders.
+
+            Due date is not on this table at all. It is derived from the upload and locked
+            for everyone (ImportRules.DueDateFor).
+
+            The affordance, not the boundary. CaseHeaderRequestPlugin re-checks server-side
+            that the caller holds an open review on THIS case; the page writes through a
+            contact permission shared with the sign-off and the claim, so a request can be
+            made by hand for any case id and hiding the inputs would enforce nothing
+            (NFR-SEC-01).
+          {% endcomment %}
+          {% if locked == false %}
+          <tr>
+            <td class="lbl">Adviser name</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_advisername" value="{{ rv['case.al_advisername'] | escape }}" aria-label="Adviser name" /></td>
+            <td class="lbl">Adviser status</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_adviserstatus" aria-label="Adviser status"><option value="">&mdash;</option><option value="120910500" {% if h_adviserstatus.value == 120910500 %}selected{% endif %}>PreCAS</option><option value="120910501" {% if h_adviserstatus.value == 120910501 %}selected{% endif %}>CAS</option><option value="120910502" {% if h_adviserstatus.value == 120910502 %}selected{% endif %}>Enhanced</option><option value="120910503" {% if h_adviserstatus.value == 120910503 %}selected{% endif %}>Watchlist</option></select></td>
+          </tr>
+          <tr>
+            <td class="lbl">Adviser code</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_advisercode" value="{{ rv['case.al_advisercode'] | escape }}" aria-label="Adviser code" /></td>
+            <td class="lbl">Paraplanner</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_paraplanner" value="{{ rv['case.al_paraplanner'] | escape }}" aria-label="Paraplanner" /></td>
+          </tr>
+          <tr>
+            <td class="lbl">Paraplanner code</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_paraplannercode" value="{{ rv['case.al_paraplannercode'] | escape }}" aria-label="Paraplanner code" /></td>
+            <td class="lbl">Product(s)</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_products" value="{{ rv['case.al_products'] | escape }}" aria-label="Products" /></td>
+          </tr>
+          <tr>
+            <td class="lbl">Case type</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_casetype" aria-label="Case type"><option value="">&mdash;</option><option value="120910510" {% if h_casetype.value == 120910510 %}selected{% endif %}>New advice</option><option value="120910511" {% if h_casetype.value == 120910511 %}selected{% endif %}>Ongoing</option><option value="120910512" {% if h_casetype.value == 120910512 %}selected{% endif %}>Review</option><option value="120910513" {% if h_casetype.value == 120910513 %}selected{% endif %}>Switch/Transfer</option></select></td>
+            <td class="lbl">Advice date</td><td class="val"><input type="date" class="ot-hdr-input" data-ot-hdr="al_advicedate" value="{{ rv['case.al_advicedate'] | date: 'yyyy-MM-dd' }}" aria-label="Advice date" /></td>
+          </tr>
+          <tr>
+            <td class="lbl">Product / solution type</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_productsolutiontype" aria-label="Product or solution type"><option value="">&mdash;</option><option value="120910520" {% if h_producttype.value == 120910520 %}selected{% endif %}>Accumulation investment</option><option value="120910521" {% if h_producttype.value == 120910521 %}selected{% endif %}>Accumulation Pension</option><option value="120910522" {% if h_producttype.value == 120910522 %}selected{% endif %}>IHT</option><option value="120910523" {% if h_producttype.value == 120910523 %}selected{% endif %}>Protection</option><option value="120910524" {% if h_producttype.value == 120910524 %}selected{% endif %}>No change reviews</option></select></td>
+            <td class="lbl">Sample source</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_samplesource" aria-label="Sample source"><option value="">&mdash;</option><option value="120910530" {% if h_samplesource.value == 120910530 %}selected{% endif %}>Random</option><option value="120910531" {% if h_samplesource.value == 120910531 %}selected{% endif %}>Mandatory</option><option value="120910532" {% if h_samplesource.value == 120910532 %}selected{% endif %}>High Risk</option><option value="120910533" {% if h_samplesource.value == 120910533 %}selected{% endif %}>Thematic</option></select></td>
+          </tr>
+          <tr>
+            <td class="lbl">Checker name</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_checkername" value="{{ rv['case.al_checkername'] | escape }}" aria-label="Checker name" /></td>
+            <td class="lbl">Check date</td><td class="val"><input type="date" class="ot-hdr-input" data-ot-hdr="al_checkdate" value="{{ rv['case.al_checkdate'] | date: 'yyyy-MM-dd' }}" aria-label="Check date" /></td>
+          </tr>
+          <tr>
+            <td class="lbl">Client name / initials</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_clientname" value="{{ rv['case.al_clientname'] | escape }}" aria-label="Client name or initials" /></td>
+            <td class="lbl">IO reference</td><td class="val">{{ rv['case.al_casereference'] | escape }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Pre or post check</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_preorpostcheck" aria-label="Pre or post check"><option value="">&mdash;</option><option value="120910540" {% if h_prepost.value == 120910540 %}selected{% endif %}>Pre</option><option value="120910541" {% if h_prepost.value == 120910541 %}selected{% endif %}>Post</option></select></td>
+            <td class="lbl">Vulnerable client?</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_vulnerableclient" aria-label="Vulnerable client"><option value="">&mdash;</option><option value="120910550" {% if h_vulnerable.value == 120910550 %}selected{% endif %}>Yes</option><option value="120910551" {% if h_vulnerable.value == 120910551 %}selected{% endif %}>No</option><option value="120910552" {% if h_vulnerable.value == 120910552 %}selected{% endif %}>Potentially vulnerable</option><option value="120910553" {% if h_vulnerable.value == 120910553 %}selected{% endif %}>N/A</option></select></td>
+          </tr>
+          {% else %}
           <tr><td class="lbl">Adviser name</td><td class="val">{{ rv['case.al_advisername'] | escape }}</td><td class="lbl">Adviser status</td><td class="val">{{ h_adviserstatus.label | escape }}</td></tr>
           <tr><td class="lbl">Adviser code</td><td class="val">{{ rv['case.al_advisercode'] | escape }}</td><td class="lbl">Paraplanner</td><td class="val">{{ rv['case.al_paraplanner'] | escape }}</td></tr>
           <tr><td class="lbl">Paraplanner code</td><td class="val">{{ rv['case.al_paraplannercode'] | escape }}</td><td class="lbl">Product(s)</td><td class="val">{{ rv['case.al_products'] | escape }}</td></tr>
@@ -284,6 +339,7 @@
           <tr><td class="lbl">Checker name</td><td class="val">{{ rv['case.al_checkername'] | escape }}</td><td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' }}</td></tr>
           <tr><td class="lbl">Client name / initials</td><td class="val">{{ rv['case.al_clientname'] | escape }}</td><td class="lbl">IO reference</td><td class="val">{{ rv['case.al_casereference'] | escape }}</td></tr>
           <tr><td class="lbl">Pre or post check</td><td class="val">{{ h_prepost.label | escape }}</td><td class="lbl">Vulnerable client?</td><td class="val">{{ h_vulnerable.label | escape }}</td></tr>
+          {% endif %}
           {% comment %}
             The Tax team's own two fields (project owner, 2026-09-13). The document labels
             them "(Tax team to complete)" and "For Tax team usage", so it already assigns
@@ -326,13 +382,27 @@
                 <option value="120910570" {% if h_taxdisposition.value == 120910570 %}selected{% endif %}>Submit to AQS</option>
                 <option value="120910571" {% if h_taxdisposition.value == 120910571 %}selected{% endif %}>Return to paraplanner</option>
               </select>
-              <button type="button" class="ot-btn ot-btn--secondary" id="ot-header-save"
-                      data-case-id="{{ cid }}">Save</button>
-              <span id="ot-header-status" role="status" aria-live="polite"></span>
             </td>
           </tr>
           {% else %}
           <tr><td class="lbl">Tax check required<br>(Tax team to complete)</td><td class="val">{{ h_taxrequired.label | escape }}</td><td class="lbl">For Tax team usage</td><td class="val">{{ h_taxdisposition.label | escape }}</td></tr>
+          {% endif %}
+
+          {% comment %}
+            One Save for the whole header, in its own row rather than tucked into the Tax
+            cell it used to share. It saved the Tax team's two fields and was rendered only
+            on a Tax review; the header is now editable on an AQS review too, where that
+            row does not exist and the button went with it.
+          {% endcomment %}
+          {% if locked == false %}
+          <tr>
+            <td class="lbl">Header</td>
+            <td class="val" colspan="3">
+              <button type="button" class="ot-btn ot-btn--secondary" id="ot-header-save"
+                      data-case-id="{{ cid }}">Save header</button>
+              <span id="ot-header-status" role="status" aria-live="polite"></span>
+            </td>
+          </tr>
           {% endif %}
         </tbody>
       </table>
@@ -1855,17 +1925,45 @@
       alone. Sending the current value instead would be harmless but would put a field in the
       audit line that nobody moved.
     {% endcomment %}
-    {% if rv.al_reviewtype.value == 120910200 and locked == false %}
+    {% if locked == false %}
       <script>
         (function () {
           var save = document.getElementById('ot-header-save');
+          var status = document.getElementById('ot-header-status');
+          if (!save || !status) { return; }
+
+          /*
+           * The Tax team's two selects exist only on an unsubmitted Tax review. Everything
+           * else on the header is editable on any open review, so both are optional here
+           * and the payload names only what is present and changed.
+           */
           var required = document.getElementById('ot-taxrequired');
           var disposition = document.getElementById('ot-taxdisposition');
-          var status = document.getElementById('ot-header-status');
-          if (!save || !required || !disposition || !status) { return; }
 
-          var initialRequired = required.value;
-          var initialDisposition = disposition.value;
+          var initialRequired = required ? required.value : '';
+          var initialDisposition = disposition ? disposition.value : '';
+
+          // The rest of the header, remembered as rendered so an untouched field is never
+          // sent. Sending the current value would be harmless but would put a field in the
+          // audit line that nobody moved.
+          var headerInputs = [];
+          var rendered = document.querySelectorAll('[data-ot-hdr]');
+          for (var h = 0; h < rendered.length; h++) {
+            headerInputs.push({ el: rendered[h], initial: rendered[h].value });
+          }
+
+          /** The changed header fields, as the flat object the plug-in parses. */
+          function changedFields() {
+            var fields = {};
+            var any = false;
+            for (var i = 0; i < headerInputs.length; i++) {
+              var entry = headerInputs[i];
+              if (entry.el.value === entry.initial) { continue; }
+              fields[entry.el.getAttribute('data-ot-hdr')] = entry.el.value;
+              any = true;
+            }
+            return any ? fields : null;
+          }
 
           function show(message, kind) {
             status.textContent = message;
@@ -1907,7 +2005,11 @@
           }
 
           save.addEventListener('click', function () {
-            if (required.value === initialRequired && disposition.value === initialDisposition) {
+            var fields = changedFields();
+            var taxMoved = (required && required.value !== initialRequired)
+              || (disposition && disposition.value !== initialDisposition);
+
+            if (!fields && !taxMoved) {
               show('Nothing has changed.', null);
               return;
             }
@@ -1921,13 +2023,19 @@
               return;
             }
 
-            var payload = {
-              al_caseheaderrequest: JSON.stringify({
-                caseId: save.getAttribute('data-case-id'),
-                taxCheckRequired: required.value === initialRequired ? 0 : parseInt(required.value || '0', 10),
-                taxTeamDisposition: disposition.value === initialDisposition ? 0 : parseInt(disposition.value || '0', 10)
-              })
+            var request_body = {
+              caseId: save.getAttribute('data-case-id'),
+              taxCheckRequired: (required && required.value !== initialRequired)
+                ? parseInt(required.value || '0', 10) : 0,
+              taxTeamDisposition: (disposition && disposition.value !== initialDisposition)
+                ? parseInt(disposition.value || '0', 10) : 0
             };
+
+            // Only when something moved: an empty object would make the plug-in read this
+            // as a header edit and run the assignment guard for no reason.
+            if (fields) { request_body.fields = JSON.stringify(fields); }
+
+            var payload = { al_caseheaderrequest: JSON.stringify(request_body) };
 
             window.shell.getTokenDeferred().done(function (token) {
               var request = new XMLHttpRequest();
@@ -1940,8 +2048,11 @@
                 save.disabled = false;
 
                 if (request.status >= 200 && request.status < 300) {
-                  initialRequired = required.value;
-                  initialDisposition = disposition.value;
+                  if (required) { initialRequired = required.value; }
+                  if (disposition) { initialDisposition = disposition.value; }
+                  for (var k = 0; k < headerInputs.length; k++) {
+                    headerInputs[k].initial = headerInputs[k].el.value;
+                  }
                   /*
                    * Confirmed in place, and the reload offered rather than taken.
                    *
