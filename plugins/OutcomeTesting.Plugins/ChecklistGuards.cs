@@ -20,6 +20,7 @@ namespace OutcomeTesting.Plugins
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 { "Q-GR-01", "Q-GR-01 carries the advice quality grade, which OutcomeRules maps to the case outcome. Without it no case can be graded." },
+                { "Q-GR-02", "Q-GR-02 is the primary root cause, which GradingRules requires on every grade but Pass and clears when the grade returns to Pass. Without it no non-pass case records why." },
                 { "Q-TAX-02", "Q-TAX-02 is the Tax check outcome, which decides whether a Tax case goes to remediation." },
                 { "Q-FQ-01", "Q-FQ-01 is the AQS file quality outcome and Trail Light column 10; the export refuses a row without it." },
                 { "Q-FQTAX-01", "Q-FQTAX-01 is the Tax file quality outcome." },

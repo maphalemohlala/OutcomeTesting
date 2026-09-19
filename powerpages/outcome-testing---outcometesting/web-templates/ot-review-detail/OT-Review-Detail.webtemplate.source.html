@@ -659,6 +659,21 @@
         {% assign lens_tick_cell = '' %}
         {% assign lens_tick_span = 0 %}
         {% comment %}
+          The advice quality grade, carried forward so the primary root cause below knows
+          whether to draw itself (item 3, 2026-09-19). A passing file has no cause to name,
+          and GradingRules is where that is decided for real - it is what excuses Q-GR-02 at
+          submission and what clears a cause recorded before the grade changed. This is only
+          the drawing half.
+
+          Captured as the loop passes the grade rather than looked up: Q-GR-01 is display
+          order 1 and Q-GR-02 is order 2 in the one section, so the grade is always seen
+          first. grade_seen is what makes that safe rather than assumed - if the two were
+          ever reordered the grade would be unknown at the root cause, and an unknown grade
+          draws the row, which is the direction that leaves a checker able to answer.
+        {% endcomment %}
+        {% assign grade_seen = false %}
+        {% assign grade_value = '' %}
+        {% comment %}
           Sections outer, that section's questions inner. The rows are matched on the section
           CODE rather than the section id, because the code is a plain string on both sides
           while an aliased guid's type through Liquid is not something to bet the whole form
@@ -1000,6 +1015,11 @@
           {% endcomment %}
           {% capture chosen_value %}{{ existing.al_answerchoice.value }}{% endcapture %}
 
+          {% if rt == 120910010 %}
+            {% assign grade_seen = true %}
+            {% assign grade_value = chosen_value %}
+          {% endif %}
+
           {% assign qcode = qv['q.al_questioncode'] %}
           {% if qcode contains '-LENS' %}
             {% comment %}
@@ -1036,12 +1056,24 @@
             </table>
             {% assign rcvalues = '120910320,120910321,120910322,120910323,120910324,120910325,120910326,120910327,120910328' | split: ',' %}
             {% assign rclabels = 'FactFind quality,Risk / capacity mismatch,Research / rationale,Charges / value,Client communication,Process / documentation,AML / CRA,Retirement Proposition,Adviser judgement' | split: ',' %}
+            {% comment %}
+              Hidden when the grade already says the file passed, so the page arrives right
+              rather than showing the block and taking it away once the script runs - and so
+              a submitted review, which runs no script at all, reads the same way.
+
+              An ungraded review still draws it. The gate may not demand a cause before it
+              knows the grade, but the checklist asks the question, and checklistForm.ts
+              draws it on the same terms.
+            {% endcomment %}
+            {% assign hide_rootcause = false %}
+            {% if grade_seen and grade_value == '120910300' %}{% assign hide_rootcause = true %}{% endif %}
             <table class="rootcause"
                    data-ot-answer
+                   data-ot-rootcause
                    data-question-version="{{ qv_id }}"
                    data-response-id="{{ existing.al_responseid }}"
                    data-response-type="{{ rt }}"
-                   data-column="choice">
+                   data-column="choice"{% if hide_rootcause %} hidden{% endif %}>
               <tbody>
                 <tr><th colspan="3">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></th></tr>
                 <tr>
@@ -1565,6 +1597,55 @@
 
             var answers = document.querySelectorAll('[data-ot-answer]');
             for (var i = 0; i < answers.length; i++) { bind(answers[i]); }
+
+            /*
+             * The primary root cause appears only while the grade says the file did not pass
+             * (item 3, 2026-09-19). The server is where this is actually enforced -
+             * SubmitReviewPlugin stops demanding Q-GR-02 on a Pass, and ResponseProgressPlugin
+             * clears a cause already recorded - so this is the AD-041 half: it saves a checker
+             * answering a question that is about to be taken away from them.
+             *
+             * Both rows are found by their response type, which is already in the DOM on every
+             * answer: the grade's scale belongs to Q-GR-01 and the nine-cause single select to
+             * Q-GR-02, and to no other question (AD-055). The template has decided the opening
+             * state already, so this only has to keep up with changes.
+             */
+            var gradeRow = document.querySelector('[data-ot-answer][data-response-type="120910010"]');
+            var rootCause = document.querySelector('[data-ot-rootcause]');
+
+            if (gradeRow && rootCause) {
+              var gradeInputs = gradeRow.querySelectorAll('[data-ot-input]');
+
+              // Function expressions rather than declarations: this script runs in strict
+              // mode, where a function declared inside a block is not something every
+              // engine agrees on, and everything else in this file is ES5.
+              var gradeChosen = function () {
+                for (var g = 0; g < gradeInputs.length; g++) {
+                  if (gradeInputs[g].checked) { return gradeInputs[g].value; }
+                }
+                return '';
+              };
+
+              var syncRootCause = function () {
+                var passed = gradeChosen() === '120910300';
+                rootCause.hidden = passed;
+
+                /*
+                 * Untick on the way out, so the page stops showing a cause the server is
+                 * clearing on this very save. Nothing is sent from here: the grade's own save
+                 * is what clears the row, and a second request racing it would be the one to
+                 * decide which write landed last.
+                 */
+                if (passed) {
+                  var causes = rootCause.querySelectorAll('[data-ot-input]');
+                  for (var c = 0; c < causes.length; c++) { causes[c].checked = false; }
+                }
+              };
+
+              for (var h = 0; h < gradeInputs.length; h++) {
+                gradeInputs[h].addEventListener('change', syncRootCause);
+              }
+            }
           })();
         </script>
         {% endif %}

@@ -57,7 +57,10 @@ namespace OutcomeTesting.Plugins
 
         // al_outcome and the questions that drive it.
         private const string OutcomeEntity = "al_outcome";
-        private const string GradeQuestionCode = "Q-GR-01";
+        // The grade and the root cause beside it now live on GradingRules, which both this
+        // plug-in and the two front ends read (item 3, 2026-09-19). Aliased here so the
+        // existing call sites keep reading as prose.
+        private const string GradeQuestionCode = GradingRules.GradeQuestionCode;
         private const string TaxOutcomeQuestionCode = "Q-TAX-02";
 
         // The checklist's own remediation trigger, per discipline (V8: "Remedial action
@@ -357,6 +360,18 @@ namespace OutcomeTesting.Plugins
                 }
             }
 
+            // The primary root cause is owed on every grade but Pass (item 3, 2026-09-19).
+            // Q-GR-02 is seeded mandatory and stays mandatory - it is genuinely required on
+            // the reviews that owe it - so the condition is applied here, at the gate, rather
+            // than by unsetting al_ismandatory, which would excuse it on every review at once
+            // and leave nothing to enforce.
+            //
+            // The grade is read only when a root cause is actually in the list: on a Tax
+            // review it never is, because S-GRADE is AQS-owned and the query above is already
+            // scoped by discipline, so a Tax submit pays nothing for a rule that cannot apply
+            // to it.
+            RemoveRootCauseWhenPassing(service, targetId, required);
+
             if (required.Count == 0)
             {
                 return;
@@ -401,6 +416,60 @@ namespace OutcomeTesting.Plugins
             if (missing.Count > 0)
             {
                 throw new InvalidPluginExecutionException(UnansweredRefusal(missing, required.Count));
+            }
+        }
+
+        /// <summary>
+        /// Drops the primary root cause from the questions this submission owes, when the
+        /// advice quality grade says the file passed or has not been graded at all
+        /// (item 3, 2026-09-19).
+        ///
+        /// Matched on question code rather than on response type. The response type is what
+        /// the front ends filter on, because it is what they have in hand, but AD-055 made
+        /// the single select unique to Q-GR-02 by arrangement rather than by rule, and a
+        /// question added through checklist administration could take that type tomorrow.
+        /// The code is the AD-122 contract, and ChecklistGuards now refuses to retire it.
+        ///
+        /// A list rather than a single row: nothing in the schema stops a second version of
+        /// Q-GR-02 being in force, and excusing only the first would leave the other
+        /// demanding an answer the page no longer draws.
+        ///
+        /// Public and static so it can be tested with plain Entities, for the reason IsOwed
+        /// and SectionRefusal are: the assembly is signed and deliberately carries no
+        /// InternalsVisibleTo, so public is what makes a helper reachable from the tests.
+        /// </summary>
+        public static void RemoveRootCauseWhenPassing(
+            IOrganizationService service,
+            Guid targetId,
+            List<Entity> required)
+        {
+            var rootCauses = new List<Entity>();
+            foreach (var version in required)
+            {
+                var aliased = version.GetAttributeValue<AliasedValue>("q.al_questioncode");
+                var code = aliased == null ? null : aliased.Value as string;
+                if (code != null
+                    && code.Trim().Equals(
+                        GradingRules.RootCauseQuestionCode, StringComparison.OrdinalIgnoreCase))
+                {
+                    rootCauses.Add(version);
+                }
+            }
+
+            if (rootCauses.Count == 0)
+            {
+                return;
+            }
+
+            var grade = AnswerChoiceFor(service, targetId, GradeQuestionCode);
+            if (GradingRules.RootCauseRequired(grade))
+            {
+                return;
+            }
+
+            foreach (var rootCause in rootCauses)
+            {
+                required.Remove(rootCause);
             }
         }
 

@@ -1228,6 +1228,13 @@ footer a:focus-visible, .footer a:focus-visible {
 /* ---- root cause 3x3 ---- */
 .ot-checklist .rootcause td { width: 33.33%; }
 
+/* Explicit, not inherited from the browser default, for the reason
+   .ot-accountability[hidden] is: the block is shown and hidden as the grade
+   changes (item 3, 2026-09-19), this site also loads Bootstrap, and any
+   display rule reaching a table would beat [hidden] and leave the root cause
+   on screen for a file that passed. */
+.ot-checklist .rootcause[hidden] { display: none; }
+
 .ot-checklist .sr-only {
   position: absolute;
   width: 1px; height: 1px;

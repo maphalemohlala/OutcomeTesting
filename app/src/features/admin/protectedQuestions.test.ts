@@ -10,7 +10,7 @@ import { PROTECTED_QUESTION_CODES, protectedReason } from './protectedQuestions'
  * copy only hides a control the server would refuse anyway (AD-041).
  */
 describe('protectedQuestions', () => {
-  it('carries exactly the eight codes the plug-in assembly guards', () => {
+  it('carries exactly the nine codes the plug-in assembly guards', () => {
     expect([...PROTECTED_QUESTION_CODES].sort()).toEqual(
       [
         'Q-FQ-01',
@@ -20,6 +20,7 @@ describe('protectedQuestions', () => {
         'Q-FQTAX-02',
         'Q-FQTAX-03',
         'Q-GR-01',
+        'Q-GR-02',
         'Q-TAX-02',
       ].sort(),
     );
@@ -46,13 +47,13 @@ describe('protectedQuestions', () => {
 describe('the mirror matches the plug-in assembly', () => {
   it('guards the same codes ChecklistGuards does', () => {
     // Read from the C# rather than restated, because a hand-copied list goes stale
-    // silently: a ninth code added server-side would leave the UI offering a Retire
+    // silently: a tenth code added server-side would leave the UI offering a Retire
     // control the server refuses.
     const inCsharp = [...checklistGuardsSource.matchAll(/\{ "(Q-[A-Z0-9-]+)",/g)]
       .map((m) => m[1])
       .sort();
 
-    expect(inCsharp).toHaveLength(8);
+    expect(inCsharp).toHaveLength(9);
     expect(inCsharp).toEqual([...PROTECTED_QUESTION_CODES].sort());
   });
 });

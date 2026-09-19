@@ -11,6 +11,7 @@
  */
 const PROTECTED: Record<string, string> = {
   'Q-GR-01': 'carries the advice quality grade, which decides the case outcome',
+  'Q-GR-02': 'is the primary root cause, required on every grade but Pass',
   'Q-TAX-02': 'is the Tax check outcome, which decides whether a case goes to remediation',
   'Q-FQ-01': 'is the AQS file quality outcome and Trail Light column 10',
   'Q-FQTAX-01': 'is the Tax file quality outcome',

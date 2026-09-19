@@ -12,6 +12,7 @@ import {
 import { ADVICE_DATE_LABEL } from '../cases/caseHeaderDates';
 import { choiceLabel } from '../../lib/choiceLabel';
 import { date, text } from '../../lib/format';
+import { withoutUnaskedRootCause } from './gradingRules';
 import type { FormRow, ReviewSection, SectionedAnswer } from './reviewSections';
 
 /**
@@ -628,13 +629,22 @@ export function formBlocks<T extends SectionedAnswer>(
     }
 
     const lensTick = section.rows.find((row) => isLensTick(row)) ?? null;
+    /*
+     * The primary root cause is drawn only when the grade says the file did not pass
+     * (item 3, 2026-09-19). Applied to the section's own rows because the grade and the
+     * cause sit together in Judgement and Grading; every other section is handed straight
+     * back. GradingRules enforces the same rule server-side, where it decides whether the
+     * question is owed at submission and clears a cause recorded before the grade changed -
+     * this only keeps the document from drawing a row the review does not owe.
+     */
+    const visible = withoutUnaskedRootCause(section.rows);
     const group: FormGroup<T> = {
       id: section.id,
       heading:
         spec?.subsections && section.code
           ? `${section.code.replace(/^S-/, '')}. ${section.name}`
           : null,
-      rows: lensTick ? section.rows.filter((row) => row !== lensTick) : section.rows,
+      rows: lensTick ? visible.filter((row) => row !== lensTick) : visible,
       lens: spec?.subsections ? section.helpText : null,
       lensTick,
     };

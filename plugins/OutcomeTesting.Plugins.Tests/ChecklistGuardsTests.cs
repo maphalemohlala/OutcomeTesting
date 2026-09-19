@@ -47,11 +47,12 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Exactly_eight_codes_are_protected()
+        public void Exactly_nine_codes_are_protected()
         {
-            // Pinned deliberately. A ninth appearing here without a matching constant in the
-            // plug-in that reads it is how this guard drifts out of truth.
-            Assert.Equal(8, ChecklistGuards.ProtectedCodes.Count());
+            // Pinned deliberately. A tenth appearing here without a matching constant in the
+            // plug-in that reads it is how this guard drifts out of truth. Q-GR-02 joined on
+            // 2026-09-19, when GradingRules began reading it by name (item 3).
+            Assert.Equal(9, ChecklistGuards.ProtectedCodes.Count());
         }
     }
 }
