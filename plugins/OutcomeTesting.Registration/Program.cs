@@ -372,6 +372,11 @@ if (args.Length >= 2 && args[0].Equals("backfilltaxoutcome", StringComparison.Or
     return BackfillTaxOutcome(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
 }
 
+if (args.Length >= 2 && args[0].Equals("backfillioreference", StringComparison.OrdinalIgnoreCase))
+{
+    return BackfillIoReference(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+}
+
 if (args.Length >= 5 && args[0].Equals("setattributedescription", StringComparison.OrdinalIgnoreCase))
 {
     return SetAttributeDescription(args[1], args[2], args[3], args[4]);
@@ -7724,6 +7729,86 @@ int SetCasePeople(string orgUrl, string referenceLike, string personName, bool c
 // Idempotent and additive. A case that already carries a value is left alone, so a re-run
 // after a later submit cannot overwrite a fresher grade with an older review's answer, and
 // the newest submitted review wins where a case somehow carries two Tax legs.
+/// <summary>
+/// Stamps al_ioreference on cases imported before that column existed.
+///
+/// The IO reference the business quotes is the extract's ClientRef, which the import has
+/// always stored in al_clientref; from 2026-09-19 it writes the same header to
+/// al_ioreference as well (ImportRules.Columns). Cases imported before that carry the one
+/// and not the other, and show blank where the business expects a reference.
+///
+/// Reads al_clientref rather than re-reading the spreadsheet, so the backfill cannot
+/// disagree with what the import recorded. Cases with no al_clientref - the seeded ones -
+/// are left alone: there is nothing to copy, and inventing a reference would be worse than
+/// a blank. A case that already carries al_ioreference is never overwritten, so the verb
+/// is safe to re-run.
+///
+/// Deliberately NOT al_casereference: that is the BR-001 import key and the table's
+/// alternate key, and ClientRef repeats across a client's cases.
+/// </summary>
+int BackfillIoReference(string orgUrl, bool confirm)
+{
+    using var svc = Connect(orgUrl);
+
+    var rows = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_outcomecase\">" +
+        "<attribute name=\"al_outcomecaseid\"/>" +
+        "<attribute name=\"al_casereference\"/>" +
+        "<attribute name=\"al_clientref\"/>" +
+        "<attribute name=\"al_ioreference\"/>" +
+        "<filter><condition attribute=\"al_clientref\" operator=\"not-null\"/></filter>" +
+        "<order attribute=\"al_casereference\"/>" +
+        "</entity></fetch>")).Entities;
+
+    var pending = new List<(Guid Id, string Reference, string ClientRef)>();
+    var already = 0;
+
+    foreach (var row in rows)
+    {
+        var clientRef = row.GetAttributeValue<string>("al_clientref");
+        if (string.IsNullOrWhiteSpace(clientRef))
+        {
+            continue;
+        }
+
+        if (!string.IsNullOrWhiteSpace(row.GetAttributeValue<string>("al_ioreference")))
+        {
+            already++;
+            continue;
+        }
+
+        pending.Add((
+            row.Id,
+            row.GetAttributeValue<string>("al_casereference") ?? row.Id.ToString("D"),
+            clientRef.Trim()));
+    }
+
+    Console.WriteLine($"{rows.Count} case(s) carry a ClientRef; {already} already stamped; {pending.Count} to write.");
+    foreach (var p in pending)
+    {
+        Console.WriteLine($"   {p.Reference}  <- {p.ClientRef}");
+    }
+
+    if (!confirm)
+    {
+        Console.WriteLine("Dry run. Re-run with --confirm to write.");
+        return 0;
+    }
+
+    var written = 0;
+    foreach (var p in pending)
+    {
+        svc.Update(new Entity("al_outcomecase", p.Id)
+        {
+            ["al_ioreference"] = p.ClientRef,
+        });
+        written++;
+    }
+
+    Console.WriteLine($"Stamped {written} case(s).");
+    return 0;
+}
+
 int BackfillTaxOutcome(string orgUrl, bool confirm)
 {
     using var svc = Connect(orgUrl);

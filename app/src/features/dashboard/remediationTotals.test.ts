@@ -7,6 +7,17 @@ const OPEN = 120910600;
 /** A long-past due date and clock start, so "overdue" and "breached" are deterministic. */
 const LONG_AGO = '2020-01-06T09:00:00Z';
 
+/**
+ * Raised just now, so an action that says nothing about its own clock is never breached.
+ *
+ * This was a fixed 2026-09-01. remediationClock falls back to createdon when there is no
+ * al_clockstartedon, and breaches past ten working days, so the suite passed while that
+ * date was recent and began failing on 2026-09-19, once it was fourteen working days back
+ * - a calendar failure reported as a counting bug. The tests that DO exercise the clock
+ * pass LONG_AGO explicitly and are unaffected.
+ */
+const JUST_RAISED = new Date().toISOString();
+
 function action(
   id: string,
   review: string | undefined,
@@ -18,7 +29,7 @@ function action(
     al_actionstatus: status,
     al_actionstatusname: status === COMPLETED ? 'Completed' : 'Open',
     _al_reviewinstanceid_value: review,
-    createdon: '2026-09-01T09:00:00Z',
+    createdon: JUST_RAISED,
     ...extra,
   };
 }
@@ -114,7 +125,7 @@ describe('remediationTotals', () => {
         al_remediationactionid: 'a1',
         al_actionstatus: COMPLETED,
         _al_reviewinstanceid_value: 'rev-1',
-        createdon: '2026-09-01T09:00:00Z',
+        createdon: JUST_RAISED,
       },
     ];
 
