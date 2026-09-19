@@ -77,7 +77,7 @@ namespace OutcomeTesting.Plugins.Tests
             Graded(svc, OutcomeRules.OutcomePassWithIssues);
             OpenAction(svc);
 
-            Remediation.AssignUnassignedActions(svc, Ref(), Correlation);
+            Remediation.AssignOpenActions(svc, Ref(), Correlation);
 
             var queued = Queued(svc);
             Assert.Equal("Remedial needed - Pass with issues: IO-TEST-100",
@@ -93,7 +93,7 @@ namespace OutcomeTesting.Plugins.Tests
             Graded(svc, OutcomeRules.OutcomePotentialHarm);
             OpenAction(svc);
 
-            Remediation.AssignUnassignedActions(svc, Ref(), Correlation);
+            Remediation.AssignOpenActions(svc, Ref(), Correlation);
 
             var queued = Queued(svc);
             Assert.Equal("Remedial needed - insufficient evidence/ potential harm: IO-TEST-100",
@@ -110,7 +110,7 @@ namespace OutcomeTesting.Plugins.Tests
             Graded(svc, OutcomeRules.OutcomePass);
             OpenAction(svc);
 
-            Remediation.AssignUnassignedActions(svc, Ref(), Correlation);
+            Remediation.AssignOpenActions(svc, Ref(), Correlation);
 
             var queued = Queued(svc);
             Assert.Equal("Remediation required on case IO-TEST-100",
@@ -125,7 +125,7 @@ namespace OutcomeTesting.Plugins.Tests
             var svc = Case();
             OpenAction(svc);
 
-            Remediation.AssignUnassignedActions(svc, Ref(), Correlation);
+            Remediation.AssignOpenActions(svc, Ref(), Correlation);
 
             Assert.Equal("Remediation required on case IO-TEST-100",
                 Queued(svc).GetAttributeValue<string>("al_subject"));
@@ -139,7 +139,7 @@ namespace OutcomeTesting.Plugins.Tests
             Graded(svc, OutcomeRules.OutcomePassWithIssues);
             OpenAction(svc);
 
-            Remediation.AssignUnassignedActions(svc, Ref(), Correlation);
+            Remediation.AssignOpenActions(svc, Ref(), Correlation);
 
             var queued = Queued(svc);
             Assert.Equal(NotificationOutbox.EventRemediationAssigned,
@@ -226,7 +226,7 @@ namespace OutcomeTesting.Plugins.Tests
             NotificationEmitterPlugin.QueueCasePassed(svc, Correlation, Ref());
             NotificationEmitterPlugin.QueueCasePassed(svc, Correlation, Ref());
 
-            Assert.Single(svc.Creates.Where(c => c.Contains("al_event")));
+            Assert.Single(svc.Creates, c => c.Contains("al_event"));
         }
 
         [Fact]
