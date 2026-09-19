@@ -41,6 +41,12 @@ const COLUMNS: ColumnDef[] = [
   { header: 'TaskID', field: 'al_casereference', kind: 'text' },
   { header: 'ServiceCaseSequentialRef', field: 'al_servicecaseref', kind: 'text' },
   { header: 'ClientRef', field: 'al_clientref', kind: 'text' },
+  // The IO reference the business quotes, from ClientRef (project owner, 2026-09-19).
+  // A second column fed by the same header rather than a re-sourcing of al_casereference:
+  // that column carries TaskID and is the BR-001 import key and the alternate key, and
+  // ClientRef repeats across a client's cases, so keying on it would collapse two genuine
+  // cases into one. Mirrors the pair in `ImportRules.Columns`.
+  { header: 'ClientRef', field: 'al_ioreference', kind: 'text' },
   { header: 'Client', field: 'al_clientname', kind: 'text' },
   { header: 'AdviserName', field: 'al_advisername', kind: 'text' },
   { header: 'AdviserEmail', field: 'al_adviseremail', kind: 'text' },

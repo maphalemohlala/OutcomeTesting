@@ -1015,6 +1015,46 @@
             <Description description="CreatedDate from the extract. Carried by the Intelligent Office task extract (BR-001)." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_IoReference">
+          <Type>nvarchar</Type>
+          <Name>al_ioreference</Name>
+          <LogicalName>al_ioreference</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.0.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>1</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>text</Format>
+          <MaxLength>100</MaxLength>
+          <Length>200</Length>
+          <displaynames>
+            <displayname description="IO reference" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The Intelligent Office reference the business quotes for the case, taken from the extract's ClientRef column (project owner, 2026-09-19). Deliberately separate from al_casereference: that column carries TaskID and is the BR-001 import key and the alternate key, and ClientRef repeats across a client's cases, so it cannot serve as a key. This column identifies the case to a person; al_casereference identifies it to the import." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_IoOutcome">
           <Type>picklist</Type>
           <Name>al_iooutcome</Name>

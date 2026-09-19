@@ -161,6 +161,15 @@ namespace OutcomeTesting.Plugins
             new ColumnDef("TaskID", "al_casereference", ColumnKind.Text, null),
             new ColumnDef("ServiceCaseSequentialRef", "al_servicecaseref", ColumnKind.Text, null),
             new ColumnDef("ClientRef", "al_clientref", ColumnKind.Text, null),
+            // The IO reference the business quotes, from ClientRef (project owner,
+            // 2026-09-19). Deliberately a second column fed by the same header rather than a
+            // re-sourcing of al_casereference: that column is the BR-001 import key and the
+            // table's alternate key, and ClientRef repeats across a client's cases, so
+            // keying on it would collapse two genuine cases into one on import. TaskID keeps
+            // the key; this is what a person is shown and what points back at Intelligent
+            // Office. The apply loop writes by Attribute, so one header filling two columns
+            // needs nothing of it.
+            new ColumnDef("ClientRef", "al_ioreference", ColumnKind.Text, null),
             new ColumnDef("Client", "al_clientname", ColumnKind.Text, null),
             new ColumnDef("AdviserName", "al_advisername", ColumnKind.Text, null),
             new ColumnDef("AdviserEmail", "al_adviseremail", ColumnKind.Text, null),

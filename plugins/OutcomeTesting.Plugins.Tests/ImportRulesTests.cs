@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using OutcomeTesting.Plugins;
@@ -62,6 +62,88 @@ namespace OutcomeTesting.Plugins.Tests
         private static string File(params string[] rows)
         {
             return Header + "\r\n" + string.Join("\r\n", rows) + "\r\n";
+        }
+
+        // ---- IO reference -------------------------------------------------------
+
+        /// <summary>
+        /// A valid extract row carrying a ClientRef. The class-level Header does not name
+        /// that column, and a row with no stamped checklist item is refused before any
+        /// column mapping happens - the route could not be derived - so these tests bring
+        /// their own header rather than reusing one that would fail for an unrelated reason.
+        /// </summary>
+        private const string IoHeader =
+            "TaskID,ClientRef,ChecklistItem1,CompletedBy1,CompletionDate1";
+
+        private static string IoRow(string taskId, string clientRef)
+        {
+            return taskId + "," + clientRef + ",Tax Check,Miko Stewart," + Stamp;
+        }
+
+        private static string IoFile(params string[] rows)
+        {
+            return IoHeader + "\r\n" + string.Join("\r\n", rows) + "\r\n";
+        }
+
+        /// <summary>
+        /// The IO reference is ClientRef, not TaskID (project owner, 2026-09-19).
+        ///
+        /// It is carried in its own column rather than re-sourcing al_casereference,
+        /// because that column is the BR-001 import key and the table's alternate key.
+        /// ClientRef repeats across a client's cases, so keying on it would make two
+        /// genuine cases collide on import. TaskID keeps the key; ClientRef is what a
+        /// person is shown and what points back at Intelligent Office.
+        /// </summary>
+        [Fact]
+        public void Takes_the_io_reference_from_the_client_ref()
+        {
+            var result = ImportRules.ParseCsv(IoFile(IoRow("253925362", "CLI-4821")));
+
+            Assert.Null(result.Fatal);
+            var row = Assert.Single(result.Valid);
+            Assert.Equal("CLI-4821", row.Values["al_ioreference"]);
+        }
+
+        /// <summary>
+        /// And the key is still TaskID. Guards the collision the separate column exists to
+        /// avoid: if al_casereference ever starts carrying ClientRef, this fails.
+        /// </summary>
+        [Fact]
+        public void Keeps_the_case_reference_on_the_task_id_when_both_are_present()
+        {
+            var result = ImportRules.ParseCsv(IoFile(IoRow("253925362", "CLI-4821")));
+
+            var row = Assert.Single(result.Valid);
+            Assert.Equal("253925362", row.Values["al_casereference"]);
+            Assert.Equal("CLI-4821", row.Values["al_clientref"]);
+            Assert.Equal("CLI-4821", row.Values["al_ioreference"]);
+        }
+
+        /// <summary>
+        /// Two cases for one client import as two cases. This is the scenario that
+        /// re-sourcing al_casereference would have broken: both rows carry the same
+        /// ClientRef, and both must survive because their TaskIDs differ.
+        /// </summary>
+        [Fact]
+        public void Imports_two_cases_that_share_a_client_ref()
+        {
+            var result = ImportRules.ParseCsv(
+                IoFile(IoRow("253925362", "CLI-4821"), IoRow("254471517", "CLI-4821")));
+
+            Assert.Empty(result.Invalid);
+            Assert.Equal(2, result.Valid.Count);
+            Assert.Equal("CLI-4821", result.Valid[0].Values["al_ioreference"]);
+            Assert.Equal("CLI-4821", result.Valid[1].Values["al_ioreference"]);
+        }
+
+        /// <summary>A row with no ClientRef leaves the column unset rather than blank.</summary>
+        [Fact]
+        public void Leaves_the_io_reference_unset_when_the_extract_carries_none()
+        {
+            var result = ImportRules.ParseCsv(IoFile(IoRow("253925362", "")));
+
+            var row = Assert.Single(result.Valid);
+            Assert.False(row.Values.ContainsKey("al_ioreference"));
         }
 
         // ---- key ----------------------------------------------------------------
