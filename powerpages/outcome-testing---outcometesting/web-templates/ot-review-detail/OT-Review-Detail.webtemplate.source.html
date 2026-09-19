@@ -98,7 +98,8 @@
         <attribute name="al_advicedate" />
         <attribute name="al_productsolutiontype" />
         <attribute name="al_samplesource" />
-        <attribute name="al_checkername" />
+        <attribute name="al_taxcheckername" />
+        <attribute name="al_aqscheckername" />
         <attribute name="al_checkdate" />
         <attribute name="al_preorpostcheck" />
         <attribute name="al_vulnerableclient" />
@@ -329,8 +330,18 @@
             <td class="lbl">Sample source</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_samplesource" aria-label="Sample source"><option value="">&mdash;</option><option value="120910530" {% if h_samplesource.value == 120910530 %}selected{% endif %}>Random</option><option value="120910531" {% if h_samplesource.value == 120910531 %}selected{% endif %}>Mandatory</option><option value="120910532" {% if h_samplesource.value == 120910532 %}selected{% endif %}>High Risk</option><option value="120910533" {% if h_samplesource.value == 120910533 %}selected{% endif %}>Thematic</option></select></td>
           </tr>
           <tr>
-            <td class="lbl">Checker name</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_checkername" value="{{ rv['case.al_checkername'] | escape }}" aria-label="Checker name" /></td>
+            {% comment %}
+              Read-only from 2026-09-19 (item 2). Each checker REFLECTS the allocation on that
+              review instance, stamped server-side by al_AssignCase and by a portal claim, so
+              neither is free text. UpdateCaseDetailsPlugin and CaseHeaderRequestPlugin both
+              refuse al_checkername now, and a text box the server rejects is worse than none.
+            {% endcomment %}
+            <td class="lbl">Tax Checker</td><td class="val">{{ rv['case.al_taxcheckername'] | default: 'Not yet allocated' | escape }}</td>
+            <td class="lbl">AQS Checker</td><td class="val">{{ rv['case.al_aqscheckername'] | default: 'Not yet allocated' | escape }}</td>
+          </tr>
+          <tr>
             <td class="lbl">Check date</td><td class="val"><input type="date" class="ot-hdr-input" data-ot-hdr="al_checkdate" value="{{ rv['case.al_checkdate'] | date: 'yyyy-MM-dd' }}" aria-label="Check date" /></td>
+            <td class="lbl"></td><td class="val"></td>
           </tr>
           <tr>
             <td class="lbl">Client name / initials</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_clientname" value="{{ rv['case.al_clientname'] | escape }}" aria-label="Client name or initials" /></td>
@@ -346,7 +357,8 @@
           <tr><td class="lbl">Paraplanner code</td><td class="val">{{ rv['case.al_paraplannercode'] | escape }}</td><td class="lbl">Product(s)</td><td class="val">{{ rv['case.al_products'] | escape }}</td></tr>
           <tr><td class="lbl">Case type</td><td class="val">{{ h_casetype.label | escape }}</td><td class="lbl">Date of meeting - Client contact</td><td class="val">{{ rv['case.al_advicedate'] | date: 'dd MMM yyyy' }}</td></tr>
           <tr><td class="lbl">Product / solution type</td><td class="val">{{ h_producttype.label | escape }}</td><td class="lbl">Sample source</td><td class="val">{{ h_samplesource.label | escape }}</td></tr>
-          <tr><td class="lbl">Checker name</td><td class="val">{{ rv['case.al_checkername'] | escape }}</td><td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' }}</td></tr>
+          <tr><td class="lbl">Tax Checker</td><td class="val">{{ rv['case.al_taxcheckername'] | default: 'Not yet allocated' | escape }}</td><td class="lbl">AQS Checker</td><td class="val">{{ rv['case.al_aqscheckername'] | default: 'Not yet allocated' | escape }}</td></tr>
+          <tr><td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' }}</td><td class="lbl"></td><td class="val"></td></tr>
           <tr><td class="lbl">Client name / initials</td><td class="val">{{ rv['case.al_clientname'] | escape }}</td><td class="lbl">IO reference</td><td class="val">{{ rv['case.al_casereference'] | escape }}</td></tr>
           <tr><td class="lbl">Pre or post check</td><td class="val">{{ h_prepost.label | escape }}</td><td class="lbl">Vulnerable client?</td><td class="val">{{ h_vulnerable.label | escape }}</td></tr>
           {% endif %}

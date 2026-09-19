@@ -38,7 +38,8 @@
       <attribute name="al_productsolutiontype" />
       <attribute name="al_taxcheckrequired" />
       <attribute name="al_taxteamdisposition" />
-      <attribute name="al_checkername" />
+      <attribute name="al_taxcheckername" />
+      <attribute name="al_aqscheckername" />
       <attribute name="al_checklistitems" />
       <filter type="and">
         <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
@@ -167,6 +168,39 @@
       Above the document rather than inside it, which is where the review page puts its own
       print action: the sheet carries the record, the page around it carries the controls.
     {% endcomment %}
+    {% comment %}
+      The two checkers on the header (item 2, 2026-09-19), each with the empty state that
+      tells a reader which of two silences they are looking at. An unstamped column means
+      "nobody is allocated yet" where the case takes that check, and "this case does not take
+      one" where it has no such review - the same column value, opposite meanings.
+
+      Read from the review instances this page already fetched rather than from the route,
+      because a review that exists is the stronger fact: the route says what the case owes and
+      these are the checks actually raised on it.
+    {% endcomment %}
+    {% assign has_tax_review = false %}
+    {% assign has_aqs_review = false %}
+    {% for r in reviews.results.entities %}
+      {% if r.al_reviewtype.value == 120910200 %}{% assign has_tax_review = true %}{% endif %}
+      {% if r.al_reviewtype.value == 120910201 %}{% assign has_aqs_review = true %}{% endif %}
+    {% endfor %}
+
+    {% if c.al_taxcheckername != blank %}
+      {% assign tax_checker = c.al_taxcheckername %}
+    {% elsif has_tax_review %}
+      {% assign tax_checker = 'Not yet allocated' %}
+    {% else %}
+      {% assign tax_checker = 'No check of this type' %}
+    {% endif %}
+
+    {% if c.al_aqscheckername != blank %}
+      {% assign aqs_checker = c.al_aqscheckername %}
+    {% elsif has_aqs_review %}
+      {% assign aqs_checker = 'Not yet allocated' %}
+    {% else %}
+      {% assign aqs_checker = 'No check of this type' %}
+    {% endif %}
+
     {% assign submitted_reviews = 0 %}
     {% for r in reviews.results.entities %}
       {% if r.al_submittedon %}{% assign submitted_reviews = submitted_reviews | plus: 1 %}{% endif %}
@@ -235,8 +269,12 @@
             <td class="lbl">Pre or post check</td><td class="val">{{ c.al_preorpostcheck.label | default: '—' | escape }}</td>
           </tr>
           <tr>
-            <td class="lbl">Checker</td><td class="val">{{ c.al_checkername | default: '—' | escape }}</td>
+            <td class="lbl">Tax Checker</td><td class="val">{{ tax_checker | escape }}</td>
+            <td class="lbl">AQS Checker</td><td class="val">{{ aqs_checker | escape }}</td>
+          </tr>
+          <tr>
             <td class="lbl">Due date</td><td class="val">{{ c.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+            <td class="lbl"></td><td class="val"></td>
           </tr>
         </tbody>
       </table>
@@ -289,8 +327,12 @@
             <td class="lbl">Sample source</td><td class="val">{{ c.al_samplesource.label | default: '—' | escape }}</td>
           </tr>
           <tr>
-            <td class="lbl">Checker name</td><td class="val">{{ c.al_checkername | default: '—' | escape }}</td>
+            <td class="lbl">Tax Checker</td><td class="val">{{ tax_checker | escape }}</td>
+            <td class="lbl">AQS Checker</td><td class="val">{{ aqs_checker | escape }}</td>
+          </tr>
+          <tr>
             <td class="lbl">Check date</td><td class="val">{{ c.al_checkdate | date: 'dd MMM yyyy' | default: '—' }}</td>
+            <td class="lbl"></td><td class="val"></td>
           </tr>
           <tr>
             <td class="lbl">Client name / initials</td><td class="val">{{ c.al_clientname | default: '—' | escape }}</td>

@@ -35,9 +35,32 @@ function positions(item: CaseSummary): { role: PersonRole; name: string | null; 
   return [
     { role: 'Adviser', name: item.adviser, code: item.adviserCode },
     { role: 'Paraplanner', name: item.paraplanner, code: item.paraplannerCode },
-    { role: 'Checker', name: item.checker, code: null },
+    ...checkers(item),
     { role: 'Owner', name: item.owner, code: null },
   ];
+}
+
+/**
+ * The case's checkers, as directory positions (item 2, 2026-09-19).
+ *
+ * The role stays "Checker" rather than splitting into Tax and AQS: this directory answers
+ * "what has this person got on", and someone who checks both disciplines is one person with
+ * one workload, not two entries to be read side by side.
+ *
+ * De-duplicated by name, which is what stops a case counting twice against someone who holds
+ * BOTH of its checks - the case would otherwise be added to their total once per column.
+ * Two different names produce two positions, which is correct: that case really is on two
+ * people's desks.
+ */
+function checkers(item: CaseSummary): { role: PersonRole; name: string | null; code: string | null }[] {
+  const named = [item.taxChecker, item.aqsChecker]
+    .map((name) => name?.trim())
+    .filter((name): name is string => !!name);
+
+  const distinct = Array.from(new Set(named.map((name) => name.toLowerCase())))
+    .map((lower) => named.find((name) => name.toLowerCase() === lower) as string);
+
+  return distinct.map((name) => ({ role: 'Checker' as PersonRole, name, code: null }));
 }
 
 function emptyOutcomes(): Record<Outcome, number> {

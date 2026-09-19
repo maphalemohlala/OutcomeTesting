@@ -118,6 +118,7 @@ export interface Al_outcomecasesBase {
   al_adviseremail?: string;
   al_advisername?: string;
   al_adviserstatus?: Al_outcomecasesal_adviserstatus;
+  al_aqscheckername?: string;
   al_casereference: string;
   al_casestatus: Al_outcomecasesal_casestatus;
   al_casetype?: Al_outcomecasesal_casetype;
@@ -152,6 +153,7 @@ export interface Al_outcomecasesBase {
   al_servicestatus?: string;
   al_taskstartdate?: string;
   al_tasktype?: string;
+  al_taxcheckername?: string;
   al_taxcheckrequired?: Al_outcomecasesal_taxcheckrequired;
   al_taxoutcome?: Al_outcomecasesal_taxoutcome;
   al_taxteamdisposition?: Al_outcomecasesal_taxteamdisposition;

@@ -132,7 +132,6 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData("al_paraplanner")]
         [InlineData("al_products")]
         [InlineData("al_advicedate")]
-        [InlineData("al_checkername")]
         [InlineData("al_checkdate")]
         [InlineData("al_vulnerableclient")]
         public void Allows_the_header_fields_a_checker_owns(string field)
@@ -143,6 +142,24 @@ namespace OutcomeTesting.Plugins.Tests
             };
 
             CaseHeaderRequestPlugin.EnsureCheckerEditable(fields);
+        }
+
+        [Fact]
+        public void Refuses_the_checker_name_a_checker_used_to_be_able_to_type()
+        {
+            // Item 2, 2026-09-19. The header now carries a Tax Checker and an AQS Checker,
+            // and each REFLECTS the checker assigned to that review - so neither is free text
+            // anyone types, on this surface or in the Code App. Allocation is the one thing
+            // that knows who holds a check, and it is what writes them.
+            var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "al_checkername", "Someone Else" },
+            };
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => CaseHeaderRequestPlugin.EnsureCheckerEditable(fields));
+
+            Assert.Contains("al_checkername", error.Message);
         }
 
         [Fact]

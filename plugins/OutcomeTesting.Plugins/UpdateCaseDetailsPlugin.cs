@@ -482,7 +482,12 @@ namespace OutcomeTesting.Plugins
                 { "al_advicedate", new EditableField(EditableKind.DateOnly, CaseHeaderRules.AdviceDateLabel) },
                 { "al_productsolutiontype", new EditableField(EditableKind.Option, "Product/solution type") },
                 { "al_samplesource", new EditableField(EditableKind.Option, "Sample source") },
-                { "al_checkername", new EditableField(EditableKind.Text, "Checker") },
+                // al_checkername is deliberately absent (item 2, 2026-09-19). The case header
+                // now carries a Tax Checker and an AQS Checker, and each one REFLECTS the
+                // checker assigned to that review - so neither is free text a manager types.
+                // Typing a name here was already mistaken for allocating the check once
+                // (2026-09-09); the two derived columns make that mistake unavailable rather
+                // than merely discouraged. Allocation is al_AssignCase, and a portal claim.
                 { "al_checkdate", new EditableField(EditableKind.DateOnly, "Check date") },
                 { "al_preorpostcheck", new EditableField(EditableKind.Option, "Pre or post check") },
                 { "al_vulnerableclient", new EditableField(EditableKind.Option, "Vulnerable client") },

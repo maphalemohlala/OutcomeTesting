@@ -23,7 +23,8 @@ function caseRow(overrides: Partial<CaseSummary>): CaseSummary {
     adviserCode: null,
     paraplanner: null,
     paraplannerCode: null,
-    checker: null,
+    taxChecker: null,
+    aqsChecker: null,
     caseType: null,
     productSolutionType: null,
     products: null,
@@ -38,7 +39,7 @@ function caseRow(overrides: Partial<CaseSummary>): CaseSummary {
 describe('buildDirectory', () => {
   it('counts one person once per position they hold on a case', () => {
     const directory = buildDirectory([
-      caseRow({ id: 'a', adviser: 'Jane Adviser', checker: 'Jane Adviser' }),
+      caseRow({ id: 'a', adviser: 'Jane Adviser', aqsChecker: 'Jane Adviser' }),
     ]);
 
     expect(directory.map((p) => p.role).sort()).toEqual(['Adviser', 'Checker']);
@@ -100,7 +101,7 @@ describe('buildDirectory', () => {
 describe('casesForPerson', () => {
   const cases = [
     caseRow({ id: 'a', adviser: 'Jane Adviser' }),
-    caseRow({ id: 'b', checker: 'Jane Adviser' }),
+    caseRow({ id: 'b', aqsChecker: 'Jane Adviser' }),
     caseRow({ id: 'c', adviser: 'Someone Else' }),
   ];
 
@@ -125,7 +126,7 @@ describe('isPersonRole', () => {
 describe('caseloadByName', () => {
   it('counts a case once for someone holding two positions on it', () => {
     const loads = caseloadByName([
-      caseRow({ id: 'a', adviser: 'Jane Adviser', checker: 'Jane Adviser' }),
+      caseRow({ id: 'a', adviser: 'Jane Adviser', aqsChecker: 'Jane Adviser' }),
     ]);
 
     const jane = loads.get('jane adviser');
@@ -154,7 +155,7 @@ describe('caseloadByName', () => {
   });
 
   it('ignores blank names rather than inventing an empty person', () => {
-    const loads = caseloadByName([caseRow({ id: 'a', adviser: '   ', checker: null })]);
+    const loads = caseloadByName([caseRow({ id: 'a', adviser: '   ', aqsChecker: null })]);
 
     expect(loads.size).toBe(0);
   });

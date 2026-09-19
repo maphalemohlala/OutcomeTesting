@@ -225,21 +225,41 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal(ContactId, assignee.ContactId);
         }
 
-        [Fact]
-        public void Stamps_the_allocated_checker_onto_the_case()
+        [Theory]
+        [InlineData(ResponseRules.ReviewTypeTax, "al_taxcheckername")]
+        [InlineData(ResponseRules.ReviewTypeAqs, "al_aqscheckername")]
+        public void Stamps_the_allocated_checker_into_that_disciplines_column(int reviewType, string attribute)
         {
-            // The checklist header and the case detail read al_checkername, not the
-            // assignment row. Before 2026-09-10 only the portal self-claim wrote it, so a
-            // case allocated from the app read as unchecked everywhere but the history.
+            // The checklist header, the case detail and the worklist read these columns, not
+            // the assignment row. Before 2026-09-10 only the portal self-claim wrote a checker
+            // at all, so a case allocated from the app read as unchecked everywhere but the
+            // history; before 2026-09-19 there was one column for both disciplines.
             var caseId = Guid.Parse("cccccccc-3333-4333-8333-333333333333");
             var svc = new FakeOrganizationService();
             svc.Seed("al_outcomecase", caseId, "al_casereference", "IO-TEST-010");
 
-            AssignCasePlugin.StampCheckerName(svc, caseId, "Ada Checker");
+            AssignCasePlugin.StampCheckerName(svc, caseId, reviewType, "Ada Checker");
 
             Assert.Equal(
                 "Ada Checker",
-                svc.Row("al_outcomecase", caseId).GetAttributeValue<string>("al_checkername"));
+                svc.Row("al_outcomecase", caseId).GetAttributeValue<string>(attribute));
+        }
+
+        [Fact]
+        public void An_allocation_on_one_discipline_leaves_the_other_alone()
+        {
+            // The whole point of item 2. A case taking both checks has two checkers, and the
+            // single column it used to carry named whichever was allocated second.
+            var caseId = Guid.Parse("cccccccc-3333-4333-8333-333333333334");
+            var svc = new FakeOrganizationService();
+            svc.Seed("al_outcomecase", caseId, "al_taxcheckername", "Tom Tax");
+
+            AssignCasePlugin.StampCheckerName(
+                svc, caseId, ResponseRules.ReviewTypeAqs, "Ada Checker");
+
+            var row = svc.Row("al_outcomecase", caseId);
+            Assert.Equal("Tom Tax", row.GetAttributeValue<string>("al_taxcheckername"));
+            Assert.Equal("Ada Checker", row.GetAttributeValue<string>("al_aqscheckername"));
         }
 
         [Fact]
@@ -249,13 +269,29 @@ namespace OutcomeTesting.Plugins.Tests
             // the check now, including after a check has started.
             var caseId = Guid.Parse("dddddddd-4444-4444-8444-444444444444");
             var svc = new FakeOrganizationService();
-            svc.Seed("al_outcomecase", caseId, "al_checkername", "Prior Checker");
+            svc.Seed("al_outcomecase", caseId, "al_aqscheckername", "Prior Checker");
 
-            AssignCasePlugin.StampCheckerName(svc, caseId, "Ada Checker");
+            AssignCasePlugin.StampCheckerName(
+                svc, caseId, ResponseRules.ReviewTypeAqs, "Ada Checker");
 
             Assert.Equal(
                 "Ada Checker",
-                svc.Row("al_outcomecase", caseId).GetAttributeValue<string>("al_checkername"));
+                svc.Row("al_outcomecase", caseId).GetAttributeValue<string>("al_aqscheckername"));
+        }
+
+        [Fact]
+        public void A_review_with_no_discipline_stamps_nothing()
+        {
+            // There is no column that would be right, and putting the name in either would
+            // attribute a check to someone who did not make it.
+            var caseId = Guid.Parse("dddddddd-4444-4444-8444-444444444445");
+            var svc = new FakeOrganizationService();
+            svc.Seed("al_outcomecase", caseId);
+
+            AssignCasePlugin.StampCheckerName(svc, caseId, null, "Ada Checker");
+            AssignCasePlugin.StampCheckerName(svc, caseId, 999, "Ada Checker");
+
+            Assert.Empty(svc.Updates);
         }
 
         // --- Reallocating to someone who held the check before -------------------------

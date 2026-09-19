@@ -56,7 +56,15 @@ export interface CaseSummary {
   adviserCode: string | null;
   paraplanner: string | null;
   paraplannerCode: string | null;
-  checker: string | null;
+  /**
+   * One checker per discipline (item 2, 2026-09-19), each the checker assigned to that
+   * review instance. The single `checker` these replace named whichever discipline was
+   * allocated second, so a list filtered on it found a case under one checker and not the
+   * other. Null means "no name stamped" - `checkerNames.checkerState` reads the route to
+   * say whether that is unallocated or not required.
+   */
+  taxChecker: string | null;
+  aqsChecker: string | null;
   caseType: string | null;
   productSolutionType: string | null;
   products: string | null;
@@ -155,7 +163,8 @@ export function toSummary(record: Al_outcomecases, grades?: CaseOutcomeGrades): 
     adviserCode: record.al_advisercode ?? null,
     paraplanner: record.al_paraplanner ?? null,
     paraplannerCode: record.al_paraplannercode ?? null,
-    checker: record.al_checkername ?? null,
+    taxChecker: record.al_taxcheckername ?? null,
+    aqsChecker: record.al_aqscheckername ?? null,
     caseType: choiceLabel(Al_outcomecasesal_casetype, record.al_casetype, record.al_casetypename),
     productSolutionType: choiceLabel(
       Al_outcomecasesal_productsolutiontype,

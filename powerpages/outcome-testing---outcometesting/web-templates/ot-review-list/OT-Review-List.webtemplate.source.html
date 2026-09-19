@@ -231,15 +231,21 @@
       <div class="ot-table-wrap">
         <table class="ot-table">
           {% comment %}
-            No checker column, and no claim that these cases have none (project owner,
-            2026-09-10). al_checkername is the "Checker name" column of the upload file as
-            much as it is the allocated checker - AssignCasePlugin and ClaimCasePlugin both
-            write it, and so does the import - so a queued case nobody has ever been given
-            still carries a person's name. Printing it here under a caption promising "no
-            checker" made unclaimed cases read as somebody else's work. What decides that a
-            case is available is its status and the absence of a claim, which is what the
-            filter above asks; the imported name stays on the case and is shown on the case
-            record, where it is case data rather than an allocation.
+            No checker column here (project owner, 2026-09-10), and the reason has changed
+            with item 2 (2026-09-19) without changing the answer.
+
+            The old reason: al_checkername was the "Checker name" column of the upload file as
+            much as it was the allocated checker, so a queued case nobody had been given still
+            carried a person's name, and printing it under a caption promising "no checker"
+            made unclaimed cases read as somebody else's work. The import stopped writing that
+            column on 2026-09-14, and the column itself is now dormant.
+
+            The reason now: the case carries al_taxcheckername and al_aqscheckername, each
+            stamped by the allocation of that review. A case in THIS list is one nobody has
+            claimed, so the column for the discipline being claimed is empty by definition -
+            it would be a column of blanks. What decides that a case is available is its status
+            and the absence of a claim, which is what the filter above asks. The two names are
+            shown on the case record, where the allocation they describe belongs.
           {% endcomment %}
           <caption>
             {{ unassigned.size }} case{% if unassigned.size != 1 %}s{% endif %} waiting for an

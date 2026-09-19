@@ -31,7 +31,9 @@ function withinRange(createdOn: string | null, from: string, to: string): boolea
 
 function matchesPerson(item: CaseSummary, person: string): boolean {
   const name = person.toLowerCase();
-  return [item.adviser, item.paraplanner, item.checker, item.owner].some(
+  // Both checkers, so a search for a name finds the case whichever discipline that
+  // person holds (item 2, 2026-09-19). Searching one column used to miss the other.
+  return [item.adviser, item.paraplanner, item.taxChecker, item.aqsChecker, item.owner].some(
     (value) => (value ?? '').toLowerCase() === name,
   );
 }

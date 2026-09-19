@@ -392,6 +392,11 @@ if (args.Length >= 2 && args[0].Equals("backfillioreference", StringComparison.O
     return BackfillIoReference(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
 }
 
+if (args.Length >= 2 && args[0].Equals("backfillcheckernames", StringComparison.OrdinalIgnoreCase))
+{
+    return BackfillCheckerNames(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+}
+
 if (args.Length >= 5 && args[0].Equals("setattributedescription", StringComparison.OrdinalIgnoreCase))
 {
     return SetAttributeDescription(args[1], args[2], args[3], args[4]);
@@ -8104,6 +8109,146 @@ int BackfillIoReference(string orgUrl, bool confirm)
 
     Console.WriteLine($"Stamped {written} case(s).");
     return 0;
+}
+
+/// <summary>
+/// Fills al_taxcheckername and al_aqscheckername from the review assignments that already
+/// exist (item 2, 2026-09-19).
+///
+/// The two columns are stamped by al_AssignCase and by a portal claim from now on, but every
+/// case allocated before they existed carries its checker only in the single al_checkername -
+/// which, on a case taking both checks, names whichever discipline was allocated second. The
+/// assignment on each review instance is the record that was always right, so that is what
+/// this reads.
+///
+/// al_checkername itself is NOT cleared. Dropping what it holds would delete the last
+/// allocation made under the old rule, which is evidence about how a case was handled; it is
+/// left dormant for the project owner to decide on.
+///
+/// Active review instances only, and the name is preferred from the assigned CONTACT - which
+/// is what a portal claim stamps and what a checker sees themselves called - falling back to
+/// the owning user where a review carries no contact.
+/// </summary>
+int BackfillCheckerNames(string orgUrl, bool confirm)
+{
+    using var svc = Connect(orgUrl);
+
+    var rows = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_reviewinstance\">" +
+        "<attribute name=\"al_reviewtype\"/>" +
+        "<attribute name=\"al_outcomecaseid\"/>" +
+        "<attribute name=\"al_assignedcontactid\"/>" +
+        "<attribute name=\"ownerid\"/>" +
+        "<filter>" +
+        "<condition attribute=\"statecode\" operator=\"eq\" value=\"0\"/>" +
+        "<condition attribute=\"al_outcomecaseid\" operator=\"not-null\"/>" +
+        "</filter>" +
+        "<link-entity name=\"al_outcomecase\" from=\"al_outcomecaseid\" to=\"al_outcomecaseid\" alias=\"c\">" +
+        "<attribute name=\"al_casereference\"/>" +
+        "<attribute name=\"al_taxcheckername\"/>" +
+        "<attribute name=\"al_aqscheckername\"/>" +
+        "</link-entity>" +
+        "</entity></fetch>")).Entities;
+
+    // Case id -> the two columns this run would set. Held per case rather than written per
+    // review, so a case with both checks takes one Update carrying both names.
+    var pending = new Dictionary<Guid, Dictionary<string, string>>();
+    var references = new Dictionary<Guid, string>();
+    var skipped = 0;
+    var already = 0;
+
+    foreach (var row in rows)
+    {
+        var caseRef = row.GetAttributeValue<EntityReference>("al_outcomecaseid");
+        var type = row.GetAttributeValue<OptionSetValue>("al_reviewtype");
+        if (caseRef == null || type == null)
+        {
+            skipped++;
+            continue;
+        }
+
+        // 120910200 Tax, 120910201 AQS - the same mapping CheckerNames.AttributeFor makes.
+        string attribute;
+        if (type.Value == 120910200)
+        {
+            attribute = "al_taxcheckername";
+        }
+        else if (type.Value == 120910201)
+        {
+            attribute = "al_aqscheckername";
+        }
+        else
+        {
+            skipped++;
+            continue;
+        }
+
+        var contact = row.GetAttributeValue<EntityReference>("al_assignedcontactid");
+        var owner = row.GetAttributeValue<EntityReference>("ownerid");
+        var name = contact?.Name ?? owner?.Name;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            skipped++;
+            continue;
+        }
+
+        var existing = Aliased(row, "c." + attribute) as string;
+        if (!string.IsNullOrWhiteSpace(existing))
+        {
+            already++;
+            continue;
+        }
+
+        references[caseRef.Id] = Aliased(row, "c.al_casereference") as string ?? caseRef.Id.ToString("D");
+
+        if (!pending.TryGetValue(caseRef.Id, out var columns))
+        {
+            columns = new Dictionary<string, string>();
+            pending[caseRef.Id] = columns;
+        }
+
+        columns[attribute] = name.Trim();
+    }
+
+    Console.WriteLine(
+        $"{rows.Count} active review(s); {already} already stamped; {skipped} skipped (no case, no discipline or no assignee); " +
+        $"{pending.Count} case(s) to write.");
+
+    foreach (var entry in pending)
+    {
+        var tax = entry.Value.TryGetValue("al_taxcheckername", out var t) ? t : "-";
+        var aqs = entry.Value.TryGetValue("al_aqscheckername", out var a) ? a : "-";
+        Console.WriteLine($"   {references[entry.Key],-20} Tax: {tax,-24} AQS: {aqs}");
+    }
+
+    if (!confirm)
+    {
+        Console.WriteLine("Dry run. Re-run with --confirm to write.");
+        return 0;
+    }
+
+    var written = 0;
+    foreach (var entry in pending)
+    {
+        var update = new Entity("al_outcomecase", entry.Key);
+        foreach (var column in entry.Value)
+        {
+            update[column.Key] = column.Value;
+        }
+
+        svc.Update(update);
+        written++;
+    }
+
+    Console.WriteLine($"Stamped {written} case(s). al_checkername left untouched.");
+    return 0;
+}
+
+/// <summary>A link-entity aliased value, unwrapped; null where the column came back empty.</summary>
+object Aliased(Entity row, string alias)
+{
+    var value = row.GetAttributeValue<AliasedValue>(alias);
+    return value?.Value;
 }
 
 int BackfillTaxOutcome(string orgUrl, bool confirm)

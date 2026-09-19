@@ -13,6 +13,8 @@ import { ADVICE_DATE_LABEL } from '../cases/caseHeaderDates';
 import { choiceLabel } from '../../lib/choiceLabel';
 import { date, text } from '../../lib/format';
 import { withoutUnaskedRootCause } from './gradingRules';
+import { checkerLabel } from '../cases/checkerNames';
+import { REVIEW_ROUTES, type ReviewRoute } from '../../types/domain';
 import type { FormRow, ReviewSection, SectionedAnswer } from './reviewSections';
 
 /**
@@ -246,6 +248,18 @@ export interface HeaderField {
 }
 
 /**
+ * The case's review route, where it carries a recognised one.
+ *
+ * Read from the lookup's name rather than its id, which is what the record already holds.
+ * An unrecognised or absent route reads as null, and `checkerNames` treats that as requiring
+ * both checks - so an unallocated one reads as work outstanding rather than work nobody owes.
+ */
+function headerRoute(record: Al_outcomecases): ReviewRoute | null {
+  const name = record.al_reviewrouteidname ?? null;
+  return REVIEW_ROUTES.find((route) => route === name) ?? null;
+}
+
+/**
  * The case header block, field for field in the order the document lays them out. These are
  * Outcome Case columns captured at intake, not checklist questions (checklist-v8.md).
  */
@@ -285,7 +299,23 @@ export function caseHeaderFields(record: Al_outcomecases): HeaderField[] {
         record.al_samplesourcename,
       ),
     },
-    { label: 'Checker name', value: text(record.al_checkername) },
+    /*
+     * Two checkers, not one (item 2, 2026-09-19). A case taking both a Tax check and an AQS
+     * check has two, and the single "Checker name" the document draws named whichever was
+     * allocated second. Each reflects the checker assigned to that review instance and is
+     * stamped server-side by the allocation; neither is typed.
+     *
+     * This is the fourth deliberate difference from the reference Checker Checklist, which
+     * has one Checker name field. checklistDocument.test.ts carries it as one.
+     */
+    {
+      label: 'Tax Checker',
+      value: checkerLabel(record.al_taxcheckername, headerRoute(record), 'Tax'),
+    },
+    {
+      label: 'AQS Checker',
+      value: checkerLabel(record.al_aqscheckername, headerRoute(record), 'AQS'),
+    },
     { label: 'Check date', value: date(record.al_checkdate) },
     { label: 'Client name / initials', value: text(record.al_clientname) },
     { label: 'IO reference', value: text(record.al_casereference) },

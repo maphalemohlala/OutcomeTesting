@@ -136,7 +136,7 @@ namespace OutcomeTesting.Plugins
             // by hand - and why editing that name was mistaken for allocating the check
             // (2026-09-09). The allocation is the one thing that knows who holds the check,
             // so it is what says so. The field was removed from the form on 2026-09-10.
-            StampCheckerName(userService, caseId, assignee.UserName);
+            StampCheckerName(userService, caseId, ReviewTypeOf(review), assignee.UserName);
 
             // Queued -> Assigned, refused by AD-057 if the case is not somewhere the
             // lifecycle allows it from. Deliberately after the assignment row exists: a case
@@ -393,17 +393,40 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Writes the allocated checker's name onto the case (<c>al_checkername</c>), the
-        /// name the checklist header and the case detail print. Mirrors what
-        /// ClaimCasePlugin does for a portal self-claim, so a check reads the same however
-        /// it was allocated.
+        /// Writes the allocated checker's name onto the case, into the column for the
+        /// discipline they were allocated (item 2, 2026-09-19): al_taxcheckername or
+        /// al_aqscheckername. The names the checklist header, the case detail and the
+        /// worklist print. Mirrors what ClaimCasePlugin does for a portal self-claim, so a
+        /// check reads the same however it was allocated.
+        ///
+        /// Until 2026-09-19 this wrote one al_checkername for both disciplines, so a case
+        /// taking a Tax check and an AQS check named whichever was allocated second and gave
+        /// no hint it had ever named the first.
+        ///
+        /// A review whose discipline the model does not define writes nothing. There is no
+        /// column that would be right, and putting the name in either would attribute a check
+        /// to someone who did not make it.
         /// </summary>
-        public static void StampCheckerName(IOrganizationService service, Guid caseId, string checkerName)
+        public static void StampCheckerName(
+            IOrganizationService service, Guid caseId, int? reviewType, string checkerName)
         {
+            string attribute;
+            if (!CheckerNames.TryAttributeFor(reviewType, out attribute))
+            {
+                return;
+            }
+
             service.Update(new Entity(CaseEntity, caseId)
             {
-                [CheckerNameAttr] = checkerName,
+                [attribute] = checkerName,
             });
+        }
+
+        /// <summary>The discipline of a review row, where it carries one.</summary>
+        private static int? ReviewTypeOf(Entity review)
+        {
+            var type = review == null ? null : review.GetAttributeValue<OptionSetValue>(ReviewTypeAttr);
+            return type == null ? (int?)null : type.Value;
         }
 
         /// <summary>

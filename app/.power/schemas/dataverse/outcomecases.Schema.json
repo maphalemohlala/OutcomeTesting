@@ -12,7 +12,7 @@
       "properties": {
         "al_advicedate": {
           "type": "string",
-          "title": "Advice date",
+          "title": "Date of meeting - Client contact",
           "x-ms-dataverse-attribute": "al_advicedate",
           "x-ms-dataverse-type": "DateTimeType",
           "x-ms-schema-name": "al_AdviceDate"
@@ -77,6 +77,14 @@
           "x-ms-dataverse-type": "VirtualType",
           "x-ms-schema-name": "al_adviserstatusName",
           "x-ms-read-only": true
+        },
+        "al_aqscheckername": {
+          "type": "string",
+          "title": "AQS Checker",
+          "x-ms-dataverse-attribute": "al_aqscheckername",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_AqsCheckerName",
+          "maxLength": 100
         },
         "al_casereference": {
           "type": "string",
@@ -643,6 +651,14 @@
           "x-ms-dataverse-attribute": "al_tasktype",
           "x-ms-dataverse-type": "StringType",
           "x-ms-schema-name": "al_TaskType",
+          "maxLength": 100
+        },
+        "al_taxcheckername": {
+          "type": "string",
+          "title": "Tax Checker",
+          "x-ms-dataverse-attribute": "al_taxcheckername",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_TaxCheckerName",
           "maxLength": 100
         },
         "al_taxcheckrequired": {

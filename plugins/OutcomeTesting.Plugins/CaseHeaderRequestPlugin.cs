@@ -327,7 +327,6 @@ namespace OutcomeTesting.Plugins
                 "al_advicedate",
                 "al_productsolutiontype",
                 "al_samplesource",
-                "al_checkername",
                 "al_checkdate",
                 "al_preorpostcheck",
                 "al_vulnerableclient",

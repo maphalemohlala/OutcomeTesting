@@ -44,12 +44,12 @@ namespace OutcomeTesting.Plugins
         private const string IsActiveAttr = "al_isactive";
         private const string AssignmentReasonAttr = "al_assignmentreason";
         private const string AssignmentCodeAttr = "al_caseassignmentcode";
-        private const string CheckerNameAttr = "al_checkername";
         private const string CaseStatusAttr = "al_casestatus";
         private const string CaseRouteAttr = "al_reviewrouteid";
         private const string RouteRequiresTaxAttr = "al_requirestaxreview";
         private const string RouteRequiresAqsAttr = "al_requiresaqsreview";
         private const string ReviewTypeAttr = "al_reviewtype";
+
         private const string ReviewStatusAttr = "al_reviewstatus";
         private const string ChecklistVersionAttr = "al_checklistversionid";
         private const string EffectiveFromAttr = "al_effectivefrom";
@@ -67,6 +67,13 @@ namespace OutcomeTesting.Plugins
         public ClaimCasePlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(ClaimCasePlugin))
         {
+        }
+
+        /// <summary>The discipline of a review row, where it carries one (item 2, 2026-09-19).</summary>
+        private static int? ReviewTypeOf(Entity review)
+        {
+            var type = review == null ? null : review.GetAttributeValue<OptionSetValue>(ReviewTypeAttr);
+            return type == null ? (int?)null : type.Value;
         }
 
         protected override void ExecuteDataversePlugin(ILocalPluginContext localPluginContext)
@@ -157,13 +164,16 @@ namespace OutcomeTesting.Plugins
 
             StampReview(service, review.Id, assignee);
 
-            // The V8 case header's own checker field, which is what the worklist and the
-            // case detail read. Without it the case reads as unchecked to everyone outside
-            // the assignment history.
-            service.Update(new Entity(CaseEntity, caseRef.Id)
-            {
-                [CheckerNameAttr] = checkerName,
-            });
+            // The case header's checker field for THIS discipline, which is what the worklist
+            // and the case detail read (item 2, 2026-09-19). Without it the case reads as
+            // unchecked to everyone outside the assignment history. One column per discipline
+            // since 2026-09-19: a portal claim on the AQS leg must not overwrite the name of
+            // whoever holds the Tax check.
+            AssignCasePlugin.StampCheckerName(
+                service,
+                caseRef.Id,
+                ReviewTypeOf(review),
+                checkerName);
 
             CaseTransitions.MoveThrough(service, caseRef.Id, CaseLifecycle.Assigned);
 
