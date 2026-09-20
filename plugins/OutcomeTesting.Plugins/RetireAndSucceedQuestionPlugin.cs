@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -19,6 +19,7 @@ namespace OutcomeTesting.Plugins
         private const string InResponseType = "ResponseType";
         private const string InMandatory = "Mandatory";
         private const string InDisplayOrder = "DisplayOrder";
+        private const string InEffectiveFrom = "EffectiveFrom";
         private const string InIdempotencyKey = "IdempotencyKey";
 
         private const string OutNewVersionId = "NewVersionId";
@@ -50,6 +51,7 @@ namespace OutcomeTesting.Plugins
             var responseTypeOverride = CommandHelpers.GetOptionalString(context, InResponseType);
             var mandatoryOverride = CommandHelpers.GetOptionalString(context, InMandatory);
             var displayOrderOverride = CommandHelpers.GetOptionalString(context, InDisplayOrder);
+            var effectiveFromArg = CommandHelpers.GetOptionalString(context, InEffectiveFrom);
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "question.retire", PermissionHelpers.AccessEdit);
@@ -69,7 +71,26 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.PreconditionPrefix + "The question has no current version to succeed.");
             }
 
-            var today = DateTime.UtcNow.Date;
+            /*
+             * The day the new wording starts being asked (F31).
+             *
+             * This command hard-coded today, alone among the seven. AD-122 accepts that a
+             * mandatory question in force today is owed by every unsubmitted review of that
+             * discipline at its next submit, and names the effective-from date as the control
+             * for it - "which is why every command exposes the effective-from date". This one
+             * did not, and it is the command that changes a question's WORDING, which is the
+             * most ordinary edit there is. So the one mitigation the decision relies on was
+             * missing exactly where it was argued to apply.
+             *
+             * Absent is still today, so every existing caller behaves as it did.
+             *
+             * The retirement and the successor take the SAME day, as they always have: on the
+             * changeover day the successor alone is current, which is the contract
+             * versionEffective and ResponseRules.IsVersionEffective are both written against.
+             * Dating them apart would leave a gap with no version in force.
+             */
+            var today = AddQuestionPlugin.ParseEffectiveFrom(
+                effectiveFromArg, DateTime.UtcNow.Date);
             var currentNumber = current.GetAttributeValue<int>("al_versionnumber");
             var newNumber = currentNumber + 1;
 
