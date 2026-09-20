@@ -230,6 +230,30 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.False(row.Values.ContainsKey("al_assignedby"));
         }
 
+        [Theory]
+        [InlineData("Tax Check")]
+        [InlineData("Trust Documentation Check")]
+        [InlineData("High Risk Item 1")]
+        [InlineData("High Risk Item 2")]
+        [InlineData("Enhanced Supervision")]
+        [InlineData("Pre-CAS Adviser")]
+        [InlineData("Leaver")]
+        public void Recognises_every_item_wording_the_real_extract_uses(string item)
+        {
+            // These seven are the ONLY stamped checklist names in the real Pre-Advice Check
+            // task extract of 2026-09-14, read on 2026-09-20. They answer AD-124's open
+            // question about IO's exact item wording from data rather than from the
+            // synthetic sample, and they matter because an unrecognised name does not route
+            // on what it did recognise - it FAILS the whole row (BR-002).
+            //
+            // Only the vocabulary is recorded here. The extract itself carries client names,
+            // references, addresses, postcodes, emails and phone numbers, so it is not in
+            // this repository and must not be.
+            Assert.True(
+                ImportRules.ChecklistItems.ContainsKey(item),
+                item + " is used by the real extract and must be recognised.");
+        }
+
         [Fact]
         public void Does_not_import_the_assigned_to_name_anywhere()
         {

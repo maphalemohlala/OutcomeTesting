@@ -51,22 +51,49 @@ records that nobody has yet relied on would be tooling built ahead of a need.
 
 ---
 
-## The residual risk, stated plainly
+## The risk is closed — the real extract settles it
 
-**No real IO extract was available to check this against.** The only extract in the repository
-is `data/io-task-extract-sample.csv`, which is synthetic — its names are literally
-"Paraplanner 1" and "Checker 4".
+This section originally recorded a residual risk, because no real IO extract was available and
+the ruling rested on a synthetic sample plus the written specification. **The owner supplied
+the real extract the same day, and it confirms the mapping.**
 
-That sample supports this mapping: `AssignedBy` is "Paraplanner N" in all seven rows. So does
-the written specification, which has said `AssignedBy` throughout. Against that, the
-2026-09-14 direction said the real extract put the two the other way round.
+Read from the Pre-Advice Check task extract of 2026-09-14, on 2026-09-20:
 
-The project owner was shown this conflict and reaffirmed `AssignedBy`. **If a real extract
-later shows otherwise, the fix is one line in each of the two files above, plus the tests.**
+| Column | Populated | What it holds |
+|---|---|---|
+| `AssignedBy` | **14 of 14 rows** | One name on 13 rows, another on 1 |
+| `AssignedTo` | **7 of 14 rows — blank on half** | Equals `CompletedBy1`, the checklist stamper, on 6 rows |
+
+**The old mapping was worse than "names the wrong person".** With `AssignedTo` feeding
+`al_paraplanner`, **half the file would have imported with no para-planner at all** — and
+`al_paraplanner` is who receives the Pass and Remediation letters about a client's advice
+outcome. Seven cases would have had no recipient, and before AD-161 nothing would have said so
+until the letters failed to arrive.
+
+`AssignedTo` tracking `CompletedBy1` is the corroboration: it is whoever actioned the task, not
+whoever raised it.
+
+Two further things the extract confirmed:
+
+- **Every header the import reads is present.** No mapped column is missing.
+- **All seven stamped checklist names are already recognised** — `Tax Check`,
+  `Trust Documentation Check`, `High Risk Item 1`, `High Risk Item 2`, `Enhanced Supervision`,
+  `Pre-CAS Adviser`, `Leaver`. That answers AD-124's open question about IO's exact item
+  wording from data rather than guesswork, and it matters because an unrecognised name does not
+  route on what it did recognise — it fails the whole row. A test now pins the seven.
+- **13 of 14 rows import.** The one failure is the already-documented row with no checklist
+  item stamped, which is the designed behaviour.
 
 The test fixtures were renamed with the mapping, deliberately. `AssignedTo` used to be called
 "Pat Paraplanner" in both fixtures — which is precisely the assumption that got written into
 the column map twice. A fixture that embeds the guess cannot catch the guess.
+
+### The extract is not in this repository, and must not be
+
+It carries client names, references, addresses, postcodes, email addresses and phone numbers.
+Only the checklist vocabulary was taken from it into the codebase, in a test. If it needs to be
+kept, it belongs somewhere with access control, not in git.
+
 
 ---
 
@@ -89,7 +116,7 @@ reporting did not quietly become a looser send.
 
 ## Verification
 
-- **1139** plug-in tests, **608** app tests, `tsc -b` clean.
+- **1146** plug-in tests, **608** app tests, `tsc -b` clean.
 - The two mapping tests were run against the old mapping and **both fail**; they pass against
   the new one.
 - No schema change. No environment change. Nothing to deploy beyond the assembly and the app.
