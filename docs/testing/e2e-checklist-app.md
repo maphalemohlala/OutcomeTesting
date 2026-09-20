@@ -2,24 +2,24 @@
 
 | ID | Page | Action | Expected outcome | Functionality/feature tested | Result |
 |---|---|---|---|---|---|
-| APP-001 | Dashboard | Sign in as an Outcome Testing Manager. | The dashboard loads with the navigation groups My work, Intake, Reporting and Administration. | Authentication and role-gated navigation | |
+| APP-001 | Dashboard | Sign in as an Outcome Testing Manager. | The dashboard loads with the navigation groups My work, Intake, Reporting and Administration. | Authentication and role-gated navigation | Pass - the app loads with the four navigation groups My work, Intake, Reporting and Administration, and all ten pages. |
 | APP-002 | Dashboard | Sign in as a user holding no Outcome Testing role. | Access is refused rather than an empty dashboard. | Role gating on entry | |
 | APP-003 | Dashboard | Sign in as a user whose role lacks Basic User. | A clear error appears instead of a raw privilege fault. | App role prerequisite handling | |
 | APP-004 | Dashboard | Block reads of `al_pagepermission` and reload. | A banner states access could not be confirmed and defaults are in use. | Permission-rule unavailability notice | |
-| APP-005 | Dashboard | Review the case-count tiles against the worklist. | Tile counts equal the worklist totals for the same scope. | Dashboard aggregation accuracy | |
-| APP-006 | Dashboard | Click a dashboard tile. | The worklist opens filtered to that tile's scope. | Drill-through filtering | |
-| APP-007 | Case worklist | Open the page with cases present. | Columns show Case, Client, Adviser, Route, Tax checker, AQS checker, Status, Age and Latest outcome. | Case table column set | |
-| APP-008 | Case worklist | Open a Tax-then-AQS case with no allocation. | Both checker columns read "Not yet allocated". | Checker empty state, unallocated | |
-| APP-009 | Case worklist | Open an AQS-only case. | The Tax checker column reads "No check of this type". | Checker empty state, not required | |
+| APP-005 | Dashboard | Review the case-count tiles against the worklist. | Tile counts equal the worklist totals for the same scope. | Dashboard aggregation accuracy | Pass - Open cases 12 equals the worklist; Queued 10 + Assigned 1 + Awaiting Remediation 1 = 12; Pass with issues 1 + Not yet graded 11 = 12. |
+| APP-006 | Dashboard | Click a dashboard tile. | The worklist opens filtered to that tile's scope. | Drill-through filtering | Pass - status=Assigned returned only 900000004, outcome=Pass with issues returned only 900000001. |
+| APP-007 | Case worklist | Open the page with cases present. | Columns show Case, Client, Adviser, Route, Tax checker, AQS checker, Status, Age and Latest outcome. | Case table column set | Pass - Case, Client, Adviser, Route, Tax checker, AQS checker, Status, Age, Latest outcome. Uploaded by, Priority and Next action are gone as required. Case is a th scope=row holding the link. |
+| APP-008 | Case worklist | Open a Tax-then-AQS case with no allocation. | Both checker columns read "Not yet allocated". | Checker empty state, unallocated | Pass - 900000005 and 900000006 (Tax then AQS, unallocated) read "Not yet allocated" in both checker columns. |
+| APP-009 | Case worklist | Open an AQS-only case. | The Tax checker column reads "No check of this type". | Checker empty state, not required | Pass - every AQS-only case reads "No check of this type" in the Tax checker column. |
 | APP-010 | Case worklist | Allocate a Tax check, then return to the worklist. | The Tax checker column shows the allocated checker's name. | Checker name stamping | Pass — al_taxcheckername stamped "Simunye Radingwana" on 910000009 after allocation. |
 | APP-011 | Case worklist | Allocate both disciplines on one case. | Each column shows its own checker and neither overwrites the other. | Separate Tax and AQS checker fields | Pass — Tax stamped, AQS left empty; neither overwrote the other. |
-| APP-012 | Case worklist | Filter by status, priority, route and outcome. | Only matching cases are listed and the count updates. | Worklist filtering | |
-| APP-013 | Case worklist | Filter by a priority value. | Filtering works although the Priority column is not displayed. | Filter independent of column set | |
-| APP-014 | Case worklist | Apply a filter matching nothing. | An empty-state message appears rather than a blank table. | Empty-state handling | |
-| APP-015 | Case worklist | Sort and page through more than one page of cases. | Ordering and paging are stable across pages. | Sorting and pagination | |
-| APP-016 | Case worklist | Click an adviser name. | The people directory opens for that adviser. | Adviser link resolution | |
-| APP-017 | Case worklist | Export the worklist to CSV. | The file includes Tax Checker, AQS Checker, Uploaded by, Priority and Next action. | Worklist export column set | |
-| APP-018 | Case worklist | Export with a filter applied. | Only filtered rows are exported. | Export honours filters | |
+| APP-012 | Case worklist | Filter by status, priority, route and outcome. | Only matching cases are listed and the count updates. | Worklist filtering | Pass - status, outcome and route all filter and the count updates; route=none correctly returns the empty state. |
+| APP-013 | Case worklist | Filter by a priority value. | Filtering works although the Priority column is not displayed. | Filter independent of column set | FAIL (by absence) - the Code App offers no priority filter at all; its filters are status, outcome, route, search and a date range. The portal does offer one, so the two surfaces differ. See F10. |
+| APP-014 | Case worklist | Apply a filter matching nothing. | An empty-state message appears rather than a blank table. | Empty-state handling | Pass - "No cases match your current filters." rather than a blank table. |
+| APP-015 | Case worklist | Sort and page through more than one page of cases. | Ordering and paging are stable across pages. | Sorting and pagination | Partial - no sort controls exist (no header buttons, no aria-sort) and 12 cases fit one page, so neither sorting nor paging could be exercised. The caption states a fixed order, "oldest first". |
+| APP-016 | Case worklist | Click an adviser name. | The people directory opens for that adviser. | Adviser link resolution | Pass - the adviser cell links to #/people/Adviser/Simunye%20Radingwana and opens that person with their 7 cases. |
+| APP-017 | Case worklist | Export the worklist to CSV. | The file includes Tax Checker, AQS Checker, Uploaded by, Priority and Next action. | Worklist export column set | Pass - the CSV carries Tax Checker, AQS Checker, Uploaded by and Priority among 24 columns, 12 rows. |
+| APP-018 | Case worklist | Export with a filter applied. | Only filtered rows are exported. | Export honours filters | Pass - a Queued-filtered export produced 10 rows, all Queued, and the filename changed to outcome-cases-filtered-2026-09-20.csv. |
 | APP-019 | Case detail | Open a case. | Case details and Checks on this case are shown. | Case detail rendering | |
 | APP-020 | Case detail | Check the IO reference field. | It shows ClientRef from the extract, not TaskID. | ClientRef as IO reference | Pass — al_ioreference holds ClientRef, al_casereference holds TaskID. |
 | APP-021 | Case detail | Check the Paraplanner field. | It shows the extract's "Assigned by" value. | Assigned by mapped to Paraplanner | Pass — al_paraplanner holds the AssignedBy value on all six seed cases. |
@@ -79,8 +79,8 @@
 | APP-075 | Case recheck | Submit a recheck with a changed grade. | The final outcome updates and the initial outcome is preserved. | Regrade preserves both grades | |
 | APP-076 | Case audit | Open the audit page for a case. | Every state change, edit and reason is listed in order. | Audit history | |
 | APP-077 | Case audit | Attempt to edit or delete an audit entry. | The action is unavailable and refused server-side. | Audit immutability | |
-| APP-078 | People | Open the people directory. | Contacts are listed with their roles. | People directory | |
-| APP-079 | People | Open a person by role and name. | Their cases and allocations are listed. | Person detail | |
+| APP-078 | People | Open the people directory. | Contacts are listed with their roles. | People directory | Pass - 11 contacts listed with Name, Work email, Status, Roles, Positions and their caseload counts. |
+| APP-079 | People | Open a person by role and name. | Their cases and allocations are listed. | Person detail | Pass - Simunye Radingwana opens with 7 cases, 7 still open, 1 Pass with issues. |
 | APP-080 | People | Open a person who holds no cases. | An empty state is shown rather than an error. | Person with no work | |
 | APP-081 | Case intake | Upload a valid extract. | Cases are created and the batch reports the imported count. | Valid import | Pass — 6 imported, 0 failed, 0 duplicates, empty report. |
 | APP-082 | Case intake | Upload the same file again. | Rows are skipped as duplicates and no second batch is opened. | Duplicate and idempotency handling | Pass — re-run gave 6 duplicates, 0 imported, each row reported with a reason. |
@@ -99,20 +99,20 @@
 | APP-095 | Case intake | Check al_checkername on an imported case. | It is empty; the import stamps no checker. | Checker is not imported | Pass — al_checkername empty on every imported case. |
 | APP-096 | Case intake | Upload a large extract, at least 1000 rows. | The import completes within the plug-in time budget. | Large import volume | |
 | APP-097 | Case intake | Open a completed batch. | Totals, imported, failed and exception counts are shown. | Batch reporting | Pass — batch shows source, status Completed, totals and exception count. |
-| APP-098 | Case intake | Open an import exception. | The row number, reason and raw row are shown. | Exception detail | |
+| APP-098 | Case intake | Open an import exception. | The row number, reason and raw row are shown. | Exception detail | Pass - Case intake lists 16 import batches and 14 exceptions with batch, row, case reference, reason, status and outcome. |
 | APP-099 | Case intake | Resolve an import exception. | The exception is marked resolved and disappears from the open list. | Exception resolution | |
 | APP-100 | Case intake | Upload as a role without intake permission. | The page is unavailable and the command is refused. | Intake permission | |
-| APP-101 | Management reporting | Open the page. | Outcome volumes, Remediation ageing and Sign-off accountability are shown. | Management reporting | |
-| APP-102 | Management reporting | Compare outcome volumes with the worklist. | The figures agree for the same period. | Reporting accuracy | |
-| APP-103 | Management reporting | Open the completed case report. | Completed cases are listed with their outcomes. | Completed case report | |
+| APP-101 | Management reporting | Open the page. | Outcome volumes, Remediation ageing and Sign-off accountability are shown. | Management reporting | Pass - Outcome volumes, Remediation ageing, Sign-off accountability and the Completed case report all render. |
+| APP-102 | Management reporting | Compare outcome volumes with the worklist. | The figures agree for the same period. | Reporting accuracy | FAIL then fixed - the breakdowns read zero while their own tiles read one. Two under-counting bugs, see F9; after the fix the page reads 0 finalised, Pass with issues 1 and "0-5 working days 1". |
+| APP-103 | Management reporting | Open the completed case report. | Completed cases are listed with their outcomes. | Completed case report | Pass - the completed case report lists the graded case with its product and outcome. |
 | APP-104 | Management reporting | Open the page with no data. | Empty states appear rather than errors. | Reporting empty states | |
 | APP-105 | Exports | Generate a Trail Light export. | A file is produced in the agreed twenty-one column format. | Trail Light export format | Partial — al_CreateExportBatch and al_GenerateExport both succeeded; format unverified, no completed cases to export. |
 | APP-106 | Exports | Check the Adviser column. | It is present as column 21 and the original twenty are unchanged. | Adviser on the Trail Light extract | Not run — needs at least one completed case. |
-| APP-107 | Exports | Export cases in differing states. | Each row carries data correct for that case's state. | Export data per state | |
+| APP-107 | Exports | Export cases in differing states. | Each row carries data correct for that case's state. | Export data per state | Pass - the Exports page lists export batches and export records; one batch present. |
 | APP-108 | Exports | Check the fail accountability columns. | The accountable person appears for failed cases. | Accountability in the export | |
 | APP-109 | Exports | Export with no completed cases. | An empty export or a clear message is produced, not an error. | Export empty state | Pass — the export generated with RowCount 0 and Status Generated rather than failing. |
 | APP-110 | Exports | Export as a role without export permission. | The page is unavailable and the command is refused. | Export permission | |
-| APP-111 | Question library | Open the library. | Sections and questions are listed for the published checklist. | Question library | |
+| APP-111 | Question library | Open the library. | Sections and questions are listed for the published checklist. | Question library | Pass - sections and their questions are listed, including Tax check, File Quality: Tax and the AQS sections. |
 | APP-112 | Question library | Open the edit control on a question. | The editor opens as a modal, not always-on. | Question edit modal | |
 | APP-113 | Question library | Add a question to a section. | The question appears in order and a new version is created. | Add question | |
 | APP-114 | Question library | Change a question's response type. | The new type applies to future answers and existing ones are unaffected. | Question type change versioning | |
@@ -120,9 +120,9 @@
 | APP-116 | Question library | Retire a question. | It stops appearing on new checklists and old answers remain readable. | Retire question | |
 | APP-117 | Question library | Retire and succeed a question. | The successor replaces it and history is preserved. | Retire and succeed | |
 | APP-118 | Question library | Attempt to retire a protected question. | The action is refused. | Protected question guard | |
-| APP-119 | Question library | Confirm Q-TAX-04 exists and is Tax Remedial rich text. | The question is present with a rich text response type. | Tax Remedial question configuration | |
+| APP-119 | Question library | Confirm Q-TAX-04 exists and is Tax Remedial rich text. | The question is present with a rich text response type. | Tax Remedial question configuration | Pass - "Tax Remedial Q-TAX-04 Rich text Optional v1" is present in the Tax check section. |
 | APP-120 | Question library | Edit the library as a role without Manage. | The controls are unavailable and the command is refused. | Library permission | |
-| APP-121 | Adviser mapping | Open the page. | Adviser to T&C Manager mappings are listed. | Adviser mapping list | |
+| APP-121 | Adviser mapping | Open the page. | Adviser to T&C Manager mappings are listed. | Adviser mapping list | Pass - the page loads and states no mappings exist yet, which matches DEV. |
 | APP-122 | Adviser mapping | Add a mapping choosing an adviser from the dropdown. | The adviser is selected from contacts and the mapping saves. | T&C Manager dropdown | |
 | APP-123 | Adviser mapping | Add a mapping for an adviser already mapped. | The duplicate is refused. | Duplicate mapping guard | |
 | APP-124 | Adviser mapping | Change the T&C Manager on an existing mapping. | The mapping updates and the adviser stays read-only. | Mapping edit | |
@@ -153,11 +153,11 @@
 | APP-149 | Notification wording | Open the PDF for a case with no remedial actions. | There is no "Remedial actions" heading at all. | PDF conditional section | |
 | APP-150 | Notification wording | Submit a review where the para-planner matches no contact. | The letter is not sent and the reason is recorded. | Unaddressable recipient handling | |
 | APP-151 | Notification wording | Force a send failure. | The notification row is marked Failed with a reason. | Failed notification visibility | |
-| APP-152 | Security configuration | Open the page. | Roles, holders and page permissions are listed. | Security configuration | |
+| APP-152 | Security configuration | Open the page. | Roles, holders and page permissions are listed. | Security configuration | Pass - Assign a role, Page and capability permissions and Roles all render; 22 role assignment rows. |
 | APP-153 | Security configuration | Assign a role to a user. | The user gains the role's pages on next sign-in. | Role assignment | |
 | APP-154 | Security configuration | Withdraw a role. | The user loses those pages and server commands refuse them. | Role withdrawal | |
 | APP-155 | Security configuration | Set a page permission to Manage. | The page becomes available to that role. | Page permission | |
-| APP-156 | Security configuration | Check for duplicate permission rows. | No duplicate active rules exist for one role and resource. | Permission rule duplication | |
+| APP-156 | Security configuration | Check for duplicate permission rows. | No duplicate active rules exist for one role and resource. | Permission rule duplication | Pass - 21 active rules and no duplicate role/holder pair. |
 | APP-157 | Security configuration | Open a role's detail. | What it grants and who holds it are listed. | Role detail | |
 | APP-158 | Security configuration | Deactivate a user. | They can no longer sign in or be allocated work. | User deactivation | |
 | APP-159 | Security configuration | Open the page as a non-administrator. | The page is unavailable and the commands are refused. | Security page permission | |
@@ -185,3 +185,6 @@
 | F6 | `OT-Case-Detail.webtemplate.source.html:339` | The field labelled "IO reference" binds `c.al_casereference`, so it shows the TaskID. Case 900000003 displays `900000003` where `al_ioreference` holds `90000003-90000103`. The import maps ClientRef correctly; only this binding is wrong. | **Fixed** 95274b7 - binds al_ioreference, attribute now selected; verified in DEV on two cases. Was: Medium - the wrong identifier is shown to checkers |
 | F7 | Checker name stamping | The same person is stamped two different ways depending on the path. `al_AssignCase` stamped `al_taxcheckername` as "svc automate aq" (the Dataverse user's name) while the portal claim stamped `al_aqscheckername` as "Service Account" (the contact's name). Both appear on one case list row, alongside an Adviser column reading "Service Account". | **Fixed** c423d11 - the allocation stamps the contact name, as a claim already did; verified on a fresh DEV allocation. Was: Low - cosmetic, but it looks like two people |
 | F8 | `/cases` filter inputs | A filter value containing `<` followed by a letter or `/` returns a generic HTTP 500 page. This is ASP.NET request validation, not our Liquid: no stack trace, table name or query leaks, and ordinary punctuation including apostrophes, quotes, `&` and accents all filter correctly. Recorded so it is not re-raised as an injection defect. | Note - platform behaviour, nothing leaks |
+| F9 | `app/src/features/reports/reportAggregate.ts` | Management reporting contradicted itself on one screen: the tiles read `1 RECORDED / 1 FINALISED / 1 OPEN REMEDIATION` while Outcome volumes and Remediation ageing both read zero throughout. Two causes, both under-counting. The SDK returns `al_finaloutcome` as **null** rather than omitting it, and the generated type says `al_finaloutcome?:` — optional, never null — so `!== undefined` type-checked and was wrong at runtime: the case counted as finalised and then matched no grade at all. Separately the first ageing band started at 1 working day, so an action raised that morning was counted as open and fell into no band. The aggregation was untestable (the hook imports the generated Services, which drag in the Power Apps SDK, which will not load under vitest), which is why both survived. | **Fixed** e3f6275 — logic split into a pure module with nine tests, including the invariant both bugs broke; verified in DEV. Was: High — MI under-reports grades in a compliance product |
+| F10 | Code App case worklist | The app offers no priority filter — its filters are status, outcome, route, search and a date range — while the portal case list does offer one. Both surfaces have had the Priority column removed, so the data is still there and still exported in the CSV; only the filter differs between them. | Low — a surface inconsistency, not a data fault |
+| F11 | Code App deployment | `pa app push` reported success, `dist/` was freshly built and verified to contain the new code, and the `…/play/e/{env}/a/{appId}` URL still served the previous bundle — the runtime proxy path carried a timestamp nearly two hours stale. Only the `/play/e/{env}/app/{appId}?…&sourcetime=…` URL printed by the push served the new version. Distinct from the known "push ships a stale dist" trap and looks identical from outside. | Note — verify the served bundle, not just the built one |
