@@ -496,6 +496,11 @@ if (args.Length >= 4 && args[0].Equals("webapi", StringComparison.OrdinalIgnoreC
     return WebApi(args);
 }
 
+if (args.Length >= 3 && args[0].Equals("webapimany", StringComparison.OrdinalIgnoreCase))
+{
+    return WebApiMany(args[1], args[2]);
+}
+
 if (args.Length >= 3 && args[0].Equals("settracelog", StringComparison.OrdinalIgnoreCase))
 {
     return SetTraceLog(args);
@@ -797,6 +802,111 @@ int WebApi(string[] a)
 
         return 2;
     }
+}
+
+// Several Web API calls over ONE sign-in.
+//
+// `webapi` connects afresh every time, and the sign-in is the expensive part - tens of
+// seconds. That is fine for a handful of calls and hopeless for the setup a lifecycle test
+// needs: answering one checklist is 35 writes, which is half an hour of signing in and
+// about a second of work.
+//
+// Takes a JSON array of { "verb": ..., "path": ..., "body": ... }, where body may be an
+// object - sent as JSON - or absent. Each result is printed as one line: the index, the
+// status, and the response where there is one, so a failure in the middle is attributable
+// without re-running anything.
+//
+// It does NOT stop at the first failure. These are usually independent writes, and stopping
+// would leave the caller guessing which of the rest would also have failed.
+int WebApiMany(string orgUrl, string requestsFile)
+{
+    var file = requestsFile.StartsWith("@", StringComparison.Ordinal)
+        ? requestsFile.Substring(1)
+        : requestsFile;
+
+    var requests = JsonNode.Parse(File.ReadAllText(file))!.AsArray();
+
+    using var svc = Connect(orgUrl);
+
+    var failed = 0;
+
+    for (var i = 0; i < requests.Count; i++)
+    {
+        var request = requests[i]!.AsObject();
+        var verb = (request.TryGetPropertyValue("verb", out var verbNode) && verbNode != null
+            ? verbNode.GetValue<string>()
+            : "POST").Trim().ToUpperInvariant();
+        var target = (request.TryGetPropertyValue("path", out var pathNode) && pathNode != null
+            ? pathNode.GetValue<string>()
+            : string.Empty).TrimStart('/');
+        var payload = request.TryGetPropertyValue("body", out var bodyNode) && bodyNode != null
+            ? bodyNode.ToJsonString()
+            : null;
+
+        HttpMethod method;
+        switch (verb)
+        {
+            case "GET": method = HttpMethod.Get; break;
+            case "POST": method = HttpMethod.Post; break;
+            case "PATCH": method = new HttpMethod("PATCH"); break;
+            case "DELETE": method = HttpMethod.Delete; break;
+            default:
+                Console.WriteLine(i + " SKIPPED unknown verb " + verb);
+                failed++;
+                continue;
+        }
+
+        var headers = new Dictionary<string, List<string>>();
+
+        // Same reason as webapi: without If-Match a PATCH at a missing row creates one.
+        if (verb == "PATCH" || verb == "DELETE")
+        {
+            headers["If-Match"] = new List<string> { "*" };
+        }
+
+        try
+        {
+            using var response = svc.ExecuteWebRequest(method, target, payload, headers);
+
+            var content = response.Content == null
+                ? string.Empty
+                : response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+            Console.WriteLine(
+                i + " HTTP " + (int)response.StatusCode + " " + response.ReasonPhrase
+                + (string.IsNullOrWhiteSpace(content) ? string.Empty : " " + Flatten(content)));
+
+            if (!response.IsSuccessStatusCode)
+            {
+                failed++;
+            }
+        }
+        catch (HttpOperationException failure)
+        {
+            // As in webapi: the exception's own message says nothing, and the refusal a
+            // server-side rule threw is in the response body.
+            var refusal = failure.Response == null ? null : failure.Response.Content;
+
+            Console.WriteLine(
+                i + " HTTP " + (failure.Response == null
+                    ? "(no response)"
+                    : ((int)failure.Response.StatusCode).ToString())
+                + " " + Flatten(string.IsNullOrWhiteSpace(refusal) ? failure.Message : refusal));
+
+            failed++;
+        }
+    }
+
+    Console.WriteLine(requests.Count + " requests, " + failed + " failed.");
+    return failed == 0 ? 0 : 2;
+}
+
+// One line per result, so the index stays readable beside it. A refusal sentence is what
+// matters here and it is short; a long query result is better read with `webapi`.
+string Flatten(string text)
+{
+    var single = text.Replace("\r", " ").Replace("\n", " ").Trim();
+    return single.Length <= 400 ? single : single.Substring(0, 400) + "...";
 }
 
 // Plug-in trace logging for the environment (organization.plugintracelogsetting).
