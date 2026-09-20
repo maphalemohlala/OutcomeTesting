@@ -66,3 +66,48 @@ One thing the automated checks genuinely cannot do is confirm the page *renders*
 that gap is now closed — a sample is generated through `CompletedCheckPdf`, rasterised and
 looked at, which is how the subheading size was found to be wrong (AD-166). For the portal
 templates it is still open: the gate is static and nothing renders Liquid.
+
+---
+
+# 2026-09-20 (later) — recipients, and letters of your own (AD-168)
+
+## What went to DEV
+
+| Component | How | Verified |
+|---|---|---|
+| `al_notificationtemplate.al_event` | `addchoicecolumn` | 8 options, matching `NotificationOutbox.KnownEvents()` |
+| `al_notificationtemplate.al_recipientkind` | `addchoicecolumn` | 5 options, matching `NotificationRecipients` |
+| `al_notificationtemplate.al_recipientcontactid` | `addlookupcolumn` | lookup to `contact` |
+| `OutcomeTesting.Plugins` assembly | `pushassembly` | 289,792 bytes, matching the `-c Release` build made immediately before |
+| Code App | `pa app push` | data source regenerated first; the model diff was **exactly** the 28 lines for the three columns |
+
+No plug-in step was registered: the guard already runs pre-operation on Create and Update of
+`al_notificationtemplate`, and the new rules are in the same type.
+
+## The registration tool hung twice, and it was not the verb
+
+`addchoicecolumn` sat on `Connecting to <org>…` for 12 minutes backgrounded, then 10 more in
+the foreground, printing nothing. It is not a slow metadata publish and it is not sign-in:
+running the cheap `fetch` verb immediately afterwards connected and returned in seconds.
+
+It is **two instances of the tool contending for the MSAL token cache**. Killing the stray
+process and re-running the identical command succeeded in seconds. This extends the existing
+one-process-at-a-time rule, and the symptom is worth recording because it looks exactly like a
+slow write — which is what sent me reading `AddChoiceColumn` for a `Console.ReadLine` that was
+never there.
+
+**If the tool sits on `Connecting…`**: `Get-Process -Name OutcomeTesting.Registration`, stop
+what is there, retry. Never background it.
+
+## What is NOT verified in DEV
+
+The logic has 1251 plug-in tests behind it, but **nothing has been exercised end to end in an
+environment**, because there is no verb that creates a template row — the table is
+administered from the Code App screen. The fan-out in particular has never queued a real
+letter outside a test.
+
+That is what **T7d** in `docs/audit-2026-09.md` is for, and step 4 is the one to actually do:
+point a letter at a para-planner who matches no contact and confirm the letter still reaches
+its original recipient. An override that resolves to nobody must not empty an address the
+system had worked out correctly, and losing a letter silently is worse than ignoring a bad
+setting.
