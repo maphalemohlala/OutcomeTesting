@@ -744,6 +744,16 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-badge--none         { color: var(--colour-text-muted); }
 
 /* ------------------------------------------------------------------
+   An absent checker on the case list. Not a blank: it says WHICH of
+   the two absences it is, and they mean opposite things - a check
+   nobody owes against a check nobody has picked up. Italic for the
+   one that is nobody's outstanding work, so a column of them skims.
+   Worded in the template to match CHECKER_LABELS in the Code App.
+   ------------------------------------------------------------------ */
+.ot-checker            { color: var(--colour-text-muted); }
+.ot-checker--na        { font-style: italic; }
+
+/* ------------------------------------------------------------------
    A check the route requires that has not been created yet. Held back
    from the rows carrying real work so the eye separates "owed" from
    "under way", without colour being the only signal — the row says

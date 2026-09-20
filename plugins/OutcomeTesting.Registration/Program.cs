@@ -401,6 +401,11 @@ if (args.Length >= 4 && args[0].Equals("setcasepeople", StringComparison.Ordinal
     return SetCasePeople(args[1], args[2], args[3], ConfirmedFor(args, args[1]));
 }
 
+if (args.Length >= 4 && args[0].Equals("setcaseadviser", StringComparison.OrdinalIgnoreCase))
+{
+    return SetCaseAdviser(args[1], args[2], args[3], ConfirmedFor(args, args[1]));
+}
+
 if (args.Length >= 3 && args[0].Equals("repointremediation", StringComparison.OrdinalIgnoreCase))
 {
     return RepointRemediation(args[1], args[2], ConfirmedFor(args, args[1]));
@@ -8503,6 +8508,73 @@ int VerifyTaxHeader(string[] a)
 // Written straight through the SDK rather than through al_UpdateCaseDetails. No step is
 // registered on al_outcomecase, so nothing is bypassed, and an audit trail of seed rows being
 // relabelled is noise rather than history.
+// Sets al_advisername on matching cases, and NOTHING else.
+//
+// setcasepeople below will not do: it writes the adviser, the para-planner AND the checker
+// name from one value, and it refuses a name that does not resolve to an active contact. All
+// three are right for what it is for - seeding a case whose people must be addressable - and
+// all three are wrong here.
+//
+// An adviser name is NOT a contact. It arrives on the extract as free text, it is what the
+// adviser -> T&C Manager mapping is looked up by, and AD-029 is explicit that an imported
+// name nobody registered has to survive. Requiring a contact would refuse exactly the values
+// the extract actually carries.
+//
+// al_checkername is deliberately not touched either. It is not an assignment (AD-113): the
+// import stopped stamping it for that reason, and a verb that quietly put a name back would
+// undo that.
+//
+// Straight through the SDK, as setcasepeople is: no step is registered on al_outcomecase, so
+// nothing is bypassed.
+int SetCaseAdviser(string orgUrl, string referenceLike, string adviserName, bool confirm)
+{
+    using var svc = Connect(orgUrl);
+
+    var name = adviserName.Trim();
+    if (name.Length == 0)
+    {
+        Console.Error.WriteLine("An adviser name is needed. Clearing the column is not what this is for.");
+        return 1;
+    }
+
+    var cases = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_outcomecase\"><attribute name=\"al_outcomecaseid\"/>" +
+        "<attribute name=\"al_casereference\"/><attribute name=\"al_advisername\"/><filter>" +
+        "<condition attribute=\"al_casereference\" operator=\"like\" value=\"" +
+        System.Security.SecurityElement.Escape(referenceLike) + "\"/>" +
+        "</filter><order attribute=\"al_casereference\"/></entity></fetch>")).Entities;
+
+    Console.WriteLine($"{cases.Count} case(s) matching '{referenceLike}':");
+    foreach (var c in cases)
+    {
+        var was = c.GetAttributeValue<string>("al_advisername");
+        var unchanged = string.Equals(was, name, StringComparison.Ordinal);
+        Console.WriteLine($"   {c.GetAttributeValue<string>("al_casereference")}: "
+            + $"'{was}' -> '{name}'{(unchanged ? " (no change)" : string.Empty)}");
+    }
+
+    if (!confirm)
+    {
+        Console.WriteLine("Dry run. Re-run with --confirm <orgUrl> to write.");
+        return 0;
+    }
+
+    var written = 0;
+    foreach (var c in cases)
+    {
+        if (string.Equals(c.GetAttributeValue<string>("al_advisername"), name, StringComparison.Ordinal))
+        {
+            continue;
+        }
+
+        svc.Update(new Entity("al_outcomecase", c.Id) { ["al_advisername"] = name });
+        written++;
+    }
+
+    Console.WriteLine($"Set the adviser to '{name}' on {written} case(s); {cases.Count - written} already held it.");
+    return 0;
+}
+
 int SetCasePeople(string orgUrl, string referenceLike, string personName, bool confirm)
 {
     using var svc = Connect(orgUrl);

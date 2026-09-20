@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import caseListTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-case-list/OT-Case-List.webtemplate.source.html?raw';
+import { REVIEW_ROUTES } from '../../types/domain';
 import { CHECKER_LABELS, checkerLabel, checkerState, routeRequires } from './checkerNames';
 
 /**
@@ -80,5 +82,49 @@ describe('checkerLabel', () => {
     expect(checkerLabel(null, 'Tax then AQS', 'AQS')).toBe(CHECKER_LABELS.unallocated);
     expect(checkerLabel(null, 'Tax only', 'AQS')).toBe(CHECKER_LABELS['not-required']);
     expect(CHECKER_LABELS.unallocated).not.toBe(CHECKER_LABELS['not-required']);
+  });
+});
+
+/**
+ * The portal case list shows the same two columns, and decides the empty states the same
+ * way — from the route, because a list holds one flat row per case and has no reviews to
+ * count. It is Liquid, so it cannot import CHECKER_LABELS; it spells the two sentences out.
+ *
+ * This is the drift test for that (AD-041). It reads the template and fails when the
+ * wording, the route names or the columns disagree with this module — because the two
+ * surfaces saying different things about the same case is the failure nobody would spot
+ * until a checker and a manager were reading different screens.
+ */
+describe('the portal case list agrees with this module', () => {
+  it('words both empty states exactly as CHECKER_LABELS does', () => {
+    expect(caseListTemplate).toContain(CHECKER_LABELS['not-required']);
+    expect(caseListTemplate).toContain(CHECKER_LABELS.unallocated);
+  });
+
+  it('selects the two columns it renders', () => {
+    // A template that renders a column it never selected shows every case as unallocated,
+    // which reads as real data rather than as a missing attribute.
+    expect(caseListTemplate).toContain('<attribute name="al_taxcheckername" />');
+    expect(caseListTemplate).toContain('<attribute name="al_aqscheckername" />');
+  });
+
+  it('suppresses each discipline on exactly the route that does not owe it', () => {
+    // The mirror of routeRequires. Tax is not owed on an AQS only case; AQS is not owed on
+    // a Tax only case; anything else - including a case with no route - owes both.
+    expect(caseListTemplate).toContain("rt_name == 'AQS only'");
+    expect(caseListTemplate).toContain("rt_name == 'Tax only'");
+
+    for (const route of REVIEW_ROUTES) {
+      const suppressed = caseListTemplate.includes(`rt_name == '${route}'`);
+      const owedByBoth = routeRequires(route, 'Tax') && routeRequires(route, 'AQS');
+      expect(suppressed).toBe(!owedByBoth);
+    }
+  });
+
+  it('keeps them as two columns', () => {
+    // Merging them would reinstate the defect Fixes 2 removed: one column naming whichever
+    // discipline was allocated second.
+    expect(caseListTemplate).toContain('<th scope="col">Tax checker</th>');
+    expect(caseListTemplate).toContain('<th scope="col">AQS checker</th>');
   });
 });

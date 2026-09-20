@@ -84,3 +84,13 @@
 .worklist__unavailable p + p {
   margin-top: var(--space-3);
 }
+
+/* An absent checker is not a blank: it says which of the two absences it is. Muted, and
+   italic for the one that is nobody's outstanding work, so a column of them skims. */
+.worklist__checker {
+  color: var(--colour-text-muted);
+}
+
+.worklist__checker--not-required {
+  font-style: italic;
+}

@@ -355,6 +355,8 @@
     <attribute name="al_casereference" />
     <attribute name="al_clientname" />
     <attribute name="al_advisername" />
+    <attribute name="al_taxcheckername" />
+    <attribute name="al_aqscheckername" />
     <attribute name="al_casetype" />
     <attribute name="al_casestatus" />
     <attribute name="al_priority" />
@@ -423,6 +425,8 @@
             <th scope="col">Client</th>
             <th scope="col">Adviser</th>
             <th scope="col">Route</th>
+            <th scope="col">Tax checker</th>
+            <th scope="col">AQS checker</th>
             <th scope="col">Case type</th>
             <th scope="col">Status</th>
             <th scope="col">Outcome</th>
@@ -438,6 +442,29 @@
               <td>{{ c.al_clientname | escape }}</td>
               <td>{{ c.al_advisername | escape }}</td>
               <td>{{ c['rt.al_name'] | default: 'Not routed' | escape }}</td>
+              {% comment %}
+                Two columns, not one. A case on Tax then AQS has two checkers, and the
+                single checker column these replace named whichever discipline was
+                allocated second - the defect Fixes 2 removed from the case header.
+
+                An absent name is TWO different states and they mean opposite things to
+                whoever is reading the list: a case that will never take a Tax check has
+                not been overlooked, a case awaiting allocation has. Decided from the
+                ROUTE, because a list holds one flat row per case and has no reviews to
+                count - which is how the Code App worklist decides it too. Case detail
+                counts the reviews instead, because it has them.
+
+                An unknown route is treated as requiring both, so an unallocated check
+                reads as work outstanding rather than as work nobody owes. That is the
+                safe direction: it shows something that may not be needed rather than
+                hiding something that is.
+
+                The two sentences are worded exactly as CHECKER_LABELS in the Code App
+                spells them. When one changes, change both.
+              {% endcomment %}
+              {% assign rt_name = c['rt.al_name'] %}
+              <td>{% if c.al_taxcheckername != blank %}{{ c.al_taxcheckername | escape }}{% elsif rt_name == 'AQS only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
+              <td>{% if c.al_aqscheckername != blank %}{{ c.al_aqscheckername | escape }}{% elsif rt_name == 'Tax only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
               <td>{{ c.al_casetype.label | escape }}</td>
               <td>{% include 'OT Status Badge' status: c.al_casestatus.label %}</td>
               <td>{% capture grade %}{% include 'OT Outcome Label' final: c['oc.al_finaloutcome'] initial: c['oc.al_initialoutcome'] %}{% endcapture %}{% assign grade = grade | strip %}{% if grade != '' %}{% include 'OT Status Badge' status: grade %}{% elsif c.al_taxoutcome %}{% assign tax = c.al_taxoutcome.label %}{% if tax == null or tax == '' %}{% assign traw = c.al_taxoutcome.value | default: c.al_taxoutcome | integer %}{% case traw %}{% when 120910300 %}{% assign tax = 'Pass' %}{% when 120910301 %}{% assign tax = 'Fail' %}{% when 120910302 %}{% assign tax = 'Pass with issues' %}{% endcase %}{% endif %}{% if tax and tax != '' %}{% capture taxlabel %}Tax: {{ tax }}{% endcapture %}{% include 'OT Status Badge' status: taxlabel %}{% else %}<span class="ot-badge ot-badge--none">Not yet graded</span>{% endif %}{% else %}<span class="ot-badge ot-badge--none">Not yet graded</span>{% endif %}</td>

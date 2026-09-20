@@ -7,6 +7,8 @@ import { StageLabel } from '../../components/status/StageLabel';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import { ExportMenu } from '../../components/export/ExportMenu';
 import { CASE_STATUSES, OUTCOMES, REVIEW_ROUTES } from '../../types/domain';
+import type { ReviewRoute, ReviewType } from '../../types/domain';
+import { CHECKER_LABELS, checkerState } from './checkerNames';
 import { CASE_EXPORT_HEADERS, caseExportRow } from './caseExport';
 import { useCaseWorklist, type CaseSummary } from './useCaseWorklist';
 import './CaseWorklistPage.css';
@@ -63,6 +65,40 @@ function applyFilters(cases: CaseSummary[], filters: Filters): CaseSummary[] {
     }
     return true;
   });
+}
+
+/**
+ * One discipline's checker.
+ *
+ * A name is a person; an absence is one of two different things, and they are not
+ * interchangeable - a case that will never take a Tax check has not been overlooked, a case
+ * awaiting allocation has. `checkerState` reads the route to tell them apart, and the two
+ * are styled differently so a column of them can be skimmed.
+ */
+function CheckerCell({
+  name,
+  route,
+  type,
+}: {
+  name: string | null;
+  route: ReviewRoute | null;
+  type: ReviewType;
+}) {
+  const state = checkerState(name, route, type);
+
+  if (state.kind === 'named') {
+    return (
+      <td>
+        <Link to={`/people/Checker/${encodeURIComponent(state.name)}`}>{state.name}</Link>
+      </td>
+    );
+  }
+
+  return (
+    <td className={`worklist__checker worklist__checker--${state.kind}`}>
+      {CHECKER_LABELS[state.kind]}
+    </td>
+  );
 }
 
 export function CaseWorklistPage() {
@@ -242,6 +278,17 @@ export function CaseWorklistPage() {
                   <th scope="col">Client</th>
                   <th scope="col">Adviser</th>
                   <th scope="col">Route</th>
+                  {/*
+                    TWO columns, not one. A case on Tax then AQS has two checkers, and the
+                    single checker column these replace named whichever discipline was
+                    allocated second - which is the defect Fixes 2 removed from the header
+                    (2026-09-19). Merging them back here would put it straight back.
+
+                    They sit after Route because Route is what decides which of the two
+                    empty states an absent name means.
+                  */}
+                  <th scope="col">Tax checker</th>
+                  <th scope="col">AQS checker</th>
                   <th scope="col">Status</th>
                   <th scope="col">{UPLOADED_BY_LABEL}</th>
                   <th scope="col">Priority</th>
@@ -255,7 +302,7 @@ export function CaseWorklistPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="worklist__empty">
+                    <td colSpan={12} className="worklist__empty">
                       No cases match your current filters.
                     </td>
                   </tr>
@@ -276,6 +323,8 @@ export function CaseWorklistPage() {
                         )}
                       </td>
                       <td>{item.route ?? 'Not routed'}</td>
+                      <CheckerCell name={item.taxChecker} route={item.route} type="Tax" />
+                      <CheckerCell name={item.aqsChecker} route={item.route} type="AQS" />
                       <td>
                         <StageLabel status={item.status} />
                       </td>
