@@ -104,7 +104,8 @@ namespace OutcomeTesting.Plugins
 
             var details = "FQ adviser " + fqAdviser + ", FQ paraplanner " + fqParaplanner
                 + ", AQ adviser " + aqAdviser + ", AQ paraplanner " + aqParaplanner
-                + ", FQ named " + Describe(fqContactId) + ", AQ named " + Describe(aqContactId);
+                + ", FQ named " + Describe(fqContactId, NameOf(userService, fqContactId))
+                + ", AQ named " + Describe(aqContactId, NameOf(userService, aqContactId));
 
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandSetFailAccountability, "SetFailAccountability", OutcomeEntity, targetId,
@@ -154,9 +155,52 @@ namespace OutcomeTesting.Plugins
             return new EntityReference("contact", id);
         }
 
-        private static string Describe(EntityReference contact)
+        /// <summary>
+        /// How a named person is written into the audit line.
+        ///
+        /// This wrote the contact's GUID alone, which is unreadable to the auditor the line
+        /// exists for (F21). It went unnoticed because the parameter never arrived until
+        /// F15 was fixed, so every line said "(the case's own)" and this branch was never
+        /// reached in the product.
+        ///
+        /// The id stays beside the name: names are not unique and contacts are renamed, so
+        /// a name alone would be readable without being evidence. A name that cannot be
+        /// read falls back to the id, which is worse to read but still true.
+        /// </summary>
+        public static string Describe(EntityReference contact, string fullName)
         {
-            return contact == null ? "(the case's own)" : contact.Id.ToString("D");
+            if (contact == null)
+            {
+                return "(the case's own)";
+            }
+
+            var id = contact.Id.ToString("D");
+            return string.IsNullOrWhiteSpace(fullName) ? id : fullName.Trim() + " (" + id + ")";
+        }
+
+        /// <summary>
+        /// The contact's name for the audit line, or null when it cannot be read.
+        ///
+        /// Read through the caller's service, so it sees what they may see. A failure is not
+        /// escalated: the judgement has already been written by this point, and refusing the
+        /// command because its audit line would be less readable would be the wrong trade.
+        /// </summary>
+        private static string NameOf(IOrganizationService service, EntityReference contact)
+        {
+            if (contact == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                var row = service.Retrieve("contact", contact.Id, new ColumnSet("fullname"));
+                return row.GetAttributeValue<string>("fullname");
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         public static string RefusalFor(int? effectiveOutcome, bool fileQualityFailed)
