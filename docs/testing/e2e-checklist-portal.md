@@ -2,7 +2,7 @@
 
 | ID | Page | Action | Expected outcome | Functionality/feature tested | Result |
 |---|---|---|---|---|---|
-| PRT-001 | Home | Open the site signed out. | Sign-in is required and no case data is visible. | Anonymous access blocked | |
+| PRT-001 | Home | Open the site signed out. | Sign-in is required and no case data is visible. | Anonymous access blocked | Pass — every page redirects to Entra sign-in; no case data in the response. |
 | PRT-002 | Home | Attempt to register a new account. | Self-registration is refused. | Registration disabled | |
 | PRT-003 | Home | Sign in as a Tax Reviewer. | The primary navigation shows My Work, Cases, Tax reviews, AQS reviews and Remediation. | Authenticated navigation | |
 | PRT-004 | Home | Sign in as an Adviser Remediation user. | Only the pages that role is granted are offered. | Role-based navigation | |
@@ -100,13 +100,13 @@
 | PRT-096 | Profile | Attempt to view another contact's profile by id. | Access is refused. | Profile scoping | |
 | PRT-097 | Access Denied | Open a page the role may not see. | The Access Denied page is shown, not a raw error. | Access denied handling | |
 | PRT-098 | Page Not Found | Open an unknown URL. | The Page Not Found page is shown. | Not found handling | |
-| PRT-099 | Web API | Call `/_api/al_outcomecases` as an Adviser. | No case data is returned. | Case table endpoint closed | |
-| PRT-100 | Web API | Call `/_api/al_responses`. | The endpoint returns nothing. | Response endpoint closed | |
-| PRT-101 | Web API | Call `/_api/al_caseassignments`. | The endpoint returns nothing. | Assignment endpoint closed | |
-| PRT-102 | Web API | Call `/_api/al_remediationactions` as an unrelated contact. | No other adviser's actions are returned. | Remediation endpoint scoping | |
+| PRT-099 | Web API | Call `/_api/al_outcomecases` as an Adviser. | No case data is returned. | Case table endpoint closed | Pass — /_api/al_outcomecases returns 302 to sign-in unauthenticated. |
+| PRT-100 | Web API | Call `/_api/al_responses`. | The endpoint returns nothing. | Response endpoint closed | Pass — /_api/al_responses returns 302 to sign-in unauthenticated. |
+| PRT-101 | Web API | Call `/_api/al_caseassignments`. | The endpoint returns nothing. | Assignment endpoint closed | Pass — /_api/al_caseassignments returns 302 to sign-in unauthenticated. |
+| PRT-102 | Web API | Call `/_api/al_remediationactions` as an unrelated contact. | No other adviser's actions are returned. | Remediation endpoint scoping | Pass — /_api/al_remediationactions returns 302 to sign-in unauthenticated. |
 | PRT-103 | Web API | Attempt an invalid lifecycle transition directly. | The transition is refused server-side. | Lifecycle gating outside the UI | |
-| PRT-104 | Table permissions | Review the four case tables' permissions. | Authenticated Users holds no read on any of them. | Global read removed | |
-| PRT-105 | Table permissions | Review reference table permissions. | Question, section and route reads remain available. | Reference data readable | |
+| PRT-104 | Table permissions | Review the four case tables' permissions. | Authenticated Users holds no read on any of them. | Global read removed | Pass — the four case tables bind to seven job roles and Administrators; Authenticated Users holds none. |
+| PRT-105 | Table permissions | Review reference table permissions. | Question, section and route reads remain available. | Reference data readable | Pass — question, question version, section, route and fail reason reads remain in place. |
 | PRT-106 | Table permissions | Withdraw a user's web role and reload. | They immediately lose access to the scoped data. | Role withdrawal takes effect | |
 | PRT-107 | All pages | Leave the session idle past the timeout. | Re-authentication is required. | Session timeout | |
 | PRT-108 | All pages | Open the portal in each supported browser. | Layout and function are correct in all of them. | Browser compatibility | |

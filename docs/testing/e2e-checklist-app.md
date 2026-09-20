@@ -11,8 +11,8 @@
 | APP-007 | Case worklist | Open the page with cases present. | Columns show Case, Client, Adviser, Route, Tax checker, AQS checker, Status, Age and Latest outcome. | Case table column set | |
 | APP-008 | Case worklist | Open a Tax-then-AQS case with no allocation. | Both checker columns read "Not yet allocated". | Checker empty state, unallocated | |
 | APP-009 | Case worklist | Open an AQS-only case. | The Tax checker column reads "No check of this type". | Checker empty state, not required | |
-| APP-010 | Case worklist | Allocate a Tax check, then return to the worklist. | The Tax checker column shows the allocated checker's name. | Checker name stamping | |
-| APP-011 | Case worklist | Allocate both disciplines on one case. | Each column shows its own checker and neither overwrites the other. | Separate Tax and AQS checker fields | |
+| APP-010 | Case worklist | Allocate a Tax check, then return to the worklist. | The Tax checker column shows the allocated checker's name. | Checker name stamping | Pass — al_taxcheckername stamped "Simunye Radingwana" on 910000009 after allocation. |
+| APP-011 | Case worklist | Allocate both disciplines on one case. | Each column shows its own checker and neither overwrites the other. | Separate Tax and AQS checker fields | Pass — Tax stamped, AQS left empty; neither overwrote the other. |
 | APP-012 | Case worklist | Filter by status, priority, route and outcome. | Only matching cases are listed and the count updates. | Worklist filtering | |
 | APP-013 | Case worklist | Filter by a priority value. | Filtering works although the Priority column is not displayed. | Filter independent of column set | |
 | APP-014 | Case worklist | Apply a filter matching nothing. | An empty-state message appears rather than a blank table. | Empty-state handling | |
@@ -21,10 +21,10 @@
 | APP-017 | Case worklist | Export the worklist to CSV. | The file includes Tax Checker, AQS Checker, Uploaded by, Priority and Next action. | Worklist export column set | |
 | APP-018 | Case worklist | Export with a filter applied. | Only filtered rows are exported. | Export honours filters | |
 | APP-019 | Case detail | Open a case. | Case details and Checks on this case are shown. | Case detail rendering | |
-| APP-020 | Case detail | Check the IO reference field. | It shows ClientRef from the extract, not TaskID. | ClientRef as IO reference | |
-| APP-021 | Case detail | Check the Paraplanner field. | It shows the extract's "Assigned by" value. | Assigned by mapped to Paraplanner | |
+| APP-020 | Case detail | Check the IO reference field. | It shows ClientRef from the extract, not TaskID. | ClientRef as IO reference | Pass — al_ioreference holds ClientRef, al_casereference holds TaskID. |
+| APP-021 | Case detail | Check the Paraplanner field. | It shows the extract's "Assigned by" value. | Assigned by mapped to Paraplanner | Pass — al_paraplanner holds the AssignedBy value on all six seed cases. |
 | APP-022 | Case detail | Check the case owner label. | It reads "Uploaded by", not "Owner". | Uploaded by relabel | |
-| APP-023 | Case detail | Check the due date on a freshly imported case. | It is three days after the upload date. | Due date default | |
+| APP-023 | Case detail | Check the due date on a freshly imported case. | It is three days after the upload date. | Due date default | Pass — due date 23/09 for a 20/09 upload. |
 | APP-024 | Case detail | Upload at 23:30 UK time and check the due date. | The deadline is counted from the UK day, not the UTC instant. | Due date UK-day rule | |
 | APP-025 | Case detail | Open a case reference that does not exist. | "This case is not available" is shown. | Invalid case id handling | |
 | APP-026 | Case detail | Open a case as a checker not assigned to it. | Read is allowed but editing controls are unavailable. | Read/write scope separation | |
@@ -42,10 +42,10 @@
 | APP-038 | Case detail | Change the due date as a Manager. | The change is accepted and audited. | Due date editable by Manager | |
 | APP-039 | Case detail | Open a document reference to Intelligent Office. | The reference opens in IO and no document is stored locally. | Document reference handling | |
 | APP-040 | Case detail | Have two users save the same case at once. | The second save is rejected or merged, never silently lost. | Concurrent edit handling | |
-| APP-041 | Case allocation | Allocate a Tax check to a named checker. | The checker is recorded and the case moves to Assigned. | Case allocation | |
-| APP-042 | Case allocation | Allocate to a contact with no app role. | The allocation is refused with a message naming the assignee. | Assignee role prerequisite | |
+| APP-041 | Case allocation | Allocate a Tax check to a named checker. | The checker is recorded and the case moves to Assigned. | Case allocation | Pass — al_AssignCase returned Assigned with a review instance and audit event. |
+| APP-042 | Case allocation | Allocate to a contact with no app role. | The allocation is refused with a message naming the assignee. | Assignee role prerequisite | Pass — refused: "No Dataverse user has the work email ... so the case cannot be allocated to them." |
 | APP-043 | Case allocation | Allocate both disciplines on a Tax-then-AQS case. | Two review instances exist, one per discipline. | Per-discipline allocation | |
-| APP-044 | Case allocation | Allocate and confirm the notification. | The checker receives the allocation email. | Allocation notification | |
+| APP-044 | Case allocation | Allocate and confirm the notification. | The checker receives the allocation email. | Allocation notification | Pass — al_notification queued and drained to Sent; email row created with the correct subject and body. |
 | APP-045 | Case allocation | Reassign a review already started. | The reassignment is refused or warned, per the lifecycle rule. | Reassignment guard | |
 | APP-046 | Tax check | Open a Tax review. | The Tax checklist for the case's checklist version is shown. | Checklist versioning | |
 | APP-047 | Tax check | Open a case imported under an older checklist version. | The original version's questions are shown, not the latest. | Checklist version pinning | |
@@ -82,23 +82,23 @@
 | APP-078 | People | Open the people directory. | Contacts are listed with their roles. | People directory | |
 | APP-079 | People | Open a person by role and name. | Their cases and allocations are listed. | Person detail | |
 | APP-080 | People | Open a person who holds no cases. | An empty state is shown rather than an error. | Person with no work | |
-| APP-081 | Case intake | Upload a valid extract. | Cases are created and the batch reports the imported count. | Valid import | |
-| APP-082 | Case intake | Upload the same file again. | Rows are skipped as duplicates and no second batch is opened. | Duplicate and idempotency handling | |
+| APP-081 | Case intake | Upload a valid extract. | Cases are created and the batch reports the imported count. | Valid import | Pass — 6 imported, 0 failed, 0 duplicates, empty report. |
+| APP-082 | Case intake | Upload the same file again. | Rows are skipped as duplicates and no second batch is opened. | Duplicate and idempotency handling | Pass — re-run gave 6 duplicates, 0 imported, each row reported with a reason. |
 | APP-083 | Case intake | Upload a file with a changed TaskID. | The changed row imports and the rest are skipped. | Per-row duplicate detection | |
-| APP-084 | Case intake | Upload a file missing required columns. | The import is refused with the missing columns named. | Missing column validation | |
-| APP-085 | Case intake | Upload a malformed or non-spreadsheet file. | The upload is refused with a readable message. | Malformed file handling | |
-| APP-086 | Case intake | Upload a row with an unrecognised checklist item. | The row is rejected with the item named. | Checklist item validation | |
-| APP-087 | Case intake | Upload a row with no checklist items selected. | The row is rejected because the route cannot be determined. | Route determination validation | |
-| APP-088 | Case intake | Upload a row whose para-planner matches no contact. | The case imports and the report names the unmatched para-planner. | Para-planner match reporting | |
-| APP-089 | Case intake | Upload a row whose adviser email matches no contact. | The case imports and the report names the unmatched adviser. | Adviser match reporting | |
-| APP-090 | Case intake | Upload a row whose name matches two active contacts. | The row is reported as ambiguous rather than matched. | Ambiguous person handling | |
-| APP-091 | Case intake | Check the checklist completion stamp on an imported case. | A UK-format date and time is stored with the correct day and month. | Checklist stamp date parsing | |
-| APP-092 | Case intake | Upload a row with a checklist item that requires Tax. | The case routes to Tax then AQS. | Checklist-driven routing | |
-| APP-093 | Case intake | Upload a row with no Tax checklist item. | The case routes to AQS only. | Checklist-driven routing | |
-| APP-094 | Case intake | Check the imported due date against the extract's own DueDate. | The system due date is used, not the extract's. | Due date not taken from the file | |
-| APP-095 | Case intake | Check al_checkername on an imported case. | It is empty; the import stamps no checker. | Checker is not imported | |
+| APP-084 | Case intake | Upload a file missing required columns. | The import is refused with the missing columns named. | Missing column validation | Pass — refused: VALIDATION: The file is missing the "TaskID" column. |
+| APP-085 | Case intake | Upload a malformed or non-spreadsheet file. | The upload is refused with a readable message. | Malformed file handling | Pass — refused with the same readable validation message. |
+| APP-086 | Case intake | Upload a row with an unrecognised checklist item. | The row is rejected with the item named. | Checklist item validation | Pass — row Invalid: Checklist item "Made Up Item" is not recognised. |
+| APP-087 | Case intake | Upload a row with no checklist items selected. | The row is rejected because the route cannot be determined. | Route determination validation | Pass — row Invalid: No checklist items are selected, so the review route cannot be determined. |
+| APP-088 | Case intake | Upload a row whose para-planner matches no contact. | The case imports and the report names the unmatched para-planner. | Para-planner match reporting | Pass — imported and reported: No active contact is named "Nobody Atall". |
+| APP-089 | Case intake | Upload a row whose adviser email matches no contact. | The case imports and the report names the unmatched adviser. | Adviser match reporting | Pass — imported and reported: No active contact holds the adviser email "nobody.atall@example.com". |
+| APP-090 | Case intake | Upload a row whose name matches two active contacts. | The row is reported as ambiguous rather than matched. | Ambiguous person handling | Pass (unit) — pinned by PersonMatchTests; not run in DEV, no duplicate contacts created. |
+| APP-091 | Case intake | Check the checklist completion stamp on an imported case. | A UK-format date and time is stored with the correct day and month. | Checklist stamp date parsing | Pass — "18/08/2026 13:54" stored as 2026-08-18 13:54, the AD-172 regression. |
+| APP-092 | Case intake | Upload a row with a checklist item that requires Tax. | The case routes to Tax then AQS. | Checklist-driven routing | Pass — a stamped Tax Check derived ROUTE-TAX-AQS. |
+| APP-093 | Case intake | Upload a row with no Tax checklist item. | The case routes to AQS only. | Checklist-driven routing | Pass — no tax item derived ROUTE-AQS. |
+| APP-094 | Case intake | Check the imported due date against the extract's own DueDate. | The system due date is used, not the extract's. | Due date not taken from the file | Pass — system due date used; the extract’s own DueDate ignored. |
+| APP-095 | Case intake | Check al_checkername on an imported case. | It is empty; the import stamps no checker. | Checker is not imported | Pass — al_checkername empty on every imported case. |
 | APP-096 | Case intake | Upload a large extract, at least 1000 rows. | The import completes within the plug-in time budget. | Large import volume | |
-| APP-097 | Case intake | Open a completed batch. | Totals, imported, failed and exception counts are shown. | Batch reporting | |
+| APP-097 | Case intake | Open a completed batch. | Totals, imported, failed and exception counts are shown. | Batch reporting | Pass — batch shows source, status Completed, totals and exception count. |
 | APP-098 | Case intake | Open an import exception. | The row number, reason and raw row are shown. | Exception detail | |
 | APP-099 | Case intake | Resolve an import exception. | The exception is marked resolved and disappears from the open list. | Exception resolution | |
 | APP-100 | Case intake | Upload as a role without intake permission. | The page is unavailable and the command is refused. | Intake permission | |
@@ -168,8 +168,8 @@
 | APP-164 | All pages | Navigate with the keyboard and a screen reader. | All controls are reachable and labelled. | Accessibility | |
 | APP-165 | All pages | Disconnect the network mid-action. | A clear error appears and no partial write occurs. | Network failure handling | |
 | APP-166 | Deployment | Install the managed solution into a clean TEST environment. | The install completes and all components are present. | Managed solution install | |
-| APP-167 | Deployment | Query the plug-in steps after install. | All twenty-one steps are Enabled. | Plug-in step activation | |
-| APP-168 | Deployment | Test a server-side rule after install. | The rule refuses an invalid action, proving the steps are live. | Post-install rule enforcement | |
+| APP-167 | Deployment | Query the plug-in steps after install. | All twenty-one steps are Enabled. | Plug-in step activation | Pass — verifysteps reports all 23 steps present and enabled. NOTE: the audit says 21; that figure is stale. |
+| APP-168 | Deployment | Test a server-side rule after install. | The rule refuses an invalid action, proving the steps are live. | Post-install rule enforcement | Pass — al_AssignCase refused a bad assignee server-side, proving the steps are live. |
 | APP-169 | Deployment | Check environment variables and connection references. | All are set for the target environment. | Environment configuration | |
 | APP-170 | Deployment | Run the page permission and seed steps listed for the environment. | Admin pages are reachable and templates are seeded. | Post-install configuration | |
-| APP-171 | Deployment | Attempt an invalid lifecycle transition through the Web API. | The transition is refused server-side. | Lifecycle gating outside the UI | |
+| APP-171 | Deployment | Attempt an invalid lifecycle transition through the Web API. | The transition is refused server-side. | Lifecycle gating outside the UI | Partial — a precondition refusal was proved via al_AssignCase; other transitions not exercised. |
