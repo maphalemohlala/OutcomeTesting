@@ -87,7 +87,6 @@ namespace OutcomeTesting.Plugins
             }
 
             var context = localPluginContext.PluginExecutionContext;
-            var service = localPluginContext.PluginUserService;
 
             object target;
             if (!context.InputParameters.TryGetValue("Target", out target))
@@ -100,6 +99,22 @@ namespace OutcomeTesting.Plugins
             {
                 return;
             }
+
+            Progress(localPluginContext.PluginUserService, context, signoff);
+        }
+
+        /// <summary>
+        /// Everything a recorded decision sets in motion: the action reopened on a rejection,
+        /// the case moved, the final outcome recorded, the audit event, the letter, and the
+        /// close where the recheck was waived.
+        ///
+        /// Separated from the plug-in entry so the SEQUENCE can be tested, not only its
+        /// parts. F40 lived entirely in the order of two of these calls, and every piece had
+        /// a test of its own.
+        /// </summary>
+        public static void Progress(
+            IOrganizationService service, IPluginExecutionContext context, Entity signoff)
+        {
 
             var decision = signoff.GetAttributeValue<OptionSetValue>(DecisionAttr);
             var actionRef = signoff.GetAttributeValue<EntityReference>(ActionLookup);
@@ -166,7 +181,11 @@ namespace OutcomeTesting.Plugins
                     signedByName);
             }
 
-            QueueSignoffNotification(service, context, signoff, actionRef, decision.Value);
+            // The close runs BEFORE the letter (F40). It used to run after, so the letter was
+            // chosen while the case was still at Awaiting Recheck and an approval that closed
+            // the case on a waived recheck told the adviser it had "moved on to recheck" - the
+            // exact thing the three-letter split exists to prevent, and in that case
+            // contradicted by the sign-off's own notes in the next sentence.
 
             // Read AFTER MoveCase and RecordFinalOutcome, so this asks where the case actually
             // ended up rather than predicting it.
@@ -190,6 +209,17 @@ namespace OutcomeTesting.Plugins
                     QueueRecheckDue(service, context, signoff, caseId.Value);
                 }
             }
+
+            // ASKED, not tracked. There is more than one way an approval closes a case - the
+            // waiver above, and MoveCase's own close where the case carries no Outcome at all
+            // (a remediated Tax-only case) - so a flag set in one branch would be wrong in the
+            // other, which is how F40 read at first. Reading the case is right for both and
+            // stays right for the next one.
+            var closedOnTheApproval = caseId.HasValue
+                && CaseTransitions.CurrentStatus(service, caseId.Value) == CaseLifecycle.Closed;
+
+            QueueSignoffNotification(
+                service, context, signoff, actionRef, decision.Value, closedOnTheApproval);
         }
 
         /// <summary>
@@ -360,7 +390,8 @@ namespace OutcomeTesting.Plugins
             IPluginExecutionContext context,
             Entity signoff,
             EntityReference actionRef,
-            int decision)
+            int decision,
+            bool closedOnTheApproval)
         {
             var approved = decision == DecisionApprovedValue;
             var action = service.Retrieve(ActionEntity, actionRef.Id,
@@ -382,11 +413,18 @@ namespace OutcomeTesting.Plugins
             // things depending on whether the supervisor graded as they approved (project
             // owner, 2026-09-11): where they did, the case is finished and saying it "moved
             // on to recheck" would send the adviser looking for a step that is not coming.
+            // Four endings, not three. The first three were written on 2026-09-11, when a
+            // graded approval closed the case and an ungraded one waited for a recheck.
+            // AD-138 added the fourth three days later - the adviser waives the recheck, so
+            // the case closes with no grade - and nothing chose a letter for it, which left
+            // it falling through to the recheck one (F40).
             var code = !approved
                 ? NotificationTemplates.SignoffRejected
-                : finalOutcome == null
-                    ? NotificationTemplates.SignoffApprovedRecheck
-                    : NotificationTemplates.SignoffApprovedClosed;
+                : finalOutcome != null
+                    ? NotificationTemplates.SignoffApprovedClosed
+                    : closedOnTheApproval
+                        ? NotificationTemplates.SignoffApprovedClosedNoGrade
+                        : NotificationTemplates.SignoffApprovedRecheck;
 
             // The notes keep their leading space and their label, because the letters are
             // written around them being absent as often as present.

@@ -78,6 +78,15 @@ namespace OutcomeTesting.Plugins
         /// <summary>A sign-off was approved with a grade, closing the case.</summary>
         public const string SignoffApprovedClosed = "SIGNOFF-APPROVED-CLOSED";
 
+        /// <summary>
+        /// A sign-off was approved on a remediation the adviser said needed no recheck, so
+        /// the case closed without a final grade (AD-138). Its own letter rather than a
+        /// conditional inside SIGNOFF-APPROVED-CLOSED: that one's whole point is naming the
+        /// grade, and "closed with a final outcome of" followed by nothing is worse than
+        /// either sentence on its own.
+        /// </summary>
+        public const string SignoffApprovedClosedNoGrade = "SIGNOFF-APPROVED-CLOSED-NOGRADE";
+
         /// <summary>A sign-off was rejected and the work went back to the adviser.</summary>
         public const string SignoffRejected = "SIGNOFF-REJECTED";
 
@@ -662,6 +671,13 @@ namespace OutcomeTesting.Plugins
                     "Your remediation on case {{reference}} has been approved, and the case is now closed with a "
                         + "final outcome of {{finalOutcome}}.{{notes}}",
                     TokenReference, TokenFinalOutcome, TokenNotes),
+
+                Plain(SignoffApprovedClosedNoGrade, "Remediation approved - case closed, no recheck",
+                    "Remediation approved on case {{reference}}",
+                    "Your remediation on case {{reference}} has been approved. You recorded that it needs no "
+                        + "further checking, so the case is now closed and nothing more is needed from you."
+                        + "{{notes}}",
+                    TokenReference, TokenNotes),
 
                 Plain(SignoffRejected, "Remediation sent back",
                     "Remediation sent back on case {{reference}}",
