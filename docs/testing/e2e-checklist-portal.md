@@ -52,9 +52,9 @@
 | PRT-048 | Review | Open a Tax review. | The checklist for the case's checklist version is shown. | Checklist versioning | Pass - the V8 checklist rendered with its Tax sections, fail points, outcome and accountability blocks. |
 | PRT-049 | Review | Open a case imported under an earlier checklist version. | The earlier questions are shown, not the current ones. | Checklist version pinning | Partial - the review for case 900000001 rendered "Checker Checklist V5 Draft" while 900000003 rendered V8, so an older version does render; the version each case was imported under was not independently confirmed. Note: V5 is in Draft status. |
 | PRT-050 | Review | Answer each response type on the checklist. | Text, date, choice, multi-choice and rich text all save. | Response types | Partial - choice answers save and persist as al_response rows; text, date, multi-choice and rich text not yet exercised. |
-| PRT-051 | Review | Enter text in the "Tax Remedial" field. | Formatting is preserved and the text saves. | Tax Remedial rich text | |
-| PRT-052 | Review | Paste disallowed markup into a rich text answer. | The text is kept and the markup is removed. | Answer sanitising | |
-| PRT-053 | Review | Save an answer, then reload the page. | The saved answer is shown. | Answer persistence | FAIL - after reload the saved answers are not shown, although all three persisted correctly in Dataverse. See F5. |
+| PRT-051 | Review | Enter text in the "Tax Remedial" field. | Formatting is preserved and the text saves. | Tax Remedial rich text | Partial - the text saves, but a <b> tag injected into the editor did not survive the sanitiser, and the toolbar path was not exercised, so "formatting is preserved" is unproven. |
+| PRT-052 | Review | Paste disallowed markup into a rich text answer. | The text is kept and the markup is removed. | Answer sanitising | Pass - "Bold kept" survived; no script, onerror, javascript: or alert( reached al_response. Markup stripped, text kept. |
+| PRT-053 | Review | Save an answer, then reload the page. | The saved answer is shown. | Answer persistence | FAIL (recovers) - immediately after saving, a reload showed an empty form although all three answers had persisted as al_response rows; the answers rendered correctly once the AD-094 render cache expired about nine minutes later. No data is lost, but it reads as data loss. See F5. |
 | PRT-054 | Review | Answer a question on a review assigned to someone else. | The save is refused server-side. | Response scope enforcement | Pass — al_SubmitReview refused a non-assigned caller: UNAUTHORIZED. |
 | PRT-055 | Review | Change the review id in the URL to another user's review. | Access or write is refused. | Review URL tampering | |
 | PRT-056 | Review | Submit with mandatory questions unanswered. | Submission is refused and the missing items are named. | Mandatory answer validation | Pass - refused and named them: "4 of 4 required questions are unanswered: Q-FQTAX-01, Q-TAX-01, Q-TAX-02, Q-FQTAX-03." |
@@ -65,7 +65,7 @@
 | PRT-061 | Review | Attempt to submit that review graded Pass. | Submission is refused server-side. | Suitability restriction enforcement | |
 | PRT-062 | Review | Complete "Who carries this fail" on a failed review. | The accountable person is recorded. | Fail accountability | Pass - "Who carries this fail" was completed and accepted as part of the submitted review. |
 | PRT-063 | Review | Submit a failed review with no accountable person. | Submission is refused. | Accountability validation | |
-| PRT-064 | Review | Submit a Tax review with a Fail grade. | The case proceeds to the AQS check, not to remediation. | Tax fail proceeds to AQS | |
+| PRT-064 | Review | Submit a Tax review with a Fail grade. | The case proceeds to the AQS check, not to remediation. | Tax fail proceeds to AQS | Partial - the Tax review was submitted with a Pass outcome, not a Fail: case 900000003 returned to Queued for the AQS leg with al_taxoutcome Pass and no remediation raised. The Fail path is still untested. |
 | PRT-065 | Review | Submit the Tax review of a Tax-only case. | Remediation or closure follows with no AQS leg. | Tax-only path | |
 | PRT-066 | Review | Submit the AQS review of an AQS-only case. | The outcome is recorded and remediation raised where required. | AQS-only path | Pass - submitting a non-Pass AQS review on AQS-only case 900000001 set it to Awaiting Remediation and raised remediation action REM-900000001-2. |
 | PRT-067 | Review | Submit the AQS leg where both disciplines failed. | One combined remediation is raised for the case. | Combined remediation | |
@@ -75,22 +75,22 @@
 | PRT-071 | Review | Submit an already submitted review. | The second submission is refused. | Double submission guard | |
 | PRT-072 | Review | Open a review of a case you cannot see. | The "Review not available" empty state is shown, not an error. | Unavailable review state | |
 | PRT-073 | AQS reviews | Open the page as an AQS Reviewer. | AQS reviews assigned to that user are listed. | AQS review list scoping | |
-| PRT-074 | AQS reviews | Open a case handed back from a Tax check. | The AQS leg is present and openable. | Tax to AQS hand-back | |
+| PRT-074 | AQS reviews | Open a case handed back from a Tax check. | The AQS leg is present and openable. | Tax to AQS hand-back | Pass - after the Tax review was submitted, case 900000003 appeared in the AQS queue and was openable. |
 | PRT-075 | AQS reviews | Claim an AQS case from the queue. | The case is allocated and an AQS review is created. | AQS claim | Pass - "Run checks" confirmed first ("will no longer be available for anyone else to pick up"), then allocated the case and opened the AQS checklist. |
 | PRT-076 | AQS reviews | Open the page as an Adviser. | No AQS reviews are listed. | Role separation | |
 | PRT-077 | Remediation | Open the page as an Adviser with actions assigned. | Only their own remediation actions are listed. | Remediation scoping | |
 | PRT-078 | Remediation | Open the page as an Adviser with none assigned. | An empty state is shown. | Empty remediation list | |
-| PRT-079 | Remediation | Open an action and respond with evidence. | The response saves and the action moves to awaiting review. | Adviser response | |
+| PRT-079 | Remediation | Open an action and respond with evidence. | The response saves and the action moves to awaiting review. | Adviser response | Not run - the only open action belongs to another adviser; needs a signed-in adviser who owns one. |
 | PRT-080 | Remediation | Submit a response with no evidence where required. | The submission is refused. | Response validation | |
-| PRT-081 | Remediation | Respond to an action assigned to another adviser. | The save is refused server-side. | Remediation scope enforcement | |
-| PRT-082 | Remediation | Change the action id in the URL to another adviser's action. | Access or write is refused. | Remediation URL tampering | |
+| PRT-081 | Remediation | Respond to an action assigned to another adviser. | The save is refused server-side. | Remediation scope enforcement | Pass - refused twice server-side: the Web API PATCH returned 403 EntityPermissionWriteIsMissingDuringUpdate, and al_CompleteRemediation returned "UNAUTHORIZED: Only the adviser who owns this remediation action can complete it" even for a caller holding Administrators and T&C Supervisor. |
+| PRT-082 | Remediation | Change the action id in the URL to another adviser's action. | Access or write is refused. | Remediation URL tampering | Pass - addressing the action id directly through the Web API was refused with the same 403; the page also renders it read-only ("the rest are read-only"). |
 | PRT-083 | Remediation | Check an action's due date. | It is the configured working days from being raised. | Remediation due date | Partial - raised 20 Sep 2026 with a due date of 02 Oct 2026 (8 working days); the configured working-day value was not independently confirmed. |
 | PRT-084 | Remediation | Open an overdue action. | It is shown as overdue. | Overdue indication | |
 | PRT-085 | Remediation | Have a T&C Supervisor review a response and reject it. | The action reopens for rework and the adviser is notified. | Rework loop | |
 | PRT-086 | Remediation | Have a T&C Supervisor approve a response. | The action completes. | Remediation approval | |
 | PRT-087 | Remediation | Complete every action on a case. | The case moves to Awaiting Sign-off and the T&C Manager is notified. | Sign-off due notification | |
 | PRT-088 | Remediation | Complete every action where the adviser is unmapped. | The case still reaches Awaiting Sign-off and only the notification is lost. | Mapping affects notice, not lifecycle | |
-| PRT-089 | Remediation | Attempt sign-off with actions outstanding. | Sign-off is refused server-side. | Sign-off gating | Partial — as APP-071. |
+| PRT-089 | Remediation | Attempt sign-off with actions outstanding. | Sign-off is refused server-side. | Sign-off gating | Pass - with an action outstanding, sign-off was refused: "PRECONDITION: Only a completed remediation action can be signed off." (Round two reached only the parameter check; the state gate is now proven.) |
 | PRT-090 | Remediation | Sign off as a T&C Supervisor with the attestation. | The case closes and the closure email is sent. | Sign-off and closure | |
 | PRT-091 | Remediation | Sign off choosing to move the case to recheck. | The case moves to recheck and the recheck email is sent. | Sign-off to recheck | |
 | PRT-092 | Remediation | Attempt sign-off as an Adviser. | The action is unavailable and refused server-side. | Sign-off permission | |
