@@ -19,10 +19,12 @@ export class Al_SetFailAccountabilityService {
    * @param AqAdviser type: `Boolean`
    * @param AqParaplanner type: `Boolean`
    * @param IdempotencyKey type: `String`
+   * @param FqContactId type: `String`
+   * @param AqContactId type: `String`
    */
-  public static async al_SetFailAccountability(TargetId: string, FqAdviser: boolean, FqParaplanner: boolean, AqAdviser: boolean, AqParaplanner: boolean, IdempotencyKey: string): Promise<IOperationResult<Record<string, unknown>>> {
-    const params: { TargetId: string, FqAdviser: boolean, FqParaplanner: boolean, AqAdviser: boolean, AqParaplanner: boolean, IdempotencyKey: string } = { TargetId, FqAdviser, FqParaplanner, AqAdviser, AqParaplanner, IdempotencyKey };
-    const result = await Al_SetFailAccountabilityService.client.executeAsync<{ TargetId: string, FqAdviser: boolean, FqParaplanner: boolean, AqAdviser: boolean, AqParaplanner: boolean, IdempotencyKey: string }, Record<string, unknown>>(
+  public static async al_SetFailAccountability(TargetId: string, FqAdviser: boolean, FqParaplanner: boolean, AqAdviser: boolean, AqParaplanner: boolean, IdempotencyKey: string, FqContactId?: string, AqContactId?: string): Promise<IOperationResult<Record<string, unknown>>> {
+    const params: { TargetId: string, FqAdviser: boolean, FqParaplanner: boolean, AqAdviser: boolean, AqParaplanner: boolean, IdempotencyKey: string, FqContactId?: string, AqContactId?: string } = { TargetId, FqAdviser, FqParaplanner, AqAdviser, AqParaplanner, IdempotencyKey, FqContactId, AqContactId };
+    const result = await Al_SetFailAccountabilityService.client.executeAsync<{ TargetId: string, FqAdviser: boolean, FqParaplanner: boolean, AqAdviser: boolean, AqParaplanner: boolean, IdempotencyKey: string, FqContactId?: string, AqContactId?: string }, Record<string, unknown>>(
       {
         dataverseRequest: {
           action: 'customapi',

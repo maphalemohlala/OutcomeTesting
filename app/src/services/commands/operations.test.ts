@@ -399,24 +399,7 @@ describe('every parameter a command sends is declared in the schema', () => {
     ],
   ];
 
-  /**
-   * al_SetFailAccountability is the one command still known to drop parameters (F15). Its
-   * FqContactId and AqContactId were added to the contract and created in DEV on
-   * 2026-09-20, but a newly created Custom API request parameter is not visible to the Web
-   * API's $metadata straight away -- not even after Publish All Customizations -- and
-   * `pa app add dataverse-api` reads that metadata, so it regenerates the schema without
-   * them and reports success. The parameter rows are Active and Published and identical in
-   * every field to one that does appear; the only difference is their age.
-   *
-   * Wiring the app to send a parameter the Web API does not yet expose would turn a silent
-   * drop into a rejected request, so the schema is left alone until the generator can see
-   * them. Re-run `pa app add dataverse-api --api-name al_SetFailAccountability`, check the
-   * schema gains both, and delete this list.
-   */
-  const awaitingMetadata = new Set(['al_SetFailAccountability']);
-
   it.each(calls)('%s sends nothing the schema would drop', async (operationName, call) => {
-    if (awaitingMetadata.has(operationName)) return;
     await call();
 
     const call0 = sent.find((c) => c.operationName === operationName);

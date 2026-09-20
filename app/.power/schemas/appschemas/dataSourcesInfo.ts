@@ -1017,6 +1017,18 @@ export const dataSourcesInfo = {
             "in": "body",
             "required": true,
             "type": "string"
+          },
+          {
+            "name": "FqContactId",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "AqContactId",
+            "in": "body",
+            "required": false,
+            "type": "string"
           }
         ],
         "responseInfo": {
