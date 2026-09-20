@@ -18,53 +18,13 @@ import {
   ContactsService,
   Mspp_webrolesService,
 } from '../../generated';
-import type { CellValue, Sheet } from '../../lib/tabular';
+import type { Sheet } from '../../lib/tabular';
+// Shaping a sheet lives in extractSheet so it can be tested: this module imports the
+// generated Services, which drag in the Power Apps SDK and will not load under vitest.
+import { toSheet } from './extractSheet';
 
 /** Per-table ceiling. A truncated sheet is reported rather than passed off as complete. */
 export const EXTRACT_ROW_LIMIT = 5000;
-
-/**
- * Platform bookkeeping that carries no business meaning. Excluding it keeps a sheet
- * readable; everything else the caller is permitted to read is written as Dataverse
- * returned it, logical names included, because this is a raw analysis extract rather
- * than an operational screen.
- */
-const NOISE = new Set([
-  'importsequencenumber',
-  'overriddencreatedon',
-  'timezoneruleversionnumber',
-  'utcconversiontimezonecode',
-  'versionnumber',
-  'owneridtype',
-]);
-
-function isNoise(key: string): boolean {
-  return NOISE.has(key) || key.endsWith('yominame');
-}
-
-function normalise(value: unknown): CellValue {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'number') return Number.isFinite(value) ? value : '';
-  if (typeof value === 'string') return value;
-  return '';
-}
-
-function toSheet(name: string, records: Record<string, unknown>[]): Sheet {
-  const headers: string[] = [];
-  for (const record of records) {
-    for (const [key, value] of Object.entries(record)) {
-      if (isNoise(key) || headers.includes(key)) continue;
-      if (value !== null && typeof value === 'object') continue;
-      headers.push(key);
-    }
-  }
-  return {
-    name,
-    headers,
-    rows: records.map((record) => headers.map((header) => normalise(record[header]))),
-  };
-}
 
 /** Sheet names are the business names a manager recognises, not the table logical names. */
 const SOURCES: { name: string; read: () => Promise<{ success: boolean; data?: unknown }> }[] = [
