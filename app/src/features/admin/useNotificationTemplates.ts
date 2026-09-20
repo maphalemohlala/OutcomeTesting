@@ -7,6 +7,7 @@ import type {
   Al_notificationtemplatesal_recipientkind,
 } from '../../generated/models/Al_notificationtemplatesModel';
 import { logTechnical } from '../../services/errors';
+import { plainMessage } from '../../services/commands/failures';
 import { TEMPLATE_CODES, templateHint } from './notificationTemplates';
 import { CUSTOM_TOKENS } from './notificationRouting';
 
@@ -275,11 +276,14 @@ function routingFields(
  * supplies; replacing that with "could not save" would throw away the only part that tells
  * them what to do next.
  */
+/**
+ * This read `error.message` and showed it. For a guard that raises a bare sentence the SDK
+ * makes `message` the whole OData body, so the administrator got the plug-in class, the
+ * table name, the plug-in trace and their own user GUID in the dialog, with the sentence
+ * buried in the middle of it (F12, 2026-09-20). plainMessage unwraps the body; anything it
+ * cannot read falls back to the default rather than to the body.
+ */
 function refusalFrom(error: unknown): string {
-  const message =
-    typeof error === 'string'
-      ? error
-      : ((error as { message?: string } | null)?.message ?? '');
-
-  return message.trim() !== '' ? message : 'That wording could not be saved.';
+  const message = plainMessage(error);
+  return message !== '' ? message : 'That wording could not be saved.';
 }

@@ -97,6 +97,45 @@ export function sentenceAfterPrefix(message: string, prefix: string): string {
   return (boundary === -1 ? rest : rest.slice(0, boundary)).trim();
 }
 
+/**
+ * The sentence alone, from a fault that may be wrapped in an OData body.
+ *
+ * `classify` handles the plug-ins that prefix their messages, because it finds the prefix
+ * inside the body and `sentenceAfterPrefix` cuts at the first quote. A guard that raises a
+ * BARE sentence has no prefix to find, so nothing cut the body and the whole thing reached
+ * the screen: plug-in class, table name, step id, plug-in trace with timings, and the
+ * initiating user's GUID (F12, DEV, 2026-09-20).
+ *
+ * The SDK can hand the body over either as the error itself or as the error's `message`
+ * string, so both are unwrapped. Where a prefix IS present it is still stripped, so a
+ * caller gets one rule for every fault.
+ *
+ * An unreadable body returns the empty string rather than itself. Every caller has a
+ * friendly default; falling back to the body is what put the diagnostics on screen.
+ */
+export function plainMessage(error: unknown): string {
+  let message = extractErrorMessage(error).trim();
+
+  for (let depth = 0; depth < 4 && message.startsWith('{'); depth += 1) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(message);
+    } catch {
+      return '';
+    }
+    const inner = extractErrorMessage(parsed).trim();
+    if (!inner || inner === message) return '';
+    message = inner;
+  }
+
+  if (message.startsWith('{')) return '';
+
+  for (const prefix of Object.keys(FAILURE_PREFIXES)) {
+    if (message.includes(prefix)) return sentenceAfterPrefix(message, prefix);
+  }
+  return message;
+}
+
 /** Classifies a rejected command into the kind and the sentence to show. */
 export function classify(error: unknown): CommandFailure {
   const message = extractErrorMessage(error);
