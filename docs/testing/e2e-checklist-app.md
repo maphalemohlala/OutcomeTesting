@@ -1,0 +1,175 @@
+# Outcome Testing — end-to-end UAT checklist: Code App
+
+| ID | Page | Action | Expected outcome | Functionality/feature tested | Result |
+|---|---|---|---|---|---|
+| APP-001 | Dashboard | Sign in as an Outcome Testing Manager. | The dashboard loads with the navigation groups My work, Intake, Reporting and Administration. | Authentication and role-gated navigation | |
+| APP-002 | Dashboard | Sign in as a user holding no Outcome Testing role. | Access is refused rather than an empty dashboard. | Role gating on entry | |
+| APP-003 | Dashboard | Sign in as a user whose role lacks Basic User. | A clear error appears instead of a raw privilege fault. | App role prerequisite handling | |
+| APP-004 | Dashboard | Block reads of `al_pagepermission` and reload. | A banner states access could not be confirmed and defaults are in use. | Permission-rule unavailability notice | |
+| APP-005 | Dashboard | Review the case-count tiles against the worklist. | Tile counts equal the worklist totals for the same scope. | Dashboard aggregation accuracy | |
+| APP-006 | Dashboard | Click a dashboard tile. | The worklist opens filtered to that tile's scope. | Drill-through filtering | |
+| APP-007 | Case worklist | Open the page with cases present. | Columns show Case, Client, Adviser, Route, Tax checker, AQS checker, Status, Age and Latest outcome. | Case table column set | |
+| APP-008 | Case worklist | Open a Tax-then-AQS case with no allocation. | Both checker columns read "Not yet allocated". | Checker empty state, unallocated | |
+| APP-009 | Case worklist | Open an AQS-only case. | The Tax checker column reads "No check of this type". | Checker empty state, not required | |
+| APP-010 | Case worklist | Allocate a Tax check, then return to the worklist. | The Tax checker column shows the allocated checker's name. | Checker name stamping | |
+| APP-011 | Case worklist | Allocate both disciplines on one case. | Each column shows its own checker and neither overwrites the other. | Separate Tax and AQS checker fields | |
+| APP-012 | Case worklist | Filter by status, priority, route and outcome. | Only matching cases are listed and the count updates. | Worklist filtering | |
+| APP-013 | Case worklist | Filter by a priority value. | Filtering works although the Priority column is not displayed. | Filter independent of column set | |
+| APP-014 | Case worklist | Apply a filter matching nothing. | An empty-state message appears rather than a blank table. | Empty-state handling | |
+| APP-015 | Case worklist | Sort and page through more than one page of cases. | Ordering and paging are stable across pages. | Sorting and pagination | |
+| APP-016 | Case worklist | Click an adviser name. | The people directory opens for that adviser. | Adviser link resolution | |
+| APP-017 | Case worklist | Export the worklist to CSV. | The file includes Tax Checker, AQS Checker, Uploaded by, Priority and Next action. | Worklist export column set | |
+| APP-018 | Case worklist | Export with a filter applied. | Only filtered rows are exported. | Export honours filters | |
+| APP-019 | Case detail | Open a case. | Case details and Checks on this case are shown. | Case detail rendering | |
+| APP-020 | Case detail | Check the IO reference field. | It shows ClientRef from the extract, not TaskID. | ClientRef as IO reference | |
+| APP-021 | Case detail | Check the Paraplanner field. | It shows the extract's "Assigned by" value. | Assigned by mapped to Paraplanner | |
+| APP-022 | Case detail | Check the case owner label. | It reads "Uploaded by", not "Owner". | Uploaded by relabel | |
+| APP-023 | Case detail | Check the due date on a freshly imported case. | It is three days after the upload date. | Due date default | |
+| APP-024 | Case detail | Upload at 23:30 UK time and check the due date. | The deadline is counted from the UK day, not the UTC instant. | Due date UK-day rule | |
+| APP-025 | Case detail | Open a case reference that does not exist. | "This case is not available" is shown. | Invalid case id handling | |
+| APP-026 | Case detail | Open a case as a checker not assigned to it. | Read is allowed but editing controls are unavailable. | Read/write scope separation | |
+| APP-027 | Case detail | Edit case details and save. | Only changed fields are written and an audit entry is created. | Case header edit | |
+| APP-028 | Case detail | Change the adviser using the person picker. | The picker lists directory contacts and accepts an unlisted imported name. | Adviser person picker | |
+| APP-029 | Case detail | Set an adviser email that matches no contact. | The case saves and the adviser is reported as unmatched. | Adviser resolved by email, then name | |
+| APP-030 | Case detail | Set "Date of meeting - Client contact" to a future date. | The save is refused server-side. | Future date rejection | |
+| APP-031 | Case detail | Set the date of meeting after the due date. | The save is refused. | Date of meeting vs due date | |
+| APP-032 | Case detail | Set the date of meeting after the submission date. | The save is refused, or the rule is confirmed as withdrawn. | Date of meeting vs submission date | |
+| APP-033 | Case detail | Edit a case field as a Tax Reviewer not assigned to the case. | The save is refused server-side. | Assignment check on header edit | |
+| APP-034 | Case detail | Edit only Tax fields as an unassigned Tax Reviewer. | The save is refused. | Assignment check on the Tax-fields path | |
+| APP-035 | Case detail | Change "Tax check required" from No to Yes. | The route re-derives to Tax then AQS. | Route derivation | |
+| APP-036 | Case detail | Set the Tax team disposition to "Return to paraplanner". | The route re-derives to Tax only. | Tax-only route derivation | |
+| APP-037 | Case detail | Change the due date as a role without the grant. | The change is refused. | Due date edit permission | |
+| APP-038 | Case detail | Change the due date as a Manager. | The change is accepted and audited. | Due date editable by Manager | |
+| APP-039 | Case detail | Open a document reference to Intelligent Office. | The reference opens in IO and no document is stored locally. | Document reference handling | |
+| APP-040 | Case detail | Have two users save the same case at once. | The second save is rejected or merged, never silently lost. | Concurrent edit handling | |
+| APP-041 | Case allocation | Allocate a Tax check to a named checker. | The checker is recorded and the case moves to Assigned. | Case allocation | |
+| APP-042 | Case allocation | Allocate to a contact with no app role. | The allocation is refused with a message naming the assignee. | Assignee role prerequisite | |
+| APP-043 | Case allocation | Allocate both disciplines on a Tax-then-AQS case. | Two review instances exist, one per discipline. | Per-discipline allocation | |
+| APP-044 | Case allocation | Allocate and confirm the notification. | The checker receives the allocation email. | Allocation notification | |
+| APP-045 | Case allocation | Reassign a review already started. | The reassignment is refused or warned, per the lifecycle rule. | Reassignment guard | |
+| APP-046 | Tax check | Open a Tax review. | The Tax checklist for the case's checklist version is shown. | Checklist versioning | |
+| APP-047 | Tax check | Open a case imported under an older checklist version. | The original version's questions are shown, not the latest. | Checklist version pinning | |
+| APP-048 | Tax check | Enter text in the "Tax Remedial" field. | Bold, italic, underline, lists and links are preserved on save. | Tax Remedial rich text | |
+| APP-049 | Tax check | Paste markup outside the allow-list into Tax Remedial. | The text is kept and the disallowed markup is removed. | Rich text sanitising | |
+| APP-050 | Tax check | Submit with mandatory answers missing. | The submission is refused and the missing items are named. | Mandatory answer validation | |
+| APP-051 | Tax check | Submit a Tax check with a Fail grade. | The case proceeds to the AQS check, not straight to remediation. | Tax fail proceeds to AQS | |
+| APP-052 | Tax check | Submit a Tax check on a Tax-only case. | The case proceeds to remediation or closure without an AQS leg. | Tax-only path | |
+| APP-053 | Tax check | Answer a question as a checker not assigned to the review. | The answer is refused server-side. | Response scope enforcement | |
+| APP-054 | AQS check | Open an AQS review and set the grade to Pass. | "Primary root cause" is hidden and not required. | Conditional root cause, Pass | |
+| APP-055 | AQS check | Set the grade to anything other than Pass. | "Primary root cause" is shown and required. | Conditional root cause, non-Pass | |
+| APP-056 | AQS check | Submit a non-Pass grade with no root cause. | The submission is refused server-side. | Root cause enforcement | |
+| APP-057 | AQS check | Mark a Suitability core check as Insufficient Evidence. | The outcome choices reduce to Insufficient Evidence or Potential Harm. | Suitability outcome restriction | |
+| APP-058 | AQS check | Attempt to grade Pass with a Suitability Insufficient answer. | The grading is refused server-side. | Suitability restriction enforcement | |
+| APP-059 | AQS check | Change a question's response type, then reopen the review. | The answer options match the new type. | Question type change | |
+| APP-060 | AQS check | Submit an AQS check on an AQS-only case. | The outcome is recorded and remediation is raised where required. | AQS-only path | |
+| APP-061 | AQS check | Submit the AQS leg of a Tax-then-AQS case with both failing. | One combined remediation is raised for the case, not one per discipline. | Combined remediation | |
+| APP-062 | Case remediation | Open remediation for a failed case. | The remediation actions for the case are listed. | Remediation listing | |
+| APP-063 | Case remediation | Check the action due dates. | They are set the configured number of working days from being raised. | Remediation due date rule | |
+| APP-064 | Case remediation | Set fail accountability to an adviser. | The accountable person is stored and appears downstream. | Fail accountability mapping | |
+| APP-065 | Case remediation | Save fail accountability with no person chosen. | The save is refused. | Accountability validation | |
+| APP-066 | Case remediation | Confirm the adviser notification. | The adviser is emailed that remediation is required. | Remediation notification | |
+| APP-067 | Case remediation | Reject an adviser response and return it for rework. | The action reopens and the adviser is notified. | Rework loop | |
+| APP-068 | Case remediation | Complete every action on a case. | The case moves to Awaiting Sign-off. | Remediation completion transition | |
+| APP-069 | Case remediation | Complete every action where the adviser is mapped to a T&C Manager. | The mapped manager is emailed that a sign-off is waiting. | Sign-off due notification | |
+| APP-070 | Case remediation | Complete every action where the adviser is unmapped. | The case still reaches Awaiting Sign-off and only the notification is lost. | Mapping affects notice, not lifecycle | |
+| APP-071 | Case remediation | Attempt to sign off before all actions are complete. | The sign-off is refused server-side. | Sign-off gating | |
+| APP-072 | Case remediation | Sign off an approved case. | The case closes and the closure email is sent. | Sign-off and closure | |
+| APP-073 | Case remediation | Sign off with "moving to recheck". | The case moves to recheck and the recheck email is sent. | Sign-off to recheck | |
+| APP-074 | Case recheck | Open the recheck page for a case sent back. | The recheck review is available to complete. | Recheck flow | |
+| APP-075 | Case recheck | Submit a recheck with a changed grade. | The final outcome updates and the initial outcome is preserved. | Regrade preserves both grades | |
+| APP-076 | Case audit | Open the audit page for a case. | Every state change, edit and reason is listed in order. | Audit history | |
+| APP-077 | Case audit | Attempt to edit or delete an audit entry. | The action is unavailable and refused server-side. | Audit immutability | |
+| APP-078 | People | Open the people directory. | Contacts are listed with their roles. | People directory | |
+| APP-079 | People | Open a person by role and name. | Their cases and allocations are listed. | Person detail | |
+| APP-080 | People | Open a person who holds no cases. | An empty state is shown rather than an error. | Person with no work | |
+| APP-081 | Case intake | Upload a valid extract. | Cases are created and the batch reports the imported count. | Valid import | |
+| APP-082 | Case intake | Upload the same file again. | Rows are skipped as duplicates and no second batch is opened. | Duplicate and idempotency handling | |
+| APP-083 | Case intake | Upload a file with a changed TaskID. | The changed row imports and the rest are skipped. | Per-row duplicate detection | |
+| APP-084 | Case intake | Upload a file missing required columns. | The import is refused with the missing columns named. | Missing column validation | |
+| APP-085 | Case intake | Upload a malformed or non-spreadsheet file. | The upload is refused with a readable message. | Malformed file handling | |
+| APP-086 | Case intake | Upload a row with an unrecognised checklist item. | The row is rejected with the item named. | Checklist item validation | |
+| APP-087 | Case intake | Upload a row with no checklist items selected. | The row is rejected because the route cannot be determined. | Route determination validation | |
+| APP-088 | Case intake | Upload a row whose para-planner matches no contact. | The case imports and the report names the unmatched para-planner. | Para-planner match reporting | |
+| APP-089 | Case intake | Upload a row whose adviser email matches no contact. | The case imports and the report names the unmatched adviser. | Adviser match reporting | |
+| APP-090 | Case intake | Upload a row whose name matches two active contacts. | The row is reported as ambiguous rather than matched. | Ambiguous person handling | |
+| APP-091 | Case intake | Check the checklist completion stamp on an imported case. | A UK-format date and time is stored with the correct day and month. | Checklist stamp date parsing | |
+| APP-092 | Case intake | Upload a row with a checklist item that requires Tax. | The case routes to Tax then AQS. | Checklist-driven routing | |
+| APP-093 | Case intake | Upload a row with no Tax checklist item. | The case routes to AQS only. | Checklist-driven routing | |
+| APP-094 | Case intake | Check the imported due date against the extract's own DueDate. | The system due date is used, not the extract's. | Due date not taken from the file | |
+| APP-095 | Case intake | Check al_checkername on an imported case. | It is empty; the import stamps no checker. | Checker is not imported | |
+| APP-096 | Case intake | Upload a large extract, at least 1000 rows. | The import completes within the plug-in time budget. | Large import volume | |
+| APP-097 | Case intake | Open a completed batch. | Totals, imported, failed and exception counts are shown. | Batch reporting | |
+| APP-098 | Case intake | Open an import exception. | The row number, reason and raw row are shown. | Exception detail | |
+| APP-099 | Case intake | Resolve an import exception. | The exception is marked resolved and disappears from the open list. | Exception resolution | |
+| APP-100 | Case intake | Upload as a role without intake permission. | The page is unavailable and the command is refused. | Intake permission | |
+| APP-101 | Management reporting | Open the page. | Outcome volumes, Remediation ageing and Sign-off accountability are shown. | Management reporting | |
+| APP-102 | Management reporting | Compare outcome volumes with the worklist. | The figures agree for the same period. | Reporting accuracy | |
+| APP-103 | Management reporting | Open the completed case report. | Completed cases are listed with their outcomes. | Completed case report | |
+| APP-104 | Management reporting | Open the page with no data. | Empty states appear rather than errors. | Reporting empty states | |
+| APP-105 | Exports | Generate a Trail Light export. | A file is produced in the agreed twenty-one column format. | Trail Light export format | |
+| APP-106 | Exports | Check the Adviser column. | It is present as column 21 and the original twenty are unchanged. | Adviser on the Trail Light extract | |
+| APP-107 | Exports | Export cases in differing states. | Each row carries data correct for that case's state. | Export data per state | |
+| APP-108 | Exports | Check the fail accountability columns. | The accountable person appears for failed cases. | Accountability in the export | |
+| APP-109 | Exports | Export with no completed cases. | An empty export or a clear message is produced, not an error. | Export empty state | |
+| APP-110 | Exports | Export as a role without export permission. | The page is unavailable and the command is refused. | Export permission | |
+| APP-111 | Question library | Open the library. | Sections and questions are listed for the published checklist. | Question library | |
+| APP-112 | Question library | Open the edit control on a question. | The editor opens as a modal, not always-on. | Question edit modal | |
+| APP-113 | Question library | Add a question to a section. | The question appears in order and a new version is created. | Add question | |
+| APP-114 | Question library | Change a question's response type. | The new type applies to future answers and existing ones are unaffected. | Question type change versioning | |
+| APP-115 | Question library | Move a question within a section. | The display order updates on the checklist. | Reorder questions | |
+| APP-116 | Question library | Retire a question. | It stops appearing on new checklists and old answers remain readable. | Retire question | |
+| APP-117 | Question library | Retire and succeed a question. | The successor replaces it and history is preserved. | Retire and succeed | |
+| APP-118 | Question library | Attempt to retire a protected question. | The action is refused. | Protected question guard | |
+| APP-119 | Question library | Confirm Q-TAX-04 exists and is Tax Remedial rich text. | The question is present with a rich text response type. | Tax Remedial question configuration | |
+| APP-120 | Question library | Edit the library as a role without Manage. | The controls are unavailable and the command is refused. | Library permission | |
+| APP-121 | Adviser mapping | Open the page. | Adviser to T&C Manager mappings are listed. | Adviser mapping list | |
+| APP-122 | Adviser mapping | Add a mapping choosing an adviser from the dropdown. | The adviser is selected from contacts and the mapping saves. | T&C Manager dropdown | |
+| APP-123 | Adviser mapping | Add a mapping for an adviser already mapped. | The duplicate is refused. | Duplicate mapping guard | |
+| APP-124 | Adviser mapping | Change the T&C Manager on an existing mapping. | The mapping updates and the adviser stays read-only. | Mapping edit | |
+| APP-125 | Adviser mapping | Delete a mapping and complete a case's actions. | Sign-off still works and only the notification is lost. | Mapping is notice, not gate | |
+| APP-126 | Adviser mapping | Open the page as a role without Manage. | The page is unavailable. | Mapping permission | |
+| APP-127 | Notification wording | Open the page. | Twelve letters are listed with what sends them and who they go to. | Notification template list | |
+| APP-128 | Notification wording | Open a letter never edited. | It shows as Built-in and displays the compiled wording. | Compiled fallback | |
+| APP-129 | Notification wording | Edit a letter and save. | The stored wording is used on the next send. | Editable email templates | |
+| APP-130 | Notification wording | Open any letter, including a plain-text one. | The rich text toolbar is shown for every letter. | Rich text editor on all letters | |
+| APP-131 | Notification wording | Click a token in the picker. | The token is inserted at the caret. | Token picker | |
+| APP-132 | Notification wording | Use a token that letter does not supply. | The save is refused and the allowed tokens are named. | Token validation | |
+| APP-133 | Notification wording | Clear a letter's body and save. | The save is refused rather than falling back silently. | Empty body refusal | |
+| APP-134 | Notification wording | Save a body containing only disallowed markup. | The save is refused saying the body would be left empty. | Sanitised-to-nothing refusal | |
+| APP-135 | Notification wording | Save a body containing a script tag or a div. | The text is kept and the disallowed markup is removed. | Server-side body sanitising | |
+| APP-136 | Notification wording | PATCH a body via the Web API directly. | The same sanitising and refusals apply. | Sanitising outside the UI | |
+| APP-137 | Notification wording | Set "Goes to" to T&C Manager on a letter and trigger it. | The mapped manager receives it and the default recipient does not. | Recipient override | |
+| APP-138 | Notification wording | Set "A named contact" and save without choosing one. | The save is refused. | Named contact validation | |
+| APP-139 | Notification wording | Point a letter at a Para-planner who matches no contact. | The letter still arrives at its original recipient. | Override reaching nobody | |
+| APP-140 | Notification wording | Add a letter with a trigger event and recipient. | Both the built-in letter and the new one are sent. | Custom letter fan-out | |
+| APP-141 | Notification wording | Add a letter with no trigger event. | The save is refused. | Trigger event required | |
+| APP-142 | Notification wording | Use a restricted token in a custom letter. | The save is refused naming what a custom letter may use. | Custom letter token set | |
+| APP-143 | Notification wording | Delete a custom letter and trigger the event. | The built-in letter still sends unchanged. | Custom letter removal | |
+| APP-144 | Notification wording | Add `{{completedCheck}}` to a letter and trigger it. | The completed check PDF is attached and the token renders as nothing. | Include PDF token | |
+| APP-145 | Notification wording | Remove `{{completedCheck}}` and trigger the event. | No attachment is sent. | Attachment negative case | |
+| APP-146 | Notification wording | Delete every template row and trigger each event. | All twelve letters send in their original wording. | Empty table fallback | |
+| APP-147 | Notification wording | Submit a review on a case with a para-planner. | The para-planner receives an email with the completed check PDF attached. | Para-planner PDF attachment | |
+| APP-148 | Notification wording | Open the attached PDF. | Bullets, wrapping, answers by section and remedial actions render correctly. | PDF content and layout | |
+| APP-149 | Notification wording | Open the PDF for a case with no remedial actions. | There is no "Remedial actions" heading at all. | PDF conditional section | |
+| APP-150 | Notification wording | Submit a review where the para-planner matches no contact. | The letter is not sent and the reason is recorded. | Unaddressable recipient handling | |
+| APP-151 | Notification wording | Force a send failure. | The notification row is marked Failed with a reason. | Failed notification visibility | |
+| APP-152 | Security configuration | Open the page. | Roles, holders and page permissions are listed. | Security configuration | |
+| APP-153 | Security configuration | Assign a role to a user. | The user gains the role's pages on next sign-in. | Role assignment | |
+| APP-154 | Security configuration | Withdraw a role. | The user loses those pages and server commands refuse them. | Role withdrawal | |
+| APP-155 | Security configuration | Set a page permission to Manage. | The page becomes available to that role. | Page permission | |
+| APP-156 | Security configuration | Check for duplicate permission rows. | No duplicate active rules exist for one role and resource. | Permission rule duplication | |
+| APP-157 | Security configuration | Open a role's detail. | What it grants and who holds it are listed. | Role detail | |
+| APP-158 | Security configuration | Deactivate a user. | They can no longer sign in or be allocated work. | User deactivation | |
+| APP-159 | Security configuration | Open the page as a non-administrator. | The page is unavailable and the commands are refused. | Security page permission | |
+| APP-160 | All pages | Navigate to a route the role may not see. | Access is refused server-side, not only hidden in the menu. | Server-side route enforcement | |
+| APP-161 | All pages | Leave the session idle past the timeout. | Re-authentication is required and no unsaved data is silently lost. | Session timeout | |
+| APP-162 | All pages | Open the app in each supported browser. | Layout and function are correct in all of them. | Browser compatibility | |
+| APP-163 | All pages | Open the app at phone and tablet widths. | Layout adapts with no horizontal scrolling. | Responsive layout | |
+| APP-164 | All pages | Navigate with the keyboard and a screen reader. | All controls are reachable and labelled. | Accessibility | |
+| APP-165 | All pages | Disconnect the network mid-action. | A clear error appears and no partial write occurs. | Network failure handling | |
+| APP-166 | Deployment | Install the managed solution into a clean TEST environment. | The install completes and all components are present. | Managed solution install | |
+| APP-167 | Deployment | Query the plug-in steps after install. | All twenty-one steps are Enabled. | Plug-in step activation | |
+| APP-168 | Deployment | Test a server-side rule after install. | The rule refuses an invalid action, proving the steps are live. | Post-install rule enforcement | |
+| APP-169 | Deployment | Check environment variables and connection references. | All are set for the target environment. | Environment configuration | |
+| APP-170 | Deployment | Run the page permission and seed steps listed for the environment. | Admin pages are reachable and templates are seeded. | Post-install configuration | |
+| APP-171 | Deployment | Attempt an invalid lifecycle transition through the Web API. | The transition is refused server-side. | Lifecycle gating outside the UI | |
