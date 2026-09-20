@@ -64,8 +64,12 @@ describe('who holds a check', () => {
  * column that is silently blank — which is what F16 and F26 both were. A `record.xidname`
  * left outside a `lookupLabel(...)` call is that bug being written a third time.
  */
-describe('lookup labels across the case mappers', () => {
-  const sources = import.meta.glob('./*.ts', {
+describe('lookup labels across every mapper', () => {
+  // EVERY feature, not this folder. The first version of this globbed './*.ts' and passed
+  // while useReviewDetail.ts carried four of the same reads one directory away - the review
+  // page showed "Unassigned" and an empty Checklist version for a review that had both. A
+  // guard for a class of bug that only looks where the bug was first found is not a guard.
+  const sources = import.meta.glob('../**/*.{ts,tsx}', {
     query: '?raw',
     import: 'default',
     eager: true,
@@ -95,7 +99,9 @@ describe('lookup labels across the case mappers', () => {
 
   it('is looking at the mappers at all', () => {
     // Guards the test: a moved file or a changed glob would otherwise make it vacuous.
-    expect(Object.keys(sources).length).toBeGreaterThan(10);
+    expect(Object.keys(sources).length).toBeGreaterThan(60);
+    expect(Object.keys(sources).some((p) => p.includes('/reviews/'))).toBe(true);
+    expect(Object.keys(sources).some((p) => p.includes('/admin/'))).toBe(true);
     expect(Object.values(sources).join('')).toContain('lookupLabel(');
   });
 });

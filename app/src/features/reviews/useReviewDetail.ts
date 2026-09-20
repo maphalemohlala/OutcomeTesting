@@ -16,6 +16,7 @@ import {
 import type { ReviewType } from '../../types/domain';
 import { isRecordId } from '../../services/odata';
 import { ownerRoleForReviewType } from '../../lib/ownerRole';
+import { lookupLabel } from '../cases/lookupLabel';
 import {
   Al_reviewinstancesService,
   Al_responsesService,
@@ -141,7 +142,9 @@ function toResponse(
     id: record.al_responseid,
     versionId: record._al_questionversionid_value ?? null,
     question:
-      text(version?.al_questiontext) ?? text(record.al_questionversionidname) ?? record.al_name,
+      text(version?.al_questiontext) ??
+      lookupLabel(record, 'al_questionversionid', record.al_questionversionidname) ??
+      record.al_name,
     responseTypeValue: version?.al_responsetype ?? null,
     responseType: version
       ? version.al_responsetypename ??
@@ -168,11 +171,11 @@ function toHeader(record: Al_reviewinstances, expected: ReviewType): ReviewHeade
     type: record.al_reviewtypename ?? type ?? '—',
     status,
     sequence: record.al_sequence ?? 0,
-    checklistVersion: text(record.al_checklistversionidname),
+    checklistVersion: lookupLabel(record, 'al_checklistversionid', record.al_checklistversionidname),
     checklistVersionId: record._al_checklistversionid_value ?? null,
     caseId: record._al_outcomecaseid_value ?? null,
-    caseName: text(record.al_outcomecaseidname),
-    owner: text(record.owneridname),
+    caseName: lookupLabel(record, 'al_outcomecaseid', record.al_outcomecaseidname),
+    owner: lookupLabel(record, 'ownerid', record.owneridname),
     startedOn: date(record.al_startedon),
     submittedOn: date(record.al_submittedon),
     isSubmitted: record.al_reviewstatus === 120910212,

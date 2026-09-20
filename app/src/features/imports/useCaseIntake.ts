@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Al_importbatchesService, Al_importexceptionsService } from '../../generated';
+import { lookupLabel } from '../cases/lookupLabel';
 import {
   Al_importbatchesal_batchstatus,
   type Al_importbatches,
@@ -63,7 +64,7 @@ function toBatch(record: Al_importbatches): BatchSummary {
     totalRows: record.al_totalrows ?? null,
     importedCount: record.al_importedcount ?? null,
     exceptionCount: record.al_exceptioncount ?? null,
-    owner: record.owneridname ?? null,
+    owner: lookupLabel(record, 'ownerid', record.owneridname),
   };
 }
 
@@ -71,7 +72,7 @@ function toException(record: Al_importexceptions): ExceptionSummary {
   const status = Al_importexceptionsal_exceptionstatus[record.al_exceptionstatus] ?? 'Unknown';
   return {
     id: record.al_importexceptionid,
-    batch: record.al_importbatchidname ?? null,
+    batch: lookupLabel(record, 'al_importbatchid', record.al_importbatchidname),
     rowNumber: record.al_rownumber ?? null,
     caseReference: record.al_casereference ?? null,
     reason: record.al_reason,

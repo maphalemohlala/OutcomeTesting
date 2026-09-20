@@ -14,6 +14,7 @@ import { choiceLabel } from '../../lib/choiceLabel';
 import { date, text } from '../../lib/format';
 import { withoutUnaskedRootCause } from './gradingRules';
 import { checkerLabel } from '../cases/checkerNames';
+import { lookupLabel } from '../cases/lookupLabel';
 import { REVIEW_ROUTES, type ReviewRoute } from '../../types/domain';
 import type { FormRow, ReviewSection, SectionedAnswer } from './reviewSections';
 
@@ -255,7 +256,7 @@ export interface HeaderField {
  * both checks - so an unallocated one reads as work outstanding rather than work nobody owes.
  */
 function headerRoute(record: Al_outcomecases): ReviewRoute | null {
-  const name = record.al_reviewrouteidname ?? null;
+  const name = lookupLabel(record, 'al_reviewrouteid', record.al_reviewrouteidname);
   return REVIEW_ROUTES.find((route) => route === name) ?? null;
 }
 

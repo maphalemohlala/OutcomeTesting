@@ -12,6 +12,7 @@ import {
   type Al_signoffs,
 } from '../../generated/models/Al_signoffsModel';
 import { date, text } from '../../lib/format';
+import { lookupLabel } from '../cases/lookupLabel';
 
 export interface RemediationActionRow {
   id: string;
@@ -96,8 +97,8 @@ export function toAction(record: Al_remediationactions): RemediationActionRow {
       '—',
     dueOn: date(record.al_duedate),
     completedOn: date(record.al_completedon),
-    triggeredBy: text(record.al_reviewinstanceidname),
-    owner: text(record.owneridname),
+    triggeredBy: lookupLabel(record, 'al_reviewinstanceid', record.al_reviewinstanceidname),
+    owner: lookupLabel(record, 'ownerid', record.owneridname),
     assignedTo: text(extra.al_assignedcontactidname as string | undefined),
     remedialAction: text(extra.al_adviserresponse as string | undefined),
     evidenceReference: text(extra.al_evidencereference as string | undefined),
@@ -127,7 +128,7 @@ export function toOutcome(record: Al_outcomes): OutcomeRow {
     regradeReason: text(record.al_regradereason),
     finalisedOn: date(record.al_finalisedon),
     regradedOn: date(record.al_regradedon),
-    reviewInstance: text(record.al_reviewinstanceidname),
+    reviewInstance: lookupLabel(record, 'al_reviewinstanceid', record.al_reviewinstanceidname),
   };
 }
 
@@ -141,7 +142,7 @@ export function toSignoff(record: Al_signoffs): SignoffRow {
       '—',
     notes: text(record.al_notes),
     signedOffOn: date(record.al_signedoffon),
-    remediationAction: text(record.al_remediationactionidname),
+    remediationAction: lookupLabel(record, 'al_remediationactionid', record.al_remediationactionidname),
     remediationActionId:
       ((record as unknown as Record<string, unknown>)._al_remediationactionid_value as
         | string
@@ -157,6 +158,6 @@ export function toSignoff(record: Al_signoffs): SignoffRow {
     // and still fall back, which is the most their rows can honestly say.
     signedOffBy:
       text((record as unknown as Record<string, unknown>).al_signedbyname as string | undefined) ??
-      text(record.owneridname),
+      lookupLabel(record, 'ownerid', record.owneridname),
   };
 }
