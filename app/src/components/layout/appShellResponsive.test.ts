@@ -40,4 +40,16 @@ describe('the navigation rail at phone width', () => {
     expect(rail).toMatch(/min-width:\s*0/);
     expect(rail).toMatch(/max-width:\s*100%/);
   });
+
+  /*
+   * min-width alone left the page still scrolling 268px. Each group carries a
+   * visually-hidden <h2> for screen readers and .visually-hidden is position: absolute,
+   * so with a static rail those headings resolved against the document and the rail's
+   * overflow never clipped them - one sat 628px out, which was exactly the document's
+   * scrollWidth. Making the rail a containing block brought it back to the viewport width
+   * and removed the scroll entirely.
+   */
+  it('is the containing block for the headings inside it', () => {
+    expect(rail).toMatch(/position:\s*relative/);
+  });
 });

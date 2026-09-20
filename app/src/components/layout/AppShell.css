@@ -154,6 +154,16 @@
      */
     min-width: 0;
     max-width: 100%;
+
+    /*
+     * And the rail is the containing block for what is inside it. Each group carries a
+     * visually-hidden <h2> naming it for a screen reader, and .visually-hidden is
+     * position: absolute. With the rail static, those headings resolved against the
+     * document instead, so the rail's overflow did not clip them: one sat 628px out and
+     * the page still scrolled sideways by 268px after min-width alone had stopped the
+     * rail itself widening. min-width and this are both needed (F19).
+     */
+    position: relative;
   }
 
   .shell__group + .shell__group {
