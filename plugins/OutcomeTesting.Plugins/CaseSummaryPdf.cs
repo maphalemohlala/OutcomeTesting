@@ -17,10 +17,13 @@ namespace OutcomeTesting.Plugins
     /// different document under the same letter.
     /// </para>
     /// <para>
-    /// <b>It carries what the case already tells the para-planner elsewhere.</b> No answers
-    /// and no grade: the para-planner is not a checker, AD-020 keeps them out of the review
-    /// page, and putting the checker's findings into an attachment would route round that
-    /// rather than deciding it.
+    /// <b>It carries the completed check and any remedial actions</b> (AD-165). It did not
+    /// until 2026-09-20: the document deliberately withheld the answers and the grade, on a
+    /// reading of AD-020 that treated the para-planner as somebody who could open the review
+    /// page and should not be handed a way round it. The project owner settled that -
+    /// para-planners have no access to the system at all - so the attachment is not a route
+    /// round a screen they could otherwise reach. It is the only sight of the check they get,
+    /// and without the findings it was a covering note for a document nobody was sending.
     /// </para>
     /// </summary>
     public static class CaseSummaryPdf
@@ -102,25 +105,64 @@ namespace OutcomeTesting.Plugins
                 }
             }
 
+            var labels = new OptionLabels(service);
+            var reviews = ReviewRows(service, caseRef);
+
             blocks.Add(PdfBlock.Spacer());
             blocks.Add(PdfBlock.Heading("Checks on this case"));
-            foreach (var line in Reviews(service, caseRef))
+            if (reviews.Count == 0)
             {
-                blocks.Add(PdfBlock.Bullet(line));
+                blocks.Add(PdfBlock.Bullet("No checks are open on this case."));
+            }
+
+            foreach (var review in reviews)
+            {
+                blocks.Add(PdfBlock.Bullet(IndexLine(review)));
+            }
+
+            // The check itself, which is what the para-planner is actually being sent
+            // (Change 2, Change 7). Submitted reviews only - see CompletedCheck.
+            foreach (var review in reviews)
+            {
+                var submitted = review.GetAttributeValue<DateTime?>("al_submittedon");
+                if (!submitted.HasValue)
+                {
+                    continue;
+                }
+
+                var answers = CompletedCheck.Answers(service, review.Id, labels);
+                if (answers.Count == 0)
+                {
+                    continue;
+                }
+
+                blocks.Add(PdfBlock.Spacer());
+                blocks.Add(PdfBlock.Heading(TypeName(review) + " - submitted " + Date(submitted)));
+                blocks.AddRange(answers);
+            }
+
+            // Omitted entirely when there are none, which the requirement asks for in as many
+            // words. A heading with nothing under it reads as a document that failed to load.
+            var remedial = CompletedCheck.RemedialActions(service, caseRef, labels);
+            if (remedial.Count > 0)
+            {
+                blocks.Add(PdfBlock.Spacer());
+                blocks.Add(PdfBlock.Heading("Remedial actions"));
+                blocks.AddRange(remedial);
             }
 
             blocks.Add(PdfBlock.Spacer());
             blocks.Add(PdfBlock.Paragraph(
-                "This summary was produced when the review was submitted and describes the case as "
+                "This document was produced when the review was submitted and describes the case as "
                 + "it stood at that moment. The case record in the portal is the live version."));
 
             return blocks;
         }
 
-        /// <summary>One line per review on the case: which check, and where it has got to.</summary>
-        private static List<string> Reviews(IOrganizationService service, EntityReference caseRef)
+        /// <summary>The case's reviews, in the order they were checked.</summary>
+        private static List<Entity> ReviewRows(IOrganizationService service, EntityReference caseRef)
         {
-            var lines = new List<string>();
+            var reviews = new List<Entity>();
 
             try
             {
@@ -133,31 +175,32 @@ namespace OutcomeTesting.Plugins
                 query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
                 query.AddOrder("al_sequence", OrderType.Ascending);
 
-                foreach (var review in service.RetrieveMultiple(query).Entities)
-                {
-                    var type = review.GetAttributeValue<OptionSetValue>("al_reviewtype");
-                    var submitted = review.GetAttributeValue<DateTime?>("al_submittedon");
-
-                    lines.Add(
-                        (type != null && type.Value == ResponseRules.ReviewTypeTax ? "Tax check" : "AQS check")
-                        + " - " + (submitted.HasValue
-                            ? "submitted " + Date(submitted)
-                            : "not yet submitted"));
-                }
+                reviews.AddRange(service.RetrieveMultiple(query).Entities);
             }
             catch (Exception)
             {
-                // A summary missing one section is better than no summary, and better than
-                // a submit that failed because a document could not be drawn.
-                return lines;
+                // A document missing one section is better than no document, and better than
+                // a submit that failed because one could not be drawn.
+                return reviews;
             }
 
-            if (lines.Count == 0)
-            {
-                lines.Add("No checks are open on this case.");
-            }
+            return reviews;
+        }
 
-            return lines;
+        /// <summary>Which check this is.</summary>
+        private static string TypeName(Entity review)
+        {
+            var type = review.GetAttributeValue<OptionSetValue>("al_reviewtype");
+            return type != null && type.Value == ResponseRules.ReviewTypeTax ? "Tax check" : "AQS check";
+        }
+
+        /// <summary>One line for the index: which check, and where it has got to.</summary>
+        private static string IndexLine(Entity review)
+        {
+            var submitted = review.GetAttributeValue<DateTime?>("al_submittedon");
+            return TypeName(review) + " - " + (submitted.HasValue
+                ? "submitted " + Date(submitted)
+                : "not yet submitted");
         }
 
         /// <summary>The ticked items, one per line, as the case stores them.</summary>

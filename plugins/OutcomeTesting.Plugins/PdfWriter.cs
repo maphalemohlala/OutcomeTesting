@@ -14,6 +14,16 @@ namespace OutcomeTesting.Plugins
         /// <summary>A section heading, bold.</summary>
         Heading,
 
+        /// <summary>
+        /// A heading one level below <see cref="Heading"/>, bold at body size.
+        ///
+        /// Added for the completed check (AD-165), which has two levels of structure: the
+        /// check, and the sections of the checklist inside it. Drawing both with
+        /// <see cref="Heading"/> would have made a section indistinguishable from the check
+        /// it belongs to.
+        /// </summary>
+        Subheading,
+
         /// <summary>A run of body text, wrapped across as many lines as it needs.</summary>
         Paragraph,
 
@@ -49,6 +59,12 @@ namespace OutcomeTesting.Plugins
         public static PdfBlock Heading(string text)
         {
             return new PdfBlock { Kind = PdfBlockKind.Heading, Text = text };
+        }
+
+        /// <summary>A heading one level below <see cref="Heading(string)"/>.</summary>
+        public static PdfBlock Subheading(string text)
+        {
+            return new PdfBlock { Kind = PdfBlockKind.Subheading, Text = text };
         }
 
         /// <summary>A paragraph of body text.</summary>
@@ -202,6 +218,17 @@ namespace OutcomeTesting.Plugins
                         foreach (var line in Wrap(block.Text, Bold, HeadingSize, ContentWidth))
                         {
                             Emit(Bold, HeadingSize, Margin, line);
+                        }
+
+                        break;
+
+                    case PdfBlockKind.Subheading:
+                        // Half a block gap rather than a whole one: it belongs to the heading
+                        // above it, and spacing it equally would read as a sibling.
+                        y -= BlockGap / 2;
+                        foreach (var line in Wrap(block.Text, Bold, BodySize, ContentWidth))
+                        {
+                            Emit(Bold, BodySize, Margin, line);
                         }
 
                         break;

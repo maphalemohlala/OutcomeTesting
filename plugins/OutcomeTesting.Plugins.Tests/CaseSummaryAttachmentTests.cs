@@ -17,6 +17,16 @@ namespace OutcomeTesting.Plugins.Tests
     /// that caused the notification, so throwing would roll back a checker's submit because a
     /// PDF could not be drawn.
     /// </para>
+    /// <para>
+    /// <b>It carries the completed check and its remedial actions</b> (AD-165). It did not
+    /// until 2026-09-20: the document was a case summary that deliberately withheld the
+    /// answers, on a reading of AD-020 that treated the para-planner as somebody who could
+    /// see the review page and should not be given a way round it. The project owner settled
+    /// that on 2026-09-20 - para-planners have no access to the system at all, so the
+    /// attachment is not a route round a screen, it is the only sight of the check they get.
+    /// The test that pinned the old boundary is replaced by the ones below rather than
+    /// deleted, because the assertion it made is now exactly backwards.
+    /// </para>
     /// </summary>
     public class CaseSummaryAttachmentTests
     {
@@ -49,20 +59,103 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Contains("High Risk Item 1", text);
         }
 
+        // ------------------------------------------------------------ the completed check
+
         [Fact]
-        public void Carries_no_answers_and_no_grade()
+        public void Carries_the_answers_of_a_completed_check()
         {
-            // The para-planner is not a checker and AD-020 keeps them out of the review page.
-            // Putting the findings in an attachment would route round that rather than
-            // deciding it, so this is a boundary the document must not quietly cross.
-            var service = Case();
-            service.Seed("al_response", Guid.NewGuid(),
-                "al_answertext", "The adviser did not evidence the recommendation.");
+            // The requirement, and what the document withheld until AD-165: "a PDF of the
+            // completed checks for that case".
+            var text = Flat(CaseSummaryPdf.Build(Checked(), Ref()));
 
-            var text = Drawn(CaseSummaryPdf.Build(service, Ref()));
+            Assert.Contains("Client objectives recorded: Pass", text);
+            Assert.Contains("Adviser charges evidenced: Fail", text);
+        }
 
-            Assert.DoesNotContain("did not evidence", text);
-            Assert.DoesNotContain("Potential harm", text);
+        [Fact]
+        public void Groups_the_answers_under_the_section_they_were_asked_in()
+        {
+            // The checker answered them in sections and the para-planner reads them in the
+            // same order; an ungrouped run of sixty questions is a list, not a check.
+            var text = Flat(CaseSummaryPdf.Build(Checked(), Ref()));
+
+            var section = text.IndexOf("Suitability core checks", StringComparison.Ordinal);
+            var charges = text.IndexOf("Adviser charges evidenced", StringComparison.Ordinal);
+
+            Assert.True(section >= 0, "the section heading is drawn");
+            Assert.True(section < charges, "the section heading precedes its questions");
+        }
+
+        [Fact]
+        public void Draws_a_rich_text_answer_as_readable_text()
+        {
+            // Change 7: Tax Remedial is the one rich-text answer, and it is markup in the
+            // column. Drawn as-is the para-planner would read the tags; the PDF has no HTML.
+            var text = Flat(CaseSummaryPdf.Build(Checked(), Ref()));
+
+            Assert.Contains("Re-run the CGT calculation", text);
+            Assert.DoesNotContain("<b>", text);
+            Assert.DoesNotContain("&amp;", text);
+        }
+
+        [Fact]
+        public void Leaves_out_a_check_that_was_never_submitted()
+        {
+            // "The completed checks". A half-answered review in somebody's drafts is not a
+            // finding, and sending it as one would be worse than sending nothing.
+            var service = Checked(submitted: false);
+
+            var text = Flat(CaseSummaryPdf.Build(service, Ref()));
+
+            Assert.DoesNotContain("Client objectives recorded: Pass", text);
+            Assert.Contains("not yet submitted", text);
+        }
+
+        // ------------------------------------------------------------ remedial actions
+
+        [Fact]
+        public void Lists_the_remedial_actions_raised_on_the_case()
+        {
+            var service = Checked();
+            service.Seed("al_remediationaction", Guid.NewGuid(),
+                "al_outcomecaseid", Ref(),
+                "al_description", "Evidence the charges disclosure and re-issue the letter.",
+                "al_actionstatus", new OptionSetValue(Remediation.StatusOpen),
+                "al_duedate", new DateTime(2026, 10, 1, 9, 0, 0, DateTimeKind.Utc),
+                "statecode", 0);
+
+            var text = Flat(CaseSummaryPdf.Build(service, Ref()));
+
+            Assert.Contains("Remedial actions", text);
+            Assert.Contains("Evidence the charges disclosure", text);
+            Assert.Contains("1 October 2026", text);
+        }
+
+        [Fact]
+        public void Omits_the_remedial_section_entirely_when_there_are_none()
+        {
+            // The requirement is explicit: "If there are no remedial actions, omit that
+            // section rather than showing an empty one." An empty heading reads as a document
+            // that failed to load its own content.
+            var text = Flat(CaseSummaryPdf.Build(Checked(), Ref()));
+
+            Assert.DoesNotContain("Remedial actions", text);
+        }
+
+        [Fact]
+        public void Does_not_count_a_remedial_action_belonging_to_another_case()
+        {
+            var service = Checked();
+            service.Seed("al_remediationaction", Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", Guid.NewGuid()),
+                "al_description", "Another case's action.",
+                "al_actionstatus", new OptionSetValue(Remediation.StatusOpen),
+                "statecode", 0);
+
+            var text = Flat(CaseSummaryPdf.Build(service, Ref()));
+
+            Assert.DoesNotContain("Remedial actions", text);
+            Assert.DoesNotContain("Another case", text);
         }
 
         [Fact]
@@ -182,6 +275,99 @@ namespace OutcomeTesting.Plugins.Tests
             }
 
             return service;
+        }
+
+        /// <summary>
+        /// A case with one submitted Tax check: two scale answers in a named section and the
+        /// rich-text Tax Remedial answer Change 7 added.
+        /// </summary>
+        private static FakeOrganizationService Checked(bool submitted = true)
+        {
+            var service = Case();
+            service.SeedOptionSet("al_response", "al_answerchoice",
+                ResponseRules.ChoicePass, "Pass",
+                ResponseRules.ChoiceFail, "Fail");
+            service.SeedOptionSet("al_remediationaction", "al_actionstatus",
+                Remediation.StatusOpen, "Open",
+                Remediation.StatusCompleted, "Completed");
+
+            var reviewId = Guid.NewGuid();
+            var review = service.Seed("al_reviewinstance", reviewId,
+                "al_outcomecaseid", Ref(),
+                "al_reviewtype", new OptionSetValue(ResponseRules.ReviewTypeTax),
+                "al_sequence", 1,
+                "statecode", 0);
+
+            if (submitted)
+            {
+                review["al_submittedon"] = new DateTime(2026, 9, 14, 10, 30, 0, DateTimeKind.Utc);
+            }
+
+            var section = Guid.NewGuid();
+            service.Seed("al_section", section,
+                "al_name", "Suitability core checks", "al_sectioncode", "S-E1", "al_displayorder", 1);
+
+            Answer(service, reviewId, section, 1, "Q-E1-01", "Client objectives recorded",
+                ResponseRules.TypePassFail, "al_answerchoice",
+                new OptionSetValue(ResponseRules.ChoicePass));
+
+            Answer(service, reviewId, section, 2, "Q-E1-02", "Adviser charges evidenced",
+                ResponseRules.TypePassFail, "al_answerchoice",
+                new OptionSetValue(ResponseRules.ChoiceFail));
+
+            Answer(service, reviewId, section, 3, "Q-TAX-04", "Tax Remedial",
+                ResponseRules.TypeRichText, "al_answerrichtext",
+                "<p>Re-run the <b>CGT</b> calculation &amp; reissue.</p>");
+
+            return service;
+        }
+
+        private static void Answer(
+            FakeOrganizationService service,
+            Guid reviewId,
+            Guid sectionId,
+            int order,
+            string code,
+            string questionText,
+            int responseType,
+            string answerColumn,
+            object answer)
+        {
+            var questionId = Guid.NewGuid();
+            var versionId = Guid.NewGuid();
+
+            service.Seed("al_question", questionId,
+                "al_questioncode", code,
+                "al_sectionid", new EntityReference("al_section", sectionId));
+
+            service.Seed("al_questionversion", versionId,
+                "al_questionid", new EntityReference("al_question", questionId),
+                "al_questiontext", questionText,
+                "al_responsetype", new OptionSetValue(responseType),
+                "al_displayorder", order);
+
+            service.Seed("al_response", Guid.NewGuid(),
+                "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
+                "al_questionversionid", new EntityReference("al_questionversion", versionId),
+                answerColumn, answer);
+        }
+
+        /// <summary>
+        /// The drawn text with its line breaks flattened to spaces.
+        ///
+        /// The writer wraps a long value across lines and draws a Field's label and value as
+        /// two separate operations, so an assertion on a phrase has to read the page rather
+        /// than the individual draw calls.
+        /// </summary>
+        private static string Flat(byte[] pdf)
+        {
+            var collapsed = Drawn(pdf).Replace('\n', ' ');
+            while (collapsed.IndexOf("  ", StringComparison.Ordinal) >= 0)
+            {
+                collapsed = collapsed.Replace("  ", " ");
+            }
+
+            return collapsed;
         }
 
         /// <summary>Every string the document draws, unescaped.</summary>
