@@ -546,6 +546,20 @@ namespace OutcomeTesting.Plugins
             // that meant the 13th month is a data error, not a January date. Rejecting it
             // puts the row in front of a person; accepting it writes a wrong advice date
             // that nothing downstream can detect.
+            //
+            // The DATE PART is what is judged, because a time attached to it used to carry
+            // the whole value past this guard: the space and the colon made the test below
+            // false, and the general parser underneath then read it month-first anyway
+            // (2026-09-20). A separator is required so a written-out "31 Jan 2026 10:00",
+            // which says outright which part is the month, is not caught by it.
+            var datePart = trimmed.Split(' ')[0];
+            if (datePart.Length < trimmed.Length
+                && datePart.IndexOfAny(DateSeparators) >= 0
+                && IsNumericDateForm(datePart))
+            {
+                return null;
+            }
+
             if (IsNumericDateForm(trimmed))
             {
                 return null;
@@ -561,6 +575,9 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>True when the value is digits and date separators alone.</summary>
+        /// <summary>What separates the parts of a numeric date, in any order this accepts.</summary>
+        private static readonly char[] DateSeparators = { '/', '-', '.' };
+
         private static bool IsNumericDateForm(string value)
         {
             foreach (var ch in value)
@@ -575,9 +592,22 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// A date that may carry a time, as the checklist completion stamps do. The Code App
-        /// resolves the workbook's serials to ISO before posting, so the time arrives as
-        /// "2026-09-04T13:54:00"; a plain date still parses through <see cref="ParseDate"/>.
+        /// A date that may carry a time, as the checklist completion stamps do.
+        ///
+        /// <para>
+        /// TWO forms arrive, and for a while only one of them worked. When the workbook
+        /// stores the cell as a date-formatted serial, the Code App's reader resolves it and
+        /// the value posts as "2026-09-04T13:54:00". When the workbook stores it as TEXT -
+        /// which the supplied extract does - nothing converts it, and it arrives exactly as
+        /// Intelligent Office wrote it: "18/08/2026 13:54", UK order.
+        /// </para>
+        /// <para>
+        /// The UK forms are tried explicitly because the fallback underneath reads INVARIANT
+        /// culture, which is month-first. Until 2026-09-20 a text stamp fell through to it
+        /// and "06/08/2026 14:49" came back as 8 June - silently, because a day below 13 is
+        /// a valid month and nothing downstream could tell. Above the twelfth it returned
+        /// nothing at all, which reads as a checklist nobody stamped.
+        /// </para>
         /// </summary>
         public static DateTime? ParseDateTime(string value)
         {
@@ -596,6 +626,19 @@ namespace OutcomeTesting.Plugins
                 "yyyy-MM-dd HH:mm",
             };
             if (DateTime.TryParseExact(trimmed, iso, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+            {
+                return parsed;
+            }
+
+            // Day first, as every other numeric date in this file is read (see ParseDate).
+            var uk = new[]
+            {
+                "d/M/yyyy H:mm",
+                "d/M/yyyy H:mm:ss",
+                "d/M/yyyy HH:mm",
+                "d/M/yyyy HH:mm:ss",
+            };
+            if (DateTime.TryParseExact(trimmed, uk, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
             {
                 return parsed;
             }

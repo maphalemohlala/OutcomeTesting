@@ -632,6 +632,105 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal(DayOfWeek.Monday, due.DayOfWeek);
         }
 
+        // ------------------------------------------- the stamp the real extract writes
+
+        /// <remarks>
+        /// The supplied workbook stores its CompletionDate cells as TEXT, not as the
+        /// date-formatted serials the Code App converts to ISO. So the value arrives exactly
+        /// as Intelligent Office wrote it - UK order, with a time - and the ISO assumption
+        /// ParseDateTime was built on does not hold for it.
+        /// </remarks>
+        [Fact]
+        public void A_uk_stamp_from_the_extract_keeps_its_day_and_month()
+        {
+            // 6 August, not 8 June. This was THE defect: with the day below 13 the value
+            // parsed, silently, month-first, and nothing downstream could tell.
+            Assert.Equal(
+                new DateTime(2026, 8, 6, 14, 49, 0),
+                ImportRules.ParseDateTime("06/08/2026 14:49"));
+        }
+
+        [Fact]
+        public void A_uk_stamp_past_the_twelfth_is_read_rather_than_dropped()
+        {
+            // The same defect wearing its other face. No month 18 exists, so the month-first
+            // parser returned nothing and the case was created with no checklist stamp at
+            // all - which reads as "the paraplanner did not record one".
+            Assert.Equal(
+                new DateTime(2026, 8, 18, 13, 54, 0),
+                ImportRules.ParseDateTime("18/08/2026 13:54"));
+        }
+
+        [Fact]
+        public void Seconds_on_a_uk_stamp_are_kept()
+        {
+            Assert.Equal(
+                new DateTime(2026, 12, 3, 9, 5, 30),
+                ImportRules.ParseDateTime("03/12/2026 09:05:30"));
+        }
+
+        [Fact]
+        public void The_iso_stamp_the_code_app_produces_still_parses()
+        {
+            // The workbook reader resolves a date-formatted serial to this, so both forms
+            // reach the same column and both must work.
+            Assert.Equal(
+                new DateTime(2026, 9, 4, 13, 54, 0),
+                ImportRules.ParseDateTime("2026-09-04T13:54:00"));
+        }
+
+        [Fact]
+        public void A_stamp_that_is_a_date_alone_still_parses_uk_first()
+        {
+            Assert.Equal(new DateTime(2026, 8, 6), ImportRules.ParseDateTime("06/08/2026"));
+        }
+
+        [Fact]
+        public void An_impossible_numeric_stamp_is_refused_rather_than_guessed()
+        {
+            // 13 is not a month in either reading, so there is nothing to fall back to. The
+            // point is that it comes back empty rather than being handed to a parser that
+            // would try month-first and invent an answer.
+            Assert.Null(ImportRules.ParseDateTime("13/13/2026 10:00"));
+        }
+
+        [Fact]
+        public void A_written_out_date_carrying_a_time_is_still_unambiguous()
+        {
+            // The guard added for the numeric forms must not catch this one: "Jan" says
+            // which part is the month, so there is nothing to be ambiguous about.
+            Assert.Equal(new DateTime(2026, 1, 31), ImportRules.ParseDate("31 Jan 2026 10:00"));
+        }
+
+        [Fact]
+        public void A_numeric_date_carrying_a_time_is_refused_by_ParseDate_itself()
+        {
+            // ParseDate is public and feeds every mapped date column, not only the checklist
+            // stamp. If an extract ever wrote "06/08/2026 00:00" into StartDate, the same
+            // month-first misreading would have happened there and gone equally unseen.
+            Assert.Null(ImportRules.ParseDate("06/08/2026 14:49"));
+        }
+
+        [Fact]
+        public void The_checklist_stamp_survives_the_real_extracts_form()
+        {
+            // End to end through the reader, because the unit above proves the parser and
+            // this proves the column actually written.
+            var headers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "ChecklistItem1", 0 },
+                { "CompletedBy1", 1 },
+                { "CompletionDate1", 2 },
+            };
+            var fields = new List<string> { "Tax Check", "Miko Stewart", "18/08/2026 13:54" };
+
+            var selection = ImportRules.ReadChecklist(fields, headers);
+
+            Assert.Null(selection.Error);
+            Assert.True(selection.RequiresTax);
+            Assert.Equal(new DateTime(2026, 8, 18, 13, 54, 0), selection.CompletedOn);
+        }
+
         // ------------------------------------------------------------------ the UK day
 
         [Fact]
