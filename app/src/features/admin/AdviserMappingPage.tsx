@@ -5,9 +5,11 @@ import { usePermissions } from '../../app/permissions/permissionContext';
 import {
   useAdviserMappings,
   saveAdviserMapping,
+  removeAdviserMapping,
   type AdviserMappingRow,
   type ContactOption,
 } from './useAdviserMappings';
+import { alreadyMappedRefusal } from './adviserMappingFailure';
 import './AdviserMappingPage.css';
 
 /**
@@ -25,6 +27,8 @@ export function AdviserMappingPage() {
   const canEdit = can('page.admin.advisers', 'Manage');
 
   const [editing, setEditing] = useState<AdviserMappingRow | 'new' | null>(null);
+  const [removing, setRemoving] = useState<AdviserMappingRow | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
 
   return (
     <div className="advisers">
@@ -86,6 +90,17 @@ export function AdviserMappingPage() {
                         >
                           Change
                         </button>
+                        <button
+                          type="button"
+                          className="advisers__btn advisers__btn--ghost"
+                          onClick={() => {
+                            setProblem(null);
+                            setRemoving(row);
+                          }}
+                        >
+                          Remove
+                          <span className="advisers__sr"> the mapping for {row.adviserEmail}</span>
+                        </button>
                       </td>
                     )}
                   </tr>
@@ -94,14 +109,32 @@ export function AdviserMappingPage() {
             </table>
           )}
 
+          {problem && <p className="advisers__problem">{problem}</p>}
+
           {editing && (
             <MappingForm
               row={editing === 'new' ? null : editing}
               contacts={state.contacts}
+              mappings={state.mappings}
               onClose={() => setEditing(null)}
               onSaved={() => {
                 setEditing(null);
                 setReloadKey((k) => k + 1);
+              }}
+            />
+          )}
+
+          {removing && (
+            <RemoveMapping
+              row={removing}
+              onClose={() => setRemoving(null)}
+              onRemoved={() => {
+                setRemoving(null);
+                setReloadKey((k) => k + 1);
+              }}
+              onProblem={(reason) => {
+                setRemoving(null);
+                setProblem(reason);
               }}
             />
           )}
@@ -114,11 +147,14 @@ export function AdviserMappingPage() {
 function MappingForm({
   row,
   contacts,
+  mappings,
   onClose,
   onSaved,
 }: {
   row: AdviserMappingRow | null;
   contacts: ContactOption[];
+  /** What is already mapped, so a duplicate is named here rather than guessed at. */
+  mappings: AdviserMappingRow[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -129,9 +165,20 @@ function MappingForm({
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    setSaving(true);
     setProblem(null);
 
+    // Only when adding. Changing a row keeps its own adviser, so it always matches itself.
+    // The alternate key is what actually prevents a second row for one adviser; this is
+    // here so the answer is immediate and names the adviser rather than the fault.
+    if (row === null) {
+      const clash = alreadyMappedRefusal(adviserEmail, mappings);
+      if (clash) {
+        setProblem(clash);
+        return;
+      }
+    }
+
+    setSaving(true);
     const result = await saveAdviserMapping(row?.id ?? null, adviserEmail, managerId);
     setSaving(false);
 
@@ -216,6 +263,73 @@ function MappingForm({
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+/**
+ * Confirms removing a mapping (F18).
+ *
+ * Removal used to be impossible: the only action was Change, and clearing the manager was
+ * refused, so an adviser who should no longer be routed kept a stale T&C Manager for good.
+ *
+ * Confirmed rather than done on the first click, because the row cannot be recovered from
+ * this page - and the consequence is spelled out, because "remove" on a screen about
+ * permissions-shaped things invites the fear that access is being taken away. It is not.
+ */
+function RemoveMapping({
+  row,
+  onClose,
+  onRemoved,
+  onProblem,
+}: {
+  row: AdviserMappingRow;
+  onClose: () => void;
+  onRemoved: () => void;
+  onProblem: (reason: string) => void;
+}) {
+  const [removing, setRemoving] = useState(false);
+
+  async function confirm() {
+    setRemoving(true);
+    const result = await removeAdviserMapping(row.id);
+    setRemoving(false);
+
+    if (result.ok) {
+      onRemoved();
+      return;
+    }
+
+    onProblem(result.reason);
+  }
+
+  return (
+    <Modal title="Remove mapping" onClose={onClose}>
+      <div className="advisers__form">
+        <p>
+          <strong>{row.adviserEmail}</strong>
+          {row.managerName ? <> is mapped to {row.managerName}.</> : <> has no manager chosen.</>}
+        </p>
+        <p className="advisers__hint">
+          Removing it stops {row.managerName ?? 'anyone'} being told when a sign-off falls due
+          for this adviser. Nothing else changes: the sign-off still works, any T&amp;C Manager
+          can perform one, and nobody gains or loses access to any case.
+        </p>
+
+        <div className="advisers__actions">
+          <button type="button" className="advisers__btn" onClick={confirm} disabled={removing}>
+            {removing ? 'Removing…' : 'Remove mapping'}
+          </button>
+          <button
+            type="button"
+            className="advisers__btn advisers__btn--ghost"
+            onClick={onClose}
+            disabled={removing}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 }

@@ -6,6 +6,7 @@ import {
   type AdviserMappingRow,
   type ContactOption,
 } from './adviserMappingRows';
+import { describeRemoveFailure, describeSaveFailure } from './adviserMappingFailure';
 
 // Held in adviserMappingRows so the shaping can be tested; this module cannot be imported
 // under the test runner because ../../generated pulls in the Power Apps client.
@@ -135,12 +136,35 @@ export async function saveAdviserMapping(
 
     if (!result.success) {
       logTechnical('adviser mapping save', result.error);
-      return { ok: false, reason: 'That mapping could not be saved.' };
+      return { ok: false, reason: describeSaveFailure(result.error) };
     }
 
     return { ok: true };
   } catch (error) {
     logTechnical('adviser mapping save', error);
-    return { ok: false, reason: 'That mapping could not be saved.' };
+    return { ok: false, reason: describeSaveFailure(error) };
+  }
+}
+
+/**
+ * Removes one mapping, so that adviser's sign-offs stop being routed.
+ *
+ * Deleted rather than deactivated. `al_adviseremail` is an alternate key, and an alternate
+ * key holds against inactive rows too, so a deactivated mapping would make that adviser
+ * impossible to map again - "remove, then map them to someone else" would come back as a
+ * duplicate with no row on the page to explain it.
+ *
+ * Nothing is lost by deleting: the mapping carries no history, it grants no access, and the
+ * audit trail for a sign-off records who was told at the time it happened (F18).
+ */
+export async function removeAdviserMapping(
+  id: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  try {
+    await Al_advisermappingsService.delete(id);
+    return { ok: true };
+  } catch (error) {
+    logTechnical('adviser mapping remove', error);
+    return { ok: false, reason: describeRemoveFailure(error) };
   }
 }
