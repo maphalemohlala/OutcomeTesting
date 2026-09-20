@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import css from './AppShell.css?raw';
 
 /**
  * F19, found in DEV on 2026-09-20. At phone width the whole page scrolled sideways by
@@ -20,10 +19,10 @@ import { describe, expect, it } from 'vitest';
  *
  * Read from the stylesheet because there is no DOM here to lay out; the live check is the
  * document's scrollWidth against its clientWidth at 390px, which is how this was found.
+ * Imported with ?raw, as the other source-drift tests in this app do -- the app's
+ * TypeScript project has no node types, so node:fs is not available here.
  */
 describe('the navigation rail at phone width', () => {
-  const css = readFileSync(join(__dirname, 'AppShell.css'), 'utf8');
-
   const narrow = css.slice(css.indexOf('@media (max-width: 60rem)'));
   const rail = narrow.slice(narrow.indexOf('.shell__rail'), narrow.indexOf('.shell__group'));
 
