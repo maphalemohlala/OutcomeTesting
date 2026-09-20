@@ -6,8 +6,15 @@ import './CaseOutcomeSummary.css';
  * regrade and sign-off detail lives on the remediation screen; this only surfaces
  * the preserved initial and final outcomes so the case's standing is visible here.
  */
-export function CaseOutcomeSummary({ caseId }: { caseId: string }) {
-  const state = useCaseOutcome(caseId);
+export function CaseOutcomeSummary({
+  caseId,
+  reloadKey = 0,
+}: {
+  caseId: string;
+  /** Bumped by the page when a command has written something this summary reads. */
+  reloadKey?: number;
+}) {
+  const state = useCaseOutcome(caseId, reloadKey);
 
   return (
     <section className="case-outcome" aria-labelledby="panel-outcome">

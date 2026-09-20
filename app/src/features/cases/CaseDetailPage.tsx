@@ -26,7 +26,10 @@ export function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const [reloadKey, setReloadKey] = useState(0);
   const state = useCaseDetail(caseId, reloadKey);
-  const reviews = useCaseReviews(caseId);
+  // Same key the header follows. Allocating a check writes a review instance, and a
+  // Checks table that did not re-read said "AQS check allocated" in the banner while
+  // still listing one check underneath it (F27).
+  const reviews = useCaseReviews(caseId, reloadKey);
 
   return (
     <>
@@ -167,7 +170,7 @@ export function CaseDetailPage() {
                       ) : null}
                     </section>
 
-                    <CaseOutcomeSummary caseId={state.detail.id} />
+                    <CaseOutcomeSummary caseId={state.detail.id} reloadKey={reloadKey} />
 
                     {/*
                       Directly under the grades it describes (item 8, 2026-09-19).

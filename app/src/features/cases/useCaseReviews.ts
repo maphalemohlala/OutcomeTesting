@@ -14,7 +14,7 @@ export type CaseReviewsState =
  * Lists the Tax and AQS checks raised for one case (BR-004), ordered by sequence so
  * Tax precedes AQS. Row visibility is enforced by Dataverse security (BR-012).
  */
-export function useCaseReviews(caseId: string | undefined): CaseReviewsState {
+export function useCaseReviews(caseId: string | undefined, reloadKey = 0): CaseReviewsState {
   const [state, setState] = useState<CaseReviewsState>({ status: 'loading' });
   const [loadedFor, setLoadedFor] = useState<string | undefined>(caseId);
 
@@ -51,7 +51,7 @@ export function useCaseReviews(caseId: string | undefined): CaseReviewsState {
     return () => {
       cancelled = true;
     };
-  }, [caseId]);
+  }, [caseId, reloadKey]);
 
   if (caseId && !isRecordId(caseId)) {
     return { status: 'unavailable' };
