@@ -1,19 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Al_advisermappingsService, ContactsService } from '../../generated';
 import { logTechnical } from '../../services/errors';
+import {
+  toMappingRows,
+  type AdviserMappingRow,
+  type ContactOption,
+} from './adviserMappingRows';
 
-export interface AdviserMappingRow {
-  id: string;
-  adviserEmail: string;
-  managerId: string | null;
-  managerName: string | null;
-}
-
-export interface ContactOption {
-  id: string;
-  name: string;
-  email: string;
-}
+// Held in adviserMappingRows so the shaping can be tested; this module cannot be imported
+// under the test runner because ../../generated pulls in the Power Apps client.
+export type { AdviserMappingRow, ContactOption } from './adviserMappingRows';
 
 export type AdviserMappingsState =
   | { status: 'loading' }
@@ -79,12 +75,7 @@ export function useAdviserMappings(reloadKey = 0): AdviserMappingsState {
         setState({
           status: 'ready',
           contacts,
-          mappings: mappingResult.data.map((row) => ({
-            id: row.al_advisermappingid,
-            adviserEmail: (row.al_adviseremail ?? '').trim(),
-            managerId: row._al_tcmanagerid_value ?? null,
-            managerName: row.al_tcmanageridname ?? null,
-          })),
+          mappings: toMappingRows(mappingResult.data, contacts),
         });
       })
       .catch((error) => {
