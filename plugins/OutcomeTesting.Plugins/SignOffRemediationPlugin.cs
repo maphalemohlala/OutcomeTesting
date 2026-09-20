@@ -173,11 +173,25 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.PreconditionPrefix + "Only a completed remediation action can be signed off.");
             }
 
-            if (FindSignoff(systemService, targetId) != null)
+            // APPROVED sign-offs only, which is the same question SignoffGuardPlugin asks
+            // on the create this command is about to issue - and asked here through the very
+            // same method, so the two cannot drift apart again.
+            //
+            // This used to refuse on ANY active sign-off, rejections included (F39), which
+            // made every rejection terminal on the command path: the action reopens, the
+            // adviser reworks it, CompleteRemediation returns the case to Awaiting Sign-off,
+            // and the supervisor is then refused the decision that would close it. e4e4ff3
+            // fixed exactly that on 2026-09-11 and fixed it in the guard, where a portal
+            // create lands; nothing changed here, and this check runs first, so the command
+            // went on ending the loop it exists to start.
+            //
+            // What the refusal was reaching for is still enforced: overriding an approval is
+            // a privileged correction (AD-031), not something the ordinary command does.
+            if (SignoffGuardPlugin.AlreadySettled(systemService, targetId))
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix +
-                    "This remediation action has already been signed off. Reopening a completed sign-off is a privileged correction (AD-031).");
+                    "This remediation action has already been approved. Reopening an approved sign-off is a privileged correction (AD-031).");
             }
 
             // The version the manager attested to. The action is not written by this
@@ -230,6 +244,15 @@ namespace OutcomeTesting.Plugins
             };
             query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
             query.Criteria.AddCondition(SignoffAction, ConditionOperator.Equal, actionId);
+
+            // Latest first. An action reworked after a rejection carries two decisions, so
+            // "the sign-off on this action" stopped being one row - and with TopCount 1 and
+            // no order the platform may return either. The replay above reports what was
+            // recorded, and answering an approval with the rejection it superseded would be
+            // worse than not answering at all. createdon breaks a tie and covers rows written
+            // before al_signedoffon was stamped.
+            query.AddOrder("al_signedoffon", OrderType.Descending);
+            query.AddOrder("createdon", OrderType.Descending);
 
             var found = systemService.RetrieveMultiple(query).Entities;
             return found.Count > 0 ? found[0] : null;

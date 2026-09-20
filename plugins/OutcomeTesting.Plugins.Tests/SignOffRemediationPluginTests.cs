@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Xunit;
@@ -153,8 +153,13 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Contains("completed", ex.Message);
         }
 
+        /// <summary>
+        /// An APPROVED action: overriding that is a privileged correction (AD-031). The
+        /// refusal used to fall on any second decision, including one following a rejection,
+        /// which made every rejection terminal - see SignOffAfterRejectionTests (F39).
+        /// </summary>
         [Fact]
-        public void A_second_signoff_on_the_same_action_is_refused()
+        public void A_second_signoff_on_an_approved_action_is_refused()
         {
             var svc = CompletedAction();
             svc.Seed(
@@ -167,7 +172,7 @@ namespace OutcomeTesting.Plugins.Tests
             var ex = Assert.Throws<InvalidPluginExecutionException>(
                 () => SignOffRemediationPlugin.CreateSignoff(svc, svc, ActionId, "Rejected", "Again.", null));
 
-            Assert.Contains("already been signed off", ex.Message);
+            Assert.Contains("already been approved", ex.Message);
         }
 
         [Fact]
