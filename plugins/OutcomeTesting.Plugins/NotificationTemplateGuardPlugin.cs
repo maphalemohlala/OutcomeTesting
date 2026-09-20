@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -180,7 +180,8 @@ namespace OutcomeTesting.Plugins
                 return "The " + definition.Name + " letter does not supply "
                     + Join(Braced(unknown)) + ". "
                     + (unknown.Length == 1 ? "It would render as a gap. " : "They would render as gaps. ")
-                    + "This letter can use: " + Join(Braced(definition.Tokens)) + ".";
+                    + "This letter can use: "
+                    + Join(Braced(NotificationTemplates.AllowedTokens(definition.Tokens))) + ".";
             }
 
             return null;
@@ -235,7 +236,8 @@ namespace OutcomeTesting.Plugins
                 return "\"" + code + "\" cannot use " + Join(Braced(unknown)) + ". "
                     + (unknown.Length == 1 ? "It would render as a gap. " : "They would render as gaps. ")
                     + "A letter of your own can use: "
-                    + Join(Braced(NotificationTemplateRows.CustomTokens)) + ".";
+                    + Join(Braced(NotificationTemplates.AllowedTokens(
+                        NotificationTemplateRows.CustomTokens))) + ".";
             }
 
             return null;

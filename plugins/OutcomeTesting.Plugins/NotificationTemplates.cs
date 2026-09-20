@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.Xrm.Sdk;
@@ -466,6 +466,33 @@ namespace OutcomeTesting.Plugins
             }
 
             return UnknownTokensAgainst(definition.Tokens, subject, body);
+        }
+
+        /// <summary>
+        /// Everything this wording may use: a letter's own tokens, plus the ones every letter
+        /// may use whatever its list says.
+        ///
+        /// <para>
+        /// The same set <see cref="UnknownTokensAgainst"/> judges against, so a refusal cannot
+        /// name a list that disagrees with the rule that produced it. It did (F25, DEV,
+        /// 2026-09-20): both refusals listed only the letter's own tokens, so a letter that
+        /// accepted <c>{{completedCheck}}</c> perfectly well told an administrator, in the one
+        /// sentence they had to go on, that it could not.
+        /// </para>
+        /// </summary>
+        public static string[] AllowedTokens(string[] ownTokens)
+        {
+            var allowed = new List<string>(ownTokens ?? new string[0]);
+
+            foreach (var always in AlwaysAllowed)
+            {
+                if (!allowed.Contains(always))
+                {
+                    allowed.Add(always);
+                }
+            }
+
+            return allowed.ToArray();
         }
 
         /// <summary>
