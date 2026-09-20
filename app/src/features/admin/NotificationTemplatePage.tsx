@@ -272,7 +272,6 @@ function TemplateForm({
   // of mistake that is only noticed after the letter has gone.
   const [focused, setFocused] = useState<'subject' | 'body'>('body');
   const subjectRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editorRef = useRef<RichTextEditorHandle>(null);
   const [contactId, setContactId] = useState<string | null>(row.recipientContactId);
   const [problem, setProblem] = useState<string | null>(null);
@@ -293,13 +292,7 @@ function TemplateForm({
       return;
     }
 
-    if (row.isHtml) {
-      editorRef.current?.insertText(text);
-      return;
-    }
-
-    const el = textareaRef.current;
-    if (el) setBody(spliceAtCaret(el, text));
+    editorRef.current?.insertText(text);
   }
 
   async function submit(event: React.FormEvent) {
@@ -354,32 +347,26 @@ function TemplateForm({
           the editor on both would quietly inject tags into a letter that is sent as plain
           text, and the reader would see the markup rather than the formatting.
         */}
+        {/*
+          Every letter, not only the ones the catalogue calls HTML (AD-170). The body reaches
+          the reader through email.description, which renders as markup whatever the letter is
+          called - so there was never a plain-text letter in the sense the flag implied, and
+          nine of the twelve were getting a bare textarea for no reason a reader could see.
+        */}
         {/* Focus bubbles, so one handler covers the editor's editable area. */}
         <div onFocus={() => setFocused('body')}>
-          {row.isHtml ? (
-            <RichTextEditor
-              id="template-body"
-              ref={editorRef}
-              value={body}
-              onChange={setBody}
-              label="Body"
-              disabled={saving}
-            />
-          ) : (
-            <textarea
-              id="template-body"
-              ref={textareaRef}
-              rows={12}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-            />
-          )}
+          <RichTextEditor
+            id="template-body"
+            ref={editorRef}
+            value={body}
+            onChange={setBody}
+            label="Body"
+            disabled={saving}
+          />
         </div>
         <p className="templates__hint">
-          {row.isHtml
-            ? 'Formatting is kept as you set it here. Anything beyond the toolbar’s ' +
-              'formatting and links is removed when you save.'
-            : 'This letter is plain text. Any markup you put in it is removed when you save.'}
+          Formatting is kept as you set it here. Anything beyond the toolbar’s formatting and
+          links is removed when you save.
         </p>
 
         <RecipientFields

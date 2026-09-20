@@ -174,7 +174,7 @@
 .tokens__intro {
   margin: 0 0 var(--space-2);
   font-size: var(--text-sm);
-  color: var(--colour-text-muted);
+  font-weight: 600;
 }
 
 .tokens__list {
@@ -185,25 +185,27 @@
   list-style: none;
 }
 
+/* Bordered rather than borderless. A button with no edge on a plain background reads as a
+   line of text, which is how the first version of this looked like no picker at all. */
 .tokens__btn {
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
   width: 100%;
-  padding: var(--space-1, 4px) var(--space-2);
+  padding: var(--space-2);
   text-align: left;
   font-family: inherit;
   font-size: var(--text-sm);
   color: inherit;
-  background: transparent;
-  border: 1px solid transparent;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
   border-radius: var(--radius);
   cursor: pointer;
 }
 
 .tokens__btn:hover:not(:disabled) {
   background: var(--colour-surface-sunken);
-  border-color: var(--colour-border);
+  border-color: var(--colour-action);
 }
 
 .tokens__btn:disabled {

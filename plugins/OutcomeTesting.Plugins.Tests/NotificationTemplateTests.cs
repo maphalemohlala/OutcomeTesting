@@ -280,6 +280,53 @@ namespace OutcomeTesting.Plugins.Tests
             return map;
         }
 
+        // ------------------------------------------------------------ stored bodies are markup
+
+        [Fact]
+        public void A_stored_body_escapes_its_token_values_even_on_a_plain_text_letter()
+        {
+            // AD-170. Every letter is edited in a rich-text editor now, so a stored body is
+            // markup whatever the catalogue calls the letter - and email.description renders
+            // as markup regardless. A client name carrying an ampersand has to be escaped here
+            // or it lands in the markup raw.
+            var service = Stored(
+                NotificationTemplates.RecheckDue,
+                "Recheck due",
+                "<p>{{reference}} for {{client}}.</p>");
+
+            var letter = NotificationTemplates.Render(
+                service,
+                NotificationTemplates.RecheckDue,
+                new Dictionary<string, string>
+                {
+                    { NotificationTemplates.TokenReference, "OT-1" },
+                    { NotificationTemplates.TokenClient, "Smith & Co <script>" },
+                });
+
+            Assert.True(letter.FromTemplate);
+            Assert.Contains("Smith &amp; Co", letter.Body);
+            Assert.DoesNotContain("<script>", letter.Body);
+        }
+
+        [Fact]
+        public void The_compiled_copy_of_a_plain_text_letter_is_unchanged()
+        {
+            // The other half of AD-170, and the reason the flag was not simply flipped: the
+            // fallback is code-authored, known safe, and compared byte for byte in
+            // NotificationBodiesTests. An environment holding no rows sends what it always did.
+            var letter = NotificationTemplates.Render(
+                new FakeOrganizationService(),
+                NotificationTemplates.RecheckDue,
+                new Dictionary<string, string>
+                {
+                    { NotificationTemplates.TokenReference, "Smith & Co" },
+                });
+
+            Assert.False(letter.FromTemplate);
+            Assert.Contains("Smith & Co", letter.Body);
+            Assert.DoesNotContain("&amp;", letter.Body);
+        }
+
         private static FakeOrganizationService Stored(string code, string subject, string body)
         {
             var service = new FakeOrganizationService();

@@ -255,7 +255,18 @@ namespace OutcomeTesting.Plugins
                 // The subject is plain text in every mail client, so its tokens are never
                 // escaped whatever the body is.
                 Subject = Substitute(subject, tokens, escape: false),
-                Body = Substitute(body, tokens, escape: definition.IsHtml),
+
+                // A STORED body is markup whatever the catalogue calls the letter, so its
+                // token values are escaped (AD-170). Every letter is edited in a rich-text
+                // editor and cleaned on the way in by AD-169, and `email.description` renders
+                // as markup regardless - so a client called "Smith & Co" has to be escaped
+                // here or it lands in markup raw.
+                //
+                // The COMPILED copy keeps its own flag. It is code-authored and known safe,
+                // and the plain-text fallbacks are compared byte for byte in
+                // NotificationBodiesTests; changing them would be changing what the system
+                // sent before anybody edited anything.
+                Body = Substitute(body, tokens, escape: fromTemplate || definition.IsHtml),
                 FromTemplate = fromTemplate,
             };
         }
