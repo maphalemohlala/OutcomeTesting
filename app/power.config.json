@@ -123,6 +123,11 @@
           "entitySetName": "al_advisermappings",
           "logicalName": "al_advisermapping",
           "isHidden": false
+        },
+        "notificationtemplates": {
+          "entitySetName": "al_notificationtemplates",
+          "logicalName": "al_notificationtemplate",
+          "isHidden": false
         }
       },
       "environmentVariableName": ""

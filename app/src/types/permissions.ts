@@ -79,6 +79,7 @@ export const RESOURCE_KEYS = [
   'page.exports',
   'page.admin.questions',
   'page.admin.advisers',
+  'page.admin.templates',
   'page.admin.security',
   'page.admin.users',
   // Capabilities (write actions gated independently of page view).
@@ -189,6 +190,9 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   // the checking process, not only by administrators: it decides who is told a sign-off
   // is waiting, and a stale mapping shows up as a manager who never hears.
   { role: 'AL Portal - Outcome Testing Manager', resource: 'page.admin.advisers', level: 'Manage' },
+  // The letters are the checking team's words to advisers, so the people who run the
+  // process own them - not only whoever administers the environment.
+  { role: 'AL Portal - Outcome Testing Manager', resource: 'page.admin.templates', level: 'Manage' },
   { role: 'AL Portal - Outcome Testing Manager', resource: 'command.assign', level: 'Edit' },
   { role: 'AL Portal - Outcome Testing Manager', resource: 'export.generate', level: 'Edit' },
 
@@ -225,6 +229,7 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
     { role, resource: 'page.exports' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'page.admin.questions' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'page.admin.advisers' as ResourceKey, level: 'Manage' as AccessLevel },
+    { role, resource: 'page.admin.templates' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'page.admin.security' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'page.admin.users' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'question.retire' as ResourceKey, level: 'Edit' as AccessLevel },
@@ -328,6 +333,7 @@ export function pageResourceForPath(path: string): ResourceKey | null {
   if (path.startsWith('/exports')) return 'page.exports';
   if (path.startsWith('/admin/questions')) return 'page.admin.questions';
   if (path.startsWith('/admin/advisers')) return 'page.admin.advisers';
+  if (path.startsWith('/admin/templates')) return 'page.admin.templates';
   if (path.startsWith('/admin/security')) return 'page.admin.security';
   return null;
 }

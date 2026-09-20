@@ -1,0 +1,123 @@
+.templates {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.templates__note {
+  padding: var(--space-4);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-left: 3px solid var(--colour-action);
+}
+
+.templates__table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+}
+
+.templates__table th,
+.templates__table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.templates__table thead th {
+  background: var(--colour-surface-sunken);
+}
+
+.templates__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* The code under the name: an administrator matching a letter to a deployment note needs
+   it, and it is not what they scan the list by. */
+.templates__code {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+/* "Built-in" is a real state, not a missing value, so it is marked rather than blank. */
+.templates__builtin {
+  color: var(--colour-text-muted);
+  font-style: italic;
+}
+
+.templates__subject {
+  max-width: 28rem;
+}
+
+.templates__form {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-left: 3px solid var(--colour-action);
+}
+
+.templates__form h2 {
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-2);
+}
+
+.templates__form label {
+  font-weight: 600;
+}
+
+.templates__form input,
+.templates__form textarea {
+  padding: var(--space-2);
+  border: 1px solid var(--colour-border);
+  background: var(--colour-surface);
+  color: inherit;
+  font-family: inherit;
+}
+
+.templates__form textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.templates__hint {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.templates__token {
+  display: inline-block;
+  margin-right: var(--space-2);
+  padding: 0 var(--space-1, 4px);
+  background: var(--colour-surface-sunken);
+  font-size: var(--text-sm);
+}
+
+.templates__problem {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--colour-danger, #b3261e);
+  background: var(--colour-surface-sunken);
+}
+
+.templates__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.templates__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

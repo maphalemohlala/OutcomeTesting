@@ -10,6 +10,7 @@ import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { PeoplePage } from '../features/people/PeoplePage';
 import { PersonCasesPage } from '../features/people/PersonCasesPage';
 import { AdviserMappingPage } from '../features/admin/AdviserMappingPage';
+import { NotificationTemplatePage } from '../features/admin/NotificationTemplatePage';
 import { QuestionLibraryPage } from '../features/admin/QuestionLibraryPage';
 import { SecurityConfigPage } from '../features/admin/SecurityConfigPage';
 import { RoleDetailPage } from '../features/admin/RoleDetailPage';
@@ -104,6 +105,11 @@ export function AppRoutes() {
         <Route
           path="/admin/advisers"
           element={<RequirePermission resource="page.admin.advisers"><AdviserMappingPage /></RequirePermission>}
+        />
+        {/* The wording of every letter the solution sends (Change 1, AD-163). */}
+        <Route
+          path="/admin/templates"
+          element={<RequirePermission resource="page.admin.templates"><NotificationTemplatePage /></RequirePermission>}
         />
         {/*
           The Users admin page merged into People: one directory, sourced from Contacts,
