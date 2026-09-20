@@ -34,6 +34,75 @@ namespace OutcomeTesting.Plugins.Tests
             return svc;
         }
 
+        /// <summary>
+        /// F32, found in DEV on 2026-09-20 while working APP-158. Deactivating a person on
+        /// the People page removed them from every picker in the app and changed nothing
+        /// server-side: al_AssignCase allocated a case to them through the Web API, created
+        /// the review instance and queued them an email, while the People page listed them
+        /// as Inactive.
+        ///
+        /// The command already refused a DISABLED Dataverse user. The contact had no such
+        /// check - and the contact is the only one of the two this application can set,
+        /// because Deactivate writes the contact's statecode and cannot touch a Dataverse
+        /// licence. So the one state the product controls was the one the gate ignored.
+        /// </summary>
+        [Fact]
+        public void Refuses_a_contact_that_has_been_deactivated()
+        {
+            var svc = new FakeOrganizationService();
+            svc.Seed("systemuser", UserId, "internalemailaddress", Email, "fullname", "Ada Checker", "isdisabled", false);
+            svc.Seed("contact", ContactId, "emailaddress1", Email, "fullname", "Ada Checker", "statecode", new OptionSetValue(1));
+
+            var refusal = Assert.Throws<InvalidPluginExecutionException>(
+                () => AssignCasePlugin.ResolveAssignee(svc, Email));
+
+            Assert.Contains("deactivated", refusal.Message);
+            Assert.Contains("Ada Checker", refusal.Message);
+            Assert.StartsWith(CommandHelpers.PreconditionPrefix, refusal.Message);
+        }
+
+        [Fact]
+        public void Says_what_to_do_about_a_deactivated_contact()
+        {
+            // A refusal that names the page the reader has to go to, because "deactivated"
+            // alone leaves them looking for a setting on the case.
+            var svc = new FakeOrganizationService();
+            svc.Seed("systemuser", UserId, "internalemailaddress", Email, "fullname", "Ada Checker", "isdisabled", false);
+            svc.Seed("contact", ContactId, "emailaddress1", Email, "fullname", "Ada Checker", "statecode", new OptionSetValue(1));
+
+            var refusal = Assert.Throws<InvalidPluginExecutionException>(
+                () => AssignCasePlugin.ResolveAssignee(svc, Email));
+
+            Assert.Contains("People page", refusal.Message);
+        }
+
+        [Fact]
+        public void Falls_back_to_the_email_when_a_deactivated_contact_has_no_name()
+        {
+            var svc = new FakeOrganizationService();
+            svc.Seed("systemuser", UserId, "internalemailaddress", Email, "fullname", "Ada Checker", "isdisabled", false);
+            svc.Seed("contact", ContactId, "emailaddress1", Email, "statecode", new OptionSetValue(1));
+
+            var refusal = Assert.Throws<InvalidPluginExecutionException>(
+                () => AssignCasePlugin.ResolveAssignee(svc, Email));
+
+            Assert.Contains(Email, refusal.Message);
+        }
+
+        [Fact]
+        public void Allocates_to_an_active_contact_as_it_always_did()
+        {
+            // The negative half. A contact carrying an explicit Active state, and one
+            // carrying no state at all, both still resolve - a row that does not say is not
+            // evidence of deactivation, and refusing it would block every allocation.
+            var explicitly = new FakeOrganizationService();
+            explicitly.Seed("systemuser", UserId, "internalemailaddress", Email, "fullname", "Ada Checker", "isdisabled", false);
+            explicitly.Seed("contact", ContactId, "emailaddress1", Email, "fullname", "Ada Checker", "statecode", new OptionSetValue(0));
+
+            Assert.Equal(ContactId, AssignCasePlugin.ResolveAssignee(explicitly, Email).ContactId);
+            Assert.Equal(ContactId, AssignCasePlugin.ResolveAssignee(Both(), Email).ContactId);
+        }
+
         [Fact]
         public void Resolves_both_identities_from_one_work_email()
         {

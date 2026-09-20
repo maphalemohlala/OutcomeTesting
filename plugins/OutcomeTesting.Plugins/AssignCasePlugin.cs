@@ -201,7 +201,7 @@ namespace OutcomeTesting.Plugins
             var contact = FindSingle(
                 service,
                 ContactEntity,
-                new ColumnSet("fullname"),
+                new ColumnSet("fullname", "statecode"),
                 new FilterExpression
                 {
                     Conditions = { new ConditionExpression("emailaddress1", ConditionOperator.Equal, email) },
@@ -212,6 +212,32 @@ namespace OutcomeTesting.Plugins
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix +
                     "No portal contact has the work email " + email + ". Allocating without one would leave them unable to open the review.");
+            }
+
+            /*
+             * Deactivated in the app is deactivated for real (F32, DEV, 2026-09-20).
+             *
+             * The check above already refuses a DISABLED Dataverse user, and this one was
+             * missing its counterpart. That is the wrong way round: the People page's
+             * Deactivate writes the CONTACT's statecode - it cannot disable a Dataverse
+             * licence - so the one state this application can actually set was the one the
+             * command did not honour. A leaver marked Inactive was removed from every picker
+             * and could still be allocated work through any other path, which then emailed
+             * them, while a manager reading "Inactive" had every reason to believe otherwise.
+             *
+             * Refused rather than warned: they cannot open the review either, because Power
+             * Pages resolves Contact-scoped permissions through this same row (AD-047), so
+             * the allocation would sit with somebody who cannot act on it.
+             */
+            var contactState = contact.GetAttributeValue<OptionSetValue>("statecode");
+            if (contactState != null && contactState.Value != 0)
+            {
+                var name = contact.GetAttributeValue<string>("fullname");
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix
+                    + (string.IsNullOrWhiteSpace(name) ? email : name)
+                    + " has been deactivated, so work cannot be allocated to them. "
+                    + "Reactivate them on the People page first.");
             }
 
             var userName = user.GetAttributeValue<string>("fullname") ?? email;
