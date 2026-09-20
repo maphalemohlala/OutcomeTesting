@@ -144,6 +144,16 @@
     border-right: none;
     border-bottom: 1px solid var(--colour-border);
     overflow-x: auto;
+
+    /*
+     * The rail scrolls sideways rather than widening the page. overflow-x on its own did
+     * not do it: as a flex item the rail is sized to its content, so at phone width the
+     * Administration group's four long labels made it 538px inside a 375px viewport and
+     * the whole document scrolled, carrying the header and the page away with it. A flex
+     * item needs min-width to be told it may be narrower than its content (F19).
+     */
+    min-width: 0;
+    max-width: 100%;
   }
 
   .shell__group + .shell__group {
