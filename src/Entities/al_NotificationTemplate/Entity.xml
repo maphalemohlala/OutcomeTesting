@@ -52,6 +52,96 @@
             <Description description="The body. Some letters are markup and some are plain text - NotificationTemplates knows which, and escapes token values accordingly. The template itself is used as written." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_Event">
+          <Type>picklist</Type>
+          <Name>al_event</Name>
+          <LogicalName>al_event</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.4.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <optionset Name="al_notificationtemplate_al_event">
+            <OptionSetType>picklist</OptionSetType>
+            <IntroducedVersion>1.0.4.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Trigger event" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="The event that sends this letter. Set on letters an administrator added." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="120910800" IsHidden="0">
+                <labels>
+                  <label description="Allocation" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910801" IsHidden="0">
+                <labels>
+                  <label description="Review submitted" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910802" IsHidden="0">
+                <labels>
+                  <label description="Remediation assigned" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910803" IsHidden="0">
+                <labels>
+                  <label description="Sign-off approved" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910804" IsHidden="0">
+                <labels>
+                  <label description="Sign-off rejected" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910805" IsHidden="0">
+                <labels>
+                  <label description="Case passed" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910806" IsHidden="0">
+                <labels>
+                  <label description="Recheck due" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910807" IsHidden="0">
+                <labels>
+                  <label description="Sign-off due" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Trigger event" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The event that sends this letter. Set on letters an administrator added." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_Name">
           <Type>nvarchar</Type>
           <Name>al_name</Name>
@@ -127,6 +217,120 @@
           </displaynames>
           <Descriptions>
             <Description description="Unique identifier for entity instances" languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_RecipientContactId">
+          <Type>lookup</Type>
+          <Name>al_recipientcontactid</Name>
+          <LogicalName>al_recipientcontactid</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>0</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.4.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <ExternalName>al_recipientcontactid</ExternalName>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <LookupStyle>single</LookupStyle>
+          <LookupTypes />
+          <displaynames>
+            <displayname description="Recipient contact" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The person this letter goes to, when the recipient is a named contact rather than a role on the case." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_RecipientKind">
+          <Type>picklist</Type>
+          <Name>al_recipientkind</Name>
+          <LogicalName>al_recipientkind</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.4.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <optionset Name="al_notificationtemplate_al_recipientkind">
+            <OptionSetType>picklist</OptionSetType>
+            <IntroducedVersion>1.0.4.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Recipient" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="Who receives this letter. Resolved from the case, never from whoever triggered the save." languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="120910810" IsHidden="0">
+                <labels>
+                  <label description="Adviser" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910811" IsHidden="0">
+                <labels>
+                  <label description="T&amp;C Manager" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910812" IsHidden="0">
+                <labels>
+                  <label description="Para-planner" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910813" IsHidden="0">
+                <labels>
+                  <label description="Checker" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910814" IsHidden="0">
+                <labels>
+                  <label description="A named contact" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Recipient" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Who receives this letter. Resolved from the case, never from whoever triggered the save." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_Subject">

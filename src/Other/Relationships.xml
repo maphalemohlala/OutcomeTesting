@@ -42,6 +42,7 @@
   <EntityRelationship Name="contact_al_aqaccountablecontactid_al_outcome" />
   <EntityRelationship Name="contact_al_caseassignment" />
   <EntityRelationship Name="contact_al_fqaccountablecontactid_al_outcome" />
+  <EntityRelationship Name="contact_al_recipientcontactid_al_notificationtemplate" />
   <EntityRelationship Name="contact_al_remediationaction" />
   <EntityRelationship Name="contact_al_reviewinstance" />
   <EntityRelationship Name="lk_al_advisermapping_createdby" />

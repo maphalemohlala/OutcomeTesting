@@ -79,7 +79,23 @@ templates it is still open: the gate is static and nothing renders Liquid.
 | `al_notificationtemplate.al_recipientkind` | `addchoicecolumn` | 5 options, matching `NotificationRecipients` |
 | `al_notificationtemplate.al_recipientcontactid` | `addlookupcolumn` | lookup to `contact` |
 | `OutcomeTesting.Plugins` assembly | `pushassembly` | 289,792 bytes, matching the `-c Release` build made immediately before |
-| Code App | `pa app push` | data source regenerated first; the model diff was **exactly** the 28 lines for the three columns |
+| Code App | `npm run build` then `pa app push` | data source regenerated first; the model diff was **exactly** the 28 lines for the three columns. Bundle `index-CEjJFIki.js` |
+
+## The first app push shipped a stale bundle
+
+`pa app push` does **not** build. It uploads whatever `app/dist/` already holds and reports
+success either way. The first push here went out at 12:58 against a `dist/` built at 11:27,
+so the modal and button work from around 12:20 never reached DEV — and it was reported as
+deployed. The user found it before any check did.
+
+This is the same shape as `pushassembly` sending a stale `bin/Release`: an upload verb that
+trusts a build directory it does not own. Neither the test suites nor `tsc -b` can catch it,
+because both read `src/` and the push reads `dist/`.
+
+**Always `npm run build` immediately before `pa app push`**, then confirm the bundle changed —
+the hash in `index-<hash>.js` moves on every real rebuild, and grepping it for a string only
+the new code contains settles it. A Code App deployment is not reported until that check has
+been done, exactly as the assembly push is not reported until its byte count is checked.
 
 No plug-in step was registered: the guard already runs pre-operation on Create and Update of
 `al_notificationtemplate`, and the new rules are in the same type.
