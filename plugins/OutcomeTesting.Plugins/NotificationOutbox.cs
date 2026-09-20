@@ -204,25 +204,7 @@ namespace OutcomeTesting.Plugins
                 return id;
             }
 
-            try
-            {
-                var pdf = CompletedCheckPdf.Build(service, caseRef);
-                if (pdf == null || pdf.Length == 0)
-                {
-                    return id;
-                }
-
-                service.Update(new Entity(NotificationEntity, id)
-                {
-                    [AttachmentNameAttr] = CompletedCheckPdf.FileName(CaseReference(service, caseRef)),
-                    [AttachmentBodyAttr] = Convert.ToBase64String(pdf),
-                });
-            }
-            catch (Exception)
-            {
-                // Deliberately swallowed; see the summary. The letter is already queued.
-            }
-
+            AttachCompletedCheck(service, id, caseRef);
             return id;
         }
 
@@ -244,7 +226,8 @@ namespace OutcomeTesting.Plugins
             // is the default and stays the answer unless somebody has actually picked
             // somebody else; an override that resolved to nobody is ignored rather than
             // allowed to empty a recipient the caller had worked out correctly.
-            recipientEmail = Chosen(service, templateCode, targetTable, targetId) ?? recipientEmail;
+            var settings = NotificationTemplateRows.SettingsFor(service, templateCode);
+            recipientEmail = Chosen(service, settings, targetTable, targetId) ?? recipientEmail;
             var row = new Entity(NotificationEntity)
             {
                 ["al_name"] = CommandHelpers.Truncate(EventName(eventValue) + ": " + subject, 200),
@@ -290,6 +273,14 @@ namespace OutcomeTesting.Plugins
 
             var created = service.Create(row);
 
+            // The wording asked for the completed check (AD-171). The para-planner's letter
+            // attaches one by its own call regardless; this is what lets any other letter.
+            if (settings.WantsCompletedCheck)
+            {
+                AttachCompletedCheck(
+                    service, created, NotificationRecipients.CaseOf(service, targetTable, targetId));
+            }
+
             // The letters an administrator attached to this event, sent in addition to this
             // one. Deliberately AFTER the built-in is created: an extra letter is worth
             // having and is never worth losing the real one over, and a failure here would
@@ -304,23 +295,21 @@ namespace OutcomeTesting.Plugins
         /// chosen and the caller's own routing stands.
         /// </summary>
         private static string Chosen(
-            IOrganizationService service, string templateCode, string targetTable, Guid targetId)
+            IOrganizationService service,
+            NotificationTemplateRows.TemplateSettings settings,
+            string targetTable,
+            Guid targetId)
         {
-            if (string.IsNullOrWhiteSpace(templateCode))
+            if (settings == null || !settings.Kind.HasValue)
             {
                 return null;
             }
 
-            var choice = NotificationTemplateRows.OverrideFor(service, templateCode);
-            if (choice == null)
-            {
-                return null;
-            }
-
+            var choice = settings;
             var caseRef = NotificationRecipients.CaseOf(service, targetTable, targetId);
             var email = NotificationRecipients.EmailFor(
                 service,
-                choice.Kind,
+                choice.Kind.Value,
                 caseRef,
                 NotificationRecipients.ReviewOf(targetTable, targetId),
                 choice.Contact);
@@ -379,12 +368,13 @@ namespace OutcomeTesting.Plugins
                         continue;
                     }
 
+
                     var customSubject = NotificationTemplates.Substitute(
                         template.Subject, tokens, escape: false);
                     var customBody = NotificationTemplates.Substitute(
                         template.Body, tokens, escape: true);
 
-                    service.Create(new Entity(NotificationEntity)
+                    var customRow = new Entity(NotificationEntity)
                     {
                         ["al_name"] = CommandHelpers.Truncate(
                             EventName(eventValue) + ": " + customSubject, 200),
@@ -398,12 +388,56 @@ namespace OutcomeTesting.Plugins
                         ["al_body"] = CommandHelpers.Truncate(customBody, 4000),
                         ["al_queuedon"] = DateTime.UtcNow,
                         ["al_correlationid"] = correlationId.ToString("D"),
-                    });
+                    };
+
+                    var customId = service.Create(customRow);
+
+                    if (template.WantsCompletedCheck)
+                    {
+                        AttachCompletedCheck(service, customId, caseRef);
+                    }
                 }
             }
             catch (Exception)
             {
                 // See the summary. An extra letter never costs the event that raised it.
+            }
+        }
+
+        /// <summary>
+        /// Puts the completed check on a queued letter.
+        ///
+        /// <para>
+        /// Never throws. The letter is already queued by the time this runs, and a document
+        /// that could not be drawn must not take it back off - the same rule the para-planner's
+        /// attachment has followed since AD-164.
+        /// </para>
+        /// </summary>
+        private static void AttachCompletedCheck(
+            IOrganizationService service, Guid notificationId, EntityReference caseRef)
+        {
+            if (notificationId == Guid.Empty || caseRef == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var pdf = CompletedCheckPdf.Build(service, caseRef);
+                if (pdf == null || pdf.Length == 0)
+                {
+                    return;
+                }
+
+                service.Update(new Entity(NotificationEntity, notificationId)
+                {
+                    [AttachmentNameAttr] = CompletedCheckPdf.FileName(CaseReference(service, caseRef)),
+                    [AttachmentBodyAttr] = Convert.ToBase64String(pdf),
+                });
+            }
+            catch (Exception)
+            {
+                // Deliberately swallowed; see the summary.
             }
         }
 

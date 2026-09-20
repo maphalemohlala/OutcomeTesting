@@ -97,11 +97,13 @@ export function templateHint(code: string): TemplateHint | null {
  * editor can say so before a round trip, and so an administrator is not left guessing at a
  * token list they cannot otherwise see.
  */
+// The attachment marker is allowed in every letter (AD-171), so the editor must not
+// report it as one this letter does not supply.
 export function unknownTokens(code: string, subject: string, body: string): string[] {
   const hint = templateHint(code);
   if (!hint) return [];
 
-  const allowed = new Set(hint.tokens);
+  const allowed = new Set([...hint.tokens, 'completedCheck']);
   const offenders: string[] = [];
   const text = `${subject ?? ''} ${body ?? ''}`;
 

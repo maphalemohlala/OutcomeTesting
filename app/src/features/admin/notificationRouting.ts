@@ -47,6 +47,22 @@ export const KIND_CONTACT = 120910814;
  * exist only at the moment one particular event fires, so a letter attached to an arbitrary
  * event has no claim on them — it would read correctly on this screen and arrive with gaps.
  */
+/**
+ * The marker that attaches the completed check, allowed in every letter (AD-171).
+ *
+ * Not in any letter's own token list, because it says what the letter CARRIES rather than what
+ * it says — naming it in twelve places would invite the twelve to disagree.
+ */
+export const TOKEN_COMPLETED_CHECK = 'completedCheck';
+
+/** Tokens every letter may use, whatever its own list says. */
+export const ALWAYS_ALLOWED_TOKENS: readonly string[] = [TOKEN_COMPLETED_CHECK];
+
+/** A letter's own tokens plus the ones every letter may use, for the picker. */
+export function tokensFor(own: readonly string[]): string[] {
+  return [...own, ...ALWAYS_ALLOWED_TOKENS.filter((t) => !own.includes(t))];
+}
+
 export const CUSTOM_TOKENS: readonly string[] = [
   'reference',
   'adviser',
@@ -77,6 +93,8 @@ export const TOKEN_HELP: Record<string, string> = {
   grading: 'How this letter names the grading that caused it.',
   finalOutcome: 'The final outcome recorded at sign-off.',
   notes: 'The signatory’s notes, e.g. “ Notes: …”, or nothing where they left none.',
+  completedCheck:
+    'Attaches the completed check as a PDF. Puts nothing in the text — say what you like about it yourself.',
 };
 
 /** The one-line description for a token, or a plain fallback. */
@@ -101,7 +119,7 @@ export function recipientLabel(value: number | null): string | null {
  * is the server's, and it is what the page shows on a failed save.
  */
 export function unknownCustomTokens(subject: string, body: string): string[] {
-  const allowed = new Set(CUSTOM_TOKENS);
+  const allowed = new Set([...CUSTOM_TOKENS, ...ALWAYS_ALLOWED_TOKENS]);
   const offenders: string[] = [];
   const text = `${subject ?? ''} ${body ?? ''}`;
 

@@ -122,6 +122,31 @@ namespace OutcomeTesting.Plugins
         /// <summary>" Notes: …" as the signatory wrote them, or nothing.</summary>
         public const string TokenNotes = "notes";
 
+        /// <summary>
+        /// Attaches the completed check to this letter. Renders as NOTHING in the text.
+        ///
+        /// <para>
+        /// A marker rather than a value, and offered as a token because that is where an
+        /// administrator already looks for what a letter can carry - a checkbox somewhere else
+        /// on the form would be a second place to learn.
+        /// </para>
+        /// <para>
+        /// It prints nothing deliberately. What the letter says about the attachment is the
+        /// administrator's to write, and a token that inserted its own sentence would be
+        /// wording they could not edit.
+        /// </para>
+        /// </summary>
+        public const string TokenCompletedCheck = "completedCheck";
+
+        /// <summary>
+        /// Tokens every letter may use, whatever its own list says.
+        ///
+        /// Only the attachment marker. It is not a value any one letter supplies - it is an
+        /// instruction about the letter - so listing it twelve times in the catalogue would
+        /// invite the twelve to disagree.
+        /// </summary>
+        public static readonly string[] AlwaysAllowed = { TokenCompletedCheck };
+
         /// <summary>Tokens whose value is markup and must NOT be escaped.</summary>
         private static readonly HashSet<string> RawTokens =
             new HashSet<string>(StringComparer.Ordinal) { TokenCaseButton };
@@ -190,6 +215,9 @@ namespace OutcomeTesting.Plugins
 
             /// <summary>True when the stored template was used rather than the compiled copy.</summary>
             public bool FromTemplate { get; set; }
+
+            /// <summary>True when the wording asked for the completed check to be attached.</summary>
+            public bool WantsCompletedCheck { get; set; }
         }
 
         /// <summary>
@@ -252,6 +280,10 @@ namespace OutcomeTesting.Plugins
 
             return new Letter
             {
+                // Read from the template text before the marker is stripped out of it. It
+                // renders as nothing, so by the time anybody sees the body it is gone.
+                WantsCompletedCheck = Mentions(body, TokenCompletedCheck),
+
                 // The subject is plain text in every mail client, so its tokens are never
                 // escaped whatever the body is.
                 Subject = Substitute(subject, tokens, escape: false),
@@ -266,9 +298,89 @@ namespace OutcomeTesting.Plugins
                 // and the plain-text fallbacks are compared byte for byte in
                 // NotificationBodiesTests; changing them would be changing what the system
                 // sent before anybody edited anything.
-                Body = Substitute(body, tokens, escape: fromTemplate || definition.IsHtml),
+                // Stripped rather than left to Substitute, which only replaces tokens it was
+                // given a value for - and this one never has a value, because it is an
+                // instruction about the letter rather than a thing the letter says.
+                Body = Substitute(
+                    Strip(body, TokenCompletedCheck),
+                    tokens,
+                    escape: fromTemplate || definition.IsHtml),
                 FromTemplate = fromTemplate,
             };
+        }
+
+        /// <summary>Removes every occurrence of a token, however it is spaced.</summary>
+        public static string Strip(string template, string token)
+        {
+            if (string.IsNullOrEmpty(template))
+            {
+                return template;
+            }
+
+            var output = new StringBuilder(template.Length);
+            var at = 0;
+
+            while (true)
+            {
+                var open = template.IndexOf("{{", at, StringComparison.Ordinal);
+                if (open < 0)
+                {
+                    output.Append(template, at, template.Length - at);
+                    return output.ToString();
+                }
+
+                var close = template.IndexOf("}}", open + 2, StringComparison.Ordinal);
+                if (close < 0)
+                {
+                    output.Append(template, at, template.Length - at);
+                    return output.ToString();
+                }
+
+                var name = template.Substring(open + 2, close - open - 2).Trim();
+                output.Append(template, at, open - at);
+
+                if (!string.Equals(name, token, StringComparison.Ordinal))
+                {
+                    output.Append(template, open, close + 2 - open);
+                }
+
+                at = close + 2;
+            }
+        }
+
+        /// <summary>Whether this wording carries a token, however it is spaced.</summary>
+        public static bool Mentions(string template, string token)
+        {
+            if (string.IsNullOrEmpty(template))
+            {
+                return false;
+            }
+
+            var at = 0;
+            while (true)
+            {
+                var open = template.IndexOf("{{", at, StringComparison.Ordinal);
+                if (open < 0)
+                {
+                    return false;
+                }
+
+                var close = template.IndexOf("}}", open + 2, StringComparison.Ordinal);
+                if (close < 0)
+                {
+                    return false;
+                }
+
+                if (string.Equals(
+                        template.Substring(open + 2, close - open - 2).Trim(),
+                        token,
+                        StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                at = close + 2;
+            }
         }
 
         /// <summary>The active stored template for a code, or null.</summary>
@@ -369,6 +481,13 @@ namespace OutcomeTesting.Plugins
         {
             var allowed = new HashSet<string>(
                 allowedTokens ?? new string[0], StringComparer.Ordinal);
+
+            // Allowed in every letter: it says what the letter carries rather than what it
+            // says, so no letter's own list needs to name it.
+            foreach (var always in AlwaysAllowed)
+            {
+                allowed.Add(always);
+            }
             var offenders = new List<string>();
             var text = (subject ?? string.Empty) + " " + (body ?? string.Empty);
 

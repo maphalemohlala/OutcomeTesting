@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 // gives: tsconfig.app.json restricts ambient types to vite/client on purpose.
 import templatesSource from '../../../../plugins/OutcomeTesting.Plugins/NotificationTemplates.cs?raw';
 import { TEMPLATE_CODES, templateHint, unknownTokens } from './notificationTemplates';
+import { ALWAYS_ALLOWED_TOKENS } from './notificationRouting';
 import { can, pageResourceForPath, resolvePermissions } from '../../types/permissions';
 
 /**
@@ -39,13 +40,16 @@ describe('notificationTemplates', () => {
       ...templatesSource.matchAll(/public const string Token\w+ = "(\w+)";/g),
     ].map((m) => m[1]);
 
-    const used = new Set<string>();
+    // The always-allowed ones belong to no single letter by design (AD-171): they say what a
+    // letter CARRIES rather than what it says, so naming them in twelve lists would invite the
+    // twelve to disagree. They are still offered on every letter, by tokensFor.
+    const used = new Set<string>(ALWAYS_ALLOWED_TOKENS);
     for (const code of TEMPLATE_CODES) {
       for (const token of templateHint(code)!.tokens) used.add(token);
     }
 
-    // Every token the C# defines is offered by at least one letter. A token defined and
-    // never offered would be one no administrator could ever discover.
+    // Every token the C# defines is offered somewhere. A token defined and never offered
+    // would be one no administrator could ever discover.
     for (const token of tokensInCSharp) {
       expect(used.has(token)).toBe(true);
     }

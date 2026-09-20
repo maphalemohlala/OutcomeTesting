@@ -8,6 +8,9 @@ import recipientsSource from '../../../../plugins/OutcomeTesting.Plugins/Notific
 import rowsSource from '../../../../plugins/OutcomeTesting.Plugins/NotificationTemplateRows.cs?raw';
 import { TEMPLATE_CODES, templateHint } from './notificationTemplates';
 import {
+  ALWAYS_ALLOWED_TOKENS,
+  TOKEN_COMPLETED_CHECK,
+  tokensFor,
   CUSTOM_TOKENS,
   TOKEN_HELP,
   tokenHelp,
@@ -135,7 +138,7 @@ describe('what each token does', () => {
     // The picker exists because the old list named the tokens and said nothing about what any
     // of them did. A token gaining a definition in the C# without gaining a line here would
     // put it back in that state for one entry, silently.
-    const used = new Set<string>(CUSTOM_TOKENS);
+    const used = new Set<string>([...CUSTOM_TOKENS, ...ALWAYS_ALLOWED_TOKENS]);
     for (const code of TEMPLATE_CODES) {
       for (const token of templateHint(code)!.tokens) {
         used.add(token);
@@ -149,7 +152,7 @@ describe('what each token does', () => {
   it('describes no token that no letter uses', () => {
     // The other direction: a description left behind for a token that has been removed would
     // offer an administrator something the server now refuses.
-    const used = new Set<string>(CUSTOM_TOKENS);
+    const used = new Set<string>([...CUSTOM_TOKENS, ...ALWAYS_ALLOWED_TOKENS]);
     for (const code of TEMPLATE_CODES) {
       for (const token of templateHint(code)!.tokens) {
         used.add(token);
@@ -176,5 +179,35 @@ describe('what each token does', () => {
 
   it('falls back rather than showing an empty line for an unknown token', () => {
     expect(tokenHelp('nonesuch')).not.toBe('');
+  });
+});
+
+describe('the attachment marker', () => {
+  it('is offered on every letter, not owned by any one of them', () => {
+    // It says what the letter CARRIES rather than what it says.
+    for (const code of TEMPLATE_CODES) {
+      expect(tokensFor(templateHint(code)!.tokens)).toContain(TOKEN_COMPLETED_CHECK);
+      expect(templateHint(code)!.tokens).not.toContain(TOKEN_COMPLETED_CHECK);
+    }
+  });
+
+  it('is offered on a letter of your own too', () => {
+    expect(tokensFor(CUSTOM_TOKENS)).toContain(TOKEN_COMPLETED_CHECK);
+  });
+
+  it('is not reported as a token the letter cannot supply', () => {
+    // The editor must not refuse what the server allows.
+    expect(unknownCustomTokens('Subject', `{{${TOKEN_COMPLETED_CHECK}}}`)).toEqual([]);
+  });
+
+  it('is never offered twice', () => {
+    expect(tokensFor([TOKEN_COMPLETED_CHECK, 'reference'])).toEqual([
+      TOKEN_COMPLETED_CHECK,
+      'reference',
+    ]);
+  });
+
+  it('says it puts nothing in the text, which is the surprising part', () => {
+    expect(tokenHelp(TOKEN_COMPLETED_CHECK).toLowerCase()).toContain('nothing in the text');
   });
 });

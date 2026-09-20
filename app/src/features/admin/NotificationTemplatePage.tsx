@@ -13,6 +13,7 @@ import {
   RECIPIENT_KINDS,
   TRIGGER_EVENTS,
   eventLabel,
+  tokensFor,
   normaliseCode,
   recipientLabel,
   unknownCustomTokens,
@@ -379,7 +380,7 @@ function TemplateForm({
         />
 
         <TokenPicker
-          tokens={row.tokens}
+          tokens={tokensFor(row.tokens)}
           onInsert={insertToken}
           targetLabel={focused === 'subject' ? 'Subject' : 'Body'}
           disabled={saving}
@@ -598,7 +599,7 @@ function NewTemplateForm({
         </p>
 
         <TokenPicker
-          tokens={CUSTOM_TOKENS}
+          tokens={tokensFor(CUSTOM_TOKENS)}
           onInsert={insertToken}
           targetLabel={focused === 'subject' ? 'Subject' : 'Body'}
           disabled={saving}

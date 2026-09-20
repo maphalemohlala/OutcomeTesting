@@ -69,16 +69,22 @@ namespace OutcomeTesting.Plugins
 
             /// <summary>The contact, when the kind names one.</summary>
             public EntityReference RecipientContact { get; set; }
+
+            /// <summary>True when the body carries the completed-check marker.</summary>
+            public bool WantsCompletedCheck { get; set; }
         }
 
-        /// <summary>Who a stored row says a letter goes to; null where it does not say.</summary>
-        public sealed class RecipientChoice
+        /// <summary>What a stored row says about a letter, beyond its wording.</summary>
+        public sealed class TemplateSettings
         {
-            /// <summary>One of the five kinds.</summary>
-            public int Kind { get; set; }
+            /// <summary>One of the five kinds, or null where the row chooses nobody.</summary>
+            public int? Kind { get; set; }
 
             /// <summary>The contact, when the kind names one.</summary>
             public EntityReference Contact { get; set; }
+
+            /// <summary>True when the wording carries the completed-check marker.</summary>
+            public bool WantsCompletedCheck { get; set; }
         }
 
         /// <summary>
@@ -151,6 +157,8 @@ namespace OutcomeTesting.Plugins
                         Body = body,
                         RecipientKind = kind.Value,
                         RecipientContact = row.GetAttributeValue<EntityReference>(RecipientContactAttr),
+                        WantsCompletedCheck = NotificationTemplates.Mentions(
+                            body, NotificationTemplates.TokenCompletedCheck),
                     });
                 }
             }
@@ -163,21 +171,29 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// The recipient a stored row chooses for a built-in letter, or null where it chooses
-        /// none and the code's own routing stands.
+        /// What a stored row says about one of the twelve, beyond its wording: who it goes to,
+        /// and whether it carries the completed check.
+        ///
+        /// <para>
+        /// Never null. A letter nobody has edited still answers - from the compiled copy, which
+        /// is what would be sent - so a marker written into the catalogue is honoured before
+        /// anybody creates a row.
+        /// </para>
         /// </summary>
-        public static RecipientChoice OverrideFor(IOrganizationService service, string code)
+        public static TemplateSettings SettingsFor(IOrganizationService service, string code)
         {
+            var settings = new TemplateSettings();
             if (string.IsNullOrWhiteSpace(code))
             {
-                return null;
+                return settings;
             }
 
             try
             {
                 var query = new QueryExpression(NotificationTemplates.TemplateEntity)
                 {
-                    ColumnSet = new ColumnSet(RecipientKindAttr, RecipientContactAttr),
+                    ColumnSet = new ColumnSet(
+                        RecipientKindAttr, RecipientContactAttr, NotificationTemplates.BodyAttr),
                     TopCount = 1,
                     Criteria = new FilterExpression(),
                 };
@@ -185,29 +201,40 @@ namespace OutcomeTesting.Plugins
                 query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
 
                 var rows = service.RetrieveMultiple(query).Entities;
-                if (rows.Count == 0)
+                if (rows.Count > 0)
                 {
-                    return null;
-                }
+                    var kind = rows[0].GetAttributeValue<OptionSetValue>(RecipientKindAttr);
+                    if (kind != null && NotificationRecipients.IsKnown(kind.Value))
+                    {
+                        settings.Kind = kind.Value;
+                        settings.Contact = rows[0].GetAttributeValue<EntityReference>(RecipientContactAttr);
+                    }
 
-                var kind = rows[0].GetAttributeValue<OptionSetValue>(RecipientKindAttr);
-                if (kind == null || !NotificationRecipients.IsKnown(kind.Value))
-                {
-                    return null;
+                    var stored = rows[0].GetAttributeValue<string>(NotificationTemplates.BodyAttr);
+                    if (!string.IsNullOrWhiteSpace(stored))
+                    {
+                        settings.WantsCompletedCheck = NotificationTemplates.Mentions(
+                            stored, NotificationTemplates.TokenCompletedCheck);
+                        return settings;
+                    }
                 }
-
-                return new RecipientChoice
-                {
-                    Kind = kind.Value,
-                    Contact = rows[0].GetAttributeValue<EntityReference>(RecipientContactAttr),
-                };
             }
             catch (Exception)
             {
                 // An unreadable table leaves the built-in routing in place, which is what the
                 // letter did before anybody edited it.
-                return null;
+                return settings;
             }
+
+            // No usable row: the compiled copy is what will be sent, so it decides.
+            var definition = NotificationTemplates.Definition(code);
+            if (definition != null)
+            {
+                settings.WantsCompletedCheck = NotificationTemplates.Mentions(
+                    definition.Body, NotificationTemplates.TokenCompletedCheck);
+            }
+
+            return settings;
         }
 
         /// <summary>
