@@ -258,6 +258,13 @@
     {% endif %}
 
     {% comment %}
+      Filled in by the autosave script when it can tell the page is behind what was saved.
+      Empty and hidden otherwise, so a reviewer whose page is current never sees it. The
+      CACHE_LAG comment on the script says why the page can be behind at all.
+    {% endcomment %}
+    <div class="ot-notice" role="status" data-ot-cache-notice hidden></div>
+
+    {% comment %}
       The Tax check's notes (project owner, 2026-09-19).
 
       On a submitted review only, and only where this review is not itself the Tax one.
@@ -1454,6 +1461,49 @@
 
             function two(n) { return (n < 10 ? '0' : '') + n; }
 
+            /*
+             * CACHE_LAG. F5, found in DEV on 2026-09-20. An answer saves correctly, the page
+             * says "Saved", and reloading within the next fifteen minutes can render the form
+             * empty. The page reads al_response through Liquid; the write is made by
+             * AnswerRequestPlugin as the application user; and a plug-in write never
+             * invalidates the portal's data cache (AD-094). Nothing is lost - the rows are in
+             * Dataverse, and the submit check reads them server-side, so a submit from a page
+             * that looks empty still succeeds - but an empty form after a save reads as lost
+             * work, and the first instinct is to type it all again.
+             *
+             * So the page remembers which answers it saved, for this review, in this tab, and
+             * says so when the server has not caught up.
+             *
+             * It deliberately does NOT re-apply the values. An answer on screen that the
+             * server did not send is indistinguishable from one it did, and a reviewer could
+             * not tell which they were reading. A sentence they can act on is worth more than
+             * a value they cannot trust.
+             */
+            var CACHE_LAG_KEY = 'ot.savedAnswers.' + REVIEW_ID;
+            var CACHE_LAG_WINDOW_MS = 20 * 60 * 1000;
+            var cacheLagProbes = {};
+
+            function readSavedAnswers() {
+              try { return JSON.parse(window.sessionStorage.getItem(CACHE_LAG_KEY) || '{}') || {}; }
+              catch (e) { return {}; }
+            }
+
+            function writeSavedAnswers(map) {
+              // Private browsing and a full store both throw. The notice is a courtesy, so
+              // losing it is not worth breaking the save that has just succeeded.
+              try { window.sessionStorage.setItem(CACHE_LAG_KEY, JSON.stringify(map)); }
+              catch (e) { /* no notice this time */ }
+            }
+
+            function isBlankRequest(request) {
+              return request.answerText === null
+                && request.answerRichText === null
+                && request.answerChoice === null
+                && request.answerDate === null
+                && (!request.answerChoices || request.answerChoices.length === 0)
+                && (!request.failReasons || request.failReasons.length === 0);
+            }
+
             function bind(root) {
               var questionVersion = root.getAttribute('data-question-version');
               var column = root.getAttribute('data-column');
@@ -1575,7 +1625,8 @@
                * create left here to remember an id for.
                */
               function save() {
-                var body = { al_answerrequest: JSON.stringify(currentRequest()) };
+                var request = currentRequest();
+                var body = { al_answerrequest: JSON.stringify(request) };
                 show('Saving...', 'saving');
 
                 function done() {
@@ -1583,6 +1634,14 @@
                   // An answer just saved is no longer one the submit refused for.
                   root.classList.remove('ot-answer--missing');
                   show('Saved ' + two(now.getHours()) + ':' + two(now.getMinutes()), 'saved');
+
+                  // CACHE_LAG: what this tab knows it has saved. Clearing an answer is
+                  // recorded as nothing to catch up on, so blanking a value never raises
+                  // the notice.
+                  var saved = readSavedAnswers();
+                  if (isBlankRequest(request)) { delete saved[questionVersion]; }
+                  else { saved[questionVersion] = now.getTime(); }
+                  writeSavedAnswers(saved);
                 }
 
                 api('PATCH', 'al_reviewinstances(' + REVIEW_ID + ')', body,
@@ -1659,10 +1718,60 @@
               for (var r = 0; r < reasonBoxes.length; r++) {
                 reasonBoxes[r].addEventListener('change', toggleReason);
               }
+
+              // CACHE_LAG: how this answer reports whether the page came back empty for it.
+              cacheLagProbes[questionVersion] = function () {
+                return isBlankRequest(currentRequest());
+              };
             }
 
             var answers = document.querySelectorAll('[data-ot-answer]');
             for (var i = 0; i < answers.length; i++) { bind(answers[i]); }
+
+            /*
+             * CACHE_LAG, the read side. Runs once, after every answer has bound and
+             * registered how to read itself. An answer counts as behind when this tab saved
+             * it recently and the page has come back with nothing in it - never when the page
+             * shows something, so a value the server did send is never contradicted.
+             */
+            (function reportCacheLag() {
+              var saved = readSavedAnswers();
+              var now = Date.now();
+              var stillFresh = {};
+              var behind = 0;
+              var qv;
+              var isBlankNow;
+
+              for (qv in saved) {
+                if (!Object.prototype.hasOwnProperty.call(saved, qv)) { continue; }
+                if (now - saved[qv] > CACHE_LAG_WINDOW_MS) { continue; }
+                stillFresh[qv] = saved[qv];
+                isBlankNow = cacheLagProbes[qv];
+                if (isBlankNow && isBlankNow()) { behind++; }
+              }
+              writeSavedAnswers(stillFresh);
+
+              var notice = document.querySelector('[data-ot-cache-notice]');
+              if (!notice || behind === 0) { return; }
+
+              var one = behind === 1;
+              var they = one ? 'It is' : 'They are';
+              var them = one ? 'it' : 'them';
+              var theyWill = one ? 'it will' : 'they will';
+
+              notice.innerHTML = '';
+              var strong = document.createElement('strong');
+              strong.textContent = one
+                ? 'One answer you saved is not shown below yet.'
+                : behind + ' answers you saved are not shown below yet.';
+              notice.appendChild(strong);
+              notice.appendChild(document.createTextNode(
+                ' ' + they + ' saved. This site caches pages for up to fifteen minutes, so a '
+                + 'reload can arrive before the page catches up. Do not enter ' + them
+                + ' again: reload in a few minutes and ' + theyWill + ' be there. Submitting '
+                + 'is checked against what is stored, not against what is on screen.'));
+              notice.hidden = false;
+            })();
 
             /*
              * The primary root cause appears only while the grade says the file did not pass
