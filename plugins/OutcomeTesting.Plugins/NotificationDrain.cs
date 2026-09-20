@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -65,6 +65,8 @@ namespace OutcomeTesting.Plugins
             return new ColumnSet(
                 "al_status",
                 "al_recipientemail",
+                NotificationOutbox.AttachmentNameAttr,
+                NotificationOutbox.AttachmentBodyAttr,
                 "al_subject",
                 "al_body",
                 "al_event",
@@ -119,6 +121,8 @@ namespace OutcomeTesting.Plugins
             try
             {
                 var emailId = service.Create(Compose(notification, recipient, sender));
+
+                Attach(service, notification, emailId);
 
                 var send = new OrganizationRequest(SendEmailMessage);
                 send["EmailId"] = emailId;
@@ -193,6 +197,49 @@ namespace OutcomeTesting.Plugins
                 ["from"] = new EntityCollection(new List<Entity> { from }) { EntityName = ActivityPartyEntity },
                 ["to"] = new EntityCollection(new List<Entity> { to }) { EntityName = ActivityPartyEntity },
             };
+        }
+
+        /// <summary>
+        /// Attaches the document the outbox row carries, if it carries one (Change 2, AD-164).
+        ///
+        /// <para>
+        /// Created against the email BEFORE SendEmail, because an attachment added after the
+        /// send is an attachment nobody receives.
+        /// </para>
+        /// <para>
+        /// <b>A failed attachment does not fail the send.</b> The letter is the thing that
+        /// has to arrive; a document that cannot be attached leaves the recipient with the
+        /// words and without the summary, which is a worse email but not a missing one.
+        /// Throwing here would mark the row Failed and re-drain it, sending the letter twice
+        /// to fix a document.
+        /// </para>
+        /// </summary>
+        private static void Attach(IOrganizationService service, Entity notification, Guid emailId)
+        {
+            var body = notification.GetAttributeValue<string>(NotificationOutbox.AttachmentBodyAttr);
+            var name = notification.GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr);
+
+            if (string.IsNullOrWhiteSpace(body) || string.IsNullOrWhiteSpace(name))
+            {
+                return;
+            }
+
+            try
+            {
+                service.Create(new Entity("activitymimeattachment")
+                {
+                    ["objectid"] = new EntityReference(EmailEntity, emailId),
+                    ["objecttypecode"] = EmailEntity,
+                    ["subject"] = name,
+                    ["filename"] = name,
+                    ["mimetype"] = "application/pdf",
+                    ["body"] = body,
+                });
+            }
+            catch (Exception)
+            {
+                // Deliberately swallowed; see the summary.
+            }
         }
 
         private static Result Fail(IOrganizationService service, Guid notificationId, string reason)

@@ -135,6 +135,70 @@ namespace OutcomeTesting.Plugins
         /// As <see cref="Queue(IOrganizationService, IPluginExecutionContext, int, string, Guid, string, string, string)"/>,
         /// for callers that hold the correlation id but not the context.
         /// </summary>
+        /// <summary>The column holding the attached document's file name.</summary>
+        public const string AttachmentNameAttr = "al_attachmentname";
+
+        /// <summary>The column holding the attached document, base64 encoded.</summary>
+        public const string AttachmentBodyAttr = "al_attachmentbody";
+
+        /// <summary>
+        /// Queues a notification and attaches a case summary to it (Change 2, AD-164).
+        ///
+        /// <para>
+        /// The document is built HERE, at queue time, so it is a snapshot of the case at the
+        /// moment of the event rather than at send time. A re-drain then sends the same
+        /// document under the same letter, which a document generated at send time could not
+        /// promise.
+        /// </para>
+        /// <para>
+        /// <b>A document that cannot be built costs the attachment, never the letter.</b>
+        /// This runs inside the transaction that caused the notification, so throwing here
+        /// would roll back a checker's submit because a PDF could not be drawn. The letter
+        /// goes either way and the row simply carries no attachment.
+        /// </para>
+        /// </summary>
+        public static Guid QueueWithCaseSummary(
+            IOrganizationService service,
+            Guid correlationId,
+            int eventValue,
+            string targetTable,
+            Guid targetId,
+            string recipientEmail,
+            string subject,
+            string body,
+            EntityReference caseRef)
+        {
+            var id = Queue(service, correlationId, eventValue, targetTable, targetId, recipientEmail, subject, body);
+
+            // Guid.Empty means the event was already queued, so the attachment is already on
+            // the row that exists and writing it again would replace a sent document.
+            if (id == Guid.Empty || caseRef == null)
+            {
+                return id;
+            }
+
+            try
+            {
+                var pdf = CaseSummaryPdf.Build(service, caseRef);
+                if (pdf == null || pdf.Length == 0)
+                {
+                    return id;
+                }
+
+                service.Update(new Entity(NotificationEntity, id)
+                {
+                    [AttachmentNameAttr] = CaseSummaryPdf.FileName(CaseReference(service, caseRef)),
+                    [AttachmentBodyAttr] = Convert.ToBase64String(pdf),
+                });
+            }
+            catch (Exception)
+            {
+                // Deliberately swallowed; see the summary. The letter is already queued.
+            }
+
+            return id;
+        }
+
         public static Guid Queue(
             IOrganizationService service,
             Guid correlationId,
