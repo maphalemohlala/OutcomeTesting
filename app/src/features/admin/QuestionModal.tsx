@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { addQuestion, moveQuestion, retireAndSucceedQuestion } from '../../services/commands/questions';
+import { today } from './effectiveDay';
 import { intentFor, refusalFor, type QuestionDraft } from './questionModalIntent';
 import { RESPONSE_TYPE_OPTIONS, type LibraryQuestion, type LibrarySection } from './useQuestionLibrary';
 
@@ -36,6 +37,12 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
 
   const [draft, setDraft] = useState<QuestionDraft>(original);
   const [questionCode, setQuestionCode] = useState('');
+  // The day the change starts being asked. AD-122 accepts that a mandatory question in
+  // force today is owed by every unsubmitted review of that discipline at its next submit,
+  // and names this as the control for it - dating it forward lets reviews already open
+  // finish against the set they started with. Today by default, which is what every one of
+  // these commands did before the field existed.
+  const [effectiveFrom, setEffectiveFrom] = useState(today());
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +81,11 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
       return;
     }
 
+    if (!effectiveFrom) {
+      setError('Choose the day the change takes effect.');
+      return;
+    }
+
     setBusy(true);
     setError(null);
 
@@ -90,6 +102,7 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
             responseType: draft.responseType!,
             mandatory: draft.mandatory,
             displayOrder: draft.displayOrder || undefined,
+            effectiveFrom,
             idempotencyKey: key,
           })
         : isMove
@@ -98,6 +111,7 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
               targetSectionId: draft.sectionId,
               newQuestionCode: questionCode.trim(),
               reason: reason.trim(),
+              effectiveFrom,
               idempotencyKey: key,
             })
           : await retireAndSucceedQuestion({
@@ -106,6 +120,7 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
               responseType: draft.responseType!,
               mandatory: draft.mandatory,
               displayOrder: draft.displayOrder,
+              effectiveFrom,
               idempotencyKey: key,
             });
 
@@ -194,6 +209,25 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
           />
         </label>
 
+        <label className="library__field">
+          <span>
+            {mode === 'add'
+              ? 'Asked from'
+              : isMove
+                ? 'Asked in the new section from'
+                : 'New wording asked from'}
+          </span>
+          <input
+            type="date"
+            value={effectiveFrom}
+            min={today()}
+            onChange={(e) => {
+              setEffectiveFrom(e.target.value);
+              setError(null);
+            }}
+          />
+        </label>
+
         {mode === 'add' || isMove ? (
           <label className="library__field">
             <span>{isMove ? 'New question code' : 'Question code'}</span>
@@ -215,12 +249,16 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
 
         <p className="library__consequence" role="status">
           {mode === 'add'
-            ? 'The question is added to the checklist version in force. If it is mandatory it will be owed by every review of that team that has not yet been submitted.'
+            ? `The question is added to the checklist version in force${
+                effectiveFrom === today() ? ' today' : ` on ${effectiveFrom}`
+              }. If it is mandatory it will be owed by every review of that team that has not yet been submitted on that day.`
             : isMove
               ? 'Moving retires this question where it is and creates it in the new section under a new code, so the answers already given stay attached to the section they were answered in. The wording, response type, mandatory flag and display order are carried across unchanged, which is why they are shown here but cannot be edited — change them first, then move, or move first and then edit.'
               : editIntent === 'none'
                 ? 'Nothing has changed yet.'
-                : 'Saving creates a new version and retires the current one. Reviews already submitted keep the version they were answered against.'}
+                : `Saving creates a new version${
+                    effectiveFrom === today() ? '' : ` from ${effectiveFrom}`
+                  } and retires the current one. Reviews already submitted keep the version they were answered against.`}
         </p>
 
         {error ? (

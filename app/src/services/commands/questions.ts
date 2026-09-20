@@ -13,6 +13,8 @@ export interface RetireAndSucceedQuestionInput {
   responseType?: number;
   mandatory?: boolean;
   displayOrder?: number;
+  /** yyyy-MM-dd. Absent is today. */
+  effectiveFrom?: string;
   idempotencyKey: string;
 }
 
@@ -34,6 +36,7 @@ export function retireAndSucceedQuestion(
   if (input.responseType !== undefined) body.ResponseType = String(input.responseType);
   if (input.mandatory !== undefined) body.Mandatory = input.mandatory ? 'true' : 'false';
   if (input.displayOrder !== undefined) body.DisplayOrder = String(input.displayOrder);
+  if (input.effectiveFrom !== undefined) body.EffectiveFrom = input.effectiveFrom;
   return executeCommand<RetireAndSucceedQuestionOutput>('al_RetireAndSucceedQuestion', body);
 }
 

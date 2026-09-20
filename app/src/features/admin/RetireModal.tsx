@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
+import { today } from './effectiveDay';
 import type { CommandResult } from '../../services/commands/commandClient';
 
 /**
@@ -20,11 +21,6 @@ interface Props {
   onConfirm: (reason: string, effectiveTo: string) => Promise<CommandResult<unknown>>;
   onClose: () => void;
   onRetired: () => void;
-}
-
-/** Today as yyyy-MM-dd, which is what the commands take and what the columns hold. */
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 export function RetireModal({

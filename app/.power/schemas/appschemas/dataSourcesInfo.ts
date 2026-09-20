@@ -855,6 +855,12 @@ export const dataSourcesInfo = {
             "in": "body",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "EffectiveFrom",
+            "in": "body",
+            "required": false,
+            "type": "string"
           }
         ],
         "responseInfo": {
