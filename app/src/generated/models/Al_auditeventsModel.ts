@@ -4,13 +4,21 @@
  */
 export const Al_auditeventsal_command = {
   120910750: 'ImportCases',
+  120910792: 'SetFailAccountability',
   120910751: 'AssignCase',
   120910752: 'ReturnCase',
+  120910793: 'AddQuestion',
   120910753: 'StartReview',
+  120910794: 'RetireQuestion',
+  120910795: 'MoveQuestion',
   120910754: 'SubmitReview',
   120910755: 'IssueOutcome',
+  120910796: 'AddSection',
   120910756: 'CompleteRemediation',
+  120910797: 'RetireSection',
   120910757: 'SignOffRemediation',
+  120910798: 'UpdateSection',
+  120910799: 'CorrectTaxOutcome',
   120910758: 'RegradeCase',
   120910759: 'CreateExportBatch',
   120910773: 'AssignUserRole',
@@ -19,12 +27,13 @@ export const Al_auditeventsal_command = {
   120910776: 'RetireAndSucceedQuestion',
   120910778: 'UpdateCaseDetails',
   120910784: 'CreateRole',
-  120910788: 'SetRoleAssignmentActive',
   120910785: 'CreateUser',
-  120910786: 'UpdateUser',
+  120910788: 'SetRoleAssignmentActive',
   120910789: 'SetPermissionRuleActive',
-  120910787: 'SetUserActive',
-  120910790: 'UpdateRole'
+  120910791: 'ResolveImportException',
+  120910786: 'UpdateUser',
+  120910790: 'UpdateRole',
+  120910787: 'SetUserActive'
 } as const;
 export type Al_auditeventsal_command = keyof typeof Al_auditeventsal_command;
 export const Al_auditeventsstatecode = {
