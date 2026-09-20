@@ -73,6 +73,24 @@ function OutcomeAccountability({
   // own adviser or paraplanner, which is what the extract falls back to.
   const [fqPerson, setFqPerson] = useState(outcome.fqAccountable?.id ?? '');
   const [aqPerson, setAqPerson] = useState(outcome.aqAccountable?.id ?? '');
+
+  /*
+   * Take the record's values when the record itself changes, and not before (F29).
+   *
+   * The version number moves when the row does, so this fires once the re-read after a save
+   * has actually landed. Until then the editor keeps showing what the person typed, which is
+   * both what they expect and, after a successful save, what the row now says.
+   *
+   * React's documented way of adjusting state to a prop, done during render rather than in an
+   * effect so there is no frame where the old values are painted.
+   */
+  const [seenVersion, setSeenVersion] = useState(outcome.rowVersion);
+  if (outcome.rowVersion !== seenVersion) {
+    setSeenVersion(outcome.rowVersion);
+    setDraft(effective);
+    setFqPerson(outcome.fqAccountable?.id ?? '');
+    setAqPerson(outcome.aqAccountable?.id ?? '');
+  }
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; kind: 'error' | 'success' } | null>(null);
 
@@ -244,7 +262,18 @@ export function FailAccountabilityPanel({
           <ul className="accountability__list">
             {state.outcomes.map((outcome) => (
               <OutcomeAccountability
-                key={outcome.id + '-' + reloadKey}
+                /*
+                 * Keyed on the outcome alone. It used to carry reloadKey, which onSaved bumps
+                 * the instant the write returns - so React tore the editor down and built it
+                 * again while the re-read was still in flight, seeding the new one from the
+                 * outcome it already had. The ticks and the named people sprang back to what
+                 * they were before the save, the success message went with the old instance,
+                 * and both stayed wrong until the page was left and returned to (F29).
+                 *
+                 * The draft now follows the record instead, below, which happens when the
+                 * data actually lands rather than when the request is sent.
+                 */
+                key={outcome.id}
                 outcome={outcome}
                 people={people}
                 onSaved={() => setReloadKey((current) => current + 1)}
