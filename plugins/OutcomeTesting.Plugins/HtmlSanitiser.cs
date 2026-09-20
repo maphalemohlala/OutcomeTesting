@@ -22,8 +22,13 @@ namespace OutcomeTesting.Plugins
     ///
     /// Runs server-side in AnswerWriter, so it applies to every write whatever sent it -
     /// the portal, the Code App, or a request someone made by hand against the Web API.
-    /// The surfaces sanitise again at render time; this is the copy that decides what is
-    /// STORED.
+    /// ResponseGuardPlugin calls it again pre-operation on al_response, so a write that
+    /// never passes through AnswerWriter is cleaned too. Both of those are WRITE-time.
+    /// Nothing sanitises at RENDER time: the surfaces emit al_answerrichtext as markup as
+    /// it comes out of the column (OT Review Detail, OT Tax Notes), so what these two
+    /// calls store is what a browser is handed. An earlier version of this comment
+    /// claimed a render-time pass and there has never been one - do not relax anything
+    /// here on the strength of a layer that does not exist (audit finding 11).
     ///
     /// Free of Dataverse types, like ResponseRules, so it is unit testable on its own.
     /// </summary>
