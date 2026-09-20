@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
+import { RichTextEditor } from '../../components/form/RichTextEditor';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import { unknownTokens } from './notificationTemplates';
@@ -296,16 +297,32 @@ function TemplateForm({
         />
 
         <label htmlFor="template-body">Body</label>
-        <textarea
-          id="template-body"
-          rows={12}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-        />
+        {/*
+          A rich-text editor for an HTML letter and a plain box for a plain-text one. Putting
+          the editor on both would quietly inject tags into a letter that is sent as plain
+          text, and the reader would see the markup rather than the formatting.
+        */}
+        {row.isHtml ? (
+          <RichTextEditor
+            id="template-body"
+            value={body}
+            onChange={setBody}
+            label="Body"
+            disabled={saving}
+          />
+        ) : (
+          <textarea
+            id="template-body"
+            rows={12}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+          />
+        )}
         <p className="templates__hint">
           {row.isHtml
-            ? 'This letter is HTML — your paragraph tags are kept as written.'
-            : 'This letter is plain text.'}
+            ? 'Formatting is kept as you set it here. Type a token such as {{reference}} ' +
+              'straight into the text.'
+            : 'This letter is plain text, so it has no formatting.'}
         </p>
 
         <RecipientFields
@@ -504,14 +521,15 @@ function NewTemplateForm({
         />
 
         <label htmlFor="template-body">Body</label>
-        <textarea
+        <RichTextEditor
           id="template-body"
-          rows={10}
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={setBody}
+          label="Body"
+          disabled={saving}
         />
         <p className="templates__hint">
-          HTML — your paragraph tags are kept as written. This letter can use:{' '}
+          Formatting is kept as you set it here. This letter can use:{' '}
           {CUSTOM_TOKENS.map((t) => (
             <code key={t} className="templates__token">{`{{${t}}}`}</code>
           ))}

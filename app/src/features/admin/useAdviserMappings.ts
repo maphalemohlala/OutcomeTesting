@@ -9,7 +9,7 @@ export interface AdviserMappingRow {
   managerName: string | null;
 }
 
-export interface ManagerOption {
+export interface ContactOption {
   id: string;
   name: string;
   email: string;
@@ -18,7 +18,7 @@ export interface ManagerOption {
 export type AdviserMappingsState =
   | { status: 'loading' }
   | { status: 'unavailable'; reason: string }
-  | { status: 'ready'; mappings: AdviserMappingRow[]; managers: ManagerOption[] };
+  | { status: 'ready'; mappings: AdviserMappingRow[]; contacts: ContactOption[] };
 
 /**
  * The adviser -> T&C Manager mapping, and the contacts that can be chosen as a manager
@@ -67,7 +67,7 @@ export function useAdviserMappings(reloadKey = 0): AdviserMappingsState {
           return;
         }
 
-        const managers: ManagerOption[] = contactResult.data
+        const contacts: ContactOption[] = contactResult.data
           .filter((c) => Number(c.statecode) === 0 && (c.emailaddress1 ?? '').trim() !== '')
           .map((c) => ({
             id: c.contactid,
@@ -78,7 +78,7 @@ export function useAdviserMappings(reloadKey = 0): AdviserMappingsState {
 
         setState({
           status: 'ready',
-          managers,
+          contacts,
           mappings: mappingResult.data.map((row) => ({
             id: row.al_advisermappingid,
             adviserEmail: (row.al_adviseremail ?? '').trim(),

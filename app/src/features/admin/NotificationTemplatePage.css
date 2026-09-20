@@ -61,6 +61,7 @@
 }
 
 .templates__form input,
+.templates__form select,
 .templates__form textarea {
   padding: var(--space-2);
   border: 1px solid var(--colour-border);

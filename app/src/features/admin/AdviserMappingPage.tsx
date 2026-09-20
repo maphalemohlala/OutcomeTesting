@@ -6,7 +6,7 @@ import {
   useAdviserMappings,
   saveAdviserMapping,
   type AdviserMappingRow,
-  type ManagerOption,
+  type ContactOption,
 } from './useAdviserMappings';
 import './AdviserMappingPage.css';
 
@@ -97,7 +97,7 @@ export function AdviserMappingPage() {
           {editing && (
             <MappingForm
               row={editing === 'new' ? null : editing}
-              managers={state.managers}
+              contacts={state.contacts}
               onClose={() => setEditing(null)}
               onSaved={() => {
                 setEditing(null);
@@ -113,12 +113,12 @@ export function AdviserMappingPage() {
 
 function MappingForm({
   row,
-  managers,
+  contacts,
   onClose,
   onSaved,
 }: {
   row: AdviserMappingRow | null;
-  managers: ManagerOption[];
+  contacts: ContactOption[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -150,26 +150,42 @@ function MappingForm({
   return (
     <Modal title={row ? 'Change mapping' : 'Map an adviser'} onClose={onClose}>
       <form className="advisers__form" onSubmit={submit}>
-        <label htmlFor="adviser-email">Adviser’s work email</label>
-        <input
-          id="adviser-email"
-          type="email"
-          value={adviserEmail}
-          // Read-only when changing an existing row: the email is the alternate key, so
-          // editing it here would silently move the mapping to a different adviser rather
-          // than correct this one.
-          readOnly={row !== null}
-          onChange={(e) => setAdviserEmail(e.target.value)}
-        />
+        <label htmlFor="adviser-email">Adviser</label>
+        {/*
+          Chosen from contacts rather than typed. A mapping is keyed on the adviser's email and
+          matched against the case's al_adviseremail exactly, so a typo produced a row that
+          looked right in this list and routed nothing.
+
+          Fixed when changing an existing row: the email IS the alternate key, so choosing
+          somebody else here would silently move the mapping to a different adviser rather than
+          correct this one. Retire the row and map the other adviser instead.
+        */}
+        {row !== null ? (
+          <input id="adviser-email" type="email" value={adviserEmail} readOnly />
+        ) : (
+          <select
+            id="adviser-email"
+            value={adviserEmail}
+            onChange={(e) => setAdviserEmail(e.target.value)}
+          >
+            <option value="">Choose…</option>
+            {contacts.map((c) => (
+              <option key={c.id} value={c.email}>
+                {c.name} ({c.email})
+              </option>
+            ))}
+          </select>
+        )}
         <p className="advisers__hint">
-          As it appears on the case. The import takes it from the extract’s AdviserEmail
-          column.
+          The adviser’s email has to match the one on their cases, which the import takes from
+          the extract’s AdviserEmail column. An adviser who is not a contact cannot be picked
+          here — add the contact first.
         </p>
 
         <label htmlFor="manager">T&amp;C Manager</label>
         <select id="manager" value={managerId} onChange={(e) => setManagerId(e.target.value)}>
           <option value="">Choose…</option>
-          {managers.map((m) => (
+          {contacts.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name} ({m.email})
             </option>
@@ -183,7 +199,11 @@ function MappingForm({
         {problem && <p className="advisers__problem">{problem}</p>}
 
         <div className="advisers__actions">
-          <button type="submit" className="advisers__btn" disabled={saving}>
+          <button
+            type="submit"
+            className="advisers__btn"
+            disabled={saving || adviserEmail.trim() === '' || managerId === ''}
+          >
             {saving ? 'Saving…' : 'Save'}
           </button>
           <button

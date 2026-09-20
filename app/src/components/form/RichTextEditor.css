@@ -1,0 +1,76 @@
+/* The editor is drawn as one control: the toolbar and the text share a border, so the bar
+   reads as part of the field rather than as buttons floating above it. */
+.rte {
+  border: 1px solid var(--colour-border);
+  background: var(--colour-surface);
+}
+
+.rte[data-disabled='true'] {
+  background: var(--colour-surface-sunken);
+}
+
+.rte__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1, 4px);
+  padding: var(--space-1, 4px) var(--space-2);
+  border-bottom: 1px solid var(--colour-border);
+  background: var(--colour-surface-sunken);
+}
+
+.rte__btn {
+  min-width: 2rem;
+  padding: var(--space-1, 4px) var(--space-2);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.rte__btn:hover:not(:disabled) {
+  background: var(--colour-surface);
+  border-color: var(--colour-border);
+}
+
+.rte__btn:disabled {
+  color: var(--colour-text-muted);
+  cursor: not-allowed;
+}
+
+.rte__sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 var(--space-1, 4px);
+  background: var(--colour-border);
+}
+
+.rte__area {
+  min-height: 12rem;
+  padding: var(--space-2);
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+.rte__area:focus {
+  outline: 2px solid var(--colour-action);
+  outline-offset: -2px;
+}
+
+/* The editor shows the letter as the reader will see it, so its paragraphs and lists need the
+   spacing an email client gives them rather than the page's reset. */
+.rte__area p {
+  margin: 0 0 var(--space-2);
+}
+
+.rte__area p:last-child {
+  margin-bottom: 0;
+}
+
+.rte__area ul,
+.rte__area ol {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-4);
+}
