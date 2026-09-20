@@ -6,8 +6,11 @@ import { describe, expect, it } from 'vitest';
 import outboxSource from '../../../../plugins/OutcomeTesting.Plugins/NotificationOutbox.cs?raw';
 import recipientsSource from '../../../../plugins/OutcomeTesting.Plugins/NotificationRecipients.cs?raw';
 import rowsSource from '../../../../plugins/OutcomeTesting.Plugins/NotificationTemplateRows.cs?raw';
+import { TEMPLATE_CODES, templateHint } from './notificationTemplates';
 import {
   CUSTOM_TOKENS,
+  TOKEN_HELP,
+  tokenHelp,
   KIND_CONTACT,
   RECIPIENT_KINDS,
   TRIGGER_EVENTS,
@@ -124,5 +127,54 @@ describe('normalising a code somebody typed', () => {
   it('gives an empty string for something with no code in it at all', () => {
     // The caller treats this as "no code given" rather than saving a row keyed on nothing.
     expect(normaliseCode('  !!  ')).toBe('');
+  });
+});
+
+describe('what each token does', () => {
+  it('explains every token any letter can use', () => {
+    // The picker exists because the old list named the tokens and said nothing about what any
+    // of them did. A token gaining a definition in the C# without gaining a line here would
+    // put it back in that state for one entry, silently.
+    const used = new Set<string>(CUSTOM_TOKENS);
+    for (const code of TEMPLATE_CODES) {
+      for (const token of templateHint(code)!.tokens) {
+        used.add(token);
+      }
+    }
+
+    const missing = [...used].filter((t) => !(t in TOKEN_HELP));
+    expect(missing).toEqual([]);
+  });
+
+  it('describes no token that no letter uses', () => {
+    // The other direction: a description left behind for a token that has been removed would
+    // offer an administrator something the server now refuses.
+    const used = new Set<string>(CUSTOM_TOKENS);
+    for (const code of TEMPLATE_CODES) {
+      for (const token of templateHint(code)!.tokens) {
+        used.add(token);
+      }
+    }
+
+    expect(Object.keys(TOKEN_HELP).filter((t) => !used.has(t))).toEqual([]);
+  });
+
+  it('tells the two link tokens apart, which is the pair that matters', () => {
+    // caseLink and caseButton are a web address and a button. Reading only their names, the
+    // difference is a guess.
+    expect(tokenHelp('caseLink')).not.toBe(tokenHelp('caseButton'));
+    expect(tokenHelp('caseLink').toLowerCase()).toContain('address');
+    expect(tokenHelp('caseButton').toLowerCase()).toContain('button');
+  });
+
+  it('says when a token can legitimately come out as nothing', () => {
+    // dueText and notes are written to be dropped into a sentence and are often empty. An
+    // administrator who does not know that reads a gap as a fault.
+    expect(tokenHelp('dueText').toLowerCase()).toContain('nothing');
+    expect(tokenHelp('notes').toLowerCase()).toContain('nothing');
+  });
+
+  it('falls back rather than showing an empty line for an unknown token', () => {
+    expect(tokenHelp('nonesuch')).not.toBe('');
   });
 });

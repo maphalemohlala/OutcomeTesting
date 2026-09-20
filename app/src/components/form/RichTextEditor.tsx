@@ -1,5 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import './RichTextEditor.css';
+
+export interface RichTextEditorHandle {
+  /** Drops text in at the caret, or at the end when the editor has not been focused. */
+  insertText: (text: string) => void;
+}
 
 interface Props {
   id: string;
@@ -33,8 +38,26 @@ interface Props {
  * dependency for six buttons.
  * </p>
  */
-export function RichTextEditor({ id, value, onChange, label, disabled = false }: Props) {
+export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function RichTextEditor(
+  { id, value, onChange, label, disabled = false },
+  ref,
+) {
   const areaRef = useRef<HTMLDivElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    insertText(text: string) {
+      const area = areaRef.current;
+      if (!area || disabled) return;
+
+      // Focus first: insertText acts on the current selection, and if the selection is
+      // somewhere else on the page the token lands there instead. Focusing an element the
+      // caret has never been in puts it at the start, so an untouched editor takes the token
+      // at the beginning rather than silently dropping it.
+      area.focus();
+      document.execCommand('insertText', false, text);
+      onChange(area.innerHTML);
+    },
+  }));
 
   // Written only when the incoming value is not already what the element holds. Assigning
   // innerHTML on every render puts the caret back to the start on each keystroke, which is
@@ -159,4 +182,4 @@ export function RichTextEditor({ id, value, onChange, label, disabled = false }:
       />
     </div>
   );
-}
+});

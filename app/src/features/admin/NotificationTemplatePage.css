@@ -163,3 +163,60 @@
   color: var(--colour-danger, #b3261e);
   font-size: var(--text-sm);
 }
+
+/* The token list. Buttons rather than the read-only chips this replaced: the old row named
+   the tokens and said nothing about what any of them did, so using one meant knowing it
+   already and spelling it exactly. */
+.tokens {
+  margin-top: var(--space-2);
+}
+
+.tokens__intro {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.tokens__list {
+  display: grid;
+  gap: var(--space-1, 4px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tokens__btn {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1, 4px) var(--space-2);
+  text-align: left;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.tokens__btn:hover:not(:disabled) {
+  background: var(--colour-surface-sunken);
+  border-color: var(--colour-border);
+}
+
+.tokens__btn:disabled {
+  color: var(--colour-text-muted);
+  cursor: not-allowed;
+}
+
+.tokens__name {
+  flex: 0 0 auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--colour-action);
+}
+
+.tokens__help {
+  color: var(--colour-text-muted);
+}

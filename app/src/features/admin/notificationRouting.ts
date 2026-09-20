@@ -55,6 +55,35 @@ export const CUSTOM_TOKENS: readonly string[] = [
   'caseButton',
 ];
 
+/**
+ * What each token actually puts in the letter, in the words of the person writing one.
+ *
+ * The editor used to list the token names and nothing else, which told an administrator what
+ * they were allowed to type and not what any of it would do. These are taken from the doc
+ * comments on `NotificationTemplates`, and `notificationRouting.test.ts` fails if a token
+ * gains a definition there without gaining a line here.
+ *
+ * Several are written to be dropped into a sentence and carry their own leading space or
+ * punctuation - `dueText` and `notes` especially - so the description says when a token can
+ * legitimately come out as nothing at all.
+ */
+export const TOKEN_HELP: Record<string, string> = {
+  reference: 'The case reference, e.g. OT-2026-0417.',
+  adviser: 'The adviser’s name, or “Adviser” where the case does not name one.',
+  client: 'The client’s name, or “This case” — it opens a sentence either way.',
+  caseLink: 'The web address of the case in the portal, as plain text.',
+  caseButton: 'A styled button linking to the case. Comes out as nothing where there is no portal.',
+  dueText: 'A sentence naming the due date, e.g. “ It is due by 3 March 2026.”, or nothing.',
+  grading: 'How this letter names the grading that caused it.',
+  finalOutcome: 'The final outcome recorded at sign-off.',
+  notes: 'The signatory’s notes, e.g. “ Notes: …”, or nothing where they left none.',
+};
+
+/** The one-line description for a token, or a plain fallback. */
+export function tokenHelp(token: string): string {
+  return TOKEN_HELP[token] ?? 'Filled in when the letter is sent.';
+}
+
 export function eventLabel(value: number | null): string | null {
   if (value === null) return null;
   return TRIGGER_EVENTS.find((e) => e.value === value)?.label ?? null;

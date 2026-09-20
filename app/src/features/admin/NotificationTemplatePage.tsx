@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
-import { RichTextEditor } from '../../components/form/RichTextEditor';
+import {
+  RichTextEditor,
+  type RichTextEditorHandle,
+} from '../../components/form/RichTextEditor';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import { unknownTokens } from './notificationTemplates';
@@ -21,6 +24,7 @@ import {
   type ContactOption,
   type TemplateRow,
 } from './useNotificationTemplates';
+import { TokenPicker } from './TokenPicker';
 import './NotificationTemplatePage.css';
 
 /**
@@ -159,6 +163,27 @@ export function NotificationTemplatePage() {
 }
 
 /**
+ * Puts text in at the caret of a plain field and returns the new value.
+ *
+ * The caret is restored after React has re-rendered from the state this returns; setting the
+ * value alone sends it to the end, so inserting a token mid-sentence would move the cursor to
+ * the bottom of the letter each time.
+ */
+function spliceAtCaret(el: HTMLInputElement | HTMLTextAreaElement, text: string): string {
+  const start = el.selectionStart ?? el.value.length;
+  const end = el.selectionEnd ?? start;
+  const next = el.value.slice(0, start) + text + el.value.slice(end);
+  const caret = start + text.length;
+
+  requestAnimationFrame(() => {
+    el.focus();
+    el.setSelectionRange(caret, caret);
+  });
+
+  return next;
+}
+
+/**
  * Who a letter goes to, shared by both forms.
  *
  * Leaving it unset on a built-in letter is a real choice and the default one: the code that
@@ -242,6 +267,13 @@ function TemplateForm({
   const [subject, setSubject] = useState(row.subject);
   const [body, setBody] = useState(row.body);
   const [kind, setKind] = useState<number | null>(row.recipientKind);
+  // Which field a token goes into. Tracked rather than assumed, and named on the picker:
+  // dropping one into the body when the person had just clicked into the subject is the kind
+  // of mistake that is only noticed after the letter has gone.
+  const [focused, setFocused] = useState<'subject' | 'body'>('body');
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<RichTextEditorHandle>(null);
   const [contactId, setContactId] = useState<string | null>(row.recipientContactId);
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -251,6 +283,24 @@ function TemplateForm({
     : unknownTokens(row.code, subject, body);
   const empty = subject.trim() === '' || body.trim() === '';
   const contactMissing = kind === KIND_CONTACT && !contactId;
+
+  function insertToken(token: string) {
+    const text = `{{${token}}}`;
+
+    if (focused === 'subject') {
+      const el = subjectRef.current;
+      if (el) setSubject(spliceAtCaret(el, text));
+      return;
+    }
+
+    if (row.isHtml) {
+      editorRef.current?.insertText(text);
+      return;
+    }
+
+    const el = textareaRef.current;
+    if (el) setBody(spliceAtCaret(el, text));
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -291,8 +341,10 @@ function TemplateForm({
         <label htmlFor="template-subject">Subject</label>
         <input
           id="template-subject"
+          ref={subjectRef}
           type="text"
           value={subject}
+          onFocus={() => setFocused('subject')}
           onChange={(e) => setSubject(e.target.value)}
         />
 
@@ -302,22 +354,27 @@ function TemplateForm({
           the editor on both would quietly inject tags into a letter that is sent as plain
           text, and the reader would see the markup rather than the formatting.
         */}
-        {row.isHtml ? (
-          <RichTextEditor
-            id="template-body"
-            value={body}
-            onChange={setBody}
-            label="Body"
-            disabled={saving}
-          />
-        ) : (
-          <textarea
-            id="template-body"
-            rows={12}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-          />
-        )}
+        {/* Focus bubbles, so one handler covers the editor's editable area. */}
+        <div onFocus={() => setFocused('body')}>
+          {row.isHtml ? (
+            <RichTextEditor
+              id="template-body"
+              ref={editorRef}
+              value={body}
+              onChange={setBody}
+              label="Body"
+              disabled={saving}
+            />
+          ) : (
+            <textarea
+              id="template-body"
+              ref={textareaRef}
+              rows={12}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+            />
+          )}
+        </div>
         <p className="templates__hint">
           {row.isHtml
             ? 'Formatting is kept as you set it here. Type a token such as {{reference}} ' +
@@ -334,12 +391,12 @@ function TemplateForm({
           allowDefault={!row.custom}
         />
 
-        <p className="templates__hint">
-          Tokens this letter fills in:{' '}
-          {row.tokens.map((t) => (
-            <code key={t} className="templates__token">{`{{${t}}}`}</code>
-          ))}
-        </p>
+        <TokenPicker
+          tokens={row.tokens}
+          onInsert={insertToken}
+          targetLabel={focused === 'subject' ? 'Subject' : 'Body'}
+          disabled={saving}
+        />
 
         {offenders.length > 0 && (
           <p className="templates__problem">
@@ -420,6 +477,21 @@ function NewTemplateForm({
   const [body, setBody] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [focused, setFocused] = useState<'subject' | 'body'>('body');
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<RichTextEditorHandle>(null);
+
+  function insertToken(token: string) {
+    const text = `{{${token}}}`;
+
+    if (focused === 'subject') {
+      const el = subjectRef.current;
+      if (el) setSubject(spliceAtCaret(el, text));
+      return;
+    }
+
+    editorRef.current?.insertText(text);
+  }
 
   // The code is the table's alternate key, so it is normalised as it is typed rather than
   // saved as written: "tell the manager" and "TELL-THE-MANAGER" must not become two rows.
@@ -515,25 +587,32 @@ function NewTemplateForm({
         <label htmlFor="template-subject">Subject</label>
         <input
           id="template-subject"
+          ref={subjectRef}
           type="text"
           value={subject}
+          onFocus={() => setFocused('subject')}
           onChange={(e) => setSubject(e.target.value)}
         />
 
         <label htmlFor="template-body">Body</label>
-        <RichTextEditor
-          id="template-body"
-          value={body}
-          onChange={setBody}
-          label="Body"
+        <div onFocus={() => setFocused('body')}>
+          <RichTextEditor
+            id="template-body"
+            ref={editorRef}
+            value={body}
+            onChange={setBody}
+            label="Body"
+            disabled={saving}
+          />
+        </div>
+        <p className="templates__hint">Formatting is kept as you set it here.</p>
+
+        <TokenPicker
+          tokens={CUSTOM_TOKENS}
+          onInsert={insertToken}
+          targetLabel={focused === 'subject' ? 'Subject' : 'Body'}
           disabled={saving}
         />
-        <p className="templates__hint">
-          Formatting is kept as you set it here. This letter can use:{' '}
-          {CUSTOM_TOKENS.map((t) => (
-            <code key={t} className="templates__token">{`{{${t}}}`}</code>
-          ))}
-        </p>
 
         {clashes && (
           <p className="templates__problem">
