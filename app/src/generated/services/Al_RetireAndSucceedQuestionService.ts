@@ -18,10 +18,11 @@ export class Al_RetireAndSucceedQuestionService {
    * @param IdempotencyKey type: `String`
    * @param ResponseType type: `String`
    * @param Mandatory type: `String`
+   * @param DisplayOrder type: `String`
    */
-  public static async al_RetireAndSucceedQuestion(QuestionId: string, NewWording: string, IdempotencyKey: string, ResponseType?: string, Mandatory?: string): Promise<IOperationResult<Record<string, unknown>>> {
-    const params: { QuestionId: string, NewWording: string, IdempotencyKey: string, ResponseType?: string, Mandatory?: string } = { QuestionId, NewWording, IdempotencyKey, ResponseType, Mandatory };
-    const result = await Al_RetireAndSucceedQuestionService.client.executeAsync<{ QuestionId: string, NewWording: string, IdempotencyKey: string, ResponseType?: string, Mandatory?: string }, Record<string, unknown>>(
+  public static async al_RetireAndSucceedQuestion(QuestionId: string, NewWording: string, IdempotencyKey: string, ResponseType?: string, Mandatory?: string, DisplayOrder?: string): Promise<IOperationResult<Record<string, unknown>>> {
+    const params: { QuestionId: string, NewWording: string, IdempotencyKey: string, ResponseType?: string, Mandatory?: string, DisplayOrder?: string } = { QuestionId, NewWording, IdempotencyKey, ResponseType, Mandatory, DisplayOrder };
+    const result = await Al_RetireAndSucceedQuestionService.client.executeAsync<{ QuestionId: string, NewWording: string, IdempotencyKey: string, ResponseType?: string, Mandatory?: string, DisplayOrder?: string }, Record<string, unknown>>(
       {
         dataverseRequest: {
           action: 'customapi',

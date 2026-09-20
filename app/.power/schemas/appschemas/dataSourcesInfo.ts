@@ -849,6 +849,12 @@ export const dataSourcesInfo = {
             "in": "body",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "DisplayOrder",
+            "in": "body",
+            "required": false,
+            "type": "string"
           }
         ],
         "responseInfo": {
