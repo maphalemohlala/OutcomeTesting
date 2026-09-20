@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Round-trips a Dataverse solution into src/, leaving src/ an exact mirror of the export.
 
@@ -58,6 +58,73 @@ try {
     $exportedFiles = @(Get-ChildItem -Path $unpackPath -Recurse -File)
     if ($exportedFiles.Count -eq 0) {
         throw "The unpack produced no files. src/ has been left untouched."
+    }
+
+    <#
+    .SYNOPSIS
+        Re-applies <StateCode>Enabled</StateCode> to every exported step file.
+
+    .DESCRIPTION
+        Audit finding 3, 2026-09-20.
+
+        Dataverse imports an SdkMessageProcessingStep DISABLED unless activation is
+        requested, and `pac solution import` requests it only with --activate-plugins. An
+        import that forgets the flag switches the rules off silently. That is not
+        hypothetical: it happened on 2026-09-02 to the six al_response steps and went
+        unnoticed until 2026-09-09. Those steps are where the server-side enforcement lives,
+        so a silent deactivation turns every rule into a suggestion.
+
+        The fix is to say Enabled in the solution files. The problem is that the EXPORT does
+        not emit StateCode, and this script's whole contract is that src/ mirrors the export
+        (AD-013) - so the next round trip would strip all 21 stamps and say nothing.
+
+        Hence this: the one deliberate, declared divergence from "mirrors the export". It is
+        idempotent, it only ever adds, and it reports what it touched so the divergence is
+        visible in the run rather than buried in a diff.
+
+        Enabled is not an assumption. All 52 OutcomeTesting.Plugins steps in DEV were
+        confirmed statecode 0 before the stamp was introduced. If a step is ever DELIBERATELY
+        disabled, this will fight that decision - which is why it prints a line per file.
+    #>
+    function Restore-StepState([string]$StepFolder) {
+        if (-not (Test-Path $StepFolder)) { return }
+
+        $anchor = '  <SdkMessageProcessingStepImages'
+        $stamp = @(
+            '  <!-- Stamped 2026-09-20, audit finding 3. Dataverse imports a step DISABLED'
+            '       unless activation is requested, and an import that forgot the'
+            '       activate-plugins flag switched these off once already (2026-09-02, six'
+            '       al_response steps, unnoticed for a week). The export does not emit these'
+            '       two elements, so round-trip-src.ps1 re-applies them after every export;'
+            '       see Restore-StepState there. Do not remove either without reading that. -->'
+            '  <StateCode>Enabled</StateCode>'
+            '  <StatusCode>Enabled</StatusCode>'
+        ) -join "`n"
+
+        $restored = 0
+        $already = 0
+        foreach ($file in Get-ChildItem -Path $StepFolder -Filter '*.xml' -File) {
+            $text = Get-Content -Path $file.FullName -Raw
+            if ($text -match '<StateCode>') { $already++; continue }
+
+            $index = $text.IndexOf($anchor)
+            if ($index -lt 0) {
+                Write-Host "  ! $($file.Name) has no images element; state not stamped." -ForegroundColor Yellow
+                continue
+            }
+
+            $text = $text.Insert($index, $stamp + "`n")
+            Set-Content -Path $file.FullName -Value $text -NoNewline -Encoding UTF8
+            $restored++
+        }
+
+        Write-Host ""
+        if ($restored -gt 0) {
+            Write-Host "Step state re-stamped on $restored file(s); $already already carried it." -ForegroundColor Cyan
+        }
+        else {
+            Write-Host "Step state: all $already file(s) already Enabled." -ForegroundColor Cyan
+        }
     }
 
     function Get-RelativePaths([string]$root) {
@@ -123,8 +190,10 @@ try {
             ForEach-Object { Remove-Item -Path $_.FullName -Recurse -Force }
     }
 
+    Restore-StepState -StepFolder (Join-Path $srcPath 'SdkMessageProcessingSteps')
+
     Write-Host ""
-    Write-Host "src/ now mirrors the export exactly." -ForegroundColor Green
+    Write-Host "src/ now mirrors the export exactly, plus the step-state stamp." -ForegroundColor Green
 }
 finally {
     Remove-Item -Path $work -Recurse -Force -ErrorAction SilentlyContinue

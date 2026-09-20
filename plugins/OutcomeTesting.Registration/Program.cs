@@ -471,6 +471,11 @@ if (args.Length >= 3 && args[0].Equals("setstepstate", StringComparison.OrdinalI
     return SetStepState(args);
 }
 
+if (args.Length >= 2 && args[0].Equals("verifysteps", StringComparison.OrdinalIgnoreCase))
+{
+    return VerifySteps(args[1], args.Length > 2 ? args[2] : null);
+}
+
 if (args.Length >= 2 && args[0].Equals("pushassembly", StringComparison.OrdinalIgnoreCase))
 {
     return PushAssembly(args[1], args.Length > 2 ? args[2] : null);
@@ -8226,6 +8231,138 @@ int SetPagePermissionRule(string orgUrl, string role, string resourceKey, string
     }
 
     return 0;
+}
+
+/// <summary>
+/// Post-import gate (audit finding 3, 2026-09-20). Reads every step the SOLUTION declares
+/// out of src/SdkMessageProcessingSteps, then asserts each one exists in the target
+/// environment and is ENABLED. Exit code 1 if any is missing or disabled.
+///
+/// This exists because "the import succeeded" and "the rules are running" are different
+/// facts, and only the first one is reported. Dataverse imports a step Disabled unless
+/// activation is requested; `pac solution import` requests it only with
+/// --activate-plugins. On 2026-09-02 an import without it switched off the six al_response
+/// steps, and nobody noticed for a week - the code was present, the tests passed, and only
+/// the step state was wrong.
+///
+/// Reads the expected list from the solution source rather than a hard-coded list, so a
+/// step added later is covered without anyone remembering to add it here.
+///
+/// Usage: verifysteps &lt;orgUrl&gt; [&lt;pathToSrc&gt;]
+/// </summary>
+int VerifySteps(string orgUrl, string srcPath)
+{
+    var folder = srcPath;
+    if (string.IsNullOrWhiteSpace(folder))
+    {
+        // Walk up from the working directory to the repository root, so the verb works from
+        // the registration project as well as from the root.
+        var probe = new DirectoryInfo(Directory.GetCurrentDirectory());
+        while (probe != null && !Directory.Exists(Path.Combine(probe.FullName, "src", "SdkMessageProcessingSteps")))
+        {
+            probe = probe.Parent;
+        }
+
+        if (probe == null)
+        {
+            Console.Error.WriteLine("Could not find src/SdkMessageProcessingSteps. Pass the path to src as the second argument.");
+            return 1;
+        }
+
+        folder = Path.Combine(probe.FullName, "src", "SdkMessageProcessingSteps");
+    }
+
+    var expected = new List<(string Name, string Declared)>();
+    foreach (var file in Directory.GetFiles(folder, "*.xml"))
+    {
+        var xml = File.ReadAllText(file);
+        var name = System.Text.RegularExpressions.Regex.Match(xml, "<SdkMessageProcessingStep Name=\"([^\"]*)\"");
+        var state = System.Text.RegularExpressions.Regex.Match(xml, "<StateCode>([^<]*)</StateCode>");
+        if (name.Success)
+        {
+            expected.Add((name.Groups[1].Value, state.Success ? state.Groups[1].Value : "(none)"));
+        }
+    }
+
+    if (expected.Count == 0)
+    {
+        Console.Error.WriteLine("No step definitions found under " + folder + ". Refusing to report a clean run.");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    var live = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    // Filtered to this assembly's plug-in types, not the whole table. sdkmessageprocessingstep
+    // holds thousands of platform rows in any environment, so an unfiltered read silently
+    // truncates at the page limit and reports every one of our steps MISSING - which is what
+    // the first run of this verb did, against an environment where all 21 were present and
+    // enabled. A gate that cries wolf is worse than no gate.
+    foreach (var row in svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"sdkmessageprocessingstep\">" +
+        "<attribute name=\"name\"/><attribute name=\"statecode\"/>" +
+        "<link-entity name=\"plugintype\" from=\"plugintypeid\" to=\"plugintypeid\" alias=\"pt\">" +
+        "<filter><condition attribute=\"assemblyname\" operator=\"eq\" value=\"OutcomeTesting.Plugins\"/></filter>" +
+        "</link-entity>" +
+        "</entity></fetch>")).Entities)
+    {
+        var name = row.GetAttributeValue<string>("name");
+        var state = row.GetAttributeValue<OptionSetValue>("statecode");
+        if (!string.IsNullOrEmpty(name) && state != null)
+        {
+            live[name] = state.Value;
+        }
+    }
+
+    Console.WriteLine("Verifying " + expected.Count + " solution step(s) against " + orgUrl);
+    Console.WriteLine();
+
+    var missing = 0;
+    var disabled = 0;
+    var unstamped = 0;
+
+    foreach (var (name, declared) in expected.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
+    {
+        if (!declared.Equals("Enabled", StringComparison.OrdinalIgnoreCase))
+        {
+            // The solution file itself does not ask for Enabled, so an import would leave it
+            // off whatever the flag said. Reported separately: this is a source defect, not
+            // an environment one.
+            Console.WriteLine("  SOURCE   " + name + " - src declares state '" + declared + "', not Enabled");
+            unstamped++;
+        }
+
+        int state;
+        if (!live.TryGetValue(name, out state))
+        {
+            Console.WriteLine("  MISSING  " + name);
+            missing++;
+            continue;
+        }
+
+        if (state != 0)
+        {
+            Console.WriteLine("  DISABLED " + name);
+            disabled++;
+            continue;
+        }
+
+        Console.WriteLine("  ok       " + name);
+    }
+
+    Console.WriteLine();
+    if (missing == 0 && disabled == 0 && unstamped == 0)
+    {
+        Console.WriteLine("All " + expected.Count + " step(s) present and enabled.");
+        return 0;
+    }
+
+    Console.Error.WriteLine(
+        "FAILED: " + missing + " missing, " + disabled + " disabled, " + unstamped + " not stamped Enabled in src.");
+    Console.Error.WriteLine(
+        "A disabled step means the server-side rules are not running. Re-import with --activate-plugins, " +
+        "or enable the named steps with the setstepstate verb.");
+    return 1;
 }
 
 int BackfillCheckerNames(string orgUrl, bool confirm)
