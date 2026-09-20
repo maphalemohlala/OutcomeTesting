@@ -71,7 +71,13 @@ namespace OutcomeTesting.Plugins
             var subject = Merged(service, row, NotificationTemplates.SubjectAttr);
             var body = Merged(service, row, NotificationTemplates.BodyAttr);
 
-            var refusal = Refusal(code, subject, body);
+            var refusal = Refusal(
+                code,
+                subject,
+                body,
+                MergedOption(service, row, NotificationTemplateRows.EventAttr),
+                MergedOption(service, row, NotificationTemplateRows.RecipientKindAttr),
+                MergedLookup(service, row, NotificationTemplateRows.RecipientContactAttr) != null);
             if (refusal != null)
             {
                 throw new InvalidPluginExecutionException(refusal);
@@ -86,16 +92,49 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string Refusal(string code, string subject, string body)
         {
+            return Refusal(code, subject, body, null, null, false);
+        }
+
+        /// <summary>
+        /// Why this template cannot be saved, or null when it can.
+        ///
+        /// <para>
+        /// A letter an administrator invented is judged differently from one of the twelve
+        /// (AD-168). It has no compiled copy behind it, so there is nothing for a bad row to
+        /// fall back to: without an event nothing would ever raise it, and without a recipient
+        /// there is nobody to send it to. Both would look like configuration and do nothing,
+        /// which is the failure this guard exists to make loud.
+        /// </para>
+        /// </summary>
+        public static string Refusal(
+            string code,
+            string subject,
+            string body,
+            int? eventValue,
+            int? recipientKind,
+            bool hasContact)
+        {
             if (string.IsNullOrWhiteSpace(code))
             {
                 return "A notification template needs a template code.";
             }
 
+            if (recipientKind.HasValue && !NotificationRecipients.IsKnown(recipientKind.Value))
+            {
+                return "That is not somebody this system can work out from a case. Choose the "
+                    + "adviser, the T&C Manager, the para-planner, the checker, or a named contact.";
+            }
+
+            if (recipientKind == NotificationRecipients.KindContact && !hasContact)
+            {
+                return "This letter is set to go to a named contact, but no contact is chosen. "
+                    + "Pick the person, or choose one of the roles instead.";
+            }
+
             var definition = NotificationTemplates.Definition(code.Trim());
             if (definition == null)
             {
-                return "\"" + code.Trim() + "\" is not a notification this solution sends, so a template "
-                    + "for it would never be read. Check the code against the list of letters.";
+                return CustomRefusal(code.Trim(), subject, body, eventValue, recipientKind);
             }
 
             if (string.IsNullOrWhiteSpace(subject))
@@ -116,12 +155,106 @@ namespace OutcomeTesting.Plugins
             if (unknown.Length > 0)
             {
                 return "The " + definition.Name + " letter does not supply "
-                    + Join(unknown) + ". "
+                    + Join(Braced(unknown)) + ". "
                     + (unknown.Length == 1 ? "It would render as a gap. " : "They would render as gaps. ")
                     + "This letter can use: " + Join(Braced(definition.Tokens)) + ".";
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Why a letter of somebody's own cannot be saved, or null when it can.
+        ///
+        /// The tokens are the ones a case can answer whatever raised it. A letter attached to
+        /// an arbitrary event has no claim on a grade or an outcome, which exist only at the
+        /// moment one particular event fires - offering them would produce a letter that reads
+        /// correctly on the screen where it was written and arrives with gaps in it.
+        /// </summary>
+        private static string CustomRefusal(
+            string code, string subject, string body, int? eventValue, int? recipientKind)
+        {
+            if (!eventValue.HasValue)
+            {
+                return "\"" + code + "\" is a letter of your own, so it needs to be attached to "
+                    + "something. Choose the event that should send it.";
+            }
+
+            if (!NotificationOutbox.IsKnownEvent(eventValue.Value))
+            {
+                return "That is not an event this system raises, so nothing would ever send "
+                    + "\"" + code + "\".";
+            }
+
+            if (!recipientKind.HasValue)
+            {
+                return "\"" + code + "\" has nobody to go to. Choose who should receive it.";
+            }
+
+            if (string.IsNullOrWhiteSpace(subject))
+            {
+                return "\"" + code + "\" needs a subject line.";
+            }
+
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                // There is no compiled copy behind a letter of your own, so an empty one is
+                // simply never sent - and nothing says so.
+                return "\"" + code + "\" needs a body. A letter of your own has no built-in "
+                    + "wording to fall back on, so an empty one is never sent at all.";
+            }
+
+            var unknown = NotificationTemplates.UnknownTokensAgainst(
+                NotificationTemplateRows.CustomTokens, subject, body);
+
+            if (unknown.Length > 0)
+            {
+                return "\"" + code + "\" cannot use " + Join(Braced(unknown)) + ". "
+                    + (unknown.Length == 1 ? "It would render as a gap. " : "They would render as gaps. ")
+                    + "A letter of your own can use: "
+                    + Join(Braced(NotificationTemplateRows.CustomTokens)) + ".";
+            }
+
+            return null;
+        }
+
+        /// <summary>The option this write leaves behind, merged as <see cref="Merged"/> is.</summary>
+        private static int? MergedOption(IOrganizationService service, Entity row, string attribute)
+        {
+            var value = MergedValue<OptionSetValue>(service, row, attribute);
+            return value == null ? (int?)null : value.Value;
+        }
+
+        /// <summary>The lookup this write leaves behind.</summary>
+        private static EntityReference MergedLookup(
+            IOrganizationService service, Entity row, string attribute)
+        {
+            return MergedValue<EntityReference>(service, row, attribute);
+        }
+
+        private static T MergedValue<T>(IOrganizationService service, Entity row, string attribute)
+            where T : class
+        {
+            if (row.Contains(attribute))
+            {
+                return row.GetAttributeValue<T>(attribute);
+            }
+
+            if (row.Id == Guid.Empty)
+            {
+                return null;
+            }
+
+            try
+            {
+                var stored = service.Retrieve(
+                    NotificationTemplates.TemplateEntity, row.Id, new ColumnSet(attribute));
+                return stored.GetAttributeValue<T>(attribute);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         /// <summary>

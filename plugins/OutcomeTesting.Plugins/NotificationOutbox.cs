@@ -109,6 +109,33 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// Whether this is an event the solution actually raises.
+        ///
+        /// Keyed off <see cref="EventName"/> so the two cannot drift: an event added there and
+        /// forgotten here would let a template be attached to something nothing ever fires.
+        /// </summary>
+        public static bool IsKnownEvent(int eventValue)
+        {
+            return EventName(eventValue) != "Unknown";
+        }
+
+        /// <summary>Every event a template can be attached to, in the order they occur.</summary>
+        public static int[] KnownEvents()
+        {
+            return new[]
+            {
+                EventAllocation,
+                EventReviewSubmitted,
+                EventRemediationAssigned,
+                EventSignoffApproved,
+                EventSignoffRejected,
+                EventCasePassed,
+                EventRecheckDue,
+                EventSignoffDue,
+            };
+        }
+
+        /// <summary>
         /// Writes one outbox row. Returns the new row's id, or <see cref="Guid.Empty"/> when
         /// an identical event was already queued for the same target.
         ///
@@ -208,9 +235,16 @@ namespace OutcomeTesting.Plugins
             string recipientEmail,
             string subject,
             string body,
-            string occurrence = null)
+            string occurrence = null,
+            string templateCode = null)
         {
             var code = CodeFor(eventValue, targetId, occurrence);
+
+            // Who this goes to may have been chosen as data (AD-168). The code's own routing
+            // is the default and stays the answer unless somebody has actually picked
+            // somebody else; an override that resolved to nobody is ignored rather than
+            // allowed to empty a recipient the caller had worked out correctly.
+            recipientEmail = Chosen(service, templateCode, targetTable, targetId) ?? recipientEmail;
             var row = new Entity(NotificationEntity)
             {
                 ["al_name"] = CommandHelpers.Truncate(EventName(eventValue) + ": " + subject, 200),
@@ -254,7 +288,123 @@ namespace OutcomeTesting.Plugins
                 return Guid.Empty;
             }
 
-            return service.Create(row);
+            var created = service.Create(row);
+
+            // The letters an administrator attached to this event, sent in addition to this
+            // one. Deliberately AFTER the built-in is created: an extra letter is worth
+            // having and is never worth losing the real one over, and a failure here would
+            // otherwise take the notification that the system itself depends on with it.
+            QueueCustom(service, correlationId, eventValue, targetTable, targetId);
+
+            return created;
+        }
+
+        /// <summary>
+        /// The address a stored template chooses for this letter, or null where none is
+        /// chosen and the caller's own routing stands.
+        /// </summary>
+        private static string Chosen(
+            IOrganizationService service, string templateCode, string targetTable, Guid targetId)
+        {
+            if (string.IsNullOrWhiteSpace(templateCode))
+            {
+                return null;
+            }
+
+            var choice = NotificationTemplateRows.OverrideFor(service, templateCode);
+            if (choice == null)
+            {
+                return null;
+            }
+
+            var caseRef = NotificationRecipients.CaseOf(service, targetTable, targetId);
+            var email = NotificationRecipients.EmailFor(
+                service,
+                choice.Kind,
+                caseRef,
+                NotificationRecipients.ReviewOf(targetTable, targetId),
+                choice.Contact);
+
+            return string.IsNullOrWhiteSpace(email) ? null : email;
+        }
+
+        /// <summary>
+        /// Queues one letter per template an administrator has attached to this event.
+        ///
+        /// <para>
+        /// Each gets a notification code of its own - the event, the target and the template's
+        /// code - so two custom letters at one event do not collide with each other or with
+        /// the built-in, and a replay still finds them already queued.
+        /// </para>
+        /// <para>
+        /// Never throws. These are letters somebody added to a system that worked without
+        /// them; the transaction that raised the event must not fail because one of them
+        /// could not be built.
+        /// </para>
+        /// </summary>
+        private static void QueueCustom(
+            IOrganizationService service,
+            Guid correlationId,
+            int eventValue,
+            string targetTable,
+            Guid targetId)
+        {
+            try
+            {
+                var templates = NotificationTemplateRows.CustomFor(service, eventValue);
+                if (templates.Count == 0)
+                {
+                    return;
+                }
+
+                var caseRef = NotificationRecipients.CaseOf(service, targetTable, targetId);
+                var reviewRef = NotificationRecipients.ReviewOf(targetTable, targetId);
+                var tokens = NotificationTemplateRows.CaseTokens(service, caseRef);
+
+                foreach (var template in templates)
+                {
+                    var email = NotificationRecipients.EmailFor(
+                        service, template.RecipientKind, caseRef, reviewRef, template.RecipientContact);
+
+                    if (string.IsNullOrWhiteSpace(email))
+                    {
+                        // Nobody to send to. Queuing it unaddressed would put a row in the
+                        // outbox that can never drain and that nothing is watching.
+                        continue;
+                    }
+
+                    var customCode = CodeFor(eventValue, targetId, template.Code);
+                    if (Exists(service, customCode))
+                    {
+                        continue;
+                    }
+
+                    var customSubject = NotificationTemplates.Substitute(
+                        template.Subject, tokens, escape: false);
+                    var customBody = NotificationTemplates.Substitute(
+                        template.Body, tokens, escape: true);
+
+                    service.Create(new Entity(NotificationEntity)
+                    {
+                        ["al_name"] = CommandHelpers.Truncate(
+                            EventName(eventValue) + ": " + customSubject, 200),
+                        ["al_notificationcode"] = customCode,
+                        ["al_event"] = new OptionSetValue(eventValue),
+                        ["al_status"] = new OptionSetValue(StatusPending),
+                        ["al_targettable"] = targetTable,
+                        ["al_targetid"] = targetId.ToString("D"),
+                        ["al_recipientemail"] = CommandHelpers.Truncate(email, 200),
+                        ["al_subject"] = CommandHelpers.Truncate(customSubject, 400),
+                        ["al_body"] = CommandHelpers.Truncate(customBody, 4000),
+                        ["al_queuedon"] = DateTime.UtcNow,
+                        ["al_correlationid"] = correlationId.ToString("D"),
+                    });
+                }
+            }
+            catch (Exception)
+            {
+                // See the summary. An extra letter never costs the event that raised it.
+            }
         }
 
         /// <summary>

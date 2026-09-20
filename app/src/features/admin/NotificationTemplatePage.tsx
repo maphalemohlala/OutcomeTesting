@@ -4,14 +4,27 @@ import { PageIntro } from '../../components/layout/PageIntro';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import { unknownTokens } from './notificationTemplates';
 import {
+  CUSTOM_TOKENS,
+  KIND_CONTACT,
+  RECIPIENT_KINDS,
+  TRIGGER_EVENTS,
+  eventLabel,
+  normaliseCode,
+  recipientLabel,
+  unknownCustomTokens,
+} from './notificationRouting';
+import {
   useNotificationTemplates,
   saveTemplate,
+  createTemplate,
+  type ContactOption,
   type TemplateRow,
 } from './useNotificationTemplates';
 import './NotificationTemplatePage.css';
 
 /**
- * The wording of every letter the solution sends (Change 1, AD-163).
+ * The wording of every letter the solution sends, who it goes to, and what sends it
+ * (Change 1, AD-163; recipients and letters of your own, AD-168).
  *
  * The page lists every letter, not every stored row. A letter nobody has edited is still
  * sent, on the wording compiled into the plug-in assembly, and showing only the rows would
@@ -27,15 +40,21 @@ export function NotificationTemplatePage() {
   const { can } = usePermissions();
   const canEdit = can('page.admin.templates', 'Manage');
 
-  const [editing, setEditing] = useState<TemplateRow | null>(null);
+  const [editing, setEditing] = useState<TemplateRow | 'new' | null>(null);
+
+  const reload = () => {
+    setEditing(null);
+    setReloadKey((k) => k + 1);
+  };
 
   return (
     <div className="templates">
       <PageIntro
         title="Notification wording"
         purpose={
-          'The subject and body of every email this system sends. A letter you have not ' +
-          'edited uses the built-in wording, and changing one takes effect on the next send.'
+          'The subject and body of every email this system sends, and who receives it. A ' +
+          'letter you have not edited uses the built-in wording, and changing one takes ' +
+          'effect on the next send.'
         }
       />
 
@@ -43,90 +62,201 @@ export function NotificationTemplatePage() {
       {state.status === 'unavailable' && <p className="templates__note">{state.reason}</p>}
 
       {state.status === 'ready' && (
-        <table className="templates__table">
-          <thead>
-            <tr>
-              <th scope="col">Letter</th>
-              <th scope="col">Wording</th>
-              <th scope="col">Subject</th>
-              {canEdit && (
-                <th scope="col">
-                  <span className="templates__sr">Actions</span>
-                </th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {state.templates.map((row) => (
-              <tr key={row.code}>
-                <td>
-                  {row.name}
-                  <span className="templates__code">{row.code}</span>
-                </td>
-                <td>
-                  {row.stored ? (
-                    'Edited'
-                  ) : (
-                    <span className="templates__builtin">Built-in</span>
-                  )}
-                </td>
-                <td className="templates__subject">
-                  {row.stored ? row.subject : <span className="templates__builtin">—</span>}
-                </td>
+        <>
+          {canEdit && (
+            <button
+              type="button"
+              className="templates__btn templates__add"
+              onClick={() => setEditing('new')}
+            >
+              Add a letter
+            </button>
+          )}
+
+          <table className="templates__table">
+            <thead>
+              <tr>
+                <th scope="col">Letter</th>
+                <th scope="col">Sent at</th>
+                <th scope="col">Goes to</th>
+                <th scope="col">Wording</th>
                 {canEdit && (
-                  <td>
-                    <button
-                      type="button"
-                      className="templates__btn templates__btn--ghost"
-                      onClick={() => setEditing(row)}
-                    >
-                      Edit
-                    </button>
-                  </td>
+                  <th scope="col">
+                    <span className="templates__sr">Actions</span>
+                  </th>
                 )}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {state.templates.map((row) => (
+                <tr key={row.code}>
+                  <td>
+                    {row.name}
+                    <span className="templates__code">{row.code}</span>
+                  </td>
+                  <td>
+                    {row.custom ? (
+                      (eventLabel(row.eventValue) ?? (
+                        <span className="templates__problem-cell">Nothing sends this</span>
+                      ))
+                    ) : (
+                      <span className="templates__builtin">When the system raises it</span>
+                    )}
+                  </td>
+                  <td>
+                    {recipientLabel(row.recipientKind) ? (
+                      <>
+                        {recipientLabel(row.recipientKind)}
+                        {row.recipientKind === KIND_CONTACT && row.recipientContactName && (
+                          <span className="templates__code">{row.recipientContactName}</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="templates__builtin">Whoever the letter is about</span>
+                    )}
+                  </td>
+                  <td>
+                    {row.stored ? 'Edited' : <span className="templates__builtin">Built-in</span>}
+                  </td>
+                  {canEdit && (
+                    <td>
+                      <button
+                        type="button"
+                        className="templates__btn templates__btn--ghost"
+                        onClick={() => setEditing(row)}
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-      {editing && (
-        <TemplateForm
-          row={editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            setReloadKey((k) => k + 1);
-          }}
-        />
+          {editing === 'new' && (
+            <NewTemplateForm
+              contacts={state.contacts}
+              taken={state.templates.map((t) => t.code)}
+              onClose={() => setEditing(null)}
+              onSaved={reload}
+            />
+          )}
+
+          {editing !== null && editing !== 'new' && (
+            <TemplateForm
+              row={editing}
+              contacts={state.contacts}
+              onClose={() => setEditing(null)}
+              onSaved={reload}
+            />
+          )}
+        </>
       )}
     </div>
   );
 }
 
+/**
+ * Who a letter goes to, shared by both forms.
+ *
+ * Leaving it unset on a built-in letter is a real choice and the default one: the code that
+ * raises it already works out who it is about, and that is right far more often than a
+ * blanket rule would be.
+ */
+function RecipientFields({
+  kind,
+  setKind,
+  contactId,
+  setContactId,
+  contacts,
+  allowDefault,
+}: {
+  kind: number | null;
+  setKind: (value: number | null) => void;
+  contactId: string | null;
+  setContactId: (value: string | null) => void;
+  contacts: ContactOption[];
+  allowDefault: boolean;
+}) {
+  return (
+    <>
+      <label htmlFor="template-recipient">Goes to</label>
+      <select
+        id="template-recipient"
+        value={kind === null ? '' : String(kind)}
+        onChange={(e) => setKind(e.target.value === '' ? null : Number(e.target.value))}
+      >
+        {allowDefault && <option value="">Whoever the letter is about (recommended)</option>}
+        {!allowDefault && <option value="">Choose…</option>}
+        {RECIPIENT_KINDS.map((r) => (
+          <option key={r.value} value={r.value}>
+            {r.label}
+          </option>
+        ))}
+      </select>
+      {allowDefault && kind === null && (
+        <p className="templates__hint">
+          The code that raises this letter works out who it is about — the adviser on the case,
+          the checker who submitted it, and so on. Choose somebody here only to override that.
+        </p>
+      )}
+
+      {kind === KIND_CONTACT && (
+        <>
+          <label htmlFor="template-contact">Which contact</label>
+          <select
+            id="template-contact"
+            value={contactId ?? ''}
+            onChange={(e) => setContactId(e.target.value === '' ? null : e.target.value)}
+          >
+            <option value="">Choose…</option>
+            {contacts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} ({c.email})
+              </option>
+            ))}
+          </select>
+          <p className="templates__hint">
+            The same person for every case. Only contacts with a work email are listed —
+            somebody without one would be chosen here but never written to.
+          </p>
+        </>
+      )}
+    </>
+  );
+}
+
 function TemplateForm({
   row,
+  contacts,
   onClose,
   onSaved,
 }: {
   row: TemplateRow;
+  contacts: ContactOption[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [subject, setSubject] = useState(row.subject);
   const [body, setBody] = useState(row.body);
+  const [kind, setKind] = useState<number | null>(row.recipientKind);
+  const [contactId, setContactId] = useState<string | null>(row.recipientContactId);
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const offenders = unknownTokens(row.code, subject, body);
+  const offenders = row.custom
+    ? unknownCustomTokens(subject, body)
+    : unknownTokens(row.code, subject, body);
   const empty = subject.trim() === '' || body.trim() === '';
+  const contactMissing = kind === KIND_CONTACT && !contactId;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
     setProblem(null);
 
-    const result = await saveTemplate(row, subject, body);
+    const result = await saveTemplate(row, subject, body, kind, contactId);
     setSaving(false);
 
     if (result.ok) {
@@ -151,6 +281,12 @@ function TemplateForm({
           </p>
         )}
 
+        {row.custom && (
+          <p className="templates__hint">
+            Sent at: <strong>{eventLabel(row.eventValue) ?? 'nothing sends this yet'}</strong>.
+          </p>
+        )}
+
         <label htmlFor="template-subject">Subject</label>
         <input
           id="template-subject"
@@ -171,6 +307,15 @@ function TemplateForm({
             ? 'This letter is HTML — your paragraph tags are kept as written.'
             : 'This letter is plain text.'}
         </p>
+
+        <RecipientFields
+          kind={kind}
+          setKind={setKind}
+          contactId={contactId}
+          setContactId={setContactId}
+          contacts={contacts}
+          allowDefault={!row.custom}
+        />
 
         <p className="templates__hint">
           Tokens this letter fills in:{' '}
@@ -196,6 +341,12 @@ function TemplateForm({
           </p>
         )}
 
+        {contactMissing && (
+          <p className="templates__problem">
+            This letter is set to go to a named contact, but no contact is chosen.
+          </p>
+        )}
+
         {problem && <p className="templates__problem">{problem}</p>}
 
         <div className="templates__actions">
@@ -206,9 +357,198 @@ function TemplateForm({
           <button
             type="submit"
             className="templates__btn"
-            disabled={saving || offenders.length > 0 || empty}
+            disabled={saving || offenders.length > 0 || empty || contactMissing}
           >
             {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            type="button"
+            className="templates__btn templates__btn--ghost"
+            onClick={onClose}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/**
+ * A letter of an administrator's own (AD-168).
+ *
+ * Unlike the twelve, this one exists only because its row says so: without an event nothing
+ * would ever raise it, and without a recipient there is nobody to send it to. Both are
+ * required here and refused server-side, because a row that looks like configuration and does
+ * nothing is the failure mode worth being loud about.
+ */
+function NewTemplateForm({
+  contacts,
+  taken,
+  onClose,
+  onSaved,
+}: {
+  contacts: ContactOption[];
+  taken: string[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [code, setCode] = useState('');
+  const [eventValue, setEventValue] = useState<number | null>(null);
+  const [kind, setKind] = useState<number | null>(null);
+  const [contactId, setContactId] = useState<string | null>(null);
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // The code is the table's alternate key, so it is normalised as it is typed rather than
+  // saved as written: "tell the manager" and "TELL-THE-MANAGER" must not become two rows.
+  const normalised = normaliseCode(code === '' ? name : code);
+  const clashes = taken.includes(normalised);
+
+  const offenders = unknownCustomTokens(subject, body);
+  const contactMissing = kind === KIND_CONTACT && !contactId;
+  const incomplete =
+    name.trim() === '' ||
+    normalised === '' ||
+    eventValue === null ||
+    kind === null ||
+    subject.trim() === '' ||
+    body.trim() === '';
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setProblem(null);
+
+    const result = await createTemplate({
+      code: normalised,
+      name: name.trim(),
+      subject,
+      body,
+      eventValue,
+      recipientKind: kind,
+      recipientContactId: contactId,
+    });
+    setSaving(false);
+
+    if (result.ok) {
+      onSaved();
+      return;
+    }
+
+    setProblem(result.reason);
+  }
+
+  return (
+    <Modal title="Add a letter" onClose={onClose}>
+      <form className="templates__form" onSubmit={submit}>
+        <p className="templates__hint">
+          This letter is sent in addition to whatever the system already sends at that moment —
+          it does not replace it.
+        </p>
+
+        <label htmlFor="template-name">Name</label>
+        <input
+          id="template-name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+
+        <label htmlFor="template-code">Code</label>
+        <input
+          id="template-code"
+          type="text"
+          value={code}
+          placeholder={normaliseCode(name)}
+          onChange={(e) => setCode(e.target.value)}
+        />
+        <p className="templates__hint">
+          Saved as <code className="templates__token">{normalised || '—'}</code>. Taken from the
+          name unless you set one.
+        </p>
+
+        <label htmlFor="template-event">Sent at</label>
+        <select
+          id="template-event"
+          value={eventValue === null ? '' : String(eventValue)}
+          onChange={(e) => setEventValue(e.target.value === '' ? null : Number(e.target.value))}
+        >
+          <option value="">Choose…</option>
+          {TRIGGER_EVENTS.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+
+        <RecipientFields
+          kind={kind}
+          setKind={setKind}
+          contactId={contactId}
+          setContactId={setContactId}
+          contacts={contacts}
+          allowDefault={false}
+        />
+
+        <label htmlFor="template-subject">Subject</label>
+        <input
+          id="template-subject"
+          type="text"
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+        />
+
+        <label htmlFor="template-body">Body</label>
+        <textarea
+          id="template-body"
+          rows={10}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+        />
+        <p className="templates__hint">
+          HTML — your paragraph tags are kept as written. This letter can use:{' '}
+          {CUSTOM_TOKENS.map((t) => (
+            <code key={t} className="templates__token">{`{{${t}}}`}</code>
+          ))}
+        </p>
+
+        {clashes && (
+          <p className="templates__problem">
+            A letter with the code {normalised} already exists. Give this one a different name
+            or code.
+          </p>
+        )}
+
+        {offenders.length > 0 && (
+          <p className="templates__problem">
+            A letter of your own cannot use{' '}
+            {offenders.map((t) => `{{${t}}}`).join(', ')}
+            {offenders.length === 1
+              ? ' — it would render as a gap.'
+              : ' — they would render as gaps.'}
+          </p>
+        )}
+
+        {contactMissing && (
+          <p className="templates__problem">
+            This letter is set to go to a named contact, but no contact is chosen.
+          </p>
+        )}
+
+        {problem && <p className="templates__problem">{problem}</p>}
+
+        <div className="templates__actions">
+          <button
+            type="submit"
+            className="templates__btn"
+            disabled={saving || incomplete || clashes || offenders.length > 0 || contactMissing}
+          >
+            {saving ? 'Saving…' : 'Add the letter'}
           </button>
           <button
             type="button"

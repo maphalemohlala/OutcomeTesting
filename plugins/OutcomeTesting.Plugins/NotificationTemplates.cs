@@ -342,7 +342,22 @@ namespace OutcomeTesting.Plugins
                 return new[] { "(unknown template code)" };
             }
 
-            var allowed = new HashSet<string>(definition.Tokens, StringComparer.Ordinal);
+            return UnknownTokensAgainst(definition.Tokens, subject, body);
+        }
+
+        /// <summary>
+        /// The tokens in this wording that are not in the allowed set.
+        ///
+        /// Split out from <see cref="UnknownTokens(string,string,string)"/> for the letters an
+        /// administrator writes themselves (AD-168): those have no catalogue entry, so the
+        /// allowed set comes from what a case can always answer rather than from a definition.
+        /// One scanner, so the two cannot come to disagree about what a token even is.
+        /// </summary>
+        public static string[] UnknownTokensAgainst(
+            string[] allowedTokens, string subject, string body)
+        {
+            var allowed = new HashSet<string>(
+                allowedTokens ?? new string[0], StringComparer.Ordinal);
             var offenders = new List<string>();
             var text = (subject ?? string.Empty) + " " + (body ?? string.Empty);
 

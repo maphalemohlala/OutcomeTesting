@@ -151,3 +151,14 @@
   color: var(--colour-action-text);
   background: var(--colour-action-hover);
 }
+
+.templates__add {
+  justify-self: start;
+}
+
+/* A custom letter with no event attached is sent by nothing at all, which is the one state
+   on this page that looks like configuration and does nothing. */
+.templates__problem-cell {
+  color: var(--colour-danger, #b3261e);
+  font-size: var(--text-sm);
+}

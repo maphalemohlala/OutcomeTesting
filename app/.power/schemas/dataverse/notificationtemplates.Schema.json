@@ -19,6 +19,55 @@
           "required": true,
           "maxLength": 20000
         },
+        "al_event": {
+          "type": "string",
+          "title": "Trigger event",
+          "x-ms-dataverse-attribute": "al_event",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "al_Event",
+          "enum": [
+            "Allocation",
+            "Review submitted",
+            "Remediation assigned",
+            "Sign-off approved",
+            "Sign-off rejected",
+            "Case passed",
+            "Recheck due",
+            "Sign-off due"
+          ],
+          "x-ms-enum-values": [
+            120910800,
+            120910801,
+            120910802,
+            120910803,
+            120910804,
+            120910805,
+            120910806,
+            120910807
+          ],
+          "Color": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "2f25647d-e1b4-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Trigger event",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "al_eventname": {
+          "type": "string",
+          "title": "al_eventname",
+          "x-ms-dataverse-attribute": "al_eventname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_eventName",
+          "x-ms-read-only": true
+        },
         "al_name": {
           "type": "string",
           "title": "Name",
@@ -38,6 +87,71 @@
           "x-ms-dataverse-primary-id": true,
           "required": true,
           "x-ms-keyType": "primary"
+        },
+        "al_recipientcontactid": {
+          "type": "string",
+          "title": "Recipient contact",
+          "x-ms-dataverse-attribute": "al_recipientcontactid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_RecipientContactId"
+        },
+        "al_recipientcontactidname": {
+          "type": "string",
+          "title": "al_recipientcontactidname",
+          "x-ms-dataverse-attribute": "al_recipientcontactidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_RecipientContactIdName",
+          "x-ms-read-only": true,
+          "maxLength": 160
+        },
+        "al_recipientcontactidyominame": {
+          "type": "string",
+          "title": "al_recipientcontactidyominame",
+          "x-ms-dataverse-attribute": "al_recipientcontactidyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_RecipientContactIdYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 450
+        },
+        "al_recipientkind": {
+          "type": "string",
+          "title": "Recipient",
+          "x-ms-dataverse-attribute": "al_recipientkind",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "al_RecipientKind",
+          "enum": [
+            "Adviser",
+            "T&C Manager",
+            "Para-planner",
+            "Checker",
+            "A named contact"
+          ],
+          "x-ms-enum-values": [
+            120910810,
+            120910811,
+            120910812,
+            120910813,
+            120910814
+          ],
+          "Color": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "29dc88ba-e1b4-f111-aaac-e4fade069307",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Recipient",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "al_recipientkindname": {
+          "type": "string",
+          "title": "al_recipientkindname",
+          "x-ms-dataverse-attribute": "al_recipientkindname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_recipientkindName",
+          "x-ms-read-only": true
         },
         "al_subject": {
           "type": "string",

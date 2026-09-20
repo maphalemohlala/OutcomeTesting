@@ -96,7 +96,9 @@ namespace OutcomeTesting.Plugins.Tests
             var refusal = NotificationTemplateGuardPlugin.Refusal(
                 NotificationTemplates.SignoffDue, "Subject", "{{one}} {{two}} {{three}}");
 
-            Assert.Contains("one, two and three", refusal);
+            // Braced since AD-168: the offenders were reported bare while the allowed
+            // set beside them was braced, so one sentence named tokens two ways.
+            Assert.Contains("{{one}}, {{two}} and {{three}}", refusal);
             Assert.Contains("They would render as gaps", refusal);
         }
 
