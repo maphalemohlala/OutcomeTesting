@@ -47,11 +47,20 @@ export function CaseIntakePage() {
             >
               {busy ? 'Uploading…' : 'Upload cases'}
             </button>
+            {/*
+              * The picker itself, driven by the button above. Out of the tab order and out
+              * of the accessibility tree on purpose (F35): .visually-hidden clips rather
+              * than removes, so without this, tabbing off "Upload cases" put focus on a
+              * 1x1 unlabelled file field with no visible focus ring. The button is the
+              * control; this is how it opens.
+              */}
             <input
               ref={fileInputRef}
               type="file"
               accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
               className="visually-hidden"
+              tabIndex={-1}
+              aria-hidden="true"
               onChange={onChooseFile}
             />
           </div>
