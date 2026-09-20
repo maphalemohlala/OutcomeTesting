@@ -282,7 +282,7 @@ namespace OutcomeTesting.Plugins
             // The para-planner's letter is the one that carries the case summary (Change 2,
             // AD-164): they are not a checker, AD-020 keeps them out of the review page, and
             // this is the document that tells them what was checked and why.
-            NotificationOutbox.QueueWithCaseSummary(
+            NotificationOutbox.QueueWithCompletedCheck(
                 service,
                 correlationId,
                 NotificationOutbox.EventReviewSubmitted,

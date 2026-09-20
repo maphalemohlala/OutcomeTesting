@@ -157,7 +157,7 @@ namespace OutcomeTesting.Plugins
         /// goes either way and the row simply carries no attachment.
         /// </para>
         /// </summary>
-        public static Guid QueueWithCaseSummary(
+        public static Guid QueueWithCompletedCheck(
             IOrganizationService service,
             Guid correlationId,
             int eventValue,
@@ -179,7 +179,7 @@ namespace OutcomeTesting.Plugins
 
             try
             {
-                var pdf = CaseSummaryPdf.Build(service, caseRef);
+                var pdf = CompletedCheckPdf.Build(service, caseRef);
                 if (pdf == null || pdf.Length == 0)
                 {
                     return id;
@@ -187,7 +187,7 @@ namespace OutcomeTesting.Plugins
 
                 service.Update(new Entity(NotificationEntity, id)
                 {
-                    [AttachmentNameAttr] = CaseSummaryPdf.FileName(CaseReference(service, caseRef)),
+                    [AttachmentNameAttr] = CompletedCheckPdf.FileName(CaseReference(service, caseRef)),
                     [AttachmentBodyAttr] = Convert.ToBase64String(pdf),
                 });
             }

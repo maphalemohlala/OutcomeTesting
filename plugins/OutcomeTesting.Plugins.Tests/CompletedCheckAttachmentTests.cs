@@ -8,7 +8,7 @@ using Xunit;
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// The case summary attached to the para-planner's email (Change 2, AD-164).
+    /// The completed check attached to the para-planner's email (Change 2, AD-164, AD-165).
     ///
     /// <para>
     /// The audit noted that the item included a failure-handling question with nothing to
@@ -28,7 +28,7 @@ namespace OutcomeTesting.Plugins.Tests
     /// deleted, because the assertion it made is now exactly backwards.
     /// </para>
     /// </summary>
-    public class CaseSummaryAttachmentTests
+    public class CompletedCheckAttachmentTests
     {
         private static readonly Guid CaseId = Guid.Parse("caee1111-1111-4111-8111-111111111111");
 
@@ -39,7 +39,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var service = Case();
 
-            var text = Drawn(CaseSummaryPdf.Build(service, Ref()));
+            var text = Drawn(CompletedCheckPdf.Build(service, Ref()));
 
             Assert.Contains("IO-300001", text);
             Assert.Contains("A. Client", text);
@@ -52,7 +52,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // The question a para-planner is most likely to have, and the one thing the case
             // carried that nothing showed until AD-158.
-            var text = Drawn(CaseSummaryPdf.Build(Case(), Ref()));
+            var text = Drawn(CompletedCheckPdf.Build(Case(), Ref()));
 
             Assert.Contains("Why this case was selected", text);
             Assert.Contains("Tax Check", text);
@@ -66,7 +66,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // The requirement, and what the document withheld until AD-165: "a PDF of the
             // completed checks for that case".
-            var text = Flat(CaseSummaryPdf.Build(Checked(), Ref()));
+            var text = Flat(CompletedCheckPdf.Build(Checked(), Ref()));
 
             Assert.Contains("Client objectives recorded: Pass", text);
             Assert.Contains("Adviser charges evidenced: Fail", text);
@@ -77,7 +77,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // The checker answered them in sections and the para-planner reads them in the
             // same order; an ungrouped run of sixty questions is a list, not a check.
-            var text = Flat(CaseSummaryPdf.Build(Checked(), Ref()));
+            var text = Flat(CompletedCheckPdf.Build(Checked(), Ref()));
 
             var section = text.IndexOf("Suitability core checks", StringComparison.Ordinal);
             var charges = text.IndexOf("Adviser charges evidenced", StringComparison.Ordinal);
@@ -91,7 +91,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // Change 7: Tax Remedial is the one rich-text answer, and it is markup in the
             // column. Drawn as-is the para-planner would read the tags; the PDF has no HTML.
-            var text = Flat(CaseSummaryPdf.Build(Checked(), Ref()));
+            var text = Flat(CompletedCheckPdf.Build(Checked(), Ref()));
 
             Assert.Contains("Re-run the CGT calculation", text);
             Assert.DoesNotContain("<b>", text);
@@ -105,7 +105,7 @@ namespace OutcomeTesting.Plugins.Tests
             // finding, and sending it as one would be worse than sending nothing.
             var service = Checked(submitted: false);
 
-            var text = Flat(CaseSummaryPdf.Build(service, Ref()));
+            var text = Flat(CompletedCheckPdf.Build(service, Ref()));
 
             Assert.DoesNotContain("Client objectives recorded: Pass", text);
             Assert.Contains("not yet submitted", text);
@@ -124,7 +124,7 @@ namespace OutcomeTesting.Plugins.Tests
                 "al_duedate", new DateTime(2026, 10, 1, 9, 0, 0, DateTimeKind.Utc),
                 "statecode", 0);
 
-            var text = Flat(CaseSummaryPdf.Build(service, Ref()));
+            var text = Flat(CompletedCheckPdf.Build(service, Ref()));
 
             Assert.Contains("Remedial actions", text);
             Assert.Contains("Evidence the charges disclosure", text);
@@ -137,7 +137,7 @@ namespace OutcomeTesting.Plugins.Tests
             // The requirement is explicit: "If there are no remedial actions, omit that
             // section rather than showing an empty one." An empty heading reads as a document
             // that failed to load its own content.
-            var text = Flat(CaseSummaryPdf.Build(Checked(), Ref()));
+            var text = Flat(CompletedCheckPdf.Build(Checked(), Ref()));
 
             Assert.DoesNotContain("Remedial actions", text);
         }
@@ -152,7 +152,7 @@ namespace OutcomeTesting.Plugins.Tests
                 "al_actionstatus", new OptionSetValue(Remediation.StatusOpen),
                 "statecode", 0);
 
-            var text = Flat(CaseSummaryPdf.Build(service, Ref()));
+            var text = Flat(CompletedCheckPdf.Build(service, Ref()));
 
             Assert.DoesNotContain("Remedial actions", text);
             Assert.DoesNotContain("Another case", text);
@@ -163,7 +163,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var service = Case(checklist: null);
 
-            var text = Drawn(CaseSummaryPdf.Build(service, Ref()));
+            var text = Drawn(CompletedCheckPdf.Build(service, Ref()));
 
             Assert.Contains("No checklist items are recorded", text);
         }
@@ -171,7 +171,7 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void Names_the_file_after_the_case()
         {
-            Assert.Equal("Case summary IO-300001.pdf", CaseSummaryPdf.FileName("IO-300001"));
+            Assert.Equal("Completed check IO-300001.pdf", CompletedCheckPdf.FileName("IO-300001"));
         }
 
         [Fact]
@@ -179,13 +179,13 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // The name reaches a mail client and then somebody's disk. A reference carrying a
             // slash is a file that will not save.
-            Assert.Equal("Case summary IO 300001.pdf", CaseSummaryPdf.FileName("IO/300001:"));
+            Assert.Equal("Completed check IO 300001.pdf", CompletedCheckPdf.FileName("IO/300001:"));
         }
 
         [Fact]
         public void Still_names_a_file_when_the_case_has_no_reference()
         {
-            Assert.Equal("Case summary unreferenced.pdf", CaseSummaryPdf.FileName(null));
+            Assert.Equal("Completed check unreferenced.pdf", CompletedCheckPdf.FileName(null));
         }
 
         // ------------------------------------------------------------ failure handling
@@ -193,13 +193,13 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void A_case_that_cannot_be_read_produces_no_document_rather_than_throwing()
         {
-            Assert.Null(CaseSummaryPdf.Build(new FakeOrganizationService(), Ref()));
+            Assert.Null(CompletedCheckPdf.Build(new FakeOrganizationService(), Ref()));
         }
 
         [Fact]
         public void No_case_produces_no_document()
         {
-            Assert.Null(CaseSummaryPdf.Build(new FakeOrganizationService(), null));
+            Assert.Null(CompletedCheckPdf.Build(new FakeOrganizationService(), null));
         }
 
         [Fact]
@@ -209,7 +209,7 @@ namespace OutcomeTesting.Plugins.Tests
             // has to survive; the attachment is the part that may be missing.
             var service = new FakeOrganizationService();
 
-            var id = NotificationOutbox.QueueWithCaseSummary(
+            var id = NotificationOutbox.QueueWithCompletedCheck(
                 service, Guid.NewGuid(), NotificationOutbox.EventReviewSubmitted,
                 "al_reviewinstance", Guid.NewGuid(), "para@example.com",
                 "Review submitted", "The review has been submitted.",
@@ -231,7 +231,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var service = Case();
 
-            var id = NotificationOutbox.QueueWithCaseSummary(
+            var id = NotificationOutbox.QueueWithCompletedCheck(
                 service, Guid.NewGuid(), NotificationOutbox.EventReviewSubmitted,
                 "al_reviewinstance", Guid.NewGuid(), "para@example.com",
                 "Review submitted", "The review has been submitted.",
@@ -244,7 +244,7 @@ namespace OutcomeTesting.Plugins.Tests
             var encoded = row.GetAttributeValue<string>(NotificationOutbox.AttachmentBodyAttr);
             Assert.False(string.IsNullOrWhiteSpace(encoded));
             Assert.Equal(
-                "Case summary IO-300001.pdf",
+                "Completed check IO-300001.pdf",
                 row.GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
 
             // It decodes to a real PDF, not merely to some bytes.

@@ -7,7 +7,7 @@ using Microsoft.Xrm.Sdk.Query;
 namespace OutcomeTesting.Plugins
 {
     /// <summary>
-    /// The case summary attached to the para-planner's email (Change 2, AD-164).
+    /// The completed check attached to the para-planner's email (Change 2, AD-164, AD-165).
     ///
     /// <para>
     /// Built when the notification is QUEUED rather than when it is sent, which makes it a
@@ -26,7 +26,7 @@ namespace OutcomeTesting.Plugins
     /// and without the findings it was a covering note for a document nobody was sending.
     /// </para>
     /// </summary>
-    public static class CaseSummaryPdf
+    public static class CompletedCheckPdf
     {
         private const string CaseEntity = "al_outcomecase";
 
@@ -34,15 +34,15 @@ namespace OutcomeTesting.Plugins
         public static string FileName(string caseReference)
         {
             var safe = Sanitise(caseReference);
-            return "Case summary " + (safe.Length == 0 ? "unreferenced" : safe) + ".pdf";
+            return "Completed check " + (safe.Length == 0 ? "unreferenced" : safe) + ".pdf";
         }
 
         /// <summary>
-        /// The summary for a case, or null when there is no case to describe.
+        /// The document for a case, or null when there is no case to describe.
         ///
         /// Never throws. A document is worth having and is not worth losing the letter over,
         /// so the caller treats null as "send without an attachment" (see
-        /// <c>NotificationOutbox.QueueWithSummary</c>).
+        /// <c>NotificationOutbox.QueueWithCompletedCheck</c>).
         /// </summary>
         public static byte[] Build(IOrganizationService service, EntityReference caseRef)
         {
@@ -75,7 +75,7 @@ namespace OutcomeTesting.Plugins
 
             var blocks = new List<PdfBlock>
             {
-                PdfBlock.Title("Outcome Testing - case summary"),
+                PdfBlock.Title("Outcome Testing - completed check"),
                 PdfBlock.Field("Case reference", Or(reference, "not recorded")),
                 PdfBlock.Field("IO reference", Or(row.GetAttributeValue<string>("al_ioreference"), "not recorded")),
                 PdfBlock.Field("Client", Or(row.GetAttributeValue<string>("al_clientname"), "not recorded")),

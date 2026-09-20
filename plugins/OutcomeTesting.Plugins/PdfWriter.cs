@@ -15,7 +15,7 @@ namespace OutcomeTesting.Plugins
         Heading,
 
         /// <summary>
-        /// A heading one level below <see cref="Heading"/>, bold at body size.
+        /// A heading one level below <see cref="Heading"/>, bold and a point smaller.
         ///
         /// Added for the completed check (AD-165), which has two levels of structure: the
         /// check, and the sections of the checklist inside it. Drawing both with
@@ -135,6 +135,12 @@ namespace OutcomeTesting.Plugins
 
         private const double TitleSize = 18;
         private const double HeadingSize = 12;
+
+        // Between a heading and the body, because a Field's LABEL is also bold at body size:
+        // at 10 a subheading was indistinguishable from the questions beneath it, which is
+        // the one job it has. Found by rendering a sample and looking at it.
+        private const double SubheadingSize = 11;
+
         private const double BodySize = 10;
         private const double LineGap = 1.35;         // multiplied by the font size
         private const double BlockGap = 6;
@@ -226,9 +232,9 @@ namespace OutcomeTesting.Plugins
                         // Half a block gap rather than a whole one: it belongs to the heading
                         // above it, and spacing it equally would read as a sibling.
                         y -= BlockGap / 2;
-                        foreach (var line in Wrap(block.Text, Bold, BodySize, ContentWidth))
+                        foreach (var line in Wrap(block.Text, Bold, SubheadingSize, ContentWidth))
                         {
-                            Emit(Bold, BodySize, Margin, line);
+                            Emit(Bold, SubheadingSize, Margin, line);
                         }
 
                         break;
