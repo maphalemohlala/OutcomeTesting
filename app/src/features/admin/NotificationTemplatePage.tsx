@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Modal } from '../../components/feedback/Modal';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import { unknownTokens } from './notificationTemplates';
@@ -74,7 +75,11 @@ export function NotificationTemplatePage() {
                 </td>
                 {canEdit && (
                   <td>
-                    <button type="button" onClick={() => setEditing(row)}>
+                    <button
+                      type="button"
+                      className="templates__btn templates__btn--ghost"
+                      onClick={() => setEditing(row)}
+                    >
                       Edit
                     </button>
                   </td>
@@ -132,74 +137,89 @@ function TemplateForm({
     setProblem(result.reason);
   }
 
+  // A pop-up rather than a panel below the table. Which letter is being edited is a modal
+  // decision, and leaving the table live invited a second Edit click that swapped the
+  // form's subject out from under a half-typed one with nothing said. Modal brings Escape,
+  // the backdrop and the focus move with it.
   return (
-    <form className="templates__form" onSubmit={submit}>
-      <h2>{row.name}</h2>
+    <Modal title={row.name} onClose={onClose}>
+      <form className="templates__form" onSubmit={submit}>
+        {!row.stored && (
+          <p className="templates__hint">
+            This letter has no saved wording yet, so it is currently sent using the built-in
+            copy. Saving here replaces it.
+          </p>
+        )}
 
-      {!row.stored && (
+        <label htmlFor="template-subject">Subject</label>
+        <input
+          id="template-subject"
+          type="text"
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+        />
+
+        <label htmlFor="template-body">Body</label>
+        <textarea
+          id="template-body"
+          rows={12}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+        />
         <p className="templates__hint">
-          This letter has no saved wording yet, so it is currently sent using the built-in
-          copy. Saving here replaces it.
+          {row.isHtml
+            ? 'This letter is HTML — your paragraph tags are kept as written.'
+            : 'This letter is plain text.'}
         </p>
-      )}
 
-      <label htmlFor="template-subject">Subject</label>
-      <input
-        id="template-subject"
-        type="text"
-        value={subject}
-        onChange={(e) => setSubject(e.target.value)}
-      />
-
-      <label htmlFor="template-body">Body</label>
-      <textarea
-        id="template-body"
-        rows={12}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-      />
-      <p className="templates__hint">
-        {row.isHtml
-          ? 'This letter is HTML — your paragraph tags are kept as written.'
-          : 'This letter is plain text.'}
-      </p>
-
-      <p className="templates__hint">
-        Tokens this letter fills in:{' '}
-        {row.tokens.map((t) => (
-          <code key={t} className="templates__token">{`{{${t}}}`}</code>
-        ))}
-      </p>
-
-      {offenders.length > 0 && (
-        <p className="templates__problem">
-          This letter does not supply{' '}
-          {offenders.map((t) => `{{${t}}}`).join(', ')}
-          {offenders.length === 1 ? ' — it would render as a gap.' : ' — they would render as gaps.'}
+        <p className="templates__hint">
+          Tokens this letter fills in:{' '}
+          {row.tokens.map((t) => (
+            <code key={t} className="templates__token">{`{{${t}}}`}</code>
+          ))}
         </p>
-      )}
 
-      {empty && (
-        <p className="templates__problem">
-          A subject and a body are both needed. Saving one empty would quietly fall back to
-          the built-in wording instead of sending what you wrote.
-        </p>
-      )}
+        {offenders.length > 0 && (
+          <p className="templates__problem">
+            This letter does not supply{' '}
+            {offenders.map((t) => `{{${t}}}`).join(', ')}
+            {offenders.length === 1
+              ? ' — it would render as a gap.'
+              : ' — they would render as gaps.'}
+          </p>
+        )}
 
-      {problem && <p className="templates__problem">{problem}</p>}
+        {empty && (
+          <p className="templates__problem">
+            A subject and a body are both needed. Saving one empty would quietly fall back to
+            the built-in wording instead of sending what you wrote.
+          </p>
+        )}
 
-      <div className="templates__actions">
-        {/*
-          Disabled on what this page can see, not as the authority. The plug-in refuses the
-          same things and its sentence is what appears above on a failed save.
-        */}
-        <button type="submit" disabled={saving || offenders.length > 0 || empty}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-        <button type="button" onClick={onClose} disabled={saving}>
-          Cancel
-        </button>
-      </div>
-    </form>
+        {problem && <p className="templates__problem">{problem}</p>}
+
+        <div className="templates__actions">
+          {/*
+            Disabled on what this page can see, not as the authority. The plug-in refuses the
+            same things and its sentence is what appears above on a failed save.
+          */}
+          <button
+            type="submit"
+            className="templates__btn"
+            disabled={saving || offenders.length > 0 || empty}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            type="button"
+            className="templates__btn templates__btn--ghost"
+            onClick={onClose}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

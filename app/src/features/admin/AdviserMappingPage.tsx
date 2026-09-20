@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Modal } from '../../components/feedback/Modal';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import {
@@ -42,7 +43,11 @@ export function AdviserMappingPage() {
       {state.status === 'ready' && (
         <>
           {canEdit && (
-            <button type="button" className="advisers__add" onClick={() => setEditing('new')}>
+            <button
+              type="button"
+              className="advisers__btn advisers__add"
+              onClick={() => setEditing('new')}
+            >
               Map an adviser
             </button>
           )}
@@ -74,7 +79,11 @@ export function AdviserMappingPage() {
                     </td>
                     {canEdit && (
                       <td>
-                        <button type="button" onClick={() => setEditing(row)}>
+                        <button
+                          type="button"
+                          className="advisers__btn advisers__btn--ghost"
+                          onClick={() => setEditing(row)}
+                        >
                           Change
                         </button>
                       </td>
@@ -134,49 +143,59 @@ function MappingForm({
     setProblem(result.reason);
   }
 
+  // A pop-up rather than a panel under the table, for the reason the question library's
+  // editors already are: the list behind it stays a list, and a second Change click cannot
+  // swap the form's adviser out from under a half-finished edit. Modal brings Escape, the
+  // backdrop and the focus move with it, so none of that is re-implemented here.
   return (
-    <form className="advisers__form" onSubmit={submit}>
-      <h2>{row ? 'Change mapping' : 'Map an adviser'}</h2>
+    <Modal title={row ? 'Change mapping' : 'Map an adviser'} onClose={onClose}>
+      <form className="advisers__form" onSubmit={submit}>
+        <label htmlFor="adviser-email">Adviser’s work email</label>
+        <input
+          id="adviser-email"
+          type="email"
+          value={adviserEmail}
+          // Read-only when changing an existing row: the email is the alternate key, so
+          // editing it here would silently move the mapping to a different adviser rather
+          // than correct this one.
+          readOnly={row !== null}
+          onChange={(e) => setAdviserEmail(e.target.value)}
+        />
+        <p className="advisers__hint">
+          As it appears on the case. The import takes it from the extract’s AdviserEmail
+          column.
+        </p>
 
-      <label htmlFor="adviser-email">Adviser’s work email</label>
-      <input
-        id="adviser-email"
-        type="email"
-        value={adviserEmail}
-        // Read-only when changing an existing row: the email is the alternate key, so
-        // editing it here would silently move the mapping to a different adviser rather
-        // than correct this one.
-        readOnly={row !== null}
-        onChange={(e) => setAdviserEmail(e.target.value)}
-      />
-      <p className="advisers__hint">
-        As it appears on the case. The import takes it from the extract’s AdviserEmail column.
-      </p>
+        <label htmlFor="manager">T&amp;C Manager</label>
+        <select id="manager" value={managerId} onChange={(e) => setManagerId(e.target.value)}>
+          <option value="">Choose…</option>
+          {managers.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name} ({m.email})
+            </option>
+          ))}
+        </select>
+        <p className="advisers__hint">
+          Only contacts with a work email are listed. A manager with no email address would be
+          mapped but never written to.
+        </p>
 
-      <label htmlFor="manager">T&amp;C Manager</label>
-      <select id="manager" value={managerId} onChange={(e) => setManagerId(e.target.value)}>
-        <option value="">Choose…</option>
-        {managers.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name} ({m.email})
-          </option>
-        ))}
-      </select>
-      <p className="advisers__hint">
-        Only contacts with a work email are listed. A manager with no email address would be
-        mapped but never written to.
-      </p>
+        {problem && <p className="advisers__problem">{problem}</p>}
 
-      {problem && <p className="advisers__problem">{problem}</p>}
-
-      <div className="advisers__actions">
-        <button type="submit" disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-        <button type="button" onClick={onClose} disabled={saving}>
-          Cancel
-        </button>
-      </div>
-    </form>
+        <div className="advisers__actions">
+          <button type="submit" className="advisers__btn" disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            type="button"
+            className="advisers__btn advisers__btn--ghost"
+            onClick={onClose}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
