@@ -3,8 +3,8 @@
 **Date:** 2026-09-20
 **Environment:** `Env_AQ_Dev` (`org0b075da8.crm11.dynamics.com`) only. Promotion to TEST/PROD is a separate decision.
 **Branch:** `feat/change-batch-sep-2026`
-**Commits:** `85957cf` (F4), `95274b7` (F6), `c423d11` (F7), `49dc593` (F5)
-**Decisions:** AD-176, AD-177, AD-178, AD-179
+**Commits:** `85957cf` (F4), `95274b7` (F6), `c423d11` (F7), `49dc593` (F5), `33fe9d6` (F1)
+**Decisions:** AD-176, AD-177, AD-178, AD-179, AD-180
 
 ---
 
@@ -129,10 +129,47 @@ wording now agrees in number.
 | 6 | sha256 of `pluginassembly.content` vs the local DLL | `e2ab2537…9384` — **match** |
 | 7 | Live verification in DEV | the tables above |
 
+## F1 — a wrong TargetId leaked a raw platform fault
+
+Found in the earlier round and fixed with this batch.
+
+`al_SignOffRemediation` and `al_CompleteRemediation` took the caller's `TargetId` straight
+to a retrieve, so a case id passed where an action id belonged answered:
+
+```
+UNEXPECTED: ... OrganizationServiceFault: Entity 'al_remediationaction' With Id = ... Does Not Exist
+```
+
+An internal table name reaching the caller is what NFR-OBS-01 exists to prevent, and it
+reads as a broken command rather than as a wrong id.
+
+`CommandHelpers.RetrieveOrNotFound` now holds the guard, because three other commands had
+already written the same try/catch by hand. It is deliberately **only** for an id that
+arrived from outside: an id read from a lookup on a row the platform handed us is not this
+case, and swallowing a missing row there would hide a real referential fault behind a
+polite sentence (AD-180).
+
+The test fake threw `InvalidOperationException` for a missing row. It now throws the
+platform's own `FaultException<OrganizationServiceFault>` — otherwise a guard written
+against the wrong exception type would pass the tests and still leak in Dataverse. All 1296
+existing tests passed unchanged against the more faithful fake.
+
+Verified in DEV, three distinct answers from the same command:
+
+| Call | Answer |
+|---|---|
+| a case id where an action id belongs | `NOTFOUND: That remediation action no longer exists. Refresh the case and try again.` |
+| a real action, still Open | `PRECONDITION: Only a completed remediation action can be signed off.` |
+| a real action owned by someone else | `UNAUTHORIZED: Only the adviser who owns this remediation action can complete it.` |
+
+The assembly's byte count was **identical** to the previous build (293,376) while its
+sha256 differed — which is exactly why the hash and not the size is the deployment check.
+
 ## Left alone
 
 - Case 900000003 still holds `al_taxcheckername = "svc automate aq"` from before the F7
   fix. It is seed data and re-stamping it would prove nothing.
-- **F1** (a wrong `TargetId` on the remediation commands leaks a raw platform fault) is
-  still open. It was found in an earlier round and is not part of this batch.
+- Three other commands still guard their own retrieves by hand
+  (`SetPermissionRuleActivePlugin`, `SetRoleAssignmentActivePlugin`, `UpdateRolePlugin`).
+  They already behave correctly; migrating them to the shared helper is tidying, not a fix.
 - **F8** is ASP.NET request validation, not ours, and nothing leaks through it.
