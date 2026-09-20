@@ -46,6 +46,7 @@ namespace OutcomeTesting.Plugins
         private const string ReviewStatusAttr = "al_reviewstatus";
         private const string ReviewTypeAttr = "al_reviewtype";
         private const string ReviewCaseAttr = "al_outcomecaseid";
+        private const string AssignedContactAttr = "al_assignedcontactid";
 
         private const int StatusSubmitted = 120910212;
         // The same event the command path writes, taken from it rather than re-declared: a
@@ -150,21 +151,28 @@ namespace OutcomeTesting.Plugins
 
             EnsureCheckerEditable(fields);
 
-            // The role is the contact's, read from the platform, never a claim in the
-            // payload. The contact permission the page writes through is shared with the
-            // sign-off and the claim (one allowlist per table), so the check has to be here.
+            // Assignment first, and for EVERY payload (audit finding 2, 2026-09-20).
             //
-            // Gated on what the edit actually touches. A checker editing the client's name
-            // is not doing the Tax team's work and must not need the Tax team's role.
+            // This used to run only when `fields.Count > 0`, so a payload carrying nothing
+            // but TaxCheckRequired or TaxTeamDisposition skipped it entirely - and those two
+            // re-derive the review route (BR-004, AD-036). Any contact holding the Tax
+            // Reviewer role could therefore reroute ANY case in the system whose Tax review
+            // was unsubmitted, including one assigned to somebody else. Reading every case
+            // is deliberate (project owner, 2026-09-20) and reading is all it may buy:
+            // "tax reviewers can only work on cases assigned to them".
+            //
+            // The contact permission the page writes through is shared with the sign-off and
+            // the claim - one allowlist per table - so this check has to be here. The contact
+            // is read from the platform, never claimed in the payload.
+            EnsureAssignedToCase(service, contactId, caseId);
+
+            // The ROLE check stays gated on what the edit actually touches. A checker editing
+            // the client's name is not doing the Tax team's work and must not need the Tax
+            // team's role. That was always the right shape; assignment was not.
             if (editsTaxFields)
             {
                 EnsureTaxReviewerRole(service, contactId);
-                EnsureTaxReviewOpen(service, caseId);
-            }
-
-            if (fields.Count > 0)
-            {
-                EnsureAssignedToCase(service, contactId, caseId);
+                EnsureTaxReviewOpen(service, contactId, caseId);
             }
 
             // Cleared before the case is updated, so the column never keeps a request after
@@ -433,7 +441,7 @@ namespace OutcomeTesting.Plugins
         /// not been created yet, where "is a Tax check required?" is exactly the question
         /// these two fields exist to answer.
         /// </remarks>
-        public static void EnsureTaxReviewOpen(IOrganizationService service, Guid caseId)
+        public static void EnsureTaxReviewOpen(IOrganizationService service, Guid contactId, Guid caseId)
         {
             var query = new QueryExpression(ReviewEntity)
             {
@@ -451,6 +459,32 @@ namespace OutcomeTesting.Plugins
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix +
                     "The Tax check on this case has been submitted, so its header fields can no longer be changed.");
+            }
+
+            // The caller's own Tax review, not just anybody's (audit finding 2). The check
+            // above asks whether the case's Tax work is still open; this asks whether it is
+            // THEIRS. Apart they are two half-checks that read as one whole one - which is
+            // exactly how the hole survived review.
+            //
+            // Kept here rather than left to EnsureAssignedToCase alone: that method accepts
+            // an open review of EITHER discipline, so an AQS checker assigned to the case
+            // would pass it. Editing the Tax fields is the Tax team's work.
+            var mine = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            mine.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            mine.Criteria.AddCondition(ReviewCaseAttr, ConditionOperator.Equal, caseId);
+            mine.Criteria.AddCondition(ReviewTypeAttr, ConditionOperator.Equal, ResponseRules.ReviewTypeTax);
+            mine.Criteria.AddCondition(AssignedContactAttr, ConditionOperator.Equal, contactId);
+
+            if (service.RetrieveMultiple(mine).Entities.Count == 0)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.UnauthorizedPrefix +
+                    "You can only change the Tax fields on a case whose Tax check is assigned to you.");
             }
         }
     }
