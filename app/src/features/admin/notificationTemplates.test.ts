@@ -55,6 +55,93 @@ describe('notificationTemplates', () => {
     }
   });
 
+  /**
+   * The wording, not only the token list (F28).
+   *
+   * The subjects and bodies are a second copy of the letters, which is a real cost - the
+   * registration tool LINKS NotificationTemplates.cs rather than transcribe it, and its
+   * csproj says why. The app cannot link C#, so the copy is policed here instead: if either
+   * side is edited without the other, these fail.
+   */
+  describe('the built-in wording', () => {
+    /**
+     * The C# with its string concatenation collapsed, so a body written as several joined
+     * literals reads as the one string it compiles to. Escapes are undone the same way.
+     */
+    const flattened = templatesSource
+      .replace(/"\s*\+\s*"/g, '')
+      .replace(/\\"/g, '"');
+
+    it('carries a subject and a body for every letter', () => {
+      for (const code of TEMPLATE_CODES) {
+        const hint = templateHint(code)!;
+        expect(hint.subject.length, code).toBeGreaterThan(0);
+        expect(hint.body.length, code).toBeGreaterThan(0);
+      }
+    });
+
+    it('matches the assembly, letter for letter', () => {
+      // The two remediation letters are built by RemediationBody(harm), whose two variable
+      // sentences sit either side of a ternary, so they are checked separately below.
+      const computed = new Set(['REMEDIATION-PASS-WITH-ISSUES', 'REMEDIATION-HARM']);
+
+      for (const code of TEMPLATE_CODES) {
+        const hint = templateHint(code)!;
+
+        expect(
+          flattened.includes(hint.subject),
+          `${code}: the subject here is not the one NotificationTemplates.cs sends.`,
+        ).toBe(true);
+
+        if (computed.has(code)) continue;
+
+        expect(
+          flattened.includes(hint.body),
+          `${code}: the body here is not the one NotificationTemplates.cs sends. ` +
+            'Copy it across, or the editor shows one wording and the letter sends another.',
+        ).toBe(true);
+      }
+    });
+
+    it('matches the assembly on the two letters it builds from a condition', () => {
+      const harm = templateHint('REMEDIATION-HARM')!.body;
+      const issues = templateHint('REMEDIATION-PASS-WITH-ISSUES')!.body;
+
+      // Every literal RemediationBody declares outside its ternary appears in both.
+      for (const shared of [
+        '<p>Dear {{adviser}},</p>',
+        'a need for remedial work has been identified due to the case receiving {{grading}}.{{dueText}}',
+        '<p>The case summary in the portal details the remedial actions.',
+        '<p>Please follow the link to confirm that the ',
+        ' has been taken.</p>',
+        '{{caseButton}}<p>Many thanks</p>',
+      ]) {
+        expect(flattened.includes(shared), `C# no longer says: ${shared}`).toBe(true);
+        expect(harm.includes(shared), `harm body no longer says: ${shared}`).toBe(true);
+        expect(issues.includes(shared), `issues body no longer says: ${shared}`).toBe(true);
+      }
+
+      // And the two that differ are on the right side of the condition.
+      const onlyHarm = ' Please liaise with your T&amp;C Manager to move this case forward.';
+      expect(flattened.includes(onlyHarm)).toBe(true);
+      expect(harm.includes(onlyHarm)).toBe(true);
+      expect(issues.includes(onlyHarm)).toBe(false);
+
+      expect(harm.includes('the required remedial action has been taken')).toBe(true);
+      expect(issues.includes('the remedial action has been taken')).toBe(true);
+      expect(issues.includes('required remedial action')).toBe(false);
+    });
+
+    it('uses only tokens the letter is allowed to use', () => {
+      // The built-in wording has to satisfy the same rule an administrator's edit does,
+      // or the page would offer a starting point the server then refuses.
+      for (const code of TEMPLATE_CODES) {
+        const hint = templateHint(code)!;
+        expect(unknownTokens(code, hint.subject, hint.body), code).toEqual([]);
+      }
+    });
+  });
+
   it('knows nothing about a code that is not ours', () => {
     expect(templateHint('NOT-A-LETTER')).toBeNull();
   });

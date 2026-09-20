@@ -6,7 +6,7 @@ import {
 } from '../../components/form/RichTextEditor';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { usePermissions } from '../../app/permissions/permissionContext';
-import { unknownTokens } from './notificationTemplates';
+import { builtInWording, unknownTokens } from './notificationTemplates';
 import {
   CUSTOM_TOKENS,
   KIND_CONTACT,
@@ -369,8 +369,20 @@ function TemplateForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [subject, setSubject] = useState(row.subject);
-  const [body, setBody] = useState(row.body);
+  /*
+   * A letter with no stored row opens on the wording it is actually being sent with (F28).
+   *
+   * It used to open empty, so the page whose stated purpose is "the subject and body of
+   * every email this system sends" showed neither, for exactly the letters running on the
+   * built-in copy. Anyone wanting to change one sentence of the standard wording had to
+   * retype the whole letter, because they could not see it.
+   *
+   * Nothing is written until Save, so opening and closing still leaves the letter on its
+   * built-in copy - the hint above says so, and "Use built-in" puts it back.
+   */
+  const builtIn = row.custom ? null : builtInWording(row.code);
+  const [subject, setSubject] = useState(row.stored ? row.subject : (builtIn?.subject ?? ''));
+  const [body, setBody] = useState(row.stored ? row.body : (builtIn?.body ?? ''));
   const [kind, setKind] = useState<number | null>(row.recipientKind);
   // Which field a token goes into. Tracked rather than assumed, and named on the picker:
   // dropping one into the body when the person had just clicked into the subject is the kind
@@ -426,7 +438,8 @@ function TemplateForm({
         {!row.stored && (
           <p className="templates__hint">
             This letter has no saved wording yet, so it is currently sent using the built-in
-            copy. Saving here replaces it.
+            copy — which is what is shown below. Saving here replaces it; closing without
+            saving leaves the letter on the built-in copy.
           </p>
         )}
 
