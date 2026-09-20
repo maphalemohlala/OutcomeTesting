@@ -254,6 +254,13 @@ if (args.Length >= 2 && args[0].Equals("createadvisermapping", StringComparison.
     return CreateAdviserMappingTable(args[1], args.Length > 2 ? args[2] : "OutcomeTesting");
 }
 
+if (args.Length >= 2 && args[0].Equals("dedupepagepermissions", StringComparison.OrdinalIgnoreCase))
+{
+    return DedupePagePermissions(
+        args[1],
+        args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+}
+
 if (args.Length >= 2 && args[0].Equals("createnotificationtemplate", StringComparison.OrdinalIgnoreCase))
 {
     return CreateNotificationTemplateTable(args[1], args.Length > 2 ? args[2] : "OutcomeTesting");
@@ -7218,6 +7225,140 @@ static void GrantTable(
 // The table holds ONLY the wording. Which letter is sent, to whom, and when, all stay in
 // compiled code - a row here cannot invent a notification or redirect one, it can only change
 // the words of a letter the solution already decided to send.
+// Retires the shadow al_pagepermission rows left by the two key formats (audit finding 6).
+//
+// Two writers built the row key differently: WebRoleSeed slugged the role name, while
+// al_SetPagePermission - what the Security configuration screen calls - did not. AD-154
+// settled the RAW name as the format, so the slugged rows are the legacy ones.
+//
+// The danger this verb exists to avoid is the reason the audit called deactivating them a
+// business call: MaxLevel takes the HIGHEST level across active rows, so a shadow row keeps
+// granting what an administrator believes they have revoked - and retiring the wrong one of
+// a pair would silently take access away instead.
+//
+// So it never retires a row that grants MORE than the row it keeps. Where the slugged row is
+// higher, it is reported and left alone for a person to decide, because that is a real change
+// of access and not a tidy-up. Where it grants the same or less, retiring it changes nothing
+// anybody can observe except that the Security screen and the environment now agree.
+//
+// Deactivated rather than deleted: a rule someone may have relied on stays readable, and the
+// permission model is a read of ACTIVE rows.
+int DedupePagePermissions(string orgUrl, bool confirm)
+{
+    using var svc = Connect(orgUrl);
+
+    var query = new QueryExpression("al_pagepermission")
+    {
+        ColumnSet = new ColumnSet(
+            "al_pagepermissioncode", "al_rolecode", "al_resourcekey", "al_accesslevel"),
+        Criteria = new FilterExpression(),
+    };
+    query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+
+    var rows = svc.RetrieveMultiple(query).Entities;
+    Console.WriteLine(confirm ? "Retiring shadow page permission rows." : "Dry run - nothing will be changed.");
+    Console.WriteLine($"{rows.Count} active rule(s).");
+    Console.WriteLine();
+
+    var groups = rows
+        .GroupBy(r => (r.GetAttributeValue<string>("al_rolecode") ?? string.Empty)
+            + "|" + (r.GetAttributeValue<string>("al_resourcekey") ?? string.Empty))
+        .Where(g => g.Count() > 1)
+        .ToList();
+
+    if (groups.Count == 0)
+    {
+        Console.WriteLine("No role holds two active rules for one resource.");
+        return 0;
+    }
+
+    var retired = 0;
+    var refused = 0;
+
+    foreach (var group in groups)
+    {
+        Console.WriteLine($"  {group.Key}");
+
+        // The keeper is the raw-name row (AD-154). A slugged key is upper case with the
+        // spaces and punctuation of the role name replaced by hyphens, so the raw one is
+        // the row whose code still contains the role name as it is written.
+        var keeper = group.FirstOrDefault(r =>
+            (r.GetAttributeValue<string>("al_pagepermissioncode") ?? string.Empty)
+                .IndexOf(r.GetAttributeValue<string>("al_rolecode") ?? "\u0000", StringComparison.Ordinal) >= 0);
+
+        if (keeper == null)
+        {
+            Console.WriteLine("    no raw-name row here; left alone for a person to look at.");
+            refused++;
+            continue;
+        }
+
+        var keeperLevel = Level(keeper);
+        Console.WriteLine($"    keep    {keeper.GetAttributeValue<string>("al_pagepermissioncode")}  ({LevelName(keeperLevel)})");
+
+        foreach (var other in group)
+        {
+            if (other.Id == keeper.Id)
+            {
+                continue;
+            }
+
+            var code = other.GetAttributeValue<string>("al_pagepermissioncode");
+            var level = Level(other);
+
+            if (level > keeperLevel)
+            {
+                // The whole point of the guard. Retiring this would revoke access.
+                Console.WriteLine(
+                    $"    REFUSED {code}  ({LevelName(level)}) grants MORE than the row kept "
+                    + $"({LevelName(keeperLevel)}). Decide this one deliberately.");
+                refused++;
+                continue;
+            }
+
+            Console.WriteLine($"    retire  {code}  ({LevelName(level)})");
+            retired++;
+
+            if (!confirm)
+            {
+                continue;
+            }
+
+            svc.Update(new Entity("al_pagepermission", other.Id)
+            {
+                ["statecode"] = new OptionSetValue(1),
+                ["statuscode"] = new OptionSetValue(2),
+            });
+        }
+    }
+
+    Console.WriteLine();
+    Console.WriteLine(
+        confirm
+            ? $"Retired {retired} shadow rule(s); {refused} left for a person to decide."
+            : $"{retired} would be retired, {refused} left for a person. Re-run with --confirm.");
+
+    return 0;
+}
+
+int Level(Entity row)
+{
+    var value = row.GetAttributeValue<OptionSetValue>("al_accesslevel");
+    return value == null ? 0 : value.Value;
+}
+
+string LevelName(int level)
+{
+    switch (level)
+    {
+        case 120910766: return "None";
+        case 120910767: return "View";
+        case 120910768: return "Edit";
+        case 120910769: return "Manage";
+        default: return level.ToString(CultureInfo.InvariantCulture);
+    }
+}
+
 int CreateNotificationTemplateTable(string orgUrl, string solutionUniqueName)
 {
     using var svc = Connect(orgUrl);
