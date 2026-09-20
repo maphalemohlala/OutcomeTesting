@@ -148,8 +148,18 @@ namespace OutcomeTesting.Plugins.Tests
             var row = Row(entityName, id);
             if (row == null)
             {
-                throw new InvalidOperationException(
-                    entityName + " " + id.ToString("D") + " does not exist.");
+                // The platform's own exception, not a convenient stand-in. A retrieve of a
+                // row that is not there is exactly what a caller-supplied TargetId can
+                // provoke, and a guard written against the wrong exception type would look
+                // correct here and still leak the raw fault in Dataverse (F1, 2026-09-20).
+                throw new System.ServiceModel.FaultException<OrganizationServiceFault>(
+                    new OrganizationServiceFault
+                    {
+                        ErrorCode = -2147220969,
+                        Message = entityName + " With Id = " + id.ToString("D") + " Does Not Exist",
+                    },
+                    new System.ServiceModel.FaultReason(
+                        entityName + " With Id = " + id.ToString("D") + " Does Not Exist"));
             }
 
             if (columnSet == null || columnSet.AllColumns)

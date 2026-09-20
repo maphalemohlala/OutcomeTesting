@@ -55,6 +55,36 @@ namespace OutcomeTesting.Plugins.Tests
                 details: null);
         }
 
+        /// <summary>
+        /// F1, found on 2026-09-20. The retrieve had no existence guard, so a TargetId that
+        /// is not a remediation action left the platform fault to travel out as
+        /// <c>UNEXPECTED: ... Entity 'al_remediationaction' With Id = ... Does Not Exist</c>,
+        /// naming an internal table to whoever called it. NFR-OBS-01: a message that reaches
+        /// a caller names no table, query, id or stack.
+        /// </summary>
+        [Fact]
+        public void Refuses_a_target_that_is_not_a_remediation_action_without_naming_the_table()
+        {
+            var svc = new FakeOrganizationService();
+            var notAnAction = Guid.Parse("99999999-9999-4999-8999-999999999999");
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => CompleteRemediationPlugin.Complete(
+                    svc,
+                    notAnAction,
+                    "key-" + Guid.NewGuid().ToString("N"),
+                    expectedRowVersion: null,
+                    actorId: Guid.NewGuid(),
+                    correlationId: Guid.NewGuid(),
+                    requireCallerOwnsAction: true,
+                    details: null));
+
+            Assert.StartsWith("NOTFOUND: ", error.Message);
+            Assert.DoesNotContain("al_remediationaction", error.Message);
+            Assert.DoesNotContain("OrganizationServiceFault", error.Message);
+            Assert.DoesNotContain(notAnAction.ToString("D"), error.Message);
+        }
+
         [Fact]
         public void Custom_api_path_refuses_a_caller_who_does_not_own_the_action()
         {

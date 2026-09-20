@@ -29,6 +29,43 @@ namespace OutcomeTesting.Plugins
         public const string AuditEntity = "al_auditevent";
 
         /// <summary>
+        /// Retrieves a row a CALLER named, and turns "it is not there" into a sentence they
+        /// can act on.
+        ///
+        /// <para>F1, 2026-09-20: <c>al_SignOffRemediation</c> and
+        /// <c>al_CompleteRemediation</c> retrieved <c>al_remediationaction</c> straight from
+        /// the TargetId with no guard, so passing a case id where an action id belonged
+        /// answered <c>UNEXPECTED: ... OrganizationServiceFault: Entity
+        /// 'al_remediationaction' With Id = ... Does Not Exist</c>. That names an internal
+        /// table to whoever called it, which NFR-OBS-01 exists to prevent, and it reads as a
+        /// broken command rather than as a wrong id.</para>
+        ///
+        /// <para>Only for an id that arrived from outside. An id read from a lookup on a row
+        /// the platform handed us is NOT this: a missing row there is genuinely unexpected
+        /// and should keep travelling as one, because swallowing it would hide a real
+        /// referential fault behind a polite sentence.</para>
+        ///
+        /// <para><paramref name="message"/> carries no id, because the caller already has the
+        /// one they sent and an id in a message is an internal detail to everyone else.</para>
+        /// </summary>
+        public static Entity RetrieveOrNotFound(
+            IOrganizationService service,
+            string entityName,
+            Guid id,
+            ColumnSet columns,
+            string message)
+        {
+            try
+            {
+                return service.Retrieve(entityName, id, columns);
+            }
+            catch (FaultException<OrganizationServiceFault>)
+            {
+                throw new InvalidPluginExecutionException(NotFoundPrefix + message);
+            }
+        }
+
+        /// <summary>
         /// Retrieves every row matching <paramref name="query"/>, following Dataverse's
         /// paging cookie rather than stopping at the first page.
         ///

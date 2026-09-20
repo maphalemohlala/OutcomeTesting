@@ -159,7 +159,12 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.PreconditionPrefix + "A rejected sign-off must record notes explaining the return.");
             }
 
-            var action = userService.Retrieve(ActionEntity, targetId, new ColumnSet(ActionStatus, "al_outcomecaseid"));
+            var action = CommandHelpers.RetrieveOrNotFound(
+                userService,
+                ActionEntity,
+                targetId,
+                new ColumnSet(ActionStatus, "al_outcomecaseid"),
+                "That remediation action no longer exists. Refresh the case and try again.");
 
             var status = action.GetAttributeValue<OptionSetValue>(ActionStatus);
             if (status == null || status.Value != StatusCompleted)

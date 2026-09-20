@@ -33,6 +33,48 @@ namespace OutcomeTesting.Plugins.Tests
             return svc;
         }
 
+        /// <summary>
+        /// F1, found on 2026-09-20 by calling the command with a case id where it wanted an
+        /// action id. The retrieve had no existence guard, so the platform fault travelled
+        /// out as
+        /// <c>UNEXPECTED: ... OrganizationServiceFault: Entity 'al_remediationaction' With
+        /// Id = ... Does Not Exist</c> - naming an internal table to whoever called it,
+        /// where every other refusal on this command is a sentence they can act on.
+        ///
+        /// NFR-OBS-01: a message that reaches a caller names no table, query, id or stack.
+        /// </summary>
+        [Fact]
+        public void Refuses_a_target_that_is_not_a_remediation_action_without_naming_the_table()
+        {
+            var svc = new FakeOrganizationService();
+            var notAnAction = Guid.Parse("99999999-9999-4999-8999-999999999999");
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => SignOffRemediationPlugin.CreateSignoff(svc, svc, notAnAction, "Approved", null, null));
+
+            Assert.StartsWith("NOTFOUND: ", error.Message);
+            Assert.DoesNotContain("al_remediationaction", error.Message);
+            Assert.DoesNotContain("OrganizationServiceFault", error.Message);
+            Assert.DoesNotContain(notAnAction.ToString("D"), error.Message);
+        }
+
+        /// <summary>
+        /// The rejection-needs-notes rule is checked before the action is read, so it must
+        /// keep answering first even for an id that does not exist. Otherwise fixing F1
+        /// would quietly change which of two refusals a caller sees.
+        /// </summary>
+        [Fact]
+        public void Still_refuses_a_rejection_with_no_notes_before_it_looks_for_the_action()
+        {
+            var svc = new FakeOrganizationService();
+            var notAnAction = Guid.Parse("99999999-9999-4999-8999-999999999999");
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => SignOffRemediationPlugin.CreateSignoff(svc, svc, notAnAction, "Rejected", null, null));
+
+            Assert.Contains("A rejected sign-off must record notes", error.Message);
+        }
+
         [Fact]
         public void Creates_the_signoff_carrying_the_decision_action_case_and_notes()
         {

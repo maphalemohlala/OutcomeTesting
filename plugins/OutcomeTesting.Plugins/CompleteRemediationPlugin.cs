@@ -126,10 +126,12 @@ namespace OutcomeTesting.Plugins
                 };
             }
 
-            var action = service.Retrieve(
+            var action = CommandHelpers.RetrieveOrNotFound(
+                service,
                 ActionEntity,
                 targetId,
-                new ColumnSet(ActionStatus, "ownerid", ActionAdviserResponse, "al_outcomecaseid", ReviewLookup));
+                new ColumnSet(ActionStatus, "ownerid", ActionAdviserResponse, "al_outcomecaseid", ReviewLookup),
+                "That remediation action no longer exists. Refresh the case and try again.");
 
             if (requireCallerOwnsAction)
             {
