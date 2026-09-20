@@ -75,9 +75,11 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            var outcome = userService.Retrieve(
-                OutcomeEntity, targetId,
-                new ColumnSet(Outcomes.InitialOutcomeAttr, Outcomes.FinalOutcomeAttr, CaseAttr));
+            var outcome = CommandHelpers.RetrieveOrNotFound(
+                userService, OutcomeEntity, targetId,
+                new ColumnSet(Outcomes.InitialOutcomeAttr, Outcomes.FinalOutcomeAttr, CaseAttr),
+                "That outcome no longer exists, so accountability cannot be recorded "
+                + "against it. Refresh and try again.");
 
             var caseRef = outcome.GetAttributeValue<EntityReference>(CaseAttr);
             var fileQualityFailed = caseRef != null && FileQuality.FailedOn(userService, caseRef.Id);

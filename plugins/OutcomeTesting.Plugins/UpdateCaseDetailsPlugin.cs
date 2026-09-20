@@ -139,7 +139,9 @@ namespace OutcomeTesting.Plugins
 
             // Capture the before-values of every attribute we may touch, so the Audit Event
             // records a true before/after and the caller's read privilege gates the command.
-            var before = userService.Retrieve(CaseEntity, targetId, BuildBeforeColumnSet());
+            var before = CommandHelpers.RetrieveOrNotFound(
+                userService, CaseEntity, targetId, BuildBeforeColumnSet(),
+                "That case no longer exists. Refresh and try again.");
 
             var update = new Entity(CaseEntity, targetId);
             var changes = new List<string>();

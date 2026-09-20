@@ -110,7 +110,10 @@ namespace OutcomeTesting.Plugins
             PermissionHelpers.EnsureAppPermission(systemService, context, "command.assign", PermissionHelpers.AccessEdit);
 
             // Retrieved through the caller's service so read privilege on the case is part of the gate.
-            var outcomeCase = userService.Retrieve(CaseEntity, caseId, new ColumnSet(CaseRefAttr, "al_reviewrouteid"));
+            var outcomeCase = CommandHelpers.RetrieveOrNotFound(
+                userService, CaseEntity, caseId,
+                new ColumnSet(CaseRefAttr, "al_reviewrouteid"),
+                "That case no longer exists. Refresh and try again.");
             var caseReference = outcomeCase.GetAttributeValue<string>(CaseRefAttr);
 
             // Identity resolution happens before anything is written: a half-assigned case -

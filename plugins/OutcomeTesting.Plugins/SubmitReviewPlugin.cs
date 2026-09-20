@@ -160,10 +160,12 @@ namespace OutcomeTesting.Plugins
                 };
             }
 
-            var review = service.Retrieve(
+            var review = CommandHelpers.RetrieveOrNotFound(
+                service,
                 ReviewEntity,
                 targetId,
-                new ColumnSet(ReviewStatus, ReviewChecklistVersion, ReviewType, ReviewOutcomeCase, "ownerid", "al_sequence"));
+                new ColumnSet(ReviewStatus, ReviewChecklistVersion, ReviewType, ReviewOutcomeCase, "ownerid", "al_sequence"),
+                "That review no longer exists. Refresh and try again.");
 
             if (requireCallerOwnsReview)
             {

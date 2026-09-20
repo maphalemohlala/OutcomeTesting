@@ -147,7 +147,16 @@ namespace OutcomeTesting.Plugins
             }
 
             // Confirm the outcome exists (and the caller can read it) before writing.
-            var outcome = userService.Retrieve(OutcomeEntity, targetId, new ColumnSet(InitialOutcomeAttr, "al_outcomecaseid"));
+            // The outcome, not the case. Pointed at a case id - which is the easy
+            // mistake, because every other command in this chain takes one - this used
+            // to answer with the platform's own "Does Not Exist" fault under UNEXPECTED
+            // (F37). A supervisor whose page has gone stale needs "refresh and try
+            // again", not a stack-shaped sentence.
+            var outcome = CommandHelpers.RetrieveOrNotFound(
+                userService, OutcomeEntity, targetId,
+                new ColumnSet(InitialOutcomeAttr, "al_outcomecaseid"),
+                "That outcome no longer exists, so there is nothing to record a final "
+                + "grade against. Refresh and try again.");
 
             // A regrade overrides a grade that was already given, so there has to BE one.
             // Without this, a final outcome can be written against an ungraded record: BR-007
