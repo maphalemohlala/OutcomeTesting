@@ -16,6 +16,14 @@ namespace OutcomeTesting.Plugins
     /// it is a letter somebody receives about a client's advice outcome.
     /// </para>
     /// <para>
+    /// <b>It also cleans the body</b> (AD-169). An administrator writing a letter is writing
+    /// markup that lands in somebody's inbox, so the stored body is reduced to
+    /// <see cref="HtmlSanitiser"/>'s allow-list before it is written — the same treatment
+    /// <c>ResponseGuardPlugin</c> gives <c>al_answerrichtext</c>, and for the same reason: the
+    /// table is reachable from the Web API, so a screen that only produces safe markup is not
+    /// a guarantee that only safe markup arrives.
+    /// </para>
+    /// <para>
     /// Three refusals, and all three are about what the reader would get:
     /// </para>
     /// <list type="bullet">
@@ -68,8 +76,23 @@ namespace OutcomeTesting.Plugins
             }
 
             var code = Merged(service, row, NotificationTemplates.CodeAttr);
+
+            // Cleaned BEFORE anything is judged, so the refusals below rule on what will
+            // actually be stored rather than on what was sent.
+            var emptied = SanitiseBody(row);
+
             var subject = Merged(service, row, NotificationTemplates.SubjectAttr);
             var body = Merged(service, row, NotificationTemplates.BodyAttr);
+
+            if (emptied)
+            {
+                // Distinguished from a body nobody typed. "It needs a body" to somebody who
+                // just wrote one reads as a bug in the screen.
+                throw new InvalidPluginExecutionException(
+                    "Nothing in that body is formatting this system keeps, so saving it would "
+                    + "leave the letter empty. Text, bold, italic, underline, lists and links "
+                    + "are kept; anything else is removed.");
+            }
 
             var refusal = Refusal(
                 code,
@@ -216,6 +239,46 @@ namespace OutcomeTesting.Plugins
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Reduces the body to the markup the allow-list keeps, in place, and reports whether
+        /// that left nothing of something somebody actually wrote.
+        ///
+        /// <para>
+        /// <b>Every letter, not only the ones marked HTML.</b> `NotificationDrain.Compose` puts
+        /// the body in <c>email.description</c>, which is rendered as markup — that is what the
+        /// HTML letters and <c>{{caseButton}}</c> rely on — so a tag in a letter the catalogue
+        /// calls plain text is live markup all the same. Escaping a literal <c>&amp;</c> or
+        /// <c>&lt;</c> there makes it DISPLAY correctly rather than breaking it, so there is no
+        /// case for treating the two kinds differently.
+        /// </para>
+        /// <para>
+        /// Only when the write carries a body. An update that changes the subject alone must
+        /// not rewrite a body it never mentioned.
+        /// </para>
+        /// <para>
+        /// <c>{{caseButton}}</c> survives untouched: it is plain text in the stored row and
+        /// becomes markup only at render, from a value this assembly builds.
+        /// </para>
+        /// </summary>
+        private static bool SanitiseBody(Entity row)
+        {
+            if (!row.Contains(NotificationTemplates.BodyAttr))
+            {
+                return false;
+            }
+
+            var original = row.GetAttributeValue<string>(NotificationTemplates.BodyAttr);
+            if (string.IsNullOrWhiteSpace(original))
+            {
+                return false;
+            }
+
+            var cleaned = HtmlSanitiser.Clean(original);
+            row[NotificationTemplates.BodyAttr] = cleaned;
+
+            return string.IsNullOrWhiteSpace(cleaned);
         }
 
         /// <summary>The option this write leaves behind, merged as <see cref="Merged"/> is.</summary>

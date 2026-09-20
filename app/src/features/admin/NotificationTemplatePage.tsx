@@ -377,9 +377,9 @@ function TemplateForm({
         </div>
         <p className="templates__hint">
           {row.isHtml
-            ? 'Formatting is kept as you set it here. Type a token such as {{reference}} ' +
-              'straight into the text.'
-            : 'This letter is plain text, so it has no formatting.'}
+            ? 'Formatting is kept as you set it here. Anything beyond the toolbar’s ' +
+              'formatting and links is removed when you save.'
+            : 'This letter is plain text. Any markup you put in it is removed when you save.'}
         </p>
 
         <RecipientFields
@@ -605,7 +605,10 @@ function NewTemplateForm({
             disabled={saving}
           />
         </div>
-        <p className="templates__hint">Formatting is kept as you set it here.</p>
+        <p className="templates__hint">
+          Formatting is kept as you set it here. Anything beyond the toolbar’s formatting and
+          links is removed when you save.
+        </p>
 
         <TokenPicker
           tokens={CUSTOM_TOKENS}
