@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
@@ -59,6 +60,39 @@ namespace OutcomeTesting.Plugins
             }
 
             return value.ToString(CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Whether the option set actually holds this value.
+        ///
+        /// A value outside the set used to be written straight to Dataverse, which threw, and
+        /// the caller got the plug-in class name and the internal table in an UNEXPECTED
+        /// fault instead of a sentence (F23). Checking here turns that into a refusal the
+        /// caller can read.
+        ///
+        /// True when the options cannot be read at all - not a choice column, or metadata
+        /// that would not load. Refusing then would turn an unreadable option set into a
+        /// failed save, and Dataverse still refuses a value it genuinely will not take.
+        /// </summary>
+        public bool IsMember(string entityLogicalName, string attribute, int value)
+        {
+            var map = MapFor(entityLogicalName, attribute);
+            return map == null || map.ContainsKey(value);
+        }
+
+        /// <summary>
+        /// The labels this option set will accept, comma separated, so a refusal can say what
+        /// to send instead. Null where the options cannot be read.
+        /// </summary>
+        public string AcceptedLabels(string entityLogicalName, string attribute)
+        {
+            var map = MapFor(entityLogicalName, attribute);
+            if (map == null || map.Count == 0)
+            {
+                return null;
+            }
+
+            return string.Join(", ", map.Values.ToArray());
         }
 
         /// <summary>

@@ -166,6 +166,7 @@ namespace OutcomeTesting.Plugins
 
             if (priority.HasValue)
             {
+                EnsureOption(labels, PriorityAttr, "Priority", priority.Value);
                 update[PriorityAttr] = new OptionSetValue(priority.Value);
                 changes.Add("Priority " + labels.Describe(CaseEntity, PriorityAttr, before.GetAttributeValue<OptionSetValue>(PriorityAttr))
                     + " -> " + labels.Label(CaseEntity, PriorityAttr, priority.Value));
@@ -600,6 +601,31 @@ namespace OutcomeTesting.Plugins
         /// remediation — and then be collected by the export, which filters on Closed, and
         /// delivered with no review instance and a blank grade.
         /// </summary>
+        /// <summary>
+        /// Refuses a choice value the option set does not hold.
+        ///
+        /// Without this the value reached Dataverse, which threw, and the caller got
+        /// "UNEXPECTED: OutcomeTesting.Plugins.UpdateCaseDetailsPlugin could not complete.
+        /// OrganizationServiceFault: ... is outside the valid range" - the plug-in class and
+        /// the internal table, where every other refusal on this command is a sentence
+        /// (F23, the same NFR-OBS-01 failure as F1).
+        ///
+        /// The accepted labels are named because the caller cannot otherwise know them: the
+        /// numbers are not guessable and the refusal is the only place they appear.
+        /// </summary>
+        private static void EnsureOption(OptionLabels labels, string attribute, string label, int value)
+        {
+            if (labels.IsMember(CaseEntity, attribute, value))
+            {
+                return;
+            }
+
+            var accepted = labels.AcceptedLabels(CaseEntity, attribute);
+            throw new InvalidPluginExecutionException(
+                CommandHelpers.ValidationPrefix + label + " is not one of the values this field accepts"
+                + (accepted == null ? "." : ": " + accepted + "."));
+        }
+
         private static void EnsureLifecycleTransition(Entity before, Entity update)
         {
             if (!update.Contains(StatusAttr))
@@ -798,6 +824,7 @@ namespace OutcomeTesting.Plugins
                                     CommandHelpers.ValidationPrefix + def.Label + " must be a whole number option value.");
                             }
 
+                            EnsureOption(labels, attr, def.Label, option);
                             update[attr] = new OptionSetValue(option);
                             changes.Add(def.Label + " " + labels.Describe(CaseEntity, attr, before.GetAttributeValue<OptionSetValue>(attr))
                                 + " -> " + labels.Label(CaseEntity, attr, option));
