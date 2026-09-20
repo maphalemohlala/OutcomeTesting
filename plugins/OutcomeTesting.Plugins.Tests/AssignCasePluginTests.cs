@@ -44,6 +44,42 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal("Ada Checker", assignee.UserName);
         }
 
+        /// <summary>
+        /// F7, found in DEV on 2026-09-20. A Dataverse user and the contact that is the same
+        /// person do not have to carry the same fullname, and here they did not: al_AssignCase
+        /// stamped "svc automate aq" while a portal claim on the next case stamped "Service
+        /// Account". Both appeared in the checker columns of one case list, beside an Adviser
+        /// column reading "Service Account", so the same person read as two people.
+        ///
+        /// The contact name wins, because it is the name every other person column on these
+        /// screens shows and the one the portal claim already stamps.
+        /// </summary>
+        [Fact]
+        public void Takes_the_checker_name_from_the_contact_not_the_dataverse_user()
+        {
+            var svc = new FakeOrganizationService();
+            svc.Seed("systemuser", UserId, "internalemailaddress", Email, "fullname", "svc automate aq", "isdisabled", false);
+            svc.Seed("contact", ContactId, "emailaddress1", Email, "fullname", "Service Account");
+
+            var assignee = AssignCasePlugin.ResolveAssignee(svc, Email);
+
+            Assert.Equal("Service Account", assignee.ContactName);
+
+            // The Dataverse name is still carried, because the provisioning refusal names the
+            // user that Dataverse itself would refuse, not their portal contact.
+            Assert.Equal("svc automate aq", assignee.UserName);
+        }
+
+        [Fact]
+        public void Falls_back_to_the_dataverse_user_name_when_the_contact_carries_none()
+        {
+            var svc = new FakeOrganizationService();
+            svc.Seed("systemuser", UserId, "internalemailaddress", Email, "fullname", "Ada Checker", "isdisabled", false);
+            svc.Seed("contact", ContactId, "emailaddress1", Email);
+
+            Assert.Equal("Ada Checker", AssignCasePlugin.ResolveAssignee(svc, Email).ContactName);
+        }
+
         [Fact]
         public void Matches_a_user_on_domainname_when_internalemailaddress_is_unset()
         {

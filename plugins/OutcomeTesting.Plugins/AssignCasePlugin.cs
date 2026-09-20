@@ -136,7 +136,7 @@ namespace OutcomeTesting.Plugins
             // by hand - and why editing that name was mistaken for allocating the check
             // (2026-09-09). The allocation is the one thing that knows who holds the check,
             // so it is what says so. The field was removed from the form on 2026-09-10.
-            StampCheckerName(userService, caseId, ReviewTypeOf(review), assignee.UserName);
+            StampCheckerName(userService, caseId, ReviewTypeOf(review), assignee.ContactName);
 
             // Queued -> Assigned, refused by AD-057 if the case is not somewhere the
             // lifecycle allows it from. Deliberately after the assignment row exists: a case
@@ -222,6 +222,7 @@ namespace OutcomeTesting.Plugins
                 UserId = user.Id,
                 ContactId = contact.Id,
                 UserName = userName,
+                ContactName = contact.GetAttributeValue<string>("fullname") ?? userName,
             };
         }
 
@@ -645,7 +646,18 @@ namespace OutcomeTesting.Plugins
 
             public Guid ContactId { get; set; }
 
+            /// <summary>
+            /// The Dataverse user's own name. Used where the message is about Dataverse
+            /// provisioning, because that is the identity Dataverse would refuse.
+            /// </summary>
             public string UserName { get; set; }
+
+            /// <summary>
+            /// The portal contact's own name, which is what the case screens print. The two
+            /// do not have to agree: in DEV the same person was "svc automate aq" as a
+            /// Dataverse user and "Service Account" as a contact (F7, 2026-09-20).
+            /// </summary>
+            public string ContactName { get; set; }
         }
     }
 }
