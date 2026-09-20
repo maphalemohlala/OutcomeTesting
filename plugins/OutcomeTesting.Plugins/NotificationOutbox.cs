@@ -534,7 +534,7 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>Why a para-planner name did or did not reach somebody.</summary>
-        public enum ParaplannerMatchKind
+        public enum PersonMatchKind
         {
             /// <summary>The row named nobody.</summary>
             NoName,
@@ -553,13 +553,22 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>The outcome of resolving a para-planner name, with words for a report.</summary>
-        public sealed class ParaplannerMatch
+        public sealed class PersonMatch
         {
             /// <summary>What happened.</summary>
-            public ParaplannerMatchKind Kind { get; set; }
+            public PersonMatchKind Kind { get; set; }
 
             /// <summary>The work email, set only when <see cref="IsMatch"/>.</summary>
             public string Email { get; set; }
+
+            /// <summary>
+            /// The contact the value resolved to, set only when <see cref="IsMatch"/>.
+            ///
+            /// This is the "link" part: a person field holds text, and this says which record
+            /// that text turned out to be, so a caller can point at the person rather than
+            /// repeat their name.
+            /// </summary>
+            public EntityReference Contact { get; set; }
 
             /// <summary>One sentence for the import report, naming the value that failed.</summary>
             public string Reason { get; set; }
@@ -567,7 +576,7 @@ namespace OutcomeTesting.Plugins
             /// <summary>True only for an unambiguous, reachable match.</summary>
             public bool IsMatch
             {
-                get { return Kind == ParaplannerMatchKind.Matched; }
+                get { return Kind == PersonMatchKind.Matched; }
             }
         }
 
@@ -596,62 +605,113 @@ namespace OutcomeTesting.Plugins
         /// is a data-protection incident where an unrouted row is an operational one.
         /// </para>
         /// </summary>
-        public static ParaplannerMatch MatchParaplanner(IOrganizationService service, string name)
+        public static PersonMatch MatchParaplanner(IOrganizationService service, string name)
         {
-            if (string.IsNullOrWhiteSpace(name))
+            // The para-planner has no email column on the case, so the name is all there is.
+            return MatchPerson(service, null, name, "para-planner");
+        }
+
+        /// <summary>
+        /// The adviser, from <c>al_adviseremail</c> where it is set and <c>al_advisername</c>
+        /// where it is not (project owner, 2026-09-20).
+        /// </summary>
+        public static PersonMatch MatchAdviser(
+            IOrganizationService service, string email, string name)
+        {
+            return MatchPerson(service, email, name, "adviser");
+        }
+
+        /// <summary>
+        /// Resolves a person field to exactly one active contact.
+        ///
+        /// <para>
+        /// <b>Email first, name second</b> (project owner, 2026-09-20). An address identifies
+        /// somebody; a display name describes them. Two people share a name far more often
+        /// than they share a mailbox, so where a field carries both, the email decides and the
+        /// name is only consulted when there is no email to go on.
+        /// </para>
+        /// <para>
+        /// <b>Two rows are fetched, never one.</b> The second row is what proves the match was
+        /// unambiguous - <c>TopCount 1</c> would return the first of two J Smiths and look
+        /// certain. The same applies to an email, which is unique by convention rather than by
+        /// constraint: nothing in Dataverse stops two contacts carrying one address.
+        /// </para>
+        /// <para>
+        /// Every failure carries a sentence naming the value that failed, because these are
+        /// read by a person looking at an import report rather than by code.
+        /// </para>
+        /// </summary>
+        public static PersonMatch MatchPerson(
+            IOrganizationService service, string email, string name, string role)
+        {
+            var label = string.IsNullOrWhiteSpace(role) ? "person" : role;
+            var byEmail = (email ?? string.Empty).Trim();
+            var byName = (name ?? string.Empty).Trim();
+
+            if (byEmail.Length == 0 && byName.Length == 0)
             {
-                return new ParaplannerMatch
+                return new PersonMatch
                 {
-                    Kind = ParaplannerMatchKind.NoName,
-                    Reason = "The row names no para-planner, so nothing can be sent about this case.",
+                    Kind = PersonMatchKind.NoName,
+                    Reason = "The row names no " + label
+                        + ", so nothing can be sent about this case.",
                 };
             }
 
-            var trimmed = name.Trim();
+            var attribute = byEmail.Length > 0 ? "emailaddress1" : "fullname";
+            var value = byEmail.Length > 0 ? byEmail : byName;
 
             var query = new QueryExpression("contact")
             {
                 ColumnSet = new ColumnSet("emailaddress1"),
-                // Two, not one: the second row is what proves the match was unambiguous.
-                // TopCount 1 would return the first of two J Smiths and look certain.
                 TopCount = 2,
                 Criteria = new FilterExpression(),
             };
-            query.Criteria.AddCondition("fullname", ConditionOperator.Equal, trimmed);
+            query.Criteria.AddCondition(attribute, ConditionOperator.Equal, value);
             query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
 
             var matches = service.RetrieveMultiple(query).Entities;
 
             if (matches.Count == 0)
             {
-                return new ParaplannerMatch
+                return new PersonMatch
                 {
-                    Kind = ParaplannerMatchKind.NoContact,
-                    Reason = "No active contact is named \"" + trimmed + "\".",
+                    Kind = PersonMatchKind.NoContact,
+                    Reason = byEmail.Length > 0
+                        ? "No active contact holds the " + label + " email \"" + value + "\"."
+                        : "No active contact is named \"" + value + "\".",
                 };
             }
 
             if (matches.Count > 1)
             {
-                return new ParaplannerMatch
+                return new PersonMatch
                 {
-                    Kind = ParaplannerMatchKind.Ambiguous,
-                    Reason = "Two or more active contacts are named \"" + trimmed
-                        + "\", so no notification can be addressed.",
+                    Kind = PersonMatchKind.Ambiguous,
+                    Reason = byEmail.Length > 0
+                        ? "Two or more active contacts hold the email \"" + value
+                            + "\", so no notification can be addressed."
+                        : "Two or more active contacts are named \"" + value
+                            + "\", so no notification can be addressed.",
                 };
             }
 
-            var email = matches[0].GetAttributeValue<string>("emailaddress1");
-            if (string.IsNullOrWhiteSpace(email))
+            var found = matches[0].GetAttributeValue<string>("emailaddress1");
+            if (string.IsNullOrWhiteSpace(found))
             {
-                return new ParaplannerMatch
+                return new PersonMatch
                 {
-                    Kind = ParaplannerMatchKind.NoEmail,
-                    Reason = "The contact named \"" + trimmed + "\" has no work email.",
+                    Kind = PersonMatchKind.NoEmail,
+                    Reason = "The contact named \"" + value + "\" has no work email.",
                 };
             }
 
-            return new ParaplannerMatch { Kind = ParaplannerMatchKind.Matched, Email = email };
+            return new PersonMatch
+            {
+                Kind = PersonMatchKind.Matched,
+                Email = found,
+                Contact = matches[0].ToEntityReference(),
+            };
         }
 
         /// <summary>The case reference a person recognises, for the subject line.</summary>

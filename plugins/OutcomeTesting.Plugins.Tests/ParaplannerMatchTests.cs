@@ -69,7 +69,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var match = NotificationOutbox.MatchParaplanner(new FakeOrganizationService(), "   ");
 
-            Assert.Equal(NotificationOutbox.ParaplannerMatchKind.NoName, match.Kind);
+            Assert.Equal(NotificationOutbox.PersonMatchKind.NoName, match.Kind);
             Assert.Contains("names no para-planner", match.Reason);
         }
 
@@ -80,7 +80,7 @@ namespace OutcomeTesting.Plugins.Tests
             // tells an administrator nothing they can go and fix.
             var match = NotificationOutbox.MatchParaplanner(new FakeOrganizationService(), "Nobody Here");
 
-            Assert.Equal(NotificationOutbox.ParaplannerMatchKind.NoContact, match.Kind);
+            Assert.Equal(NotificationOutbox.PersonMatchKind.NoContact, match.Kind);
             Assert.Contains("Nobody Here", match.Reason);
         }
 
@@ -93,7 +93,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             var match = NotificationOutbox.MatchParaplanner(service, "J Smith");
 
-            Assert.Equal(NotificationOutbox.ParaplannerMatchKind.Ambiguous, match.Kind);
+            Assert.Equal(NotificationOutbox.PersonMatchKind.Ambiguous, match.Kind);
             Assert.Contains("J Smith", match.Reason);
         }
 
@@ -106,7 +106,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             var match = NotificationOutbox.MatchParaplanner(service, "Sam Jones");
 
-            Assert.Equal(NotificationOutbox.ParaplannerMatchKind.NoEmail, match.Kind);
+            Assert.Equal(NotificationOutbox.PersonMatchKind.NoEmail, match.Kind);
             Assert.Contains("no work email", match.Reason);
         }
 
@@ -123,7 +123,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             var match = NotificationOutbox.MatchParaplanner(service, "Sam Jones");
 
-            Assert.Equal(NotificationOutbox.ParaplannerMatchKind.Ambiguous, match.Kind);
+            Assert.Equal(NotificationOutbox.PersonMatchKind.Ambiguous, match.Kind);
             Assert.Null(match.Email);
         }
 
@@ -146,12 +146,12 @@ namespace OutcomeTesting.Plugins.Tests
         // ------------------------------------------------- the send path did not loosen
 
         [Theory]
-        [InlineData(NotificationOutbox.ParaplannerMatchKind.NoName)]
-        [InlineData(NotificationOutbox.ParaplannerMatchKind.NoContact)]
-        [InlineData(NotificationOutbox.ParaplannerMatchKind.Ambiguous)]
-        [InlineData(NotificationOutbox.ParaplannerMatchKind.NoEmail)]
+        [InlineData(NotificationOutbox.PersonMatchKind.NoName)]
+        [InlineData(NotificationOutbox.PersonMatchKind.NoContact)]
+        [InlineData(NotificationOutbox.PersonMatchKind.Ambiguous)]
+        [InlineData(NotificationOutbox.PersonMatchKind.NoEmail)]
         public void No_email_is_returned_for_anything_that_is_not_a_match(
-            NotificationOutbox.ParaplannerMatchKind kind)
+            NotificationOutbox.PersonMatchKind kind)
         {
             // Splitting one null into four reasons must not turn any of them into a send.
             // This is the negative: the reporting is richer, the addressing is not.
@@ -166,15 +166,15 @@ namespace OutcomeTesting.Plugins.Tests
 
         /// <summary>Seeds whatever contacts produce <paramref name="kind"/>, and returns the name.</summary>
         private static string NameProducing(
-            FakeOrganizationService service, NotificationOutbox.ParaplannerMatchKind kind)
+            FakeOrganizationService service, NotificationOutbox.PersonMatchKind kind)
         {
             switch (kind)
             {
-                case NotificationOutbox.ParaplannerMatchKind.NoName:
+                case NotificationOutbox.PersonMatchKind.NoName:
                     return null;
-                case NotificationOutbox.ParaplannerMatchKind.NoContact:
+                case NotificationOutbox.PersonMatchKind.NoContact:
                     return "Nobody Here";
-                case NotificationOutbox.ParaplannerMatchKind.Ambiguous:
+                case NotificationOutbox.PersonMatchKind.Ambiguous:
                     SeedContact(service, "J Smith", "first@example.com");
                     SeedContact(service, "J Smith", "second@example.com");
                     return "J Smith";

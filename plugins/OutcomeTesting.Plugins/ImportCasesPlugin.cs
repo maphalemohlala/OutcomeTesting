@@ -211,6 +211,24 @@ namespace OutcomeTesting.Plugins
                             row.RowNumber, row.Reference, "Imported (para-planner unmatched)",
                             paraplanner.Reason, row.Raw));
                     }
+
+                    // The adviser, on the same terms (project owner, 2026-09-20). Reported
+                    // rather than fatal for the reason above, and it is a WEAKER statement
+                    // than the para-planner's: an adviser letter is still sent to the stored
+                    // address when no contact holds it, because losing a letter is worse than
+                    // sending one to an address the directory does not happen to carry. What
+                    // this line buys is knowing on the day that the adviser on this case is
+                    // nobody the system can point at.
+                    var adviser = NotificationOutbox.MatchAdviser(
+                        systemService,
+                        record.GetAttributeValue<string>("al_adviseremail"),
+                        record.GetAttributeValue<string>("al_advisername"));
+                    if (!adviser.IsMatch)
+                    {
+                        report.Add(ReportRow(
+                            row.RowNumber, row.Reference, "Imported (adviser unmatched)",
+                            adviser.Reason, row.Raw));
+                    }
                 }
                 catch (Exception error)
                 {
