@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<SdkMessageProcessingStep Name="NotificationTemplateGuardPlugin: Update of al_notificationtemplate" SdkMessageProcessingStepId="{b8a554d4-d4b4-f111-aaac-e4fade069307}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <SdkMessageId>20bebb1b-ea3e-db11-86a7-000a3a5473e8</SdkMessageId>
+  <PluginTypeName>OutcomeTesting.Plugins.NotificationTemplateGuardPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f</PluginTypeName>
+  <PluginTypeId>07b31cc7-d4b4-f111-aaac-e4fade069307</PluginTypeId>
+  <PrimaryEntity>al_notificationtemplate</PrimaryEntity>
+  <AsyncAutoDelete>0</AsyncAutoDelete>
+  <FilteringAttributes></FilteringAttributes>
+  <InvocationSource>1</InvocationSource>
+  <Mode>0</Mode>
+  <Rank>1</Rank>
+  <EventHandlerTypeCode>4602</EventHandlerTypeCode>
+  <Stage>20</Stage>
+  <IsCustomizable>1</IsCustomizable>
+  <IsHidden>0</IsHidden>
+  <SupportedDeployment>0</SupportedDeployment>
+  <IntroducedVersion>1.0</IntroducedVersion>
+  <!-- Stamped 2026-09-20, audit finding 3. Dataverse imports a step DISABLED
+       unless activation is requested, and an import that forgot the
+       activate-plugins flag switched these off once already (2026-09-02, six
+       al_response steps, unnoticed for a week). The export does not emit these
+       two elements, so round-trip-src.ps1 re-applies them after every export;
+       see Restore-StepState there. Do not remove either without reading that. -->
+  <StateCode>Enabled</StateCode>
+  <StatusCode>Enabled</StatusCode>
+  <SdkMessageProcessingStepImages />
+</SdkMessageProcessingStep>

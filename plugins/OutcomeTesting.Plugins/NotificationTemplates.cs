@@ -397,6 +397,30 @@ namespace OutcomeTesting.Plugins
                 + "\">" + Html(label) + "</a></p>";
         }
 
+        /// <summary>The adviser's name for the salutation, or "Adviser".</summary>
+        public static string Salutation(string adviserName)
+        {
+            return string.IsNullOrWhiteSpace(adviserName) ? "Adviser" : adviserName.Trim();
+        }
+
+        /// <summary>
+        /// How the letter opens its sentence: with the client, or with "This case".
+        ///
+        /// Capitalised only in the fallback, because a client name carries its own capitals
+        /// and lower-casing "Mr and Mrs Smith" would be worse than a sentence starting with
+        /// a name.
+        /// </summary>
+        public static string ClientOpener(string clientName)
+        {
+            return string.IsNullOrWhiteSpace(clientName) ? "This case" : clientName.Trim();
+        }
+
+        /// <summary>The case reference, or "a case".</summary>
+        public static string ReferenceOr(string caseReference)
+        {
+            return string.IsNullOrWhiteSpace(caseReference) ? "a case" : caseReference.Trim();
+        }
+
         /// <summary>Text as HTML, as <c>NotificationBodies</c> has always escaped it.</summary>
         private static string Html(string text)
         {

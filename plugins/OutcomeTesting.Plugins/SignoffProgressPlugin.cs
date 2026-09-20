@@ -325,6 +325,14 @@ namespace OutcomeTesting.Plugins
                 ? NotificationOutbox.ContactEmail(service, new EntityReference("contact", signatory.Value))
                 : null;
 
+            var recheck = NotificationTemplates.Render(
+                service,
+                NotificationTemplates.RecheckDue,
+                new Dictionary<string, string>
+                {
+                    { NotificationTemplates.TokenReference, reference },
+                });
+
             NotificationOutbox.Queue(
                 service,
                 context,
@@ -332,8 +340,8 @@ namespace OutcomeTesting.Plugins
                 "al_outcomecase",
                 caseId,
                 email,
-                "Case " + reference + " is waiting for its final outcome",
-                RecheckDueBody(reference));
+                recheck.Subject,
+                recheck.Body);
         }
 
         /// <summary>
@@ -369,18 +377,34 @@ namespace OutcomeTesting.Plugins
             // is not coming; where they did not, it is still waiting on one.
             var finalOutcome = signoff.GetAttributeValue<OptionSetValue>(FinalOutcomeAttr);
 
-            var body = approved
-                ? finalOutcome == null
-                    ? "Your remediation on case " + reference + " has been approved and the case has moved on to recheck."
-                    : "Your remediation on case " + reference + " has been approved, and the case is now closed with a final outcome of "
-                        + RegradeCasePlugin.FinalOutcomeLabel(finalOutcome.Value) + "."
-                : "Your remediation on case " + reference + " has been sent back for further work. "
-                    + "The ten-working-day clock has restarted from today (OD-018).";
+            // Three letters, not one with two conditionals in it. Approval means different
+            // things depending on whether the supervisor graded as they approved (project
+            // owner, 2026-09-11): where they did, the case is finished and saying it "moved
+            // on to recheck" would send the adviser looking for a step that is not coming.
+            var code = !approved
+                ? NotificationTemplates.SignoffRejected
+                : finalOutcome == null
+                    ? NotificationTemplates.SignoffApprovedRecheck
+                    : NotificationTemplates.SignoffApprovedClosed;
 
-            if (!string.IsNullOrWhiteSpace(notes))
-            {
-                body += " Notes: " + notes;
-            }
+            // The notes keep their leading space and their label, because the letters are
+            // written around them being absent as often as present.
+            var noteText = string.IsNullOrWhiteSpace(notes) ? string.Empty : " Notes: " + notes;
+
+            var letter = NotificationTemplates.Render(
+                service,
+                code,
+                new Dictionary<string, string>
+                {
+                    { NotificationTemplates.TokenReference, reference },
+                    { NotificationTemplates.TokenNotes, noteText },
+                    {
+                        NotificationTemplates.TokenFinalOutcome,
+                        finalOutcome == null
+                            ? string.Empty
+                            : RegradeCasePlugin.FinalOutcomeLabel(finalOutcome.Value)
+                    },
+                });
 
             NotificationOutbox.Queue(
                 service,
@@ -389,8 +413,8 @@ namespace OutcomeTesting.Plugins
                 SignoffEntity,
                 signoff.Id,
                 email,
-                (approved ? "Remediation approved on case " : "Remediation sent back on case ") + reference,
-                body);
+                letter.Subject,
+                letter.Body);
         }
 
         /// <summary>

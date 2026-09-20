@@ -66,6 +66,8 @@
   <EntityRelationship Name="lk_al_importexception_modifiedby" />
   <EntityRelationship Name="lk_al_notification_createdby" />
   <EntityRelationship Name="lk_al_notification_modifiedby" />
+  <EntityRelationship Name="lk_al_notificationtemplate_createdby" />
+  <EntityRelationship Name="lk_al_notificationtemplate_modifiedby" />
   <EntityRelationship Name="lk_al_outcome_createdby" />
   <EntityRelationship Name="lk_al_outcome_modifiedby" />
   <EntityRelationship Name="lk_al_outcomecase_createdby" />
@@ -96,6 +98,7 @@
   <EntityRelationship Name="organization_al_checklist" />
   <EntityRelationship Name="organization_al_checklistversion" />
   <EntityRelationship Name="organization_al_failreason" />
+  <EntityRelationship Name="organization_al_notificationtemplate" />
   <EntityRelationship Name="organization_al_question" />
   <EntityRelationship Name="organization_al_questionversion" />
   <EntityRelationship Name="organization_al_reviewroute" />

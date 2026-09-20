@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -320,6 +321,14 @@ namespace OutcomeTesting.Plugins
 
                 var reference = NotificationOutbox.CaseReference(service, caseRef) ?? "a case";
 
+                var letter = NotificationTemplates.Render(
+                    service,
+                    NotificationTemplates.SignoffDue,
+                    new Dictionary<string, string>
+                    {
+                        { NotificationTemplates.TokenReference, reference },
+                    });
+
                 NotificationOutbox.Queue(
                     service,
                     correlationId,
@@ -327,9 +336,8 @@ namespace OutcomeTesting.Plugins
                     "al_outcomecase",
                     caseRef.Id,
                     routing.Email,
-                    "Sign-off needed on case " + reference,
-                    "The adviser has completed every remediation action on case " + reference
-                        + ", so it is now waiting for your sign-off.");
+                    letter.Subject,
+                    letter.Body);
             }
             catch (Exception error)
             {

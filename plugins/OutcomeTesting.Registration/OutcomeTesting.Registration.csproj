@@ -21,4 +21,23 @@
     <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client" Version="1.*" />
   </ItemGroup>
 
+  <!--
+    The notification copy is LINKED from the plug-in project rather than copied here, and a
+    project reference is not an option: the plug-ins target net462 and this tool targets
+    net8.0.
+
+    It has to be one file. The whole point of the template table is that the wording lives in
+    one place; a seed verb carrying its own transcription of the same letters would be a
+    second copy, drifting from the fallback the moment either was edited - and the drift would
+    surface as an environment whose seeded rows quietly disagree with what it sends when those
+    rows are missing.
+
+    NotificationTemplates depends only on Microsoft.Xrm.Sdk types, which the Dataverse client
+    package supplies here too.
+  -->
+  <ItemGroup>
+    <Compile Include="..\OutcomeTesting.Plugins\NotificationTemplates.cs"
+             Link="Linked\NotificationTemplates.cs" />
+  </ItemGroup>
+
 </Project>

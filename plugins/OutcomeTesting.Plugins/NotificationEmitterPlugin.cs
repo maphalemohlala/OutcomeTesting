@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -101,9 +102,18 @@ namespace OutcomeTesting.Plugins
             // has to find the site, sign in and search for the reference the email just gave
             // them. Where the environment has a portal, the email carries the case itself.
             var link = NotificationOutbox.CaseLink(service, caseRef);
-            var body = link == null
-                ? "Case " + reference + " is now assigned to you for checking. Open it in the portal to start the review."
-                : "Case " + reference + " is now assigned to you for checking. Open it to start the review: " + link;
+
+            // Two codes rather than one letter with a conditional in it: the sentence really
+            // does differ, and an administrator editing "open it in the portal" should not
+            // have to reason about when the other branch fires.
+            var letter = NotificationTemplates.Render(
+                service,
+                link == null ? NotificationTemplates.AllocationNoLink : NotificationTemplates.Allocation,
+                new Dictionary<string, string>
+                {
+                    { NotificationTemplates.TokenReference, reference },
+                    { NotificationTemplates.TokenCaseLink, link },
+                });
 
             var assignedOn = assignment.GetAttributeValue<DateTime?>("al_assignedon");
 
@@ -114,8 +124,8 @@ namespace OutcomeTesting.Plugins
                 AssignmentEntity,
                 assignmentId,
                 email,
-                "Case " + reference + " has been allocated to you",
-                body,
+                letter.Subject,
+                letter.Body,
                 assignedOn.HasValue
                     ? assignedOn.Value.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture)
                     : null);
@@ -181,21 +191,36 @@ namespace OutcomeTesting.Plugins
             // rather than being told they received a grading they did not.
             var grade = NotificationOutbox.InitialOutcome(service, reviewRef);
 
-            var subject = NotificationBodies.RemediationSubject(grade, reference);
-            var body = NotificationBodies.Remediation(
-                grade,
-                caseRow == null ? null : caseRow.GetAttributeValue<string>("al_advisername"),
-                caseRow == null ? null : caseRow.GetAttributeValue<string>("al_clientname"),
-                NotificationOutbox.CaseLink(service, caseRef),
-                dueText);
+            // Which of the three remedial letters this grading earned. Null for a grading
+            // the supplied copy was never written for - a flagged Pass, or a Tax leg, which
+            // records no BR-005 grade at all - and those get the plainer letter rather than
+            // being told they received a grading they did not.
+            var code = RemediationLetter.RemediationCodeFor(grade);
+            var remedialLink = NotificationOutbox.CaseLink(service, caseRef);
 
-            if (subject == null || body == null)
-            {
-                subject = "Remediation required on case " + reference;
-                body = "Remediation has been raised against case " + reference
-                    + " and assigned to you (BR-006)." + dueText
-                    + " Record your response against each item in the portal.";
-            }
+            var letter = NotificationTemplates.Render(
+                service,
+                code,
+                new Dictionary<string, string>
+                {
+                    { NotificationTemplates.TokenReference, reference },
+                    {
+                        NotificationTemplates.TokenAdviser,
+                        NotificationTemplates.Salutation(
+                            caseRow == null ? null : caseRow.GetAttributeValue<string>("al_advisername"))
+                    },
+                    {
+                        NotificationTemplates.TokenClient,
+                        NotificationTemplates.ClientOpener(
+                            caseRow == null ? null : caseRow.GetAttributeValue<string>("al_clientname"))
+                    },
+                    { NotificationTemplates.TokenGrading, RemediationLetter.GradingPhrase(grade) },
+                    { NotificationTemplates.TokenDueText, dueText },
+                    {
+                        NotificationTemplates.TokenCaseButton,
+                        NotificationTemplates.CaseButton(remedialLink, "Confirm remedial action")
+                    },
+                });
 
             NotificationOutbox.Queue(
                 service,
@@ -204,8 +229,8 @@ namespace OutcomeTesting.Plugins
                 targetTable,
                 targetId,
                 email,
-                subject,
-                body);
+                letter.Subject,
+                letter.Body);
         }
 
         /// <summary>
@@ -239,6 +264,27 @@ namespace OutcomeTesting.Plugins
             // name. An unmatched adviser still queues the row - see Queue.
             var email = NotificationOutbox.ContactEmail(service, Remediation.AdviserContact(service, caseRef));
 
+            var passed = NotificationTemplates.Render(
+                service,
+                NotificationTemplates.CasePassed,
+                new Dictionary<string, string>
+                {
+                    { NotificationTemplates.TokenReference, NotificationTemplates.ReferenceOr(reference) },
+                    {
+                        NotificationTemplates.TokenAdviser,
+                        NotificationTemplates.Salutation(caseRow.GetAttributeValue<string>("al_advisername"))
+                    },
+                    {
+                        NotificationTemplates.TokenClient,
+                        NotificationTemplates.ClientOpener(caseRow.GetAttributeValue<string>("al_clientname"))
+                    },
+                    {
+                        NotificationTemplates.TokenCaseButton,
+                        NotificationTemplates.CaseButton(
+                            NotificationOutbox.CaseLink(service, caseRef), "View the case")
+                    },
+                });
+
             NotificationOutbox.Queue(
                 service,
                 correlationId,
@@ -246,11 +292,8 @@ namespace OutcomeTesting.Plugins
                 "al_outcomecase",
                 caseRef.Id,
                 email,
-                NotificationBodies.PassSubject(reference),
-                NotificationBodies.Pass(
-                    caseRow.GetAttributeValue<string>("al_advisername"),
-                    caseRow.GetAttributeValue<string>("al_clientname"),
-                    NotificationOutbox.CaseLink(service, caseRef)));
+                passed.Subject,
+                passed.Body);
         }
     }
 }

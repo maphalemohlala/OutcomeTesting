@@ -254,6 +254,18 @@ if (args.Length >= 2 && args[0].Equals("createadvisermapping", StringComparison.
     return CreateAdviserMappingTable(args[1], args.Length > 2 ? args[2] : "OutcomeTesting");
 }
 
+if (args.Length >= 2 && args[0].Equals("createnotificationtemplate", StringComparison.OrdinalIgnoreCase))
+{
+    return CreateNotificationTemplateTable(args[1], args.Length > 2 ? args[2] : "OutcomeTesting");
+}
+
+if (args.Length >= 2 && args[0].Equals("seednotificationtemplates", StringComparison.OrdinalIgnoreCase))
+{
+    return SeedNotificationTemplates(
+        args[1],
+        args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+}
+
 if (args.Length >= 2 && args[0].Equals("addmemocolumn", StringComparison.OrdinalIgnoreCase))
 {
     return AddMemoColumn(args);
@@ -7196,6 +7208,270 @@ static void GrantTable(
 // row and an email is exact; para-planner matching is by name only because nothing better
 // exists there, and AD-161 exists to make that weakness loud. There is no reason to repeat it
 // where a strong key is available.
+// Creates the editable notification wording table (Change 1). Idempotent, like every other
+// create verb here, so it is safe to re-run against an environment that already has part of
+// it.
+//
+// Organisation-owned configuration (AD-024): the copy belongs to the organisation, not to
+// whoever happened to edit it last.
+//
+// The table holds ONLY the wording. Which letter is sent, to whom, and when, all stay in
+// compiled code - a row here cannot invent a notification or redirect one, it can only change
+// the words of a letter the solution already decided to send.
+int CreateNotificationTemplateTable(string orgUrl, string solutionUniqueName)
+{
+    using var svc = Connect(orgUrl);
+
+    var exists = true;
+    try
+    {
+        svc.Execute(new RetrieveEntityRequest
+        {
+            LogicalName = NotificationTemplateTable.Logical,
+            EntityFilters = EntityFilters.Entity,
+        });
+    }
+    catch (Exception)
+    {
+        exists = false;
+    }
+
+    if (!exists)
+    {
+        Console.WriteLine($"Creating table {NotificationTemplateTable.Schema}…");
+        svc.Execute(new CreateEntityRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            Entity = new EntityMetadata
+            {
+                SchemaName = NotificationTemplateTable.Schema,
+                LogicalName = NotificationTemplateTable.Logical,
+                DisplayName = NotificationTemplateTable.Text("Notification template"),
+                DisplayCollectionName = NotificationTemplateTable.Text("Notification templates"),
+                Description = NotificationTemplateTable.Text(
+                    "The subject and body of one letter, editable without a deployment (Change 1). A missing, "
+                    + "inactive or half-written row falls back to the copy compiled into the plug-in assembly, "
+                    + "so an environment holding none of these sends exactly what it sent before."),
+                OwnershipType = OwnershipTypes.OrganizationOwned,
+                IsActivity = false,
+                IsAuditEnabled = new BooleanManagedProperty(true),
+            },
+            PrimaryAttribute = new StringAttributeMetadata
+            {
+                SchemaName = "al_Name",
+                LogicalName = "al_name",
+                RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.ApplicationRequired),
+                MaxLength = 200,
+                FormatName = StringFormatName.Text,
+                DisplayName = NotificationTemplateTable.Text("Name"),
+                Description = NotificationTemplateTable.Text("What an administrator sees in the list of letters."),
+            },
+        });
+        Console.WriteLine("  created.");
+    }
+    else
+    {
+        Console.WriteLine($"Table {NotificationTemplateTable.Schema} already exists; adding any missing parts.");
+    }
+
+    var present = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var current = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = NotificationTemplateTable.Logical,
+        EntityFilters = EntityFilters.Attributes,
+    });
+    foreach (var attribute in current.EntityMetadata.Attributes)
+    {
+        present.Add(attribute.LogicalName);
+    }
+
+    void Add(AttributeMetadata attribute)
+    {
+        if (present.Contains(attribute.LogicalName))
+        {
+            Console.WriteLine($"  {attribute.LogicalName}: already present");
+            return;
+        }
+
+        svc.Execute(new CreateAttributeRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            EntityName = NotificationTemplateTable.Logical,
+            Attribute = attribute,
+        });
+        Console.WriteLine($"  {attribute.LogicalName}: created");
+    }
+
+    Add(new StringAttributeMetadata
+    {
+        SchemaName = NotificationTemplateTable.CodeSchema,
+        LogicalName = NotificationTemplateTable.CodeLogical,
+        RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.ApplicationRequired),
+        MaxLength = 100,
+        FormatName = StringFormatName.Text,
+        DisplayName = NotificationTemplateTable.Text("Template code"),
+        Description = NotificationTemplateTable.Text(
+            "Which letter this is, as NotificationTemplates names it - for example CASE-PASSED. The "
+            + "alternate key, so one letter cannot hold two conflicting versions of its wording."),
+    });
+
+    Add(new StringAttributeMetadata
+    {
+        SchemaName = NotificationTemplateTable.SubjectSchema,
+        LogicalName = NotificationTemplateTable.SubjectLogical,
+        RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.ApplicationRequired),
+        MaxLength = 400,
+        FormatName = StringFormatName.Text,
+        DisplayName = NotificationTemplateTable.Text("Subject"),
+        Description = NotificationTemplateTable.Text(
+            "The subject line. Tokens are written as {{name}} and are always plain text here, whatever "
+            + "the body is, because no mail client renders markup in a subject."),
+    });
+
+    Add(new MemoAttributeMetadata
+    {
+        SchemaName = NotificationTemplateTable.BodySchema,
+        LogicalName = NotificationTemplateTable.BodyLogical,
+        RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.ApplicationRequired),
+        MaxLength = 20000,
+        DisplayName = NotificationTemplateTable.Text("Body"),
+        Description = NotificationTemplateTable.Text(
+            "The body. Some letters are markup and some are plain text - NotificationTemplates knows "
+            + "which, and escapes token values accordingly. The template itself is used as written."),
+    });
+
+    var keys = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = NotificationTemplateTable.Logical,
+        EntityFilters = EntityFilters.Entity,
+    });
+    var hasKey = keys.EntityMetadata.Keys != null
+        && keys.EntityMetadata.Keys.Any(k => k.LogicalName == NotificationTemplateTable.KeyLogical);
+    if (!hasKey)
+    {
+        svc.Execute(new CreateEntityKeyRequest
+        {
+            EntityName = NotificationTemplateTable.Logical,
+            SolutionUniqueName = solutionUniqueName,
+            EntityKey = new EntityKeyMetadata
+            {
+                SchemaName = NotificationTemplateTable.KeySchema,
+                LogicalName = NotificationTemplateTable.KeyLogical,
+                DisplayName = NotificationTemplateTable.Text("Template code"),
+                KeyAttributes = new[] { NotificationTemplateTable.CodeLogical },
+            },
+        });
+        Console.WriteLine($"  {NotificationTemplateTable.KeyLogical}: created");
+    }
+    else
+    {
+        Console.WriteLine($"  {NotificationTemplateTable.KeyLogical}: already present");
+    }
+
+    svc.Execute(new PublishAllXmlRequest());
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    var after = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = NotificationTemplateTable.Logical,
+        EntityFilters = EntityFilters.Attributes | EntityFilters.Entity,
+    });
+    var names = new HashSet<string>(
+        after.EntityMetadata.Attributes.Select(a => a.LogicalName), StringComparer.OrdinalIgnoreCase);
+
+    var missing = new List<string>();
+    foreach (var required in new[]
+             {
+                 NotificationTemplateTable.CodeLogical,
+                 NotificationTemplateTable.SubjectLogical,
+                 NotificationTemplateTable.BodyLogical,
+             })
+    {
+        if (!names.Contains(required)) { missing.Add(required); }
+    }
+
+    if (after.EntityMetadata.Keys == null
+        || !after.EntityMetadata.Keys.Any(k => k.LogicalName == NotificationTemplateTable.KeyLogical))
+    {
+        missing.Add(NotificationTemplateTable.KeyLogical);
+    }
+
+    if (missing.Count > 0)
+    {
+        Console.Error.WriteLine(
+            "Not found after the create returned: " + string.Join(", ", missing)
+            + ". Investigate before relying on it.");
+        return 1;
+    }
+
+    Console.WriteLine(
+        $"Published. {NotificationTemplateTable.Schema} is in solution '{solutionUniqueName}'.");
+    return 0;
+}
+
+// Writes one row per letter, carrying the wording compiled into the assembly today.
+//
+// Seeding is OPTIONAL and the solution works without it: an environment with no rows falls
+// back to the same copy, so this exists to give an administrator something to edit rather
+// than to make the letters work.
+//
+// Existing rows are never overwritten. Somebody's edited wording is the whole point of the
+// table, and a re-run of a seed is not a reason to throw it away.
+int SeedNotificationTemplates(string orgUrl, bool confirm)
+{
+    using var svc = Connect(orgUrl);
+
+    var definitions = OutcomeTesting.Plugins.NotificationTemplates.All.ToList();
+    Console.WriteLine(confirm ? "Seeding notification templates." : "Dry run - nothing will be written.");
+    Console.WriteLine();
+
+    var written = 0;
+    var kept = 0;
+
+    foreach (var definition in definitions)
+    {
+        var query = new QueryExpression(NotificationTemplateTable.Logical)
+        {
+            ColumnSet = new ColumnSet(false),
+            TopCount = 1,
+            Criteria = new FilterExpression(),
+        };
+        query.Criteria.AddCondition(
+            NotificationTemplateTable.CodeLogical, ConditionOperator.Equal, definition.Code);
+
+        var existing = svc.RetrieveMultiple(query).Entities;
+        if (existing.Count > 0)
+        {
+            Console.WriteLine($"  {definition.Code,-30} already present, left alone");
+            kept++;
+            continue;
+        }
+
+        Console.WriteLine($"  {definition.Code,-30} {(confirm ? "created" : "would be created")}");
+        written++;
+
+        if (!confirm)
+        {
+            continue;
+        }
+
+        svc.Create(new Entity(NotificationTemplateTable.Logical)
+        {
+            ["al_name"] = definition.Name,
+            [NotificationTemplateTable.CodeLogical] = definition.Code,
+            [NotificationTemplateTable.SubjectLogical] = definition.Subject,
+            [NotificationTemplateTable.BodyLogical] = definition.Body,
+        });
+    }
+
+    Console.WriteLine();
+    Console.WriteLine(
+        confirm
+            ? $"Seeded {written} template(s); {kept} already existed and were left alone."
+            : $"{written} would be created, {kept} already exist. Re-run with --confirm to write them.");
+    return 0;
+}
+
 int CreateAdviserMappingTable(string orgUrl, string solutionUniqueName)
 {
     using var svc = Connect(orgUrl);
@@ -9695,6 +9971,30 @@ sealed class YamlValue
 /// para-planner matching has to fail loudly (AD-161). Routing a sign-off to the wrong T&C
 /// Manager because two advisers are called J Smith would be the same class of defect.
 /// </summary>
+/// <summary>
+/// The editable notification wording (Change 1). The codes and the default copy live in
+/// OutcomeTesting.Plugins.NotificationTemplates; this class only names the table.
+/// </summary>
+static class NotificationTemplateTable
+{
+    public const string Logical = "al_notificationtemplate";
+    public const string Schema = "al_NotificationTemplate";
+
+    public const string CodeLogical = "al_templatecode";
+    public const string CodeSchema = "al_TemplateCode";
+
+    public const string SubjectLogical = "al_subject";
+    public const string SubjectSchema = "al_Subject";
+
+    public const string BodyLogical = "al_body";
+    public const string BodySchema = "al_Body";
+
+    public const string KeyLogical = "al_notificationtemplatecodekey";
+    public const string KeySchema = "al_NotificationTemplateCodeKey";
+
+    public static Label Text(string value) => new Label(value, 1033);
+}
+
 static class AdviserMappingTable
 {
     public const string Logical = "al_advisermapping";

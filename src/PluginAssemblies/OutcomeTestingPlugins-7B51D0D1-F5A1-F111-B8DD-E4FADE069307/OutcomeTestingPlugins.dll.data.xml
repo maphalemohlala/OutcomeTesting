@@ -74,6 +74,9 @@
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.NotificationEmitterPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="efefcb20-e1a7-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.NotificationEmitterPlugin">
       <FriendlyName>OutcomeTesting.Plugins.NotificationEmitterPlugin</FriendlyName>
     </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.NotificationTemplateGuardPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="07b31cc7-d4b4-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.NotificationTemplateGuardPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.NotificationTemplateGuardPlugin</FriendlyName>
+    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.RegradeCasePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="4b61d8ba-07a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.RegradeCasePlugin">
       <FriendlyName>OutcomeTesting.Plugins.RegradeCasePlugin</FriendlyName>
     </PluginType>

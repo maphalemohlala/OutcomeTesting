@@ -271,6 +271,14 @@ namespace OutcomeTesting.Plugins
             var caseRef = review.GetAttributeValue<EntityReference>("al_outcomecaseid");
             var reference = NotificationOutbox.CaseReference(service, caseRef) ?? "a case";
 
+            var submitted = NotificationTemplates.Render(
+                service,
+                NotificationTemplates.ReviewSubmitted,
+                new Dictionary<string, string>
+                {
+                    { NotificationTemplates.TokenReference, reference },
+                });
+
             NotificationOutbox.Queue(
                 service,
                 correlationId,
@@ -278,8 +286,8 @@ namespace OutcomeTesting.Plugins
                 ReviewEntity,
                 reviewId,
                 NotificationOutbox.ParaplannerEmail(service, caseRef),
-                "Review submitted on case " + reference,
-                "The review on case " + reference + " has been submitted and is locked to further edits (FR-017).");
+                submitted.Subject,
+                submitted.Body);
         }
 
         /// <summary>
