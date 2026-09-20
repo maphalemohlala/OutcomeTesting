@@ -71,7 +71,12 @@ namespace OutcomeTesting.Plugins
                 context.InitiatingUserId,
                 context.CorrelationId,
                 requireCallerOwnsAction: true,
-                details: null);
+                details: null,
+                // The sign-off-due routing goes quiet on an unmapped adviser by design, and
+                // says why in the trace log instead - but only if it is handed somewhere to
+                // write (F41). Nothing passed one, so every explanation it had was discarded
+                // and a manager who was never told had no way to find out why.
+                trace: message => localPluginContext.Trace(message));
 
             CommandHelpers.SetResponse(context, result.Status, result.AuditEventId, result.Conflict);
         }
