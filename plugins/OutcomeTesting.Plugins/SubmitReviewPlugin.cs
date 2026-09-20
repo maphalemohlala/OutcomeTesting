@@ -936,6 +936,7 @@ namespace OutcomeTesting.Plugins
 
             bool requiresRemediation;
             string remediationReason;
+            DeferredTax deferredTaxFail = null;
 
             if (isAqs)
             {
@@ -967,9 +968,28 @@ namespace OutcomeTesting.Plugins
                 }
 
                 CreateOutcome(service, targetId, caseRef, caseReference, sequence, outcomeValue);
-                nextStatus = OutcomeRules.NextCaseStatusForAqs(outcomeValue, remedialFlagged);
-                requiresRemediation = OutcomeRules.RequiresRemediation(outcomeValue, remedialFlagged);
-                remediationReason = new OptionLabels(service).Label(OutcomeEntity, "al_initialoutcome", outcomeValue);
+
+                // The Tax fail this case may be carrying (project owner, 2026-09-20). The Tax
+                // submit stamped al_taxoutcome and moved the case to the queue without raising
+                // anything, so THIS submit is the only one that will ask the adviser for
+                // anything about either check. Read from the case rather than from the Tax
+                // review, because al_taxoutcome is where the Tax submit recorded its verdict.
+                deferredTaxFail = DeferredTaxFail(service, caseRef.Id);
+
+                nextStatus = OutcomeRules.NextCaseStatusForAqs(
+                    outcomeValue, remedialFlagged, deferredTaxFail != null);
+                requiresRemediation =
+                    OutcomeRules.RequiresRemediation(outcomeValue, remedialFlagged) || deferredTaxFail != null;
+
+                var aqsReason = new OptionLabels(service).Label(OutcomeEntity, "al_initialoutcome", outcomeValue);
+
+                // Both reasons when both failed, so the adviser is told what they are putting
+                // right rather than only the half that happened to be submitted last.
+                remediationReason = deferredTaxFail == null
+                    ? aqsReason
+                    : (OutcomeRules.RequiresRemediation(outcomeValue, remedialFlagged)
+                        ? aqsReason + "; " + deferredTaxFail.Reason
+                        : deferredTaxFail.Reason);
             }
             else
             {
@@ -989,7 +1009,13 @@ namespace OutcomeTesting.Plugins
 
                 var aqsStillToCome = AqsStillToCome(service, caseRef.Id);
                 nextStatus = OutcomeRules.NextCaseStatusForTax(answer.Value, aqsStillToCome, remedialFlagged);
-                requiresRemediation = taxRequiresRemediation || remedialFlagged;
+
+                // Deferred, not discarded (project owner, 2026-09-20). With AQS still to come
+                // the fail is recorded on al_taxoutcome and the AQS submit raises ONE action
+                // set covering both checks. A Tax-only case has nothing coming, so it raises
+                // here exactly as it always did.
+                requiresRemediation = OutcomeRules.TaxRaisesRemediationNow(
+                    taxRequiresRemediation || remedialFlagged, aqsStillToCome);
                 // Read from al_outcomecase.al_taxoutcome, not al_response.al_answerchoice,
                 // even though the two carry the same values. The answer-choice set is shared
                 // with the suitability grid and the Consumer Duty overlay, where 120910302 is
@@ -1019,7 +1045,8 @@ namespace OutcomeTesting.Plugins
                     caseReference,
                     sequence,
                     remediationReason,
-                    isAqs ? AqsObservationQuestionCode : TaxObservationQuestionCode);
+                    isAqs ? AqsObservationQuestionCode : TaxObservationQuestionCode,
+                    deferredTaxFail);
             }
             else if (OutcomeRules.EarnsPassNotification(nextStatus, requiresRemediation))
             {
@@ -1110,6 +1137,100 @@ namespace OutcomeTesting.Plugins
         /// replayed submit finds the row it already raised instead of raising a second one,
         /// and an adviser part-way through their response is never sent back to Open.
         /// </summary>
+        /// <summary>
+        /// A Tax fail recorded by an earlier submit and not yet actioned, with what the
+        /// combined remediation needs from it (project owner, 2026-09-20).
+        /// </summary>
+        public sealed class DeferredTax
+        {
+            /// <summary>The Tax review the fail came from, for its items and observation.</summary>
+            public Guid ReviewId { get; set; }
+
+            /// <summary>"Tax check: Fail", as the adviser reads it.</summary>
+            public string Reason { get; set; }
+        }
+
+        /// <summary>
+        /// The Tax fail this case is carrying, or null when there is none to carry.
+        ///
+        /// Read from <c>al_taxoutcome</c> on the CASE, not from the Tax review's answer. The
+        /// Tax submit stamps that column precisely so the verdict outlives the review that
+        /// made it, and it is scoped to this discipline - the shared answer-choice set reads
+        /// 120910302 as "Insufficient evidence" everywhere else and as "Pass with issues" for
+        /// the Tax check alone (AD-055 amended), so taking the shared label would put wording
+        /// in front of the adviser that no checker ever saw.
+        ///
+        /// Returns null when the Tax check passed, when there is no Tax review, or when the
+        /// column holds something this solution does not recognise. The last of those is
+        /// deliberately silent rather than throwing: an unreadable Tax result must not stop an
+        /// AQS checker submitting their own work, and the AQS outcome still raises whatever it
+        /// raises on its own account.
+        /// </summary>
+        public static DeferredTax DeferredTaxFail(IOrganizationService service, Guid caseId)
+        {
+            var row = service.Retrieve(CaseEntity, caseId, new ColumnSet(TaxOutcomeAttr));
+            var outcome = row.GetAttributeValue<OptionSetValue>(TaxOutcomeAttr);
+            if (outcome == null)
+            {
+                return null;
+            }
+
+            bool requiresRemediation;
+            if (!OutcomeRules.TryTaxResultRequiresRemediation(outcome.Value, out requiresRemediation)
+                || !requiresRemediation)
+            {
+                return null;
+            }
+
+            var taxReview = SubmittedReviewId(service, caseId, ResponseRules.ReviewTypeTax);
+            if (!taxReview.HasValue)
+            {
+                return null;
+            }
+
+            return new DeferredTax
+            {
+                ReviewId = taxReview.Value,
+                Reason = "Tax check: "
+                    + new OptionLabels(service).Label(CaseEntity, TaxOutcomeAttr, outcome.Value),
+            };
+        }
+
+        /// <summary>The submitted review of the given discipline on this case, if there is one.</summary>
+        private static Guid? SubmittedReviewId(IOrganizationService service, Guid caseId, int reviewType)
+        {
+            var query = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition(ReviewOutcomeCase, ConditionOperator.Equal, caseId);
+            query.Criteria.AddCondition("al_reviewtype", ConditionOperator.Equal, reviewType);
+            query.Criteria.AddCondition("al_submittedon", ConditionOperator.NotNull);
+
+            var found = service.RetrieveMultiple(query).Entities;
+            return found.Count == 0 ? (Guid?)null : found[0].Id;
+        }
+
+        /// <summary>
+        /// Raises the BR-006 remediation for this submission - ONE action set per case,
+        /// covering both checks (project owner, 2026-09-20).
+        ///
+        /// <paramref name="deferredTax"/> is the Tax fail an earlier submit recorded and did
+        /// not action. When it is present the adviser gets a single set of actions listing
+        /// what both checks marked down, in the order Tax then AQS - the order the case was
+        /// worked in, which is the order the adviser will recognise.
+        ///
+        /// Before 2026-09-20 a case failing both checks produced two sets of actions and two
+        /// letters, because a Tax fail went to remediation before AQS ever ran. The adviser
+        /// was asked twice about one file.
+        ///
+        /// The observation is the checker's own words from the discipline's fail observation
+        /// question, which AD-019 leaves optional - so the description has to stand without
+        /// it, and with a combined action there may be two of them.
+        /// </summary>
         private static void RaiseRemediation(
             IOrganizationService service,
             Guid reviewId,
@@ -1117,8 +1238,29 @@ namespace OutcomeTesting.Plugins
             string caseReference,
             int sequence,
             string reason,
-            string observationQuestionCode)
+            string observationQuestionCode,
+            DeferredTax deferredTax)
         {
+            var items = new List<string>();
+            string observation = null;
+
+            // Tax first: it was checked first, and an adviser reading a combined list will
+            // look for the Tax points where the Tax check left them.
+            if (deferredTax != null)
+            {
+                items.AddRange(Remediation.NonPassItems(service, deferredTax.ReviewId, DateTime.UtcNow));
+                observation = AnswerTextFor(service, deferredTax.ReviewId, TaxObservationQuestionCode);
+            }
+
+            items.AddRange(Remediation.NonPassItems(service, reviewId, DateTime.UtcNow));
+
+            var own = AnswerTextFor(service, reviewId, observationQuestionCode);
+            if (!string.IsNullOrWhiteSpace(own))
+            {
+                // Both checkers' words when both wrote some, rather than one silently winning.
+                observation = string.IsNullOrWhiteSpace(observation) ? own : observation + " " + own;
+            }
+
             Remediation.Raise(
                 service,
                 caseRef,
@@ -1126,8 +1268,8 @@ namespace OutcomeTesting.Plugins
                 reviewId,
                 sequence,
                 reason,
-                AnswerTextFor(service, reviewId, observationQuestionCode),
-                Remediation.NonPassItems(service, reviewId, DateTime.UtcNow),
+                observation,
+                items,
                 Remediation.AdviserContact(service, caseRef),
                 DateTime.UtcNow);
         }

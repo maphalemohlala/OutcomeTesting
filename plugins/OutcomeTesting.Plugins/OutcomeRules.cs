@@ -217,41 +217,92 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static int NextCaseStatusForAqs(int outcome, bool remedialActionFlagged)
         {
-            return RequiresRemediation(outcome, remedialActionFlagged)
+            return NextCaseStatusForAqs(outcome, remedialActionFlagged, false);
+        }
+
+        /// <summary>
+        /// As above, and also carrying a Tax fail that was deferred rather than actioned
+        /// (project owner, 2026-09-20).
+        ///
+        /// <paramref name="taxFailDeferred"/> is what makes the combined remediation possible:
+        /// the Tax submit moved the case to the queue and raised nothing, so this submit is
+        /// the only one that will ask the adviser for anything. An AQS pass on a case whose
+        /// Tax check failed must therefore NOT close - it is the one combination the old rule
+        /// could not produce, because a Tax fail never reached AQS at all.
+        /// </summary>
+        public static int NextCaseStatusForAqs(int outcome, bool remedialActionFlagged, bool taxFailDeferred)
+        {
+            return RequiresRemediation(outcome, remedialActionFlagged) || taxFailDeferred
                 ? CaseLifecycle.AwaitingRemediation
                 : CaseLifecycle.Closed;
         }
 
         /// <summary>
-        /// Where a Tax submit leaves the case. A Tax non-pass enters remediation whatever
-        /// the route (BR-006, OD-027) — only a passed Tax check hands off to AQS. When the
-        /// Tax check passed and AQS is still to come, the case returns to the shared queue
-        /// for manual allocation (BR-003, AD-040). Otherwise the Tax result finalises it.
+        /// Where a Tax submit leaves the case.
         ///
-        /// A flagged Tax pass is held for remediation before AQS rather than handed off
-        /// (project owner direction, 2026-09-09). That is the reasoning OD-027 already
-        /// applies to a Tax non-pass, for the same reason: AQS must not review a file with
-        /// something on it still unaddressed.
-        ///
-        /// Once that remediation is approved the case returns to the queue for its AQS
-        /// check (OD-038, resolved 2026-09-09: the case has to go through remediation before
-        /// it can reach AQS). <see cref="SignoffProgressPlugin.MoveCase"/> makes that hop,
-        /// which <see cref="CaseLifecycle"/> permits out of Awaiting Sign-off.
+        /// <para>
+        /// <b>If AQS is still to come, the case goes to the queue whatever the Tax result.</b>
+        /// A Tax fail is RECORDED - <c>al_taxoutcome</c> is stamped on the case by the same
+        /// submit - but it is not actioned yet. The AQS check then runs, and whichever of the
+        /// two failed is gathered into ONE combined remediation when AQS is submitted.
+        /// </para>
+        /// <para>
+        /// <b>This reverses OD-027 and the remediation half of BR-006</b> (project owner,
+        /// 2026-09-20). Those said a Tax non-pass entered remediation whatever the route, so
+        /// that AQS never reviewed a file with something unaddressed on it. The cost was two
+        /// remediations on a case that failed both checks: two sets of actions, two letters to
+        /// the adviser, and two rounds of the same conversation about one file. The owner's
+        /// direction is that the adviser should be asked once.
+        /// </para>
+        /// <para>
+        /// The trade was put to the owner explicitly and accepted: a serious Tax failure now
+        /// sits unactioned for as long as the AQS check takes. The AQS checker sees the Tax
+        /// result while they work - Tax notes render on a non-Tax review - so they are not
+        /// grading blind, which was the other half of the concern.
+        /// </para>
+        /// <para>
+        /// A Tax-only case is unaffected. There is no AQS check to wait for, so a fail goes
+        /// straight to remediation exactly as before, and this is why the rule takes
+        /// <paramref name="aqsStillToCome"/> rather than reading the route.
+        /// </para>
+        /// <para>
+        /// OD-038 said a case had to pass through remediation before it could reach AQS. It no
+        /// longer can, because there is no remediation before AQS on this route. The hop
+        /// <see cref="SignoffProgressPlugin.MoveCase"/> makes out of Awaiting Sign-off back to
+        /// the queue stays - a case remediated after AQS can still owe a recheck.
+        /// </para>
         /// </summary>
         public static int NextCaseStatusForTax(int answerChoice, bool aqsStillToCome, bool remedialActionFlagged)
         {
-            // OD-027: a Tax non-pass enters remediation whatever the route (BR-006). Only a
-            // passed Tax check hands off to AQS — a case whose Tax check failed must not
-            // proceed to an advice quality review with the failure unaddressed, and a later
-            // AQS pass would otherwise close the case with the Tax fail unremediated.
+            // The queue, whatever the result. Deliberately before the fail test: the fail is
+            // not lost, it is deferred to the combined remediation that the AQS submit raises.
+            if (aqsStillToCome)
+            {
+                return CaseLifecycle.Queued;
+            }
+
+            // Tax-only case, or the Tax leg of a case whose AQS is already done. Nothing is
+            // coming that could carry the fail, so it is actioned here.
             if (remedialActionFlagged || TaxResultRequiresRemediation(answerChoice))
             {
                 return CaseLifecycle.AwaitingRemediation;
             }
 
-            return aqsStillToCome
-                ? CaseLifecycle.Queued
-                : CaseLifecycle.Closed;
+            return CaseLifecycle.Closed;
+        }
+
+        /// <summary>
+        /// Whether a Tax submit should raise remediation now, or leave it to the AQS submit
+        /// to raise once, combined (project owner, 2026-09-20).
+        ///
+        /// Pure and separate from <see cref="NextCaseStatusForTax"/> because the two answer
+        /// different questions and used to be conflated: the status says where the case goes,
+        /// this says whether an adviser is asked to do something. A Tax fail with AQS still to
+        /// come moves the case to the queue AND raises nothing, which no single value can say.
+        /// </summary>
+        public static bool TaxRaisesRemediationNow(bool taxRequiresRemediation, bool aqsStillToCome)
+        {
+            return taxRequiresRemediation && !aqsStillToCome;
         }
 
         /// <summary>

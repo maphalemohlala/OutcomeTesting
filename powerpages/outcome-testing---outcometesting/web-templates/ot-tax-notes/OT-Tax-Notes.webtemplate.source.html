@@ -4,10 +4,16 @@
 
     (% include 'OT Tax Notes' case_id: cid %)
 
-  Q-TAX-03 "Case notes" is what the business calls the Tax notes. It is a question in a
-  Tax-owned section, and AD-020 filters every review page to its own discipline, so an AQS
-  checker reading a completed check and an adviser reading a remediation could not see it
-  at all. Both are people the Tax checker was writing for.
+  TWO questions, both Tax-owned:
+
+    Q-TAX-03   "Case notes"   - what the business calls the Tax notes, plain text.
+    Q-FQTAX-03 "Tax Remedial" - the rich-text answer, added 2026-09-19.
+
+  AD-020 filters every review page to its own discipline, so an AQS checker reading a
+  completed check and an adviser reading a remediation could see neither. Both are people
+  the Tax checker was writing for, and the remedial one especially: from 2026-09-20 a Tax
+  fail is carried into ONE combined remediation raised after the AQS check, so this panel is
+  where an adviser reads what the Tax checker asked them to put right.
 
   Nothing here is editable. A response belongs to the review that recorded it, and the Tax
   review is submitted and locked (BR-012, PP-11) by the time either of these pages is read.
@@ -22,9 +28,15 @@
   labelled with its submission date instead, which is both honest and more useful; the
   ordinary case has exactly one.
 
-  Renders nothing at all when there is no Tax note: a case may be AQS-only, or the Tax
-  checker may simply have left the box empty, and an empty panel headed "Tax check notes"
-  reads as a fault.
+  Renders nothing at all when both are empty: a case may be AQS-only, or the Tax checker may
+  simply have left the boxes empty, and an empty panel headed "Tax check notes" reads as a
+  fault. Either one alone is enough to open the panel.
+
+  The remedial answer is emitted as MARKUP and the note is escaped, which is the difference
+  between the two columns rather than an inconsistency. al_answerrichtext is reduced to an
+  allow-list by HtmlSanitiser pre-operation on al_response, so it cannot reach the column
+  unsanitised whatever wrote it; al_answertext is plain text and would show its own angle
+  brackets as tags if it were not escaped.
 {% endcomment %}
 
 {% if case_id and case_id != '' %}
@@ -33,10 +45,15 @@
     <entity name="al_response">
       <attribute name="al_responseid" />
       <attribute name="al_answertext" />
+      <attribute name="al_answerrichtext" />
       <link-entity name="al_questionversion" from="al_questionversionid" to="al_questionversionid" alias="qv">
         <link-entity name="al_question" from="al_questionid" to="al_questionid" alias="q">
+          <attribute name="al_questioncode" />
           <filter type="and">
-            <condition attribute="al_questioncode" operator="eq" value="Q-TAX-03" />
+            <condition attribute="al_questioncode" operator="in">
+              <value>Q-TAX-03</value>
+              <value>Q-FQTAX-03</value>
+            </condition>
           </filter>
         </link-entity>
       </link-entity>
@@ -61,7 +78,8 @@
   {% assign ot_tax_note_count = 0 %}
   {% for r in ot_tax_notes.results.entities %}
     {% assign ot_note_text = r.al_answertext | strip %}
-    {% if ot_note_text != '' %}
+    {% assign ot_note_rich = r.al_answerrichtext | strip %}
+    {% if ot_note_text != '' or ot_note_rich != '' %}
       {% assign ot_tax_note_count = ot_tax_note_count | plus: 1 %}
     {% endif %}
   {% endfor %}
@@ -74,14 +92,21 @@
     </p>
     {% for r in ot_tax_notes.results.entities %}
       {% assign ot_note_text = r.al_answertext | strip %}
-      {% if ot_note_text != '' %}
+      {% assign ot_note_rich = r.al_answerrichtext | strip %}
+      {% assign ot_note_code = r['q.al_questioncode'] %}
+      {% if ot_note_text != '' or ot_note_rich != '' %}
       <div class="ot-tax-notes__item">
         {% if ot_tax_note_count > 1 %}
         <p class="ot-tax-notes__meta">
+          {% if ot_note_code == 'Q-FQTAX-03' %}Tax remedial{% else %}Case notes{% endif %} &mdash;
           Tax check submitted {{ r['ri.al_submittedon'] | date: 'dd MMM yyyy' | default: 'date not recorded' }}
         </p>
         {% endif %}
+        {% if ot_note_rich != '' %}
+        <div class="ot-tax-notes__text ot-rte__read">{{ ot_note_rich }}</div>
+        {% else %}
         <p class="ot-tax-notes__text">{{ ot_note_text | escape | newline_to_br }}</p>
+        {% endif %}
       </div>
       {% endif %}
     {% endfor %}

@@ -130,14 +130,58 @@ namespace OutcomeTesting.Plugins.Tests
         [Theory]
         [InlineData(ResponseRules.ChoiceFail)]
         [InlineData(ResponseRules.ChoiceInsufficient)]
-        public void Sends_a_failed_tax_check_to_remediation_even_when_aqs_is_still_to_come(int answer)
+        public void Queues_a_failed_tax_check_for_aqs_rather_than_remediating_it(int answer)
         {
-            // OD-027: only a passed Tax check hands off to AQS. A non-pass enters
-            // remediation whatever the route, so an AQS pass cannot later close the case
-            // with the Tax failure unaddressed (BR-006).
+            // REVERSED 2026-09-20 (project owner). This test asserted the opposite until
+            // today: OD-027 sent a Tax non-pass to remediation whatever the route, so AQS
+            // never saw a file with something unaddressed on it.
+            //
+            // The cost was asking the adviser twice about one file. The fail is not lost - the
+            // submit stamps al_taxoutcome, and the AQS submit gathers it into one combined
+            // remediation. TaxRaisesRemediationNow is the half of the old rule that says
+            // whether anyone is asked to DO anything, which this value cannot express.
+            Assert.Equal(
+                CaseLifecycle.Queued,
+                OutcomeRules.NextCaseStatusForTax(answer, true, remedialActionFlagged: false));
+
+            Assert.False(OutcomeRules.TaxRaisesRemediationNow(true, aqsStillToCome: true));
+        }
+
+        [Theory]
+        [InlineData(ResponseRules.ChoiceFail)]
+        [InlineData(ResponseRules.ChoiceInsufficient)]
+        public void Still_remediates_a_failed_tax_only_case_at_once(int answer)
+        {
+            // Nothing is coming that could carry the fail, so it is actioned here - which is
+            // why the rule takes aqsStillToCome rather than reading the route. A Tax-only case
+            // is untouched by the reversal.
             Assert.Equal(
                 CaseLifecycle.AwaitingRemediation,
-                OutcomeRules.NextCaseStatusForTax(answer, true, remedialActionFlagged: false));
+                OutcomeRules.NextCaseStatusForTax(answer, false, remedialActionFlagged: false));
+
+            Assert.True(OutcomeRules.TaxRaisesRemediationNow(true, aqsStillToCome: false));
+        }
+
+        [Fact]
+        public void An_aqs_pass_does_not_close_a_case_whose_tax_check_failed()
+        {
+            // The combination the old rule could never produce, because a Tax fail never
+            // reached AQS at all. If this closed, the deferred Tax fail would be lost in
+            // silence - the exact risk the old design existed to avoid, and the reason the
+            // deferral has to be carried into this decision rather than assumed away.
+            Assert.Equal(
+                CaseLifecycle.AwaitingRemediation,
+                OutcomeRules.NextCaseStatusForAqs(
+                    OutcomeRules.OutcomePass, remedialActionFlagged: false, taxFailDeferred: true));
+        }
+
+        [Fact]
+        public void An_aqs_pass_closes_a_case_whose_tax_check_passed()
+        {
+            Assert.Equal(
+                CaseLifecycle.Closed,
+                OutcomeRules.NextCaseStatusForAqs(
+                    OutcomeRules.OutcomePass, remedialActionFlagged: false, taxFailDeferred: false));
         }
 
         [Fact]
@@ -296,15 +340,20 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Holds_a_flagged_tax_pass_for_remediation_before_aqs()
+        public void Queues_a_flagged_tax_pass_for_aqs_rather_than_holding_it()
         {
-            // Direction 2026-09-09, and the same reasoning OD-027 applies to a Tax
-            // non-pass: AQS must not review a file with something unaddressed on it.
-            // Once the action is approved the case returns to the queue for its AQS check
-            // (OD-038): SignoffProgressPlugin.MoveCase, via Awaiting Sign-off -> Queued.
+            // REVERSED 2026-09-20 with the non-pass above, and for the same reason. The
+            // 2026-09-09 direction held a flagged Tax pass before AQS so that AQS never saw a
+            // file with something unaddressed; the owner's direction now is that the adviser
+            // is asked once, after both checks.
+            //
+            // The flag is not lost: TaxRaisesRemediationNow says nothing is raised yet, and
+            // the AQS submit picks the Tax verdict back up off al_taxoutcome.
             Assert.Equal(
-                CaseLifecycle.AwaitingRemediation,
+                CaseLifecycle.Queued,
                 OutcomeRules.NextCaseStatusForTax(ResponseRules.ChoicePass, true, true));
+
+            Assert.False(OutcomeRules.TaxRaisesRemediationNow(true, aqsStillToCome: true));
         }
 
         [Fact]
