@@ -43,14 +43,18 @@ namespace OutcomeTesting.Plugins.Tests
                 "IOA07028411",
                 client,
                 "Jane Adviser",
-                "Pat Paraplanner",
+                // AssignedTo. The extract puts the CHECKER here, which is why this fixture
+                // no longer calls it "Pat Paraplanner" - the old name was the guess that
+                // caused the mapping to be reversed twice.
+                "Chris Checker",
                 status,
                 outcome,
                 string.Empty,
                 string.Empty,
                 string.Empty,
                 "Pre-Advice Check Required",
-                "Jessica Bell",
+                // AssignedBy: the para-planner who raised the task (AD-160).
+                "Pat Paraplanner",
                 item1,
                 by1,
                 date1,
@@ -206,18 +210,38 @@ namespace OutcomeTesting.Plugins.Tests
 
 
         [Fact]
-        public void Takes_the_paraplanner_from_assigned_to()
+        public void Takes_the_paraplanner_from_assigned_by()
         {
-            // AssignedTo carries the paraplanner (project owner, 2026-09-14), correcting the
-            // 2026-09-12 reading that took them from AssignedBy. The sample extract this was
-            // first written against is synthetic - its two names are literally "Paraplanner 1"
-            // and "Checker 4" - so the column it labelled paraplanner was a guess, and the
-            // real extract puts them the other way round.
+            // REVERSED 2026-09-20 (AD-160). This test asserted AssignedTo until today, on
+            // the 2026-09-14 direction that the real extract put the two the other way
+            // round from the sample.
+            //
+            // The owner reaffirmed AssignedBy with that conflict put to them explicitly. It
+            // is also what the written specification always said, and what the only extract
+            // in this repository shows - AssignedBy is "Paraplanner N" in every row of it.
+            //
+            // The fixture names changed with the mapping, deliberately: calling the
+            // AssignedTo value "Pat Paraplanner" is precisely the assumption that got
+            // written into the column map twice.
             var result = ImportRules.ParseCsv(File(Row("1")));
 
             var row = Assert.Single(result.Valid);
             Assert.Equal("Pat Paraplanner", row.Values["al_paraplanner"]);
             Assert.False(row.Values.ContainsKey("al_assignedby"));
+        }
+
+        [Fact]
+        public void Does_not_import_the_assigned_to_name_anywhere()
+        {
+            // Not merely mapped elsewhere - absent. AD-113: a name the file carried never
+            // proved a case was allocated, and a re-import must not overwrite whoever is.
+            var result = ImportRules.ParseCsv(File(Row("1")));
+
+            var row = Assert.Single(result.Valid);
+            foreach (var value in row.Values)
+            {
+                Assert.NotEqual("Chris Checker", value.Value as string);
+            }
         }
 
         [Fact]

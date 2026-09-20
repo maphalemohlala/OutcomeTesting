@@ -51,18 +51,19 @@ const COLUMNS: ColumnDef[] = [
   { header: 'AdviserName', field: 'al_advisername', kind: 'text' },
   { header: 'AdviserEmail', field: 'al_adviseremail', kind: 'text' },
   // AD-113: the name the file carried, not proof of allocation.
-  // The paraplanner, from AssignedTo (project owner, 2026-09-14), correcting the 2026-09-12
-  // reading that took them from AssignedBy and the checker from AssignedTo. That reading came
-  // from data/io-task-extract-sample.csv, which is synthetic - its names are literally
-  // "Paraplanner 1" and "Checker 4" - so which column held which was a guess.
+  // The paraplanner, from AssignedBy (project owner, 2026-09-20), REVERSING the 2026-09-14
+  // reading that took them from AssignedTo. The sample extract - still the only one in this
+  // repository - maps AssignedBy to every "Paraplanner N", and the written specification has
+  // said AssignedBy throughout; the owner reaffirmed it with that conflict put to them
+  // (AD-160).
   //
-  // AssignedBy is deliberately not mapped: it is whoever IO records as having assigned the
-  // task, which is neither the paraplanner nor known to be the checker.
+  // AssignedTo is no longer mapped: it is who the task was assigned TO, which the sample
+  // shows as the checker, and AD-113 established that such a name never proved allocation.
   //
   // al_checkername is deliberately absent. The checker is set manually (project owner,
   // 2026-09-14) - by allocation, by a claim, or by editing the case - and only the columns
   // listed here are written, so a re-import cannot overwrite whoever is allocated.
-  { header: 'AssignedTo', field: 'al_paraplanner', kind: 'text' },
+  { header: 'AssignedBy', field: 'al_paraplanner', kind: 'text' },
   {
     header: 'Status',
     field: 'al_iotaskstatus',

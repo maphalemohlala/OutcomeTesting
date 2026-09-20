@@ -61,14 +61,17 @@ function row(taskId: string, options: RowOptions = {}): string {
     'IOA07028411',
     client,
     'Jane Adviser',
-    'Pat Paraplanner',
+    // AssignedTo. The extract puts the CHECKER here; calling this value "Pat Paraplanner"
+    // is the assumption that got written into the column map twice.
+    'Chris Checker',
     status,
     outcome,
     '',
     completedDate,
     dueDate,
     'Pre-Advice Check Required',
-    'Jessica Bell',
+    // AssignedBy: the para-planner who raised the task (AD-160).
+    'Pat Paraplanner',
     item1,
     by1,
     date1,
@@ -120,15 +123,29 @@ describe('the import key', () => {
 });
 
 describe('who the file names', () => {
-  it('takes the paraplanner from AssignedTo', () => {
-    // AssignedTo carries the paraplanner (project owner, 2026-09-14), correcting the
-    // 2026-09-12 reading that took them from AssignedBy. That reading came from a synthetic
-    // sample whose names are literally "Paraplanner 1" and "Checker 4", so which column held
-    // which was a guess the real extract does not bear out.
+  it('takes the paraplanner from AssignedBy', () => {
+    // REVERSED 2026-09-20 (AD-160). This asserted AssignedTo until today, on the 2026-09-14
+    // direction that the real extract put the two the other way round from the sample.
+    //
+    // The owner reaffirmed AssignedBy with that conflict put to them explicitly. It is what
+    // the written specification always said, and what the only extract in this repository
+    // shows - AssignedBy is "Paraplanner N" in every row of it.
+    //
+    // This file and ImportRules.cs must agree: the app transcribes the workbook and the
+    // plug-in parses the CSV, so a mapping that changed in one and not the other would
+    // import different people depending on which route the upload took.
     const [only] = parse(row('1')).valid;
 
     expect(only.record.al_paraplanner).toBe('Pat Paraplanner');
     expect(only.record.al_assignedby).toBeUndefined();
+  });
+
+  it('does not import the AssignedTo name anywhere', () => {
+    // Not merely mapped elsewhere - absent. AD-113: a name the file carried never proved a
+    // case was allocated, and a re-import must not overwrite whoever is.
+    const [only] = parse(row('1')).valid;
+
+    expect(Object.values(only.record)).not.toContain('Chris Checker');
   });
 
   it('does not import a checker name', () => {

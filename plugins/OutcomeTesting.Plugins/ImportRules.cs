@@ -173,17 +173,27 @@ namespace OutcomeTesting.Plugins
             new ColumnDef("Client", "al_clientname", ColumnKind.Text, null),
             new ColumnDef("AdviserName", "al_advisername", ColumnKind.Text, null),
             new ColumnDef("AdviserEmail", "al_adviseremail", ColumnKind.Text, null),
-            // The paraplanner, from AssignedTo (project owner, 2026-09-14). This corrects the
-            // 2026-09-12 reading, which took the paraplanner from AssignedBy and the checker
-            // from AssignedTo. That reading came from data/io-task-extract-sample.csv, which
-            // is synthetic - its names are literally "Paraplanner 1" and "Checker 4" - so
-            // which column held which was a guess the real extract does not bear out.
+            // The paraplanner, from AssignedBy (project owner, 2026-09-20). This REVERSES the
+            // 2026-09-14 reading, which took the paraplanner from AssignedTo.
             //
-            // AssignedBy is deliberately not mapped. It is whoever IO records as having
-            // assigned the task, which is not the paraplanner and not known to be the
-            // checker; importing it into a column named for either would repeat the mistake
-            // this line fixes.
-            new ColumnDef("AssignedTo", "al_paraplanner", ColumnKind.Text, null),
+            // Both readings have now been directed, so the reasoning matters more than the
+            // date. The 2026-09-14 note dismissed data/io-task-extract-sample.csv as
+            // synthetic - its names are literally "Paraplanner 1" and "Checker 4" - and said
+            // the real extract did not bear it out. That sample is still the only extract in
+            // this repository, it maps AssignedBy to every "Paraplanner N", and the written
+            // specification has said AssignedBy throughout. The owner reaffirmed AssignedBy
+            // on 2026-09-20 with that conflict put to them explicitly (AD-160).
+            //
+            // AssignedTo is no longer mapped. It is who IO assigned the task TO, which the
+            // sample shows as the checker, and AD-113 already established that a name the
+            // file carried never proved a case was allocated to anyone. Importing it into a
+            // column named for the paraplanner is the mistake this line now fixes.
+            //
+            // A name is only useful here if it reaches somebody: ImportCasesPlugin resolves
+            // it against Contact on the way in and reports every row whose para-planner
+            // cannot be addressed, rather than letting it surface weeks later as a Failed
+            // notification nobody is watching (finding 7).
+            new ColumnDef("AssignedBy", "al_paraplanner", ColumnKind.Text, null),
             // al_checkername is deliberately absent. The checker is set manually (project
             // owner, 2026-09-14): by allocation (AssignCasePlugin), by a claim
             // (ClaimCasePlugin), or by editing the case. The import used to stamp it from
@@ -233,6 +243,13 @@ namespace OutcomeTesting.Plugins
         /// in DueDateFor.
         /// </summary>
         public const int DueWithinDays = 3;
+
+        /// <summary>
+        /// The case column carrying the para-planner's name, from the extract's AssignedBy
+        /// (AD-160). Named here so the import's match check and the column map cannot drift
+        /// apart - they were one edit away from doing so when the mapping moved.
+        /// </summary>
+        public const string ParaplannerAttribute = "al_paraplanner";
 
         /// <summary>
         /// When a case uploaded at <paramref name="uploadedAt"/> falls due: three days after
