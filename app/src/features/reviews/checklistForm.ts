@@ -318,7 +318,9 @@ export function caseHeaderFields(record: Al_outcomecases): HeaderField[] {
     },
     { label: 'Check date', value: date(record.al_checkdate) },
     { label: 'Client name / initials', value: text(record.al_clientname) },
-    { label: 'IO reference', value: text(record.al_casereference) },
+    // ClientRef, not the TaskID. al_casereference is the TaskID and is the page heading;
+    // binding it here showed a checker the wrong identifier on every case (F6, 2026-09-20).
+    { label: 'IO reference', value: text(record.al_ioreference) },
     {
       label: 'Pre or post check',
       value: choiceLabel(

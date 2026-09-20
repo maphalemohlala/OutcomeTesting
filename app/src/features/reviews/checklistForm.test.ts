@@ -135,7 +135,11 @@ describe('caseHeaderFields', () => {
   const record = {
     al_outcomecaseid: 'c1',
     al_name: 'IO-100001',
-    al_casereference: 'IO-100001',
+    // Deliberately unlike the IO reference below. They were both 'IO-100001', so the header
+    // binding to the wrong one of the two read as correct and the test agreed with it
+    // (F6, 2026-09-20).
+    al_casereference: 'TASK-100001',
+    al_ioreference: 'IO-100001',
     al_casestatus: 120910585,
     al_advisername: 'A. Adviser',
     al_adviserstatus: 120910501,
@@ -187,7 +191,10 @@ describe('caseHeaderFields', () => {
     expect(byLabel.get('Case type')).toBe('New advice');
     expect(byLabel.get('Date of meeting - Client contact')).toBe('01 Aug 2026');
     expect(byLabel.get('Vulnerable client?')).toBe('Potentially vulnerable');
+    // The IO reference the business quotes is ClientRef, held in al_ioreference. The case
+    // reference is the TaskID and belongs to the heading, not to this field.
     expect(byLabel.get('IO reference')).toBe('IO-100001');
+    expect(byLabel.get('IO reference')).not.toBe('TASK-100001');
     expect(byLabel.get('For Tax team usage')).toBe('Submit to AQS');
   });
 
