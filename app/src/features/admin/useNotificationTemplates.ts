@@ -10,6 +10,7 @@ import { logTechnical } from '../../services/errors';
 import { plainMessage } from '../../services/commands/failures';
 import { TEMPLATE_CODES, templateHint } from './notificationTemplates';
 import { CUSTOM_TOKENS } from './notificationRouting';
+import { describeRemoveFailure } from './notificationTemplateRemoval';
 
 export interface TemplateRow {
   /** Null for a letter that has no stored row and is running on the built-in wording. */
@@ -213,6 +214,38 @@ export async function saveTemplate(
   } catch (error) {
     logTechnical('notification template save', error);
     return { ok: false, reason: refusalFrom(error) };
+  }
+}
+
+/**
+ * Takes a stored letter off the table (F24).
+ *
+ * <p>
+ * One call covers both things this page could not undo. For a letter of an administrator's
+ * own, the row IS the letter, so removing it stops the letter existing. For one of the
+ * twelve, the row is only the stored wording over the top of the copy compiled into the
+ * assembly, so removing it puts the built-in copy back.
+ * </p>
+ * <p>
+ * Deleted rather than deactivated. Every server-side read of this table already filters to
+ * the active row for a code — so deactivating would work — but `al_templatecode` is the
+ * table's alternate key and an inactive row keeps it, which would leave the code held by a
+ * row this page no longer lists. That is F18's trap on the adviser mapping table, and this
+ * is the same table shape.
+ * </p>
+ */
+export async function removeTemplate(
+  id: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  try {
+    // The generated delete resolves to void and REJECTS on failure, unlike create and
+    // update which resolve to a result object. So there is nothing to inspect here: an
+    // arrival back from the await is the success.
+    await Al_notificationtemplatesService.delete(id);
+    return { ok: true };
+  } catch (error) {
+    logTechnical('notification template remove', error);
+    return { ok: false, reason: describeRemoveFailure(error) };
   }
 }
 

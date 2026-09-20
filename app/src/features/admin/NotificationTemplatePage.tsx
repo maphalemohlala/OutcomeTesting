@@ -22,9 +22,11 @@ import {
   useNotificationTemplates,
   saveTemplate,
   createTemplate,
+  removeTemplate,
   type ContactOption,
   type TemplateRow,
 } from './useNotificationTemplates';
+import { removalPrompt } from './notificationTemplateRemoval';
 import { TokenPicker } from './TokenPicker';
 import './NotificationTemplatePage.css';
 
@@ -47,9 +49,13 @@ export function NotificationTemplatePage() {
   const canEdit = can('page.admin.templates', 'Manage');
 
   const [editing, setEditing] = useState<TemplateRow | 'new' | null>(null);
+  const [removing, setRemoving] = useState<TemplateRow | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
 
   const reload = () => {
     setEditing(null);
+    setRemoving(null);
+    setProblem(null);
     setReloadKey((k) => k + 1);
   };
 
@@ -133,6 +139,24 @@ export function NotificationTemplatePage() {
                       >
                         Edit
                       </button>
+                      {/*
+                        Only where there is a row to take away. One of the twelve that nobody
+                        has edited is already on its built-in wording, so the action would do
+                        nothing and saying so is worse than not offering it.
+                      */}
+                      {removalPrompt(row) && (
+                        <button
+                          type="button"
+                          className="templates__btn templates__btn--ghost"
+                          onClick={() => {
+                            setProblem(null);
+                            setRemoving(row);
+                          }}
+                        >
+                          {row.custom ? 'Remove' : 'Use built-in'}
+                          <span className="templates__sr"> wording for {row.name}</span>
+                        </button>
+                      )}
                     </td>
                   )}
                 </tr>
@@ -157,9 +181,89 @@ export function NotificationTemplatePage() {
               onSaved={reload}
             />
           )}
+
+          {problem && <p className="templates__problem">{problem}</p>}
+
+          {removing && (
+            <RemoveTemplate
+              row={removing}
+              onClose={() => setRemoving(null)}
+              onRemoved={reload}
+              onProblem={(reason) => {
+                setRemoving(null);
+                setProblem(reason);
+              }}
+            />
+          )}
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Confirms taking a stored letter off the table (F24).
+ *
+ * Confirmed rather than done on the first click, because the row is deleted and the wording
+ * cannot be recovered from this page. The dialog says what stops AND what does not, which is
+ * the part that matters: on a page listing twelve letters the system sends, "remove" invites
+ * the fear that an event is being switched off. It is not — the built-in letter for that
+ * event carries on exactly as before.
+ *
+ * All the words come from `removalPrompt`, because the two cases read very differently: a
+ * letter of your own stops existing, and one of the twelve carries on being sent in its
+ * original wording.
+ */
+function RemoveTemplate({
+  row,
+  onClose,
+  onRemoved,
+  onProblem,
+}: {
+  row: TemplateRow;
+  onClose: () => void;
+  onRemoved: () => void;
+  onProblem: (reason: string) => void;
+}) {
+  const [removing, setRemoving] = useState(false);
+  const prompt = removalPrompt(row);
+
+  if (prompt === null || row.id === null) return null;
+
+  async function confirm() {
+    setRemoving(true);
+    const result = await removeTemplate(row.id!);
+    setRemoving(false);
+
+    if (result.ok) {
+      onRemoved();
+      return;
+    }
+
+    onProblem(result.reason);
+  }
+
+  return (
+    <Modal title={prompt.title} onClose={onClose}>
+      <div className="templates__form">
+        <p>{prompt.lead}</p>
+        <p className="templates__hint">{prompt.consequence}</p>
+
+        <div className="templates__actions">
+          <button type="button" className="templates__btn" onClick={confirm} disabled={removing}>
+            {removing ? 'Working…' : prompt.confirmLabel}
+          </button>
+          <button
+            type="button"
+            className="templates__btn templates__btn--ghost"
+            onClick={onClose}
+            disabled={removing}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
