@@ -55,6 +55,22 @@
       "isoptional": false
     },
     {
+      "uniquename": "FqContactId",
+      "name": "FqContactId",
+      "displayname": "FQ accountable contact",
+      "description": "Id of the contact named as accountable for the File Quality fail, when someone other than the case's own adviser or paraplanner carries it. Empty means the case's own people carry it, and is written as null so a previous name is cleared rather than left behind.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "AqContactId",
+      "name": "AqContactId",
+      "displayname": "AQ accountable contact",
+      "description": "Id of the contact named as accountable for the Advice Quality fail, on the same terms as FqContactId.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
       "uniquename": "IdempotencyKey",
       "name": "IdempotencyKey",
       "displayname": "Idempotency key",
