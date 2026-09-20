@@ -5,7 +5,10 @@ import './ChecklistSection.css';
  * The IO task's checklist items - High Risk Item 1, Enhanced Supervision, Tax Check and
  * the rest - as the paraplanner ticked them on the upload (project owner, 2026-09-19).
  * Not the checklist version's questions: those are the form itself, and a checker reading
- * the form already has them. This says what had put the case in front of them.
+ * the form already has them. This says what had put the case in front of them. The change
+ * batch originally asked for the version's questions grouped by section; the owner
+ * corrected the requirement to what is built here on 2026-09-20 (AD-158), and
+ * checklistRender.test.tsx pins it.
  *
  * Read-only, and only the ticked items: the case stores what was selected, not the
  * vocabulary it was selected from, so there is no "not applicable" row to draw.

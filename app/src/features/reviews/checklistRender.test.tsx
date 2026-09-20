@@ -257,6 +257,28 @@ describe('the Checklist section', () => {
     expect(html).not.toContain('Why this case was selected');
   });
 
+  it('is a flat list of the ticked items, not the checklist version grouped by section', () => {
+    // The corrected Change 4 requirement (AD-158, project owner 2026-09-20). The batch
+    // originally asked for the checklist VERSION's questions, grouped by section, every
+    // item from the source sheets; what was built - and what the owner confirmed they
+    // wanted - is the IO task's ticked items as a flat list. Nothing failed if someone
+    // re-implemented the original wording, so this is the test that would.
+    const html = render('Tax', TAX, checklist());
+
+    const list = html.slice(
+      html.indexOf('checklist-items__list'),
+      html.indexOf('</ul>', html.indexOf('checklist-items__list')),
+    );
+
+    // One row per ticked item, and no grouping level above them.
+    expect(list.match(/<li/g)).toHaveLength(2);
+    expect(list).not.toMatch(/<(h[1-6]|ul|section)/);
+
+    // The form's own questions are the check itself and render below; a question drawn
+    // in here would be the section saying the same thing twice.
+    expect(list).not.toContain('Q-');
+  });
+
   it('sits above the checklist document rather than inside it', () => {
     // The section is orientation for the form, not one of the document's own blocks -
     // putting it inside checklist-doc would place it in the printed Checker Checklist.
