@@ -498,7 +498,7 @@ if (args.Length >= 4 && args[0].Equals("webapi", StringComparison.OrdinalIgnoreC
 
 if (args.Length >= 3 && args[0].Equals("webapimany", StringComparison.OrdinalIgnoreCase))
 {
-    return WebApiMany(args[1], args[2]);
+    return WebApiMany(args[1], args[2], args.Length >= 4 ? args[3] : null);
 }
 
 if (args.Length >= 3 && args[0].Equals("settracelog", StringComparison.OrdinalIgnoreCase))
@@ -818,8 +818,14 @@ int WebApi(string[] a)
 //
 // It does NOT stop at the first failure. These are usually independent writes, and stopping
 // would leave the caller guessing which of the rest would also have failed.
-int WebApiMany(string orgUrl, string requestsFile)
+// The optional third argument is a file to write every response to, in full. The
+// console line is truncated at 400 characters so a run stays readable, which is fine
+// for writes and useless for reads - a query whose answer is the point of the call
+// came back unparseable. Both, rather than one or the other: the console says what
+// happened while it happens, the file holds what came back.
+int WebApiMany(string orgUrl, string requestsFile, string? outFile)
 {
+    var transcript = new JsonArray();
     var file = requestsFile.StartsWith("@", StringComparison.Ordinal)
         ? requestsFile.Substring(1)
         : requestsFile;
@@ -876,6 +882,8 @@ int WebApiMany(string orgUrl, string requestsFile)
                 i + " HTTP " + (int)response.StatusCode + " " + response.ReasonPhrase
                 + (string.IsNullOrWhiteSpace(content) ? string.Empty : " " + Flatten(content)));
 
+            Record(transcript, i, (int)response.StatusCode, content);
+
             if (!response.IsSuccessStatusCode)
             {
                 failed++;
@@ -893,8 +901,22 @@ int WebApiMany(string orgUrl, string requestsFile)
                     : ((int)failure.Response.StatusCode).ToString())
                 + " " + Flatten(string.IsNullOrWhiteSpace(refusal) ? failure.Message : refusal));
 
+            Record(
+                transcript,
+                i,
+                failure.Response == null ? 0 : (int)failure.Response.StatusCode,
+                string.IsNullOrWhiteSpace(refusal) ? failure.Message : refusal);
+
             failed++;
         }
+    }
+
+    if (!string.IsNullOrWhiteSpace(outFile))
+    {
+        File.WriteAllText(
+            outFile,
+            transcript.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine("Responses written to " + outFile);
     }
 
     Console.WriteLine(requests.Count + " requests, " + failed + " failed.");
@@ -903,6 +925,31 @@ int WebApiMany(string orgUrl, string requestsFile)
 
 // One line per result, so the index stays readable beside it. A refusal sentence is what
 // matters here and it is short; a long query result is better read with `webapi`.
+// Kept whole in the transcript, parsed when it is JSON so the file reads as one
+// document rather than a list of escaped strings.
+void Record(JsonArray transcript, int index, int status, string content)
+{
+    JsonNode? parsed = null;
+    if (!string.IsNullOrWhiteSpace(content))
+    {
+        try
+        {
+            parsed = JsonNode.Parse(content);
+        }
+        catch (JsonException)
+        {
+            parsed = JsonValue.Create(content);
+        }
+    }
+
+    transcript.Add(new JsonObject
+    {
+        ["i"] = index,
+        ["status"] = status,
+        ["body"] = parsed,
+    });
+}
+
 string Flatten(string text)
 {
     var single = text.Replace("\r", " ").Replace("\n", " ").Trim();
