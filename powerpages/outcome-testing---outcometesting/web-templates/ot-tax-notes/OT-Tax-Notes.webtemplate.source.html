@@ -6,8 +6,16 @@
 
   TWO questions, both Tax-owned:
 
-    Q-TAX-03   "Case notes"   - what the business calls the Tax notes, plain text.
-    Q-FQTAX-03 "Tax Remedial" - the rich-text answer, added 2026-09-19.
+    Q-TAX-03  "Case notes"   - what the business calls the Tax notes, plain text.
+    Q-TAX-04  "Tax Remedial" - the rich-text answer, added 2026-09-19.
+
+  Q-TAX-04, NOT Q-FQTAX-03, which is what this fetch asked for until 2026-09-20. They are
+  different questions and only their names are alike: Q-FQTAX-03 is "Remedial action
+  required?", the mandatory Yes/No in the Tax File Quality section that AD-091 reads to
+  decide whether a remediation is raised at all. It carries a choice and can never carry
+  markup, so the panel asked for a column that question never fills and the Tax checker's
+  remedial text reached nobody - silently, because an empty answer is exactly how this
+  template is told there is nothing to show (audit finding 14).
 
   AD-020 filters every review page to its own discipline, so an AQS checker reading a
   completed check and an adviser reading a remediation could see neither. Both are people
@@ -52,7 +60,7 @@
           <filter type="and">
             <condition attribute="al_questioncode" operator="in">
               <value>Q-TAX-03</value>
-              <value>Q-FQTAX-03</value>
+              <value>Q-TAX-04</value>
             </condition>
           </filter>
         </link-entity>
@@ -98,7 +106,7 @@
       <div class="ot-tax-notes__item">
         {% if ot_tax_note_count > 1 %}
         <p class="ot-tax-notes__meta">
-          {% if ot_note_code == 'Q-FQTAX-03' %}Tax remedial{% else %}Case notes{% endif %} &mdash;
+          {% if ot_note_code == 'Q-TAX-04' %}Tax remedial{% else %}Case notes{% endif %} &mdash;
           Tax check submitted {{ r['ri.al_submittedon'] | date: 'dd MMM yyyy' | default: 'date not recorded' }}
         </p>
         {% endif %}

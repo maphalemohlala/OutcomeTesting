@@ -83,6 +83,9 @@ Owner: Tax team. Rendered only when the route includes Tax (BR-004).
 | Q-TAX-01 | Tax check reason | MultiSelect | Yes | LSA/LSDBA/TTFAC, Trust, IHT, Tax calculation, Other |
 | Q-TAX-02 | Tax check outcome | PassFailInsufficient | Yes | PASS, PASS WITH ISSUES, FAIL |
 | Q-TAX-03 | Case notes | MultilineText | No | |
+| Q-TAX-04 | Tax Remedial | RichText | No | |
+
+**Q-TAX-04 is an addition, not part of V8 as transcribed.** Added 2026-09-19 under AD-122 (content is administered into the version in force), effective from that day, for Change 7 of the September batch: somewhere for the Tax checker to set out what the adviser must put right, with formatting, which `MultilineText` cannot carry. Display order 4 puts it directly below Case notes, which is the requirement (AD-159). Do not confuse it with **Q-FQTAX-03 "Remedial action required?"** in S-FQTAX below — that is the mandatory Yes/No that decides whether a remediation is raised at all (AD-091), and the two have been conflated once already, in code.
 
 Notes: the Tax outcome is a three-value scale, not the four-value AQS grade in BR-005. Tax check reason is multi-select because a case can fail for several tax reasons at once (AD-022).
 
