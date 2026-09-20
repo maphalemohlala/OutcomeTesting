@@ -58,8 +58,8 @@
       </entity>
     </fetch>
     {% endfetchxml %}
-    {% assign by_case_row = by_case.results.entities[0] %}
-    {% if by_case_row %}
+    {% if by_case.results and by_case.results.entities.size > 0 %}
+      {% assign by_case_row = by_case.results.entities[0] %}
       {% assign review_id = by_case_row.al_reviewinstanceid %}
     {% endif %}
   {% endif %}
@@ -111,7 +111,16 @@
   </fetch>
   {% endfetchxml %}
 
-  {% assign rv = review.results.entities[0] %}
+  {% comment %}
+     The size test has to come FIRST. Indexing entities[0] on an empty result throws
+     "Index was outside the bounds of the array" on this engine, and the index is evaluated
+     before the null test below - so without this guard the "Review not available" message,
+     which exists for precisely the case of a review you cannot see, was unreachable. The
+     same pattern the tiles on OT My Work already use.
+  {% endcomment %}
+  {% if review.results and review.results.entities.size > 0 %}
+    {% assign rv = review.results.entities[0] %}
+  {% endif %}
 
   {% if rv == null %}
     {% include 'OT Empty State' title: 'Review not available' message: 'This review does not exist, or you do not have permission to view it.' %}

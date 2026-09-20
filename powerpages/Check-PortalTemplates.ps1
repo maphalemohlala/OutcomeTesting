@@ -23,9 +23,19 @@
          the same fetch that can actually hold its answer.
       C  Every answer column a fetch selects is one that at least one of the question codes
          in that fetch can fill.
+      D  Every '{% include 'OT ...' %}' names a web template that exists in this tree.
+      E  No template uses a Liquid construct this site's engine rejects.
 
     B is the one that catches finding 14. C catches its mirror image - selecting a column
     nothing in the query will ever populate.
+
+    D and E cover the same failure MODE from two other directions, which is what makes them
+    worth having: each one fails SILENTLY. A mistyped include renders nothing at all - the
+    engine does not raise, it simply produces no output, exactly as the finding-14 fetch drew
+    nothing rather than erroring. E is the list of constructs this engine has already been
+    caught rejecting (two-argument truncate, multi-character split, indexing entities[0]);
+    each was found in production rather than in a document, and entities[0] throws "Index was
+    outside the bounds of the array" on a page that is merely empty that day.
 
     STATIC, and deliberately so. It reads the checked-in templates and the checked-in
     checklist, needs no environment and no sign-in, and so it can run on every change
@@ -233,10 +243,97 @@ foreach ($file in $templates) {
     }
 }
 
+# ---------------------------------------------------------------- D: includes resolve
+
+# Every OT template this tree defines, by the name Liquid would include it under.
+$templateNames = New-Object System.Collections.Generic.HashSet[string]
+foreach ($manifest in (Get-ChildItem -Recurse -File -Filter *.webtemplate.yml $TemplateRoot)) {
+    foreach ($line in (Get-Content $manifest.FullName)) {
+        if ($line -match '^\s*adx_name\s*:\s*(.+?)\s*$') {
+            [void]$templateNames.Add($Matches[1])
+        }
+    }
+}
+
+# ---------------------------------------------------------------- E: constructs that fail here
+#
+# Each pattern is something this engine was caught rejecting on a live page. The fix is
+# recorded beside it so a failure here reads as an instruction rather than a prohibition.
+$rejected = @(
+    @{ Pattern = "truncate:\s*\d+\s*,";      Detail = "two-argument truncate; this engine takes the length only" },
+    @{ Pattern = "split:\s*'[^']{2,}'";        Detail = "multi-character split; this engine splits on a single character" }
+)
+
+# entities[0] is checked on its own, because the index is not the defect - an UNGUARDED index
+# is. The tiles on OT My Work read entities[0] correctly, inside an "if ... .size > 0" that
+# opens on the line above, and a rule that failed them would be teaching the wrong lesson.
+#
+# What throws is indexing an EMPTY result: "Index was outside the bounds of the array". The
+# index is evaluated before any filter or null test that follows it, so a `default` filter
+# cannot save it and neither can testing the result afterwards - the guard has to come first.
+# That is how OT Review Detail's "Review not available" empty state came to be unreachable:
+# it was written for a review you cannot see, and the line that threw ran before it.
+#
+# The guard is looked for on the same line or the three above it, naming the same variable,
+# which is the whole of the pattern this codebase uses.
+$guardWindow = 3
+
+foreach ($file in $templates) {
+    $rel = $file.FullName.Substring($TemplateRoot.Length + 1)
+    $text = [IO.File]::ReadAllText($file.FullName)
+
+    # Comments are stripped first, and they have to be: the templates that explain why
+    # entities[0] is not used say the words "entities[0]" to do it. A gate that failed on its
+    # own documentation would be turned off within a week.
+    $code = [regex]::Replace($text, '(?s)<!--.*?-->', '')
+    $code = [regex]::Replace($code, '(?s)\{%-?\s*comment\s*-?%\}.*?\{%-?\s*endcomment\s*-?%\}', '')
+
+    foreach ($m in [regex]::Matches($code, "\{%-?\s*include\s+'([^']+)'")) {
+        $name = $m.Groups[1].Value
+
+        # Only this solution's own templates. The platform's - Breadcrumbs, Search, Page
+        # Header and the faceted-search set - are not in this tree and never will be.
+        if (-not $name.StartsWith('OT ', [StringComparison]::Ordinal)) { continue }
+
+        if (-not $templateNames.Contains($name)) {
+            Add-Failure 'D' ("$rel includes '$name', which no web template in this tree " +
+                "defines. A mistyped include renders NOTHING rather than failing.")
+        }
+    }
+
+    foreach ($rule in $rejected) {
+        foreach ($m in [regex]::Matches($code, $rule.Pattern)) {
+            Add-Failure 'E' "$rel uses $($rule.Detail). Found: '$($m.Value.Trim())'."
+        }
+    }
+
+    $lines = $code -split "`n"
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        foreach ($m in [regex]::Matches($lines[$i], '([A-Za-z_]\w*)\.results\.entities\[0\]')) {
+            $variable = $m.Groups[1].Value
+            $guard = [regex]::Escape($variable) + '\.results\.entities\.size\s*>\s*0'
+
+            $guarded = $false
+            for ($back = [Math]::Max(0, $i - $guardWindow); $back -le $i; $back++) {
+                if ($lines[$back] -match $guard) { $guarded = $true; break }
+            }
+
+            if (-not $guarded) {
+                Add-Failure 'E' ("$rel line $($i + 1) indexes $variable.results.entities[0] " +
+                    "with no '.size > 0' guard above it. An empty result throws " +
+                    "'Index was outside the bounds of the array', and it throws BEFORE any " +
+                    "null test that follows - so the empty state below it is unreachable.")
+            }
+        }
+    }
+}
+
 # ---------------------------------------------------------------- result
 
 Write-Host ("Checked {0} template(s) and {1} fetch block(s); {2} name a question AND read an answer column, which is the pairing this checks, against {3} question(s) typed from {4}." -f `
     $templates.Count, $fetchCount, $pairChecks, $responseTypeOf.Count, $source)
+Write-Host ("Resolved every 'OT ...' include against {0} template name(s), scanned for {1} construct(s) this engine rejects, and checked every entities[0] for a .size guard." -f `
+    $templateNames.Count, $rejected.Count)
 
 if (-not $OrgUrl) {
     Write-Host ''
