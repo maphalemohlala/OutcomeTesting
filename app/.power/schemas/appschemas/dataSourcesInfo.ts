@@ -194,6 +194,13 @@ export const dataSourcesInfo = {
       }
     }
   },
+  "al_advisermappings": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "al_advisermappingid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "al_al_failreason_al_responseset": {
     "tableId": "",
     "version": "",

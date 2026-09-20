@@ -118,6 +118,11 @@
           "entitySetName": "al_failreasons",
           "logicalName": "al_failreason",
           "isHidden": false
+        },
+        "advisermappings": {
+          "entitySetName": "al_advisermappings",
+          "logicalName": "al_advisermapping",
+          "isHidden": false
         }
       },
       "environmentVariableName": ""

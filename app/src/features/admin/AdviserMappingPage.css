@@ -1,0 +1,106 @@
+.advisers {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.advisers__note {
+  padding: var(--space-4);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-left: 3px solid var(--colour-action);
+}
+
+.advisers__add {
+  justify-self: start;
+}
+
+.advisers__table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+}
+
+.advisers__table th,
+.advisers__table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  border-bottom: 1px solid var(--colour-border);
+}
+
+.advisers__table thead th {
+  background: var(--colour-surface-sunken);
+}
+
+.advisers__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* A mapping with no manager routes nothing, so it is marked rather than left looking
+   like an ordinary empty cell. */
+.advisers__missing {
+  color: var(--colour-text-muted);
+  font-style: italic;
+}
+
+.advisers__form {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-border);
+  border-left: 3px solid var(--colour-action);
+}
+
+.advisers__form h2 {
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-2);
+}
+
+.advisers__form label {
+  font-weight: 600;
+}
+
+.advisers__form input,
+.advisers__form select {
+  padding: var(--space-2);
+  border: 1px solid var(--colour-border);
+  background: var(--colour-surface);
+  color: inherit;
+}
+
+.advisers__form input[readonly] {
+  background: var(--colour-surface-sunken);
+}
+
+.advisers__hint {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
+.advisers__problem {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--colour-danger, #b3261e);
+  background: var(--colour-surface-sunken);
+}
+
+.advisers__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+/* Visually hidden, still read out: the actions column has no visible heading but the
+   table still needs one for a screen reader (NFR-ACC-01). */
+.advisers__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

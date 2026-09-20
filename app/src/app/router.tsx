@@ -9,6 +9,7 @@ import { CaseIntakePage } from '../features/imports/CaseIntakePage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { PeoplePage } from '../features/people/PeoplePage';
 import { PersonCasesPage } from '../features/people/PersonCasesPage';
+import { AdviserMappingPage } from '../features/admin/AdviserMappingPage';
 import { QuestionLibraryPage } from '../features/admin/QuestionLibraryPage';
 import { SecurityConfigPage } from '../features/admin/SecurityConfigPage';
 import { RoleDetailPage } from '../features/admin/RoleDetailPage';
@@ -97,6 +98,12 @@ export function AppRoutes() {
         <Route
           path="/admin/questions"
           element={<RequirePermission resource="page.admin.questions"><QuestionLibraryPage /></RequirePermission>}
+        />
+        {/* Adviser -> T&C Manager mapping (Fixes 5, AD-162). Routing only: it decides who is
+            told a sign-off is waiting, never who may perform one. */}
+        <Route
+          path="/admin/advisers"
+          element={<RequirePermission resource="page.admin.advisers"><AdviserMappingPage /></RequirePermission>}
         />
         {/*
           The Users admin page merged into People: one directory, sourced from Contacts,

@@ -78,6 +78,7 @@ export const RESOURCE_KEYS = [
   'page.reports',
   'page.exports',
   'page.admin.questions',
+  'page.admin.advisers',
   'page.admin.security',
   'page.admin.users',
   // Capabilities (write actions gated independently of page view).
@@ -184,6 +185,10 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   { role: 'AL Portal - Outcome Testing Manager', resource: 'page.remediation', level: 'View' },
   { role: 'AL Portal - Outcome Testing Manager', resource: 'page.reports', level: 'View' },
   { role: 'AL Portal - Outcome Testing Manager', resource: 'page.exports', level: 'Manage' },
+  // Fixes 5 (AD-162). The adviser -> T&C Manager mapping is run by the people who run
+  // the checking process, not only by administrators: it decides who is told a sign-off
+  // is waiting, and a stale mapping shows up as a manager who never hears.
+  { role: 'AL Portal - Outcome Testing Manager', resource: 'page.admin.advisers', level: 'Manage' },
   { role: 'AL Portal - Outcome Testing Manager', resource: 'command.assign', level: 'Edit' },
   { role: 'AL Portal - Outcome Testing Manager', resource: 'export.generate', level: 'Edit' },
 
@@ -219,6 +224,7 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
     { role, resource: 'page.reports' as ResourceKey, level: 'View' as AccessLevel },
     { role, resource: 'page.exports' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'page.admin.questions' as ResourceKey, level: 'Manage' as AccessLevel },
+    { role, resource: 'page.admin.advisers' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'page.admin.security' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'page.admin.users' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'question.retire' as ResourceKey, level: 'Edit' as AccessLevel },
@@ -321,6 +327,7 @@ export function pageResourceForPath(path: string): ResourceKey | null {
   if (path.startsWith('/reports')) return 'page.reports';
   if (path.startsWith('/exports')) return 'page.exports';
   if (path.startsWith('/admin/questions')) return 'page.admin.questions';
+  if (path.startsWith('/admin/advisers')) return 'page.admin.advisers';
   if (path.startsWith('/admin/security')) return 'page.admin.security';
   return null;
 }
