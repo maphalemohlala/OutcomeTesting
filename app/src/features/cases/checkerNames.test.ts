@@ -189,3 +189,22 @@ describe('case detail decides the empty states from the route', () => {
     expect(caseDetailTemplate).toMatch(/hdr_rt == null[\s\S]{0,200}owes_tax = true/);
   });
 });
+
+/**
+ * The field labelled "IO reference" on case detail bound al_casereference, so it showed
+ * the TaskID. Case 900000003 displayed 900000003 where al_ioreference held
+ * 90000003-90000103 (DEV, 2026-09-20). The import maps ClientRef to al_ioreference
+ * correctly; only this binding was wrong.
+ */
+describe('case detail shows the IO reference', () => {
+  it('binds al_ioreference under that label, not the case reference', () => {
+    expect(caseDetailTemplate).toMatch(/IO reference<\/td><td class="val">\{\{ c\.al_ioreference/);
+    expect(caseDetailTemplate).not.toMatch(/IO reference<\/td><td class="val">\{\{ c\.al_casereference/);
+  });
+
+  it('selects the column it renders', () => {
+    // Rendering a column the fetch never selected shows an em dash on every case, which
+    // reads as "this case has no IO reference" rather than as a missing attribute.
+    expect(caseDetailTemplate).toContain('<attribute name="al_ioreference" />');
+  });
+});

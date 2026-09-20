@@ -19,6 +19,7 @@
     <entity name="al_outcomecase">
       <attribute name="al_outcomecaseid" />
       <attribute name="al_casereference" />
+      <attribute name="al_ioreference" />
       <attribute name="al_casestatus" />
       <attribute name="al_casetype" />
       <attribute name="al_priority" />
@@ -378,7 +379,7 @@
           </tr>
           <tr>
             <td class="lbl">Client name / initials</td><td class="val">{{ c.al_clientname | default: '—' | escape }}</td>
-            <td class="lbl">IO reference</td><td class="val">{{ c.al_casereference | default: '—' | escape }}</td>
+            <td class="lbl">IO reference</td><td class="val">{{ c.al_ioreference | default: '—' | escape }}</td>
           </tr>
           <tr>
             <td class="lbl">Pre or post check</td><td class="val">{{ c.al_preorpostcheck.label | default: '—' | escape }}</td>
