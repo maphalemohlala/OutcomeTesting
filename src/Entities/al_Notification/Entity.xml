@@ -191,6 +191,14 @@
                   <Description description="The supervisor approved a remediation without recording a final outcome, so the case is parked at Awaiting Recheck waiting for one (AD-137)." languagecode="1033" />
                 </Descriptions>
               </option>
+              <option value="120910807" IsHidden="0">
+                <labels>
+                  <label description="Sign-off due" languagecode="1033" />
+                </labels>
+                <Descriptions>
+                  <Description description="Every remediation action on the case is complete, so it is now waiting for the T and C Manager's sign-off (Fixes 5, AD-162)." languagecode="1033" />
+                </Descriptions>
+              </option>
             </options>
           </optionset>
           <displaynames>

@@ -3,6 +3,7 @@
   <EntityRelationship Name="al_checklist_checklistversion" />
   <EntityRelationship Name="al_checklistversion_reviewinstance" />
   <EntityRelationship Name="al_checklistversion_section" />
+  <EntityRelationship Name="al_contact_al_advisermapping_tcmanager" />
   <EntityRelationship Name="al_exportbatch_exportrecord" />
   <EntityRelationship Name="al_failreason_response" />
   <EntityRelationship Name="al_importbatch_importexception" />
@@ -43,6 +44,8 @@
   <EntityRelationship Name="contact_al_fqaccountablecontactid_al_outcome" />
   <EntityRelationship Name="contact_al_remediationaction" />
   <EntityRelationship Name="contact_al_reviewinstance" />
+  <EntityRelationship Name="lk_al_advisermapping_createdby" />
+  <EntityRelationship Name="lk_al_advisermapping_modifiedby" />
   <EntityRelationship Name="lk_al_auditevent_createdby" />
   <EntityRelationship Name="lk_al_auditevent_modifiedby" />
   <EntityRelationship Name="lk_al_caseassignment_createdby" />
@@ -89,6 +92,7 @@
   <EntityRelationship Name="lk_al_signoff_modifiedby" />
   <EntityRelationship Name="lk_al_userrolemapping_createdby" />
   <EntityRelationship Name="lk_al_userrolemapping_modifiedby" />
+  <EntityRelationship Name="organization_al_advisermapping" />
   <EntityRelationship Name="organization_al_checklist" />
   <EntityRelationship Name="organization_al_checklistversion" />
   <EntityRelationship Name="organization_al_failreason" />

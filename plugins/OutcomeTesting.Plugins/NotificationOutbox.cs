@@ -50,6 +50,12 @@ namespace OutcomeTesting.Plugins
         // record the final outcome. Additive in the same way as the value above.
         public const int EventRecheckDue = 120910806;
 
+        // Added 2026-09-20 for Fixes 5. The adviser finished every action on the case, so it
+        // is now the T&C Manager's turn and nothing told them. Additive in the same way as
+        // the two values above: appending an option value costs nothing to rows already
+        // carrying the earlier ones.
+        public const int EventSignoffDue = 120910807;
+
         public const int StatusPending = 120910810;
         public const int StatusSent = 120910811;
         public const int StatusFailed = 120910812;
@@ -97,6 +103,7 @@ namespace OutcomeTesting.Plugins
                 case EventSignoffRejected: return "Sign-off rejected";
                 case EventCasePassed: return "Case passed";
                 case EventRecheckDue: return "Recheck due";
+                case EventSignoffDue: return "Sign-off due";
                 default: return "Unknown";
             }
         }

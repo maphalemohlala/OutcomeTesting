@@ -107,7 +107,11 @@ namespace OutcomeTesting.Plugins
             Guid actorId,
             Guid correlationId,
             bool requireCallerOwnsAction,
-            string details)
+            string details,
+            // Optional so every existing caller is unchanged. Where a caller has a tracing
+            // service it passes one, and the sign-off-due routing says why it sent nothing;
+            // where it does not, the routing stays silent rather than failing (NFR-OBS-01).
+            Action<string> trace = null)
         {
             // Idempotency: a replay with the same key is a success no-op (NFR-REL-01).
             var existingAudit = FindAuditByKey(service, idempotencyKey);
@@ -197,7 +201,9 @@ namespace OutcomeTesting.Plugins
             AdvanceCase(
                 service,
                 action.GetAttributeValue<EntityReference>("al_outcomecaseid"),
-                action.GetAttributeValue<EntityReference>(ReviewLookup));
+                action.GetAttributeValue<EntityReference>(ReviewLookup),
+                correlationId,
+                trace);
 
             var auditId = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details);
 
@@ -228,7 +234,11 @@ namespace OutcomeTesting.Plugins
         /// by hand is not dragged back onto the spine.
         /// </summary>
         private static void AdvanceCase(
-            IOrganizationService service, EntityReference caseRef, EntityReference reviewRef)
+            IOrganizationService service,
+            EntityReference caseRef,
+            EntityReference reviewRef,
+            Guid correlationId,
+            Action<string> trace)
         {
             if (caseRef == null)
             {
@@ -260,6 +270,75 @@ namespace OutcomeTesting.Plugins
                 service,
                 caseRef.Id,
                 new[] { CaseLifecycle.RemediationInProgress, CaseLifecycle.AwaitingSignoff });
+
+            NotifySignoffDue(service, caseRef, correlationId, trace);
+        }
+
+        /// <summary>
+        /// Tells the case's T&amp;C Manager that a sign-off is now waiting on them (Fixes 5,
+        /// AD-162).
+        ///
+        /// <para>
+        /// This is the moment the work changes hands. Until 2026-09-20 nothing was sent here
+        /// at all: the adviser was told when their remediation was approved or sent back, but
+        /// the person who had to do the approving was never told there was anything to
+        /// approve. A case reached Awaiting Sign-off and waited for somebody to notice.
+        /// </para>
+        /// <para>
+        /// <b>Routing, not authorisation.</b> Every T&amp;C Manager may still sign off any
+        /// case; the mapping only decides who is told. So an unmapped adviser costs a
+        /// notification, not the ability to proceed, and the sign-off stays possible for
+        /// anyone who goes looking.
+        /// </para>
+        /// <para>
+        /// Never throws. The adviser has just finished their work and the case has already
+        /// moved; failing their completion because a configuration row is missing would
+        /// punish the wrong person for the wrong thing. The reason goes to the trace log
+        /// instead (NFR-OBS-01), which is where an administrator looks when a manager says
+        /// they were not told.
+        /// </para>
+        /// </summary>
+        private static void NotifySignoffDue(
+            IOrganizationService service,
+            EntityReference caseRef,
+            Guid correlationId,
+            Action<string> trace)
+        {
+            try
+            {
+                var routing = TcManagerRouting.ForCase(service, caseRef);
+                if (!routing.IsRouted)
+                {
+                    if (trace != null)
+                    {
+                        trace("Sign-off due on case " + caseRef.Id.ToString("D")
+                            + " was not notified: " + routing.Reason);
+                    }
+
+                    return;
+                }
+
+                var reference = NotificationOutbox.CaseReference(service, caseRef) ?? "a case";
+
+                NotificationOutbox.Queue(
+                    service,
+                    correlationId,
+                    NotificationOutbox.EventSignoffDue,
+                    "al_outcomecase",
+                    caseRef.Id,
+                    routing.Email,
+                    "Sign-off needed on case " + reference,
+                    "The adviser has completed every remediation action on case " + reference
+                        + ", so it is now waiting for your sign-off.");
+            }
+            catch (Exception error)
+            {
+                if (trace != null)
+                {
+                    trace("Sign-off due notification failed on case " + caseRef.Id.ToString("D")
+                        + ": " + error.Message);
+                }
+            }
         }
 
         /// <summary>

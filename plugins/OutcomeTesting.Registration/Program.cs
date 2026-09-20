@@ -249,6 +249,11 @@ if (args.Length >= 2 && args[0].Equals("createnotificationtable", StringComparis
     return CreateNotificationTable(args[1], args.Length > 2 ? args[2] : "OutcomeTesting");
 }
 
+if (args.Length >= 2 && args[0].Equals("createadvisermapping", StringComparison.OrdinalIgnoreCase))
+{
+    return CreateAdviserMappingTable(args[1], args.Length > 2 ? args[2] : "OutcomeTesting");
+}
+
 if (args.Length >= 2 && args[0].Equals("addmemocolumn", StringComparison.OrdinalIgnoreCase))
 {
     return AddMemoColumn(args);
@@ -7179,6 +7184,218 @@ static void GrantTable(
 /// does not do that and the RBAC commands had to be added afterwards by a solution import
 /// (AD-062's note); naming the solution up front avoids repeating that.
 /// </summary>
+// Creates the adviser -> T&C Manager mapping table, its two columns and its alternate key
+// (AD-162, Fixes 5). Idempotent: run it against an environment that already has some of this
+// and it adds only what is missing, which is what makes it safe to re-run against TEST.
+//
+// Organisation-owned, like every other configuration table (AD-024). It is administered, not
+// allocated, so per-row ownership would buy nothing and would put a second access model in
+// front of a lookup table.
+//
+// The adviser's EMAIL is the key, not their name. The extract supplies AdviserEmail on every
+// row and an email is exact; para-planner matching is by name only because nothing better
+// exists there, and AD-161 exists to make that weakness loud. There is no reason to repeat it
+// where a strong key is available.
+int CreateAdviserMappingTable(string orgUrl, string solutionUniqueName)
+{
+    using var svc = Connect(orgUrl);
+
+    var exists = true;
+    try
+    {
+        svc.Execute(new RetrieveEntityRequest
+        {
+            LogicalName = AdviserMappingTable.Logical,
+            EntityFilters = EntityFilters.Entity,
+        });
+    }
+    catch (Exception)
+    {
+        exists = false;
+    }
+
+    if (!exists)
+    {
+        Console.WriteLine($"Creating table {AdviserMappingTable.Schema}…");
+        svc.Execute(new CreateEntityRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            Entity = new EntityMetadata
+            {
+                SchemaName = AdviserMappingTable.Schema,
+                LogicalName = AdviserMappingTable.Logical,
+                DisplayName = AdviserMappingTable.Text("Adviser mapping"),
+                DisplayCollectionName = AdviserMappingTable.Text("Adviser mappings"),
+                Description = AdviserMappingTable.Text(
+                    "Maps an adviser, by their work email, to the T&C Manager who is notified about their "
+                    + "cases and who owns the remediation sign-off (Fixes 5, AD-162). Routing only: it grants "
+                    + "no access and restricts none, because T&C Managers read every case (AD-158 era "
+                    + "permission model, Phase 1)."),
+                OwnershipType = OwnershipTypes.OrganizationOwned,
+                IsActivity = false,
+                IsAuditEnabled = new BooleanManagedProperty(true),
+            },
+            PrimaryAttribute = new StringAttributeMetadata
+            {
+                SchemaName = "al_Name",
+                LogicalName = "al_name",
+                RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.ApplicationRequired),
+                MaxLength = 200,
+                FormatName = StringFormatName.Text,
+                DisplayName = AdviserMappingTable.Text("Name"),
+                Description = AdviserMappingTable.Text(
+                    "Label for the mapping; the adviser's email is the identifying value."),
+            },
+        });
+        Console.WriteLine("  created.");
+    }
+    else
+    {
+        Console.WriteLine($"Table {AdviserMappingTable.Schema} already exists; adding any missing parts.");
+    }
+
+    var present = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var current = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = AdviserMappingTable.Logical,
+        EntityFilters = EntityFilters.Attributes,
+    });
+    foreach (var attribute in current.EntityMetadata.Attributes)
+    {
+        present.Add(attribute.LogicalName);
+    }
+
+    if (!present.Contains(AdviserMappingTable.EmailLogical))
+    {
+        svc.Execute(new CreateAttributeRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            EntityName = AdviserMappingTable.Logical,
+            Attribute = new StringAttributeMetadata
+            {
+                SchemaName = AdviserMappingTable.EmailSchema,
+                LogicalName = AdviserMappingTable.EmailLogical,
+                RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.ApplicationRequired),
+                MaxLength = 200,
+                FormatName = StringFormatName.Email,
+                DisplayName = AdviserMappingTable.Text("Adviser email"),
+                Description = AdviserMappingTable.Text(
+                    "The adviser's work email, as al_outcomecase.al_adviseremail carries it from the "
+                    + "extract. The alternate key, so one adviser cannot hold two conflicting mappings."),
+            },
+        });
+        Console.WriteLine($"  {AdviserMappingTable.EmailLogical}: created");
+    }
+    else
+    {
+        Console.WriteLine($"  {AdviserMappingTable.EmailLogical}: already present");
+    }
+
+    if (!present.Contains(AdviserMappingTable.ManagerLogical))
+    {
+        svc.Execute(new CreateOneToManyRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            OneToManyRelationship = new OneToManyRelationshipMetadata
+            {
+                SchemaName = AdviserMappingTable.RelationshipSchema,
+                ReferencedEntity = "contact",
+                ReferencingEntity = AdviserMappingTable.Logical,
+                CascadeConfiguration = new CascadeConfiguration
+                {
+                    // Restrict, deliberately. Deleting a contact who is somebody's T&C Manager
+                    // must be refused rather than silently emptying the mapping: a mapping that
+                    // quietly became blank routes nothing and says nothing, which is the exact
+                    // failure mode AD-161 was written to stop happening elsewhere.
+                    Delete = CascadeType.Restrict,
+                    Assign = CascadeType.NoCascade,
+                    Merge = CascadeType.NoCascade,
+                    Reparent = CascadeType.NoCascade,
+                    Share = CascadeType.NoCascade,
+                    Unshare = CascadeType.NoCascade,
+                },
+            },
+            Lookup = new LookupAttributeMetadata
+            {
+                SchemaName = AdviserMappingTable.ManagerSchema,
+                LogicalName = AdviserMappingTable.ManagerLogical,
+                RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.ApplicationRequired),
+                DisplayName = AdviserMappingTable.Text("T&C Manager"),
+                Description = AdviserMappingTable.Text(
+                    "The contact who is notified about this adviser's cases and owns the remediation "
+                    + "sign-off. A Contact rather than a system user, so a T&C Manager is reachable by "
+                    + "email without a Dataverse licence (BR-009, as AD-081 has it for the para-planner)."),
+            },
+        });
+        Console.WriteLine($"  {AdviserMappingTable.ManagerLogical}: created");
+    }
+    else
+    {
+        Console.WriteLine($"  {AdviserMappingTable.ManagerLogical}: already present");
+    }
+
+    var keys = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = AdviserMappingTable.Logical,
+        EntityFilters = EntityFilters.Entity,
+    });
+    var hasKey = keys.EntityMetadata.Keys != null
+        && keys.EntityMetadata.Keys.Any(k => k.LogicalName == AdviserMappingTable.KeyLogical);
+    if (!hasKey)
+    {
+        svc.Execute(new CreateEntityKeyRequest
+        {
+            EntityName = AdviserMappingTable.Logical,
+            SolutionUniqueName = solutionUniqueName,
+            EntityKey = new EntityKeyMetadata
+            {
+                SchemaName = AdviserMappingTable.KeySchema,
+                LogicalName = AdviserMappingTable.KeyLogical,
+                DisplayName = AdviserMappingTable.Text("Adviser email"),
+                KeyAttributes = new[] { AdviserMappingTable.EmailLogical },
+            },
+        });
+        Console.WriteLine($"  {AdviserMappingTable.KeyLogical}: created");
+    }
+    else
+    {
+        Console.WriteLine($"  {AdviserMappingTable.KeyLogical}: already present");
+    }
+
+    svc.Execute(new PublishAllXmlRequest());
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    var after = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = AdviserMappingTable.Logical,
+        EntityFilters = EntityFilters.Attributes | EntityFilters.Entity,
+    });
+    var names = new HashSet<string>(
+        after.EntityMetadata.Attributes.Select(a => a.LogicalName), StringComparer.OrdinalIgnoreCase);
+
+    var missing = new List<string>();
+    if (!names.Contains(AdviserMappingTable.EmailLogical)) { missing.Add(AdviserMappingTable.EmailLogical); }
+    if (!names.Contains(AdviserMappingTable.ManagerLogical)) { missing.Add(AdviserMappingTable.ManagerLogical); }
+    if (after.EntityMetadata.Keys == null
+        || !after.EntityMetadata.Keys.Any(k => k.LogicalName == AdviserMappingTable.KeyLogical))
+    {
+        missing.Add(AdviserMappingTable.KeyLogical);
+    }
+
+    if (missing.Count > 0)
+    {
+        Console.Error.WriteLine(
+            "Not found after the create returned: " + string.Join(", ", missing)
+            + ". Investigate before relying on it.");
+        return 1;
+    }
+
+    Console.WriteLine(
+        $"Published. {AdviserMappingTable.Schema} is in solution '{solutionUniqueName}', "
+        + "with its email key and T&C Manager lookup.");
+    return 0;
+}
+
 int CreateNotificationTable(string orgUrl, string solutionUniqueName)
 {
     using var svc = Connect(orgUrl);
@@ -9470,6 +9687,33 @@ sealed class YamlValue
 /// option set would mean inventing four business events. Adding values later is additive
 /// and safe, so shipping five is not a decision that has to be unwound.
 /// </summary>
+/// <summary>
+/// The adviser -> T&C Manager mapping table (AD-162, Fixes 5).
+///
+/// Keyed on the adviser's EMAIL rather than their name. The extract supplies AdviserEmail on
+/// every row, and an email is exact where a name is not - which is the whole reason
+/// para-planner matching has to fail loudly (AD-161). Routing a sign-off to the wrong T&C
+/// Manager because two advisers are called J Smith would be the same class of defect.
+/// </summary>
+static class AdviserMappingTable
+{
+    public const string Logical = "al_advisermapping";
+    public const string Schema = "al_AdviserMapping";
+
+    public const string EmailLogical = "al_adviseremail";
+    public const string EmailSchema = "al_AdviserEmail";
+
+    public const string ManagerLogical = "al_tcmanagerid";
+    public const string ManagerSchema = "al_TcManagerId";
+
+    public const string KeyLogical = "al_advisermappingemailkey";
+    public const string KeySchema = "al_AdviserMappingEmailKey";
+
+    public const string RelationshipSchema = "al_contact_al_advisermapping_tcmanager";
+
+    public static Label Text(string value) => new Label(value, 1033);
+}
+
 static class NotificationTable
 {
     public const string Logical = "al_notification";

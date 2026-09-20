@@ -78,6 +78,7 @@
       </Addresses>
     </Publisher>
     <RootComponents>
+      <RootComponent type="1" schemaName="al_advisermapping" behavior="0" />
       <RootComponent type="1" schemaName="al_auditevent" behavior="0" />
       <RootComponent type="1" schemaName="al_caseassignment" behavior="0" />
       <RootComponent type="1" schemaName="al_checklist" behavior="0" />
