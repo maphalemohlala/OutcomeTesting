@@ -1,6 +1,7 @@
 ﻿using OutcomeTesting.Registration;
 using Microsoft.Crm.Sdk.Messages;
 using Microsoft.PowerPlatform.Dataverse.Client;
+using Microsoft.PowerPlatform.Dataverse.Client.Exceptions;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
@@ -490,6 +491,11 @@ if (args.Length >= 3 && args[0].Equals("fetch", StringComparison.OrdinalIgnoreCa
     return Fetch(args[1], args[2]);
 }
 
+if (args.Length >= 4 && args[0].Equals("webapi", StringComparison.OrdinalIgnoreCase))
+{
+    return WebApi(args);
+}
+
 if (args.Length >= 3 && args[0].Equals("settracelog", StringComparison.OrdinalIgnoreCase))
 {
     return SetTraceLog(args);
@@ -710,6 +716,87 @@ int Fetch(string orgUrl, string fetchXmlOrFile)
         new { count = rows.Count, moreRecords = results.MoreRecords, rows },
         new JsonSerializerOptions { WriteIndented = true }));
     return 0;
+}
+
+// An ad-hoc Dataverse Web API request, as a client that is not this solution would make it.
+//
+// Every server-side rule here is registered on a MESSAGE, so it applies to the SDK and the
+// Web API alike - but "applies alike" is the claim, and a claim about enforcement that is
+// only reasoned about is not evidence. This verb exercises the REST transport the checklist
+// names: a real PATCH over HTTP, not an SDK Update that happens to reach the same pipeline.
+//
+// The token is the ServiceClient's own and is never printed. The path is relative to
+// /api/data/v9.2/, so the org named on the command line is the only org this can reach.
+//
+// The status line and the body are printed verbatim. A plug-in refusal arrives as an HTTP
+// error carrying the plug-in's own sentence, and tidying that up here would hide the thing
+// the run exists to show.
+int WebApi(string[] a)
+{
+    var orgUrl = a[1];
+    var verb = a[2].Trim().ToUpperInvariant();
+    var path = a[3].TrimStart('/');
+    var body = a.Length > 4
+        ? (a[4].StartsWith("@", StringComparison.Ordinal) ? File.ReadAllText(a[4].Substring(1)) : a[4])
+        : null;
+
+    HttpMethod method;
+    switch (verb)
+    {
+        case "GET": method = HttpMethod.Get; break;
+        case "POST": method = HttpMethod.Post; break;
+        case "PATCH": method = new HttpMethod("PATCH"); break;
+        case "DELETE": method = HttpMethod.Delete; break;
+        default:
+            Console.Error.WriteLine(
+                "Usage: dotnet run -- webapi <orgUrl> <GET|POST|PATCH|DELETE> <path> [<json|@file>]");
+            return 1;
+    }
+
+    var headers = new Dictionary<string, List<string>>();
+
+    // Without this, a PATCH at a row that does not exist CREATES one, so a mistyped GUID
+    // becomes a new record instead of a 404. Upsert is never what an ad-hoc call wants.
+    if (verb == "PATCH" || verb == "DELETE")
+    {
+        headers["If-Match"] = new List<string> { "*" };
+    }
+
+    using var svc = Connect(orgUrl);
+
+    try
+    {
+        using var response = svc.ExecuteWebRequest(method, path, body, headers);
+
+        var content = response.Content == null
+            ? string.Empty
+            : response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+        Console.WriteLine($"HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            Console.WriteLine(content);
+        }
+
+        return response.IsSuccessStatusCode ? 0 : 2;
+    }
+    catch (HttpOperationException failure)
+    {
+        // The client throws on any non-2xx rather than handing the response back, and the
+        // exception's own message is only "Operation returned an invalid status code". The
+        // refusal itself - the sentence a server-side rule threw - is in the response body,
+        // so a verb that let this exception escape would report that a write was rejected
+        // while hiding the one thing worth knowing: why.
+        var refusal = failure.Response == null ? null : failure.Response.Content;
+
+        Console.WriteLine(
+            "HTTP " + (failure.Response == null
+                ? "(no response)"
+                : ((int)failure.Response.StatusCode) + " " + failure.Response.ReasonPhrase));
+        Console.WriteLine(string.IsNullOrWhiteSpace(refusal) ? failure.Message : refusal);
+
+        return 2;
+    }
 }
 
 // Plug-in trace logging for the environment (organization.plugintracelogsetting).
