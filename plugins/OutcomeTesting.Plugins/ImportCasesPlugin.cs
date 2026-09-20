@@ -190,6 +190,27 @@ namespace OutcomeTesting.Plugins
                         // failure, so it is reported, not written as an al_importexception.
                         report.Add(ReportRow(row.RowNumber, row.Reference, "Imported (not queued)", result.QueueError, row.Raw));
                     }
+
+                    // Audit finding 7. The para-planner is matched to a Contact by name, which
+                    // is weak, so a name that will never reach anybody is said out loud on the
+                    // day of the upload. Until 2026-09-20 the first anyone knew of it was a
+                    // Failed notification row weeks later, and nothing watches those.
+                    //
+                    // Reported, never fatal: the case is real and the check must still happen.
+                    // Refusing the row would throw away work over a contact record that can be
+                    // fixed afterwards, and the row is not dropped silently either - it is
+                    // named in the report with the reason and the value that failed.
+                    //
+                    // Read as the system user: the person running the import is not guaranteed
+                    // read on Contact, and a diagnostic must not fail for want of a privilege.
+                    var paraplanner = NotificationOutbox.MatchParaplanner(
+                        systemService, record.GetAttributeValue<string>(ImportRules.ParaplannerAttribute));
+                    if (!paraplanner.IsMatch)
+                    {
+                        report.Add(ReportRow(
+                            row.RowNumber, row.Reference, "Imported (para-planner unmatched)",
+                            paraplanner.Reason, row.Raw));
+                    }
                 }
                 catch (Exception error)
                 {

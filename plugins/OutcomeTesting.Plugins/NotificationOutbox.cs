@@ -274,11 +274,85 @@ namespace OutcomeTesting.Plugins
             }
 
             var row = service.Retrieve("al_outcomecase", outcomeCase.Id, new ColumnSet("al_paraplanner"));
-            var name = row.GetAttributeValue<string>("al_paraplanner");
+            var match = MatchParaplanner(service, row.GetAttributeValue<string>("al_paraplanner"));
+            return match.IsMatch ? match.Email : null;
+        }
+
+        /// <summary>Why a para-planner name did or did not reach somebody.</summary>
+        public enum ParaplannerMatchKind
+        {
+            /// <summary>The row named nobody.</summary>
+            NoName,
+
+            /// <summary>No active contact carries that name.</summary>
+            NoContact,
+
+            /// <summary>Two or more do, so no one of them can be chosen.</summary>
+            Ambiguous,
+
+            /// <summary>Exactly one does, and they have no work email.</summary>
+            NoEmail,
+
+            /// <summary>Exactly one active contact, with an email.</summary>
+            Matched,
+        }
+
+        /// <summary>The outcome of resolving a para-planner name, with words for a report.</summary>
+        public sealed class ParaplannerMatch
+        {
+            /// <summary>What happened.</summary>
+            public ParaplannerMatchKind Kind { get; set; }
+
+            /// <summary>The work email, set only when <see cref="IsMatch"/>.</summary>
+            public string Email { get; set; }
+
+            /// <summary>One sentence for the import report, naming the value that failed.</summary>
+            public string Reason { get; set; }
+
+            /// <summary>True only for an unambiguous, reachable match.</summary>
+            public bool IsMatch
+            {
+                get { return Kind == ParaplannerMatchKind.Matched; }
+            }
+        }
+
+        /// <summary>
+        /// Resolves a para-planner name to a reachable Contact, and says why when it cannot.
+        ///
+        /// <para>
+        /// This is the one place that decides. <see cref="ParaplannerEmail"/> is a thin
+        /// wrapper for the send path, and the import calls it directly so a name that will
+        /// never reach anyone is reported on the day of the upload rather than surfacing
+        /// weeks later as a Failed notification nobody is watching (audit finding 7).
+        /// </para>
+        /// <para>
+        /// The four failures were one null until 2026-09-20. They are separated because a
+        /// report saying "unmatched" tells an administrator nothing they can act on, while
+        /// "two active contacts are named Sam Jones" and "Sam Jones has no work email" are
+        /// different jobs for different people.
+        /// </para>
+        /// <para>
+        /// <b>Deliberately stricter than before in one case.</b> The old query filtered on
+        /// emailaddress1 being present, so two contacts of one name where only one had an
+        /// email resolved to that one and sent. It now reads Ambiguous and sends nothing.
+        /// That is the existing rule applied honestly - a missing email address is not
+        /// evidence about which Sam Jones the case means, and the whole reason this matching
+        /// fails loudly is that sending a client's advice outcome to the wrong para-planner
+        /// is a data-protection incident where an unrouted row is an operational one.
+        /// </para>
+        /// </summary>
+        public static ParaplannerMatch MatchParaplanner(IOrganizationService service, string name)
+        {
             if (string.IsNullOrWhiteSpace(name))
             {
-                return null;
+                return new ParaplannerMatch
+                {
+                    Kind = ParaplannerMatchKind.NoName,
+                    Reason = "The row names no para-planner, so nothing can be sent about this case.",
+                };
             }
+
+            var trimmed = name.Trim();
 
             var query = new QueryExpression("contact")
             {
@@ -288,12 +362,41 @@ namespace OutcomeTesting.Plugins
                 TopCount = 2,
                 Criteria = new FilterExpression(),
             };
-            query.Criteria.AddCondition("fullname", ConditionOperator.Equal, name.Trim());
-            query.Criteria.AddCondition("emailaddress1", ConditionOperator.NotNull);
+            query.Criteria.AddCondition("fullname", ConditionOperator.Equal, trimmed);
             query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
 
             var matches = service.RetrieveMultiple(query).Entities;
-            return matches.Count == 1 ? matches[0].GetAttributeValue<string>("emailaddress1") : null;
+
+            if (matches.Count == 0)
+            {
+                return new ParaplannerMatch
+                {
+                    Kind = ParaplannerMatchKind.NoContact,
+                    Reason = "No active contact is named \"" + trimmed + "\".",
+                };
+            }
+
+            if (matches.Count > 1)
+            {
+                return new ParaplannerMatch
+                {
+                    Kind = ParaplannerMatchKind.Ambiguous,
+                    Reason = "Two or more active contacts are named \"" + trimmed
+                        + "\", so no notification can be addressed.",
+                };
+            }
+
+            var email = matches[0].GetAttributeValue<string>("emailaddress1");
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return new ParaplannerMatch
+                {
+                    Kind = ParaplannerMatchKind.NoEmail,
+                    Reason = "The contact named \"" + trimmed + "\" has no work email.",
+                };
+            }
+
+            return new ParaplannerMatch { Kind = ParaplannerMatchKind.Matched, Email = email };
         }
 
         /// <summary>The case reference a person recognises, for the subject line.</summary>
