@@ -178,6 +178,56 @@ namespace OutcomeTesting.Plugins.Tests
             return code => UpdateCaseDetailsPlugin.FindRouteByCode(service, code);
         }
 
+        /// <summary>
+        /// The deadline, through the path that actually writes it (audit finding 5).
+        ///
+        /// ImportCasesPlugin stamps al_duedate on the record before handing it to
+        /// CreateRoutedCase, so this builds the record the same way the plug-in does and
+        /// asserts what lands on the row. Tested here and not only over DueDateFor because
+        /// the audit found nothing had been imported since the rule landed: the default was
+        /// proven where it was computed, never where it was applied.
+        /// </summary>
+        [Fact]
+        public void An_imported_case_carries_a_deadline_three_days_after_the_upload()
+        {
+            var service = WithRoutes();
+            var uploadedAt = new DateTime(2026, 9, 19, 9, 30, 0, DateTimeKind.Utc);
+
+            var record = ImportedRecord(TaxCheckRequiredNo);
+            record["al_duedate"] = ImportRules.DueDateFor(uploadedAt);
+
+            var result = ImportCasesPlugin.CreateRoutedCase(service, Resolver(service), record);
+            var row = service.Row("al_outcomecase", result.CaseId);
+
+            Assert.Equal(new DateTime(2026, 9, 22), row.GetAttributeValue<DateTime>("al_duedate"));
+        }
+
+        [Fact]
+        public void Two_cases_from_one_upload_fall_due_on_the_same_day()
+        {
+            // The deadline comes from the upload moment, not from each row, so a file of a
+            // hundred cases has one deadline. A per-row clock would make two cases from the
+            // same file due on different days for a reason nobody could see.
+            var service = WithRoutes();
+            var uploadedAt = new DateTime(2026, 9, 19, 23, 59, 0, DateTimeKind.Utc);
+            var due = ImportRules.DueDateFor(uploadedAt);
+
+            var first = ImportedRecord(TaxCheckRequiredNo);
+            first["al_casereference"] = "IO-1";
+            first["al_duedate"] = due;
+
+            var second = ImportedRecord(TaxCheckRequiredNo);
+            second["al_casereference"] = "IO-2";
+            second["al_duedate"] = due;
+
+            var a = ImportCasesPlugin.CreateRoutedCase(service, Resolver(service), first);
+            var b = ImportCasesPlugin.CreateRoutedCase(service, Resolver(service), second);
+
+            Assert.Equal(
+                service.Row("al_outcomecase", a.CaseId).GetAttributeValue<DateTime>("al_duedate"),
+                service.Row("al_outcomecase", b.CaseId).GetAttributeValue<DateTime>("al_duedate"));
+        }
+
         [Fact]
         public void A_row_that_answers_tax_check_required_lands_in_the_queue_with_its_route()
         {

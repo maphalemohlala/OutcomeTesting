@@ -6,8 +6,9 @@ using Xunit;
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// The due date (item 6, 2026-09-19): defaulted 72 hours after the upload, editable, and
-    /// editable by managers only.
+    /// The due date (item 6, 2026-09-19; corrected by audit decision D2, 2026-09-20):
+    /// defaulted three days after the UK day of the upload, editable, and editable by
+    /// managers only.
     ///
     /// Three rules that live in three places, pinned together here because they only make
     /// sense as one answer: ImportRules decides what the deadline starts as,
@@ -19,13 +20,11 @@ namespace OutcomeTesting.Plugins.Tests
         // ------------------------------------------------------------------ the default
 
         [Fact]
-        public void Falls_due_seventy_two_hours_after_the_upload()
+        public void Falls_due_three_days_after_the_day_of_the_upload()
         {
             var uploaded = new DateTime(2026, 9, 18, 16, 0, 0, DateTimeKind.Utc);
 
-            Assert.Equal(
-                new DateTime(2026, 9, 21, 16, 0, 0, DateTimeKind.Utc),
-                ImportRules.DueDateFor(uploaded));
+            Assert.Equal(new DateTime(2026, 9, 21), ImportRules.DueDateFor(uploaded));
         }
 
         [Fact]
@@ -39,17 +38,24 @@ namespace OutcomeTesting.Plugins.Tests
             var due = ImportRules.DueDateFor(thursday);
 
             Assert.Equal(DayOfWeek.Sunday, due.DayOfWeek);
-            Assert.Equal(new DateTime(2026, 9, 20, 9, 0, 0, DateTimeKind.Utc), due);
+            Assert.Equal(new DateTime(2026, 9, 20), due);
         }
 
         [Fact]
-        public void Keeps_the_time_of_day_the_upload_happened_at()
+        public void Does_not_pretend_to_keep_the_time_of_day()
         {
-            // 72 hours, not "three days at midnight". A file uploaded at 4pm is due at 4pm,
-            // which is what gives the checker the whole of the third day.
+            // This test used to assert the OPPOSITE, and it was wrong (audit finding 5,
+            // corrected 2026-09-20). It read the time of day off DueDateFor's return value
+            // and called that the behaviour - but al_duedate is DateOnly (Behavior 2), so
+            // Dataverse discards the time on write and every al_duedate in DEV reads back
+            // 00:00:00. The test passed, the commit message and the deployment note both
+            // claimed a 4pm upload was due at 4pm, and none of it was true of the record.
+            //
+            // A unit test can only pin what the function returns. Making the function return
+            // midnight is what makes the two agree.
             var uploaded = new DateTime(2026, 9, 18, 16, 30, 0, DateTimeKind.Utc);
 
-            Assert.Equal(new TimeSpan(16, 30, 0), ImportRules.DueDateFor(uploaded).TimeOfDay);
+            Assert.Equal(TimeSpan.Zero, ImportRules.DueDateFor(uploaded).TimeOfDay);
         }
 
         // ------------------------------------------------------------------ who may move it

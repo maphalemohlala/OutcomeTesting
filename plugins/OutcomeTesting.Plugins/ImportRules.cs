@@ -206,7 +206,7 @@ namespace OutcomeTesting.Plugins
             // DueDate is deliberately NOT mapped (project owner, 2026-09-19). The extract
             // carries Intelligent Office's own due date, which is IO's deadline for the
             // paraplanner's task, not this system's deadline for the check. The check is
-            // due DueWithinHours after the upload, whatever the sheet says, and
+            // due DueWithinDays after the upload, whatever the sheet says, and
             // ImportCasesPlugin stamps that. Reading the column here would have the
             // spreadsheet quietly overriding the rule.
             new ColumnDef("CreatedDate", "al_iocreateddate", ColumnKind.Date, null),
@@ -217,28 +217,48 @@ namespace OutcomeTesting.Plugins
         };
 
         /// <summary>
-        /// How long a checker has, from the upload, before the case is due (project owner,
-        /// 2026-09-19: "72 hours after the upload").
+        /// How many days a checker has, from the day of the upload, before the case is due
+        /// (project owner, 2026-09-19: "3 days"; audit decision D2, 2026-09-20).
         ///
-        /// Clock hours, not working days. That differs from remediation, where an action is
+        /// DAYS, not hours, and the distinction is not pedantry. al_duedate is a DateOnly
+        /// column (Behavior 2), so whatever time of day a DateTime carries is discarded on
+        /// write - every al_duedate in DEV reads back at 00:00:00. The rule was written as
+        /// "72 hours" and stored as "three days at midnight", and the deployment note claimed
+        /// the upload's time of day was preserved. It never was.
+        ///
+        /// Calendar days, not working days. That differs from remediation, where an action is
         /// due ThresholdWorkingDays after it is raised - the two deadlines belong to
         /// different people and were set by different rules, so they are not reconciled
         /// here. If the business ever means three working days by this, it is one change,
         /// in DueDateFor.
         /// </summary>
-        public const int DueWithinHours = 72;
+        public const int DueWithinDays = 3;
 
         /// <summary>
-        /// When a case uploaded at <paramref name="uploadedAt"/> falls due.
+        /// When a case uploaded at <paramref name="uploadedAt"/> falls due: three days after
+        /// the UK DAY of the upload, at midnight.
+        ///
+        /// The UK day, not UTC's (audit finding 5, 2026-09-20). Uploads are timestamped in
+        /// UTC and the users are in London, so through British Summer Time a file uploaded at
+        /// 23:30 UTC on the 17th was uploaded at 00:30 on the 18th as far as the person who
+        /// uploaded it is concerned. Adding 72 hours to the UTC instant made that case due on
+        /// the 20th, a day earlier than the same file uploaded a minute later. Converting to
+        /// the UK day FIRST is what removes the seam; CaseHeaderRules.UkDate already owns
+        /// that conversion and the rule about dates on this header, so it is reused rather
+        /// than repeated.
         ///
         /// Taken from the upload rather than from each row, so every case in one file shares
         /// a due date: they arrived together and the checker was given them together, and a
-        /// per-row clock would make two cases from the same upload due at different minutes
-        /// for no reason anyone could see.
+        /// per-row clock would make two cases from the same upload due on different days for
+        /// no reason anyone could see.
+        ///
+        /// Returns midnight deliberately. The column cannot hold a time, so returning one
+        /// would be inventing a precision the record does not keep - which is exactly the
+        /// mistake this replaces.
         /// </summary>
         public static DateTime DueDateFor(DateTime uploadedAt)
         {
-            return uploadedAt.AddHours(DueWithinHours);
+            return CaseHeaderRules.UkDate(uploadedAt).AddDays(DueWithinDays);
         }
 
         /// <summary>

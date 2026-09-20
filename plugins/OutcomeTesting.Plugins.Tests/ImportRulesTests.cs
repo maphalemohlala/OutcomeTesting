@@ -553,23 +553,106 @@ namespace OutcomeTesting.Plugins.Tests
         /// overriding this system's rule.
         /// </summary>
         [Fact]
-        public void Due_seventy_two_hours_after_the_upload()
+        public void Due_three_days_after_the_day_of_the_upload()
         {
             var uploadedAt = new DateTime(2026, 9, 19, 9, 30, 0, DateTimeKind.Utc);
 
-            Assert.Equal(
-                new DateTime(2026, 9, 22, 9, 30, 0, DateTimeKind.Utc),
-                ImportRules.DueDateFor(uploadedAt));
+            Assert.Equal(new DateTime(2026, 9, 22), ImportRules.DueDateFor(uploadedAt));
         }
 
         [Fact]
-        public void Counts_clock_hours_straight_through_a_weekend()
+        public void Returns_midnight_because_the_column_cannot_hold_a_time()
         {
-            // Friday to Monday. Clock hours, not working days - which is what "72 hours"
+            // al_duedate is DateOnly (Behavior 2). Returning 09:30 would invent a precision
+            // the record does not keep - which is the defect this replaced: the rule said
+            // "72 hours", the column stored a date, and the deployment note claimed the time
+            // of day survived. Every al_duedate in DEV reads back 00:00:00.
+            var uploadedAt = new DateTime(2026, 9, 19, 16, 45, 0, DateTimeKind.Utc);
+
+            Assert.Equal(TimeSpan.Zero, ImportRules.DueDateFor(uploadedAt).TimeOfDay);
+        }
+
+        [Fact]
+        public void Counts_calendar_days_straight_through_a_weekend()
+        {
+            // Friday to Monday. Calendar days, not working days - which is what "3 days"
             // says, and differs from remediation, where the clock counts working days.
             var friday = new DateTime(2026, 9, 18, 16, 0, 0, DateTimeKind.Utc);
+            var due = ImportRules.DueDateFor(friday);
 
-            Assert.Equal(new DateTime(2026, 9, 21, 16, 0, 0, DateTimeKind.Utc), ImportRules.DueDateFor(friday));
+            Assert.Equal(new DateTime(2026, 9, 21), due);
+            Assert.Equal(DayOfWeek.Monday, due.DayOfWeek);
+        }
+
+        // ------------------------------------------------------------------ the UK day
+
+        [Fact]
+        public void A_late_bst_evening_upload_belongs_to_the_next_uk_day()
+        {
+            // 23:30 UTC on 17 June is 00:30 on the 18th in British Summer Time. The person
+            // who pressed the button did so on the 18th, so their deadline is the 21st.
+            //
+            // THE defect (audit finding 5). Adding 72 hours to the UTC instant gave
+            // 2026-06-20, a day earlier than the same file uploaded a minute later - a seam
+            // in the middle of the night that nobody would have found by testing at noon.
+            var uploadedAt = new DateTime(2026, 6, 17, 23, 30, 0, DateTimeKind.Utc);
+
+            Assert.Equal(new DateTime(2026, 6, 21), ImportRules.DueDateFor(uploadedAt));
+        }
+
+        [Fact]
+        public void An_early_bst_morning_upload_stays_on_its_own_uk_day()
+        {
+            // 00:30 BST on 18 June is 23:30 UTC on the 17th, which is the same instant as
+            // the case above - and must give the same answer. The pair is the point: one
+            // upload, two ways of writing it down, one deadline.
+            var uploadedAt = new DateTime(2026, 6, 17, 23, 30, 0, DateTimeKind.Utc);
+            var sameMomentLocal = new DateTimeOffset(2026, 6, 18, 0, 30, 0, TimeSpan.FromHours(1)).UtcDateTime;
+
+            Assert.Equal(ImportRules.DueDateFor(uploadedAt), ImportRules.DueDateFor(sameMomentLocal));
+        }
+
+        [Fact]
+        public void A_winter_evening_upload_stays_on_its_own_day()
+        {
+            // GMT, no offset: 23:30 UTC on 15 January is still the 15th in the UK, so the
+            // conversion must NOT move it. The fix has to be a time-zone conversion rather
+            // than a blanket "add a day to late uploads".
+            var uploadedAt = new DateTime(2026, 1, 15, 23, 30, 0, DateTimeKind.Utc);
+
+            Assert.Equal(new DateTime(2026, 1, 18), ImportRules.DueDateFor(uploadedAt));
+        }
+
+        [Fact]
+        public void Spans_the_spring_clock_change()
+        {
+            // BST began 29 March 2026. An upload on the 27th is due on the 30th: the clocks
+            // going forward does not cost anyone a day, because the arithmetic is on dates
+            // and not on elapsed hours. Adding 72 hours would have been an hour short of
+            // three days here.
+            var uploadedAt = new DateTime(2026, 3, 27, 12, 0, 0, DateTimeKind.Utc);
+
+            Assert.Equal(new DateTime(2026, 3, 30), ImportRules.DueDateFor(uploadedAt));
+        }
+
+        [Fact]
+        public void Spans_the_autumn_clock_change()
+        {
+            // BST ended 25 October 2026. An upload on the 23rd is due on the 26th, and the
+            // extra hour does not buy one either.
+            var uploadedAt = new DateTime(2026, 10, 23, 12, 0, 0, DateTimeKind.Utc);
+
+            Assert.Equal(new DateTime(2026, 10, 26), ImportRules.DueDateFor(uploadedAt));
+        }
+
+        [Fact]
+        public void Every_case_in_one_upload_shares_a_deadline()
+        {
+            // Taken from the upload, not from each row. Two cases from one file cannot fall
+            // due on different days for a reason nobody can see.
+            var uploadedAt = new DateTime(2026, 9, 19, 9, 30, 0, DateTimeKind.Utc);
+
+            Assert.Equal(ImportRules.DueDateFor(uploadedAt), ImportRules.DueDateFor(uploadedAt));
         }
 
         [Fact]

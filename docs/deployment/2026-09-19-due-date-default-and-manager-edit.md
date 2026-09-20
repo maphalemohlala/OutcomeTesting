@@ -9,6 +9,8 @@
 
 ## Your question, answered first
 
+*(One claim in this section was wrong and is corrected inline below.)*
+
 > "This is calendar time unless I say otherwise; flag it in your plan so I can confirm
 > whether it should be working days."
 
@@ -16,8 +18,14 @@
 said "3 days", so a file uploaded on **Thursday morning is due on Sunday morning**, not the
 following Tuesday.
 
-It also keeps the **time of day**: uploaded at 4pm, due at 4pm, which is what gives a checker
-the whole of the third day rather than losing the last afternoon of it.
+> **CORRECTED 2026-09-20 (audit finding 5).** This note originally said the deadline keeps
+> the **time of day** — "uploaded at 4pm, due at 4pm". **That was never true of the record.**
+> `al_duedate` is a DateOnly column, so Dataverse discards the time on write, and every
+> `al_duedate` in DEV reads back `00:00:00`. A unit test asserted the time of day off the
+> function's return value, which is why it passed while the claim was false.
+>
+> The rule is now written as what it actually is: **three days after the UK day of the
+> upload**, at midnight. It is also computed in UK time — see below.
 
 Remediation counts **working** days for its own deadline (`AddWorkingDays`, five days). The
 two are deliberately not reconciled — they are different deadlines for different people. If
@@ -178,9 +186,12 @@ resolves to None for everyone.
 
 ### The default
 
-1. Import a file. Every case in it shows a **Due date exactly three days after the upload**,
-   at the same time of day — including the cases whose `DueDate` cell in the sheet said
-   something else. That column is Intelligent Office's deadline for the paraplanner's task
+1. Import a file. Every case in it shows a **Due date exactly three days after the UK day of
+   the upload**, at midnight — including the cases whose `DueDate` cell in the sheet said
+   something else.
+   **Then repeat with an upload between 23:00 and 23:59 UTC during BST.** The deadline must
+   be three days from the *UK* day, which is the day after the UTC one. Before 2026-09-20
+   this landed a day early. That column is Intelligent Office's deadline for the paraplanner's task
    and is deliberately not read.
 2. Check an **existing** case. Its due date is **unchanged**. Nothing recalculates.
 
