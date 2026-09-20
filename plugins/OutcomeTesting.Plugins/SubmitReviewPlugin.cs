@@ -291,6 +291,7 @@ namespace OutcomeTesting.Plugins
                 NotificationOutbox.ParaplannerEmail(service, caseRef),
                 submitted.Subject,
                 submitted.Body,
+                NotificationTemplates.ReviewSubmitted,
                 caseRef);
         }
 

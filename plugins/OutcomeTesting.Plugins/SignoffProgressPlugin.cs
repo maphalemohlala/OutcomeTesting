@@ -341,7 +341,8 @@ namespace OutcomeTesting.Plugins
                 caseId,
                 email,
                 recheck.Subject,
-                recheck.Body);
+                recheck.Body,
+                NotificationTemplates.RecheckDue);
         }
 
         /// <summary>
@@ -414,7 +415,8 @@ namespace OutcomeTesting.Plugins
                 signoff.Id,
                 email,
                 letter.Subject,
-                letter.Body);
+                letter.Body,
+                code);
         }
 
         /// <summary>

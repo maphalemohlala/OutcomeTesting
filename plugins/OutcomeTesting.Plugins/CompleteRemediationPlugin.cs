@@ -339,7 +339,8 @@ namespace OutcomeTesting.Plugins
                     caseRef.Id,
                     routing.Email,
                     letter.Subject,
-                    letter.Body);
+                    letter.Body,
+                    NotificationTemplates.SignoffDue);
             }
             catch (Exception error)
             {

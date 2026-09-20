@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
@@ -126,7 +126,8 @@ namespace OutcomeTesting.Plugins.Tests
 
             NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventCasePassed,
-                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body");
+                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body",
+                NotificationTemplates.CasePassed);
 
             Assert.Equal("original@example.com", Sent(service).Single().Recipient);
         }
@@ -144,7 +145,8 @@ namespace OutcomeTesting.Plugins.Tests
 
             NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventCasePassed,
-                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body");
+                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body",
+                NotificationTemplates.CasePassed);
 
             var sent = Sent(service);
             Assert.Equal(2, sent.Count);
@@ -163,7 +165,8 @@ namespace OutcomeTesting.Plugins.Tests
 
             NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventCasePassed,
-                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body");
+                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body",
+                NotificationTemplates.CasePassed);
 
             var custom = Sent(service).Single(n => n.Recipient == "manager@example.com");
             Assert.Equal("Case OT-2026-0417 passed", custom.Subject);
@@ -182,7 +185,8 @@ namespace OutcomeTesting.Plugins.Tests
 
             NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventCasePassed,
-                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body");
+                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body",
+                NotificationTemplates.CasePassed);
 
             Assert.Single(Sent(service));
         }
@@ -198,7 +202,8 @@ namespace OutcomeTesting.Plugins.Tests
 
             NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventCasePassed,
-                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body");
+                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body",
+                NotificationTemplates.CasePassed);
 
             Assert.Single(Sent(service));
         }
@@ -213,7 +218,8 @@ namespace OutcomeTesting.Plugins.Tests
 
             NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventCasePassed,
-                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body");
+                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body",
+                NotificationTemplates.CasePassed);
 
             Assert.Single(Sent(service));
         }
@@ -228,7 +234,8 @@ namespace OutcomeTesting.Plugins.Tests
 
             NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventCasePassed,
-                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body");
+                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body",
+                NotificationTemplates.CasePassed);
 
             Assert.Single(Sent(service));
         }
@@ -245,7 +252,8 @@ namespace OutcomeTesting.Plugins.Tests
 
             NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventCasePassed,
-                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body");
+                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body",
+                NotificationTemplates.CasePassed);
 
             var sent = Sent(service);
             Assert.Equal(3, sent.Count);
@@ -261,7 +269,8 @@ namespace OutcomeTesting.Plugins.Tests
 
             var id = NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventCasePassed,
-                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body");
+                "al_outcomecase", CaseId, "original@example.com", "Subject", "Body",
+                NotificationTemplates.CasePassed);
 
             Assert.NotEqual(Guid.Empty, id);
         }

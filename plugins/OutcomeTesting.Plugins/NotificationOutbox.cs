@@ -153,9 +153,12 @@ namespace OutcomeTesting.Plugins
             Guid targetId,
             string recipientEmail,
             string subject,
-            string body)
+            string body,
+            string templateCode)
         {
-            return Queue(service, context.CorrelationId, eventValue, targetTable, targetId, recipientEmail, subject, body);
+            return Queue(
+                service, context.CorrelationId, eventValue, targetTable, targetId,
+                recipientEmail, subject, body, templateCode);
         }
 
         /// <summary>
@@ -193,9 +196,12 @@ namespace OutcomeTesting.Plugins
             string recipientEmail,
             string subject,
             string body,
+            string templateCode,
             EntityReference caseRef)
         {
-            var id = Queue(service, correlationId, eventValue, targetTable, targetId, recipientEmail, subject, body);
+            var id = Queue(
+                service, correlationId, eventValue, targetTable, targetId,
+                recipientEmail, subject, body, templateCode);
 
             // Guid.Empty means the event was already queued, so the attachment is already on
             // the row that exists and writing it again would replace a sent document.
@@ -217,8 +223,20 @@ namespace OutcomeTesting.Plugins
             string recipientEmail,
             string subject,
             string body,
-            string occurrence = null,
-            string templateCode = null)
+            /*
+             * The letter's template code, and required on purpose (F33).
+             *
+             * It used to default to null, and not one of the seven places that queue a
+             * built-in letter passed it - so `SettingsFor(service, null)` found no row every
+             * time and the chosen recipient below was dead for all twelve of them. The unit
+             * tests all passed, because every one of them supplied the code by hand.
+             *
+             * An optional argument that silently disables a feature when it is left out is
+             * not an argument anybody should have to remember. Required means the compiler
+             * asks the ninth call site the question.
+             */
+            string templateCode,
+            string occurrence = null)
         {
             var code = CodeFor(eventValue, targetId, occurrence);
 

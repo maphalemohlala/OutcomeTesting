@@ -78,7 +78,9 @@ namespace OutcomeTesting.Plugins
         /// The outbox code carries <c>al_assignedon</c>, so each allocation of the same row
         /// is its own notification: a reallocation is told, a replay is not.
         /// </summary>
-        internal static void QueueAllocation(IOrganizationService service, Guid correlationId, Guid assignmentId)
+        // Public, like QueueCasePassed beside it, so the tests can drive the path the
+        // product uses: the assembly is signed and carries no InternalsVisibleTo.
+        public static void QueueAllocation(IOrganizationService service, Guid correlationId, Guid assignmentId)
         {
             var assignment = service.Retrieve(AssignmentEntity, assignmentId,
                 new ColumnSet("al_assigneduserid", "al_assignedcontactid", CaseLookup, "al_isactive", "al_assignedon"));
@@ -106,9 +108,13 @@ namespace OutcomeTesting.Plugins
             // Two codes rather than one letter with a conditional in it: the sentence really
             // does differ, and an administrator editing "open it in the portal" should not
             // have to reason about when the other branch fires.
+            var code = link == null
+                ? NotificationTemplates.AllocationNoLink
+                : NotificationTemplates.Allocation;
+
             var letter = NotificationTemplates.Render(
                 service,
-                link == null ? NotificationTemplates.AllocationNoLink : NotificationTemplates.Allocation,
+                code,
                 new Dictionary<string, string>
                 {
                     { NotificationTemplates.TokenReference, reference },
@@ -126,6 +132,7 @@ namespace OutcomeTesting.Plugins
                 email,
                 letter.Subject,
                 letter.Body,
+                code,
                 assignedOn.HasValue
                     ? assignedOn.Value.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture)
                     : null);
@@ -230,7 +237,8 @@ namespace OutcomeTesting.Plugins
                 targetId,
                 email,
                 letter.Subject,
-                letter.Body);
+                letter.Body,
+                code);
         }
 
         /// <summary>
@@ -293,7 +301,8 @@ namespace OutcomeTesting.Plugins
                 caseRef.Id,
                 email,
                 passed.Subject,
-                passed.Body);
+                passed.Body,
+                NotificationTemplates.CasePassed);
         }
     }
 }

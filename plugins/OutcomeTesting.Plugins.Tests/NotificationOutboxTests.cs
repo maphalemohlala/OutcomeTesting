@@ -16,10 +16,16 @@ namespace OutcomeTesting.Plugins.Tests
         private static readonly Guid Target = Guid.Parse("11111111-2222-4222-8222-333333333333");
         private static readonly Guid Correlation = Guid.Parse("44444444-5555-4555-8555-666666666666");
 
-        private static FakeOrganizationService Queue(int eventValue, Guid target, string email = "a@example.com")
+        private static FakeOrganizationService Queue(
+            int eventValue,
+            Guid target,
+            string email = "a@example.com",
+            string templateCode = NotificationTemplates.CasePassed)
         {
             var service = new FakeOrganizationService();
-            NotificationOutbox.Queue(service, Correlation, eventValue, "al_outcomecase", target, email, "Subject", "Body");
+            NotificationOutbox.Queue(
+                service, Correlation, eventValue, "al_outcomecase", target, email,
+                "Subject", "Body", templateCode);
             return service;
         }
 
@@ -89,7 +95,8 @@ namespace OutcomeTesting.Plugins.Tests
             // visible gap; an empty string reads as an address that failed to resolve.
             var service = new FakeOrganizationService();
             NotificationOutbox.Queue(service, Correlation, NotificationOutbox.EventReviewSubmitted,
-                "al_reviewinstance", Target, null, "Subject", "Body");
+                "al_reviewinstance", Target, null, "Subject", "Body",
+                NotificationTemplates.ReviewSubmitted);
 
             Assert.False(Assert.Single(service.Creates).Contains("al_recipientemail"));
         }
@@ -107,7 +114,8 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var service = new FakeOrganizationService();
             NotificationOutbox.Queue(service, Correlation, NotificationOutbox.EventAllocation,
-                "al_outcomecase", Target, "a@example.com", new string('x', 900), "Body");
+                "al_outcomecase", Target, "a@example.com", new string('x', 900), "Body",
+                NotificationTemplates.Allocation);
 
             Assert.True(Assert.Single(service.Creates).GetAttributeValue<string>("al_subject").Length <= 400);
         }
@@ -296,11 +304,13 @@ namespace OutcomeTesting.Plugins.Tests
 
             var first = NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventRemediationAssigned,
-                "al_reviewinstance", review, "adviser@example.com", "Subject", "Body");
+                "al_reviewinstance", review, "adviser@example.com", "Subject", "Body",
+                NotificationTemplates.RemediationOther);
 
             var second = NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventRemediationAssigned,
-                "al_reviewinstance", review, "adviser@example.com", "Subject", "Body");
+                "al_reviewinstance", review, "adviser@example.com", "Subject", "Body",
+                NotificationTemplates.RemediationOther);
 
             Assert.NotEqual(Guid.Empty, first);
             Assert.Equal(Guid.Empty, second);
@@ -315,10 +325,12 @@ namespace OutcomeTesting.Plugins.Tests
 
             NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventRemediationAssigned,
-                "al_reviewinstance", Guid.NewGuid(), "adviser@example.com", "Subject", "Body");
+                "al_reviewinstance", Guid.NewGuid(), "adviser@example.com", "Subject", "Body",
+                NotificationTemplates.RemediationOther);
             NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventRemediationAssigned,
-                "al_reviewinstance", Guid.NewGuid(), "adviser@example.com", "Subject", "Body");
+                "al_reviewinstance", Guid.NewGuid(), "adviser@example.com", "Subject", "Body",
+                NotificationTemplates.RemediationOther);
 
             Assert.Equal(2, service.Creates.Count);
         }

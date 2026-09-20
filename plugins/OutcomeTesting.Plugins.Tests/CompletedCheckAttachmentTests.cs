@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.Xrm.Sdk;
@@ -213,6 +213,7 @@ namespace OutcomeTesting.Plugins.Tests
                 service, Guid.NewGuid(), NotificationOutbox.EventReviewSubmitted,
                 "al_reviewinstance", Guid.NewGuid(), "para@example.com",
                 "Review submitted", "The review has been submitted.",
+                NotificationTemplates.ReviewSubmitted,
                 Ref());
 
             Assert.NotEqual(Guid.Empty, id);
@@ -235,6 +236,7 @@ namespace OutcomeTesting.Plugins.Tests
                 service, Guid.NewGuid(), NotificationOutbox.EventReviewSubmitted,
                 "al_reviewinstance", Guid.NewGuid(), "para@example.com",
                 "Review submitted", "The review has been submitted.",
+                NotificationTemplates.ReviewSubmitted,
                 Ref());
 
             var row = service.Retrieve(

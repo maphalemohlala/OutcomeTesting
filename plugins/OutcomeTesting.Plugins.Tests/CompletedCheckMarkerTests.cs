@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
@@ -134,7 +134,8 @@ namespace OutcomeTesting.Plugins.Tests
 
             NotificationOutbox.Queue(
                 service, Guid.NewGuid(), NotificationOutbox.EventCasePassed,
-                "al_outcomecase", CaseId, "adviser@example.com", "Subject", "Body");
+                "al_outcomecase", CaseId, "adviser@example.com", "Subject", "Body",
+                NotificationTemplates.CasePassed);
 
             var custom = Queued(service).Single(n => n.Recipient == "manager@example.com");
             Assert.False(string.IsNullOrWhiteSpace(custom.AttachmentBody));
@@ -151,6 +152,7 @@ namespace OutcomeTesting.Plugins.Tests
                 service, Guid.NewGuid(), NotificationOutbox.EventReviewSubmitted,
                 "al_outcomecase", CaseId, "para@example.com",
                 "Review submitted", "The review has been submitted.",
+                NotificationTemplates.ReviewSubmitted,
                 new EntityReference("al_outcomecase", CaseId));
 
             Assert.NotEqual(Guid.Empty, id);
