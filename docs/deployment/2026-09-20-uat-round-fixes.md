@@ -1,4 +1,4 @@
-# Four defects found by running the UAT checklist, and their fixes
+# Five defects found by running the UAT checklist, and their fixes
 
 **Date:** 2026-09-20
 **Environment:** `Env_AQ_Dev` (`org0b075da8.crm11.dynamics.com`) only. Promotion to TEST/PROD is a separate decision.
@@ -11,8 +11,9 @@
 ## How they were found
 
 A cached portal session made the browser rows of `docs/testing/e2e-checklist-portal.md`
-reachable for the first time. All four are defects the command-layer testing could not
-have found, because all four are about what reaches the page.
+reachable for the first time. Four of the five are defects the command-layer testing
+could not have found, because they are about what reaches the page. F1 was found in the
+earlier command-layer round and is fixed here with them.
 
 Two further suspicions were investigated and **dropped rather than filed**, which is worth
 recording because both looked serious:
@@ -115,23 +116,7 @@ Verified in DEV across three reloads:
 The first live run read *"One answer… **They** are saved… enter **them** again"*, so the
 wording now agrees in number.
 
----
-
-## Deployment steps
-
-| # | Step | Result |
-|---|---|---|
-| 1 | `npx vitest run` (app) | 668 passed |
-| 2 | `dotnet test` (plug-ins) | 1296 passed |
-| 3 | `pac powerpages download` → diff against local | equivalent: differences were a BOM, YAML quoting, web-role list ordering and table-permission **filenames**; every `adx_entitypermissionid` matched, so the upload updates by id |
-| 4 | `pac powerpages upload --modelVersion Enhanced` | four uploads, 17–20s each |
-| 5 | `dotnet build -c Release` then `pushassembly` | 293,376 bytes |
-| 6 | sha256 of `pluginassembly.content` vs the local DLL | `e2ab2537…9384` — **match** |
-| 7 | Live verification in DEV | the tables above |
-
 ## F1 — a wrong TargetId leaked a raw platform fault
-
-Found in the earlier round and fixed with this batch.
 
 `al_SignOffRemediation` and `al_CompleteRemediation` took the caller's `TargetId` straight
 to a retrieve, so a case id passed where an action id belonged answered:
@@ -164,6 +149,20 @@ Verified in DEV, three distinct answers from the same command:
 
 The assembly's byte count was **identical** to the previous build (293,376) while its
 sha256 differed — which is exactly why the hash and not the size is the deployment check.
+
+---
+
+## Deployment steps
+
+| # | Step | Result |
+|---|---|---|
+| 1 | `npx vitest run` (app) | 668 passed |
+| 2 | `dotnet test` (plug-ins) | 1299 passed (1296 of them unchanged against the more faithful fake) |
+| 3 | `pac powerpages download` → diff against local | equivalent: differences were a BOM, YAML quoting, web-role list ordering and table-permission **filenames**; every `adx_entitypermissionid` matched, so the upload updates by id |
+| 4 | `pac powerpages upload --modelVersion Enhanced` | four uploads, 17–20s each |
+| 5 | `dotnet build -c Release` then `pushassembly`, twice | 293,376 bytes both times - the same size before and after the F1 change |
+| 6 | sha256 of `pluginassembly.content` vs the local DLL | `e2ab2537…9384` then `ee75ddb4…8d09` — **match** both times, and the reason the hash rather than the size is the check |
+| 7 | Live verification in DEV | the tables above |
 
 ## Left alone
 
