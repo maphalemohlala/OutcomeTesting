@@ -7,6 +7,7 @@ import {
   type Al_outcomes,
 } from '../../generated/models/Al_outcomesModel';
 import { date } from '../../lib/format';
+import { lookupLabel } from './lookupLabel';
 import { recordedFlags, type AccountabilityFlags } from './failAccountability';
 
 export interface CaseOutcomeRow {
@@ -41,7 +42,7 @@ export type CaseOutcomeState =
 
 
 /** A lookup as the panel needs it: the id to send back, and a name to show. */
-function namedContact(id?: string, name?: string): { id: string; name: string } | null {
+function namedContact(id?: string, name?: string | null): { id: string; name: string } | null {
   if (!id) return null;
   return { id, name: name?.trim() || 'Someone not in the directory' };
 }
@@ -50,7 +51,7 @@ function toOutcome(record: Al_outcomes): CaseOutcomeRow {
   return {
     id: record.al_outcomeid,
     reference: record.al_name?.trim() || record.al_outcomecode,
-    reviewInstance: record.al_reviewinstanceidname?.trim() || null,
+    reviewInstance: lookupLabel(record, 'al_reviewinstanceid', record.al_reviewinstanceidname),
     initialOutcome:
       record.al_initialoutcomename ??
       Al_outcomesal_initialoutcome[record.al_initialoutcome] ??
@@ -65,11 +66,11 @@ function toOutcome(record: Al_outcomes): CaseOutcomeRow {
     accountability: recordedFlags(record),
     fqAccountable: namedContact(
       record._al_fqaccountablecontactid_value,
-      record.al_fqaccountablecontactidname,
+      lookupLabel(record, 'al_fqaccountablecontactid', record.al_fqaccountablecontactidname),
     ),
     aqAccountable: namedContact(
       record._al_aqaccountablecontactid_value,
-      record.al_aqaccountablecontactidname,
+      lookupLabel(record, 'al_aqaccountablecontactid', record.al_aqaccountablecontactidname),
     ),
     rowVersion: record.versionnumber != null ? String(record.versionnumber) : null,
   };

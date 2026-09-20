@@ -4,6 +4,7 @@ import {
   type Al_outcomes,
 } from '../../generated/models/Al_outcomesModel';
 import { date } from '../../lib/format';
+import { lookupLabel } from './lookupLabel';
 
 export interface CaseOutcome {
   id: string;
@@ -52,7 +53,7 @@ export function toOutcome(record: Al_outcomes): CaseOutcome {
     regradeReason: record.al_regradereason?.trim() || null,
     regradedOn: date(record.al_regradedon),
     finalisedOn: date(record.al_finalisedon),
-    reviewInstance: record.al_reviewinstanceidname?.trim() || null,
+    reviewInstance: lookupLabel(record, 'al_reviewinstanceid', record.al_reviewinstanceidname),
     rowVersion: record.versionnumber === undefined ? null : String(record.versionnumber),
   };
 }

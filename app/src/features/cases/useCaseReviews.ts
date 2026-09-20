@@ -1,46 +1,14 @@
 import { useEffect, useState } from 'react';
-import type { ReviewType } from '../../types/domain';
 import { isRecordId } from '../../services/odata';
 import { Al_reviewinstancesService } from '../../generated';
-import {
-  Al_reviewinstancesal_reviewstatus,
-  Al_reviewinstancesal_reviewtype,
-  type Al_reviewinstances,
-} from '../../generated/models/Al_reviewinstancesModel';
-import { date } from '../../lib/format';
+import { toReview, type CaseReview } from './reviewRows';
 
-export interface CaseReview {
-  id: string;
-  reference: string;
-  type: ReviewType | string;
-  status: string;
-  sequence: number;
-  startedOn: string | null;
-  submittedOn: string | null;
-  owner: string | null;
-}
+export type { CaseReview } from './reviewRows';
 
 export type CaseReviewsState =
   | { status: 'unavailable' }
   | { status: 'loading' }
   | { status: 'ready'; reviews: CaseReview[] };
-
-
-function toReview(record: Al_reviewinstances): CaseReview {
-  return {
-    id: record.al_reviewinstanceid,
-    reference: record.al_name?.trim() || record.al_reviewinstancecode,
-    type: record.al_reviewtypename ?? Al_reviewinstancesal_reviewtype[record.al_reviewtype] ?? '—',
-    status:
-      record.al_reviewstatusname ??
-      Al_reviewinstancesal_reviewstatus[record.al_reviewstatus] ??
-      '—',
-    sequence: record.al_sequence ?? 0,
-    startedOn: date(record.al_startedon),
-    submittedOn: date(record.al_submittedon),
-    owner: record.owneridname?.trim() || null,
-  };
-}
 
 /**
  * Lists the Tax and AQS checks raised for one case (BR-004), ordered by sequence so
