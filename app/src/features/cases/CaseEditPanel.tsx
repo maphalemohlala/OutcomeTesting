@@ -483,7 +483,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
           <ValidationSummary errors={errors} />
           {modalError ? <Notice tone="error">{modalError}</Notice> : null}
 
-          <form className="case-edit__form" onSubmit={onSubmit}>
+          <form className="case-edit__form" onSubmit={onSubmit} noValidate>
             {SECTIONS.map((section) => (
               <fieldset key={section.heading} className="case-edit__section">
                 <legend>{section.heading}</legend>

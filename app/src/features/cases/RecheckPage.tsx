@@ -153,7 +153,7 @@ export function RecheckPage() {
       {failure ? <Notice tone="error">{failure}</Notice> : null}
 
       {mayRegrade && rows.length > 0 ? (
-        <form className="recheck__form" onSubmit={onSubmit}>
+        <form className="recheck__form" onSubmit={onSubmit} noValidate>
           <ValidationSummary errors={errors} />
 
           {rows.length > 1 ? (

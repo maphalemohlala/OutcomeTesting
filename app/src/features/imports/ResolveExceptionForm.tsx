@@ -75,7 +75,11 @@ export function ResolveExceptionForm({ exception, onResolved, onCancel }: Props)
   const noteId = `resolve-note-${exception.id}`;
 
   return (
-    <form className="intake__resolve" onSubmit={onSubmit}>
+    // noValidate on purpose (F34): this form says what is wrong itself, and says more
+    // than the browser can - the radio group has no native equivalent. A single required
+    // attribute would otherwise block submit before onSubmit runs and the summary below
+    // would never render.
+    <form className="intake__resolve" onSubmit={onSubmit} noValidate>
       <h3 className="intake__resolve-heading">
         Close row {exception.rowNumber ?? '—'}
         {exception.caseReference ? ` (${exception.caseReference})` : ''}
