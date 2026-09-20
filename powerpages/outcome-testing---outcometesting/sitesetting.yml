@@ -133,10 +133,10 @@
 - adx_name: ThemeFeature
   adx_sitesettingid: 9f87bc38-4308-442b-b442-7c8ff6d8b364
   adx_value: '{"status":"enable","selectedThemeId":"329a43fa-5471-4678-8330-d3a0b404e9bb","version":"V2"}'
-- adx_description: "Exposes al_response to the portal Web API so a checker can save answers from the review page (AD-053). Answering needs no cloud flow because the Web API supports create and update; only actions are unsupported, which is why submission does need one."
+- adx_description: "DISABLED 2026-09-20 (audit finding 1). This exposed al_response to the portal Web API for the original answer-save path, which no longer exists: the page PATCHes al_reviewinstance.al_answerrequest and AnswerRequestPlugin -> AnswerWriter does the al_response write server-side as the application user. No template addresses /_api/al_responses. Left enabled it was a reachable, unused endpoint over a table every business role can read globally - one request could enumerate every answer to every check on every case. The columns a checker may save are unchanged; they travel through the request column instead."
   adx_name: Webapi/al_response/enabled
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a1
-  adx_value: 'true'
+  adx_value: 'false'
 - adx_description: "Allowlist of columns the browser may write on al_response: the four answer columns. The browser no longer writes al_response at all - Power Pages refused the create's @odata.bind association with 90040106 whatever this list allowed, so the page now PATCHes a JSON payload onto al_reviewinstance.al_answerrequest instead, and AnswerRequestPlugin -> AnswerWriter does the al_response create-or-update server-side as the application user. This setting therefore governs nothing the page still uses; it is kept because removing a Web API allowlist entry is not something an upload does, and because al_responsecode and al_name should stay off it regardless. Earlier the same day, while the create path was still being repaired rather than replaced, al_reviewinstanceid and al_questionversionid were added here on the reasoning that an @odata.bind travels as a navigation property rather than a column and so escapes the allowlist - a reasoning this file recorded as correct at the time (the setting governs the columns the Web API may act on however they are addressed, matching Webapi/al_caseassignment/fields and Webapi/al_signoff/fields). Once the create path itself was deleted in favour of the server-side write, those two lookups had nothing left to authorize and were removed."
   adx_name: Webapi/al_response/fields
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a2
@@ -177,10 +177,10 @@
   adx_name: Webapi/error/innererror
   adx_sitesettingid: 8dea7fe4-27b0-f111-aaac-e4fade069307
   adx_value: 'true'
-- adx_description: "Exposes al_caseassignment to the portal Web API so a checker can pick a case up out of the shared queue (AD-076). A create, like the sign-off, so it needs no trigger column and can carry its own Contact-scoped permission - which is what ties the claim to the signed-in contact, since a portal write reaches Dataverse as the site's application user and cannot be attributed to a caller (AD-053)."
+- adx_description: "DISABLED 2026-09-20 (audit finding 1). Claiming no longer creates an al_caseassignment from the browser: the queue PATCHes contact.al_claimrequest and ClaimRequestPlugin -> ClaimCasePlugin does the create server-side, which is what lets it refuse a case already taken inside one transaction. No template addresses /_api/al_caseassignments. The Contact-scoped read permission stays, because the queue still reads assignments to show what is already taken."
   adx_name: Webapi/al_caseassignment/enabled
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a9
-  adx_value: 'true'
+  adx_value: 'false'
 - adx_description: "Allowlist of columns the browser may write on al_caseassignment. The case and the checker only. The business code, the assigned Dataverse user, the timestamp and the active flag are stamped by ClaimCasePlugin, so a claim cannot be backdated or given a forged key."
   adx_name: Webapi/al_caseassignment/fields
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000aa

@@ -18,9 +18,12 @@
       5. At most one Restrict Read rule per page. Power Pages raises a
          conflicting-rules error on more.
       6. No page rule binds the Anonymous Users role.
-      7. Registration, open registration and local login are off, and external
-         login is ON. Entra ID OIDC is an external identity provider, so turning
-         external login off removes the only way into the site.
+      7. Open registration and local login are OFF; external login and
+         registration are ON. Entra ID OIDC is an external identity provider, so
+         turning external login off removes the only way into the site, and
+         contact mapping happens at the registration gate - so Registration/
+         Enabled being off refuses every unbound sign-in. Open registration is
+         what would admit a stranger, and it is the one held false.
       8. Every web role referenced by a permission, or by a page rule, still
          exists.
       9. A Global-scope table permission never carries write, create or
@@ -32,6 +35,10 @@
          rather than raising anything.
      12. Every web template parses: no real Liquid tag inside a comment, and
          no unbalanced block tag. Both deploy cleanly and break at render.
+     13. No permission over CASE DATA is bound to Authenticated Users. Reading
+         a case is deliberately broad - every business role may view every
+         case - but "signed in" is not a business role, and an account
+         carrying none must not inherit the whole case file.
 
     Three guards refuse to treat a broken scan as a clean one: an empty page
     scan, an empty web-template scan, and a webrole.yml where no role can be
@@ -193,6 +200,24 @@ if ($pages.Count -eq 0) {
     Add-Failure 'guard empty-page-scan' "No web pages found under '$(Join-Path $SitePath 'web-pages')'. Page discovery is broken; refusing to treat that as a clean site."
 }
 
+# The tables assertion 13 protects: client and case data, as opposed to the checklist
+# structure every page needs to render a label.
+$caseDataTables = @('al_outcomecase', 'al_reviewinstance', 'al_response', 'al_remediationaction')
+
+# Roles that are held by virtue of signing in rather than by being given a job. Read from
+# webrole.yml rather than hard-coded, so a second such role added later is caught too.
+$authenticatedRoleIds = @(
+    $roles |
+        Where-Object { ($_.adx_authenticatedusersrole -replace "^'|'$", '').Trim() -match '^(?i)true$' } |
+        ForEach-Object { $_.adx_webroleid }
+)
+
+if (-not $authenticatedRoleIds -or $authenticatedRoleIds.Count -eq 0) {
+    # The same refusal the anonymous-role guard makes: a scan that identified no
+    # authenticated role has not proved assertion 13, it has failed to run it.
+    Add-Failure '13 case-data-authenticated-users' 'No web role in webrole.yml is marked adx_authenticatedusersrole. Assertion 13 cannot be evaluated.'
+}
+
 $settings = Read-YamlList (Join-Path $SitePath 'sitesetting.yml')
 $settingByName = @{}
 foreach ($s in $settings) { $settingByName[$s.adx_name] = $s.adx_value }
@@ -229,6 +254,25 @@ foreach ($p in $permissions) {
             $value = ($p[$right] -replace "^'|'$", '').Trim()
             if ($value -match '^(?i)true$') {
                 Add-Failure '9 global-scope-rights' "$($p._file) is Global scope and sets $right to true. Global scope must never carry write, create or delete."
+            }
+        }
+    }
+
+    # Assertion 13 (audit 2026-09, finding 1): the four tables below hold client and
+    # case data. Every business role may read them - that is the project owner's
+    # direction of 2026-09-20, and it is why they are Global scope rather than
+    # contact-scoped - but the binding must name those roles. Authenticated Users is
+    # held by every account that can sign in, including one nobody has given a job to
+    # and one whose role was withdrawn, so binding case data to it grants the whole
+    # case file by default rather than by decision.
+    #
+    # The reference tables are deliberately not listed: a question's wording, a
+    # section, a review route, a fail reason and an outcome label are the checklist's
+    # structure, not a client's file, and every page needs them to render.
+    if ($caseDataTables -contains $p.adx_entitylogicalname) {
+        foreach ($id in ($bound | Where-Object { $_ })) {
+            if ($authenticatedRoleIds -contains $id) {
+                Add-Failure '13 case-data-authenticated-users' "$($p._file) binds '$($p.adx_entityname)' over $($p.adx_entitylogicalname) to Authenticated Users. Name the business roles instead."
             }
         }
     }
@@ -349,8 +393,19 @@ foreach ($page in $pages) {
 # Values on disk are inconsistently quoted (true, 'true', False, '') depending on
 # how each setting was last saved in the maker portal, so the comparison strips
 # surrounding quotes and is case-insensitive rather than trusting exact text.
+#
+# Authentication/Registration/Enabled is NOT in this list, and its absence is the point.
+# It is the switch that lets an externally authenticated sign-in be matched to an existing
+# contact, and sitesetting.yml records that mapping happens at that gate - turning it off
+# refuses an unbound sign-in before the email is ever compared to a contact. It admits
+# nobody on its own: OpenRegistrationEnabled is what would allow a stranger to create an
+# account, and that is asserted false below.
+#
+# It was in this list until 2026-09-20, which made this gate fail on EVERY run against a
+# correctly configured site. A gate that always fails is a gate nobody reads, and it would
+# have buried assertion 13 in the same output. It is now asserted true instead, so that
+# turning it off - which breaks contact mapping - is caught.
 $mustBeFalse = @(
-    'Authentication/Registration/Enabled',
     'Authentication/Registration/OpenRegistrationEnabled',
     'Authentication/Registration/LocalLoginEnabled'
 )
@@ -362,6 +417,20 @@ foreach ($name in $mustBeFalse) {
     $value = ($settingByName[$name] -replace "^'|'$", '').Trim()
     if ($value -notmatch '^(?i)false$') {
         Add-Failure '7 registration' "Site setting '$name' is '$value', not false."
+    }
+}
+
+$mustBeTrue = @(
+    'Authentication/Registration/Enabled'
+)
+foreach ($name in $mustBeTrue) {
+    if (-not $settingByName.ContainsKey($name)) {
+        Add-Failure '7 registration' "Site setting '$name' is absent, so its platform default applies. Contact mapping happens at the registration gate; set it explicitly to true."
+        continue
+    }
+    $value = ($settingByName[$name] -replace "^'|'$", '').Trim()
+    if ($value -notmatch '^(?i)true$') {
+        Add-Failure '7 registration' "Site setting '$name' is '$value', not true. Contact mapping happens at the registration gate, so turning this off refuses every unbound sign-in."
     }
 }
 
