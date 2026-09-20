@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import caseListTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-case-list/OT-Case-List.webtemplate.source.html?raw';
+import caseDetailTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-case-detail/OT-Case-Detail.webtemplate.source.html?raw';
 import { REVIEW_ROUTES } from '../../types/domain';
 import { CHECKER_LABELS, checkerLabel, checkerState, routeRequires } from './checkerNames';
 
@@ -126,5 +127,65 @@ describe('the portal case list agrees with this module', () => {
     // discipline was allocated second.
     expect(caseListTemplate).toContain('<th scope="col">Tax checker</th>');
     expect(caseListTemplate).toContain('<th scope="col">AQS checker</th>');
+  });
+});
+
+/**
+ * The wording being present in the template is not the same as the wording reaching the
+ * page, and the tests above only ever proved the first.
+ *
+ * Verified against DEV on 2026-09-20: this site's Liquid takes the TRUE branch of
+ * `{% if <null attribute> != blank %}` and then renders the null as nothing, so every
+ * unallocated checker cell came out completely empty - no "Not yet allocated", no "No
+ * check of this type", no markup at all. The drift tests passed throughout, because the
+ * sentences were sitting in the else branches that were never reached.
+ *
+ * So the rule is about HOW emptiness is decided, not only about what it renders. Capture
+ * coerces a null to the empty string before the comparison, which is the idiom the review
+ * template already uses for a choice value, and which does not depend on `blank`.
+ */
+describe('the checker cells decide emptiness in a way that works on a null', () => {
+  const surfaces: Array<[string, string]> = [
+    ['the case list', caseListTemplate],
+    ['case detail', caseDetailTemplate],
+  ];
+
+  for (const [name, template] of surfaces) {
+    it(`does not test a checker name against blank in ${name}`, () => {
+      // The defect itself. `!= blank` reads as "is set" and behaves as "is not set".
+      expect(template).not.toContain('al_taxcheckername != blank');
+      expect(template).not.toContain('al_aqscheckername != blank');
+    });
+
+    it(`compares a captured checker name against the empty string in ${name}`, () => {
+      // The replacement, asserted positively so that deleting the branch does not pass.
+      expect(template).toMatch(/\{%\s*capture tax_checker\s*%\}/);
+      expect(template).toMatch(/\{%\s*capture aqs_checker\s*%\}/);
+      expect(template).toContain("tax_checker != ''");
+      expect(template).toContain("aqs_checker != ''");
+    });
+  }
+});
+
+/**
+ * Fixing the blank cells exposed what was underneath them: case detail decided the two
+ * empty states by counting review instances, so a Tax then AQS case whose AQS leg had not
+ * been claimed yet read "No check of this type" on the case header while the case list
+ * read "Not yet allocated" about the same case (DEV, 2026-09-20). A review row that does
+ * not exist yet is not the same as a check nobody owes.
+ *
+ * Both surfaces decide from the route, with an existing review as further evidence.
+ */
+describe('case detail decides the empty states from the route', () => {
+  it('reads the route requirement flags when deciding the header states', () => {
+    expect(caseDetailTemplate).toContain('owes_tax');
+    expect(caseDetailTemplate).toContain('owes_aqs');
+    expect(caseDetailTemplate).toMatch(/owes_tax[\s\S]{0,400}al_requirestaxreview/);
+    expect(caseDetailTemplate).toMatch(/owes_aqs[\s\S]{0,400}al_requiresaqsreview/);
+  });
+
+  it('treats an unknown route as owing both checks, as the case list does', () => {
+    // The safe direction: show a check that may not be needed rather than hide one that is.
+    expect(caseDetailTemplate).toMatch(/hdr_rt == null[\s\S]{0,200}owes_tax = true/);
   });
 });

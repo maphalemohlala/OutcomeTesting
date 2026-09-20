@@ -185,17 +185,59 @@
       {% if r.al_reviewtype.value == 120910201 %}{% assign has_aqs_review = true %}{% endif %}
     {% endfor %}
 
-    {% if c.al_taxcheckername != blank %}
-      {% assign tax_checker = c.al_taxcheckername %}
-    {% elsif has_tax_review %}
+    {% comment %}
+      Captured, not tested against blank. Verified against DEV on 2026-09-20: this site's
+      Liquid takes the TRUE branch of an if on a null attribute compared to blank, and then
+      renders the null as nothing - so both checker fields came out completely empty and
+      neither sentence below was ever reached. Capture coerces a null to the empty string
+      first, and does not depend on how blank is implemented here.
+
+      The name is captured into the same variable the fields render, so an allocated
+      checker needs no second assignment and only the two empty states are decided here.
+    {% endcomment %}
+    {% comment %}
+      Which of the two empty states an absent checker reads as, decided the same way the
+      Code App and the case list decide it: from the ROUTE, with an existing review
+      instance as further evidence the check is owed.
+
+      This block used to count review instances alone, which reads "the AQS review has not
+      been created yet" as "no AQS check is owed" - so a Tax then AQS case awaiting its AQS
+      leg said "No check of this type" on the case header while the case list said "Not yet
+      allocated" about the same case (DEV, 2026-09-20). The two surfaces disagreeing about
+      one case is the failure the drift test exists to stop.
+
+      An unknown route owes both, the same safe direction the case list takes: show a check
+      that may not be needed rather than hide one that is.
+    {% endcomment %}
+    {% assign hdr_rt = null %}
+    {% for row in route.results.entities %}{% if hdr_rt == null %}{% assign hdr_rt = row %}{% endif %}{% endfor %}
+
+    {% assign owes_tax = false %}
+    {% assign owes_aqs = false %}
+    {% if hdr_rt == null %}
+      {% assign owes_tax = true %}
+      {% assign owes_aqs = true %}
+    {% else %}
+      {% if hdr_rt.al_requirestaxreview %}{% assign owes_tax = true %}{% endif %}
+      {% if hdr_rt.al_requiresaqsreview %}{% assign owes_aqs = true %}{% endif %}
+    {% endif %}
+    {% if has_tax_review %}{% assign owes_tax = true %}{% endif %}
+    {% if has_aqs_review %}{% assign owes_aqs = true %}{% endif %}
+
+    {% capture tax_checker %}{{ c.al_taxcheckername }}{% endcapture %}
+    {% capture aqs_checker %}{{ c.al_aqscheckername }}{% endcapture %}
+
+    {% if tax_checker != '' %}
+      {% comment %} The captured name stands. {% endcomment %}
+    {% elsif owes_tax %}
       {% assign tax_checker = 'Not yet allocated' %}
     {% else %}
       {% assign tax_checker = 'No check of this type' %}
     {% endif %}
 
-    {% if c.al_aqscheckername != blank %}
-      {% assign aqs_checker = c.al_aqscheckername %}
-    {% elsif has_aqs_review %}
+    {% if aqs_checker != '' %}
+      {% comment %} The captured name stands. {% endcomment %}
+    {% elsif owes_aqs %}
       {% assign aqs_checker = 'Not yet allocated' %}
     {% else %}
       {% assign aqs_checker = 'No check of this type' %}
