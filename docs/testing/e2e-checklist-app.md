@@ -31,12 +31,12 @@
 | APP-027 | Case detail | Edit case details and save. | Only changed fields are written and an audit entry is created. | Case header edit | |
 | APP-028 | Case detail | Change the adviser using the person picker. | The picker lists directory contacts and accepts an unlisted imported name. | Adviser person picker | |
 | APP-029 | Case detail | Set an adviser email that matches no contact. | The case saves and the adviser is reported as unmatched. | Adviser resolved by email, then name | |
-| APP-030 | Case detail | Set "Date of meeting - Client contact" to a future date. | The save is refused server-side. | Future date rejection | |
+| APP-030 | Case detail | Set "Date of meeting - Client contact" to a future date. | The save is refused server-side. | Future date rejection | Pass — al_UpdateCaseDetails refused: VALIDATION: Date of meeting - Client contact cannot be in the future. |
 | APP-031 | Case detail | Set the date of meeting after the due date. | The save is refused. | Date of meeting vs due date | |
 | APP-032 | Case detail | Set the date of meeting after the submission date. | The save is refused, or the rule is confirmed as withdrawn. | Date of meeting vs submission date | |
 | APP-033 | Case detail | Edit a case field as a Tax Reviewer not assigned to the case. | The save is refused server-side. | Assignment check on header edit | |
 | APP-034 | Case detail | Edit only Tax fields as an unassigned Tax Reviewer. | The save is refused. | Assignment check on the Tax-fields path | |
-| APP-035 | Case detail | Change "Tax check required" from No to Yes. | The route re-derives to Tax then AQS. | Route derivation | |
+| APP-035 | Case detail | Change "Tax check required" from No to Yes. | The route re-derives to Tax then AQS. | Route derivation | Pass — setting tax required to No re-derived the route from Tax then AQS to AQS only. |
 | APP-036 | Case detail | Set the Tax team disposition to "Return to paraplanner". | The route re-derives to Tax only. | Tax-only route derivation | |
 | APP-037 | Case detail | Change the due date as a role without the grant. | The change is refused. | Due date edit permission | |
 | APP-038 | Case detail | Change the due date as a Manager. | The change is accepted and audited. | Due date editable by Manager | |
@@ -54,7 +54,7 @@
 | APP-050 | Tax check | Submit with mandatory answers missing. | The submission is refused and the missing items are named. | Mandatory answer validation | |
 | APP-051 | Tax check | Submit a Tax check with a Fail grade. | The case proceeds to the AQS check, not straight to remediation. | Tax fail proceeds to AQS | |
 | APP-052 | Tax check | Submit a Tax check on a Tax-only case. | The case proceeds to remediation or closure without an AQS leg. | Tax-only path | |
-| APP-053 | Tax check | Answer a question as a checker not assigned to the review. | The answer is refused server-side. | Response scope enforcement | |
+| APP-053 | Tax check | Answer a question as a checker not assigned to the review. | The answer is refused server-side. | Response scope enforcement | Pass — al_SubmitReview refused: UNAUTHORIZED: Only the checker assigned to this review can submit it. |
 | APP-054 | AQS check | Open an AQS review and set the grade to Pass. | "Primary root cause" is hidden and not required. | Conditional root cause, Pass | |
 | APP-055 | AQS check | Set the grade to anything other than Pass. | "Primary root cause" is shown and required. | Conditional root cause, non-Pass | |
 | APP-056 | AQS check | Submit a non-Pass grade with no root cause. | The submission is refused server-side. | Root cause enforcement | |
@@ -72,7 +72,7 @@
 | APP-068 | Case remediation | Complete every action on a case. | The case moves to Awaiting Sign-off. | Remediation completion transition | |
 | APP-069 | Case remediation | Complete every action where the adviser is mapped to a T&C Manager. | The mapped manager is emailed that a sign-off is waiting. | Sign-off due notification | |
 | APP-070 | Case remediation | Complete every action where the adviser is unmapped. | The case still reaches Awaiting Sign-off and only the notification is lost. | Mapping affects notice, not lifecycle | |
-| APP-071 | Case remediation | Attempt to sign off before all actions are complete. | The sign-off is refused server-side. | Sign-off gating | |
+| APP-071 | Case remediation | Attempt to sign off before all actions are complete. | The sign-off is refused server-side. | Sign-off gating | Partial — parameter validation proved (Decision must be Approved or Rejected); the state gate was not reached, see the note on the raw fault. |
 | APP-072 | Case remediation | Sign off an approved case. | The case closes and the closure email is sent. | Sign-off and closure | |
 | APP-073 | Case remediation | Sign off with "moving to recheck". | The case moves to recheck and the recheck email is sent. | Sign-off to recheck | |
 | APP-074 | Case recheck | Open the recheck page for a case sent back. | The recheck review is available to complete. | Recheck flow | |
@@ -106,11 +106,11 @@
 | APP-102 | Management reporting | Compare outcome volumes with the worklist. | The figures agree for the same period. | Reporting accuracy | |
 | APP-103 | Management reporting | Open the completed case report. | Completed cases are listed with their outcomes. | Completed case report | |
 | APP-104 | Management reporting | Open the page with no data. | Empty states appear rather than errors. | Reporting empty states | |
-| APP-105 | Exports | Generate a Trail Light export. | A file is produced in the agreed twenty-one column format. | Trail Light export format | |
-| APP-106 | Exports | Check the Adviser column. | It is present as column 21 and the original twenty are unchanged. | Adviser on the Trail Light extract | |
+| APP-105 | Exports | Generate a Trail Light export. | A file is produced in the agreed twenty-one column format. | Trail Light export format | Partial — al_CreateExportBatch and al_GenerateExport both succeeded; format unverified, no completed cases to export. |
+| APP-106 | Exports | Check the Adviser column. | It is present as column 21 and the original twenty are unchanged. | Adviser on the Trail Light extract | Not run — needs at least one completed case. |
 | APP-107 | Exports | Export cases in differing states. | Each row carries data correct for that case's state. | Export data per state | |
 | APP-108 | Exports | Check the fail accountability columns. | The accountable person appears for failed cases. | Accountability in the export | |
-| APP-109 | Exports | Export with no completed cases. | An empty export or a clear message is produced, not an error. | Export empty state | |
+| APP-109 | Exports | Export with no completed cases. | An empty export or a clear message is produced, not an error. | Export empty state | Pass — the export generated with RowCount 0 and Status Generated rather than failing. |
 | APP-110 | Exports | Export as a role without export permission. | The page is unavailable and the command is refused. | Export permission | |
 | APP-111 | Question library | Open the library. | Sections and questions are listed for the published checklist. | Question library | |
 | APP-112 | Question library | Open the edit control on a question. | The editor opens as a modal, not always-on. | Question edit modal | |
@@ -173,3 +173,10 @@
 | APP-169 | Deployment | Check environment variables and connection references. | All are set for the target environment. | Environment configuration | |
 | APP-170 | Deployment | Run the page permission and seed steps listed for the environment. | Admin pages are reachable and templates are seeded. | Post-install configuration | |
 | APP-171 | Deployment | Attempt an invalid lifecycle transition through the Web API. | The transition is refused server-side. | Lifecycle gating outside the UI | Partial — a precondition refusal was proved via al_AssignCase; other transitions not exercised. |
+## Findings raised by this run
+
+| # | Where | What happened | Severity |
+|---|---|---|---|
+| F1 | `SignOffRemediationPlugin.cs:162`, `CompleteRemediationPlugin` | A `TargetId` that is not a remediation action produces `UNEXPECTED: ... OrganizationServiceFault: Entity 'al_remediationaction' With Id = ... Does Not Exist`, naming an internal table, where every other command answers with a readable `PRECONDITION:` or `VALIDATION:` sentence. The retrieve has no existence guard. | Low — robustness and NFR-OBS-01, not access |
+| F2 | `docs/audit-2026-09.md`, T8 and the go/no-go | The step count is given as 21; `verifysteps` reports **23**. A tester counting 21 would raise a false failure. | Low — stale documentation |
+| F3 | This checklist's own harness | The first run of the import negatives split the extract on commas; the quoted `Notes` column shifted every later field, so a checklist test reported as a duplicate test. Anyone hand-editing these extracts must use a real CSV parser. | Note for testers |

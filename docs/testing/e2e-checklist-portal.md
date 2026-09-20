@@ -3,7 +3,7 @@
 | ID | Page | Action | Expected outcome | Functionality/feature tested | Result |
 |---|---|---|---|---|---|
 | PRT-001 | Home | Open the site signed out. | Sign-in is required and no case data is visible. | Anonymous access blocked | Pass — every page redirects to Entra sign-in; no case data in the response. |
-| PRT-002 | Home | Attempt to register a new account. | Self-registration is refused. | Registration disabled | |
+| PRT-002 | Home | Attempt to register a new account. | Self-registration is refused. | Registration disabled | Pass — OpenRegistrationEnabled and LocalLoginEnabled are both false; Registration/Enabled stays true only so contact mapping runs. |
 | PRT-003 | Home | Sign in as a Tax Reviewer. | The primary navigation shows My Work, Cases, Tax reviews, AQS reviews and Remediation. | Authenticated navigation | |
 | PRT-004 | Home | Sign in as an Adviser Remediation user. | Only the pages that role is granted are offered. | Role-based navigation | |
 | PRT-005 | Home | Sign in as a contact with no web role. | No case, review, response or remediation data is readable. | No global read for Authenticated Users | |
@@ -35,7 +35,7 @@
 | PRT-031 | Case detail | Edit header details as the assigned checker. | The edit is accepted and audited. | Checker header edit | |
 | PRT-032 | Case detail | Edit header details as a checker on a different case. | The edit is refused server-side. | Checkers edit only assigned cases | |
 | PRT-033 | Case detail | Change the case id in the URL to another case and edit it. | The edit is refused. | URL tampering blocked | |
-| PRT-034 | Case detail | Set "Date of meeting - Client contact" to a future date. | The save is refused. | Future date rejection | |
+| PRT-034 | Case detail | Set "Date of meeting - Client contact" to a future date. | The save is refused. | Future date rejection | Pass — the same server-side refusal as APP-030, raised by the command not the page. |
 | PRT-035 | Case detail | Set the date of meeting after the due date. | The save is refused. | Date of meeting vs due date | |
 | PRT-036 | Case detail | Check the due date on a newly imported case. | It is three days after the upload. | Due date default | |
 | PRT-037 | Case detail | Change the due date as a role without the grant. | The change is refused. | Due date edit permission | |
@@ -55,7 +55,7 @@
 | PRT-051 | Review | Enter text in the "Tax Remedial" field. | Formatting is preserved and the text saves. | Tax Remedial rich text | |
 | PRT-052 | Review | Paste disallowed markup into a rich text answer. | The text is kept and the markup is removed. | Answer sanitising | |
 | PRT-053 | Review | Save an answer, then reload the page. | The saved answer is shown. | Answer persistence | |
-| PRT-054 | Review | Answer a question on a review assigned to someone else. | The save is refused server-side. | Response scope enforcement | |
+| PRT-054 | Review | Answer a question on a review assigned to someone else. | The save is refused server-side. | Response scope enforcement | Pass — al_SubmitReview refused a non-assigned caller: UNAUTHORIZED. |
 | PRT-055 | Review | Change the review id in the URL to another user's review. | Access or write is refused. | Review URL tampering | |
 | PRT-056 | Review | Submit with mandatory questions unanswered. | Submission is refused and the missing items are named. | Mandatory answer validation | |
 | PRT-057 | Review | Set an AQS grade of Pass. | "Primary root cause" is hidden and not required. | Conditional root cause, Pass | |
@@ -90,7 +90,7 @@
 | PRT-086 | Remediation | Have a T&C Supervisor approve a response. | The action completes. | Remediation approval | |
 | PRT-087 | Remediation | Complete every action on a case. | The case moves to Awaiting Sign-off and the T&C Manager is notified. | Sign-off due notification | |
 | PRT-088 | Remediation | Complete every action where the adviser is unmapped. | The case still reaches Awaiting Sign-off and only the notification is lost. | Mapping affects notice, not lifecycle | |
-| PRT-089 | Remediation | Attempt sign-off with actions outstanding. | Sign-off is refused server-side. | Sign-off gating | |
+| PRT-089 | Remediation | Attempt sign-off with actions outstanding. | Sign-off is refused server-side. | Sign-off gating | Partial — as APP-071. |
 | PRT-090 | Remediation | Sign off as a T&C Supervisor with the attestation. | The case closes and the closure email is sent. | Sign-off and closure | |
 | PRT-091 | Remediation | Sign off choosing to move the case to recheck. | The case moves to recheck and the recheck email is sent. | Sign-off to recheck | |
 | PRT-092 | Remediation | Attempt sign-off as an Adviser. | The action is unavailable and refused server-side. | Sign-off permission | |
