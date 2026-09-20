@@ -579,94 +579,14 @@ namespace OutcomeTesting.Plugins
                 }
             }
 
-            // OD-027, as OD-038 now completes it: a Tax check that did not pass sends the
-            // case to remediation, and the AQS review follows once that remediation has been
-            // APPROVED — through remediation, not instead of it. So an AQS submit is refused
-            // while the Tax non-pass is unremediated, and allowed once the action the Tax
-            // check raised carries an approved sign-off. No submitted Tax review, or one with
-            // no answer recorded, is not refused here — the checks above already cover the
-            // cases that matter, and refusing on absent data would break AQS-only and
-            // legacy routes.
-            var submittedTax = new QueryExpression(ReviewEntity)
-            {
-                ColumnSet = new ColumnSet(false),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            submittedTax.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
-            submittedTax.Criteria.AddCondition(ReviewOutcomeCase, ConditionOperator.Equal, caseRef.Id);
-            submittedTax.Criteria.AddCondition(ReviewType, ConditionOperator.Equal, ResponseRules.ReviewTypeTax);
-            submittedTax.Criteria.AddCondition(ReviewStatus, ConditionOperator.Equal, StatusSubmitted);
-
-            // A case can carry more than one submitted Tax review — a recheck or a regrade
-            // adds another. With TopCount 1 and no order Dataverse may return any of them,
-            // so which tax result gates the AQS submit would be arbitrary. The latest
-            // submission is the one in force; modifiedon breaks a tie and covers rows
-            // predating al_submittedon.
-            submittedTax.AddOrder(ReviewSubmittedOn, OrderType.Descending);
-            submittedTax.AddOrder("modifiedon", OrderType.Descending);
-
-            var submittedTaxEntities = service.RetrieveMultiple(submittedTax).Entities;
-            if (submittedTaxEntities.Count > 0)
-            {
-                var taxReviewId = submittedTaxEntities[0].Id;
-                var taxAnswer = AnswerChoiceFor(service, taxReviewId, TaxOutcomeQuestionCode);
-                if (taxAnswer.HasValue
-                    && OutcomeRules.TaxResultRequiresRemediation(taxAnswer.Value)
-                    && !RemediationApproved(service, taxReviewId))
-                {
-                    throw new InvalidPluginExecutionException(
-                        PreconditionPrefix + "The tax check on this case did not pass and its remediation has not been signed off, so the case cannot proceed to an AQS review yet (OD-027, OD-038).");
-                }
-            }
-        }
-
-        /// <summary>
-        /// Whether every remediation action the review raised carries an approved sign-off.
-        /// This is what lets an AQS review follow a Tax non-pass (OD-038): the case went
-        /// through remediation, the T&amp;C Manager approved it, and only then did it return
-        /// to the queue. An action that was never raised, is still open, or was only ever
-        /// rejected does not count.
-        ///
-        /// Every action, not any: a review raises one per thing the checker marked down
-        /// (2026-09-10), so approving the first would otherwise open the AQS gate with the
-        /// rest of the file still unremediated. A review that raised nothing has nothing
-        /// approved, which is the same refusal it has always given.
-        /// </summary>
-        public static bool RemediationApproved(IOrganizationService service, Guid reviewId)
-        {
-            var actions = new QueryExpression("al_remediationaction")
-            {
-                ColumnSet = new ColumnSet(false),
-                Criteria = new FilterExpression(),
-            };
-            actions.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
-
-            var raised = service.RetrieveMultiple(actions).Entities;
-            if (raised.Count == 0)
-            {
-                return false;
-            }
-
-            foreach (var action in raised)
-            {
-                var signoffs = new QueryExpression("al_signoff")
-                {
-                    ColumnSet = new ColumnSet(false),
-                    TopCount = 1,
-                    Criteria = new FilterExpression(),
-                };
-                signoffs.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
-                signoffs.Criteria.AddCondition("al_remediationactionid", ConditionOperator.Equal, action.Id);
-                signoffs.Criteria.AddCondition("al_signoffdecision", ConditionOperator.Equal, SignoffProgressPlugin.DecisionApprovedValue);
-
-                if (service.RetrieveMultiple(signoffs).Entities.Count == 0)
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            // OD-038 used to stand here: a Tax non-pass held the AQS review until the
+            // remediation it raised had been approved. AD-157 retired that rule on
+            // 2026-09-20 - a Tax fail no longer raises anything, the case returns to the
+            // queue, and the AQS submit gathers both checks into one set of actions - but
+            // the gate was left behind, and the two together deadlock (F38): the AQS
+            // submit waited on a remediation only the AQS submit could ever raise. The
+            // checks above are the whole of BR-004 now: Tax must be SUBMITTED before AQS,
+            // whatever it found.
         }
 
         /// <summary>

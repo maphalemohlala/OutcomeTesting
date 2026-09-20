@@ -1,19 +1,17 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Xunit;
 
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// The two questions the sign-off and the AQS submit ask about a case's progress along
-    /// its route (BR-004, OD-027, OD-038): is an AQS review still owed, and has the
-    /// remediation a Tax check raised been approved.
+    /// The question the sign-off and the AQS submit ask about a case's progress along its
+    /// route (BR-004): is an AQS review still owed.
     /// </summary>
     public class RouteProgressTests
     {
         private static readonly Guid CaseId = Guid.Parse("11111111-2222-4333-8444-555555555555");
         private static readonly Guid RouteId = Guid.Parse("66666666-7777-4888-8999-aaaaaaaaaaaa");
-        private static readonly Guid TaxReviewId = Guid.Parse("bbbbbbbb-cccc-4ddd-8eee-ffffffffffff");
 
         private static FakeOrganizationService Case(bool? routeTax, bool? routeAqs)
         {
@@ -85,77 +83,10 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.True(SubmitReviewPlugin.AqsStillOwed(svc, CaseId));
         }
 
-        private static Guid Action(FakeOrganizationService svc, Guid reviewId)
-        {
-            return svc.Seed(
-                "al_remediationaction",
-                Guid.NewGuid(),
-                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
-                "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
-                "al_actionstatus", new OptionSetValue(Remediation.StatusCompleted)).Id;
-        }
-
-        private static void Signoff(FakeOrganizationService svc, Guid actionId, int decision, bool active = true)
-        {
-            svc.Seed(
-                "al_signoff",
-                Guid.NewGuid(),
-                "al_remediationactionid", new EntityReference("al_remediationaction", actionId),
-                "al_signoffdecision", new OptionSetValue(decision),
-                "statecode", new OptionSetValue(active ? 0 : 1));
-        }
-
-        [Fact]
-        public void A_tax_remediation_counts_as_approved_only_with_an_approved_signoff()
-        {
-            var svc = Case(routeTax: true, routeAqs: true);
-            Review(svc, ResponseRules.ReviewTypeTax, submitted: true, id: TaxReviewId);
-            var action = Action(svc, TaxReviewId);
-
-            Assert.False(SubmitReviewPlugin.RemediationApproved(svc, TaxReviewId));
-
-            Signoff(svc, action, SignoffProgressPlugin.DecisionRejectedValue);
-            Assert.False(SubmitReviewPlugin.RemediationApproved(svc, TaxReviewId));
-
-            Signoff(svc, action, SignoffProgressPlugin.DecisionApprovedValue);
-            Assert.True(SubmitReviewPlugin.RemediationApproved(svc, TaxReviewId));
-        }
-
-        [Fact]
-        public void A_review_that_raised_no_action_is_not_approved()
-        {
-            var svc = Case(routeTax: true, routeAqs: true);
-            Review(svc, ResponseRules.ReviewTypeTax, submitted: true, id: TaxReviewId);
-
-            Assert.False(SubmitReviewPlugin.RemediationApproved(svc, TaxReviewId));
-        }
-
-        [Fact]
-        public void One_approved_action_of_several_does_not_open_the_aqs_gate()
-        {
-            // A review raises one action per thing the checker marked down (2026-09-10), so
-            // approving the first would otherwise let the AQS review start with the rest of
-            // the file still unremediated.
-            var svc = Case(routeTax: true, routeAqs: true);
-            Review(svc, ResponseRules.ReviewTypeTax, submitted: true, id: TaxReviewId);
-            var first = Action(svc, TaxReviewId);
-            var second = Action(svc, TaxReviewId);
-
-            Signoff(svc, first, SignoffProgressPlugin.DecisionApprovedValue);
-            Assert.False(SubmitReviewPlugin.RemediationApproved(svc, TaxReviewId));
-
-            Signoff(svc, second, SignoffProgressPlugin.DecisionApprovedValue);
-            Assert.True(SubmitReviewPlugin.RemediationApproved(svc, TaxReviewId));
-        }
-
-        [Fact]
-        public void An_inactive_signoff_does_not_count()
-        {
-            var svc = Case(routeTax: true, routeAqs: true);
-            Review(svc, ResponseRules.ReviewTypeTax, submitted: true, id: TaxReviewId);
-            Signoff(svc, Action(svc, TaxReviewId), SignoffProgressPlugin.DecisionApprovedValue, active: false);
-
-            Assert.False(SubmitReviewPlugin.RemediationApproved(svc, TaxReviewId));
-        }
+        // The five tests that stood here asked whether a Tax review's remediation had
+        // been approved - the OD-038 AQS gate. AD-157 retired that rule on 2026-09-20 and
+        // SubmitReviewPlugin.RemediationApproved went with it (F38): a Tax fail raises no
+        // remediation any more, so a gate waiting on one could only ever refuse. What a
+        // Tax fail does instead is in TaxFailReachesAqsTests.
     }
 }
