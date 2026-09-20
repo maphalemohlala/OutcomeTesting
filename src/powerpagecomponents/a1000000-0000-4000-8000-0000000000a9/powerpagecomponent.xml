@@ -1,7 +1,7 @@
 <powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a9">
   <content>{
-  "description": "Exposes al_caseassignment to the portal Web API so a checker can pick a case up out of the shared queue (AD-076). A create, like the sign-off, so it needs no trigger column and can carry its own Contact-scoped permission - which is what ties the claim to the signed-in contact, since a portal write reaches Dataverse as the site's application user and cannot be attributed to a caller (AD-053).",
-  "value": "true"
+  "description": "DISABLED 2026-09-20 (audit finding 1). Claiming no longer creates an al_caseassignment from the browser: the queue PATCHes contact.al_claimrequest and ClaimRequestPlugin -&gt; ClaimCasePlugin does the create server-side, which is what lets it refuse a case already taken inside one transaction. No template addresses /_api/al_caseassignments. The Contact-scoped read permission stays, because the queue still reads assignments to show what is already taken.",
+  "value": "false"
 }</content>
   <iscustomizable>1</iscustomizable>
   <name>Webapi/al_caseassignment/enabled</name>

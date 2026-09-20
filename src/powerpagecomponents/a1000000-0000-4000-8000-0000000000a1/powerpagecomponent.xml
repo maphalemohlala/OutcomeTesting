@@ -1,7 +1,7 @@
 <powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a1">
   <content>{
-  "description": "Exposes al_response to the portal Web API so a checker can save answers from the review page (AD-053). Answering needs no cloud flow because the Web API supports create and update; only actions are unsupported, which is why submission does need one.",
-  "value": "true"
+  "description": "DISABLED 2026-09-20 (audit finding 1). This exposed al_response to the portal Web API for the original answer-save path, which no longer exists: the page PATCHes al_reviewinstance.al_answerrequest and AnswerRequestPlugin -&gt; AnswerWriter does the al_response write server-side as the application user. No template addresses /_api/al_responses. Left enabled it was a reachable, unused endpoint over a table every business role can read globally - one request could enumerate every answer to every check on every case. The columns a checker may save are unchanged; they travel through the request column instead.",
+  "value": "false"
 }</content>
   <iscustomizable>1</iscustomizable>
   <name>Webapi/al_response/enabled</name>
