@@ -1039,10 +1039,10 @@ namespace OutcomeTesting.Plugins
              * write: a checker's judgement and the grade it attaches to cannot end up in
              * separate transactions, one of which failed.
              */
-            var review = service.Retrieve(
-                ReviewEntity, reviewId, new ColumnSet("al_pendingaccountability"));
+            var review = ParkedAccountability(service, reviewId, caseRef.Id);
 
-            var applied = AccountabilityRequestPlugin.ApplyParked(service, review, outcome);
+            var applied = review != null
+                && AccountabilityRequestPlugin.ApplyParked(service, review, outcome);
 
             AssignUserRolePlugin.Upsert(service, OutcomeEntity, "al_outcomecode", code, outcome);
 
@@ -1050,12 +1050,67 @@ namespace OutcomeTesting.Plugins
             {
                 // Cleared once it has been applied, so a later regrade of the same review
                 // cannot silently re-apply a judgement its checker made about a grade that
-                // no longer stands.
-                service.Update(new Entity(ReviewEntity, reviewId)
+                // no longer stands. Cleared on the review it was READ from, which on the
+                // carry-forward path is the deferred leg rather than this one.
+                service.Update(new Entity(ReviewEntity, review.Id)
                 {
                     ["al_pendingaccountability"] = null,
                 });
             }
+        }
+
+        /// <summary>
+        /// The review holding the "who carries this fail" judgement that belongs to the
+        /// outcome being created, or null when no leg recorded one.
+        ///
+        /// The review being submitted answers it whenever it has a judgement of its own, so
+        /// nothing a checker recorded about THIS submission is ever overwritten.
+        ///
+        /// Where it has none, a leg that deferred is asked (F50, 2026-09-21). A Tax fail on
+        /// a Tax-then-AQS case stamps al_taxoutcome, queues the case and creates no outcome
+        /// - there is no al_outcome row for its checker's judgement to be written to, so it
+        /// stays parked on the Tax review. The AQS submit is the moment that row first
+        /// exists, and reading only the submitting review left the Tax checker's answer
+        /// sitting unread while the export fell back to its default. That default is real
+        /// and is what the panel promises, but it names a DIFFERENT person - the paraplanner
+        /// for a File Quality fail, where the Tax checker had said the adviser - so the
+        /// judgement was not merely lost, it was replaced.
+        ///
+        /// Where BOTH legs recorded one, this leg wins and the other is left parked rather
+        /// than merged. Merging a File Quality pair from one leg with an Advice Quality pair
+        /// from another is a rule nobody has given, and inventing one here would put a
+        /// combination in the extract that no checker chose.
+        /// </summary>
+        public static Entity ParkedAccountability(
+            IOrganizationService service, Guid reviewId, Guid caseId)
+        {
+            var own = service.Retrieve(
+                ReviewEntity, reviewId, new ColumnSet("al_pendingaccountability"));
+
+            if (!string.IsNullOrWhiteSpace(
+                    own.GetAttributeValue<string>("al_pendingaccountability")))
+            {
+                return own;
+            }
+
+            var query = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet("al_pendingaccountability"),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+            query.Criteria.AddCondition(
+                "al_reviewinstanceid", ConditionOperator.NotEqual, reviewId);
+            query.Criteria.AddCondition("al_pendingaccountability", ConditionOperator.NotNull);
+
+            // Newest first, so a case that somehow carries two parked legs takes the most
+            // recent judgement rather than whichever row Dataverse returned first.
+            query.AddOrder("al_submittedon", OrderType.Descending);
+
+            var found = service.RetrieveMultiple(query).Entities;
+            return found.Count == 0 ? null : found[0];
         }
 
         /// <summary>

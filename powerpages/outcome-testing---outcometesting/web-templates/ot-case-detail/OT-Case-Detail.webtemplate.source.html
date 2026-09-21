@@ -10,6 +10,31 @@
 
 {% assign case_id = request.params['id'] %}
 
+{% comment %}
+  F48, fixed 2026-09-21. An id from the query string reaches a fetchxml `eq` on a
+  uniqueidentifier column, and Dataverse throws on a value that is not a GUID - which this
+  Liquid surfaces as `Liquid error: Exception has been thrown by the target of an
+  invocation.` printed above the page's own empty state. Nothing leaked and the page still
+  rendered, but a platform exception was put in front of a reader who can do nothing with
+  it, and the friendly state that WAS reached says it better.
+
+  Checked by shape rather than by asking Dataverse, because asking is the thing that
+  throws. Dashes and the braced form are stripped, then every hex digit is removed: what
+  survives must be empty and the hex must be exactly 32 characters.
+
+  An id that fails the check is treated as no id at all, so the page falls into the state it
+  already has for arriving without one: "No case selected". That is deliberate, over a message of
+  its own - a reader who mistyped a link and a reader probing for ids are shown the same
+  thing, so neither learns whether an id was malformed or simply unknown. A well-formed id
+  that matches no row is untouched by any of this.
+{% endcomment %}
+{% assign ot_id_hex = case_id | downcase | replace: '-','' | replace: '{','' | replace: '}','' %}
+{% assign ot_id_len = ot_id_hex | size %}
+{% assign ot_id_rest = ot_id_hex | replace: '0','' | replace: '1','' | replace: '2','' | replace: '3','' | replace: '4','' | replace: '5','' | replace: '6','' | replace: '7','' | replace: '8','' | replace: '9','' | replace: 'a','' | replace: 'b','' | replace: 'c','' | replace: 'd','' | replace: 'e','' | replace: 'f','' %}
+{% assign ot_id_ok = false %}
+{% if ot_id_len == 32 and ot_id_rest == '' %}{% assign ot_id_ok = true %}{% endif %}
+{% unless ot_id_ok %}{% assign case_id = '' %}{% endunless %}
+
 {% if case_id == null or case_id == empty %}
   {% include 'OT Empty State' title: 'No case selected' message: 'Open a case from the case list to see its detail.' %}
 {% else %}

@@ -232,5 +232,64 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Contains("Tax check on this case has not been submitted", refusal.Message);
         }
+
+        /// <summary>
+        /// The whole journey, because the unit tests around
+        /// <see cref="SubmitReviewPlugin.ParkedAccountability"/> prove the lookup and NOT
+        /// that anything calls it - which is the exact shape of the defect F50 recorded.
+        /// Reverting the call site leaves those green and this one red.
+        /// </summary>
+        [Fact]
+        public void The_tax_checkers_judgement_reaches_the_outcome_the_aqs_submit_creates()
+        {
+            var svc = Case(ResponseRules.ChoiceFail, ResponseRules.ChoicePassWithIssues);
+
+            // The Tax checker names who carries their fail, on the form, before submitting.
+            // AccountabilityRequestPlugin parks it here because al_outcome does not exist
+            // yet - and on this route the Tax submit will not create one either.
+            svc.Seed(
+                "al_reviewinstance", TaxReviewId,
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_reviewtype", new OptionSetValue(ResponseRules.ReviewTypeTax),
+                "al_reviewstatus", new OptionSetValue(ResponseRules.StatusInProgress),
+                "al_checklistversionid", new EntityReference("al_checklistversion", ChecklistVersionId),
+                "al_sequence", 1,
+                "statecode", new OptionSetValue(0),
+                "al_pendingaccountability",
+                "{\"fqAdviser\":true,\"fqParaplanner\":false,\"aqAdviser\":false,"
+                    + "\"aqParaplanner\":false,\"fqContactId\":\"\",\"aqContactId\":\"\"}");
+
+            Submit(svc, TaxReviewId);
+            PickUp(svc);
+            Submit(svc, AqsReviewId);
+
+            var outcome = Assert.Single(OutcomesOn(svc));
+
+            // The adviser, because that is what the Tax checker said. Left to the export's
+            // default this would have been the PARAPLANNER for a File Quality fail - a
+            // different person, which is why dropping the judgement was not a silent no-op.
+            Assert.True(outcome.GetAttributeValue<bool>("al_fqadviseraccountable"));
+            Assert.False(outcome.GetAttributeValue<bool>("al_fqparaplanneraccountable"));
+
+            // And it is spent, so a later regrade cannot re-apply a judgement made about a
+            // grade that no longer stands.
+            Assert.Null(svc.Retrieve(
+                    "al_reviewinstance", TaxReviewId, new ColumnSet("al_pendingaccountability"))
+                .GetAttributeValue<string>("al_pendingaccountability"));
+        }
+
+        private static Entity[] OutcomesOn(FakeOrganizationService svc)
+        {
+            var query = new QueryExpression("al_outcome")
+            {
+                ColumnSet = new ColumnSet(
+                    "al_fqadviseraccountable", "al_fqparaplanneraccountable",
+                    "al_aqadviseraccountable", "al_aqparaplanneraccountable"),
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, CaseId);
+
+            return svc.RetrieveMultiple(query).Entities.ToArray();
+        }
     }
 }

@@ -138,5 +138,139 @@ namespace OutcomeTesting.Plugins.Tests
                     Review(Parked(fqParaplanner: true, fqContact: "Clare Hook")),
                     outcome));
         }
+
+        [Fact]
+        public void Carries_a_deferred_legs_judgement_forward_to_the_outcome()
+        {
+            // F50. A Tax fail on a Tax-then-AQS case defers: it stamps al_taxoutcome, queues
+            // the case and creates NO outcome, so the Tax checker's answer to "who carries
+            // this fail" has nothing to be written to and stays parked on the Tax review.
+            // The AQS submit is the one that creates the outcome - and it used to read the
+            // parked value from the review being submitted only, so the Tax checker's
+            // judgement was silently dropped and the export fell back to its default, which
+            // names a DIFFERENT person: the paraplanner for a File Quality fail, where this
+            // checker said the adviser.
+            var service = new FakeOrganizationService();
+            var caseId = Guid.NewGuid();
+            var taxReview = Guid.NewGuid();
+            var aqsReview = Guid.NewGuid();
+
+            service.Seed(
+                "al_reviewinstance", taxReview,
+                "al_outcomecaseid", new EntityReference("al_outcomecase", caseId),
+                "al_submittedon", new DateTime(2026, 9, 20, 9, 0, 0, DateTimeKind.Utc),
+                "statecode", new OptionSetValue(0),
+                "al_pendingaccountability", Parked(fqAdviser: true));
+
+            service.Seed(
+                "al_reviewinstance", aqsReview,
+                "al_outcomecaseid", new EntityReference("al_outcomecase", caseId),
+                "statecode", new OptionSetValue(0));
+
+            var source = SubmitReviewPlugin.ParkedAccountability(service, aqsReview, caseId);
+
+            Assert.NotNull(source);
+            Assert.Equal(taxReview, source.Id);
+
+            var outcome = new Entity("al_outcome");
+            Assert.True(AccountabilityRequestPlugin.ApplyParked(service, source, outcome));
+            Assert.True(outcome.GetAttributeValue<bool>("al_fqadviseraccountable"));
+        }
+
+        [Fact]
+        public void Prefers_the_submitting_reviews_own_judgement_over_a_deferred_legs()
+        {
+            // Both legs opened the panel. The judgement made about THIS submission wins;
+            // nothing recorded here is overwritten by an earlier leg.
+            var service = new FakeOrganizationService();
+            var caseId = Guid.NewGuid();
+            var aqsReview = Guid.NewGuid();
+
+            service.Seed(
+                "al_reviewinstance", Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", caseId),
+                "al_submittedon", new DateTime(2026, 9, 20, 9, 0, 0, DateTimeKind.Utc),
+                "statecode", new OptionSetValue(0),
+                "al_pendingaccountability", Parked(fqAdviser: true));
+
+            service.Seed(
+                "al_reviewinstance", aqsReview,
+                "al_outcomecaseid", new EntityReference("al_outcomecase", caseId),
+                "statecode", new OptionSetValue(0),
+                "al_pendingaccountability", Parked(aqParaplanner: true));
+
+            var source = SubmitReviewPlugin.ParkedAccountability(service, aqsReview, caseId);
+
+            Assert.NotNull(source);
+            Assert.Equal(aqsReview, source.Id);
+
+            var outcome = new Entity("al_outcome");
+            AccountabilityRequestPlugin.ApplyParked(service, source, outcome);
+            Assert.True(outcome.GetAttributeValue<bool>("al_aqparaplanneraccountable"));
+            Assert.False(outcome.GetAttributeValue<bool>("al_fqadviseraccountable"));
+        }
+
+        [Fact]
+        public void Does_not_reach_onto_another_case()
+        {
+            // The carry-forward is scoped to this case. A parked judgement on somebody
+            // else's case must never attach to this outcome.
+            var service = new FakeOrganizationService();
+            var caseId = Guid.NewGuid();
+            var aqsReview = Guid.NewGuid();
+
+            service.Seed(
+                "al_reviewinstance", Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", Guid.NewGuid()),
+                "al_submittedon", new DateTime(2026, 9, 20, 9, 0, 0, DateTimeKind.Utc),
+                "statecode", new OptionSetValue(0),
+                "al_pendingaccountability", Parked(fqAdviser: true));
+
+            service.Seed(
+                "al_reviewinstance", aqsReview,
+                "al_outcomecaseid", new EntityReference("al_outcomecase", caseId),
+                "statecode", new OptionSetValue(0));
+
+            Assert.Null(SubmitReviewPlugin.ParkedAccountability(service, aqsReview, caseId));
+        }
+
+        [Fact]
+        public void Ignores_a_deactivated_reviews_parked_judgement()
+        {
+            var service = new FakeOrganizationService();
+            var caseId = Guid.NewGuid();
+            var aqsReview = Guid.NewGuid();
+
+            service.Seed(
+                "al_reviewinstance", Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", caseId),
+                "al_submittedon", new DateTime(2026, 9, 20, 9, 0, 0, DateTimeKind.Utc),
+                "statecode", new OptionSetValue(1),
+                "al_pendingaccountability", Parked(fqAdviser: true));
+
+            service.Seed(
+                "al_reviewinstance", aqsReview,
+                "al_outcomecaseid", new EntityReference("al_outcomecase", caseId),
+                "statecode", new OptionSetValue(0));
+
+            Assert.Null(SubmitReviewPlugin.ParkedAccountability(service, aqsReview, caseId));
+        }
+
+        [Fact]
+        public void Finds_nothing_when_no_leg_recorded_a_judgement()
+        {
+            // The ordinary case, and the one that must keep deriving: the export names the
+            // paraplanner for a File Quality fail and the adviser for an Advice Quality one.
+            var service = new FakeOrganizationService();
+            var caseId = Guid.NewGuid();
+            var aqsReview = Guid.NewGuid();
+
+            service.Seed(
+                "al_reviewinstance", aqsReview,
+                "al_outcomecaseid", new EntityReference("al_outcomecase", caseId),
+                "statecode", new OptionSetValue(0));
+
+            Assert.Null(SubmitReviewPlugin.ParkedAccountability(service, aqsReview, caseId));
+        }
     }
 }
