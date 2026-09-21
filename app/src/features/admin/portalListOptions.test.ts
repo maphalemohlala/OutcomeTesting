@@ -140,6 +140,29 @@ describe('the portal draws every managed dropdown from the table', () => {
     expect(select).toContain('{% unless ');
     expect(select).toContain('(retired)');
   });
+
+  it.each(DROPDOWNS)('$label only calls it retired when the list actually loaded', (dropdown) => {
+    // Found by testing DEV in a browser: the options came back empty, and every held value
+    // fell through the "not among the offered options" branch and rendered as
+    // "Pre (retired)". It was not retired - the list could not be read.
+    //
+    // Two different things wear the same shape. "Not offered" means retired ONLY if there
+    // was something to be offered; if the fetch returned nothing, all that is known is that
+    // the catalogue is unavailable, and telling a checker their case holds a retired value
+    // is a claim about their data made from a failure to read anyone's.
+    const select = headerSelect(dropdown.attr);
+
+    // The flag is set inside the loop, so it is true only when a row was drawn.
+    const anyFlag = /\{% assign (\w+_any) = false %\}/.exec(select);
+    expect(anyFlag, 'a flag recording whether any option was drawn').not.toBeNull();
+    expect(select).toContain(`{% for o in ${dropdown.fetch}.results.entities %}{% assign ${anyFlag![1]} = true %}`);
+
+    // ...and the suffix is behind it.
+    expect(select).toContain(`{% if ${anyFlag![1]} %} (retired){% endif %}`);
+    expect(select, 'the suffix must not be emitted unconditionally').not.toMatch(
+      /escape \}\} \(retired\)/,
+    );
+  });
 });
 
 describe('what the portal may do with the options', () => {
