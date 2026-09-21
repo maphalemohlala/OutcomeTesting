@@ -355,17 +355,26 @@ Three things it deliberately does not do:
 `Question Version - read` table permission is read-only, and the Web API cannot exceed a table
 permission.
 
-### A gap this turned up: DEV's portal stylesheet was never pushed
+### A claim this note made an hour ago, and the correction
 
-Fetching `outcome-testing.css` from the DEV portal showed it missing **yesterday's** rules as
-well as today's — `ot-due--overdue`, `ot-unassigned` and the phone-width `.ot-checklist .meta`
-(F51, F52, F55). Those reached TEST through the managed solution, and the 2026-09-21 TEST note
-records them live there; nobody pushed them to **DEV**, where the portal is hand-maintained
-(`powerpages/` is not a mirror). `pushwebfile` has now sent all of them, 58,238 bytes, and the
-component reads back modified at 14:36:54Z.
+**Retracted: "DEV's portal stylesheet was never pushed, and is missing yesterday's rules."**
+That was written from a reading that does not support it. `curl` on
+`https://outcometesting.powerappsportals.com/outcome-testing.css` returns **302 to
+`login.windows.net`** — the DEV portal requires sign-in for web files — and following the
+redirect lands on a Microsoft "Sign in to your account" page. Grepping that HTML for
+`ot-due--overdue`, `ot-unassigned` and `ot-stale` returns zero for all of them, which says
+nothing whatever about the stylesheet. The response size drifting between fetches (51,567 →
+51,642 → 51,704 bytes) was the login page's own per-request tokens, not a stylesheet.
 
-The portal was still serving the older copy minutes afterwards — which is the same cache this
-whole section is about, showing itself on a second surface.
+**What is actually known.** `pushwebfile` reported writing 58,238 bytes, and the
+`outcome-testing.css` component reads back `modifiedon 2026-09-21T14:36:54Z` — so the file
+reached Dataverse. Whether DEV was behind before that push is **unknown and now
+unknowable**, and nothing here should be read as saying it was.
+
+**Why the earlier TEST check was valid and this one was not:** the 2026-09-21 TEST note
+fetched the same file from the TEST portal and got a real 200 with the three rules in it.
+TEST serves that file anonymously; DEV does not. Two portals, two different answers to the
+same command — worth knowing before anyone diagnoses a stylesheet by fetching it.
 
 ### Deployed to DEV
 
