@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
@@ -135,7 +135,6 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData("al_paraplanner")]
         [InlineData("al_products")]
         [InlineData("al_advicedate")]
-        [InlineData("al_checkdate")]
         [InlineData("al_vulnerableclient")]
         public void Allows_the_header_fields_a_checker_owns(string field)
         {
@@ -145,6 +144,23 @@ namespace OutcomeTesting.Plugins.Tests
             };
 
             CaseHeaderRequestPlugin.EnsureCheckerEditable(fields);
+        }
+
+        [Fact]
+        public void Refuses_the_check_date_a_checker_used_to_be_able_to_correct()
+        {
+            // Project owner, 2026-09-21: "the check date has to be uneditable as it is
+            // automatically updated on submit". It is derived now - the submit stamps it -
+            // and a field a command overwrites on the next submit is not one anybody types.
+            var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "al_checkdate", "2026-09-01" },
+            };
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => CaseHeaderRequestPlugin.EnsureCheckerEditable(fields));
+
+            Assert.Contains("al_checkdate", error.Message);
         }
 
         [Fact]

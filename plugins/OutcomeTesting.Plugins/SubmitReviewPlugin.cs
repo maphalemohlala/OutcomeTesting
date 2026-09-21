@@ -817,6 +817,41 @@ namespace OutcomeTesting.Plugins
             });
         }
 
+        /// <summary>
+        /// Stamps the case's check date with the day of this submit (project owner,
+        /// 2026-09-21: "the check date has to be uneditable as it is automatically updated
+        /// on submit").
+        ///
+        /// <b>This supersedes the 2026-09-19 rule</b>, which stamped the date on the first
+        /// answer saved - <c>ResponseProgressPlugin.StampCheckDate</c>, now removed - and
+        /// wrote it only when the column was empty, so that a checker could correct it
+        /// afterwards. Neither half survives the new direction: the column is no longer a
+        /// default anybody may edit, so nothing else can write it, and "when someone starts
+        /// checks" is not "on submit".
+        ///
+        /// <b>Written unconditionally, so the latest submit wins.</b> On a Tax-then-AQS case
+        /// the Tax submit dates the case and the AQS submit re-dates it, and the column ends
+        /// up holding the day the checking finished rather than the day its first half did.
+        /// That is the reading the project owner chose on 2026-09-21 when the two were put
+        /// to them side by side. It also means a value the import carried is overwritten the
+        /// moment a check is submitted, which is the point of taking the column off the
+        /// editable list: it is now derived, not supplied.
+        ///
+        /// Date-only column (behavior 2), so the date is written without a time.
+        /// </summary>
+        public static void StampCheckDate(IOrganizationService service, Guid caseId)
+        {
+            if (service == null || caseId == Guid.Empty)
+            {
+                return;
+            }
+
+            service.Update(new Entity(CaseEntity, caseId)
+            {
+                ["al_checkdate"] = DateTime.UtcNow.Date,
+            });
+        }
+
         public static bool HasOutcome(IOrganizationService service, Guid caseId)
         {
             var query = new QueryExpression(OutcomeEntity)
@@ -990,6 +1025,11 @@ namespace OutcomeTesting.Plugins
                 // reports on cannot come apart - the outbox guarantee OD-030 rests on.
                 NotificationEmitterPlugin.QueueCasePassed(service, correlationId, caseRef);
             }
+
+            // The day the check was done (project owner, 2026-09-21). Stamped here, inside
+            // the submit transaction, so a submitted review and the date the case reports
+            // for it cannot come apart.
+            StampCheckDate(service, caseRef.Id);
 
             // OutcomeRules.HopsFor is the single description of the route a submit takes:
             // open the case if it was never opened, through Submitted unless this is the Tax

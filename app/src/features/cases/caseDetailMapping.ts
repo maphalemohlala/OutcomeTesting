@@ -37,7 +37,6 @@ export interface CaseEditValues {
   al_advicedate: string;
   al_productsolutiontype: number | null;
   al_samplesource: number | null;
-  al_checkdate: string;
   al_preorpostcheck: number | null;
   al_vulnerableclient: number | null;
   al_taxcheckrequired: number | null;
@@ -139,7 +138,6 @@ export function toDetail(record: Al_outcomecases): CaseDetail {
       al_advicedate: ymd(record.al_advicedate),
       al_productsolutiontype: opt(record.al_productsolutiontype),
       al_samplesource: opt(record.al_samplesource),
-      al_checkdate: ymd(record.al_checkdate),
       al_preorpostcheck: opt(record.al_preorpostcheck),
       al_vulnerableclient: opt(record.al_vulnerableclient),
       al_taxcheckrequired: opt(record.al_taxcheckrequired),

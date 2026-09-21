@@ -106,7 +106,10 @@ const SECTIONS: Section[] = [
   {
     heading: 'Check and tax',
     fields: [
-      { attr: 'al_checkdate', label: 'Check date', kind: 'date' },
+      // Check date is deliberately absent (project owner, 2026-09-21: "the check date has
+      // to be uneditable as it is automatically updated on submit"). The submit stamps it -
+      // SubmitReviewPlugin.StampCheckDate - and al_UpdateCaseDetails no longer allowlists
+      // the column, so offering it here would produce a field that refuses every save.
       { attr: 'al_taxcheckrequired', label: 'Tax check required', kind: 'choice', options: Al_outcomecasesal_taxcheckrequired },
       { attr: 'al_taxteamdisposition', label: 'Tax team disposition', kind: 'choice', options: Al_outcomecasesal_taxteamdisposition },
     ],

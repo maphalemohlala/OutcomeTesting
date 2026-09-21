@@ -1,34 +1,23 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
-using Microsoft.Xrm.Sdk.Query;
 using Xunit;
 
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// The case's check date, stamped when checks actually start on it (project owner,
-    /// 2026-09-19).
+    /// The case's check date: stamped by the submit, and editable by nobody (project owner,
+    /// 2026-09-21: "the check date has to be uneditable as it is automatically updated on
+    /// submit").
     ///
-    /// ResponseProgressPlugin already owns that moment: it runs post-operation on
-    /// al_response and moves the review from Assigned to In progress on the first saved
-    /// answer. Stamping here rather than on assignment matters because a case can sit
-    /// assigned for days before anyone opens it, and the business reads this column as the
-    /// day the work was done.
+    /// This SUPERSEDES the 2026-09-19 rule these tests used to assert, which stamped the
+    /// date on the first answer saved and left it alone once set so a checker could correct
+    /// it. Both halves are gone: the column is derived from the submit, the latest submit
+    /// wins, and neither front end offers it.
     /// </summary>
     public class CheckDateStampTests
     {
         private static readonly Guid CaseId = Guid.Parse("11111111-1111-4111-8111-111111111111");
-
-        private static Entity Review(Guid? caseId)
-        {
-            var review = new Entity("al_reviewinstance", Guid.NewGuid());
-            if (caseId.HasValue)
-            {
-                review["al_outcomecaseid"] = new EntityReference("al_outcomecase", caseId.Value);
-            }
-
-            return review;
-        }
 
         private static FakeOrganizationService WithCase(DateTime? checkDate)
         {
@@ -50,7 +39,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var service = WithCase(null);
 
-            ResponseProgressPlugin.StampCheckDate(service, Review(CaseId));
+            SubmitReviewPlugin.StampCheckDate(service, CaseId);
 
             var update = Assert.Single(service.Updates);
             Assert.Equal("al_outcomecase", update.LogicalName);
@@ -65,44 +54,40 @@ namespace OutcomeTesting.Plugins.Tests
             // dropped by the platform, but the value written should say what is meant.
             var service = WithCase(null);
 
-            ResponseProgressPlugin.StampCheckDate(service, Review(CaseId));
+            SubmitReviewPlugin.StampCheckDate(service, CaseId);
 
             var written = service.Updates[0].GetAttributeValue<DateTime>("al_checkdate");
             Assert.Equal(TimeSpan.Zero, written.TimeOfDay);
         }
 
         [Fact]
-        public void Leaves_a_check_date_the_import_already_carried()
+        public void Overwrites_a_check_date_the_import_carried()
         {
-            // It is a DEFAULT, not a derived value. Overwriting would let the second review
-            // on a case silently redate work the first one did.
+            // The column is no longer a default the file supplies. It says when the check was
+            // submitted, and on 2026-09-21 the project owner chose "latest submit wins" over
+            // "first submit wins" with both put to them.
             var service = WithCase(new DateTime(2026, 9, 1));
 
-            ResponseProgressPlugin.StampCheckDate(service, Review(CaseId));
+            SubmitReviewPlugin.StampCheckDate(service, CaseId);
 
-            Assert.Empty(service.Updates);
+            var update = Assert.Single(service.Updates);
+            Assert.Equal(DateTime.UtcNow.Date, update.GetAttributeValue<DateTime>("al_checkdate"));
         }
 
         [Fact]
-        public void Leaves_a_check_date_a_checker_corrected()
+        public void The_second_submit_on_a_case_redates_it()
         {
-            // Same rule from the other direction: a checker may edit this field, and the
-            // next review starting must not undo that.
-            var service = WithCase(new DateTime(2026, 9, 17));
+            // A Tax-then-AQS case is submitted twice. The date ends up as the day the
+            // checking finished, not the day its first half did.
+            var service = WithCase(new DateTime(2026, 9, 18));
 
-            ResponseProgressPlugin.StampCheckDate(service, Review(CaseId));
+            SubmitReviewPlugin.StampCheckDate(service, CaseId);
+            SubmitReviewPlugin.StampCheckDate(service, CaseId);
 
-            Assert.Empty(service.Updates);
-        }
-
-        [Fact]
-        public void Does_nothing_for_a_review_with_no_case()
-        {
-            var service = WithCase(null);
-
-            ResponseProgressPlugin.StampCheckDate(service, Review(null));
-
-            Assert.Empty(service.Updates);
+            Assert.Equal(2, service.Updates.Count);
+            Assert.Equal(
+                DateTime.UtcNow.Date,
+                service.Updates[1].GetAttributeValue<DateTime>("al_checkdate"));
         }
 
         [Fact]
@@ -110,10 +95,36 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var service = WithCase(null);
 
-            ResponseProgressPlugin.StampCheckDate(service, null);
-            ResponseProgressPlugin.StampCheckDate(null, Review(CaseId));
+            SubmitReviewPlugin.StampCheckDate(service, Guid.Empty);
+            SubmitReviewPlugin.StampCheckDate(null, CaseId);
 
             Assert.Empty(service.Updates);
+        }
+
+        [Fact]
+        public void No_command_offers_the_check_date_as_an_editable_field()
+        {
+            // The rule is "uneditable", so both allowlists have to refuse it - the Code App's
+            // manager edit and the portal's header edit. Asserted through the two public
+            // gates rather than by reading the maps, because the maps are private and it is
+            // the refusal that matters.
+            var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "al_checkdate", "2026-09-01" },
+            };
+
+            Assert.Throws<InvalidPluginExecutionException>(
+                () => CaseHeaderRequestPlugin.EnsureCheckerEditable(fields));
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => UpdateCaseDetailsPlugin.ApplyFields(
+                    fields,
+                    new Entity("al_outcomecase", CaseId),
+                    new Entity("al_outcomecase", CaseId),
+                    new List<string>(),
+                    null));
+
+            Assert.Contains("al_checkdate", error.Message);
         }
     }
 }

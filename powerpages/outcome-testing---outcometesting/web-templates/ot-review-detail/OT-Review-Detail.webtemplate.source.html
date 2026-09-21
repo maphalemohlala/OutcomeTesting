@@ -414,8 +414,15 @@
             <td class="lbl">Tax Checker</td><td class="val">{{ rv['case.al_taxcheckername'] | default: 'Not yet allocated' | escape }}</td>
             <td class="lbl">AQS Checker</td><td class="val">{{ rv['case.al_aqscheckername'] | default: 'Not yet allocated' | escape }}</td>
           </tr>
+          {% comment %}
+            Read-only from 2026-09-21 (project owner: "the check date has to be uneditable as
+            it is automatically updated on submit"). SubmitReviewPlugin.StampCheckDate writes
+            the day of the submit, and CaseHeaderRequestPlugin no longer allowlists the
+            column - so a date box here would be refused on save, which is worse than none.
+            Same reasoning as the two checker names above.
+          {% endcomment %}
           <tr>
-            <td class="lbl">Check date</td><td class="val"><input type="date" class="ot-hdr-input" data-ot-hdr="al_checkdate" value="{{ rv['case.al_checkdate'] | date: 'yyyy-MM-dd' }}" aria-label="Check date" /></td>
+            <td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' | default: 'Stamped when this check is submitted' }}</td>
             <td class="lbl"></td><td class="val"></td>
           </tr>
           <tr>

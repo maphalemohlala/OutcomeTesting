@@ -521,7 +521,12 @@ namespace OutcomeTesting.Plugins
                 // Typing a name here was already mistaken for allocating the check once
                 // (2026-09-09); the two derived columns make that mistake unavailable rather
                 // than merely discouraged. Allocation is al_AssignCase, and a portal claim.
-                { "al_checkdate", new EditableField(EditableKind.DateOnly, "Check date") },
+                // al_checkdate is deliberately absent (project owner, 2026-09-21: "the check
+                // date has to be uneditable as it is automatically updated on submit"). It is
+                // now derived - SubmitReviewPlugin.StampCheckDate writes the day of the
+                // submit - and a column a command may overwrite on the next submit is not one
+                // a manager can usefully be offered. Absent from this map is what refuses it:
+                // anything not listed here is rejected by name.
                 { "al_preorpostcheck", new EditableField(EditableKind.Option, "Pre or post check") },
                 { "al_vulnerableclient", new EditableField(EditableKind.Option, "Vulnerable client") },
                 { "al_taxcheckrequired", new EditableField(EditableKind.Option, "Tax check required") },

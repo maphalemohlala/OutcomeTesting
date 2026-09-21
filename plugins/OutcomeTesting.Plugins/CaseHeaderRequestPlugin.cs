@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Serialization;
@@ -317,6 +317,8 @@ namespace OutcomeTesting.Plugins
         ///                        instruction, so the portal refuses it whoever is asking -
         ///                        a T&C Manager signed into the portal is refused here and
         ///                        allowed in the app, which is the point.
+        ///   al_checkdate         derived from the submit (project owner, 2026-09-21), so
+        ///                        nobody types it - see SubmitReviewPlugin.StampCheckDate.
         ///   al_casestatus        the lifecycle, moved by the commands that own each
         ///   al_priority          transition, and by a manager - not a field on the check.
         ///   the two Tax fields   edited on their own path above, which is role-gated,
@@ -340,7 +342,6 @@ namespace OutcomeTesting.Plugins
                 "al_advicedate",
                 "al_productsolutiontype",
                 "al_samplesource",
-                "al_checkdate",
                 "al_preorpostcheck",
                 "al_vulnerableclient",
             };

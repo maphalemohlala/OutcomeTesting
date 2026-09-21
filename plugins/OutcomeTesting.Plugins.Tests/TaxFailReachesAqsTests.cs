@@ -164,6 +164,41 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         /// <summary>
+        /// The submit stamps the case's check date, and a submit onto a case that already has
+        /// one moves it (project owner, 2026-09-21: "the check date has to be uneditable as it
+        /// is automatically updated on submit", latest submit wins).
+        ///
+        /// Driven through the real Submit rather than through StampCheckDate, because the
+        /// rule and the call site are two different things and testing only the rule is the
+        /// shape of defect F50 already shipped once: the helper stayed green while nothing
+        /// called it. Deleting the call in FinaliseReview reddens this test and nothing else.
+        /// </summary>
+        [Fact]
+        public void The_submit_stamps_the_case_check_date_over_whatever_was_there()
+        {
+            var svc = Case(ResponseRules.ChoicePass, ResponseRules.ChoicePass);
+
+            // A date the import carried. It used to survive every submit; it no longer does,
+            // because the column is derived now rather than supplied.
+            svc.Row("al_outcomecase", CaseId)["al_checkdate"] = new DateTime(2026, 1, 1);
+
+            Submit(svc, TaxReviewId);
+
+            Assert.Equal(DateTime.UtcNow.Date, CheckDate(svc));
+
+            PickUp(svc);
+            Submit(svc, AqsReviewId);
+
+            Assert.Equal(DateTime.UtcNow.Date, CheckDate(svc));
+        }
+
+        private static DateTime? CheckDate(FakeOrganizationService svc)
+        {
+            return svc.Retrieve("al_outcomecase", CaseId, new ColumnSet("al_checkdate"))
+                .GetAttributeValue<DateTime?>("al_checkdate");
+        }
+
+        /// <summary>
         /// The half that deadlocked. Nothing about the AQS review has changed; the only
         /// reason it could not be submitted was a rule that had been retired.
         /// </summary>
