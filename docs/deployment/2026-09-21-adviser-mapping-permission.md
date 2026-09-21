@@ -113,6 +113,78 @@ normalised before anything is matched.
 The permission was created in DEV and read back — `204` then `200`, `statecode 0`, content JSON
 stored exactly as sent. The template was pushed (134,050 → 138,780 chars).
 
+The deployed template was then read back out of Dataverse and compared with the file on disk:
+**identical**, 138,780 characters both sides once the working tree's CRLF is normalised, with
+all seven markers of this change present in what the server serves and the old single gate gone.
+
+### Verified live on the DEV portal
+
+Signed in as the project owner, who holds `AL Portal - T&C Supervisor`. All three states were
+reached against real data, and the second and third only because the owner built them.
+
+| Case | Adviser | Mapped manager | Pending | What rendered |
+|---|---|---|---|---|
+| 900000005 | service account | **the owner** | 5 | **Sign-off form**, `data-action-ids` carrying all five |
+| 910000005 | the owner | service account | 1 | **No form**; the "not for this one" message |
+| 900000004 | the owner | service account | 0 | Neither, correctly — nothing was pending |
+
+The message, verbatim from the page:
+
+> Remedial actions on this case are waiting to be signed off. Signing a case off is the
+> AL Portal - T&C Supervisor mapped to its adviser, which your account is not for this one.
+
+On 910000005 there is **no sign-off control of any kind** — no combobox, no Approved/Rejected,
+nothing. On 900000005 the same template renders the full form. One page, one signed-in user, two
+cases, opposite answers: that is the gate working rather than the gate being argued for.
+
+**No Liquid error on any case page**, console clean throughout, including the two where the
+mapping fetch runs and returns empty.
+
+The sign-off form appearing at all is what proves the table permission: `can_signoff` requires
+`ot_is_case_tcmanager`, which requires the `al_advisermapping` fetch to have returned a row, and
+before this change the site had no permission on that table whatsoever.
+
+### And the end-to-end path, run by the owner
+
+A mapping was created making the **service account** the T&C Manager for the owner's own adviser
+email, two actions on 900000004 were completed, and the service account signed them off:
+
+```
+19:26:19  APPROVED  by Service Account
+19:26:21  APPROVED  by Service Account
+```
+
+900000004 closed, the sign-off table separating *Supervisor sign-off: Approved, Service Account*
+from *Adviser sign-off: Simunye Radingwana*. That is AD-198 and this note working together on the
+permitted path: the service account could sign off **because it had been linked**, which is the
+whole rule. The defect it came from — a service account signing off a case it supervises nothing
+of — is closed by requiring the link rather than by naming the account.
+
+## The regrade asymmetry is real, and was observed
+
+The section above leaves extending `EnsureMappedToCase` to `RegradeRequestPlugin` open. The live
+check turned that from a theoretical note into something seen on screen.
+
+On **both** 910000005 and 900000004 — cases whose mapped manager is the service account, not the
+reader — the **Regraded outcome form rendered**, with its *Reason (required)* box and its
+**Record the final outcome** button, while the sign-off form was correctly refused.
+
+The reader on those pages is the case's own **adviser**. So, stated plainly:
+
+> Anyone holding `AL Portal - T&C Supervisor` can record the regraded outcome on any case,
+> including cases they are the adviser on, and including cases whose sign-off they are refused.
+
+This is the same shape as the defect that started the day, one command over. The page is not at
+fault — it is mirroring `RegradeRequestPlugin`, which checks the role and nothing else, and hiding
+the panel would have hidden a control the server accepts. The fix belongs in the command.
+
+**Recommended**: extend `EnsureMappedToCase` to `RegradeRequestPlugin` and collapse `can_regrade`
+back into `can_signoff`. The cost is that a case whose adviser has no mapping could then not be
+regraded by anyone — the same consequence sign-off already carries, and another reason
+`al_advisermapping` is now operational data.
+
+**Not done here**, because it restricts a command the owner has not asked to restrict.
+
 ### What the DEV data makes this look like
 
 Six cases carry remedial actions. The owner's own portal contact is the mapped T&C Manager for
