@@ -9,10 +9,8 @@ import type { AccessLevel, ResourceKey } from '../../types/permissions';
  * server-side. `fallback` is shown when the user is short of the required level;
  * a route-level gate defaults to a "no access" screen.
  *
- * Until the effective set is resolved the gate renders `pending` rather than deciding.
- * The provider stands a permissive set in while it loads, so answering `can` during that
- * window would open every gate for as long as the read takes — and indefinitely if it
- * never returns. Waiting is what keeps the permissive set out of the decision.
+ * Until the effective set is resolved the gate renders `pending` rather than deciding, so a
+ * half-loaded answer never opens anything.
  */
 export function PermissionGate({
   resource,
@@ -42,6 +40,17 @@ export function RequirePermission({
   need?: AccessLevel;
   children: ReactNode;
 }) {
+  const { accessUnknown } = usePermissions();
+
+  // When the app could not establish this person's roles at all, the shell already carries
+  // the banner that says so, and that is the whole message (project owner, 2026-09-21).
+  // Adding this screen's own panel underneath would say "your role does not grant access to
+  // this screen", which asserts they HAVE roles and that these particular ones fall short -
+  // neither of which is known. Two answers, one of them invented, is worse than one.
+  if (accessUnknown) {
+    return null;
+  }
+
   return (
     <PermissionGate
       resource={resource}

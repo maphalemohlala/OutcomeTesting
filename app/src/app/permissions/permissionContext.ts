@@ -12,6 +12,16 @@ export interface PermissionContextValue {
    * An unconfigured environment with no rules stored is NOT this: that is a real answer.
    */
   rulesUnavailable: boolean;
+  /**
+   * True when the caller's OWN ROLES could not be established — `al_GetMyRoles` failed or
+   * answered something unparseable — so nothing is granted and every screen refuses.
+   *
+   * Distinct from holding no roles, which is a real answer arrived at honestly, and from
+   * `rulesUnavailable`, where the roles ARE known and only the rulebook is a stand-in. Here
+   * the app knows nothing about this person and says so rather than guessing (project owner,
+   * 2026-09-21).
+   */
+  accessUnknown: boolean;
   can: (resource: ResourceKey, need?: AccessLevel) => boolean;
   level: (resource: ResourceKey) => AccessLevel;
 }

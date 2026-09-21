@@ -81,7 +81,8 @@ function SignedInUser() {
 }
 
 /**
- * Says so when the menu is a guess (AD-136).
+ * Says so when the menu is a guess (AD-136), or when there is no menu because the app could
+ * not work out who is asking (project owner, 2026-09-21).
  *
  * Either the rules or the caller's own roles could not be read, so what is on screen is a
  * stand-in and not this person's access. The pages offered may be more, fewer or simply
@@ -99,18 +100,30 @@ function SignedInUser() {
  * Deliberately NOT shown for an unconfigured environment with no rules stored: that is a real
  * answer, and warning on it would cry wolf on every fresh environment.
  */
-function RulesUnavailableNotice() {
-  const { rulesUnavailable } = usePermissions();
+function AccessNotice() {
+  const { rulesUnavailable, accessUnknown } = usePermissions();
+
+  if (accessUnknown) {
+    return (
+      <div className="shell__notice shell__notice--blocking" role="alert">
+        <strong>No access — we could not confirm who you are.</strong> This app could not
+        establish which application roles you hold, so it is showing you nothing rather than
+        guessing. This is usually a missing security role on your account, not a problem with
+        your work. Ask an administrator to check it, then sign in again.
+      </div>
+    );
+  }
+
   if (!rulesUnavailable) return null;
 
   return (
     <div className="shell__notice" role="status">
-      <strong>Your access could not be confirmed.</strong> This app could not work out what
-      you have been granted, so the menu is showing a default set instead. Pages may be
-      missing, and pages you are not entitled to may be listed and open — treat anything you
-      see here as unconfirmed rather than as your access. Nothing you DO is unsafe: every
-      action is checked again on the server and will be refused if you are not entitled to
-      it. Ask an administrator to check your security role.
+      <strong>Your access could not be confirmed.</strong> Your roles are known, but this app
+      could not read the rules that say what each role may open, so the menu is showing the
+      built-in defaults instead. Pages may be missing, and pages may be listed that this
+      environment does not actually grant you — treat what you see as unconfirmed. Nothing you
+      DO is unsafe: every action is checked again on the server. Ask an administrator to check
+      the permission configuration.
     </div>
   );
 }
@@ -187,7 +200,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
 
       <main className="shell__main" id="main" tabIndex={-1}>
-        <RulesUnavailableNotice />
+        <AccessNotice />
         {children}
       </main>
     </div>

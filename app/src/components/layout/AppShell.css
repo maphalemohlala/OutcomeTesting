@@ -215,3 +215,13 @@
   color: var(--colour-text);
   line-height: 1.5;
 }
+
+/*
+ * The refusal, as against the stand-in above it. A blocked page carries the same colour the
+ * rest of the app uses for a blocked stage, so somebody who has learnt what that colour means
+ * here reads it the same way — it is not a new vocabulary for one banner.
+ */
+.shell__notice--blocking {
+  border-color: var(--colour-stage-blocked);
+  border-left-width: 4px;
+}
