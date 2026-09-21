@@ -296,9 +296,14 @@ it refuses outright. A step narrowed to three would let the refused pair through
 
 ## Before anyone promotes this
 
-- **`al_paraplanneremail` must reach the target environment as metadata.** It is in the
-  solution, so a managed import carries it; a hand-built environment will not have it and
+- **TWO new columns must reach the target environment as metadata**, and they share a name:
+  `al_exportrecord.al_paraplanneremail` (the Trail Light snapshot) and, from AD-186,
+  `al_outcomecase.al_paraplanneremail` (the address the extract carries). Both are in the
+  solution, so a managed import carries them; a hand-built environment will have neither, and
   column D will be blank for every row.
+- **The extract must carry `ParaplannerEmail`.** An older file without that header still
+  imports - every column is optional but TaskID - and the para-planner then falls back to
+  being matched by name, which is the behaviour AD-186 replaced.
 - **The Code App must be pushed wherever the export is produced**, because the column order
   lives in `trailLight.ts` and nowhere else. A stale bundle writes the old twenty-one-column
   file with codes in B and D, and the receiving system cannot tell.
