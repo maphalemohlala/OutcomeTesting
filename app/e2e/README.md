@@ -22,7 +22,7 @@ Nothing about any environment is committed here. Set what you are pointing at:
 | `OT_PORTAL_URL` | The portal's base URL. |
 | `OT_CASE_MAPPED_TO_ME` | A case whose adviser maps to the signed-in user. |
 | `OT_CASE_MAPPED_ELSEWHERE` | A case **with actions awaiting sign-off** whose adviser maps to somebody else. |
-| `OT_REVIEW_URL` | An editable review page, for the managed-list specs. |
+| `OT_REVIEW_URL` | An **editable** review page — one assigned to the signed-in user. |
 | `OT_ACTION_ID` | A remedial action id, for the Web API allowlist spec. |
 
 Then:
@@ -39,6 +39,14 @@ from a browser profile that is already signed in, without typing anything:
 ```
 node e2e/capture-auth.mjs --profile "<path to a signed-in Chrome profile>"
 ```
+
+## Choosing `OT_REVIEW_URL`
+
+The Review Instance table permission is **contact-scoped** — "assigned to me". A review
+assigned to somebody else opens read-only, with no dropdowns and no tick list, so the
+managed-list specs would report the AD-192 defect against a page that is simply not yours to
+edit. It must be a review assigned to the account whose session was captured, and not yet
+submitted. On 2026-09-21 DEV had none for the UAT account, so those two specs skipped.
 
 ## Choosing `OT_CASE_MAPPED_ELSEWHERE`
 

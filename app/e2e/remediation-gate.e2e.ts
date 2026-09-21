@@ -85,7 +85,7 @@ test.describe('the supervisor controls on a remediation case', () => {
     await expect(page.locator('body')).toContainText('mapped to its adviser');
   });
 
-  test('does not name the manager it refused for', async ({ page }) => {
+  test('says only that it is not your case, naming nobody', async ({ page }) => {
     const portal = requireEnv(PORTAL_URL);
     const caseId = requireEnv(CASE_MAPPED_ELSEWHERE);
 
@@ -95,7 +95,26 @@ test.describe('the supervisor controls on a remediation case', () => {
     // Who supervises whom is not this reader's business. The table permission is
     // contact-scoped so the page could not read the name anyway - this is the assertion
     // that notices if somebody ever widens the scope and starts printing it.
-    const body = await page.locator('body').innerText();
-    expect(body).not.toMatch(/mapped to its adviser[^.]*\b(is|ask)\b/i);
+    //
+    // Pinned as the WHOLE sentence rather than by hunting for name-shaped text. The first
+    // attempt was /mapped to its adviser[^.]*\b(is|ask)\b/, which failed against the real
+    // message - "...which your account IS not for this one" - and would have failed against
+    // any correct wording containing those words. A proxy for "names a person" that cannot
+    // say what a person looks like is not an assertion, it is a guess. Matching the exact
+    // sentence means anything appended to it, a name or an address, breaks this test.
+    const hint = page.locator('p', { hasText: 'mapped to its adviser' }).first();
+    await expect(hint).toBeVisible();
+
+    // Whitespace collapsed first. toHaveText does not normalise against a regex, and the
+    // template wraps this sentence over three indented lines, so an un-normalised pattern
+    // fails on the markup's shape rather than on its words.
+    const text = (await hint.innerText()).replace(/\s+/g, ' ').trim();
+
+    expect(text).toMatch(
+      /^Remedial actions on this case are waiting to be signed off\. Signing a case off is the .+ mapped to its adviser, which your account is not for this one\.$/,
+    );
+
+    // And nothing address-shaped anywhere in it, which is the other way a name leaks.
+    expect(await hint.innerText()).not.toContain('@');
   });
 });

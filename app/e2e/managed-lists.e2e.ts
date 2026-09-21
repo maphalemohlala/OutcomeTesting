@@ -81,27 +81,54 @@ test.describe('the remediation Web API allowlist', () => {
   requires(PORTAL_URL, 'OT_ACTION_ID');
 
   test('refuses the T&C answer columns to the browser', async ({ page, request }) => {
-    const portal = requireEnv(PORTAL_URL);
+    const portal = requireEnv(PORTAL_URL).replace(/\/+$/, '');
     const actionId = requireEnv('OT_ACTION_ID');
 
     await page.goto(portal);
     await expectSignedIn(page, portal);
 
-    // Sent as the signed-in browser would send it. A 200 here would mean the allowlist has
-    // been widened back and the adviser can write the supervisor's answers again.
-    const response = await request.patch(
-      `${portal.replace(/\/+$/, '')}/_api/al_remediationactions(${actionId})`,
-      {
-        headers: { 'Content-Type': 'application/json' },
-        data: { al_recheckrequired: true },
-        failOnStatusCode: false,
-      },
-    );
+    // The anti-forgery token, the way the site's own scripts get it. Without it EVERY write
+    // is refused, and this spec would then pass against a completely open allowlist - the
+    // absence anchored to nothing, which is the mistake the session guard already made once
+    // in this suite. Fetching it means the refusal below can only be about the columns.
+    const tokenPage = await request.get(`${portal}/_layout/tokenhtml`);
+    expect(tokenPage.status(), 'could not reach the anti-forgery token endpoint').toBe(200);
+    const token = (await tokenPage.text()).match(
+      /name="__RequestVerificationToken"[^>]*value="([^"]+)"/,
+    )?.[1];
+    expect(token, 'no __RequestVerificationToken in /_layout/tokenhtml').toBeTruthy();
 
+    // And the record is readable, which proves the session, the id and the Web API are all
+    // live before anything is read into a refusal.
+    const read = await request.get(
+      `${portal}/_api/al_remediationactions(${actionId})?$select=al_adviserresponse`,
+      { failOnStatusCode: false },
+    );
+    expect(read.status(), 'the action is not readable - check OT_ACTION_ID').toBe(200);
+
+    // Now the actual question. A 204 here means the adviser's own page can write the
+    // T&C Manager's answers again (AD-199).
+    const refused = await request.patch(`${portal}/_api/al_remediationactions(${actionId})`, {
+      headers: {
+        'Content-Type': 'application/json',
+        __RequestVerificationToken: token as string,
+      },
+      data: { al_recheckrequired: true },
+      failOnStatusCode: false,
+    });
+
+    // A refusal, not merely "not 204". `not.toBe(204)` would be satisfied by a 200, which
+    // is the same shape of weak assertion as the session guard that let a signed-out run
+    // pass - an expectation loose enough to be met by the thing it exists to catch.
     expect(
-      response.status(),
+      refused.status(),
       'al_recheckrequired is writable from the browser again (AD-199)',
-    ).not.toBe(204);
-    expect(response.status()).not.toBe(200);
+    ).toBeGreaterThanOrEqual(400);
+
+    // ...and refused for the RIGHT reason. An anti-forgery failure here would mean the token
+    // handling above broke and the allowlist was never exercised.
+    const body = await refused.text();
+    expect(body.toLowerCase()).not.toContain('anti-forgery');
+    expect(body.toLowerCase()).not.toContain('requestverificationtoken');
   });
 });
