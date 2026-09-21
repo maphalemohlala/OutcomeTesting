@@ -23,7 +23,10 @@ import { PermissionContext, type PermissionContextValue } from './permissionCont
 interface Resolved {
   roles: string[];
   permissions: PermissionSet;
-  /** True when al_pagepermission could not be read, so `permissions` is a stand-in (AD-136). */
+  /**
+   * True when `permissions` is a stand-in rather than this person's access - because the
+   * rules could not be read (AD-136) or their own roles could not be (F44).
+   */
   rulesUnavailable: boolean;
 }
 
@@ -36,7 +39,7 @@ interface Resolved {
  * API call fails outright) is safe because every write is enforced server-side by the
  * Custom API commands.
  */
-async function loadPermissions(email: string): Promise<Resolved> {
+export async function loadPermissions(email: string): Promise<Resolved> {
   const [rolesResult, permResult, userResult] = await Promise.all([
     executeCommand<{ RoleCodes: string }>('al_GetMyRoles', {}),
     Al_pagepermissionsService.getAll({ filter: 'statecode eq 0', top: 5000 }),
@@ -65,14 +68,25 @@ async function loadPermissions(email: string): Promise<Resolved> {
   // that SUCCEEDS and answers an empty array is not the bootstrap case: al_GetMyRoles unions
   // al_userrolemapping with the caller's web role associations and applies the AD-090
   // exclusion server-side, so an empty result means the caller genuinely holds nothing.
+  //
+  // Whichever way the stand-in is reached, it is RECORDED (F44). The permissive set and the
+  // notice that admits to it were wired to two different signals: the notice tracks the
+  // RULES read, and the stand-in happens on the ROLES read, so the one failure that triggers
+  // it was the one failure the warning did not cover. Seen in DEV on 2026-09-21: an account
+  // holding Outcome Testing App User but NOT Basic User could still read al_pagepermission -
+  // that role grants the table directly - so the rules read succeeded and the notice stayed
+  // silent, while al_GetMyRoles faulted and handed back every role in the product.
   let roles: string[];
+  let rolesAreAStandIn = false;
   if (!rolesResult.ok) {
     roles = [...APP_ROLES];
+    rolesAreAStandIn = true;
   } else {
     try {
       roles = JSON.parse(rolesResult.data.RoleCodes) as string[];
     } catch {
       roles = [...APP_ROLES];
+      rolesAreAStandIn = true;
     }
   }
 
@@ -93,7 +107,9 @@ async function loadPermissions(email: string): Promise<Resolved> {
   return {
     roles,
     permissions: resolvePermissions(roles, rules),
-    rulesUnavailable: unavailable,
+    // Either stand-in means what is on screen is not the access this person was granted,
+    // which is the only thing the notice claims.
+    rulesUnavailable: unavailable || rolesAreAStandIn,
   };
 }
 

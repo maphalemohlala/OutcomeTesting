@@ -83,11 +83,18 @@ function SignedInUser() {
 /**
  * Says so when the menu is a guess (AD-136).
  *
- * `al_pagepermission` could not be read, so what is on screen is the coded defaults standing
- * in for rules nobody has seen. The pages offered may be more, fewer or simply different from
- * the ones this environment actually grants. Without this the app looked entirely normal and
+ * Either the rules or the caller's own roles could not be read, so what is on screen is a
+ * stand-in and not this person's access. The pages offered may be more, fewer or simply
+ * different from the ones they actually hold. Without this the app looked entirely normal and
  * the person had no way to know — the 2026-09-14 report took an investigation to explain
  * precisely because nothing on screen said anything was wrong.
+ *
+ * It covers BOTH reads as of 2026-09-21 (F44). It used to watch only the rules read, while
+ * the permissive stand-in is triggered by the ROLES read, so the failure that actually causes
+ * a guessed menu was the one this notice stayed silent for. An account with Outcome Testing
+ * App User but no Basic User hit exactly that: al_pagepermission is granted by that role and
+ * read fine, al_GetMyRoles faulted, and the app handed out every role in the product without
+ * a word.
  *
  * Deliberately NOT shown for an unconfigured environment with no rules stored: that is a real
  * answer, and warning on it would cry wolf on every fresh environment.
@@ -98,11 +105,12 @@ function RulesUnavailableNotice() {
 
   return (
     <div className="shell__notice" role="status">
-      <strong>Your access could not be confirmed.</strong> This app could not read its
-      permission rules, so the menu shows a default set rather than the access you have
-      actually been granted — some pages may be missing, and others may refuse you when you
-      open them. Nothing you do is unsafe: every action is checked again on the server. Ask an
-      administrator to check your security role.
+      <strong>Your access could not be confirmed.</strong> This app could not work out what
+      you have been granted, so the menu is showing a default set instead. Pages may be
+      missing, and pages you are not entitled to may be listed and open — treat anything you
+      see here as unconfirmed rather than as your access. Nothing you DO is unsafe: every
+      action is checked again on the server and will be refused if you are not entitled to
+      it. Ask an administrator to check your security role.
     </div>
   );
 }
