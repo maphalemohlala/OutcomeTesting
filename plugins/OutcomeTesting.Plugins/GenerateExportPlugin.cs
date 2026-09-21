@@ -106,8 +106,10 @@ namespace OutcomeTesting.Plugins
                 ColumnSet = new ColumnSet(
                     "al_casereference", "al_advisername", "al_advisercode", "al_adviseremail",
                     "al_paraplanner", "al_paraplannercode", ImportRules.ParaplannerEmailAttribute,
-                    "al_casetype", "al_productsolutiontype", ListOptionRules.ProductTypeAttribute,
-                    "al_checkdate", "al_clientname", "al_preorpostcheck",
+                    "al_casetype", ListOptionRules.CaseTypeAttribute,
+                    "al_productsolutiontype", ListOptionRules.ProductTypeAttribute,
+                    "al_checkdate", "al_clientname",
+                    "al_preorpostcheck", ListOptionRules.PreOrPostCheckAttribute,
                     CaseReviewRouteAttr),
                 Criteria = new FilterExpression(),
             };
@@ -167,10 +169,12 @@ namespace OutcomeTesting.Plugins
                     // import carries their name and nothing else (AD-160) - so the only
                     // source is the Contact that name resolves to.
                     ["al_paraplanneremail"] = ParaplannerEmail(userService, outcomeCase),
-                    ["al_casetype"] = CommandHelpers.Formatted(outcomeCase, "al_casetype"),
+                    ["al_casetype"] = ManagedOption(
+                        outcomeCase, ListOptionRules.CaseTypeAttribute, "al_casetype"),
                     ["al_productsolutiontype"] = ProductType(outcomeCase),
                     ["al_clientname"] = outcomeCase.GetAttributeValue<string>("al_clientname"),
-                    ["al_preorpostcheck"] = CommandHelpers.Formatted(outcomeCase, "al_preorpostcheck"),
+                    ["al_preorpostcheck"] = ManagedOption(
+                        outcomeCase, ListOptionRules.PreOrPostCheckAttribute, "al_preorpostcheck"),
                     ["al_advicequalitygrade"] = adviceGrade,
                     ["al_filequalitygrade"] = fileQualityGrade,
                     ["al_fqfailadvisername"] = FlaggedText(
@@ -265,16 +269,25 @@ namespace OutcomeTesting.Plugins
         /// </remarks>
         public static string ProductType(Entity outcomeCase)
         {
+            return ManagedOption(
+                outcomeCase, ListOptionRules.ProductTypeAttribute, ListOptionRules.ProductTypeLegacyAttribute);
+        }
+
+        /// <summary>
+        /// A managed-list column for the export: the option the case points at, else the
+        /// choice column it was imported with. Shared by all four lists (AD-187).
+        /// </summary>
+        public static string ManagedOption(Entity outcomeCase, string lookupAttribute, string legacyAttribute)
+        {
             if (outcomeCase == null) { return null; }
 
-            var chosen = outcomeCase.GetAttributeValue<EntityReference>(
-                ListOptionRules.ProductTypeAttribute);
+            var chosen = outcomeCase.GetAttributeValue<EntityReference>(lookupAttribute);
             if (chosen != null && !string.IsNullOrWhiteSpace(chosen.Name))
             {
                 return chosen.Name.Trim();
             }
 
-            return CommandHelpers.Formatted(outcomeCase, "al_productsolutiontype");
+            return CommandHelpers.Formatted(outcomeCase, legacyAttribute);
         }
 
         public static string ParaplannerEmail(IOrganizationService service, Entity outcomeCase)

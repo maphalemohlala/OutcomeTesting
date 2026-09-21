@@ -70,14 +70,30 @@ describe('the managed lists', () => {
     expect(new Set(MANAGED_LISTS.map((l) => l.value)).size).toBe(MANAGED_LISTS.length);
   });
 
-  it('offers only the lists a chosen option has somewhere to go', () => {
-    // Product / solution type is the pilot. A list declared but not yet migrated has no
-    // lookup on the case, so an option chosen for it could not be saved - offering it would
-    // be a page that takes an administrator's work and drops it.
-    expect(MIGRATED_LISTS.map((list) => list.value)).toEqual([LIST_PRODUCT_SOLUTION_TYPE]);
-    for (const value of [LIST_SAMPLE_SOURCE, LIST_CASE_TYPE, LIST_PRE_OR_POST_CHECK]) {
-      expect(listByValue(value)?.caseAttribute, String(value)).toBeNull();
+  it('offers every list, now that all four have somewhere to put a chosen option', () => {
+    // All four are migrated. Product / solution type went first as a pilot; the other three
+    // followed once the shape held.
+    expect(MIGRATED_LISTS.map((list) => list.value)).toEqual([
+      LIST_PRODUCT_SOLUTION_TYPE,
+      LIST_SAMPLE_SOURCE,
+      LIST_CASE_TYPE,
+      LIST_PRE_OR_POST_CHECK,
+    ]);
+    for (const list of MANAGED_LISTS) {
+      expect(list.caseAttribute, list.key).not.toBeNull();
     }
+  });
+
+  it('would not offer a list with nowhere to put a chosen option', () => {
+    // The guard that mattered while three lists were unmigrated, kept for the next one: an
+    // option chosen for a list with no lookup could not be saved, so offering it would be a
+    // page that takes an administrator's work and drops it. Asserted against a constructed
+    // list rather than a real one, so migrating every list did not quietly retire the rule.
+    const unmigrated = { ...MANAGED_LISTS[0], caseAttribute: null };
+    expect(MIGRATED_LISTS).not.toContain(unmigrated);
+    expect(lookupValueField(unmigrated)).toBeNull();
+    expect(lookupFormattedField(unmigrated)).toBeNull();
+    expect(lookupLabelOn({ al_producttypeidname: 'IHT' }, unmigrated)).toBeNull();
   });
 
   it('keeps naming the choice column each list replaces', () => {
@@ -98,14 +114,24 @@ describe('the managed lists', () => {
     expect(listByValue(999)).toBeNull();
   });
 
-  it('builds the Web API field names for a migrated list, and none for one that is not', () => {
+  it('builds the Web API field names for each list', () => {
     expect(lookupValueField(PRODUCT)).toBe('_al_producttypeid_value');
     expect(lookupFormattedField(PRODUCT)).toBe(
       '_al_producttypeid_value@OData.Community.Display.V1.FormattedValue',
     );
-    const sampleSource = listByValue(LIST_SAMPLE_SOURCE)!;
-    expect(lookupValueField(sampleSource)).toBeNull();
-    expect(lookupFormattedField(sampleSource)).toBeNull();
+    expect(lookupValueField(listByValue(LIST_SAMPLE_SOURCE)!)).toBe('_al_samplesourceid_value');
+    expect(lookupValueField(listByValue(LIST_CASE_TYPE)!)).toBe('_al_casetypeid_value');
+    expect(lookupValueField(listByValue(LIST_PRE_OR_POST_CHECK)!)).toBe('_al_preorpostcheckid_value');
+  });
+
+  it('names a lookup distinctly from the choice column it supersedes', () => {
+    // The two have to coexist through the migration, so a lookup that collided with its own
+    // legacy column could not have been created at all.
+    for (const list of MANAGED_LISTS) {
+      expect(list.caseAttribute, list.key).not.toBe(list.legacyAttribute);
+    }
+    const attributes = MANAGED_LISTS.map((list) => list.caseAttribute);
+    expect(new Set(attributes).size).toBe(attributes.length);
   });
 });
 
@@ -390,7 +416,9 @@ describe('reading a lookup label off a case record', () => {
     expect(lookupLabelOn({ [ANNOTATION]: '   ', al_producttypeidname: '' }, PRODUCT)).toBeNull();
   });
 
-  it('is null for a list that has no lookup yet', () => {
-    expect(lookupLabelOn({ [ANNOTATION]: 'IHT' }, listByValue(LIST_SAMPLE_SOURCE)!)).toBeNull();
+  it('is null for a list that has no lookup', () => {
+    expect(
+      lookupLabelOn({ [ANNOTATION]: 'IHT' }, { ...PRODUCT, caseAttribute: null }),
+    ).toBeNull();
   });
 });

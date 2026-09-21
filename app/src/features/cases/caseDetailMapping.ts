@@ -44,6 +44,9 @@ export interface CaseEditValues {
    * above is kept alongside it while cases exist that were imported before the lookup.
    */
   al_producttypeid: string;
+  al_samplesourceid: string;
+  al_casetypeid: string;
+  al_preorpostcheckid: string;
   al_samplesource: number | null;
   al_preorpostcheck: number | null;
   al_vulnerableclient: number | null;
@@ -146,6 +149,9 @@ export function toDetail(record: Al_outcomecases): CaseDetail {
       al_advicedate: ymd(record.al_advicedate),
       al_productsolutiontype: opt(record.al_productsolutiontype),
       al_producttypeid: text(record._al_producttypeid_value) ?? '',
+      al_samplesourceid: text(record._al_samplesourceid_value) ?? '',
+      al_casetypeid: text(record._al_casetypeid_value) ?? '',
+      al_preorpostcheckid: text(record._al_preorpostcheckid_value) ?? '',
       al_samplesource: opt(record.al_samplesource),
       al_preorpostcheck: opt(record.al_preorpostcheck),
       al_vulnerableclient: opt(record.al_vulnerableclient),

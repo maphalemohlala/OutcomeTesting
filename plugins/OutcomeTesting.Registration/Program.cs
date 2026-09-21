@@ -8219,23 +8219,29 @@ int CreateListOptionTable(string orgUrl, string solutionUniqueName)
         Console.WriteLine($"  {window[0]}: created");
     }
 
-    // The case's chosen option.
+    // The case's chosen option, one lookup per list.
     var caseColumns = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
     {
         LogicalName = "al_outcomecase",
         EntityFilters = EntityFilters.Attributes,
     });
-    var onCase = caseColumns.EntityMetadata.Attributes.Any(x =>
-        string.Equals(x.LogicalName, ListOptionTable.ProductTypeLogical, StringComparison.OrdinalIgnoreCase));
+    var onCase = new HashSet<string>(
+        caseColumns.EntityMetadata.Attributes.Select(x => x.LogicalName), StringComparer.OrdinalIgnoreCase);
 
-    if (!onCase)
+    foreach (var list in ListOptionTable.Lists)
     {
+        if (onCase.Contains(list.Logical))
+        {
+            Console.WriteLine($"  al_outcomecase.{list.Logical}: already present");
+            continue;
+        }
+
         svc.Execute(new CreateOneToManyRequest
         {
             SolutionUniqueName = solutionUniqueName,
             OneToManyRelationship = new OneToManyRelationshipMetadata
             {
-                SchemaName = ListOptionTable.ProductTypeRelationship,
+                SchemaName = list.Relationship,
                 ReferencedEntity = ListOptionTable.Logical,
                 ReferencingEntity = "al_outcomecase",
                 CascadeConfiguration = new CascadeConfiguration
@@ -8258,21 +8264,17 @@ int CreateListOptionTable(string orgUrl, string solutionUniqueName)
             },
             Lookup = new LookupAttributeMetadata
             {
-                SchemaName = ListOptionTable.ProductTypeSchema,
-                LogicalName = ListOptionTable.ProductTypeLogical,
+                SchemaName = list.Schema,
+                LogicalName = list.Logical,
                 RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
-                DisplayName = ListOptionTable.Text("Product / solution type"),
+                DisplayName = ListOptionTable.Text(list.Label),
                 Description = ListOptionTable.Text(
-                    "The case's product or solution type, as a managed list option. It supersedes the "
-                    + "al_productsolutiontype choice column, which is kept so a case imported before this "
-                    + "existed still reads correctly until it is backfilled."),
+                    "The case's " + list.Label.ToLowerInvariant() + ", as a managed list option. It "
+                    + "supersedes the " + list.Legacy + " choice column, which is kept so a case "
+                    + "imported before this existed still reads correctly until it is backfilled."),
             },
         });
-        Console.WriteLine($"  al_outcomecase.{ListOptionTable.ProductTypeLogical}: created");
-    }
-    else
-    {
-        Console.WriteLine($"  al_outcomecase.{ListOptionTable.ProductTypeLogical}: already present");
+        Console.WriteLine($"  al_outcomecase.{list.Logical}: created");
     }
 
     svc.Execute(new PublishAllXmlRequest());
@@ -8305,10 +8307,11 @@ int CreateListOptionTable(string orgUrl, string solutionUniqueName)
         LogicalName = "al_outcomecase",
         EntityFilters = EntityFilters.Attributes,
     });
-    if (!caseAfter.EntityMetadata.Attributes.Any(x =>
-        string.Equals(x.LogicalName, ListOptionTable.ProductTypeLogical, StringComparison.OrdinalIgnoreCase)))
+    var caseNames = new HashSet<string>(
+        caseAfter.EntityMetadata.Attributes.Select(x => x.LogicalName), StringComparer.OrdinalIgnoreCase);
+    foreach (var list in ListOptionTable.Lists)
     {
-        missing.Add("al_outcomecase." + ListOptionTable.ProductTypeLogical);
+        if (!caseNames.Contains(list.Logical)) { missing.Add("al_outcomecase." + list.Logical); }
     }
 
     if (missing.Count > 0)
@@ -8321,8 +8324,8 @@ int CreateListOptionTable(string orgUrl, string solutionUniqueName)
 
     Console.WriteLine(
         $"Published. {ListOptionTable.Schema} is in solution '{solutionUniqueName}', with its list, "
-        + "sort order, legacy value and effective window, and al_outcomecase carries the product type "
-        + "lookup. Seed it with: seedlistoptions <orgUrl> --confirm <orgUrl>");
+        + $"sort order, legacy value and effective window, and al_outcomecase carries all "
+        + $"{ListOptionTable.Lists.Length} lookups. Seed them with: seedlistoptions <orgUrl> --confirm <orgUrl>");
     return 0;
 }
 
@@ -8338,22 +8341,36 @@ int SeedListOptions(string orgUrl, bool confirmed)
 
     using var svc = Connect(orgUrl);
 
-    // The five options al_outcomecase.al_productsolutiontype carries today, read from the
-    // metadata rather than typed out here. Typing them would make this a second copy of the
-    // list that could drift from the one being migrated, and the whole exercise is to stop
-    // having two copies.
+    var failed = false;
+    foreach (var list in ListOptionTable.Lists)
+    {
+        Console.WriteLine($"{list.Label} (from {list.Legacy}):");
+        if (!SeedOneList(svc, list)) { failed = true; }
+    }
+
+    return failed ? 1 : 0;
+}
+
+/// <summary>
+/// Turns one choice column into rows, then points every case holding a value at its row.
+/// </summary>
+bool SeedOneList(IOrganizationService svc, ListOptionTable.Def list)
+{
+    // The options the choice column carries today, read from the metadata rather than typed
+    // out here. Typing them would make this a second copy of the list that could drift from
+    // the one being migrated, and the whole exercise is to stop having two copies.
     var attribute = (RetrieveAttributeResponse)svc.Execute(new RetrieveAttributeRequest
     {
         EntityLogicalName = "al_outcomecase",
-        LogicalName = "al_productsolutiontype",
+        LogicalName = list.Legacy,
         RetrieveAsIfPublished = true,
     });
 
     var picklist = attribute.AttributeMetadata as PicklistAttributeMetadata;
     if (picklist == null || picklist.OptionSet == null)
     {
-        Console.Error.WriteLine("al_outcomecase.al_productsolutiontype is not a choice column. Nothing was changed.");
-        return 1;
+        Console.Error.WriteLine($"  al_outcomecase.{list.Legacy} is not a choice column. Nothing was changed.");
+        return false;
     }
 
     var existing = svc.RetrieveMultiple(new QueryExpression(ListOptionTable.Logical)
@@ -8363,7 +8380,7 @@ int SeedListOptions(string orgUrl, bool confirmed)
         {
             Conditions =
             {
-                new ConditionExpression(ListOptionTable.ListLogical, ConditionOperator.Equal, ListOptionTable.ProductSolutionType),
+                new ConditionExpression(ListOptionTable.ListLogical, ConditionOperator.Equal, list.Value),
             },
         },
     });
@@ -8398,7 +8415,7 @@ int SeedListOptions(string orgUrl, bool confirmed)
 
         var row = new Entity(ListOptionTable.Logical);
         row[ListOptionTable.NameLogical] = label;
-        row[ListOptionTable.ListLogical] = new OptionSetValue(ListOptionTable.ProductSolutionType);
+        row[ListOptionTable.ListLogical] = new OptionSetValue(list.Value);
         row[ListOptionTable.SortOrderLogical] = order;
         row[ListOptionTable.LegacyValueLogical] = value;
         byLegacy[value] = svc.Create(row);
@@ -8411,13 +8428,13 @@ int SeedListOptions(string orgUrl, bool confirmed)
     // rather than the normal path.
     var cases = svc.RetrieveMultiple(new QueryExpression("al_outcomecase")
     {
-        ColumnSet = new ColumnSet("al_casereference", "al_productsolutiontype", ListOptionTable.ProductTypeLogical),
+        ColumnSet = new ColumnSet("al_casereference", list.Legacy, list.Logical),
         Criteria =
         {
             Conditions =
             {
-                new ConditionExpression("al_productsolutiontype", ConditionOperator.NotNull),
-                new ConditionExpression(ListOptionTable.ProductTypeLogical, ConditionOperator.Null),
+                new ConditionExpression(list.Legacy, ConditionOperator.NotNull),
+                new ConditionExpression(list.Logical, ConditionOperator.Null),
             },
         },
     });
@@ -8426,7 +8443,7 @@ int SeedListOptions(string orgUrl, bool confirmed)
     var orphaned = new List<string>();
     foreach (var outcomeCase in cases.Entities)
     {
-        var chosen = outcomeCase.GetAttributeValue<OptionSetValue>("al_productsolutiontype");
+        var chosen = outcomeCase.GetAttributeValue<OptionSetValue>(list.Legacy);
         if (chosen == null) { continue; }
 
         Guid optionId;
@@ -8434,19 +8451,19 @@ int SeedListOptions(string orgUrl, bool confirmed)
         {
             // A value no option claims: the choice column was edited and an option removed
             // after cases were written against it. Left alone and reported, because guessing
-            // a replacement would put a wrong product type on a case nobody would re-check.
+            // a replacement would put a wrong value on a case nobody would re-check.
             orphaned.Add(outcomeCase.GetAttributeValue<string>("al_casereference") + " (" + chosen.Value + ")");
             continue;
         }
 
         svc.Update(new Entity("al_outcomecase", outcomeCase.Id)
         {
-            [ListOptionTable.ProductTypeLogical] = new EntityReference(ListOptionTable.Logical, optionId),
+            [list.Logical] = new EntityReference(ListOptionTable.Logical, optionId),
         });
         filled += 1;
     }
 
-    Console.WriteLine($"Backfilled {filled} case(s) of {cases.Entities.Count} carrying a product type.");
+    Console.WriteLine($"  backfilled {filled} case(s) of {cases.Entities.Count} carrying a value.");
     if (orphaned.Count > 0)
     {
         Console.WriteLine(
@@ -8461,21 +8478,21 @@ int SeedListOptions(string orgUrl, bool confirmed)
         {
             Conditions =
             {
-                new ConditionExpression(ListOptionTable.ListLogical, ConditionOperator.Equal, ListOptionTable.ProductSolutionType),
+                new ConditionExpression(ListOptionTable.ListLogical, ConditionOperator.Equal, list.Value),
             },
         },
     });
 
-    Console.WriteLine($"Product / solution type now has {after.Entities.Count} option(s):");
+    Console.WriteLine($"  {list.Label} now has {after.Entities.Count} option(s):");
     foreach (var row in after.Entities.OrderBy(x => x.GetAttributeValue<int?>(ListOptionTable.SortOrderLogical) ?? int.MaxValue))
     {
         Console.WriteLine(
-            $"  {row.GetAttributeValue<int?>(ListOptionTable.SortOrderLogical)}"
+            $"    {row.GetAttributeValue<int?>(ListOptionTable.SortOrderLogical)}"
             + $"  {row.GetAttributeValue<string>(ListOptionTable.NameLogical)}"
             + $"  (was {row.GetAttributeValue<int?>(ListOptionTable.LegacyValueLogical)})");
     }
 
-    return after.Entities.Count == picklist.OptionSet.Options.Count ? 0 : 1;
+    return after.Entities.Count == picklist.OptionSet.Options.Count;
 }
 
 int CreateAdviserMappingTable(string orgUrl, string solutionUniqueName)
@@ -11091,11 +11108,49 @@ static class ListOptionTable
     public const string EffectiveToLogical = "al_effectiveto";
     public const string EffectiveToSchema = "al_EffectiveTo";
 
-    // The case's chosen option. Named al_producttypeid because al_productsolutiontype is the
-    // choice column it supersedes and the two have to coexist through the migration.
+    // The case's chosen option. Each lookup is named for the choice column it supersedes with
+    // an Id suffix, because the two have to coexist through the migration.
     public const string ProductTypeLogical = "al_producttypeid";
     public const string ProductTypeSchema = "al_ProductTypeId";
     public const string ProductTypeRelationship = "al_listoption_al_outcomecase_producttype";
+
+    /// <summary>One managed list: its value, the lookup it fills, and the column it replaces.</summary>
+    public sealed class Def
+    {
+        public Def(int value, string logical, string schema, string relationship, string label, string legacy)
+        {
+            Value = value;
+            Logical = logical;
+            Schema = schema;
+            Relationship = relationship;
+            Label = label;
+            Legacy = legacy;
+        }
+
+        public int Value { get; }
+        public string Logical { get; }
+        public string Schema { get; }
+        public string Relationship { get; }
+        public string Label { get; }
+        public string Legacy { get; }
+    }
+
+    /// <summary>
+    /// The four lists, in step with app/src/features/admin/listOptions.ts and
+    /// OutcomeTesting.Plugins.ListOptionRules. Three places name these; a drift between them
+    /// would not fail loudly, it would make one list silently read as another.
+    /// </summary>
+    public static readonly Def[] Lists =
+    {
+        new Def(ProductSolutionType, ProductTypeLogical, ProductTypeSchema, ProductTypeRelationship,
+            "Product / solution type", "al_productsolutiontype"),
+        new Def(SampleSource, "al_samplesourceid", "al_SampleSourceId",
+            "al_listoption_al_outcomecase_samplesource", "Sample source", "al_samplesource"),
+        new Def(CaseType, "al_casetypeid", "al_CaseTypeId",
+            "al_listoption_al_outcomecase_casetype", "Case type", "al_casetype"),
+        new Def(PreOrPostCheck, "al_preorpostcheckid", "al_PreOrPostCheckId",
+            "al_listoption_al_outcomecase_preorpostcheck", "Pre or post check", "al_preorpostcheck"),
+    };
 
     // al_list. Kept in step with app/src/features/admin/listOptions.ts, which names the same
     // four; a fresh block, because 120910814 is the highest value allocated anywhere else.

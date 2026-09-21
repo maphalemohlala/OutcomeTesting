@@ -2,68 +2,126 @@ import { describe, expect, it } from 'vitest';
 import reviewTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-review-detail/OT-Review-Detail.webtemplate.source.html?raw';
 import caseTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-case-detail/OT-Case-Detail.webtemplate.source.html?raw';
 import listOptionPermission from '../../../../powerpages/outcome-testing---outcometesting/table-permissions/List-Option---read.tablepermission.yml?raw';
-import { LIST_PRODUCT_SOLUTION_TYPE, MIGRATED_LISTS } from './listOptions';
+import { MIGRATED_LISTS } from './listOptions';
 
 /**
- * The portal's Product / solution type dropdown is drawn from al_listoption rows (AD-187).
+ * The portal's four case-header dropdowns are drawn from al_listoption rows (AD-187).
  *
- * It used to be five <option> tags written out by hand, which is the reason a new option
- * could be added to the choice column in Dataverse and still not be selectable by anybody.
- * These pin that it is now data, and the three things it must not do.
+ * They used to be <option> tags written out by hand - nineteen of them across the four -
+ * which is the reason an option could be added to a choice column in Dataverse and still not
+ * be selectable by anybody. These pin that they are now data, and what they must not do.
  */
 
-const PRODUCT = MIGRATED_LISTS[0];
+/** Every managed dropdown on the portal header: its lookup, its fetch, and its old values. */
+const DROPDOWNS = [
+  {
+    label: 'Product / solution type',
+    attr: 'al_producttypeid',
+    fetch: 'product_types',
+    list: 120910840,
+    oldValues: [120910520, 120910521, 120910522, 120910523, 120910524],
+    oldLabels: ['Accumulation Pension', 'No change reviews'],
+  },
+  {
+    label: 'Sample source',
+    attr: 'al_samplesourceid',
+    fetch: 'sample_sources',
+    list: 120910841,
+    oldValues: [120910530, 120910531, 120910532, 120910533],
+    oldLabels: ['High Risk', 'Thematic'],
+  },
+  {
+    label: 'Case type',
+    attr: 'al_casetypeid',
+    fetch: 'case_types',
+    list: 120910842,
+    oldValues: [120910510, 120910511, 120910512, 120910513],
+    oldLabels: ['New advice', 'Switch/Transfer'],
+  },
+  {
+    label: 'Pre or post check',
+    attr: 'al_preorpostcheckid',
+    fetch: 'pre_post_checks',
+    list: 120910843,
+    oldValues: [120910540, 120910541],
+    oldLabels: [] as string[],
+  },
+] as const;
 
-/** The Product / solution type cell of the editable header, tags and Liquid intact. */
-function headerSelect(): string {
-  const start = reviewTemplate.indexOf('data-ot-hdr="al_producttypeid"');
-  expect(start, 'the header select should be bound to the lookup').toBeGreaterThan(-1);
+/** One editable header cell's <select>, tags and Liquid intact. */
+function headerSelect(attr: string): string {
+  const start = reviewTemplate.indexOf(`data-ot-hdr="${attr}"`);
+  expect(start, `the header select should be bound to ${attr}`).toBeGreaterThan(-1);
   const open = reviewTemplate.lastIndexOf('<select', start);
   const end = reviewTemplate.indexOf('</select>', start);
   return reviewTemplate.slice(open, end);
 }
 
-describe('the portal draws the options from the table', () => {
-  it('no longer writes any of the five option values out by hand', () => {
-    // THE regression this exists to catch. A hard-coded value here is an option somebody can
-    // choose that the management page does not know about, or an option the page offers that
-    // the portal silently will not.
-    const select = headerSelect();
-    for (const value of [120910520, 120910521, 120910522, 120910523, 120910524]) {
+/** One list's fetchxml block. */
+function fetchBlock(name: string): string {
+  const start = reviewTemplate.indexOf(`{% fetchxml ${name} %}`);
+  expect(start, `fetchxml ${name}`).toBeGreaterThan(-1);
+  return reviewTemplate.slice(start, reviewTemplate.indexOf('{% endfetchxml %}', start));
+}
+
+describe('the portal draws every managed dropdown from the table', () => {
+  it.each(DROPDOWNS)('$label writes no option value by hand', (dropdown) => {
+    // THE regression this exists to catch. A hard-coded value is an option somebody can
+    // choose that the management page does not know about, or an option the page offers
+    // that the portal silently will not.
+    const select = headerSelect(dropdown.attr);
+    for (const value of dropdown.oldValues) {
       expect(select, `option value ${value}`).not.toContain(String(value));
     }
-    expect(select).not.toContain('Accumulation Pension');
-    expect(select).not.toContain('No change reviews');
+    for (const label of dropdown.oldLabels) {
+      expect(select, label).not.toContain(label);
+    }
   });
 
-  it('loops the rows the fetch returned', () => {
-    expect(headerSelect()).toContain('{% for po in product_types.results.entities %}');
-    expect(headerSelect()).toContain('{{ po.al_name | escape }}');
+  it.each(DROPDOWNS)('$label loops the rows its fetch returned', (dropdown) => {
+    const select = headerSelect(dropdown.attr);
+    expect(select).toContain(`{% for o in ${dropdown.fetch}.results.entities %}`);
+    expect(select).toContain('{{ o.al_name | escape }}');
   });
 
-  it('asks for exactly the one list, by the value the app and the plug-ins use', () => {
+  it.each(DROPDOWNS)('$label asks for exactly its own list', (dropdown) => {
     // All four lists share one table, so a fetch without this filter would offer sample
-    // sources in the product type dropdown.
-    const fetch = reviewTemplate.slice(
-      reviewTemplate.indexOf('{% fetchxml product_types %}'),
-      reviewTemplate.indexOf('{% endfetchxml %}', reviewTemplate.indexOf('{% fetchxml product_types %}')),
-    );
+    // sources in the case type dropdown - and they would save, because the option ids are
+    // real. The server refuses that too; this stops it ever being offered.
+    const fetch = fetchBlock(dropdown.fetch);
     expect(fetch).toContain('<entity name="al_listoption">');
     expect(fetch).toContain(
-      `<condition attribute="al_list" operator="eq" value="${LIST_PRODUCT_SOLUTION_TYPE}" />`,
+      `<condition attribute="al_list" operator="eq" value="${dropdown.list}" />`,
     );
-    expect(PRODUCT.value).toBe(LIST_PRODUCT_SOLUTION_TYPE);
   });
 
-  it('offers only the options in force, on the same half-open window as everything else', () => {
-    const fetch = reviewTemplate.slice(
-      reviewTemplate.indexOf('{% fetchxml product_types %}'),
-      reviewTemplate.indexOf('{% endfetchxml %}', reviewTemplate.indexOf('{% fetchxml product_types %}')),
+  it('gives each list its own fetch and its own lookup, with nothing shared by accident', () => {
+    expect(new Set(DROPDOWNS.map((d) => d.fetch)).size).toBe(DROPDOWNS.length);
+    expect(new Set(DROPDOWNS.map((d) => d.attr)).size).toBe(DROPDOWNS.length);
+    expect(new Set(DROPDOWNS.map((d) => d.list)).size).toBe(DROPDOWNS.length);
+  });
+
+  it('covers every list the app has migrated, and no more', () => {
+    // A list migrated in the app but left hardcoded here would be a dropdown that silently
+    // disagreed with the management page about what exists.
+    expect(DROPDOWNS.map((d) => d.attr).slice().sort()).toEqual(
+      MIGRATED_LISTS.map((l) => l.caseAttribute).slice().sort(),
     );
+    expect(DROPDOWNS.map((d) => d.list).slice().sort()).toEqual(
+      MIGRATED_LISTS.map((l) => l.value).slice().sort(),
+    );
+  });
+
+  it.each(DROPDOWNS)('$label offers only what is in force, on the shared window', (dropdown) => {
+    const fetch = fetchBlock(dropdown.fetch);
     // from <= day, and day < to. `gt` rather than `on-or-after`: an option retired today is
     // retired today, and the server refuses it either way.
-    expect(fetch).toContain('<condition attribute="al_effectivefrom" operator="on-or-before" value="{{ product_day }}" />');
-    expect(fetch).toContain('<condition attribute="al_effectiveto" operator="gt" value="{{ product_day }}" />');
+    expect(fetch).toContain(
+      '<condition attribute="al_effectivefrom" operator="on-or-before" value="{{ product_day }}" />',
+    );
+    expect(fetch).toContain(
+      '<condition attribute="al_effectiveto" operator="gt" value="{{ product_day }}" />',
+    );
     expect(fetch).toContain('<condition attribute="al_effectivefrom" operator="null" />');
     expect(fetch).toContain('<condition attribute="al_effectiveto" operator="null" />');
   });
@@ -75,11 +133,11 @@ describe('the portal draws the options from the table', () => {
     expect(reviewTemplate).toContain("{% assign product_day = now | date: 'yyyy-MM-dd' %}");
   });
 
-  it('keeps a retired option the case actually holds, marked as retired', () => {
-    // Otherwise the cell renders as "—" and a checker reads it as a field to fill in. The
-    // Code App's panel makes the same allowance; choicesIncludingHeld is its half.
-    const select = headerSelect();
-    expect(select).toContain('{% unless held_is_offered %}');
+  it.each(DROPDOWNS)('$label keeps a retired option the case holds, marked', (dropdown) => {
+    // Otherwise the cell renders as an em dash and a checker reads it as a field to fill in.
+    // choicesIncludingHeld is the Code App's half of the same allowance.
+    const select = headerSelect(dropdown.attr);
+    expect(select).toContain('{% unless ');
     expect(select).toContain('(retired)');
   });
 });
@@ -97,18 +155,32 @@ describe('what the portal may do with the options', () => {
   });
 });
 
-describe('reading a case’s product type on the portal', () => {
+describe('reading a case’s managed values on the portal', () => {
   it('prefers the chosen option and falls back to the choice column, on both pages', () => {
-    // Until every case is backfilled, reading only the lookup would blank this on the older
-    // ones - which is the same precedence the app and the export apply.
-    expect(reviewTemplate).toContain('{% if h_producttypeid.name %}');
-    expect(reviewTemplate).toContain('{{ h_producttype.label | escape }}');
-    expect(caseTemplate).toContain('{% if c.al_producttypeid.name %}');
-    expect(caseTemplate).toContain("{{ c.al_productsolutiontype.label | default: '—' | escape }}");
+    // Until every case is backfilled, reading only the lookup would blank these on the older
+    // ones - the same precedence the app and the export apply.
+    const reviewPairs: readonly (readonly [string, string])[] = [
+      ['h_producttypeid', 'h_producttype'],
+      ['h_casetypeid', 'h_casetype'],
+      ['h_samplesourceid', 'h_samplesource'],
+      ['h_preorpostcheckid', 'h_prepost'],
+    ];
+
+    for (const [lookup, legacy] of reviewPairs) {
+      expect(reviewTemplate, lookup).toContain(`{% if ${lookup}.name %}`);
+      expect(reviewTemplate, legacy).toContain(`{{ ${legacy}.label | escape }}`);
+    }
+
+    for (const list of MIGRATED_LISTS) {
+      expect(caseTemplate, list.key).toContain(`{% if c.${list.caseAttribute}.name %}`);
+      expect(caseTemplate, list.key).toContain(`{{ c.${list.legacyAttribute}.label`);
+    }
   });
 
-  it('asks for the lookup on both pages, or there would be nothing to read', () => {
-    expect(reviewTemplate).toContain('<attribute name="al_producttypeid" />');
-    expect(caseTemplate).toContain('<attribute name="al_producttypeid" />');
+  it('asks for every lookup on both pages, or there would be nothing to read', () => {
+    for (const list of MIGRATED_LISTS) {
+      expect(reviewTemplate, list.key).toContain(`<attribute name="${list.caseAttribute}" />`);
+      expect(caseTemplate, list.key).toContain(`<attribute name="${list.caseAttribute}" />`);
+    }
   });
 });

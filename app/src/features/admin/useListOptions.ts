@@ -7,6 +7,7 @@ import {
   type ListOptionRow,
   type ManagedList,
   type OptionDraft,
+  type RawListOption,
 } from './listOptions';
 import { describeDeleteFailure, describeSaveFailure } from './listOptionFailure';
 
@@ -19,15 +20,26 @@ export type ListOptionsState =
   | { status: 'unavailable'; reason: string }
   | { status: 'ready'; options: ListOptionRow[] };
 
+export type AllListOptionsState =
+  | { status: 'loading' }
+  | { status: 'unavailable'; reason: string }
+  | { status: 'ready'; rows: RawListOption[] };
+
+const UNAVAILABLE = 'The options for this list could not be loaded right now.';
+
 /**
- * The options of one case-header list, retired ones included and flagged.
+ * Every managed list's options, unshaped.
+ *
+ * One read for all four lists rather than one per list: they share a table, the whole
+ * catalogue is a handful of rows, and a screen showing four dropdowns should not make four
+ * round trips to fill them. Shaping per list is `toOptionRows`, which is pure and tested.
  *
  * Read fresh on every reload rather than cached: an administrator who has just added an
- * option and is looking at the table to see whether it worked is the whole audience for this
- * screen, and a stale read there reads as a failure.
+ * option and is looking at the table to see whether it worked is the whole audience for the
+ * management screen, and a stale read there reads as a failure.
  */
-export function useListOptions(list: ManagedList, reloadKey = 0): ListOptionsState {
-  const [state, setState] = useState<ListOptionsState>({ status: 'loading' });
+export function useAllListOptions(reloadKey = 0): AllListOptionsState {
+  const [state, setState] = useState<AllListOptionsState>({ status: 'loading' });
 
   useEffect(() => {
     let cancelled = false;
@@ -38,30 +50,31 @@ export function useListOptions(list: ManagedList, reloadKey = 0): ListOptionsSta
 
         if (!result.success || !result.data) {
           logTechnical('list options load', result.error);
-          setState({
-            status: 'unavailable',
-            reason: 'The options for this list could not be loaded right now.',
-          });
+          setState({ status: 'unavailable', reason: UNAVAILABLE });
           return;
         }
 
-        setState({ status: 'ready', options: toOptionRows(result.data, list, new Date()) });
+        setState({ status: 'ready', rows: result.data });
       })
       .catch((error) => {
         if (cancelled) return;
         logTechnical('list options load', error);
-        setState({
-          status: 'unavailable',
-          reason: 'The options for this list could not be loaded right now.',
-        });
+        setState({ status: 'unavailable', reason: UNAVAILABLE });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [list, reloadKey]);
+  }, [reloadKey]);
 
   return state;
+}
+
+/** The options of ONE list, retired ones included and flagged. */
+export function useListOptions(list: ManagedList, reloadKey = 0): ListOptionsState {
+  const all = useAllListOptions(reloadKey);
+  if (all.status !== 'ready') return all;
+  return { status: 'ready', options: toOptionRows(all.rows, list, new Date()) };
 }
 
 /** Blank rather than a number, so clearing the sort order clears it instead of writing 0. */

@@ -542,6 +542,18 @@ namespace OutcomeTesting.Plugins
                         "Product/solution type",
                         ListOptionRules.ProductSolutionType)
                 },
+                {
+                    ListOptionRules.SampleSourceAttribute,
+                    new EditableField(EditableKind.ListOption, "Sample source", ListOptionRules.SampleSource)
+                },
+                {
+                    ListOptionRules.CaseTypeAttribute,
+                    new EditableField(EditableKind.ListOption, "Case type", ListOptionRules.CaseType)
+                },
+                {
+                    ListOptionRules.PreOrPostCheckAttribute,
+                    new EditableField(EditableKind.ListOption, "Pre or post check", ListOptionRules.PreOrPostCheck)
+                },
                 { "al_samplesource", new EditableField(EditableKind.Option, "Sample source") },
                 // al_checkername is deliberately absent (item 2, 2026-09-19). The case header
                 // now carries a Tax Checker and an AQS Checker, and each one REFLECTS the

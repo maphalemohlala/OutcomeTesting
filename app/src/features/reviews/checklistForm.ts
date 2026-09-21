@@ -12,8 +12,12 @@ import {
 import { ADVICE_DATE_LABEL } from '../cases/caseHeaderDates';
 import { MIGRATED_LISTS, lookupLabelOn } from '../admin/listOptions';
 
-/** The only migrated list so far; MIGRATED_LISTS is the single place that says which. */
-const PRODUCT_SOLUTION_TYPE = MIGRATED_LISTS[0];
+/** MIGRATED_LISTS is the single place that says which lists have a lookup on the case. */
+function managedList(key: string) {
+  const found = MIGRATED_LISTS.find((list) => list.key === key);
+  if (!found) throw new Error(`No migrated list '${key}'`);
+  return found;
+}
 import { choiceLabel } from '../../lib/choiceLabel';
 import { date, text } from '../../lib/format';
 import { withoutUnaskedRootCause } from './gradingRules';
@@ -285,7 +289,9 @@ export function caseHeaderFields(record: Al_outcomecases): HeaderField[] {
     { label: 'Product(s)', value: text(record.al_products) },
     {
       label: 'Case type',
-      value: choiceLabel(Al_outcomecasesal_casetype, record.al_casetype, record.al_casetypename),
+      value:
+        lookupLabelOn(record as unknown as Record<string, unknown>, managedList('case-type')) ??
+        choiceLabel(Al_outcomecasesal_casetype, record.al_casetype, record.al_casetypename),
     },
     { label: ADVICE_DATE_LABEL, value: date(record.al_advicedate) },
     {
@@ -294,7 +300,7 @@ export function caseHeaderFields(record: Al_outcomecases): HeaderField[] {
       // lookup existed still carries (AD-187). Not a transitional nicety: until every case
       // is backfilled, reading only the lookup would blank the field on the older ones.
       value:
-        lookupLabelOn(record as unknown as Record<string, unknown>, PRODUCT_SOLUTION_TYPE) ??
+        lookupLabelOn(record as unknown as Record<string, unknown>, managedList('product-solution-type')) ??
         choiceLabel(
           Al_outcomecasesal_productsolutiontype,
           record.al_productsolutiontype,
@@ -303,7 +309,9 @@ export function caseHeaderFields(record: Al_outcomecases): HeaderField[] {
     },
     {
       label: 'Sample source',
-      value: choiceLabel(
+      value:
+        lookupLabelOn(record as unknown as Record<string, unknown>, managedList('sample-source')) ??
+        choiceLabel(
         Al_outcomecasesal_samplesource,
         record.al_samplesource,
         record.al_samplesourcename,

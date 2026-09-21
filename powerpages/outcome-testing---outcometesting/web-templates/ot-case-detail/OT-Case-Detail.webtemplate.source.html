@@ -63,6 +63,9 @@
       <attribute name="al_products" />
       <attribute name="al_productsolutiontype" />
       <attribute name="al_producttypeid" />
+      <attribute name="al_samplesourceid" />
+      <attribute name="al_casetypeid" />
+      <attribute name="al_preorpostcheckid" />
       <attribute name="al_taxcheckrequired" />
       <attribute name="al_taxteamdisposition" />
       <attribute name="al_taxcheckername" />
@@ -330,12 +333,12 @@
       <table class="meta">
         <tbody>
           <tr>
-            <td class="lbl">Case type</td><td class="val">{{ c.al_casetype.label | default: '—' | escape }}</td>
+            <td class="lbl">Case type</td><td class="val">{% if c.al_casetypeid.name %}{{ c.al_casetypeid.name | escape }}{% else %}{{ c.al_casetype.label | default: '—' | escape }}{% endif %}</td>
             <td class="lbl">Priority</td><td class="val">{{ c.al_priority.label | default: '—' | escape }}</td>
           </tr>
           <tr>
-            <td class="lbl">Sample source</td><td class="val">{{ c.al_samplesource.label | default: '—' | escape }}</td>
-            <td class="lbl">Pre or post check</td><td class="val">{{ c.al_preorpostcheck.label | default: '—' | escape }}</td>
+            <td class="lbl">Sample source</td><td class="val">{% if c.al_samplesourceid.name %}{{ c.al_samplesourceid.name | escape }}{% else %}{{ c.al_samplesource.label | default: '—' | escape }}{% endif %}</td>
+            <td class="lbl">Pre or post check</td><td class="val">{% if c.al_preorpostcheckid.name %}{{ c.al_preorpostcheckid.name | escape }}{% else %}{{ c.al_preorpostcheck.label | default: '—' | escape }}{% endif %}</td>
           </tr>
           <tr>
             <td class="lbl">Tax Checker</td><td class="val">{{ tax_checker | escape }}</td>
@@ -388,7 +391,7 @@
             <td class="lbl">Product(s)</td><td class="val">{{ c.al_products | default: '—' | escape }}</td>
           </tr>
           <tr>
-            <td class="lbl">Case type</td><td class="val">{{ c.al_casetype.label | default: '—' | escape }}</td>
+            <td class="lbl">Case type</td><td class="val">{% if c.al_casetypeid.name %}{{ c.al_casetypeid.name | escape }}{% else %}{{ c.al_casetype.label | default: '—' | escape }}{% endif %}</td>
             <td class="lbl">Date of meeting - Client contact</td><td class="val">{{ c.al_advicedate | date: 'dd MMM yyyy' | default: '—' }}</td>
           </tr>
           <tr>
@@ -397,7 +400,7 @@
               imported with (AD-187). Not a transitional nicety: until every case is
               backfilled, reading only the lookup would blank this on the older ones.
             {% endcomment %}{% if c.al_producttypeid.name %}{{ c.al_producttypeid.name | escape }}{% else %}{{ c.al_productsolutiontype.label | default: '—' | escape }}{% endif %}</td>
-            <td class="lbl">Sample source</td><td class="val">{{ c.al_samplesource.label | default: '—' | escape }}</td>
+            <td class="lbl">Sample source</td><td class="val">{% if c.al_samplesourceid.name %}{{ c.al_samplesourceid.name | escape }}{% else %}{{ c.al_samplesource.label | default: '—' | escape }}{% endif %}</td>
           </tr>
           <tr>
             <td class="lbl">Tax Checker</td><td class="val">{{ tax_checker | escape }}</td>
@@ -412,7 +415,7 @@
             <td class="lbl">IO reference</td><td class="val">{{ c.al_ioreference | default: '—' | escape }}</td>
           </tr>
           <tr>
-            <td class="lbl">Pre or post check</td><td class="val">{{ c.al_preorpostcheck.label | default: '—' | escape }}</td>
+            <td class="lbl">Pre or post check</td><td class="val">{% if c.al_preorpostcheckid.name %}{{ c.al_preorpostcheckid.name | escape }}{% else %}{{ c.al_preorpostcheck.label | default: '—' | escape }}{% endif %}</td>
             <td class="lbl">Vulnerable client?</td><td class="val">{{ c.al_vulnerableclient.label | default: '—' | escape }}</td>
           </tr>
           <tr>

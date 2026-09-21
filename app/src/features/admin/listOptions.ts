@@ -88,27 +88,25 @@ export const MANAGED_LISTS: readonly ManagedList[] = [
     caseAttribute: 'al_producttypeid',
     legacyAttribute: 'al_productsolutiontype',
   },
-  // Declared so the destination is visible and the choice column carries every value it will
-  // ever need, but not yet migrated: each needs its own lookup, backfill and picker change.
   {
     value: LIST_SAMPLE_SOURCE,
     key: 'sample-source',
     label: 'Sample source',
-    caseAttribute: null,
+    caseAttribute: 'al_samplesourceid',
     legacyAttribute: 'al_samplesource',
   },
   {
     value: LIST_CASE_TYPE,
     key: 'case-type',
     label: 'Case type',
-    caseAttribute: null,
+    caseAttribute: 'al_casetypeid',
     legacyAttribute: 'al_casetype',
   },
   {
     value: LIST_PRE_OR_POST_CHECK,
     key: 'pre-or-post-check',
     label: 'Pre or post check',
-    caseAttribute: null,
+    caseAttribute: 'al_preorpostcheckid',
     legacyAttribute: 'al_preorpostcheck',
   },
 ];

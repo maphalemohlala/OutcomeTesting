@@ -147,6 +147,9 @@
         <attribute name="al_advicedate" />
         <attribute name="al_productsolutiontype" />
         <attribute name="al_producttypeid" />
+        <attribute name="al_samplesourceid" />
+        <attribute name="al_casetypeid" />
+        <attribute name="al_preorpostcheckid" />
         <attribute name="al_samplesource" />
         <attribute name="al_taxcheckername" />
         <attribute name="al_aqscheckername" />
@@ -357,6 +360,12 @@
     {% endcomment %}
     {% assign h_producttypeid = rv['case.al_producttypeid'] %}
     {% assign held_producttype = h_producttypeid.id %}
+    {% assign h_samplesourceid = rv['case.al_samplesourceid'] %}
+    {% assign held_samplesource = h_samplesourceid.id %}
+    {% assign h_casetypeid = rv['case.al_casetypeid'] %}
+    {% assign held_casetype = h_casetypeid.id %}
+    {% assign h_preorpostcheckid = rv['case.al_preorpostcheckid'] %}
+    {% assign held_preorpost = h_preorpostcheckid.id %}
     {% comment %}
       TODAY, not the review's as_of. as_of answers "which question version was this review
       answered against", which is a question about history; this answers "what may be chosen
@@ -373,6 +382,75 @@
         <filter type="and">
           <condition attribute="statecode" operator="eq" value="0" />
           <condition attribute="al_list" operator="eq" value="120910840" />
+          <filter type="or">
+            <condition attribute="al_effectivefrom" operator="null" />
+            <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ product_day }}" />
+          </filter>
+          <filter type="or">
+            <condition attribute="al_effectiveto" operator="null" />
+            <condition attribute="al_effectiveto" operator="gt" value="{{ product_day }}" />
+          </filter>
+        </filter>
+        <order attribute="al_sortorder" />
+        <order attribute="al_name" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+{% fetchxml sample_sources %}
+    <fetch>
+      <entity name="al_listoption">
+        <attribute name="al_listoptionid" />
+        <attribute name="al_name" />
+        <attribute name="al_sortorder" />
+        <filter type="and">
+          <condition attribute="statecode" operator="eq" value="0" />
+          <condition attribute="al_list" operator="eq" value="120910841" />
+          <filter type="or">
+            <condition attribute="al_effectivefrom" operator="null" />
+            <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ product_day }}" />
+          </filter>
+          <filter type="or">
+            <condition attribute="al_effectiveto" operator="null" />
+            <condition attribute="al_effectiveto" operator="gt" value="{{ product_day }}" />
+          </filter>
+        </filter>
+        <order attribute="al_sortorder" />
+        <order attribute="al_name" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+{% fetchxml case_types %}
+    <fetch>
+      <entity name="al_listoption">
+        <attribute name="al_listoptionid" />
+        <attribute name="al_name" />
+        <attribute name="al_sortorder" />
+        <filter type="and">
+          <condition attribute="statecode" operator="eq" value="0" />
+          <condition attribute="al_list" operator="eq" value="120910842" />
+          <filter type="or">
+            <condition attribute="al_effectivefrom" operator="null" />
+            <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ product_day }}" />
+          </filter>
+          <filter type="or">
+            <condition attribute="al_effectiveto" operator="null" />
+            <condition attribute="al_effectiveto" operator="gt" value="{{ product_day }}" />
+          </filter>
+        </filter>
+        <order attribute="al_sortorder" />
+        <order attribute="al_name" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+{% fetchxml pre_post_checks %}
+    <fetch>
+      <entity name="al_listoption">
+        <attribute name="al_listoptionid" />
+        <attribute name="al_name" />
+        <attribute name="al_sortorder" />
+        <filter type="and">
+          <condition attribute="statecode" operator="eq" value="0" />
+          <condition attribute="al_list" operator="eq" value="120910843" />
           <filter type="or">
             <condition attribute="al_effectivefrom" operator="null" />
             <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ product_day }}" />
@@ -437,7 +515,7 @@
             <td class="lbl">Product(s)</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_products" value="{{ rv['case.al_products'] | escape }}" aria-label="Products" /></td>
           </tr>
           <tr>
-            <td class="lbl">Case type</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_casetype" aria-label="Case type"><option value="">&mdash;</option><option value="120910510" {% if h_casetype.value == 120910510 %}selected{% endif %}>New advice</option><option value="120910511" {% if h_casetype.value == 120910511 %}selected{% endif %}>Ongoing</option><option value="120910512" {% if h_casetype.value == 120910512 %}selected{% endif %}>Review</option><option value="120910513" {% if h_casetype.value == 120910513 %}selected{% endif %}>Switch/Transfer</option></select></td>
+            <td class="lbl">Case type</td><td class="val">{% comment %}Drawn from al_listoption rows (AD-187), not written out by hand.{% endcomment %}<select class="ot-hdr-input" data-ot-hdr="al_casetypeid" aria-label="Case type"><option value="">&mdash;</option>{% assign casetype_offered = false %}{% for o in case_types.results.entities %}<option value="{{ o.al_listoptionid }}" {% if held_casetype and o.al_listoptionid == held_casetype %}selected{% assign casetype_offered = true %}{% endif %}>{{ o.al_name | escape }}</option>{% endfor %}{% unless casetype_offered %}{% if held_casetype %}<option value="{{ held_casetype }}" selected>{{ h_casetypeid.name | escape }} (retired)</option>{% endif %}{% endunless %}</select></td>
             <td class="lbl">Date of meeting - Client contact</td><td class="val"><input type="date" class="ot-hdr-input" data-ot-hdr="al_advicedate" data-ot-no-future value="{{ rv['case.al_advicedate'] | date: 'yyyy-MM-dd' }}" aria-label="Date of meeting - Client contact" /></td>
           </tr>
           <tr>
@@ -450,14 +528,14 @@
               The options offered TODAY only. A retired one is left out and the server
               refuses it anyway (ListOptionRules.Resolve), so listing it would offer a choice
               the save rejects.
-            {% endcomment %}<select class="ot-hdr-input" data-ot-hdr="al_producttypeid" aria-label="Product or solution type"><option value="">&mdash;</option>{% assign held_is_offered = false %}{% for po in product_types.results.entities %}<option value="{{ po.al_listoptionid }}" {% if held_producttype and po.al_listoptionid == held_producttype %}selected{% assign held_is_offered = true %}{% endif %}>{{ po.al_name | escape }}</option>{% endfor %}{% comment %}
+            {% endcomment %}<select class="ot-hdr-input" data-ot-hdr="al_producttypeid" aria-label="Product or solution type"><option value="">&mdash;</option>{% assign held_is_offered = false %}{% for o in product_types.results.entities %}<option value="{{ o.al_listoptionid }}" {% if held_producttype and o.al_listoptionid == held_producttype %}selected{% assign held_is_offered = true %}{% endif %}>{{ o.al_name | escape }}</option>{% endfor %}{% comment %}
               A case holding a RETIRED option still shows it, marked, rather than rendering
               as "—". Nothing would be lost by the blank - an unchanged field is not sent -
               but a checker looking at an empty dropdown where a product type belongs reads
               it as a field that needs filling in, and fills it in. The Code App's panel
               makes the same allowance for the same reason.
             {% endcomment %}{% unless held_is_offered %}{% if held_producttype %}<option value="{{ held_producttype }}" selected>{{ h_producttypeid.name | escape }} (retired)</option>{% endif %}{% endunless %}</select></td>
-            <td class="lbl">Sample source</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_samplesource" aria-label="Sample source"><option value="">&mdash;</option><option value="120910530" {% if h_samplesource.value == 120910530 %}selected{% endif %}>Random</option><option value="120910531" {% if h_samplesource.value == 120910531 %}selected{% endif %}>Mandatory</option><option value="120910532" {% if h_samplesource.value == 120910532 %}selected{% endif %}>High Risk</option><option value="120910533" {% if h_samplesource.value == 120910533 %}selected{% endif %}>Thematic</option></select></td>
+            <td class="lbl">Sample source</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_samplesourceid" aria-label="Sample source"><option value="">&mdash;</option>{% assign samplesource_offered = false %}{% for o in sample_sources.results.entities %}<option value="{{ o.al_listoptionid }}" {% if held_samplesource and o.al_listoptionid == held_samplesource %}selected{% assign samplesource_offered = true %}{% endif %}>{{ o.al_name | escape }}</option>{% endfor %}{% unless samplesource_offered %}{% if held_samplesource %}<option value="{{ held_samplesource }}" selected>{{ h_samplesourceid.name | escape }} (retired)</option>{% endif %}{% endunless %}</select></td>
           </tr>
           <tr>
             {% comment %}
@@ -485,19 +563,19 @@
             <td class="lbl">IO reference</td><td class="val">{{ rv['case.al_casereference'] | escape }}</td>
           </tr>
           <tr>
-            <td class="lbl">Pre or post check</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_preorpostcheck" aria-label="Pre or post check"><option value="">&mdash;</option><option value="120910540" {% if h_prepost.value == 120910540 %}selected{% endif %}>Pre</option><option value="120910541" {% if h_prepost.value == 120910541 %}selected{% endif %}>Post</option></select></td>
+            <td class="lbl">Pre or post check</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_preorpostcheckid" aria-label="Pre or post check"><option value="">&mdash;</option>{% assign prepost_offered = false %}{% for o in pre_post_checks.results.entities %}<option value="{{ o.al_listoptionid }}" {% if held_preorpost and o.al_listoptionid == held_preorpost %}selected{% assign prepost_offered = true %}{% endif %}>{{ o.al_name | escape }}</option>{% endfor %}{% unless prepost_offered %}{% if held_preorpost %}<option value="{{ held_preorpost }}" selected>{{ h_preorpostcheckid.name | escape }} (retired)</option>{% endif %}{% endunless %}</select></td>
             <td class="lbl">Vulnerable client?</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_vulnerableclient" aria-label="Vulnerable client"><option value="">&mdash;</option><option value="120910550" {% if h_vulnerable.value == 120910550 %}selected{% endif %}>Yes</option><option value="120910551" {% if h_vulnerable.value == 120910551 %}selected{% endif %}>No</option><option value="120910552" {% if h_vulnerable.value == 120910552 %}selected{% endif %}>Potentially vulnerable</option><option value="120910553" {% if h_vulnerable.value == 120910553 %}selected{% endif %}>N/A</option></select></td>
           </tr>
           {% else %}
           <tr><td class="lbl">Adviser name</td><td class="val">{{ rv['case.al_advisername'] | escape }}</td><td class="lbl">Adviser status</td><td class="val">{{ h_adviserstatus.label | escape }}</td></tr>
           <tr><td class="lbl">Adviser code</td><td class="val">{{ rv['case.al_advisercode'] | escape }}</td><td class="lbl">Paraplanner</td><td class="val">{{ rv['case.al_paraplanner'] | escape }}</td></tr>
           <tr><td class="lbl">Paraplanner code</td><td class="val">{{ rv['case.al_paraplannercode'] | escape }}</td><td class="lbl">Product(s)</td><td class="val">{{ rv['case.al_products'] | escape }}</td></tr>
-          <tr><td class="lbl">Case type</td><td class="val">{{ h_casetype.label | escape }}</td><td class="lbl">Date of meeting - Client contact</td><td class="val">{{ rv['case.al_advicedate'] | date: 'dd MMM yyyy' }}</td></tr>
-          <tr><td class="lbl">Product / solution type</td><td class="val">{% comment %}The chosen option, else the choice column an un-backfilled case still carries (AD-187).{% endcomment %}{% if h_producttypeid.name %}{{ h_producttypeid.name | escape }}{% else %}{{ h_producttype.label | escape }}{% endif %}</td><td class="lbl">Sample source</td><td class="val">{{ h_samplesource.label | escape }}</td></tr>
+          <tr><td class="lbl">Case type</td><td class="val">{% if h_casetypeid.name %}{{ h_casetypeid.name | escape }}{% else %}{{ h_casetype.label | escape }}{% endif %}</td><td class="lbl">Date of meeting - Client contact</td><td class="val">{{ rv['case.al_advicedate'] | date: 'dd MMM yyyy' }}</td></tr>
+          <tr><td class="lbl">Product / solution type</td><td class="val">{% comment %}The chosen option, else the choice column an un-backfilled case still carries (AD-187).{% endcomment %}{% if h_producttypeid.name %}{{ h_producttypeid.name | escape }}{% else %}{{ h_producttype.label | escape }}{% endif %}</td><td class="lbl">Sample source</td><td class="val">{% if h_samplesourceid.name %}{{ h_samplesourceid.name | escape }}{% else %}{{ h_samplesource.label | escape }}{% endif %}</td></tr>
           <tr><td class="lbl">Tax Checker</td><td class="val">{{ rv['case.al_taxcheckername'] | default: 'Not yet allocated' | escape }}</td><td class="lbl">AQS Checker</td><td class="val">{{ rv['case.al_aqscheckername'] | default: 'Not yet allocated' | escape }}</td></tr>
           <tr><td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' }}</td><td class="lbl"></td><td class="val"></td></tr>
           <tr><td class="lbl">Client name / initials</td><td class="val">{{ rv['case.al_clientname'] | escape }}</td><td class="lbl">IO reference</td><td class="val">{{ rv['case.al_casereference'] | escape }}</td></tr>
-          <tr><td class="lbl">Pre or post check</td><td class="val">{{ h_prepost.label | escape }}</td><td class="lbl">Vulnerable client?</td><td class="val">{{ h_vulnerable.label | escape }}</td></tr>
+          <tr><td class="lbl">Pre or post check</td><td class="val">{% if h_preorpostcheckid.name %}{{ h_preorpostcheckid.name | escape }}{% else %}{{ h_prepost.label | escape }}{% endif %}</td><td class="lbl">Vulnerable client?</td><td class="val">{{ h_vulnerable.label | escape }}</td></tr>
           {% endif %}
           {% comment %}
             The Tax team's own two fields (project owner, 2026-09-13). The document labels

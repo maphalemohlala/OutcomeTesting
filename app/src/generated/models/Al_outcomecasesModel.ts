@@ -122,6 +122,7 @@ export interface Al_outcomecasesBase {
   al_casereference: string;
   al_casestatus: Al_outcomecasesal_casestatus;
   al_casetype?: Al_outcomecasesal_casetype;
+  "al_CaseTypeId@odata.bind"?: string;
   al_checkdate?: string;
   al_checkername?: string;
   al_checklistcompletedby?: string;
@@ -144,6 +145,7 @@ export interface Al_outcomecasesBase {
   al_paraplannercode?: string;
   al_paraplanneremail?: string;
   al_preorpostcheck?: Al_outcomecasesal_preorpostcheck;
+  "al_PreOrPostCheckId@odata.bind"?: string;
   "al_previouscaseid@odata.bind"?: string;
   al_priority?: Al_outcomecasesal_priority;
   al_products?: string;
@@ -151,6 +153,7 @@ export interface Al_outcomecasesBase {
   "al_ProductTypeId@odata.bind"?: string;
   "al_reviewrouteid@odata.bind"?: string;
   al_samplesource?: Al_outcomecasesal_samplesource;
+  "al_SampleSourceId@odata.bind"?: string;
   al_servicecaseref?: string;
   al_servicestatus?: string;
   al_taskstartdate?: string;
@@ -172,16 +175,19 @@ export interface Al_outcomecasesBase {
 export interface Al_outcomecases extends Al_outcomecasesBase {
   al_adviserstatusname?: string;
   al_casestatusname?: string;
+  al_casetypeidname?: string;
   al_casetypename?: string;
   al_initialtaxoutcomename?: string;
   al_iooutcomename?: string;
   al_iotaskstatusname?: string;
+  al_preorpostcheckidname?: string;
   al_preorpostcheckname?: string;
   al_previouscaseidname?: string;
   al_priorityname?: string;
   al_productsolutiontypename?: string;
   al_producttypeidname?: string;
   al_reviewrouteidname?: string;
+  al_samplesourceidname?: string;
   al_samplesourcename?: string;
   al_taxcheckrequiredname?: string;
   al_taxoutcomename?: string;
@@ -205,12 +211,18 @@ export interface Al_outcomecases extends Al_outcomecasesBase {
   statecodename?: string;
   statuscodename?: string;
   versionnumber?: number;
+  al_casetypeid?: object;
+  _al_casetypeid_value?: string;
+  al_preorpostcheckid?: object;
+  _al_preorpostcheckid_value?: string;
   al_previouscaseid?: object;
   _al_previouscaseid_value?: string;
   al_producttypeid?: object;
   _al_producttypeid_value?: string;
   al_reviewrouteid?: object;
   _al_reviewrouteid_value?: string;
+  al_samplesourceid?: object;
+  _al_samplesourceid_value?: string;
   createdby?: object;
   _createdby_value?: string;
   createdonbehalfby?: object;

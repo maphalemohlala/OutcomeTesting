@@ -189,6 +189,22 @@
           "x-ms-optionsetdisplayname": "Case type",
           "x-ms-optionSetType": "Picklist"
         },
+        "al_casetypeid": {
+          "type": "string",
+          "title": "Case type",
+          "x-ms-dataverse-attribute": "al_casetypeid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_CaseTypeId"
+        },
+        "al_casetypeidname": {
+          "type": "string",
+          "title": "al_casetypeidname",
+          "x-ms-dataverse-attribute": "al_casetypeidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_CaseTypeIdName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
         "al_casetypename": {
           "type": "string",
           "title": "al_casetypename",
@@ -468,6 +484,22 @@
           "x-ms-optionsetdisplayname": "Pre or post check",
           "x-ms-optionSetType": "Picklist"
         },
+        "al_preorpostcheckid": {
+          "type": "string",
+          "title": "Pre or post check",
+          "x-ms-dataverse-attribute": "al_preorpostcheckid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_PreOrPostCheckId"
+        },
+        "al_preorpostcheckidname": {
+          "type": "string",
+          "title": "al_preorpostcheckidname",
+          "x-ms-dataverse-attribute": "al_preorpostcheckidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_PreOrPostCheckIdName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
         "al_preorpostcheckname": {
           "type": "string",
           "title": "al_preorpostcheckname",
@@ -637,6 +669,22 @@
           "x-ms-isGlobal": false,
           "x-ms-optionsetdisplayname": "Sample source",
           "x-ms-optionSetType": "Picklist"
+        },
+        "al_samplesourceid": {
+          "type": "string",
+          "title": "Sample source",
+          "x-ms-dataverse-attribute": "al_samplesourceid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_SampleSourceId"
+        },
+        "al_samplesourceidname": {
+          "type": "string",
+          "title": "al_samplesourceidname",
+          "x-ms-dataverse-attribute": "al_samplesourceidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_SampleSourceIdName",
+          "x-ms-read-only": true,
+          "maxLength": 200
         },
         "al_samplesourcename": {
           "type": "string",

@@ -349,6 +349,9 @@ namespace OutcomeTesting.Plugins
                 // decides whether the option exists, belongs to this list and is offered
                 // today, and the assignment and role checks above still run.
                 ListOptionRules.ProductTypeAttribute,
+                ListOptionRules.SampleSourceAttribute,
+                ListOptionRules.CaseTypeAttribute,
+                ListOptionRules.PreOrPostCheckAttribute,
                 "al_samplesource",
                 "al_preorpostcheck",
                 "al_vulnerableclient",

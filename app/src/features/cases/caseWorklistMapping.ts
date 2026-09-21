@@ -166,7 +166,9 @@ export function toSummary(record: Al_outcomecases, grades?: CaseOutcomeGrades): 
     paraplannerCode: record.al_paraplannercode ?? null,
     taxChecker: record.al_taxcheckername ?? null,
     aqsChecker: record.al_aqscheckername ?? null,
-    caseType: choiceLabel(Al_outcomecasesal_casetype, record.al_casetype, record.al_casetypename),
+    caseType:
+      lookupLabelOn(record as unknown as Record<string, unknown>, MIGRATED_LISTS[2]) ??
+      choiceLabel(Al_outcomecasesal_casetype, record.al_casetype, record.al_casetypename),
     // The managed-list lookup first, then the choice column an un-backfilled case still
     // carries (AD-187).
     productSolutionType:
@@ -179,11 +181,13 @@ export function toSummary(record: Al_outcomecases, grades?: CaseOutcomeGrades): 
     products: record.al_products ?? null,
     adviceDate: record.al_advicedate ?? null,
     checkDate: record.al_checkdate ?? null,
-    preOrPostCheck: choiceLabel(
-      Al_outcomecasesal_preorpostcheck,
-      record.al_preorpostcheck,
-      record.al_preorpostcheckname,
-    ),
+    preOrPostCheck:
+      lookupLabelOn(record as unknown as Record<string, unknown>, MIGRATED_LISTS[3]) ??
+      choiceLabel(
+        Al_outcomecasesal_preorpostcheck,
+        record.al_preorpostcheck,
+        record.al_preorpostcheckname,
+      ),
     dueDate: record.al_duedate ?? null,
   };
 }

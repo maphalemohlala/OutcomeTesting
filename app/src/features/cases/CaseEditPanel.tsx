@@ -16,17 +16,14 @@ import {
   type CommandOutcome,
 } from './caseEditSubmit';
 import { ADVICE_DATE_LABEL, ukToday } from './caseHeaderDates';
-import { MIGRATED_LISTS, choicesIncludingHeld, type ManagedList } from '../admin/listOptions';
-import { useListOptions } from '../admin/useListOptions';
+import { MIGRATED_LISTS, choicesIncludingHeld, toOptionRows, type ManagedList } from '../admin/listOptions';
+import { useAllListOptions } from '../admin/useListOptions';
 import { useCaseReviews } from './useCaseReviews';
 import { useUserDirectory } from '../../hooks/useUserDirectory';
 import {
   Al_outcomecasesal_adviserstatus,
   Al_outcomecasesal_casestatus,
-  Al_outcomecasesal_casetype,
-  Al_outcomecasesal_preorpostcheck,
   Al_outcomecasesal_priority,
-  Al_outcomecasesal_samplesource,
   Al_outcomecasesal_taxcheckrequired,
   Al_outcomecasesal_taxteamdisposition,
   Al_outcomecasesal_vulnerableclient,
@@ -51,8 +48,12 @@ import './CaseEditPanel.css';
  */
 type FieldKind = 'text' | 'date' | 'choice' | 'user' | 'listoption';
 
-/** The only migrated list so far; MIGRATED_LISTS is the single place that says which. */
-const PRODUCT_SOLUTION_TYPE = MIGRATED_LISTS[0];
+/** MIGRATED_LISTS is the single place that says which lists have a lookup on the case. */
+function managedList(key: string): ManagedList {
+  const found = MIGRATED_LISTS.find((list) => list.key === key);
+  if (!found) throw new Error(`No migrated list '${key}'`);
+  return found;
+}
 
 interface FieldDef {
   attr: keyof CaseEditValues;
@@ -106,18 +107,33 @@ const SECTIONS: Section[] = [
   {
     heading: 'Advice and product',
     fields: [
-      { attr: 'al_casetype', label: 'Case type', kind: 'choice', options: Al_outcomecasesal_casetype },
+      {
+        attr: 'al_casetypeid',
+        label: 'Case type',
+        kind: 'listoption',
+        list: managedList('case-type'),
+      },
       {
         attr: 'al_producttypeid',
         label: 'Product/solution type',
         kind: 'listoption',
-        list: PRODUCT_SOLUTION_TYPE,
+        list: managedList('product-solution-type'),
         help: 'Maintained under Admin → Dropdown options. A new option appears here as soon as it is added.',
       },
       { attr: 'al_products', label: 'Products', kind: 'text' },
       { attr: 'al_advicedate', label: ADVICE_DATE_LABEL, kind: 'date' },
-      { attr: 'al_samplesource', label: 'Sample source', kind: 'choice', options: Al_outcomecasesal_samplesource },
-      { attr: 'al_preorpostcheck', label: 'Check point', kind: 'choice', options: Al_outcomecasesal_preorpostcheck },
+      {
+        attr: 'al_samplesourceid',
+        label: 'Sample source',
+        kind: 'listoption',
+        list: managedList('sample-source'),
+      },
+      {
+        attr: 'al_preorpostcheckid',
+        label: 'Check point',
+        kind: 'listoption',
+        list: managedList('pre-or-post-check'),
+      },
     ],
   },
   {
@@ -233,16 +249,16 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
   const candidates = directory.status === 'ready' ? directory.users.filter((u) => u.active) : [];
 
   /*
-   * The managed dropdown's options, read live so an option added a moment ago on Admin ->
+   * The managed dropdowns' options, read live so an option added a moment ago on Admin ->
    * Dropdown options is offerable here without a deployment - which is the whole point of
    * holding them as rows.
    *
-   * One hook for the one migrated list. A second migrated list needs its own call rather
-   * than a loop, because hooks cannot be called conditionally; MIGRATED_LISTS is what says
-   * how many there are, and it is asserted in listOptions.test.ts.
+   * ONE read for all four lists. They share a table, the whole catalogue is a handful of
+   * rows, and a panel drawing four managed dropdowns should not make four round trips to
+   * fill them; the per-list shaping is pure.
    */
-  const productTypes = useListOptions(PRODUCT_SOLUTION_TYPE);
-  const productTypeRows = productTypes.status === 'ready' ? productTypes.options : [];
+  const listOptions = useAllListOptions();
+  const listRows = listOptions.status === 'ready' ? listOptions.rows : [];
 
   const optionLists = useMemo(() => {
     const lists = new Map<keyof CaseEditValues, { value: number; label: string }[]>();
@@ -467,7 +483,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
               simply not among the choices, and leaving the field alone leaves it alone.
             */}
             {choicesIncludingHeld(
-              productTypeRows,
+              toOptionRows(listRows, field.list!, new Date()),
               typeof value === 'string' ? value : null,
             ).map((option) => (
               <option key={option.id} value={option.id}>

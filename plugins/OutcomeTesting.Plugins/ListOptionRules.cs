@@ -39,6 +39,15 @@ namespace OutcomeTesting.Plugins
         /// <summary>The choice column al_producttypeid supersedes, kept for un-backfilled cases.</summary>
         public const string ProductTypeLegacyAttribute = "al_productsolutiontype";
 
+        public const string SampleSourceAttribute = "al_samplesourceid";
+        public const string SampleSourceLegacyAttribute = "al_samplesource";
+
+        public const string CaseTypeAttribute = "al_casetypeid";
+        public const string CaseTypeLegacyAttribute = "al_casetype";
+
+        public const string PreOrPostCheckAttribute = "al_preorpostcheckid";
+        public const string PreOrPostCheckLegacyAttribute = "al_preorpostcheck";
+
         // al_listoption.al_list.
         public const int ProductSolutionType = 120910840;
         public const int SampleSource = 120910841;

@@ -259,6 +259,119 @@ namespace OutcomeTesting.Plugins.Tests
                     new Dictionary<string, string> { { "al_listoption", Guid.NewGuid().ToString() } }));
         }
 
+        // --- all four lists -------------------------------------------------------------------
+
+        public static TheoryData<string, int, string> EveryList()
+        {
+            return new TheoryData<string, int, string>
+            {
+                { ListOptionRules.ProductTypeAttribute, ListOptionRules.ProductSolutionType, ListOptionRules.ProductTypeLegacyAttribute },
+                { ListOptionRules.SampleSourceAttribute, ListOptionRules.SampleSource, ListOptionRules.SampleSourceLegacyAttribute },
+                { ListOptionRules.CaseTypeAttribute, ListOptionRules.CaseType, ListOptionRules.CaseTypeLegacyAttribute },
+                { ListOptionRules.PreOrPostCheckAttribute, ListOptionRules.PreOrPostCheck, ListOptionRules.PreOrPostCheckLegacyAttribute },
+            };
+        }
+
+        private static List<string> ApplyTo(FakeOrganizationService service, string attribute, string optionId)
+        {
+            var changes = new List<string>();
+            UpdateCaseDetailsPlugin.ApplyFields(
+                service,
+                new Dictionary<string, string> { { attribute, optionId } },
+                new Entity("al_outcomecase", CaseId),
+                new Entity("al_outcomecase", CaseId),
+                changes,
+                new OptionLabels(service));
+            return changes;
+        }
+
+        [Theory]
+        [MemberData(nameof(EveryList))]
+        public void Every_list_accepts_an_option_of_its_own(string attribute, int list, string legacy)
+        {
+            var service = new FakeOrganizationService();
+            var id = Option(service, "An option", list);
+
+            var changes = ApplyTo(service, attribute, id.ToString());
+
+            Assert.Single(changes);
+            Assert.Contains("An option", changes[0]);
+            Assert.NotNull(legacy);
+        }
+
+        [Theory]
+        [MemberData(nameof(EveryList))]
+        public void Every_list_refuses_an_option_belonging_to_another(string attribute, int list, string legacy)
+        {
+            // The check that earns the single-table design. Four lists share al_listoption, so
+            // without it a sample source could be written into case type and would read back
+            // afterwards as an ordinary value - wrong, and invisible.
+            var service = new FakeOrganizationService();
+            var other = list == ListOptionRules.ProductSolutionType
+                ? ListOptionRules.SampleSource
+                : ListOptionRules.ProductSolutionType;
+            var id = Option(service, "Belongs elsewhere", other);
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => ApplyTo(service, attribute, id.ToString()));
+
+            Assert.Contains("is not an option on that list", error.Message);
+            Assert.NotNull(legacy);
+        }
+
+        [Theory]
+        [MemberData(nameof(EveryList))]
+        public void Every_list_refuses_a_retired_option(string attribute, int list, string legacy)
+        {
+            var service = new FakeOrganizationService();
+            var id = Option(service, "Gone", list, null, Today.AddDays(-1));
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => ApplyTo(service, attribute, id.ToString()));
+
+            Assert.Contains("retired", error.Message);
+            Assert.NotNull(legacy);
+        }
+
+        [Theory]
+        [MemberData(nameof(EveryList))]
+        public void Every_list_may_still_be_sent_from_the_portal(string attribute, int list, string legacy)
+        {
+            CaseHeaderRequestPlugin.EnsureCheckerEditable(
+                new Dictionary<string, string> { { attribute, Guid.NewGuid().ToString() } });
+            CaseHeaderRequestPlugin.EnsureCheckerEditable(
+                new Dictionary<string, string> { { legacy, "120910520" } });
+            Assert.True(list > 0);
+        }
+
+        [Fact]
+        public void The_four_lookups_are_distinct_from_each_other_and_from_their_choice_columns()
+        {
+            // The lookup and the column it supersedes have to coexist through the migration,
+            // so a name collision would have stopped the column being created at all.
+            var lookups = new[]
+            {
+                ListOptionRules.ProductTypeAttribute,
+                ListOptionRules.SampleSourceAttribute,
+                ListOptionRules.CaseTypeAttribute,
+                ListOptionRules.PreOrPostCheckAttribute,
+            };
+            var legacies = new[]
+            {
+                ListOptionRules.ProductTypeLegacyAttribute,
+                ListOptionRules.SampleSourceLegacyAttribute,
+                ListOptionRules.CaseTypeLegacyAttribute,
+                ListOptionRules.PreOrPostCheckLegacyAttribute,
+            };
+
+            Assert.Equal(lookups.Length, new HashSet<string>(lookups).Count);
+            Assert.Equal(legacies.Length, new HashSet<string>(legacies).Count);
+            for (var i = 0; i < lookups.Length; i++)
+            {
+                Assert.NotEqual(lookups[i], legacies[i]);
+            }
+        }
+
         [Fact]
         public void The_list_values_match_the_ones_the_app_and_the_table_use()
         {
