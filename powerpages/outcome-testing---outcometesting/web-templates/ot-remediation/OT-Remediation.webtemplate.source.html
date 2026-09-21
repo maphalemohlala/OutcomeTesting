@@ -673,7 +673,37 @@
                   <tr>
                     <td>{{ row_no }}</td>
                     <td>—</td>
-                    <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                    {% comment %}
+                      The same editable cell as the itemised branch above, under the same
+                      condition (F45, 2026-09-21).
+
+                      An action carries bullet lines only when the checker marked specific
+                      non-pass items. Remediation.RaiseFor deliberately raises one WITHOUT a
+                      list when there is nothing to list - its own comment says so: "No item
+                      list is not a reason to raise nothing: a grade can require remediation
+                      with no pass/fail test point behind it" - which is the ordinary
+                      Pass with issues case. Those actions landed here, and this cell was
+                      read-only, so the adviser assigned an open action had nowhere to write
+                      the one thing the page exists to collect. The page still invited them
+                      to ("you can record a response on the actions assigned to you"), and
+                      al_CompleteRemediation refuses a completion with a blank response, so
+                      the case could not leave Awaiting Remediation by their hand at all.
+
+                      Presentation only, exactly as above: the Contact-scoped table
+                      permission decides whose action can be written (AD-069) and
+                      CompleteRemediationPlugin re-checks status and response server-side.
+                    {% endcomment %}
+                    {% if user and a.al_assignedcontactid.id == user.id and a.al_actionstatus.value != 120910602 %}
+                      <td class="ot-response-cell" data-ot-response data-action-id="{{ a.al_remediationactionid }}" data-row-no="{{ row_no }}">
+                        <label class="ot-visually-hidden" for="ot-response-{{ a.al_remediationactionid }}">Remedial action for issue {{ row_no }}</label>
+                        <textarea id="ot-response-{{ a.al_remediationactionid }}"
+                                  rows="4"
+                                  class="ot-response-cell__text"
+                                  data-ot-response-text>{{ a.al_adviserresponse | escape }}</textarea>
+                      </td>
+                    {% else %}
+                      <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                    {% endif %}
                     <td>{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
                     <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
                     <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
@@ -1715,7 +1745,25 @@
       }
 
       var pending = rows();
-      if (!pending.length) { return; }
+      if (!pending.length) {
+        /*
+         * Say so. This used to be a bare `return` (F45): pressing Save and sign off with
+         * no editable rows on the page did nothing whatsoever - no request, no error, no
+         * confirmation - and the adviser had no way to tell the difference between a
+         * remediation that had saved and one the page had silently declined to send.
+         *
+         * With the cell above fixed this should not be reachable for an assigned open
+         * action, which is exactly why it must not fail quietly: if it happens again it is
+         * a symptom, and a button that does nothing in silence is how the first one hid.
+         */
+        show(markComplete
+          ? 'There is nothing here for you to sign off. None of the remedial actions on this'
+            + ' case are open and assigned to you. If you expected to answer one, reload the'
+            + ' page, and contact your Outcome Testing manager if it still says this.'
+          : 'There is nothing to save. None of the remedial actions on this case are open and'
+            + ' assigned to you.', 'error');
+        return;
+      }
 
       if (markComplete) {
         // Checked here only so the adviser is told before a round trip; the plug-in
