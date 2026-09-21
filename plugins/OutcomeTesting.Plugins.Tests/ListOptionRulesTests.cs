@@ -207,6 +207,58 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal(2, changes.Count);
         }
 
+        // --- the portal ---------------------------------------------------------------------
+
+        [Fact]
+        public void The_portal_may_send_the_lookup_its_dropdown_now_writes()
+        {
+            // OT Review Detail's Product / solution type select is bound to this field. Left
+            // off the allowlist it would be refused by name on every header save from the
+            // portal - and the checker would be told the field cannot be edited there, which
+            // would be a plain lie about a dropdown sitting in front of them.
+            CaseHeaderRequestPlugin.EnsureCheckerEditable(
+                new Dictionary<string, string>
+                {
+                    { ListOptionRules.ProductTypeAttribute, Guid.NewGuid().ToString() },
+                });
+        }
+
+        [Fact]
+        public void The_portal_may_still_send_the_choice_column_a_migrated_case_has_not_left()
+        {
+            CaseHeaderRequestPlugin.EnsureCheckerEditable(
+                new Dictionary<string, string> { { ListOptionRules.ProductTypeLegacyAttribute, "120910521" } });
+        }
+
+        [Fact]
+        public void Being_on_the_portals_allowlist_does_not_excuse_a_bad_option()
+        {
+            // The allowlist says WHICH fields the portal may name, never which values are
+            // acceptable. A checker sending a sample source is still refused, by the same
+            // rule that refuses it from the Code App.
+            var service = new FakeOrganizationService();
+            var wrongList = Option(service, "Thematic review", ListOptionRules.SampleSource);
+
+            CaseHeaderRequestPlugin.EnsureCheckerEditable(
+                new Dictionary<string, string>
+                {
+                    { ListOptionRules.ProductTypeAttribute, wrongList.ToString() },
+                });
+
+            Assert.Throws<InvalidPluginExecutionException>(() => Apply(service, wrongList.ToString()));
+        }
+
+        [Fact]
+        public void The_portal_still_may_not_name_a_field_outside_the_allowlist()
+        {
+            // The guard against the allowlist quietly widening: al_listoption is a table the
+            // portal can read, and that must not become a table the portal can steer a case
+            // through some other column.
+            Assert.Throws<InvalidPluginExecutionException>(
+                () => CaseHeaderRequestPlugin.EnsureCheckerEditable(
+                    new Dictionary<string, string> { { "al_listoption", Guid.NewGuid().ToString() } }));
+        }
+
         [Fact]
         public void The_list_values_match_the_ones_the_app_and_the_table_use()
         {

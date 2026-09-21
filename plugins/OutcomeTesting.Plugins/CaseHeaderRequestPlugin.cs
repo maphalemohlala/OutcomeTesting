@@ -341,6 +341,14 @@ namespace OutcomeTesting.Plugins
                 "al_casetype",
                 "al_advicedate",
                 "al_productsolutiontype",
+                // The managed-list lookup the portal's Product / solution type select now
+                // writes (AD-187). The choice column above stays, because a case imported
+                // before the migration carries only that and has to remain correctable.
+                //
+                // Being on this list buys nothing on its own: al_UpdateCaseDetails still
+                // decides whether the option exists, belongs to this list and is offered
+                // today, and the assignment and role checks above still run.
+                ListOptionRules.ProductTypeAttribute,
                 "al_samplesource",
                 "al_preorpostcheck",
                 "al_vulnerableclient",

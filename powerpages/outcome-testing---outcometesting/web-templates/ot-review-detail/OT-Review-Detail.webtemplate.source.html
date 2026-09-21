@@ -146,6 +146,7 @@
         <attribute name="al_casetype" />
         <attribute name="al_advicedate" />
         <attribute name="al_productsolutiontype" />
+        <attribute name="al_producttypeid" />
         <attribute name="al_samplesource" />
         <attribute name="al_taxcheckername" />
         <attribute name="al_aqscheckername" />
@@ -347,6 +348,45 @@
     {% assign h_adviserstatus = rv['case.al_adviserstatus'] %}
     {% assign h_casetype = rv['case.al_casetype'] %}
     {% assign h_producttype = rv['case.al_productsolutiontype'] %}
+    {% comment %}
+      Product / solution type is a managed LIST: its options are al_listoption rows the
+      checking team maintains on the Code App's Dropdown options page, not choice metadata a
+      developer deploys (AD-187). h_producttype above is the choice column the case was
+      imported with and is still read for display, because a case that has not been edited
+      since the migration carries only that.
+    {% endcomment %}
+    {% assign h_producttypeid = rv['case.al_producttypeid'] %}
+    {% assign held_producttype = h_producttypeid.id %}
+    {% comment %}
+      TODAY, not the review's as_of. as_of answers "which question version was this review
+      answered against", which is a question about history; this answers "what may be chosen
+      now", which is a question about the present. A submitted review's header is not
+      editable at all, so there is no case where the two should agree.
+    {% endcomment %}
+    {% assign product_day = now | date: 'yyyy-MM-dd' %}
+    {% fetchxml product_types %}
+    <fetch>
+      <entity name="al_listoption">
+        <attribute name="al_listoptionid" />
+        <attribute name="al_name" />
+        <attribute name="al_sortorder" />
+        <filter type="and">
+          <condition attribute="statecode" operator="eq" value="0" />
+          <condition attribute="al_list" operator="eq" value="120910840" />
+          <filter type="or">
+            <condition attribute="al_effectivefrom" operator="null" />
+            <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ product_day }}" />
+          </filter>
+          <filter type="or">
+            <condition attribute="al_effectiveto" operator="null" />
+            <condition attribute="al_effectiveto" operator="gt" value="{{ product_day }}" />
+          </filter>
+        </filter>
+        <order attribute="al_sortorder" />
+        <order attribute="al_name" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
     {% assign h_samplesource = rv['case.al_samplesource'] %}
     {% assign h_prepost = rv['case.al_preorpostcheck'] %}
     {% assign h_vulnerable = rv['case.al_vulnerableclient'] %}
@@ -401,7 +441,22 @@
             <td class="lbl">Date of meeting - Client contact</td><td class="val"><input type="date" class="ot-hdr-input" data-ot-hdr="al_advicedate" data-ot-no-future value="{{ rv['case.al_advicedate'] | date: 'yyyy-MM-dd' }}" aria-label="Date of meeting - Client contact" /></td>
           </tr>
           <tr>
-            <td class="lbl">Product / solution type</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_productsolutiontype" aria-label="Product or solution type"><option value="">&mdash;</option><option value="120910520" {% if h_producttype.value == 120910520 %}selected{% endif %}>Accumulation investment</option><option value="120910521" {% if h_producttype.value == 120910521 %}selected{% endif %}>Accumulation Pension</option><option value="120910522" {% if h_producttype.value == 120910522 %}selected{% endif %}>IHT</option><option value="120910523" {% if h_producttype.value == 120910523 %}selected{% endif %}>Protection</option><option value="120910524" {% if h_producttype.value == 120910524 %}selected{% endif %}>No change reviews</option></select></td>
+            <td class="lbl">Product / solution type</td><td class="val">{% comment %}
+              Drawn from al_listoption rows, so an option added minutes ago on the Code App's
+              Dropdown options page is choosable here with nothing deployed (AD-187). This
+              used to be five <option> tags written out by hand, which is why a new option
+              could be added to the choice column and still not be selectable by anybody.
+
+              The options offered TODAY only. A retired one is left out and the server
+              refuses it anyway (ListOptionRules.Resolve), so listing it would offer a choice
+              the save rejects.
+            {% endcomment %}<select class="ot-hdr-input" data-ot-hdr="al_producttypeid" aria-label="Product or solution type"><option value="">&mdash;</option>{% assign held_is_offered = false %}{% for po in product_types.results.entities %}<option value="{{ po.al_listoptionid }}" {% if held_producttype and po.al_listoptionid == held_producttype %}selected{% assign held_is_offered = true %}{% endif %}>{{ po.al_name | escape }}</option>{% endfor %}{% comment %}
+              A case holding a RETIRED option still shows it, marked, rather than rendering
+              as "—". Nothing would be lost by the blank - an unchanged field is not sent -
+              but a checker looking at an empty dropdown where a product type belongs reads
+              it as a field that needs filling in, and fills it in. The Code App's panel
+              makes the same allowance for the same reason.
+            {% endcomment %}{% unless held_is_offered %}{% if held_producttype %}<option value="{{ held_producttype }}" selected>{{ h_producttypeid.name | escape }} (retired)</option>{% endif %}{% endunless %}</select></td>
             <td class="lbl">Sample source</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_samplesource" aria-label="Sample source"><option value="">&mdash;</option><option value="120910530" {% if h_samplesource.value == 120910530 %}selected{% endif %}>Random</option><option value="120910531" {% if h_samplesource.value == 120910531 %}selected{% endif %}>Mandatory</option><option value="120910532" {% if h_samplesource.value == 120910532 %}selected{% endif %}>High Risk</option><option value="120910533" {% if h_samplesource.value == 120910533 %}selected{% endif %}>Thematic</option></select></td>
           </tr>
           <tr>
@@ -438,7 +493,7 @@
           <tr><td class="lbl">Adviser code</td><td class="val">{{ rv['case.al_advisercode'] | escape }}</td><td class="lbl">Paraplanner</td><td class="val">{{ rv['case.al_paraplanner'] | escape }}</td></tr>
           <tr><td class="lbl">Paraplanner code</td><td class="val">{{ rv['case.al_paraplannercode'] | escape }}</td><td class="lbl">Product(s)</td><td class="val">{{ rv['case.al_products'] | escape }}</td></tr>
           <tr><td class="lbl">Case type</td><td class="val">{{ h_casetype.label | escape }}</td><td class="lbl">Date of meeting - Client contact</td><td class="val">{{ rv['case.al_advicedate'] | date: 'dd MMM yyyy' }}</td></tr>
-          <tr><td class="lbl">Product / solution type</td><td class="val">{{ h_producttype.label | escape }}</td><td class="lbl">Sample source</td><td class="val">{{ h_samplesource.label | escape }}</td></tr>
+          <tr><td class="lbl">Product / solution type</td><td class="val">{% comment %}The chosen option, else the choice column an un-backfilled case still carries (AD-187).{% endcomment %}{% if h_producttypeid.name %}{{ h_producttypeid.name | escape }}{% else %}{{ h_producttype.label | escape }}{% endif %}</td><td class="lbl">Sample source</td><td class="val">{{ h_samplesource.label | escape }}</td></tr>
           <tr><td class="lbl">Tax Checker</td><td class="val">{{ rv['case.al_taxcheckername'] | default: 'Not yet allocated' | escape }}</td><td class="lbl">AQS Checker</td><td class="val">{{ rv['case.al_aqscheckername'] | default: 'Not yet allocated' | escape }}</td></tr>
           <tr><td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' }}</td><td class="lbl"></td><td class="val"></td></tr>
           <tr><td class="lbl">Client name / initials</td><td class="val">{{ rv['case.al_clientname'] | escape }}</td><td class="lbl">IO reference</td><td class="val">{{ rv['case.al_casereference'] | escape }}</td></tr>

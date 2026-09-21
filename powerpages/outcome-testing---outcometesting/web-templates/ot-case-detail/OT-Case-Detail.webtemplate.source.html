@@ -62,6 +62,7 @@
       <attribute name="al_duedate" />
       <attribute name="al_products" />
       <attribute name="al_productsolutiontype" />
+      <attribute name="al_producttypeid" />
       <attribute name="al_taxcheckrequired" />
       <attribute name="al_taxteamdisposition" />
       <attribute name="al_taxcheckername" />
@@ -391,7 +392,11 @@
             <td class="lbl">Date of meeting - Client contact</td><td class="val">{{ c.al_advicedate | date: 'dd MMM yyyy' | default: '—' }}</td>
           </tr>
           <tr>
-            <td class="lbl">Product / solution type</td><td class="val">{{ c.al_productsolutiontype.label | default: '—' | escape }}</td>
+            <td class="lbl">Product / solution type</td><td class="val">{% comment %}
+              The managed-list option the case points at, else the choice column it was
+              imported with (AD-187). Not a transitional nicety: until every case is
+              backfilled, reading only the lookup would blank this on the older ones.
+            {% endcomment %}{% if c.al_producttypeid.name %}{{ c.al_producttypeid.name | escape }}{% else %}{{ c.al_productsolutiontype.label | default: '—' | escape }}{% endif %}</td>
             <td class="lbl">Sample source</td><td class="val">{{ c.al_samplesource.label | default: '—' | escape }}</td>
           </tr>
           <tr>
