@@ -34,14 +34,29 @@ import { inForceOn } from '../../lib/effectiveWindow';
  */
 
 /** al_listoption.al_list. A fresh block: 120910814 is the highest value allocated elsewhere. */
-export const LIST_PRODUCT_SOLUTION_TYPE = 120910840;
-export const LIST_SAMPLE_SOURCE = 120910841;
-export const LIST_CASE_TYPE = 120910842;
-export const LIST_PRE_OR_POST_CHECK = 120910843;
+export const LIST_PRODUCT_SOLUTION_TYPE = 120910840 as const;
+export const LIST_SAMPLE_SOURCE = 120910841 as const;
+export const LIST_CASE_TYPE = 120910842 as const;
+export const LIST_PRE_OR_POST_CHECK = 120910843 as const;
+
+/**
+ * The four values, as literals rather than `number`.
+ *
+ * Not fussiness: the generated model types `al_listoption.al_list` as exactly this union, so
+ * a write from useListOptions only compiles while the two agree. Adding a list here and
+ * forgetting to add it to the choice column in Dataverse - or the reverse - fails the build
+ * instead of failing at runtime on somebody's save. It is the same trick trailLight.ts uses
+ * to pin a generated column, and it costs nothing.
+ */
+export type ListValue =
+  | typeof LIST_PRODUCT_SOLUTION_TYPE
+  | typeof LIST_SAMPLE_SOURCE
+  | typeof LIST_CASE_TYPE
+  | typeof LIST_PRE_OR_POST_CHECK;
 
 export interface ManagedList {
   /** al_listoption.al_list */
-  readonly value: number;
+  readonly value: ListValue;
   /** Stable key for routing and tests; never shown to a person. */
   readonly key: string;
   /** What a person calls the list. */

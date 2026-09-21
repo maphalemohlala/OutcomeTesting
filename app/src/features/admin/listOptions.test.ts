@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  RESOURCE_KEYS,
+  can,
+  pageResourceForPath,
+  resolvePermissions,
+} from '../../types/permissions';
+import {
   LIST_CASE_TYPE,
   LIST_PRE_OR_POST_CHECK,
   LIST_PRODUCT_SOLUTION_TYPE,
@@ -273,5 +279,43 @@ describe('a case that has not been backfilled yet', () => {
     // An integer from a deleted option is orphaned data. Saying nothing is honest; guessing
     // the nearest row would put a wrong product type on a case nobody would think to check.
     expect(caseOptionLabel(null, 120910999, rows)).toBeNull();
+  });
+});
+
+describe('the dropdown options page permission', () => {
+  it('is a known resource key, and the resource for its path', () => {
+    expect(RESOURCE_KEYS).toContain('page.admin.lists');
+    expect(pageResourceForPath('/admin/lists')).toBe('page.admin.lists');
+  });
+
+  it('is granted to the Outcome Testing Manager, who runs the process', () => {
+    // The point of the whole change. If only administrators could reach this page, adding a
+    // product type would still be a request somebody else has to action, which is what the
+    // owner asked to stop - it would just be a faster ticket.
+    expect(
+      can(resolvePermissions(['AL Portal - Outcome Testing Manager']), 'page.admin.lists', 'Manage'),
+    ).toBe(true);
+  });
+
+  it('is granted to the administrators who run the configuration', () => {
+    for (const role of ['AL Portal - Portal Administrator', 'Administrators']) {
+      expect(can(resolvePermissions([role]), 'page.admin.lists', 'Manage')).toBe(true);
+    }
+  });
+
+  it('is not granted to a checker or an adviser', () => {
+    // A checker choosing a product type must not also be able to invent one. The vocabulary
+    // of the case header is the checking team's to set, not any individual reviewer's.
+    for (const role of ['AL Portal - Tax Reviewer', 'AL Portal - AQS Reviewer', 'AL Portal - Adviser Remediation']) {
+      expect(can(resolvePermissions([role]), 'page.admin.lists', 'View'), role).toBe(false);
+    }
+  });
+
+  it('does not carry any authority over a case with it', () => {
+    // The guard against "maintains the dropdowns" quietly becoming "can change outcomes".
+    const set = resolvePermissions(['AL Portal - Outcome Testing Manager']);
+    expect(can(set, 'page.admin.lists', 'Manage')).toBe(true);
+    expect(can(set, 'command.signoff', 'Edit')).toBe(false);
+    expect(can(set, 'command.regrade', 'Edit')).toBe(false);
   });
 });

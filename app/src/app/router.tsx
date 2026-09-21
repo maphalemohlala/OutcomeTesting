@@ -12,6 +12,7 @@ import { PersonCasesPage } from '../features/people/PersonCasesPage';
 import { AdviserMappingPage } from '../features/admin/AdviserMappingPage';
 import { NotificationTemplatePage } from '../features/admin/NotificationTemplatePage';
 import { QuestionLibraryPage } from '../features/admin/QuestionLibraryPage';
+import { ListOptionsPage } from '../features/admin/ListOptionsPage';
 import { SecurityConfigPage } from '../features/admin/SecurityConfigPage';
 import { RoleDetailPage } from '../features/admin/RoleDetailPage';
 import { ReviewDetailPage } from '../features/reviews/ReviewDetailPage';
@@ -119,6 +120,16 @@ export function AppRoutes() {
         <Route
           path="/admin/advisers"
           element={<RequirePermission resource="page.admin.advisers"><AdviserMappingPage /></RequirePermission>}
+        />
+        {/*
+          The options behind the case header's dropdowns (project owner, 2026-09-21). Rows
+          rather than choice metadata, so adding one needs no privilege, no deployment and
+          no rebuild - see features/admin/listOptions.ts for why a page over the choice
+          columns themselves could not have worked.
+        */}
+        <Route
+          path="/admin/lists"
+          element={<RequirePermission resource="page.admin.lists"><ListOptionsPage /></RequirePermission>}
         />
         {/* The wording of every letter the solution sends (Change 1, AD-163). */}
         <Route

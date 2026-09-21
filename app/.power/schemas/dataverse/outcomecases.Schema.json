@@ -437,6 +437,14 @@
           "x-ms-schema-name": "al_ParaplannerCode",
           "maxLength": 100
         },
+        "al_paraplanneremail": {
+          "type": "string",
+          "title": "Paraplanner Email",
+          "x-ms-dataverse-attribute": "al_paraplanneremail",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_ParaplannerEmail",
+          "maxLength": 320
+        },
         "al_preorpostcheck": {
           "type": "string",
           "title": "Pre or post check",
@@ -568,6 +576,22 @@
           "x-ms-dataverse-type": "VirtualType",
           "x-ms-schema-name": "al_productsolutiontypeName",
           "x-ms-read-only": true
+        },
+        "al_producttypeid": {
+          "type": "string",
+          "title": "Product / solution type",
+          "x-ms-dataverse-attribute": "al_producttypeid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_ProductTypeId"
+        },
+        "al_producttypeidname": {
+          "type": "string",
+          "title": "al_producttypeidname",
+          "x-ms-dataverse-attribute": "al_producttypeidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_ProductTypeIdName",
+          "x-ms-read-only": true,
+          "maxLength": 200
         },
         "al_reviewrouteid": {
           "type": "string",
@@ -942,7 +966,7 @@
         },
         "ownerid": {
           "type": "string",
-          "title": "Owner",
+          "title": "Uploaded by",
           "x-ms-dataverse-attribute": "ownerid",
           "x-ms-dataverse-type": "OwnerType",
           "x-ms-schema-name": "OwnerId",

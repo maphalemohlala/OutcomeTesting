@@ -340,6 +340,7 @@ export function pageResourceForPath(path: string): ResourceKey | null {
   if (path.startsWith('/admin/questions')) return 'page.admin.questions';
   if (path.startsWith('/admin/advisers')) return 'page.admin.advisers';
   if (path.startsWith('/admin/templates')) return 'page.admin.templates';
+  if (path.startsWith('/admin/lists')) return 'page.admin.lists';
   if (path.startsWith('/admin/security')) return 'page.admin.security';
   return null;
 }

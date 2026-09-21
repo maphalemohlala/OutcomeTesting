@@ -142,11 +142,13 @@ export interface Al_outcomecasesBase {
   al_outcomecaseid: string;
   al_paraplanner?: string;
   al_paraplannercode?: string;
+  al_paraplanneremail?: string;
   al_preorpostcheck?: Al_outcomecasesal_preorpostcheck;
   "al_previouscaseid@odata.bind"?: string;
   al_priority?: Al_outcomecasesal_priority;
   al_products?: string;
   al_productsolutiontype?: Al_outcomecasesal_productsolutiontype;
+  "al_ProductTypeId@odata.bind"?: string;
   "al_reviewrouteid@odata.bind"?: string;
   al_samplesource?: Al_outcomecasesal_samplesource;
   al_servicecaseref?: string;
@@ -178,6 +180,7 @@ export interface Al_outcomecases extends Al_outcomecasesBase {
   al_previouscaseidname?: string;
   al_priorityname?: string;
   al_productsolutiontypename?: string;
+  al_producttypeidname?: string;
   al_reviewrouteidname?: string;
   al_samplesourcename?: string;
   al_taxcheckrequiredname?: string;
@@ -204,6 +207,8 @@ export interface Al_outcomecases extends Al_outcomecasesBase {
   versionnumber?: number;
   al_previouscaseid?: object;
   _al_previouscaseid_value?: string;
+  al_producttypeid?: object;
+  _al_producttypeid_value?: string;
   al_reviewrouteid?: object;
   _al_reviewrouteid_value?: string;
   createdby?: object;
