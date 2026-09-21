@@ -24,9 +24,23 @@ export function AppRoutes() {
   return (
     <AppShell>
       <Routes>
+        {/* Gated like every other screen. It was not until 2026-09-21 (F43), and the
+            dashboard is the one screen where that mattered most: it is what a sign-in lands
+            on, and it carries open case counts, the outcome distribution, the remediation
+            backlog and case ageing. A user with no application role - never granted one, or
+            a leaver deactivated through OD-010's sanctioned route - saw all of it.
+
+            Everything around the gate was already in place, which is why this survived. The
+            menu item is filtered on page.dashboard, al_pagepermission grants it to eight
+            roles, permissions.ts maps '/' to page.dashboard, and a test asserts that map.
+            The only thing missing was the route consulting any of it. */}
         <Route
           path="/"
-          element={<DashboardPage />}
+          element={
+            <RequirePermission resource="page.dashboard">
+              <DashboardPage />
+            </RequirePermission>
+          }
         />
         <Route path="/cases" element={<RequirePermission resource="page.cases"><CaseWorklistPage /></RequirePermission>} />
         <Route path="/cases/:caseId" element={<RequirePermission resource="page.cases"><CaseDetailPage /></RequirePermission>} />
