@@ -105,7 +105,7 @@ namespace OutcomeTesting.Plugins
             {
                 ColumnSet = new ColumnSet(
                     "al_casereference", "al_advisername", "al_advisercode", "al_adviseremail",
-                    "al_paraplanner", "al_paraplannercode",
+                    "al_paraplanner", "al_paraplannercode", ImportRules.ParaplannerEmailAttribute,
                     "al_casetype", "al_productsolutiontype", "al_checkdate", "al_clientname", "al_preorpostcheck",
                     CaseReviewRouteAttr),
                 Criteria = new FilterExpression(),
@@ -250,10 +250,21 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string ParaplannerEmail(IOrganizationService service, Entity outcomeCase)
         {
-            var match = NotificationOutbox.MatchParaplanner(
-                service, outcomeCase.GetAttributeValue<string>("al_paraplanner"));
+            var stored = outcomeCase.GetAttributeValue<string>(
+                ImportRules.ParaplannerEmailAttribute);
+            var name = outcomeCase.GetAttributeValue<string>("al_paraplanner");
 
-            return match != null && match.IsMatch ? match.Email : null;
+            var match = NotificationOutbox.MatchParaplanner(service, stored, name);
+            if (match != null && match.IsMatch)
+            {
+                return match.Email;
+            }
+
+            // The address the extract carried, even where no contact answers to it. Column D
+            // is the para-planner's email, and an address the firm supplied is that - a
+            // directory gap is not a reason to send the Trail Light a blank where a real
+            // address exists. This is the same fallback the adviser's letter makes (AD-168).
+            return string.IsNullOrWhiteSpace(stored) ? null : stored.Trim();
         }
 
         // AD-039 col 15 Advice Quality grade = final outcome, or initial when not yet

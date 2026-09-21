@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -204,7 +204,9 @@ namespace OutcomeTesting.Plugins
                     // Read as the system user: the person running the import is not guaranteed
                     // read on Contact, and a diagnostic must not fail for want of a privilege.
                     var paraplanner = NotificationOutbox.MatchParaplanner(
-                        systemService, record.GetAttributeValue<string>(ImportRules.ParaplannerAttribute));
+                        systemService,
+                        record.GetAttributeValue<string>(ImportRules.ParaplannerEmailAttribute),
+                        record.GetAttributeValue<string>(ImportRules.ParaplannerAttribute));
                     if (!paraplanner.IsMatch)
                     {
                         report.Add(ReportRow(

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Xunit;
 
@@ -58,7 +58,7 @@ namespace OutcomeTesting.Plugins.Tests
             var service = new FakeOrganizationService();
             SeedContact(service, "Sam Jones", "sam@example.com");
 
-            var match = NotificationOutbox.MatchParaplanner(service, "Sam Jones");
+            var match = NotificationOutbox.MatchParaplanner(service, null, "Sam Jones");
 
             Assert.True(match.IsMatch);
             Assert.Equal("sam@example.com", match.Email);
@@ -67,7 +67,7 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void Says_when_the_row_named_nobody()
         {
-            var match = NotificationOutbox.MatchParaplanner(new FakeOrganizationService(), "   ");
+            var match = NotificationOutbox.MatchParaplanner(new FakeOrganizationService(), null, "   ");
 
             Assert.Equal(NotificationOutbox.PersonMatchKind.NoName, match.Kind);
             Assert.Contains("names no para-planner", match.Reason);
@@ -78,7 +78,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // The value has to appear in the reason. "Para-planner unmatched" on its own
             // tells an administrator nothing they can go and fix.
-            var match = NotificationOutbox.MatchParaplanner(new FakeOrganizationService(), "Nobody Here");
+            var match = NotificationOutbox.MatchParaplanner(new FakeOrganizationService(), null, "Nobody Here");
 
             Assert.Equal(NotificationOutbox.PersonMatchKind.NoContact, match.Kind);
             Assert.Contains("Nobody Here", match.Reason);
@@ -91,7 +91,7 @@ namespace OutcomeTesting.Plugins.Tests
             SeedContact(service, "J Smith", "first@example.com");
             SeedContact(service, "J Smith", "second@example.com");
 
-            var match = NotificationOutbox.MatchParaplanner(service, "J Smith");
+            var match = NotificationOutbox.MatchParaplanner(service, null, "J Smith");
 
             Assert.Equal(NotificationOutbox.PersonMatchKind.Ambiguous, match.Kind);
             Assert.Contains("J Smith", match.Reason);
@@ -104,7 +104,7 @@ namespace OutcomeTesting.Plugins.Tests
             service.Seed("contact", Guid.NewGuid(),
                 "fullname", "Sam Jones", "statecode", new OptionSetValue(0));
 
-            var match = NotificationOutbox.MatchParaplanner(service, "Sam Jones");
+            var match = NotificationOutbox.MatchParaplanner(service, null, "Sam Jones");
 
             Assert.Equal(NotificationOutbox.PersonMatchKind.NoEmail, match.Kind);
             Assert.Contains("no work email", match.Reason);
@@ -121,7 +121,7 @@ namespace OutcomeTesting.Plugins.Tests
             service.Seed("contact", Guid.NewGuid(),
                 "fullname", "Sam Jones", "statecode", new OptionSetValue(0));
 
-            var match = NotificationOutbox.MatchParaplanner(service, "Sam Jones");
+            var match = NotificationOutbox.MatchParaplanner(service, null, "Sam Jones");
 
             Assert.Equal(NotificationOutbox.PersonMatchKind.Ambiguous, match.Kind);
             Assert.Null(match.Email);
@@ -137,7 +137,7 @@ namespace OutcomeTesting.Plugins.Tests
                 "emailaddress1", "left@example.com", "statecode", new OptionSetValue(1));
             SeedContact(service, "Sam Jones", "current@example.com");
 
-            var match = NotificationOutbox.MatchParaplanner(service, "Sam Jones");
+            var match = NotificationOutbox.MatchParaplanner(service, null, "Sam Jones");
 
             Assert.True(match.IsMatch);
             Assert.Equal("current@example.com", match.Email);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Xunit;
 
@@ -68,7 +68,7 @@ namespace OutcomeTesting.Plugins.Tests
             var service = new FakeOrganizationService();
             Contact(service, "Pat Paraplanner", "pat@example.com");
 
-            var match = NotificationOutbox.MatchParaplanner(service, "Pat Paraplanner");
+            var match = NotificationOutbox.MatchParaplanner(service, null, "Pat Paraplanner");
 
             Assert.True(match.IsMatch);
             Assert.Equal("pat@example.com", match.Email);
@@ -148,7 +148,7 @@ namespace OutcomeTesting.Plugins.Tests
             var service = new FakeOrganizationService();
 
             Assert.Contains("adviser", NotificationOutbox.MatchAdviser(service, null, null).Reason);
-            Assert.Contains("para-planner", NotificationOutbox.MatchParaplanner(service, null).Reason);
+            Assert.Contains("para-planner", NotificationOutbox.MatchParaplanner(service, null, null).Reason);
         }
 
         // ------------------------------------------------------------ what it must not break

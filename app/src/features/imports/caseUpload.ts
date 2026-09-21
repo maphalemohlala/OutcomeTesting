@@ -64,6 +64,13 @@ const COLUMNS: ColumnDef[] = [
   // 2026-09-14) - by allocation, by a claim, or by editing the case - and only the columns
   // listed here are written, so a re-import cannot overwrite whoever is allocated.
   { header: 'AssignedBy', field: 'al_paraplanner', kind: 'text' },
+  // The para-planner's ADDRESS (project owner, 2026-09-21: "the paraplanner email field
+  // should now be used to map the paraplanner ... emails are more safe than names"). The
+  // supplied extract carries it in ParaplannerEmail, column M, beside AssignedBy in column L.
+  //
+  // Mirrors ImportRules.Columns, which is the authority: a header this list omits never
+  // reaches the importer at all, because this is what transcribes the workbook to CSV.
+  { header: 'ParaplannerEmail', field: 'al_paraplanneremail', kind: 'text' },
   {
     header: 'Status',
     field: 'al_iotaskstatus',

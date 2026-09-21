@@ -546,9 +546,26 @@ namespace OutcomeTesting.Plugins
                 return null;
             }
 
-            var row = service.Retrieve("al_outcomecase", outcomeCase.Id, new ColumnSet("al_paraplanner"));
-            var match = MatchParaplanner(service, row.GetAttributeValue<string>("al_paraplanner"));
-            return match.IsMatch ? match.Email : null;
+            var row = service.Retrieve(
+                "al_outcomecase",
+                outcomeCase.Id,
+                new ColumnSet(ImportRules.ParaplannerEmailAttribute, "al_paraplanner"));
+
+            var stored = row.GetAttributeValue<string>(ImportRules.ParaplannerEmailAttribute);
+            var name = row.GetAttributeValue<string>("al_paraplanner");
+
+            var match = MatchParaplanner(service, stored, name);
+            if (match.IsMatch)
+            {
+                return match.Email;
+            }
+
+            // The address the extract carried, even when no contact answers to it. This is
+            // the AD-168 judgement the adviser's letter already makes - a lost letter is
+            // worse than one sent to an address the directory does not happen to hold - and
+            // until 2026-09-21 the para-planner could not make it, because a name that
+            // matched nobody left nothing to fall back to.
+            return string.IsNullOrWhiteSpace(stored) ? null : stored.Trim();
         }
 
         /// <summary>Why a para-planner name did or did not reach somebody.</summary>
@@ -623,10 +640,15 @@ namespace OutcomeTesting.Plugins
         /// is a data-protection incident where an unrouted row is an operational one.
         /// </para>
         /// </summary>
-        public static PersonMatch MatchParaplanner(IOrganizationService service, string name)
+        public static PersonMatch MatchParaplanner(
+            IOrganizationService service, string email, string name)
         {
-            // The para-planner has no email column on the case, so the name is all there is.
-            return MatchPerson(service, null, name, "para-planner");
+            // Both, from 2026-09-21. The para-planner USED to have no email column on the
+            // case - "so the name is all there is" is what this comment said - and that was
+            // the only reason they were matched by name while the adviser was matched by
+            // address. The extract carries ParaplannerEmail, ImportRules maps it, and
+            // MatchPerson has read email first and name second since 2026-09-20.
+            return MatchPerson(service, email, name, "para-planner");
         }
 
         /// <summary>

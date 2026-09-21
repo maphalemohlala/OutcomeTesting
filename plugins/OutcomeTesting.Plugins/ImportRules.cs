@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -194,6 +194,22 @@ namespace OutcomeTesting.Plugins
             // cannot be addressed, rather than letting it surface weeks later as a Failed
             // notification nobody is watching (finding 7).
             new ColumnDef("AssignedBy", "al_paraplanner", ColumnKind.Text, null),
+            // The para-planner's ADDRESS (project owner, 2026-09-21: "the paraplanner email
+            // field should now be used to map the paraplanner ... emails are more safe than
+            // names"). The extract carries it in ParaplannerEmail, beside AssignedBy.
+            //
+            // This is the same judgement AdviserEmail settled on 2026-09-20 and the reason
+            // NotificationOutbox.MatchPerson already reads email first and name second: an
+            // address identifies somebody, a display name describes them, and two people
+            // share a name far more often than they share a mailbox. Until this column
+            // existed the para-planner was the one person on a case with no address at all,
+            // so every route to them - the letter, the import's reachability check, Trail
+            // Light column D - had to resolve a name and refuse whenever two contacts
+            // answered to it.
+            //
+            // The name is still mapped and still used. It is what a person reads on the case,
+            // and it is the fallback when a row carries no address.
+            new ColumnDef("ParaplannerEmail", "al_paraplanneremail", ColumnKind.Text, null),
             // al_checkername is deliberately absent. The checker is set manually (project
             // owner, 2026-09-14): by allocation (AssignCasePlugin), by a claim
             // (ClaimCasePlugin), or by editing the case. The import used to stamp it from
@@ -250,6 +266,14 @@ namespace OutcomeTesting.Plugins
         /// apart - they were one edit away from doing so when the mapping moved.
         /// </summary>
         public const string ParaplannerAttribute = "al_paraplanner";
+
+        /// <summary>
+        /// The case column carrying the para-planner's work address, from the extract's
+        /// ParaplannerEmail (project owner, 2026-09-21). Named here for the reason
+        /// <see cref="ParaplannerAttribute"/> is: the import's reachability check and the
+        /// column map must not drift apart.
+        /// </summary>
+        public const string ParaplannerEmailAttribute = "al_paraplanneremail";
 
         /// <summary>
         /// When a case uploaded at <paramref name="uploadedAt"/> falls due: three days after
