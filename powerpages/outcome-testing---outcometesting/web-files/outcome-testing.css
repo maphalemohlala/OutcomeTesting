@@ -1797,3 +1797,23 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-stale[hidden] {
   display: none;
 }
+
+/* A managed list a case may hold several of (AD-190). Every option is visible and each is
+   its own control: a <select multiple> shows a few rows, needs ctrl-click for a second, and
+   drops the rest of the selection on a mis-click, which is the wrong trade for a field a
+   checker fills in once. */
+.ot-hdr-set {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.ot-hdr-set__item {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  font-weight: 400;
+}
+
+.ot-hdr-set__item input {
+  flex: none;
+}

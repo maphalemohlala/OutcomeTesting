@@ -218,3 +218,97 @@ describe('reading a case’s managed values on the portal', () => {
     }
   });
 });
+
+describe('the portal draws Products as a tick list', () => {
+  /** The Products checkbox group, tags and Liquid intact. */
+  function productSet(): string {
+    const start = reviewTemplate.indexOf('data-ot-hdr-set="al_productids"');
+    expect(start, 'the products group should be bound to the set field').toBeGreaterThan(-1);
+    const open = reviewTemplate.lastIndexOf('<div', start);
+    return reviewTemplate.slice(open, reviewTemplate.indexOf('</div>', start));
+  }
+
+  it('is a set, not one of the single-choice dropdowns', () => {
+    // A case covers several products - the column it replaces is labelled "Product(s)" and
+    // holds "Pension; ISA" - so a single <select> would record less than the free text did.
+    expect(MULTI_CHOICE_LISTS.map((l) => l.key)).toEqual(['products']);
+    expect(DROPDOWNS.map((d) => d.attr)).not.toContain('al_productids');
+    expect(productSet()).toContain('type="checkbox"');
+  });
+
+  it('no longer renders the free-text box it replaces', () => {
+    expect(reviewTemplate).not.toContain('data-ot-hdr="al_products"');
+  });
+
+  it('asks for its own list, and for what the case already carries', () => {
+    const offered = reviewTemplate.slice(
+      reviewTemplate.indexOf('{% fetchxml products %}'),
+      reviewTemplate.indexOf('{% endfetchxml %}', reviewTemplate.indexOf('{% fetchxml products %}')),
+    );
+    expect(offered).toContain('<condition attribute="al_list" operator="eq" value="120910844" />');
+
+    // The held set is a many-to-many, so it cannot be read off the case row.
+    const held = reviewTemplate.slice(
+      reviewTemplate.indexOf('{% fetchxml case_products %}'),
+      reviewTemplate.indexOf('{% endfetchxml %}', reviewTemplate.indexOf('{% fetchxml case_products %}')),
+    );
+    expect(held).toContain('<link-entity name="al_listoption_al_outcomecase_products"');
+    expect(held).toContain('intersect="true"');
+  });
+
+  it('tests membership on a delimited id, not a bare substring', () => {
+    // The pattern OT Answer Options uses for `locked`. No guid is a substring of another
+    // today, and a test that depends on that staying true is one that breaks quietly.
+    expect(reviewTemplate).toContain("{% assign okey = '|' | append: o.al_listoptionid | append: '|' %}");
+    expect(productSet()).toContain('{% if held_product_ids contains okey %}');
+  });
+
+  it('keeps a product the case carries that is no longer offered', () => {
+    // Saving any other header field sends the whole set, so an option silently dropped from
+    // the list would be silently dropped from the case. The server leaves an
+    // already-attached option alone for the same reason.
+    const set = productSet();
+    expect(set).toContain('{% unless offered_product_ids contains hkey %}');
+    expect(set).toContain('checked /> {{ h.al_name | escape }}');
+  });
+
+  it('only calls one retired when the offered list actually loaded', () => {
+    // Same lesson as the single-choice dropdowns, applied before it could bite: an empty
+    // fetch means the catalogue is unavailable, not that everything on the case is retired.
+    expect(productSet()).toContain('{% if products_any %} (retired){% endif %}');
+  });
+});
+
+describe('the portal sends the product set', () => {
+  it('reads the group by its boxes, sorted', () => {
+    // Sorted so ticking A then B and B then A give the same string; otherwise the change
+    // check fires on a set nobody changed and the command rewrites associations that match.
+    expect(reviewTemplate).toContain('function setValueOf(container)');
+    expect(reviewTemplate).toContain('chosen.sort();');
+  });
+
+  it('sends the WHOLE set rather than what moved', () => {
+    expect(reviewTemplate).toContain("fields[group.el.getAttribute('data-ot-hdr-set')] = now;");
+  });
+
+  it('does not send a set nobody touched', () => {
+    expect(reviewTemplate).toContain('if (now === group.initial) { continue; }');
+  });
+
+  it('re-baselines the set after a save', () => {
+    // Without this the next save re-sends a set that is already recorded.
+    expect(reviewTemplate).toContain('headerSets[m].initial = setValueOf(headerSets[m].el);');
+  });
+});
+
+describe('reading the products a case carries', () => {
+  it('lists their names on both pages, falling back to the free text', () => {
+    for (const template of [reviewTemplate, caseTemplate]) {
+      expect(template).toContain('{% for h in case_products.results.entities %}');
+      expect(template).toContain("{% assign product_names = product_names | append: '; ' | append: h.al_name %}");
+      expect(template).toContain('{% if product_names != "" %}');
+    }
+    expect(reviewTemplate).toContain("{{ rv['case.al_products'] | escape }}");
+    expect(caseTemplate).toContain("{{ c.al_products | default: '—' | escape }}");
+  });
+});

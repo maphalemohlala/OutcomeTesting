@@ -92,6 +92,27 @@
     {% include 'OT Empty State' title: 'Case not available' message: 'This case does not exist, or you do not have permission to view it.' %}
   {% else %}
 
+    {% comment %}
+      The products the case covers (AD-190). A many-to-many, so they cannot be read off the
+      case row - the intersect is joined here, the way the review page does it.
+    {% endcomment %}
+    {% fetchxml case_products %}
+    <fetch>
+      <entity name="al_listoption">
+        <attribute name="al_listoptionid" />
+        <attribute name="al_name" />
+        <attribute name="al_sortorder" />
+        <link-entity name="al_listoption_al_outcomecase_products" from="al_listoptionid" to="al_listoptionid" intersect="true">
+          <filter type="and">
+            <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
+          </filter>
+        </link-entity>
+        <order attribute="al_sortorder" />
+        <order attribute="al_name" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+
     {% fetchxml reviews %}
     <fetch>
       <entity name="al_reviewinstance">
@@ -388,7 +409,7 @@
           </tr>
           <tr>
             <td class="lbl">Paraplanner code</td><td class="val">{{ c.al_paraplannercode | default: '—' | escape }}</td>
-            <td class="lbl">Product(s)</td><td class="val">{{ c.al_products | default: '—' | escape }}</td>
+            <td class="lbl">Product(s)</td><td class="val">{% comment %}The products the case carries, else the free text it was imported with (AD-190).{% endcomment %}{% assign product_names = "" %}{% for h in case_products.results.entities %}{% if forloop.first %}{% assign product_names = h.al_name %}{% else %}{% assign product_names = product_names | append: '; ' | append: h.al_name %}{% endif %}{% endfor %}{% if product_names != "" %}{{ product_names | escape }}{% else %}{{ c.al_products | default: '—' | escape }}{% endif %}</td>
           </tr>
           <tr>
             <td class="lbl">Case type</td><td class="val">{% if c.al_casetypeid.name %}{{ c.al_casetypeid.name | escape }}{% else %}{{ c.al_casetype.label | default: '—' | escape }}{% endif %}</td>

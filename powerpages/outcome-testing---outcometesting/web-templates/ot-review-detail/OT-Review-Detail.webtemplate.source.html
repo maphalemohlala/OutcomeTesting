@@ -465,6 +465,60 @@
       </entity>
     </fetch>
     {% endfetchxml %}
+
+{% comment %}
+  Products is a SET: a case covers several, which is what the free-text column it replaces
+  already did ("Product(s)", seeded as "Pension; ISA"). So it is a many-to-many rather than a
+  lookup, and needs two reads - the options on offer, and the ones this case already carries.
+{% endcomment %}
+{% fetchxml products %}
+<fetch>
+  <entity name="al_listoption">
+    <attribute name="al_listoptionid" />
+    <attribute name="al_name" />
+    <attribute name="al_sortorder" />
+    <filter type="and">
+      <condition attribute="statecode" operator="eq" value="0" />
+      <condition attribute="al_list" operator="eq" value="120910844" />
+      <filter type="or">
+        <condition attribute="al_effectivefrom" operator="null" />
+        <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ product_day }}" />
+      </filter>
+      <filter type="or">
+        <condition attribute="al_effectiveto" operator="null" />
+        <condition attribute="al_effectiveto" operator="gt" value="{{ product_day }}" />
+      </filter>
+    </filter>
+    <order attribute="al_sortorder" />
+    <order attribute="al_name" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml case_products %}
+<fetch>
+  <entity name="al_listoption">
+    <attribute name="al_listoptionid" />
+    <attribute name="al_name" />
+    <link-entity name="al_listoption_al_outcomecase_products" from="al_listoptionid" to="al_listoptionid" intersect="true">
+      <filter type="and">
+        <condition attribute="al_outcomecaseid" operator="eq" value="{{ rv['case.al_outcomecaseid'] | xml_escape }}" />
+      </filter>
+    </link-entity>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}
+  Pipe-delimited membership tests, the way OT Answer Options builds `locked`: delimited
+  rather than compared as a bare substring, because no guid is a substring of another today
+  and a test that depends on that staying true is one that breaks quietly.
+{% endcomment %}
+{% assign products_any = false %}
+{% assign offered_product_ids = '|' %}
+{% for o in products.results.entities %}{% assign products_any = true %}{% assign offered_product_ids = offered_product_ids | append: o.al_listoptionid | append: '|' %}{% endfor %}
+{% assign held_product_ids = '|' %}
+{% for h in case_products.results.entities %}{% assign held_product_ids = held_product_ids | append: h.al_listoptionid | append: '|' %}{% endfor %}
     {% assign h_samplesource = rv['case.al_samplesource'] %}
     {% assign h_prepost = rv['case.al_preorpostcheck'] %}
     {% assign h_vulnerable = rv['case.al_vulnerableclient'] %}
@@ -512,7 +566,21 @@
           </tr>
           <tr>
             <td class="lbl">Paraplanner code</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_paraplannercode" value="{{ rv['case.al_paraplannercode'] | escape }}" aria-label="Paraplanner code" /></td>
-            <td class="lbl">Product(s)</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_products" value="{{ rv['case.al_products'] | escape }}" aria-label="Products" /></td>
+            <td class="lbl">Product(s)</td><td class="val">{% comment %}
+  A tick list, not a text box and not a single select: a case covers several products
+  (AD-190). Checkboxes rather than <select multiple> for the reason the Code App's panel uses
+  them - a multi-select shows a few rows, needs ctrl-click for a second, and drops the rest
+  of the selection on a mis-click.
+
+  The container carries data-ot-hdr-SET rather than data-ot-hdr: it is not one input with a
+  value, so the collector reads its boxes instead. The whole set is sent, because a payload
+  of additions could never remove one.
+{% endcomment %}<div class="ot-hdr-set" data-ot-hdr-set="al_productids" role="group" aria-label="Products">{% for o in products.results.entities %}{% assign okey = '|' | append: o.al_listoptionid | append: '|' %}<label class="ot-hdr-set__item"><input type="checkbox" value="{{ o.al_listoptionid }}" {% if held_product_ids contains okey %}checked{% endif %} /> {{ o.al_name | escape }}</label>{% endfor %}{% comment %}
+  A product the case already carries that is no longer offered stays ticked, so saving any
+  other header field does not quietly drop it - the server leaves an already-attached option
+  alone for the same reason. Marked "(retired)" only when the offered list actually loaded:
+  if it came back empty, all that is known is that the catalogue is unavailable.
+{% endcomment %}{% for h in case_products.results.entities %}{% assign hkey = '|' | append: h.al_listoptionid | append: '|' %}{% unless offered_product_ids contains hkey %}<label class="ot-hdr-set__item"><input type="checkbox" value="{{ h.al_listoptionid }}" checked /> {{ h.al_name | escape }}{% if products_any %} (retired){% endif %}</label>{% endunless %}{% endfor %}</div></td>
           </tr>
           <tr>
             <td class="lbl">Case type</td><td class="val">{% comment %}Drawn from al_listoption rows (AD-187), not written out by hand.{% endcomment %}<select class="ot-hdr-input" data-ot-hdr="al_casetypeid" aria-label="Case type"><option value="">&mdash;</option>{% assign casetype_offered = false %}{% assign casetype_any = false %}{% for o in case_types.results.entities %}{% assign casetype_any = true %}<option value="{{ o.al_listoptionid }}" {% if held_casetype and o.al_listoptionid == held_casetype %}selected{% assign casetype_offered = true %}{% endif %}>{{ o.al_name | escape }}</option>{% endfor %}{% unless casetype_offered %}{% if held_casetype %}<option value="{{ held_casetype }}" selected>{{ h_casetypeid.name | escape }}{% if casetype_any %} (retired){% endif %}</option>{% endif %}{% endunless %}</select></td>
@@ -569,7 +637,7 @@
           {% else %}
           <tr><td class="lbl">Adviser name</td><td class="val">{{ rv['case.al_advisername'] | escape }}</td><td class="lbl">Adviser status</td><td class="val">{{ h_adviserstatus.label | escape }}</td></tr>
           <tr><td class="lbl">Adviser code</td><td class="val">{{ rv['case.al_advisercode'] | escape }}</td><td class="lbl">Paraplanner</td><td class="val">{{ rv['case.al_paraplanner'] | escape }}</td></tr>
-          <tr><td class="lbl">Paraplanner code</td><td class="val">{{ rv['case.al_paraplannercode'] | escape }}</td><td class="lbl">Product(s)</td><td class="val">{{ rv['case.al_products'] | escape }}</td></tr>
+          <tr><td class="lbl">Paraplanner code</td><td class="val">{{ rv['case.al_paraplannercode'] | escape }}</td><td class="lbl">Product(s)</td><td class="val">{% comment %}The products the case carries (AD-190), else the free text it was imported with.{% endcomment %}{% assign product_names = "" %}{% for h in case_products.results.entities %}{% if forloop.first %}{% assign product_names = h.al_name %}{% else %}{% assign product_names = product_names | append: '; ' | append: h.al_name %}{% endif %}{% endfor %}{% if product_names != "" %}{{ product_names | escape }}{% else %}{{ rv['case.al_products'] | escape }}{% endif %}</td></tr>
           <tr><td class="lbl">Case type</td><td class="val">{% if h_casetypeid.name %}{{ h_casetypeid.name | escape }}{% else %}{{ h_casetype.label | escape }}{% endif %}</td><td class="lbl">Date of meeting - Client contact</td><td class="val">{{ rv['case.al_advicedate'] | date: 'dd MMM yyyy' }}</td></tr>
           <tr><td class="lbl">Product / solution type</td><td class="val">{% comment %}The chosen option, else the choice column an un-backfilled case still carries (AD-187).{% endcomment %}{% if h_producttypeid.name %}{{ h_producttypeid.name | escape }}{% else %}{{ h_producttype.label | escape }}{% endif %}</td><td class="lbl">Sample source</td><td class="val">{% if h_samplesourceid.name %}{{ h_samplesourceid.name | escape }}{% else %}{{ h_samplesource.label | escape }}{% endif %}</td></tr>
           <tr><td class="lbl">Tax Checker</td><td class="val">{{ rv['case.al_taxcheckername'] | default: 'Not yet allocated' | escape }}</td><td class="lbl">AQS Checker</td><td class="val">{{ rv['case.al_aqscheckername'] | default: 'Not yet allocated' | escape }}</td></tr>
@@ -3182,6 +3250,33 @@
           }
 
           /*
+           * A managed list the case may hold SEVERAL of (AD-190) is a group of checkboxes,
+           * not one input with a value, so it is collected separately and read by ticking
+           * rather than by `.value`.
+           *
+           * SORTED, and sorted again when read back, so ticking A then B and B then A give
+           * the same string. Without that the comparison below would fire on a set nobody
+           * changed, and the command would be asked to rewrite associations that already
+           * match - a write, an audit line, and a reader wondering what moved. The Code
+           * App's panel sorts for the same reason.
+           */
+          function setValueOf(container) {
+            var boxes = container.querySelectorAll('input[type="checkbox"]');
+            var chosen = [];
+            for (var b = 0; b < boxes.length; b++) {
+              if (boxes[b].checked) { chosen.push(boxes[b].value); }
+            }
+            chosen.sort();
+            return chosen.join(',');
+          }
+
+          var headerSets = [];
+          var renderedSets = document.querySelectorAll('[data-ot-hdr-set]');
+          for (var g = 0; g < renderedSets.length; g++) {
+            headerSets.push({ el: renderedSets[g], initial: setValueOf(renderedSets[g]) });
+          }
+
+          /*
            * Today in the UK, as yyyy-MM-dd (item 9, 2026-09-19).
            *
            * Users are in the UK and the browser may not be, and on a British Summer Time
@@ -3223,6 +3318,17 @@
               fields[entry.el.getAttribute('data-ot-hdr')] = entry.el.value;
               any = true;
             }
+
+            for (var j = 0; j < headerSets.length; j++) {
+              var group = headerSets[j];
+              var now = setValueOf(group.el);
+              if (now === group.initial) { continue; }
+              // The WHOLE set, not the boxes that moved: a payload of additions could never
+              // remove one, and the server replaces what it is given.
+              fields[group.el.getAttribute('data-ot-hdr-set')] = now;
+              any = true;
+            }
+
             return any ? fields : null;
           }
 
@@ -3328,6 +3434,10 @@
                   for (var k = 0; k < headerInputs.length; k++) {
                     headerInputs[k].initial = headerInputs[k].el.value;
                   }
+                  // The tick lists too, or the next save would re-send a set nobody touched.
+                  for (var m = 0; m < headerSets.length; m++) {
+                    headerSets[m].initial = setValueOf(headerSets[m].el);
+                  }
 
                   if (!routeMayHaveMoved) {
                     // An ordinary header field. Nothing else on the page depends on it, so
@@ -3385,6 +3495,18 @@
           function queue() {
             if (timer) { window.clearTimeout(timer); }
             timer = window.setTimeout(function () { saveNow(); }, DEBOUNCE_MS);
+          }
+
+          /*
+           * A tick is a whole decision, so the group saves on change. There is no typing to
+           * debounce here and no blur to wait for - a checker who ticks a box and submits
+           * immediately must not race a timer.
+           */
+          for (var q = 0; q < headerSets.length; q++) {
+            var boxes = headerSets[q].el.querySelectorAll('input[type="checkbox"]');
+            for (var r = 0; r < boxes.length; r++) {
+              boxes[r].addEventListener('change', function () { saveNow(); });
+            }
           }
 
           for (var b = 0; b < headerInputs.length; b++) {
