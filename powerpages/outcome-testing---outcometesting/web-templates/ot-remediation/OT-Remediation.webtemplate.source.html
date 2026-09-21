@@ -475,7 +475,7 @@
                 The form's last two blocks are read off the same pass that draws the rows,
                 so they cannot disagree with them: `all_approved` is every action's latest
                 decision being Approved, `form_source` is the first action carrying the
-                adviser's three answers, and `latest_adviser` is the most recently completed
+                adviser's own answer, and `latest_adviser` is the most recently completed
                 action. They are rendered under the table, once for the case.
               {% endcomment %}
               {% assign all_approved = true %}
@@ -768,10 +768,15 @@
               {% endfor %}
 
               {% comment %}
-                The adviser's three answers and the Intelligent Office reference, asked ONCE
+                The remediation-form answers and the Intelligent Office reference, asked ONCE
                 for the whole remediation (project owner, 2026-09-10: "they should be for the
                 overall remediation... the rows only need to record the remedial action for
                 each issue").
+
+                Of the three, only "Client contact required?" is still the adviser's. The
+                other two are the T&C Manager's from 2026-09-21 and are answered on the
+                sign-off panel; they are drawn here read-only so the form still reads as one
+                document.
 
                 AD-107 raises one action per fail item, and these five columns live on the
                 action row, so asking them in each row's panel asked an adviser with four
@@ -846,29 +851,29 @@
                     {{ form_source.al_clientcontactrequired.label | default: '—' | escape }}
                   {% endif %}
                 </td>
+                {% comment %}
+                  Read-only for everyone here from 2026-09-21 (project owner: "The Recheck
+                  required? and Do the remedial actions change the advice? should only be
+                  editable to T&C manager only"). The adviser used to answer both in this
+                  grid, and al_recheckrequired is what SignoffProgressPlugin reads to decide
+                  whether the case closes on the approval or waits at Awaiting Recheck
+                  (AD-138) - so the adviser was deciding whether their own remediation needed
+                  looking at again.
+
+                  The T&C Manager answers them on the sign-off panel below, which is the one
+                  place on this site where that role has already been proved. Nothing here is
+                  a security boundary (NFR-SEC-01): RemediationResponseGuardPlugin refuses
+                  every write to these two columns that did not come through the sign-off.
+                {% endcomment %}
                 <th scope="row" colspan="2">Recheck required?</th>
-                <td colspan="2">
-                  {% if answer_ids != '' %}
-                    <span class="ot-opts">
-                      <label><input type="radio" name="ot-form-rc" value="120910796" data-ot-fq="recheck"{% if answers_source.al_recheckrequired.value == 120910796 %} checked{% endif %} /> Yes</label>
-                      <label><input type="radio" name="ot-form-rc" value="120910797" data-ot-fq="recheck"{% if answers_source.al_recheckrequired.value == 120910797 %} checked{% endif %} /> No</label>
-                    </span>
-                  {% else %}
-                    {{ form_source.al_recheckrequired.label | default: '—' | escape }}
-                  {% endif %}
+                <td colspan="2" data-ot-recheck-cell>
+                  {{ answers_source.al_recheckrequired.label | default: form_source.al_recheckrequired.label | default: 'The T&C Manager answers this at sign-off' | escape }}
                 </td>
               </tr>
               <tr>
                 <th scope="row" colspan="2">Do the remedial actions change the advice?</th>
-                <td colspan="2">
-                  {% if answer_ids != '' %}
-                    <span class="ot-opts">
-                      <label><input type="radio" name="ot-form-ca" value="120910798" data-ot-fq="changesadvice"{% if answers_source.al_changesadvice.value == 120910798 %} checked{% endif %} /> Yes</label>
-                      <label><input type="radio" name="ot-form-ca" value="120910799" data-ot-fq="changesadvice"{% if answers_source.al_changesadvice.value == 120910799 %} checked{% endif %} /> No</label>
-                    </span>
-                  {% else %}
-                    {{ form_source.al_changesadvice.label | default: '—' | escape }}
-                  {% endif %}
+                <td colspan="2" data-ot-changesadvice-cell>
+                  {{ answers_source.al_changesadvice.label | default: form_source.al_changesadvice.label | default: 'The T&C Manager answers this at sign-off' | escape }}
                 </td>
                 <th scope="row" colspan="2">All remedial actions checked and approved?</th>
                 <td colspan="2" data-ot-approved-cell>{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</td>
@@ -1042,6 +1047,34 @@
                 </select>
               </div>
             {% endif %}
+            {% comment %}
+              The two answers that are the T&C Manager's (project owner, 2026-09-21). They
+              live on the attestation rather than in the adviser's grid above, because this
+              is the one write on this site where the role has already been proved: the page
+              PATCHes the signed-in user's own contact row, and SignoffRequestPlugin checks
+              the T&C Supervisor web role before it records anything (AD-099).
+
+              "Leave as recorded" is the empty value and is what a rejection sends. A
+              rejection does not ask these questions, and it must not erase what a previous
+              approval attempt answered - SignoffRequestPlugin.RecordFormAnswers treats zero
+              as "the page sent none".
+            {% endcomment %}
+            <div class="ot-field">
+              <label for="ot-recheck">Recheck required?</label>
+              <select id="ot-recheck" data-ot-signoff-recheck>
+                <option value="">Leave as recorded</option>
+                <option value="120910796">Yes</option>
+                <option value="120910797">No</option>
+              </select>
+            </div>
+            <div class="ot-field">
+              <label for="ot-changesadvice">Do the remedial actions change the advice?</label>
+              <select id="ot-changesadvice" data-ot-signoff-changesadvice>
+                <option value="">Leave as recorded</option>
+                <option value="120910798">Yes</option>
+                <option value="120910799">No</option>
+              </select>
+            </div>
             <div class="ot-field">
               <label for="ot-notes">Notes</label>
               <textarea id="ot-notes" rows="3" data-ot-signoff-notes></textarea>
@@ -1179,8 +1212,10 @@
             <p class="ot-response__status" data-ot-form-status aria-live="polite"></p>
             <p class="ot-form-submit__hint">
               Save draft keeps what you have written without signing anything off. Save and
-              sign off records every remedial action above, your three answers, and your
-              sign-off, and sends the remediation to your supervisor.
+              sign off records every remedial action above, your answer to "Client contact
+              required?", and your sign-off, and sends the remediation to your supervisor.
+              "Recheck required?" and "Do the remedial actions change the advice?" are your
+              T&C Manager's to answer when they sign it off.
             </p>
           </div>
         {% endif %}
@@ -1630,10 +1665,13 @@
    *
    * One button for the whole form (project owner, 2026-09-10: "all the saves and sign offs
    * need to be actioned by a single button at the end of the form"). Each of this adviser's
-   * open actions takes ONE request carrying its own remedial action, the three answers that
-   * belong to the remediation as a whole, and the completion trigger - so an action can
-   * never be marked complete with a response that failed to save, and the answers cannot
-   * land on some rows and not others because a later request failed.
+   * open actions takes ONE request carrying its own remedial action, the one form answer
+   * that is still the adviser's, and the completion trigger - so an action can never be
+   * marked complete with a response that failed to save, and the answer cannot land on some
+   * rows and not others because a later request failed.
+   *
+   * It used to carry three. al_recheckrequired and al_changesadvice left on 2026-09-21 and
+   * travel on the sign-off request instead; the server refuses them here.
    *
    * A failure on any row stops the rest: the button reports which one and nothing further
    * is sent, so a half-signed form is something the adviser can see rather than discover.
@@ -1836,8 +1874,15 @@
           }
         }
 
-        if (answer('clientcontact') === null || answer('recheck') === null || answer('changesadvice') === null) {
-          show('Answer the three questions for this remediation before signing off.', 'error');
+        /*
+         * One question, not three, from 2026-09-21. "Recheck required?" and "Do the remedial
+         * actions change the advice?" are the T&C Manager's and are answered on the sign-off
+         * panel; holding the adviser to them here would block a completion they are not
+         * allowed to record, and the PATCH carrying them is refused server-side anyway
+         * (RemediationResponseGuardPlugin.TcOnlyRefusal).
+         */
+        if (answer('clientcontact') === null) {
+          show('Answer "Client contact required?" for this remediation before signing off.', 'error');
           return;
         }
       }
@@ -1877,7 +1922,7 @@
             }
             show('Signed off. ' + pending.length + ' remedial action'
               + (pending.length === 1 ? ' is' : 's are')
-              + ' recorded against your three answers and sent to your supervisor.'
+              + ' recorded against your answer and sent to your supervisor.'
               + ' The rows above now show what was saved. Reload the page when you want the'
               + ' rest of it re-read, and if it still shows the old state the site cache has'
               + ' not caught up - try again in a moment.', 'success');
@@ -1906,13 +1951,15 @@
             busy(false);
           };
 
+          /*
+           * al_recheckrequired and al_changesadvice are deliberately absent (project owner,
+           * 2026-09-21). They are the T&C Manager's answers and travel on the sign-off
+           * request instead; sending them here is refused by the server, so leaving them out
+           * is what keeps a legitimate save from failing rather than a workaround.
+           */
           var payload = { al_adviserresponse: row.text };
           var cc = answer('clientcontact');
-          var rc = answer('recheck');
-          var ca = answer('changesadvice');
           if (cc !== null) { payload.al_clientcontactrequired = cc; }
-          if (rc !== null) { payload.al_recheckrequired = rc; }
-          if (ca !== null) { payload.al_changesadvice = ca; }
           if (markComplete) { payload.al_completerequested = true; }
 
           request.send(JSON.stringify(payload));
@@ -2041,6 +2088,9 @@
       var decision = panel.querySelector('[data-ot-signoff-decision]');
       var notes = panel.querySelector('[data-ot-signoff-notes]');
       var grade = panel.querySelector('[data-ot-signoff-outcome]');
+      // The two remediation-form answers that are this role's (project owner, 2026-09-21).
+      var recheck = panel.querySelector('[data-ot-signoff-recheck]');
+      var changesAdvice = panel.querySelector('[data-ot-signoff-changesadvice]');
       var save = panel.querySelector('[data-ot-signoff-save]');
       var status = panel.querySelector('[data-ot-signoff-status]');
 
@@ -2081,7 +2131,33 @@
         decision.disabled = true;
         notes.disabled = true;
         if (grade) { grade.disabled = true; }
+        if (recheck) { recheck.disabled = true; }
+        if (changesAdvice) { changesAdvice.disabled = true; }
         save.disabled = true;
+        markFormAnswers();
+      }
+
+      /*
+       * The two read-only cells in the form above, brought up to date in place.
+       *
+       * The same reason every other cell on this page is updated rather than reloaded: the
+       * page did not write these rows - SignoffRequestPlugin did - so the portal's render
+       * cache does not clear on this write, and a reload inside the change-tracking window
+       * re-draws the form still saying the T&C Manager has not answered (AD-094, AD-117).
+       */
+      function markFormAnswers() {
+        var pairs = [
+          { select: recheck, cell: document.querySelector('[data-ot-recheck-cell]') },
+          { select: changesAdvice, cell: document.querySelector('[data-ot-changesadvice-cell]') }
+        ];
+
+        for (var i = 0; i < pairs.length; i += 1) {
+          var select = pairs[i].select;
+          var cell = pairs[i].cell;
+          if (!select || !cell || !select.value) { continue; }
+          var chosen = select.options[select.selectedIndex];
+          if (chosen) { cell.textContent = chosen.textContent.replace(/^\s+|\s+$/g, ''); }
+        }
       }
 
       save.addEventListener('click', function () {
@@ -2095,6 +2171,21 @@
         // Told before the round trip; SignoffGuardPlugin refuses it regardless.
         if (decision.value === REJECTED && !notes.value.trim()) {
           show('A rejection must say what the adviser needs to put right.', 'error');
+          return;
+        }
+
+        /*
+         * An approval answers the form (project owner, 2026-09-21). Checked before the round
+         * trip only; nothing server-side requires it, because an approval on a check that
+         * predates these columns has no answers to give and must still be recordable.
+         *
+         * "Recheck required?" decides where the case goes next - No waives the recheck and
+         * closes the case on this approval (AD-138) - so an approval that leaves it unset is
+         * a judgement not made rather than a field not filled.
+         */
+        if (decision.value !== REJECTED && recheck && !recheck.value) {
+          show('Answer "Recheck required?" before approving: it decides whether this case'
+            + ' closes now or waits for a recheck.', 'error');
           return;
         }
 
@@ -2171,7 +2262,12 @@
                 notes: notes.value,
                 // Zero where the supervisor left it for a separate regrade, or where the
                 // case has no graded outcome and the field was not rendered at all.
-                finalOutcome: grade && grade.value ? Number(grade.value) : 0
+                finalOutcome: grade && grade.value ? Number(grade.value) : 0,
+                // The two answers this role owns. Zero is "leave as recorded", which is what
+                // a rejection sends: it does not ask these questions and must not erase what
+                // an earlier approval attempt answered.
+                recheckRequired: recheck && recheck.value ? Number(recheck.value) : 0,
+                changesAdvice: changesAdvice && changesAdvice.value ? Number(changesAdvice.value) : 0
               })
             };
 

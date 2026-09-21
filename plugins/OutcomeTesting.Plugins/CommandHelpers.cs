@@ -395,6 +395,42 @@ namespace OutcomeTesting.Plugins
             return false;
         }
 
+        /// <summary>
+        /// True when this plug-in is running inside the pipeline of <paramref name="messageName"/>
+        /// ON <paramref name="entityName"/> — a write issued from within the Update of a
+        /// contact, say — found by walking the parent contexts. Bounded like
+        /// <see cref="IsWithinMessage"/> so a malformed chain cannot loop.
+        ///
+        /// <b>This is a boundary, not a hint, and only because of how this site is built.</b>
+        /// A Power Pages write reaches Dataverse as the site's application user (AD-053), so
+        /// no guard on the written table can ask who the portal caller was. The resolution
+        /// this solution already uses four times over — the claim, the answer, the regrade
+        /// and the sign-off — is to move the write onto a request column on the signed-in
+        /// user's OWN contact row, which the Self-scoped contact permission pins to them, and
+        /// let a plug-in check the role and do the write server-side. A browser can therefore
+        /// reach the target table at depth 1 and never from inside a contact Update; only a
+        /// plug-in of ours can produce the second shape. Asking for the entity as well as the
+        /// message is what makes that specific rather than "something else started this".
+        /// </summary>
+        public static bool IsWithinMessageOn(
+            IPluginExecutionContext context, string messageName, string entityName)
+        {
+            var parent = context == null ? null : context.ParentContext;
+            var depth = 0;
+            while (parent != null && depth++ < 16)
+            {
+                if (string.Equals(parent.MessageName, messageName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(parent.PrimaryEntityName, entityName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                parent = parent.ParentContext;
+            }
+
+            return false;
+        }
+
         public static bool IsConcurrencyFault(FaultException<OrganizationServiceFault> fault)
         {
             // ConcurrencyVersionMismatch is 0x80060882. This carried 0x80060892 - one digit

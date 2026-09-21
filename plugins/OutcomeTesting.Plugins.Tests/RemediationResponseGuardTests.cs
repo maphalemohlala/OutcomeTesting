@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Xunit;
 
@@ -100,10 +100,17 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void A_submitted_form_answer_cannot_be_changed()
         {
-            // AD-095: the three answers travel with the response and lock with it, otherwise
-            // the T&C Manager attests to a form the adviser can still rewrite underneath.
+            // AD-095: the adviser's answer travels with the response and locks with it,
+            // otherwise the T&C Manager attests to a form the adviser can still rewrite
+            // underneath.
+            //
+            // Asserted on al_clientcontactrequired, which is the only form answer still the
+            // adviser's. It used to be asserted on al_recheckrequired, and that column is now
+            // refused OUTRIGHT rather than frozen at completion (project owner, 2026-09-21) -
+            // see TcOnlyRemediationAnswersTests. Freezing a column nobody may write would be
+            // testing the weaker of two rules.
             var update = new Entity("al_remediationaction", ActionId);
-            update["al_recheckrequired"] = new OptionSetValue(120910796);
+            update["al_clientcontactrequired"] = new OptionSetValue(120910793);
 
             var refusal = RemediationResponseGuardPlugin.Refusal(ActionWithAnswers(Remediation.StatusCompleted), update);
 
@@ -115,9 +122,22 @@ namespace OutcomeTesting.Plugins.Tests
         public void Re_sending_the_same_answer_after_submission_is_not_a_change()
         {
             var update = new Entity("al_remediationaction", ActionId);
-            update["al_changesadvice"] = new OptionSetValue(120910799);
+            update["al_clientcontactrequired"] = new OptionSetValue(120910794);
 
             Assert.Null(RemediationResponseGuardPlugin.Refusal(ActionWithAnswers(Remediation.StatusCompleted), update));
+        }
+
+        [Fact]
+        public void The_freeze_no_longer_reaches_the_two_answers_the_adviser_cannot_give()
+        {
+            // Not an oversight. TcOnlyRefusal has already refused this write before the
+            // Completed gate is reached, and it refuses it at every status rather than only
+            // after submission - which is the stronger rule, not the missing one.
+            var update = new Entity("al_remediationaction", ActionId);
+            update["al_recheckrequired"] = new OptionSetValue(120910796);
+
+            Assert.Null(RemediationResponseGuardPlugin.Refusal(ActionWithAnswers(Remediation.StatusCompleted), update));
+            Assert.NotNull(RemediationResponseGuardPlugin.TcOnlyRefusal(update, false));
         }
 
         [Fact]

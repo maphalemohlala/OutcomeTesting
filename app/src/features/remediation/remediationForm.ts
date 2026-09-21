@@ -3,7 +3,7 @@
  *
  * The portal draws this block under the actions table on both its remediation page and the
  * case record; the Code App drew the same information as four extra columns on every row
- * and two tables underneath. Those were not the form: the three answers are the adviser's
+ * and two tables underneath. Those were not the form: the answers belong to the remediation
  * and there is one set of them per case, so a column repeated them down the table, and the
  * regrade and the supervisor's decision are the case's rather than any one action's.
  * Mirrored here instead (project owner, 2026-09-10), from the same rows and by the same
@@ -209,7 +209,7 @@ export function signoffCell(action: RemediationActionRow, signoffs: SignoffRow[]
 /**
  * The form's last block, read off the same rows the table draws.
  *
- * The three answers come from the first action carrying any of them: they are answered once
+ * The answers come from the first action carrying any of them: they are answered once
  * for the case, and the plug-in writes them to whichever action the adviser answered on.
  * "All remedial actions checked and approved" is every action's latest decision being
  * Approved - not merely the absence of a rejection - so an action nobody has decided on

@@ -1,9 +1,10 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
 
 namespace OutcomeTesting.Plugins
 {
@@ -34,12 +35,22 @@ namespace OutcomeTesting.Plugins
     /// Nothing about the sign-off's rules lives here. The row is created with only the
     /// decision, the notes and the action, exactly the shape the browser used to send, so
     /// <see cref="SignoffGuardPlugin"/> and <see cref="SignoffProgressPlugin"/> run unchanged.
+    ///
+    /// <b>One thing was added on 2026-09-21</b>, and for the same reason the plug-in exists
+    /// at all. The project owner directed that "Recheck required?" and "Do the remedial
+    /// actions change the advice?" are the T&amp;C Manager's answers, not the adviser's, and
+    /// this is the only place on the portal where that role has already been proved. So the
+    /// payload carries them and <see cref="RecordFormAnswers"/> writes them; every other
+    /// route to those two columns is refused by
+    /// <see cref="RemediationResponseGuardPlugin.TcOnlyRefusal"/>.
     /// </summary>
     public class SignoffRequestPlugin : PluginBase
     {
         private const string ContactEntity = "contact";
         private const string SignoffEntity = "al_signoff";
         private const string ActionEntity = "al_remediationaction";
+        private const string CaseLookup = "al_outcomecaseid";
+        private const string ReviewLookup = "al_reviewinstanceid";
         public const string RequestAttr = "al_signoffrequest";
 
         // Who signed. An id and a name rather than a lookup, which is the shape
@@ -127,6 +138,13 @@ namespace OutcomeTesting.Plugins
             // roles' claim request (one allowlist per table), so the check has to be here.
             EnsureSupervisorRole(service, contactId);
 
+            // The two answers only this role may give (project owner, 2026-09-21), written
+            // BEFORE the sign-off is created: SignoffProgressPlugin runs on that Create and
+            // reads al_recheckrequired to decide whether the case closes here or waits at
+            // Awaiting Recheck, so writing them afterwards would route the case on the
+            // previous answer. Same transaction, so a refusal below rolls them back.
+            RecordFormAnswers(service, actionId, payload);
+
             // Cleared before the sign-off is created, so the column never keeps a request
             // after it has been acted on, and a second sign-off is a real second write rather
             // than an unchanged value Dataverse may not raise an Update for. Both writes share
@@ -175,6 +193,75 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// Writes the T&amp;C Manager's two remediation-form answers onto every action of the
+        /// check being signed off (project owner, 2026-09-21).
+        ///
+        /// Onto the whole check, not the one action, because the form asks them once: the
+        /// agreed paper form carries a single "Recheck required?" and a single "Do the
+        /// remedial actions change the advice?" under a table of numbered issues, and the
+        /// portal draws it the same way. <see cref="SignoffProgressPlugin.RecheckWaived"/>
+        /// already reads them across the check for that reason.
+        ///
+        /// Scoped to the check by <c>al_reviewinstanceid</c>, matching RecheckWaived exactly:
+        /// the two legs of a Tax-then-AQS route are separate remediations and the Tax leg's
+        /// answer is not this check's. An action carrying no review — every action raised
+        /// before the column existed — is written only when the signed action carries none
+        /// either, so the two agree about what "this check" means.
+        ///
+        /// Zero means the page sent nothing, and nothing is left alone rather than cleared: a
+        /// rejection does not ask these questions, and a rejection must not erase the answers
+        /// the previous approval attempt gave.
+        /// </summary>
+        public static void RecordFormAnswers(
+            IOrganizationService service, Guid actionId, SignoffRequestPayload payload)
+        {
+            if (service == null || payload == null
+                || (payload.RecheckRequired == 0 && payload.ChangesAdvice == 0))
+            {
+                return;
+            }
+
+            var signed = service.Retrieve(
+                ActionEntity, actionId, new ColumnSet(CaseLookup, ReviewLookup));
+
+            var caseRef = signed.GetAttributeValue<EntityReference>(CaseLookup);
+            if (caseRef == null)
+            {
+                return;
+            }
+
+            var reviewRef = signed.GetAttributeValue<EntityReference>(ReviewLookup);
+
+            var siblings = new QueryExpression(ActionEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                Criteria = new FilterExpression(),
+            };
+            siblings.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            siblings.Criteria.AddCondition(CaseLookup, ConditionOperator.Equal, caseRef.Id);
+            siblings.Criteria.AddCondition(
+                ReviewLookup,
+                reviewRef == null ? ConditionOperator.Null : ConditionOperator.Equal,
+                reviewRef == null ? new object[0] : new object[] { reviewRef.Id });
+
+            foreach (var action in service.RetrieveMultiple(siblings).Entities)
+            {
+                var write = new Entity(ActionEntity, action.Id);
+                if (payload.RecheckRequired != 0)
+                {
+                    write["al_recheckrequired"] = new OptionSetValue(payload.RecheckRequired);
+                }
+
+                if (payload.ChangesAdvice != 0)
+                {
+                    write["al_changesadvice"] = new OptionSetValue(payload.ChangesAdvice);
+                }
+
+                service.Update(write);
+            }
+        }
+
+        /// <summary>
         /// BR-008: only the T&amp;C Supervisor attests. Refused with the same words the page
         /// used to give for a 403, now for the reason that is actually true.
         /// </summary>
@@ -208,6 +295,25 @@ namespace OutcomeTesting.Plugins
 
         [DataMember(Name = "notes")]
         public string Notes { get; set; }
+
+        /// <summary>
+        /// "Recheck required?" — <c>al_remediationaction.al_recheckrequired</c>. Zero when the
+        /// page sent none, which leaves whatever the actions already carry.
+        ///
+        /// The T&amp;C Manager's answer from 2026-09-21, not the adviser's. It always decided
+        /// something the supervisor owns — <see cref="SignoffProgressPlugin.RecheckWaived"/>
+        /// reads it to choose between closing the case on this approval and stopping it at
+        /// Awaiting Recheck (AD-138) — so it now travels with the attestation that acts on it.
+        /// </summary>
+        [DataMember(Name = "recheckRequired")]
+        public int RecheckRequired { get; set; }
+
+        /// <summary>
+        /// "Do the remedial actions change the advice?" —
+        /// <c>al_remediationaction.al_changesadvice</c>. Zero when the page sent none.
+        /// </summary>
+        [DataMember(Name = "changesAdvice")]
+        public int ChangesAdvice { get; set; }
 
         /// <summary>
         /// The final BR-005 outcome, recorded as the supervisor approves (project owner,
