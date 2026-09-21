@@ -29,6 +29,9 @@
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CaseHeaderRequestPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="1a0fa190-56af-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.CaseHeaderRequestPlugin">
       <FriendlyName>OutcomeTesting.Plugins.CaseHeaderRequestPlugin</FriendlyName>
     </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CaseStatusGuardPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="b0b74bcd-a5b5-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.CaseStatusGuardPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.CaseStatusGuardPlugin</FriendlyName>
+    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.ClaimCasePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="7e4ffad2-b8a7-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.ClaimCasePlugin">
       <FriendlyName>OutcomeTesting.Plugins.ClaimCasePlugin</FriendlyName>
     </PluginType>

@@ -1,5 +1,37 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <EntityRelationships xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <EntityRelationship Name="al_listoption_al_outcomecase_products">
+    <EntityRelationshipType>ManyToMany</EntityRelationshipType>
+    <IsCustomizable>1</IsCustomizable>
+    <IntroducedVersion>1.0.5.0</IntroducedVersion>
+    <IsHierarchical>0</IsHierarchical>
+    <FirstEntityName>al_OutcomeCase</FirstEntityName>
+    <SecondEntityName>al_ListOption</SecondEntityName>
+    <IntersectEntityName>al_listoption_al_outcomecase_products</IntersectEntityName>
+    <IsValidForAdvancedFind>1</IsValidForAdvancedFind>
+    <EntityRelationshipRoles>
+      <EntityRelationshipRole>
+        <NavPaneDisplayOption>UseLabel</NavPaneDisplayOption>
+        <NavPaneArea>Details</NavPaneArea>
+        <NavPaneOrder>10000</NavPaneOrder>
+        <NavigationPropertyName>al_listoption_al_outcomecase_products</NavigationPropertyName>
+        <CustomLabels>
+          <CustomLabel description="Products" languagecode="1033" />
+        </CustomLabels>
+        <AssociationRoleOrdinal>1</AssociationRoleOrdinal>
+      </EntityRelationshipRole>
+      <EntityRelationshipRole>
+        <NavPaneDisplayOption>UseLabel</NavPaneDisplayOption>
+        <NavPaneArea>Details</NavPaneArea>
+        <NavPaneOrder>10000</NavPaneOrder>
+        <NavigationPropertyName>al_listoption_al_outcomecase_products</NavigationPropertyName>
+        <CustomLabels>
+          <CustomLabel description="Cases" languagecode="1033" />
+        </CustomLabels>
+        <AssociationRoleOrdinal>2</AssociationRoleOrdinal>
+      </EntityRelationshipRole>
+    </EntityRelationshipRoles>
+  </EntityRelationship>
   <EntityRelationship Name="al_outcomecase_caseassignment">
     <EntityRelationshipType>OneToMany</EntityRelationshipType>
     <IsCustomizable>1</IsCustomizable>

@@ -1,0 +1,11 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-00000000007a">
+  <content>{"entityname": "Adviser Mapping - advisers I supervise", "entitylogicalname": "al_advisermapping", "scope": 756150001, "contactrelationship": "al_contact_al_advisermapping_tcmanager", "read": true, "create": false, "write": false, "delete": false, "append": false, "appendto": false, "adx_entitypermission_webrole": ["a1000000-0000-4000-8000-000000000093"]}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Adviser Mapping - advisers I supervise</name>
+  <powerpagecomponenttype>18</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

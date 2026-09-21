@@ -6,7 +6,7 @@
       <LocalizedName description="Outcome Testing" languagecode="1033" />
     </LocalizedNames>
     <Descriptions />
-    <Version>1.0.4.0</Version>
+    <Version>1.0.6.0</Version>
     <Managed>0</Managed>
     <Publisher>
       <UniqueName>AscotLloyd</UniqueName>
@@ -88,6 +88,7 @@
       <RootComponent type="1" schemaName="al_failreason" behavior="0" />
       <RootComponent type="1" schemaName="al_importbatch" behavior="0" />
       <RootComponent type="1" schemaName="al_importexception" behavior="0" />
+      <RootComponent type="1" schemaName="al_listoption" behavior="0" />
       <RootComponent type="1" schemaName="al_notification" behavior="0" />
       <RootComponent type="1" schemaName="al_notificationtemplate" behavior="0" />
       <RootComponent type="1" schemaName="al_outcome" behavior="0" />
@@ -116,6 +117,7 @@
       <RootComponent type="92" id="{432da5a6-d0a6-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{462da5a6-d0a6-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{4ecc30ee-0ead-f111-aaac-e4fade069307}" behavior="0" />
+      <RootComponent type="92" id="{52cd83d4-a5b5-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{5bdd01c1-c0a3-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{5fdd01c1-c0a3-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{62dd01c1-c0a3-f111-aaac-e4fade069307}" behavior="0" />

@@ -5,7 +5,7 @@
   "create": true,
   "delete": false,
   "entitylogicalname": "al_signoff",
-  "entityname": "Signoff - T\u0026C attestation",
+  "entityname": "Signoff - T&amp;C attestation",
   "parententitypermission": "a1000000-0000-4000-8000-000000000062",
   "parentrelationship": "al_remediationaction_signoff",
   "read": true,

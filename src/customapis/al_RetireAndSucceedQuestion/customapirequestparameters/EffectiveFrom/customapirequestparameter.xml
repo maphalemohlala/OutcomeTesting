@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="EffectiveFrom">
+  <description default="Optional yyyy-MM-dd. Absent is today. May not be in the past.">
+    <label description="Optional yyyy-MM-dd. Absent is today. May not be in the past." languagecode="1033" />
+  </description>
+  <displayname default="Effective from">
+    <label description="Effective from" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>EffectiveFrom</name>
+  <type>10</type>
+</customapirequestparameter>

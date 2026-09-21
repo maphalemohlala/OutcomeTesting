@@ -10,6 +10,7 @@
     <RolePrivilege name="prvAppendal_FailReason" level="Global" />
     <RolePrivilege name="prvAppendal_ImportBatch" level="Global" />
     <RolePrivilege name="prvAppendal_ImportException" level="Global" />
+    <RolePrivilege name="prvAppendal_ListOption" level="Global" />
     <RolePrivilege name="prvAppendal_Notification" level="Global" />
     <RolePrivilege name="prvAppendal_Outcome" level="Global" />
     <RolePrivilege name="prvAppendal_OutcomeCase" level="Global" />
@@ -33,6 +34,7 @@
     <RolePrivilege name="prvAppendToal_FailReason" level="Global" />
     <RolePrivilege name="prvAppendToal_ImportBatch" level="Global" />
     <RolePrivilege name="prvAppendToal_ImportException" level="Global" />
+    <RolePrivilege name="prvAppendToal_ListOption" level="Global" />
     <RolePrivilege name="prvAppendToal_Notification" level="Global" />
     <RolePrivilege name="prvAppendToal_Outcome" level="Global" />
     <RolePrivilege name="prvAppendToal_OutcomeCase" level="Global" />
@@ -57,6 +59,7 @@
     <RolePrivilege name="prvCreateal_FailReason" level="Global" />
     <RolePrivilege name="prvCreateal_ImportBatch" level="Global" />
     <RolePrivilege name="prvCreateal_ImportException" level="Global" />
+    <RolePrivilege name="prvCreateal_ListOption" level="Global" />
     <RolePrivilege name="prvCreateal_Notification" level="Global" />
     <RolePrivilege name="prvCreateal_Outcome" level="Global" />
     <RolePrivilege name="prvCreateal_OutcomeCase" level="Global" />
@@ -72,6 +75,7 @@
     <RolePrivilege name="prvCreateContact" level="Global" />
     <RolePrivilege name="prvCreatemspp_webrole" level="Global" />
     <RolePrivilege name="prvCreateSharePointData" level="Global" />
+    <RolePrivilege name="prvDeleteal_ListOption" level="Global" />
     <RolePrivilege name="prvDeleteal_PagePermission" level="Global" />
     <RolePrivilege name="prvDeleteal_UserRoleMapping" level="Global" />
     <RolePrivilege name="prvReadal_AuditEvent" level="Global" />
@@ -83,6 +87,7 @@
     <RolePrivilege name="prvReadal_FailReason" level="Global" />
     <RolePrivilege name="prvReadal_ImportBatch" level="Global" />
     <RolePrivilege name="prvReadal_ImportException" level="Global" />
+    <RolePrivilege name="prvReadal_ListOption" level="Global" />
     <RolePrivilege name="prvReadal_Notification" level="Global" />
     <RolePrivilege name="prvReadal_Outcome" level="Global" />
     <RolePrivilege name="prvReadal_OutcomeCase" level="Global" />
@@ -115,6 +120,7 @@
     <RolePrivilege name="prvWriteal_FailReason" level="Global" />
     <RolePrivilege name="prvWriteal_ImportBatch" level="Global" />
     <RolePrivilege name="prvWriteal_ImportException" level="Global" />
+    <RolePrivilege name="prvWriteal_ListOption" level="Global" />
     <RolePrivilege name="prvWriteal_Notification" level="Global" />
     <RolePrivilege name="prvWriteal_Outcome" level="Global" />
     <RolePrivilege name="prvWriteal_OutcomeCase" level="Global" />

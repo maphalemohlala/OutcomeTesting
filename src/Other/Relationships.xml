@@ -7,6 +7,11 @@
   <EntityRelationship Name="al_exportbatch_exportrecord" />
   <EntityRelationship Name="al_failreason_response" />
   <EntityRelationship Name="al_importbatch_importexception" />
+  <EntityRelationship Name="al_listoption_al_outcomecase_casetype" />
+  <EntityRelationship Name="al_listoption_al_outcomecase_preorpostcheck" />
+  <EntityRelationship Name="al_listoption_al_outcomecase_products" />
+  <EntityRelationship Name="al_listoption_al_outcomecase_producttype" />
+  <EntityRelationship Name="al_listoption_al_outcomecase_samplesource" />
   <EntityRelationship Name="al_outcomecase_caseassignment" />
   <EntityRelationship Name="al_outcomecase_exportrecord" />
   <EntityRelationship Name="al_outcomecase_outcome" />
@@ -65,6 +70,8 @@
   <EntityRelationship Name="lk_al_importbatch_modifiedby" />
   <EntityRelationship Name="lk_al_importexception_createdby" />
   <EntityRelationship Name="lk_al_importexception_modifiedby" />
+  <EntityRelationship Name="lk_al_listoption_createdby" />
+  <EntityRelationship Name="lk_al_listoption_modifiedby" />
   <EntityRelationship Name="lk_al_notification_createdby" />
   <EntityRelationship Name="lk_al_notification_modifiedby" />
   <EntityRelationship Name="lk_al_notificationtemplate_createdby" />
@@ -99,6 +106,7 @@
   <EntityRelationship Name="organization_al_checklist" />
   <EntityRelationship Name="organization_al_checklistversion" />
   <EntityRelationship Name="organization_al_failreason" />
+  <EntityRelationship Name="organization_al_listoption" />
   <EntityRelationship Name="organization_al_notificationtemplate" />
   <EntityRelationship Name="organization_al_question" />
   <EntityRelationship Name="organization_al_questionversion" />

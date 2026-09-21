@@ -511,6 +511,45 @@
             <Description description="Advice event type: New advice, Ongoing, Review or Switch/Transfer." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_CaseTypeId">
+          <Type>lookup</Type>
+          <Name>al_casetypeid</Name>
+          <LogicalName>al_casetypeid</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>0</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.5.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <ExternalName>al_casetypeid</ExternalName>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <LookupStyle>single</LookupStyle>
+          <LookupTypes />
+          <displaynames>
+            <displayname description="Case type" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The case's case type, as a managed list option. It supersedes the al_casetype choice column, which is kept so a case imported before this existed still reads correctly until it is backfilled." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_CheckDate">
           <Type>datetime</Type>
           <Name>al_checkdate</Name>
@@ -1387,6 +1426,46 @@
             <Description description="Paraplanner identifier code carried from Intelligent Office." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_ParaplannerEmail">
+          <Type>nvarchar</Type>
+          <Name>al_paraplanneremail</Name>
+          <LogicalName>al_paraplanneremail</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.5.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>text</Format>
+          <MaxLength>320</MaxLength>
+          <Length>640</Length>
+          <displaynames>
+            <displayname description="Paraplanner Email" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The para-planner's work address, from the extract's ParaplannerEmail column (project owner, 2026-09-21). An address identifies somebody; a name describes them - the same reason AdviserEmail was mapped on 2026-09-20." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_PreOrPostCheck">
           <Type>picklist</Type>
           <Name>al_preorpostcheck</Name>
@@ -1446,6 +1525,45 @@
           </displaynames>
           <Descriptions>
             <Description description="Whether this is a pre-issue or post-issue check." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_PreOrPostCheckId">
+          <Type>lookup</Type>
+          <Name>al_preorpostcheckid</Name>
+          <LogicalName>al_preorpostcheckid</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>0</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.5.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <ExternalName>al_preorpostcheckid</ExternalName>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <LookupStyle>single</LookupStyle>
+          <LookupTypes />
+          <displaynames>
+            <displayname description="Pre or post check" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The case's pre or post check, as a managed list option. It supersedes the al_preorpostcheck choice column, which is kept so a case imported before this existed still reads correctly until it is backfilled." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_previouscaseid">
@@ -1674,6 +1792,45 @@
             <Description description="Product or solution type: Accumulation investment, Accumulation Pension, IHT, Protection or No change reviews. The system derives CRP applicability from this (AD-021)." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_ProductTypeId">
+          <Type>lookup</Type>
+          <Name>al_producttypeid</Name>
+          <LogicalName>al_producttypeid</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>0</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.5.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <ExternalName>al_producttypeid</ExternalName>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <LookupStyle>single</LookupStyle>
+          <LookupTypes />
+          <displaynames>
+            <displayname description="Product / solution type" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The case's product or solution type, as a managed list option. It supersedes the al_productsolutiontype choice column, which is kept so a case imported before this existed still reads correctly until it is backfilled." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_reviewrouteid">
           <Type>lookup</Type>
           <Name>al_reviewrouteid</Name>
@@ -1782,6 +1939,45 @@
           </displaynames>
           <Descriptions>
             <Description description="Selection basis: Random, Mandatory, High Risk or Thematic." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_SampleSourceId">
+          <Type>lookup</Type>
+          <Name>al_samplesourceid</Name>
+          <LogicalName>al_samplesourceid</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>0</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.5.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <ExternalName>al_samplesourceid</ExternalName>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <LookupStyle>single</LookupStyle>
+          <LookupTypes />
+          <displaynames>
+            <displayname description="Sample source" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The case's sample source, as a managed list option. It supersedes the al_samplesource choice column, which is kept so a case imported before this existed still reads correctly until it is backfilled." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_ServiceCaseRef">

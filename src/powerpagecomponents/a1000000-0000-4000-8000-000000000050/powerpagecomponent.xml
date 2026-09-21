@@ -9,7 +9,7 @@
   "partialurl": "outcome-testing.css",
   "publishingstateid": "2d4a3214-4408-4e1e-a97b-35db119255f8"
 }</content>
-  <filecontent mimetype="application/octet-stream">outcome-testing.css</filecontent>
+  <filecontent mimetype="text/css">outcome-testing.css</filecontent>
   <iscustomizable>1</iscustomizable>
   <name>outcome-testing.css</name>
   <powerpagecomponenttype>3</powerpagecomponenttype>

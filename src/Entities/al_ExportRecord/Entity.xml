@@ -888,6 +888,46 @@
             <Description description="AD-039 col 4. Text to preserve non-numeric codes." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_ParaplannerEmail">
+          <Type>nvarchar</Type>
+          <Name>al_paraplanneremail</Name>
+          <LogicalName>al_paraplanneremail</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.5.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>text</Format>
+          <MaxLength>320</MaxLength>
+          <Length>640</Length>
+          <displaynames>
+            <displayname description="Paraplanner Email" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Trail Light column D from 2026-09-21. Snapshotted at export time by resolving the case's paraplanner name to a Contact; empty where that name reached nobody or matched two people." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_Paraplannername">
           <Type>nvarchar</Type>
           <Name>al_paraplannername</Name>
