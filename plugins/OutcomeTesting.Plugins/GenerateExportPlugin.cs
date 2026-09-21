@@ -8,7 +8,9 @@ namespace OutcomeTesting.Plugins
     /// Server-side command GenerateExport (AD-003, AD-039, AD-034 manual only). Registered
     /// against the Custom API <c>al_GenerateExport</c>. Snapshots each Closed case into an
     /// al_exportrecord in the AD-039 20-column Trail Light shape, so the delivered values
-    /// are preserved for reconciliation (BR-012). Enforces the caller holds Edit on
+    /// are preserved for reconciliation (BR-012). Columns B and D carry EMAILS from
+    /// 2026-09-21, not codes - see <c>app/src/features/reports/trailLight.ts</c>, which is
+    /// where the file's column order lives. Enforces the caller holds Edit on
     /// <c>export.generate</c>, is idempotent per batch, and writes an Audit Event.
     /// </summary>
     public class GenerateExportPlugin : PluginBase
@@ -151,13 +153,19 @@ namespace OutcomeTesting.Plugins
                     ["al_outcomecaseid"] = new EntityReference(CaseEntity, outcomeCase.Id),
                     ["al_advisername"] = outcomeCase.GetAttributeValue<string>("al_advisername"),
                     ["al_advisercode"] = outcomeCase.GetAttributeValue<string>("al_advisercode"),
-                    // Trail Light col 21 (project owner, 2026-09-19). Snapshotted like every
-                    // other column here rather than read live at file-build time, so a later
-                    // correction to the case cannot change what an already-delivered batch
-                    // says it sent.
+                    // Trail Light col B from 2026-09-21, having been col 21 since 2026-09-19.
+                    // Snapshotted like every other column here rather than read live at
+                    // file-build time, so a later correction to the case cannot change what
+                    // an already-delivered batch says it sent.
                     ["al_adviseremail"] = outcomeCase.GetAttributeValue<string>("al_adviseremail"),
                     ["al_paraplannername"] = outcomeCase.GetAttributeValue<string>("al_paraplanner"),
                     ["al_paraplannercode"] = outcomeCase.GetAttributeValue<string>("al_paraplannercode"),
+                    // Trail Light col D (project owner, 2026-09-21: "replace column B & D
+                    // ... rather than codes show emails"). Resolved rather than read: unlike
+                    // the adviser, the para-planner has NO email column on the case - the
+                    // import carries their name and nothing else (AD-160) - so the only
+                    // source is the Contact that name resolves to.
+                    ["al_paraplanneremail"] = ParaplannerEmail(userService, outcomeCase),
                     ["al_casetype"] = CommandHelpers.Formatted(outcomeCase, "al_casetype"),
                     ["al_productsolutiontype"] = CommandHelpers.Formatted(outcomeCase, "al_productsolutiontype"),
                     ["al_clientname"] = outcomeCase.GetAttributeValue<string>("al_clientname"),
@@ -216,6 +224,36 @@ namespace OutcomeTesting.Plugins
                 null, rows.ToString(), idempotencyKey, context);
 
             SetResponse(context, batchId.ToString("D"), rows.ToString(), "Generated", auditId, false);
+        }
+
+        /// <summary>
+        /// The para-planner's work email for this case, or null when the name on it reaches
+        /// nobody.
+        ///
+        /// <see cref="NotificationOutbox.MatchParaplanner"/> is the one place that decides,
+        /// and it decides strictly: no name, no active contact of that name, TWO active
+        /// contacts of that name, or one with no work email all come back unmatched. Two
+        /// matching contacts is the case worth stating - the query deliberately does not
+        /// prefer the one that happens to have an email, because a missing address is not
+        /// evidence about which Sam Jones the case means.
+        ///
+        /// An unmatched name leaves the column empty rather than falling back to the name or
+        /// to the code. AD-039 reads by position, so column D is "Paraplanner Email" for
+        /// every row or the file lies about the rows where it is something else - and a
+        /// wrong email in a file that goes outside this system is worse than a blank one.
+        /// The para-planner match already surfaces on the import report the day of the
+        /// upload, so a gap here is one somebody has already been told about.
+        ///
+        /// Public so the four outcomes can be asserted directly. The assembly is signed and
+        /// carries no InternalsVisibleTo (see PluginBase), so public is what makes a helper
+        /// reachable from the test project.
+        /// </summary>
+        public static string ParaplannerEmail(IOrganizationService service, Entity outcomeCase)
+        {
+            var match = NotificationOutbox.MatchParaplanner(
+                service, outcomeCase.GetAttributeValue<string>("al_paraplanner"));
+
+            return match != null && match.IsMatch ? match.Email : null;
         }
 
         // AD-039 col 15 Advice Quality grade = final outcome, or initial when not yet

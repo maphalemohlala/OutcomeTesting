@@ -4,30 +4,64 @@ import type { Al_exportrecords } from '../../generated/models/Al_exportrecordsMo
 /**
  * The export record as the file builder needs it.
  *
- * A plain alias since 2026-09-19: the generated model now carries `al_adviseremail`, the
- * column having been created in DEV and the data source regenerated. The name is kept so
- * the file builder and its tests name what they consume rather than the whole table.
+ * `al_adviseremail` is on the generated model: that column was created in DEV on 2026-09-19
+ * and the data source regenerated. `al_paraplanneremail` is declared HERE because it was
+ * created on 2026-09-21 and the generator has not been re-run against it yet — the same
+ * situation AD-158 records for a Custom API parameter, where the runtime accepted a value
+ * the generated types did not yet know about.
+ *
+ * Declared as an intersection rather than edited into `Al_exportrecordsModel.ts`, because
+ * that file is generated and a hand-edit is lost the next time anyone regenerates it.
+ * `paraplannerEmailIsGenerated` below is the guard: it goes true of its own accord once the
+ * generator catches up, and its test says to delete this intersection when it does.
  */
-export type ExportRecord = Al_exportrecords;
+export type ExportRecord = Al_exportrecords & { al_paraplanneremail?: string };
+
+/**
+ * Whether the generated model has caught up and declares `al_paraplanneremail` itself.
+ *
+ * A type-level check, not a runtime one: an interface has no runtime presence, so asking a
+ * value whether it has the key would answer no for ever and guard nothing.
+ *
+ * It reads `false` today. The moment a regeneration adds the column, this alias becomes
+ * `true` and the assignment below stops compiling — which is the point. The typecheck then
+ * says, in the one place that knows, that the hand-declared intersection above is redundant
+ * and both it and this guard should be deleted.
+ */
+type GeneratedHasParaplannerEmail = 'al_paraplanneremail' extends keyof Al_exportrecords
+  ? true
+  : false;
+
+export const paraplannerEmailIsGenerated: GeneratedHasParaplannerEmail = false;
 
 /**
  * The Trail Light contract fixed by AD-039 (source: `Trailight - Outcome Testing Map.xlsx`):
- * one row per case. Columns 1-20 are the supplied template in its exact order, and column 16
- * is an intentional blank separator preserved so every downstream position matches. Do not
- * add, remove or reorder a column *within* that twenty without a decision-log entry — the
- * receiving system reads by position.
+ * one row per case. Twenty columns in the supplied template's exact order, with column 16 an
+ * intentional blank separator preserved so every downstream position matches. Do not add,
+ * remove or reorder a column without a decision-log entry — the receiving system reads by
+ * position.
  *
- * Column 21 (Adviser Email) was appended on 2026-09-19 at the project owner's request.
- * Appending is what keeps the file compatible: a reader that takes the first twenty columns
- * by position is unaffected by anything after them, whereas inserting the adviser's email
- * next to the adviser's name — the obvious place for it — would have shifted eighteen
- * columns including the separator.
+ * **Columns B and D carry emails, not codes (project owner, 2026-09-21: "replace column B &
+ * D on the trail light exports with emails. rather than codes show emails").** The positions
+ * are unchanged, so nothing downstream shifts; what changes is what column B and column D
+ * mean, which is a change a positional reader cannot detect for itself. That is why it is
+ * written here and in the decision log rather than only in the code.
+ *
+ * **Column 21 is gone with it.** Adviser Email was appended there on 2026-09-19 precisely
+ * because inserting it beside the adviser's name would have shifted eighteen columns; now
+ * that column B carries it, keeping 21 would only repeat the value. Removing the LAST column
+ * is as position-safe as adding it was — nothing before it moves — and the project owner
+ * chose that over the duplicate on 2026-09-21.
+ *
+ * The four fail-accountable code columns (L, N, R, T) are deliberately unchanged. Only B and
+ * D were asked for, and those four name a person picked out of a fail rather than the case's
+ * own adviser and para-planner.
  */
 export const TRAIL_LIGHT_HEADERS = [
   'Adviser name',
-  'Adviser Code',
+  'Adviser Email',
   'Paraplanner Name',
-  'Paraplanner Code',
+  'Paraplanner Email',
   'Case type',
   'Product / solution type',
   'Check date',
@@ -44,13 +78,15 @@ export const TRAIL_LIGHT_HEADERS = [
   'Advice Quality Fail Accountable Adviser Code',
   'Advice Quality Fail Accountable Paraplanner Name',
   'Advice Quality Fail Accountable Paraplanner Code',
-  'Adviser Email',
 ];
 
 /**
- * AD-039 types the four code columns as NUMBER. A code that is genuinely numeric is written
- * as a number so Excel does not left-pad or text-align it; anything else is passed through
+ * AD-039 types the code columns as NUMBER. A code that is genuinely numeric is written as a
+ * number so Excel does not left-pad or text-align it; anything else is passed through
  * unchanged rather than being silently dropped or coerced to zero.
+ *
+ * Four columns still use it, not six: columns B and D became emails on 2026-09-21 and an
+ * email is text whatever it looks like.
  */
 function code(value: string | undefined): CellValue {
   const text = value?.trim();
@@ -69,9 +105,13 @@ function day(value: string | undefined): string {
 export function trailLightRow(record: ExportRecord): CellValue[] {
   return [
     text(record.al_advisername),
-    code(record.al_advisercode),
+    text(record.al_adviseremail),
     text(record.al_paraplannername),
-    code(record.al_paraplannercode),
+    // Resolved from the para-planner's name when the export batch was generated, not read
+    // off the case: the case has no para-planner email column. GenerateExportPlugin refuses
+    // to guess between two contacts of one name, so this is empty where the name was
+    // ambiguous or reached nobody.
+    text(record.al_paraplanneremail),
     text(record.al_casetype),
     text(record.al_productsolutiontype),
     day(record.al_checkdate),
@@ -88,6 +128,5 @@ export function trailLightRow(record: ExportRecord): CellValue[] {
     code(record.al_aqfailadvisercode),
     text(record.al_aqfailparaplannername),
     code(record.al_aqfailparaplannercode),
-    text(record.al_adviseremail),
   ];
 }
