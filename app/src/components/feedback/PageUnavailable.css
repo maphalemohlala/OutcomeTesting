@@ -1,4 +1,4 @@
-.not-built {
+.page-unavailable {
   max-width: 60ch;
   padding: var(--space-4);
   background: var(--colour-surface);
@@ -6,20 +6,20 @@
   border-left: 3px solid var(--colour-border-strong);
 }
 
-.not-built h2 {
+.page-unavailable h2 {
   margin-bottom: var(--space-2);
   font-size: var(--text-lg);
 }
 
-.not-built p + p {
+.page-unavailable p + p {
   margin-top: var(--space-3);
 }
 
-.not-built__blockers {
+.page-unavailable__blockers {
   color: var(--colour-text-muted);
 }
 
-.not-built__blockers span {
+.page-unavailable__blockers span {
   font-weight: 600;
   color: var(--colour-text);
 }

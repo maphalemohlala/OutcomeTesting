@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { usePermissions } from './permissionContext';
-import { NotBuiltYet } from '../../components/feedback/NotBuiltYet';
+import { PageUnavailable } from '../../components/feedback/PageUnavailable';
 import type { AccessLevel, ResourceKey } from '../../types/permissions';
 
 /**
@@ -48,9 +48,11 @@ export function RequirePermission({
       need={need}
       pending={<p role="status">Checking your access…</p>}
       fallback={
-        <NotBuiltYet
+        <PageUnavailable
           title="No access"
           purpose="Your role does not grant access to this screen. Ask an administrator to assign it in Security configuration."
+          heading="No access"
+          detail="This screen exists and is working. Your application role simply does not include it, so there is nothing here for you to see. An administrator can grant it in Security configuration."
           blockedBy={[`Permission: ${resource} (${need})`]}
         />
       }

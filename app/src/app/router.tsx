@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
-import { NotBuiltYet } from '../components/feedback/NotBuiltYet';
+import { PageUnavailable } from '../components/feedback/PageUnavailable';
 import { RequirePermission } from './permissions/PermissionGate';
 import { CaseWorklistPage } from '../features/cases/CaseWorklistPage';
 import { CaseDetailPage } from '../features/cases/CaseDetailPage';
@@ -153,9 +153,11 @@ export function AppRoutes() {
         <Route
           path="*"
           element={
-            <NotBuiltYet
+            <PageUnavailable
               title="Page not found"
               purpose="That address does not match a screen in this application."
+              heading="Page not found"
+              detail="Nothing is wrong with the application. The address you followed does not match any screen in it, so there is nothing to show."
               blockedBy={['Nothing — check the link you followed']}
             />
           }
