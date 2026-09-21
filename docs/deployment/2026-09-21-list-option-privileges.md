@@ -205,5 +205,32 @@ nine named roles the YAML lists. Every one of the nine is a subset of Authentica
 the effect is the same today — and a tenth role added later would otherwise get empty dropdowns
 in silence, which is the exact failure this whole note is about.
 
-This is a write to portal configuration and was refused by the sandbox, so it needs
-authorising before it can be applied.
+## Applied and verified
+
+Authorised by the project owner and applied to DEV (`204 No Content`, read back to confirm
+the array is stored). **No site restart was needed.**
+
+| Check | Before | After |
+|---|---|---|
+| `/_api/al_listoptions` | 403 | **200**, returning the options |
+| Review page, Case type | empty | New advice, Ongoing |
+| Review page, Product or solution type | empty | Protection, No change reviews, Another Option |
+| Review page, Sample source | empty | Random, Mandatory |
+| Review page, Pre or post check | empty | Pre (selected), Post |
+| Review page, Products | no checkboxes | the four placeholders |
+
+Console on the review page: **zero errors**.
+
+The local YAML has been changed to the same two roles, so the file and the environment agree.
+Left at nine, the next `pac powerpages upload` would push the old list back in the legacy
+shape and undo this.
+
+## AD-191 closed in the same pass
+
+The AD-185 checklist-freshness call was 403-ing because `_al_questionid_value` was missing
+from the field allowlist. The candidate fix was never confirmed. It is now:
+
+```
+/_api/al_questionversions?$select=al_questionversionid,al_effectivefrom,al_effectiveto,_al_questionid_value
+→ 200
+```
