@@ -761,6 +761,13 @@ namespace OutcomeTesting.Plugins.Tests
         private const string FailReasonRelationship = "al_failreason_response";
         private const string FailReasonIntersect = "al_al_failreason_al_response";
 
+        /// <summary>
+        /// The products a case covers (AD-190). Here the relationship and its intersect share
+        /// a name, because the relationship was created with IntersectEntitySchemaName set to
+        /// the same value - so one constant serves both.
+        /// </summary>
+        private const string ProductsRelationship = ListOptionRules.ProductsRelationship;
+
         public void Associate(
             string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities)
         {
@@ -798,6 +805,16 @@ namespace OutcomeTesting.Plugins.Tests
                         Guid.NewGuid(),
                         "al_failreasonid", related.Id,
                         "al_responseid", entityId);
+                }
+                else if (relationship.SchemaName == ProductsRelationship)
+                {
+                    // Same reasoning: a real intersect row, so ListOptionRules.CurrentProducts
+                    // reads it back through the link-entity query it uses against Dataverse.
+                    Seed(
+                        ProductsRelationship,
+                        Guid.NewGuid(),
+                        "al_listoptionid", related.Id,
+                        "al_outcomecaseid", entityId);
                 }
             }
         }
@@ -838,6 +855,19 @@ namespace OutcomeTesting.Plugins.Tests
                     var stale = table.Values
                         .Where(r => Equals(r.GetAttributeValue<object>("al_failreasonid"), related.Id)
                                  && Equals(r.GetAttributeValue<object>("al_responseid"), entityId))
+                        .Select(r => r.Id)
+                        .ToList();
+                    foreach (var id in stale)
+                    {
+                        table.Remove(id);
+                    }
+                }
+                else if (relationship.SchemaName == ProductsRelationship)
+                {
+                    var table = Table(ProductsRelationship);
+                    var stale = table.Values
+                        .Where(r => Equals(r.GetAttributeValue<object>("al_listoptionid"), related.Id)
+                                 && Equals(r.GetAttributeValue<object>("al_outcomecaseid"), entityId))
                         .Select(r => r.Id)
                         .ToList();
                     foreach (var id in stale)

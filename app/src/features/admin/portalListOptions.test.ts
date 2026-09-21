@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import reviewTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-review-detail/OT-Review-Detail.webtemplate.source.html?raw';
 import caseTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-case-detail/OT-Case-Detail.webtemplate.source.html?raw';
 import listOptionPermission from '../../../../powerpages/outcome-testing---outcometesting/table-permissions/List-Option---read.tablepermission.yml?raw';
-import { MIGRATED_LISTS } from './listOptions';
+import { MIGRATED_LISTS, MULTI_CHOICE_LISTS, SINGLE_CHOICE_LISTS } from './listOptions';
 
 /**
  * The portal's four case-header dropdowns are drawn from al_listoption rows (AD-187).
@@ -101,15 +101,26 @@ describe('the portal draws every managed dropdown from the table', () => {
     expect(new Set(DROPDOWNS.map((d) => d.list)).size).toBe(DROPDOWNS.length);
   });
 
-  it('covers every list the app has migrated, and no more', () => {
+  it('covers every SINGLE-choice list, and no more', () => {
     // A list migrated in the app but left hardcoded here would be a dropdown that silently
     // disagreed with the management page about what exists.
+    //
+    // Single-choice only: Products is held through a many-to-many and is drawn as a
+    // multi-select, so it is covered by its own tests below rather than by these.
     expect(DROPDOWNS.map((d) => d.attr).slice().sort()).toEqual(
-      MIGRATED_LISTS.map((l) => l.caseAttribute).slice().sort(),
+      SINGLE_CHOICE_LISTS.map((l) => l.caseAttribute).slice().sort(),
     );
     expect(DROPDOWNS.map((d) => d.list).slice().sort()).toEqual(
-      MIGRATED_LISTS.map((l) => l.value).slice().sort(),
+      SINGLE_CHOICE_LISTS.map((l) => l.value).slice().sort(),
     );
+  });
+
+  it('accounts for every manageable list one way or the other', () => {
+    // The guard that stops a list being added to the management page and then forgotten on
+    // the portal: every migrated list is either a single-choice dropdown here or a
+    // multi-choice one, and nothing falls between the two.
+    expect(SINGLE_CHOICE_LISTS.length + MULTI_CHOICE_LISTS.length).toBe(MIGRATED_LISTS.length);
+    expect(MULTI_CHOICE_LISTS.map((l) => l.key)).toEqual(['products']);
   });
 
   it.each(DROPDOWNS)('$label offers only what is in force, on the shared window', (dropdown) => {
@@ -194,14 +205,14 @@ describe('reading a case’s managed values on the portal', () => {
       expect(reviewTemplate, legacy).toContain(`{{ ${legacy}.label | escape }}`);
     }
 
-    for (const list of MIGRATED_LISTS) {
+    for (const list of SINGLE_CHOICE_LISTS) {
       expect(caseTemplate, list.key).toContain(`{% if c.${list.caseAttribute}.name %}`);
       expect(caseTemplate, list.key).toContain(`{{ c.${list.legacyAttribute}.label`);
     }
   });
 
   it('asks for every lookup on both pages, or there would be nothing to read', () => {
-    for (const list of MIGRATED_LISTS) {
+    for (const list of SINGLE_CHOICE_LISTS) {
       expect(reviewTemplate, list.key).toContain(`<attribute name="${list.caseAttribute}" />`);
       expect(caseTemplate, list.key).toContain(`<attribute name="${list.caseAttribute}" />`);
     }

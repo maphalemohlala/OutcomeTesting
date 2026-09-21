@@ -8,10 +8,13 @@ import {
 import {
   LIST_CASE_TYPE,
   LIST_PRE_OR_POST_CHECK,
+  LIST_PRODUCTS,
   LIST_PRODUCT_SOLUTION_TYPE,
   LIST_SAMPLE_SOURCE,
   MANAGED_LISTS,
   MIGRATED_LISTS,
+  MULTI_CHOICE_LISTS,
+  SINGLE_CHOICE_LISTS,
   type RawListOption,
   caseOptionLabel,
   choicesIncludingHeld,
@@ -52,12 +55,15 @@ const SEED: RawListOption[] = [
 ];
 
 describe('the managed lists', () => {
-  it('names the four the request named, and no others', () => {
+  it('names the four the original request named, plus Products', () => {
+    // The first four are the ones the owner listed on 2026-09-21. Products was added after,
+    // on the same day, when the free-text "Product(s)" field became a dropdown too.
     expect(MANAGED_LISTS.map((list) => list.label)).toEqual([
       'Product / solution type',
       'Sample source',
       'Case type',
       'Pre or post check',
+      'Products',
     ]);
   });
 
@@ -70,17 +76,43 @@ describe('the managed lists', () => {
     expect(new Set(MANAGED_LISTS.map((l) => l.value)).size).toBe(MANAGED_LISTS.length);
   });
 
-  it('offers every list, now that all four have somewhere to put a chosen option', () => {
-    // All four are migrated. Product / solution type went first as a pilot; the other three
-    // followed once the shape held.
+  it('offers every list, because each has somewhere to put a chosen option', () => {
+    // Product / solution type went first as a pilot; the other three followed once the shape
+    // held, and Products after that.
     expect(MIGRATED_LISTS.map((list) => list.value)).toEqual([
       LIST_PRODUCT_SOLUTION_TYPE,
       LIST_SAMPLE_SOURCE,
       LIST_CASE_TYPE,
       LIST_PRE_OR_POST_CHECK,
+      LIST_PRODUCTS,
     ]);
+
+    // A lookup OR a many-to-many. Products has the latter, and is manageable on exactly the
+    // same page as the rest - which is the whole point of holding one table of options.
     for (const list of MANAGED_LISTS) {
-      expect(list.caseAttribute, list.key).not.toBeNull();
+      expect(
+        list.caseAttribute !== null || list.caseRelationship !== null,
+        list.key,
+      ).toBe(true);
+    }
+  });
+
+  it('holds Products through a relationship, and the others through a lookup', () => {
+    // A case covers several products - the column it replaces is labelled "Product(s)" and
+    // the seeded fixture is "Pension; ISA" - so a single lookup would make the field able to
+    // record less than the free text it replaces.
+    expect(MULTI_CHOICE_LISTS.map((l) => l.key)).toEqual(['products']);
+    expect(SINGLE_CHOICE_LISTS.map((l) => l.key)).toEqual([
+      'product-solution-type',
+      'sample-source',
+      'case-type',
+      'pre-or-post-check',
+    ]);
+
+    // Never both: the two are different storage and a list claiming each would be written
+    // twice and read inconsistently.
+    for (const list of MANAGED_LISTS) {
+      expect(list.caseAttribute === null || list.caseRelationship === null, list.key).toBe(true);
     }
   });
 
@@ -104,6 +136,7 @@ describe('the managed lists', () => {
       'al_samplesource',
       'al_casetype',
       'al_preorpostcheck',
+      'al_products',
     ]);
   });
 

@@ -352,6 +352,8 @@ namespace OutcomeTesting.Plugins
                 ListOptionRules.SampleSourceAttribute,
                 ListOptionRules.CaseTypeAttribute,
                 ListOptionRules.PreOrPostCheckAttribute,
+                // Not a column: the set of products a case covers, applied by association.
+                ListOptionRules.ProductsField,
                 "al_samplesource",
                 "al_preorpostcheck",
                 "al_vulnerableclient",

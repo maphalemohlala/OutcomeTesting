@@ -356,6 +356,14 @@ if (args.Length >= 2 && args[0].Equals("createlistoptiontable", StringComparison
     return CreateListOptionTable(args[1], args.Length > 2 && !args[2].StartsWith("--", StringComparison.Ordinal) ? args[2] : "OutcomeTesting");
 }
 
+if (args.Length >= 2 && args[0].Equals("createproductlist", StringComparison.OrdinalIgnoreCase))
+{
+    return CreateProductList(
+        args[1],
+        args.Length > 2 && !args[2].StartsWith("--", StringComparison.Ordinal) ? args[2] : "OutcomeTesting",
+        ConfirmedFor(args, args[1]));
+}
+
 if (args.Length >= 2 && args[0].Equals("seedlistoptions", StringComparison.OrdinalIgnoreCase))
 {
     return SeedListOptions(args[1], ConfirmedFor(args, args[1]));
@@ -8329,6 +8337,139 @@ int CreateListOptionTable(string orgUrl, string solutionUniqueName)
     return 0;
 }
 
+int CreateProductList(string orgUrl, string solutionUniqueName, bool confirmed)
+{
+    if (!confirmed)
+    {
+        Console.Error.WriteLine(
+            "This writes metadata and rows to a live environment. Re-run as: "
+            + "createproductlist <orgUrl> [<solution>] --confirm <orgUrl>");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    // A many-to-many, not a lookup. A case covers several products - the column is labelled
+    // "Product(s)" and the seeded fixture is "Pension; ISA" - so a single lookup would make
+    // the field able to record less than the free text it replaces, which is not an upgrade.
+    var exists = true;
+    try
+    {
+        svc.Execute(new RetrieveRelationshipRequest { Name = ListOptionTable.ProductsRelationship });
+    }
+    catch (Exception)
+    {
+        exists = false;
+    }
+
+    if (!exists)
+    {
+        svc.Execute(new CreateManyToManyRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            IntersectEntitySchemaName = ListOptionTable.ProductsIntersect,
+            ManyToManyRelationship = new ManyToManyRelationshipMetadata
+            {
+                SchemaName = ListOptionTable.ProductsRelationship,
+                Entity1LogicalName = "al_outcomecase",
+                Entity1AssociatedMenuConfiguration = new AssociatedMenuConfiguration
+                {
+                    Behavior = AssociatedMenuBehavior.UseLabel,
+                    Group = AssociatedMenuGroup.Details,
+                    Label = ListOptionTable.Text("Products"),
+                    Order = 10000,
+                },
+                Entity2LogicalName = ListOptionTable.Logical,
+                Entity2AssociatedMenuConfiguration = new AssociatedMenuConfiguration
+                {
+                    Behavior = AssociatedMenuBehavior.UseLabel,
+                    Group = AssociatedMenuGroup.Details,
+                    Label = ListOptionTable.Text("Cases"),
+                    Order = 10000,
+                },
+            },
+        });
+        Console.WriteLine($"  {ListOptionTable.ProductsRelationship}: created");
+    }
+    else
+    {
+        Console.WriteLine($"  {ListOptionTable.ProductsRelationship}: already present");
+    }
+
+    svc.Execute(new PublishAllXmlRequest());
+
+    // Four placeholders, because the real product names are the client's to decide and the
+    // point of the managed list is that they can decide them without a developer. They are
+    // named so that leaving one unrenamed is obvious on a case rather than plausible.
+    var existing = svc.RetrieveMultiple(new QueryExpression(ListOptionTable.Logical)
+    {
+        ColumnSet = new ColumnSet(ListOptionTable.NameLogical),
+        Criteria =
+        {
+            Conditions =
+            {
+                new ConditionExpression(ListOptionTable.ListLogical, ConditionOperator.Equal, ListOptionTable.Products),
+            },
+        },
+    });
+
+    if (existing.Entities.Count > 0)
+    {
+        Console.WriteLine($"  placeholders: {existing.Entities.Count} already present, left alone");
+    }
+    else
+    {
+        var order = 10;
+        for (var i = 1; i <= 4; i++)
+        {
+            var row = new Entity(ListOptionTable.Logical);
+            row[ListOptionTable.NameLogical] = "Product " + i + " (placeholder)";
+            row[ListOptionTable.ListLogical] = new OptionSetValue(ListOptionTable.Products);
+            row[ListOptionTable.SortOrderLogical] = order;
+            Console.WriteLine($"  placeholder {i}: created {svc.Create(row)}");
+            order += 10;
+        }
+    }
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    RetrieveRelationshipResponse after;
+    try
+    {
+        after = (RetrieveRelationshipResponse)svc.Execute(
+            new RetrieveRelationshipRequest { Name = ListOptionTable.ProductsRelationship });
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine(
+            $"{ListOptionTable.ProductsRelationship} was not found after the create returned: {ex.Message}");
+        return 1;
+    }
+
+    var seeded = svc.RetrieveMultiple(new QueryExpression(ListOptionTable.Logical)
+    {
+        ColumnSet = new ColumnSet(ListOptionTable.NameLogical, ListOptionTable.SortOrderLogical),
+        Criteria =
+        {
+            Conditions =
+            {
+                new ConditionExpression(ListOptionTable.ListLogical, ConditionOperator.Equal, ListOptionTable.Products),
+            },
+        },
+    });
+
+    Console.WriteLine(
+        $"Published. {after.RelationshipMetadata.SchemaName} links al_outcomecase to "
+        + $"{ListOptionTable.Logical}, and Products has {seeded.Entities.Count} option(s):");
+    foreach (var row in seeded.Entities.OrderBy(x => x.GetAttributeValue<int?>(ListOptionTable.SortOrderLogical) ?? int.MaxValue))
+    {
+        Console.WriteLine(
+            $"  {row.GetAttributeValue<int?>(ListOptionTable.SortOrderLogical)}"
+            + $"  {row.GetAttributeValue<string>(ListOptionTable.NameLogical)}");
+    }
+
+    return seeded.Entities.Count == 4 ? 0 : 1;
+}
+
 int SeedListOptions(string orgUrl, bool confirmed)
 {
     if (!confirmed)
@@ -11158,6 +11299,12 @@ static class ListOptionTable
     public const int SampleSource = 120910841;
     public const int CaseType = 120910842;
     public const int PreOrPostCheck = 120910843;
+    public const int Products = 120910844;
+
+    // A case covers several products, so this list attaches through a many-to-many rather
+    // than a lookup: the column it replaces is labelled "Product(s)" and holds "Pension; ISA".
+    public const string ProductsRelationship = "al_listoption_al_outcomecase_products";
+    public const string ProductsIntersect = "al_listoption_al_outcomecase_products";
 
     public static Label Text(string value) => new Label(value, 1033);
 }

@@ -38,6 +38,7 @@ export const LIST_PRODUCT_SOLUTION_TYPE = 120910840 as const;
 export const LIST_SAMPLE_SOURCE = 120910841 as const;
 export const LIST_CASE_TYPE = 120910842 as const;
 export const LIST_PRE_OR_POST_CHECK = 120910843 as const;
+export const LIST_PRODUCTS = 120910844 as const;
 
 /**
  * The four values, as literals rather than `number`.
@@ -52,7 +53,8 @@ export type ListValue =
   | typeof LIST_PRODUCT_SOLUTION_TYPE
   | typeof LIST_SAMPLE_SOURCE
   | typeof LIST_CASE_TYPE
-  | typeof LIST_PRE_OR_POST_CHECK;
+  | typeof LIST_PRE_OR_POST_CHECK
+  | typeof LIST_PRODUCTS;
 
 export interface ManagedList {
   /** al_listoption.al_list */
@@ -62,14 +64,20 @@ export interface ManagedList {
   /** What a person calls the list. */
   readonly label: string;
   /**
-   * The lookup on al_outcomecase that holds the chosen option, or null while the list is
-   * still a choice column and has not been migrated.
-   *
-   * A list with no case attribute is declared but not connected to anything: its options can
-   * be seen but there is nowhere to use them, so the page does not offer it. Migrating one is
-   * a lookup column, a backfill and this one field.
+   * The lookup on al_outcomecase that holds the chosen option, or null for a list that is
+   * not held by a lookup - either because it is not migrated, or because a case can hold
+   * SEVERAL of its options and it is attached through `caseRelationship` instead.
    */
   readonly caseAttribute: string | null;
+  /**
+   * The many-to-many that attaches this list's options to a case, for a list where a case
+   * may hold more than one.
+   *
+   * Products is the only one. The column it replaces is labelled "Product(s)" and the seeded
+   * fixture is "Pension; ISA", so a single lookup would let the field record less than the
+   * free text it replaces - which is not an upgrade.
+   */
+  readonly caseRelationship: string | null;
   /**
    * The choice column this list replaces.
    *
@@ -84,6 +92,7 @@ export const MANAGED_LISTS: readonly ManagedList[] = [
   {
     value: LIST_PRODUCT_SOLUTION_TYPE,
     key: 'product-solution-type',
+    caseRelationship: null,
     label: 'Product / solution type',
     caseAttribute: 'al_producttypeid',
     legacyAttribute: 'al_productsolutiontype',
@@ -91,6 +100,7 @@ export const MANAGED_LISTS: readonly ManagedList[] = [
   {
     value: LIST_SAMPLE_SOURCE,
     key: 'sample-source',
+    caseRelationship: null,
     label: 'Sample source',
     caseAttribute: 'al_samplesourceid',
     legacyAttribute: 'al_samplesource',
@@ -98,6 +108,7 @@ export const MANAGED_LISTS: readonly ManagedList[] = [
   {
     value: LIST_CASE_TYPE,
     key: 'case-type',
+    caseRelationship: null,
     label: 'Case type',
     caseAttribute: 'al_casetypeid',
     legacyAttribute: 'al_casetype',
@@ -105,15 +116,41 @@ export const MANAGED_LISTS: readonly ManagedList[] = [
   {
     value: LIST_PRE_OR_POST_CHECK,
     key: 'pre-or-post-check',
+    caseRelationship: null,
     label: 'Pre or post check',
     caseAttribute: 'al_preorpostcheckid',
     legacyAttribute: 'al_preorpostcheck',
   },
+  {
+    value: LIST_PRODUCTS,
+    key: 'products',
+    // Held through a many-to-many, not a lookup: a case covers several products.
+    caseRelationship: 'al_listoption_al_outcomecase_products',
+    label: 'Products',
+    caseAttribute: null,
+    legacyAttribute: 'al_products',
+  },
 ];
 
-/** The lists the management page offers: the ones a chosen option has somewhere to go. */
+/**
+ * The lists the management page offers: the ones a chosen option has somewhere to go.
+ *
+ * Either a lookup or a many-to-many counts. A list with NEITHER is declared but not connected
+ * to anything - its options could be maintained but never used - and offering it would be a
+ * page that takes an administrator's work and drops it.
+ */
 export const MIGRATED_LISTS: readonly ManagedList[] = MANAGED_LISTS.filter(
+  (list) => list.caseAttribute !== null || list.caseRelationship !== null,
+);
+
+/** The lists a case holds ONE of: the ones drawn as a single-choice dropdown. */
+export const SINGLE_CHOICE_LISTS: readonly ManagedList[] = MANAGED_LISTS.filter(
   (list) => list.caseAttribute !== null,
+);
+
+/** The lists a case may hold SEVERAL of. */
+export const MULTI_CHOICE_LISTS: readonly ManagedList[] = MANAGED_LISTS.filter(
+  (list) => list.caseRelationship !== null,
 );
 
 export function listByKey(key: string): ManagedList | null {

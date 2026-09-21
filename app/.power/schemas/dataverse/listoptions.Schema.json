@@ -42,15 +42,18 @@
             "Product / solution type",
             "Sample source",
             "Case type",
-            "Pre or post check"
+            "Pre or post check",
+            "Products"
           ],
           "x-ms-enum-values": [
             120910840,
             120910841,
             120910842,
-            120910843
+            120910843,
+            120910844
           ],
           "Color": [
+            null,
             null,
             null,
             null,

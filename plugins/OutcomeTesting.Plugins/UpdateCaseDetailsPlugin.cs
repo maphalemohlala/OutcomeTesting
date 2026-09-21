@@ -837,6 +837,17 @@ namespace OutcomeTesting.Plugins
             foreach (var pair in fields)
             {
                 var attr = pair.Key;
+
+                // Products is a SET, held through a many-to-many, so there is no column to
+                // coerce it onto: it is applied by association. Handled here rather than as
+                // an EditableKind because every other kind writes to `update`.
+                if (string.Equals(attr, ListOptionRules.ProductsField, StringComparison.OrdinalIgnoreCase))
+                {
+                    ListOptionRules.ApplyProducts(
+                        service, before.Id, pair.Value, changes, DateTime.UtcNow.Date);
+                    continue;
+                }
+
                 EditableField def;
                 if (!Editables.TryGetValue(attr, out def))
                 {
