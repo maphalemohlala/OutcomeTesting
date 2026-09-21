@@ -1074,28 +1074,30 @@
           form they will be refused for filling in.
         {% endcomment %}
         {% comment %}
-          TWO gates, because the two commands behind these panels have two different rules
-          and a panel that does not mirror its own command is the defect either way round.
+          ONE gate for both panels, because both commands now enforce one rule: the role says
+          a supervisor, the mapping says WHOSE (SupervisorMapping.EnsureManagesCase, AD-202).
 
-          can_regrade - the role alone. RegradeRequestPlugin.EnsureSupervisorRole is the
-          only check al_RegradeCase makes. Requiring the mapping here would hide a control
-          the server would have accepted.
+          This was briefly two. RegradeRequestPlugin checked the role and nothing else, so the
+          Regraded outcome panel had to stay on the role alone - gating it on the mapping
+          would have hidden a control the server accepted. The split was correct for the
+          system as it stood and wrong about the system as it should be: on the DEV portal
+          the regrade form rendered on two cases whose mapped manager was somebody else,
+          while the sign-off form on the same pages was withheld, which let anyone holding
+          the role set the final outcome on any case - their own included. The command was
+          fixed rather than the page, and the page follows it back to one variable.
 
-          can_signoff - the role AND the mapping. SignoffRequestPlugin runs
-          EnsureSupervisorRole and then EnsureMappedToCase, so a supervisor who is not this
-          adviser's manager is refused however the form is filled in.
-
-          If the regrade command ever gains the mapping gate, this splits back into one
-          variable. Until it does, the asymmetry is the truth about the system.
+          has_signoff_role is kept ONLY to choose the wording below. "You do not hold the
+          role" is a different problem from "you hold it but not over this adviser", and it
+          decides nothing.
         {% endcomment %}
         {% assign signoff_role = 'AL Portal - T&C Supervisor' %}
-        {% assign can_regrade = false %}
-        {% if user.roles contains signoff_role %}{% assign can_regrade = true %}{% endif %}
+        {% assign has_signoff_role = false %}
+        {% if user.roles contains signoff_role %}{% assign has_signoff_role = true %}{% endif %}
         {% assign can_signoff = false %}
         {% if user.roles contains signoff_role and ot_is_case_tcmanager %}{% assign can_signoff = true %}{% endif %}
         {% if signoff_ids != '' and can_signoff == false %}
           <div class="ot-form-submit">
-            {% if can_regrade %}
+            {% if has_signoff_role %}
             {% comment %}
               Holds the role, but not for this adviser. Deliberately does not name who the
               manager IS: the contact-scoped permission means this page could not read the
@@ -1257,7 +1259,7 @@
             </p>
           </div>
         {% endunless %}{% endif %}
-        {% if outcome and outcome.al_initialoutcome and ot_at_recheck and can_regrade %}
+        {% if outcome and outcome.al_initialoutcome and ot_at_recheck and can_signoff %}
           <div class="ot-form-submit" data-ot-regrade
                data-outcome-id="{{ outcome.al_outcomeid }}"
                data-row-version="{{ outcome.versionnumber }}">

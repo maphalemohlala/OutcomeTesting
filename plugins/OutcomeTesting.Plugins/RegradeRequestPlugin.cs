@@ -41,6 +41,7 @@ namespace OutcomeTesting.Plugins
     {
         private const string ContactEntity = "contact";
         private const string OutcomeEntity = "al_outcome";
+        private const string CaseLookup = "al_outcomecaseid";
         public const string RequestAttr = "al_regraderequest";
 
         public RegradeRequestPlugin(string unsecureConfiguration, string secureConfiguration)
@@ -125,6 +126,12 @@ namespace OutcomeTesting.Plugins
             // authority that approved the sign-off which brought the case to recheck.
             EnsureSupervisorRole(service, contactId);
 
+            // ...and, from 2026-09-21, the same authority over THIS case. Holding the role
+            // was the only thing checked here until AD-202, so anybody holding it could
+            // record the final outcome on any case - their own included, and including the
+            // cases whose sign-off the mapping had just refused them.
+            EnsureMappedToCase(service, contactId, outcomeId);
+
             var actorName = ActorName(service, contactId);
 
             // Cleared before the regrade is applied, so the column never keeps a request
@@ -201,8 +208,37 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// AD-202: and it is the authority over THIS case. The second of two gates - the
+        /// role says a supervisor, the mapping says WHOSE supervisor - and the order matters
+        /// for the message, because "you do not hold the role" is a different problem from
+        /// "you hold it but not over this adviser".
+        ///
+        /// <para>
+        /// The case is reached through the outcome, which is what the payload names. An
+        /// outcome attached to no case cannot have a manager resolved for it and says so,
+        /// rather than failing somewhere less legible further in.
+        /// </para>
+        /// </summary>
+        public static void EnsureMappedToCase(
+            IOrganizationService service, Guid contactId, Guid outcomeId)
+        {
+            var outcome = service.Retrieve(OutcomeEntity, outcomeId, new ColumnSet(CaseLookup));
+            var caseRef = outcome.GetAttributeValue<EntityReference>(CaseLookup);
+            if (caseRef == null)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "This outcome is not attached to a case, so its T&C Manager cannot be resolved.");
+            }
+
+            SupervisorMapping.EnsureManagesCase(service, contactId, caseRef, "Recording the final outcome");
+        }
+
+        /// <summary>
         /// AD-031: the final outcome is the T&amp;C authority's to set. Refused with the
         /// words the page can show the supervisor directly.
+        ///
+        /// The first of two gates; <see cref="EnsureMappedToCase"/> is the second.
         /// </summary>
         public static void EnsureSupervisorRole(IOrganizationService service, Guid contactId)
         {

@@ -304,23 +304,10 @@ namespace OutcomeTesting.Plugins
                     "This remedial action is not attached to a case, so its T&C Manager cannot be resolved.");
             }
 
-            var routing = TcManagerRouting.ForCase(service, caseRef);
-
-            if (routing.Manager != null && routing.Manager.Id == contactId)
-            {
-                return;
-            }
-
-            // The adviser's own address is NOT echoed when a manager exists: the refusal only
-            // has to say that it is not this account's case to sign, and naming the adviser
-            // would let anyone holding the role enumerate who supervises whom.
-            var detail = routing.Manager == null
-                ? " " + routing.Reason
-                : " Your portal account is not the T&C Manager mapped to this case's adviser.";
-
-            throw new InvalidPluginExecutionException(
-                CommandHelpers.PreconditionPrefix +
-                "Signing a case off is the T&C Manager mapped to its adviser." + detail);
+            // The rule itself lives in SupervisorMapping, because the regrade command
+            // enforces the same one (AD-202). It was briefly copied rather than shared, and
+            // the copy that did not exist is exactly what left the regrade open.
+            SupervisorMapping.EnsureManagesCase(service, contactId, caseRef, "Signing a case off");
         }
 
         /// <summary>

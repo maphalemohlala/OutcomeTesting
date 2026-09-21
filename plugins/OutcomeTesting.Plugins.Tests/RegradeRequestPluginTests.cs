@@ -16,6 +16,7 @@ namespace OutcomeTesting.Plugins.Tests
         private static readonly Guid ContactId = Guid.Parse("dddddddd-9999-4999-8999-999999999999");
         private static readonly Guid OutcomeId = Guid.Parse("eeeeeeee-9999-4999-8999-999999999999");
         private static readonly Guid CaseId = Guid.Parse("ffffffff-9999-4999-8999-999999999999");
+        private const string Adviser = "adviser@example.com";
 
         private static FakePluginExecutionContext Context()
         {
@@ -28,18 +29,50 @@ namespace OutcomeTesting.Plugins.Tests
 
         private static FakeOrganizationService Holding(int caseStatus, params string[] roleNames)
         {
+            return Holding(caseStatus, ContactId, roleNames);
+        }
+
+        /// <summary>
+        /// A supervisor who may regrade THIS case: they hold the role and they are the T&amp;C
+        /// Manager mapped to its adviser. Both are required from 2026-09-21 (AD-202), so the
+        /// fixture carries the whole chain - outcome, case, adviser email, mapping - and the
+        /// tests that vary one link are the interesting ones.
+        ///
+        /// <paramref name="mappedManager"/> of <see cref="Guid.Empty"/> seeds no mapping at
+        /// all, which is the adviser nobody supervises.
+        /// </summary>
+        private static FakeOrganizationService Holding(
+            int caseStatus, Guid mappedManager, params string[] roleNames)
+        {
             var svc = new FakeOrganizationService();
 
             // The row the page wrote, which the plug-in clears back; the fake refuses an
             // update on a row it has never seen.
             svc.Seed("contact", ContactId, RegradeRequestPlugin.RequestAttr, "{}", "fullname", "Sam Supervisor");
 
-            svc.Seed("al_outcomecase", CaseId, "al_casestatus", new OptionSetValue(caseStatus));
+            svc.Seed("al_outcomecase", CaseId,
+                "al_casestatus", new OptionSetValue(caseStatus),
+                TcManagerRouting.CaseAdviserEmailAttr, Adviser);
 
             svc.Seed(
                 "al_outcome", OutcomeId,
                 "al_initialoutcome", new OptionSetValue(120910712),
                 "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId));
+
+            if (mappedManager != Guid.Empty)
+            {
+                if (mappedManager != ContactId)
+                {
+                    // TcManagerRouting reads the manager's work email to decide whether they
+                    // are reachable, so the row has to exist for the routing to resolve.
+                    svc.Seed("contact", mappedManager,
+                        "fullname", "Pat Manager", "emailaddress1", "pat@example.com");
+                }
+
+                svc.Seed(TcManagerRouting.MappingEntity, Guid.NewGuid(),
+                    TcManagerRouting.MappingEmailAttr, Adviser,
+                    TcManagerRouting.ManagerAttr, new EntityReference("contact", mappedManager));
+            }
 
             var rows = new List<Entity>();
             foreach (var name in roleNames)
@@ -259,6 +292,115 @@ namespace OutcomeTesting.Plugins.Tests
             var row = new Entity("contact", ContactId);
             row["role.name"] = new AliasedValue("powerpagecomponent", "name", name);
             return row;
+        }
+        /// <summary>
+        /// AD-202. Holding the supervisor role was the ONLY thing this command checked, so
+        /// anybody holding it could record the final outcome on any case - including their own
+        /// cases, and including the cases whose sign-off they had just been refused. Found on
+        /// the DEV portal: the Regraded outcome form rendered on two cases whose mapped
+        /// manager was somebody else, while the sign-off form on the same pages was withheld.
+        /// </summary>
+        [Fact]
+        public void A_supervisor_who_is_not_this_case_manager_cannot_record_the_outcome()
+        {
+            var someoneElse = Guid.Parse("abababab-9999-4999-8999-999999999999");
+            var svc = Holding(120910590, someoneElse, WebRoleRegistry.TcSupervisorRole);
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => RegradeRequestPlugin.Apply(
+                    svc, ContactId, Request("Pass", "Evidence supplied on recheck."), Context()));
+
+            Assert.Contains("Recording the final outcome is the T&C Manager mapped to its adviser", error.Message);
+            Assert.Contains("not the T&C Manager mapped to this case's adviser", error.Message);
+        }
+
+        /// <summary>
+        /// And the refusal must not become a directory. Naming the manager would let anyone
+        /// holding the role enumerate who supervises whom, which is the same reason the portal
+        /// reads al_advisermapping at CONTACT scope (AD-201).
+        /// </summary>
+        [Fact]
+        public void The_refusal_does_not_name_the_manager_it_refused_for()
+        {
+            var someoneElse = Guid.Parse("abababab-9999-4999-8999-999999999999");
+            var svc = Holding(120910590, someoneElse, WebRoleRegistry.TcSupervisorRole);
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => RegradeRequestPlugin.Apply(
+                    svc, ContactId, Request("Pass", "Evidence supplied on recheck."), Context()));
+
+            Assert.DoesNotContain("Pat Manager", error.Message);
+            Assert.DoesNotContain("pat@example.com", error.Message);
+            Assert.DoesNotContain(Adviser, error.Message);
+        }
+
+        /// <summary>
+        /// An adviser nobody supervises has nobody who may record their final outcome. The
+        /// same consequence the sign-off already carried, and the message says where the gap
+        /// is because the reader is the person who can have it filled in (F58).
+        /// </summary>
+        [Fact]
+        public void An_adviser_with_no_mapping_leaves_nobody_to_record_the_outcome()
+        {
+            var svc = Holding(120910590, Guid.Empty, WebRoleRegistry.TcSupervisorRole);
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => RegradeRequestPlugin.Apply(
+                    svc, ContactId, Request("Pass", "Evidence supplied on recheck."), Context()));
+
+            Assert.Contains("No T&C Manager is mapped to the adviser", error.Message);
+        }
+
+        /// <summary>
+        /// Nothing is written when the mapping refuses - not the outcome, and not the
+        /// clear-down of the request column, which shares the transaction.
+        /// </summary>
+        [Fact]
+        public void A_refused_regrade_records_no_outcome()
+        {
+            var someoneElse = Guid.Parse("abababab-9999-4999-8999-999999999999");
+            var svc = Holding(120910590, someoneElse, WebRoleRegistry.TcSupervisorRole);
+
+            Assert.Throws<InvalidPluginExecutionException>(
+                () => RegradeRequestPlugin.Apply(
+                    svc, ContactId, Request("Pass", "Evidence supplied on recheck."), Context()));
+
+            Assert.Null(Outcome(svc).GetAttributeValue<OptionSetValue>("al_finaloutcome"));
+        }
+
+        /// <summary>
+        /// The role is answered before the mapping. "You do not hold the role" is a different
+        /// problem from "you hold it but not over this adviser", and answering the second to
+        /// somebody who has neither sends them looking for a mapping they could not use.
+        /// </summary>
+        [Fact]
+        public void The_role_is_refused_before_the_mapping_is_considered()
+        {
+            var svc = Holding(120910590, Guid.Empty, WebRoleRegistry.AqsReviewerRole);
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => RegradeRequestPlugin.Apply(
+                    svc, ContactId, Request("Pass", "Evidence supplied on recheck."), Context()));
+
+            Assert.Contains("needs the " + WebRoleRegistry.TcSupervisorRole + " role", error.Message);
+            Assert.DoesNotContain("mapped to its adviser", error.Message);
+        }
+
+        /// <summary>
+        /// An outcome with no case cannot have a manager resolved for it, and says so rather
+        /// than failing somewhere less legible.
+        /// </summary>
+        [Fact]
+        public void An_outcome_attached_to_no_case_is_refused()
+        {
+            var svc = Holding(120910590, ContactId, WebRoleRegistry.TcSupervisorRole);
+            svc.Row("al_outcome", OutcomeId).Attributes.Remove("al_outcomecaseid");
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => RegradeRequestPlugin.Apply(
+                    svc, ContactId, Request("Pass", "Evidence supplied on recheck."), Context()));
+
+            Assert.Contains("not attached to a case", error.Message);
         }
     }
 }

@@ -35,15 +35,15 @@ describe('the supervisor-only panels on the remediation page', () => {
     // query string or a data- attribute would all be the page deciding who somebody is.
     expect(remediation).toContain(`{% assign signoff_role = '${SUPERVISOR_ROLE}' %}`);
     expect(remediation).toContain(
-      '{% if user.roles contains signoff_role %}{% assign can_regrade = true %}{% endif %}',
+      '{% if user.roles contains signoff_role %}{% assign has_signoff_role = true %}{% endif %}',
     );
   });
 
   it('defaults to hiding, so a page that cannot resolve roles offers nothing', () => {
     // The order matters: false first, then set true only on a match. Written the other way
     // round, a failure to read user.roles would leave the panel showing.
-    const defaultAt = remediation.indexOf('{% assign can_regrade = false %}');
-    const grantAt = remediation.indexOf('{% assign can_regrade = true %}');
+    const defaultAt = remediation.indexOf('{% assign has_signoff_role = false %}');
+    const grantAt = remediation.indexOf('{% assign has_signoff_role = true %}');
     expect(defaultAt).toBeGreaterThan(-1);
     expect(grantAt).toBeGreaterThan(defaultAt);
   });
@@ -54,14 +54,23 @@ describe('the supervisor-only panels on the remediation page', () => {
     expect(remediation).not.toContain("{% if signoff_ids != '' %}\n          <div");
   });
 
-  it('gates the regrade panel on the role ALONE, because that is the rule it has', () => {
-    // Deliberately not can_signoff. RegradeRequestPlugin.EnsureSupervisorRole is the only
-    // gate a regrade passes - there is no EnsureMappedToCase on that side - so requiring the
-    // mapping here would hide a control the server would have accepted, which is the defect
-    // this file exists for, only pointing the other way.
+  it('gates the regrade panel on the SAME rule as the sign-off, because it now has it', () => {
+    // This used to read can_regrade, on the true reasoning that RegradeRequestPlugin checked
+    // the role alone and gating on the mapping would hide a control the server accepted.
+    // AD-202 fixed the command instead: both now run SupervisorMapping.EnsureManagesCase, so
+    // one variable is the honest mirror and two would re-open the hole on the page.
     expect(remediation).toContain(
-      '{% if outcome and outcome.al_initialoutcome and ot_at_recheck and can_regrade %}',
+      '{% if outcome and outcome.al_initialoutcome and ot_at_recheck and can_signoff %}',
     );
+    expect(remediation).not.toContain('can_regrade');
+  });
+
+  it('keeps the role flag for WORDING only, never as a gate', () => {
+    // has_signoff_role picks which sentence a refused reader sees. If it ever appears in a
+    // panel condition again, the page has drifted from the commands.
+    const gateUses = remediation.match(/and can_signoff %\}/g) || [];
+    expect(gateUses.length).toBe(2);
+    expect(remediation).toContain('{% if has_signoff_role %}');
   });
 
   it('says why rather than showing nothing at all', () => {
