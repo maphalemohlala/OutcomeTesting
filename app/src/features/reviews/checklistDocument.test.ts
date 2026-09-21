@@ -36,6 +36,12 @@ import {
  *    on is intact and the one option that moved is named in the assertion itself. The same
  *    rewording reaches a grid through optionsFor(scale, isTaxReview), which covers a section
  *    added by checklist administration rather than anything the document draws.
+ * 4. Q-TAX-04 "Tax Remedial" ends the Tax check section, and the document does not carry it.
+ *    It was added to DEV on 2026-09-19, after the reference was supplied, and back-ported
+ *    into the seed on 2026-09-21 (F56) - which is what turned this test red: the seed grew a
+ *    question the document has never had. Recorded as a difference rather than drawn into
+ *    the reference for the reason (3) gives, and asserted by name and position below so a
+ *    SECOND undocumented question cannot hide behind it.
  */
 
 // ---------------------------------------------------------------------------------------
@@ -243,7 +249,11 @@ describe('the checklist the app draws matches the reference document', () => {
     expect(documentHeadings.length).toBe(9);
     expect(documentFailReasons.length).toBe(20);
     expect(seedSections.length).toBe(12);
-    expect(seedVersions.length).toBe(46);
+
+    // 47, not the 46 the document draws: Q-TAX-04 is difference (4) above. Asserted as the
+    // document's count plus exactly one, so the number carries its own reason.
+    expect(seedVersions.length).toBe(46 + 1);
+    expect(seedVersions.filter((version) => version.text === 'Tax Remedial')).toHaveLength(1);
   });
 
   it('opens every block the document heads, in the document’s order', () => {
@@ -334,7 +344,12 @@ describe('the checklist the app draws matches the reference document', () => {
 
     // documentMetaLabels, in document order: Tax check, File Quality Outcome, the grade,
     // the two case-note boxes, then the remediation block's judgements.
-    expect(rowsOf(form(TAX), 'File Quality - Tax check section')).toEqual(documentMetaLabels[0]);
+    // Plus Q-TAX-04 at the end - difference (4). Appended rather than interleaved, so the
+    // document's own three rows are still asserted in the document's order.
+    expect(rowsOf(form(TAX), 'File Quality - Tax check section')).toEqual([
+      ...documentMetaLabels[0],
+      'Tax Remedial',
+    ]);
     expect(rowsOf(form(TAX), 'File Quality Outcome')).toEqual(documentMetaLabels[1]);
     expect(rowsOf(form(AQS), 'File Quality Outcome')).toEqual(documentMetaLabels[1]);
 
