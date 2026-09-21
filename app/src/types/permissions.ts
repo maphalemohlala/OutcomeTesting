@@ -80,6 +80,7 @@ export const RESOURCE_KEYS = [
   'page.admin.questions',
   'page.admin.advisers',
   'page.admin.templates',
+  'page.admin.lists',
   'page.admin.security',
   'page.admin.users',
   // Capabilities (write actions gated independently of page view).
@@ -193,6 +194,10 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   // The letters are the checking team's words to advisers, so the people who run the
   // process own them - not only whoever administers the environment.
   { role: 'AL Portal - Outcome Testing Manager', resource: 'page.admin.templates', level: 'Manage' },
+  // The case-header dropdowns are the checking team's own vocabulary - what a product type
+  // or a sample source is called is their decision, not an administrator's - so the same
+  // reasoning that gave them the letters gives them the lists (project owner, 2026-09-21).
+  { role: 'AL Portal - Outcome Testing Manager', resource: 'page.admin.lists', level: 'Manage' },
   { role: 'AL Portal - Outcome Testing Manager', resource: 'command.assign', level: 'Edit' },
   { role: 'AL Portal - Outcome Testing Manager', resource: 'export.generate', level: 'Edit' },
 
@@ -230,6 +235,7 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
     { role, resource: 'page.admin.questions' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'page.admin.advisers' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'page.admin.templates' as ResourceKey, level: 'Manage' as AccessLevel },
+    { role, resource: 'page.admin.lists' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'page.admin.security' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'page.admin.users' as ResourceKey, level: 'Manage' as AccessLevel },
     { role, resource: 'question.retire' as ResourceKey, level: 'Edit' as AccessLevel },

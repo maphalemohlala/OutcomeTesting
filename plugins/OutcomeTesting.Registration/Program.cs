@@ -351,6 +351,16 @@ if (args.Length >= 2 && args[0].Equals("createadvisermapping", StringComparison.
     return CreateAdviserMappingTable(args[1], args.Length > 2 ? args[2] : "OutcomeTesting");
 }
 
+if (args.Length >= 2 && args[0].Equals("createlistoptiontable", StringComparison.OrdinalIgnoreCase))
+{
+    return CreateListOptionTable(args[1], args.Length > 2 && !args[2].StartsWith("--", StringComparison.Ordinal) ? args[2] : "OutcomeTesting");
+}
+
+if (args.Length >= 2 && args[0].Equals("seedlistoptions", StringComparison.OrdinalIgnoreCase))
+{
+    return SeedListOptions(args[1], ConfirmedFor(args, args[1]));
+}
+
 if (args.Length >= 2 && args[0].Equals("dedupepagepermissions", StringComparison.OrdinalIgnoreCase))
 {
     return DedupePagePermissions(
@@ -8004,6 +8014,470 @@ int SeedNotificationTemplates(string orgUrl, bool confirm)
     return 0;
 }
 
+int CreateListOptionTable(string orgUrl, string solutionUniqueName)
+{
+    using var svc = Connect(orgUrl);
+
+    var exists = true;
+    try
+    {
+        svc.Execute(new RetrieveEntityRequest
+        {
+            LogicalName = ListOptionTable.Logical,
+            EntityFilters = EntityFilters.Entity,
+        });
+    }
+    catch (Exception)
+    {
+        exists = false;
+    }
+
+    if (!exists)
+    {
+        Console.WriteLine($"Creating table {ListOptionTable.Schema}…");
+        svc.Execute(new CreateEntityRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            Entity = new EntityMetadata
+            {
+                SchemaName = ListOptionTable.Schema,
+                LogicalName = ListOptionTable.Logical,
+                DisplayName = ListOptionTable.Text("List option"),
+                DisplayCollectionName = ListOptionTable.Text("List options"),
+                Description = ListOptionTable.Text(
+                    "One option of one case-header dropdown, held as a row so the checking team can add, "
+                    + "rename and retire it themselves (project owner, 2026-09-21). Rows rather than choice "
+                    + "metadata because adding an option to a choice column needs System Customizer, is an "
+                    + "authoring act the managed environments cannot take, and would still not appear in a "
+                    + "picker until the app was rebuilt."),
+                OwnershipType = OwnershipTypes.OrganizationOwned,
+                IsActivity = false,
+                IsAuditEnabled = new BooleanManagedProperty(true),
+            },
+            PrimaryAttribute = new StringAttributeMetadata
+            {
+                SchemaName = ListOptionTable.NameSchema,
+                LogicalName = ListOptionTable.NameLogical,
+                RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.ApplicationRequired),
+                MaxLength = 200,
+                FormatName = StringFormatName.Text,
+                DisplayName = ListOptionTable.Text("Option"),
+                Description = ListOptionTable.Text(
+                    "The words a person sees in the dropdown, and what a case shows once it is chosen. "
+                    + "Renaming it renames it on every case already holding the option, which is the point "
+                    + "of a row: the history follows the name instead of splitting at it."),
+            },
+        });
+        Console.WriteLine("  created.");
+    }
+    else
+    {
+        Console.WriteLine($"Table {ListOptionTable.Schema} already exists; adding any missing parts.");
+    }
+
+    var present = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var current = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = ListOptionTable.Logical,
+        EntityFilters = EntityFilters.Attributes,
+    });
+    foreach (var attribute in current.EntityMetadata.Attributes)
+    {
+        present.Add(attribute.LogicalName);
+    }
+
+    // Which list the option belongs to. This one IS choice metadata, deliberately: adding a
+    // new LIST needs a lookup column on the case and code that reads it, so it is a developer
+    // change either way. Adding an OPTION to an existing list is what becomes data, and that
+    // is the whole of what was asked for.
+    if (!present.Contains(ListOptionTable.ListLogical))
+    {
+        svc.Execute(new CreateAttributeRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            EntityName = ListOptionTable.Logical,
+            Attribute = new PicklistAttributeMetadata
+            {
+                SchemaName = ListOptionTable.ListSchema,
+                LogicalName = ListOptionTable.ListLogical,
+                RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.ApplicationRequired),
+                DisplayName = ListOptionTable.Text("List"),
+                Description = ListOptionTable.Text(
+                    "The case-header dropdown this option belongs to. All four are declared, but only the "
+                    + "ones with a lookup on al_outcomecase are offered by the management page: an option "
+                    + "chosen for a list with nowhere to store it would be work taken and dropped."),
+                OptionSet = new OptionSetMetadata
+                {
+                    IsGlobal = false,
+                    OptionSetType = OptionSetType.Picklist,
+                    Options =
+                    {
+                        new OptionMetadata(ListOptionTable.Text("Product / solution type"), ListOptionTable.ProductSolutionType),
+                        new OptionMetadata(ListOptionTable.Text("Sample source"), ListOptionTable.SampleSource),
+                        new OptionMetadata(ListOptionTable.Text("Case type"), ListOptionTable.CaseType),
+                        new OptionMetadata(ListOptionTable.Text("Pre or post check"), ListOptionTable.PreOrPostCheck),
+                    },
+                },
+            },
+        });
+        Console.WriteLine($"  {ListOptionTable.ListLogical}: created");
+    }
+    else
+    {
+        Console.WriteLine($"  {ListOptionTable.ListLogical}: already present");
+    }
+
+    if (!present.Contains(ListOptionTable.SortOrderLogical))
+    {
+        svc.Execute(new CreateAttributeRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            EntityName = ListOptionTable.Logical,
+            Attribute = new IntegerAttributeMetadata
+            {
+                SchemaName = ListOptionTable.SortOrderSchema,
+                LogicalName = ListOptionTable.SortOrderLogical,
+                RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+                MinValue = 0,
+                MaxValue = 100000,
+                DisplayName = ListOptionTable.Text("Sort order"),
+                Description = ListOptionTable.Text(
+                    "Where the option sits in the dropdown. Optional: an option with none sorts after every "
+                    + "option that has one, so adding one without thinking about order appends it rather "
+                    + "than jumping it to the top of a list somebody has arranged."),
+            },
+        });
+        Console.WriteLine($"  {ListOptionTable.SortOrderLogical}: created");
+    }
+    else
+    {
+        Console.WriteLine($"  {ListOptionTable.SortOrderLogical}: already present");
+    }
+
+    if (!present.Contains(ListOptionTable.LegacyValueLogical))
+    {
+        svc.Execute(new CreateAttributeRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            EntityName = ListOptionTable.Logical,
+            Attribute = new IntegerAttributeMetadata
+            {
+                SchemaName = ListOptionTable.LegacyValueSchema,
+                LogicalName = ListOptionTable.LegacyValueLogical,
+                RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+                MinValue = 0,
+                MaxValue = int.MaxValue,
+                DisplayName = ListOptionTable.Text("Replaces choice value"),
+                Description = ListOptionTable.Text(
+                    "The choice value this option was migrated from, or blank for an option added since. "
+                    + "It is what lets a case still holding only the old integer read as this option's "
+                    + "current name. Set by the migration and not meant to be edited afterwards."),
+            },
+        });
+        Console.WriteLine($"  {ListOptionTable.LegacyValueLogical}: created");
+    }
+    else
+    {
+        Console.WriteLine($"  {ListOptionTable.LegacyValueLogical}: already present");
+    }
+
+    // Effective dating rather than a retired flag, so this reads the same way the checklist
+    // does (BR-013 / AD-015): in force is from <= day < to. "Remove" sets the end date, which
+    // takes the option out of every picker while a case that already holds it keeps saying
+    // what it said.
+    foreach (var window in new[]
+    {
+        new[] { ListOptionTable.EffectiveFromLogical, ListOptionTable.EffectiveFromSchema, "Offered from",
+            "The first day the option appears in the dropdown. Blank means it always has." },
+        new[] { ListOptionTable.EffectiveToLogical, ListOptionTable.EffectiveToSchema, "Offered until",
+            "The day the option stops being offered, exclusive. Blank means it still is. Setting it is "
+            + "what \"remove\" does: the option leaves every picker, and every case already holding it is "
+            + "untouched." },
+    })
+    {
+        if (present.Contains(window[0]))
+        {
+            Console.WriteLine($"  {window[0]}: already present");
+            continue;
+        }
+
+        svc.Execute(new CreateAttributeRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            EntityName = ListOptionTable.Logical,
+            Attribute = new DateTimeAttributeMetadata
+            {
+                SchemaName = window[1],
+                LogicalName = window[0],
+                Format = DateTimeFormat.DateOnly,
+                DateTimeBehavior = DateTimeBehavior.DateOnly,
+                RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+                DisplayName = ListOptionTable.Text(window[2]),
+                Description = ListOptionTable.Text(window[3]),
+            },
+        });
+        Console.WriteLine($"  {window[0]}: created");
+    }
+
+    // The case's chosen option.
+    var caseColumns = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = "al_outcomecase",
+        EntityFilters = EntityFilters.Attributes,
+    });
+    var onCase = caseColumns.EntityMetadata.Attributes.Any(x =>
+        string.Equals(x.LogicalName, ListOptionTable.ProductTypeLogical, StringComparison.OrdinalIgnoreCase));
+
+    if (!onCase)
+    {
+        svc.Execute(new CreateOneToManyRequest
+        {
+            SolutionUniqueName = solutionUniqueName,
+            OneToManyRelationship = new OneToManyRelationshipMetadata
+            {
+                SchemaName = ListOptionTable.ProductTypeRelationship,
+                ReferencedEntity = ListOptionTable.Logical,
+                ReferencingEntity = "al_outcomecase",
+                CascadeConfiguration = new CascadeConfiguration
+                {
+                    // Restrict, and this is the point of the whole design. The generic
+                    // addlookupcolumn verb uses RemoveLink, which would let somebody delete
+                    // "IHT" and silently blank the product type on every case that held it -
+                    // a case quietly losing a header field is exactly the failure AD-161 was
+                    // written to stop. Restrict makes "you cannot delete an option a case is
+                    // using" a guarantee of the platform rather than a check in a page, which
+                    // is NFR-SEC-01 applied to integrity: the management page offers retire,
+                    // and Dataverse itself refuses the delete if anyone reaches past it.
+                    Delete = CascadeType.Restrict,
+                    Assign = CascadeType.NoCascade,
+                    Merge = CascadeType.NoCascade,
+                    Reparent = CascadeType.NoCascade,
+                    Share = CascadeType.NoCascade,
+                    Unshare = CascadeType.NoCascade,
+                },
+            },
+            Lookup = new LookupAttributeMetadata
+            {
+                SchemaName = ListOptionTable.ProductTypeSchema,
+                LogicalName = ListOptionTable.ProductTypeLogical,
+                RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+                DisplayName = ListOptionTable.Text("Product / solution type"),
+                Description = ListOptionTable.Text(
+                    "The case's product or solution type, as a managed list option. It supersedes the "
+                    + "al_productsolutiontype choice column, which is kept so a case imported before this "
+                    + "existed still reads correctly until it is backfilled."),
+            },
+        });
+        Console.WriteLine($"  al_outcomecase.{ListOptionTable.ProductTypeLogical}: created");
+    }
+    else
+    {
+        Console.WriteLine($"  al_outcomecase.{ListOptionTable.ProductTypeLogical}: already present");
+    }
+
+    svc.Execute(new PublishAllXmlRequest());
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    var after = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = ListOptionTable.Logical,
+        EntityFilters = EntityFilters.Attributes,
+    });
+    var names = new HashSet<string>(
+        after.EntityMetadata.Attributes.Select(x => x.LogicalName), StringComparer.OrdinalIgnoreCase);
+
+    var missing = new List<string>();
+    foreach (var expected in new[]
+    {
+        ListOptionTable.NameLogical,
+        ListOptionTable.ListLogical,
+        ListOptionTable.SortOrderLogical,
+        ListOptionTable.LegacyValueLogical,
+        ListOptionTable.EffectiveFromLogical,
+        ListOptionTable.EffectiveToLogical,
+    })
+    {
+        if (!names.Contains(expected)) { missing.Add(expected); }
+    }
+
+    var caseAfter = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = "al_outcomecase",
+        EntityFilters = EntityFilters.Attributes,
+    });
+    if (!caseAfter.EntityMetadata.Attributes.Any(x =>
+        string.Equals(x.LogicalName, ListOptionTable.ProductTypeLogical, StringComparison.OrdinalIgnoreCase)))
+    {
+        missing.Add("al_outcomecase." + ListOptionTable.ProductTypeLogical);
+    }
+
+    if (missing.Count > 0)
+    {
+        Console.Error.WriteLine(
+            "Not found after the create returned: " + string.Join(", ", missing)
+            + ". Investigate before relying on it.");
+        return 1;
+    }
+
+    Console.WriteLine(
+        $"Published. {ListOptionTable.Schema} is in solution '{solutionUniqueName}', with its list, "
+        + "sort order, legacy value and effective window, and al_outcomecase carries the product type "
+        + "lookup. Seed it with: seedlistoptions <orgUrl> --confirm <orgUrl>");
+    return 0;
+}
+
+int SeedListOptions(string orgUrl, bool confirmed)
+{
+    if (!confirmed)
+    {
+        Console.Error.WriteLine(
+            "This creates rows and rewrites cases in a live environment. Re-run as: "
+            + "seedlistoptions <orgUrl> --confirm <orgUrl>");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+
+    // The five options al_outcomecase.al_productsolutiontype carries today, read from the
+    // metadata rather than typed out here. Typing them would make this a second copy of the
+    // list that could drift from the one being migrated, and the whole exercise is to stop
+    // having two copies.
+    var attribute = (RetrieveAttributeResponse)svc.Execute(new RetrieveAttributeRequest
+    {
+        EntityLogicalName = "al_outcomecase",
+        LogicalName = "al_productsolutiontype",
+        RetrieveAsIfPublished = true,
+    });
+
+    var picklist = attribute.AttributeMetadata as PicklistAttributeMetadata;
+    if (picklist == null || picklist.OptionSet == null)
+    {
+        Console.Error.WriteLine("al_outcomecase.al_productsolutiontype is not a choice column. Nothing was changed.");
+        return 1;
+    }
+
+    var existing = svc.RetrieveMultiple(new QueryExpression(ListOptionTable.Logical)
+    {
+        ColumnSet = new ColumnSet(ListOptionTable.NameLogical, ListOptionTable.LegacyValueLogical),
+        Criteria =
+        {
+            Conditions =
+            {
+                new ConditionExpression(ListOptionTable.ListLogical, ConditionOperator.Equal, ListOptionTable.ProductSolutionType),
+            },
+        },
+    });
+
+    var byLegacy = new Dictionary<int, Guid>();
+    foreach (var row in existing.Entities)
+    {
+        var legacy = row.GetAttributeValue<int?>(ListOptionTable.LegacyValueLogical);
+        if (legacy.HasValue) { byLegacy[legacy.Value] = row.Id; }
+    }
+
+    var order = 10;
+    foreach (var option in picklist.OptionSet.Options)
+    {
+        var value = option.Value ?? 0;
+        var label = option.Label == null || option.Label.UserLocalizedLabel == null
+            ? null
+            : option.Label.UserLocalizedLabel.Label;
+
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            Console.Error.WriteLine($"  option {value} has no label; skipped.");
+            continue;
+        }
+
+        if (byLegacy.ContainsKey(value))
+        {
+            Console.WriteLine($"  {value} '{label}': already seeded");
+            order += 10;
+            continue;
+        }
+
+        var row = new Entity(ListOptionTable.Logical);
+        row[ListOptionTable.NameLogical] = label;
+        row[ListOptionTable.ListLogical] = new OptionSetValue(ListOptionTable.ProductSolutionType);
+        row[ListOptionTable.SortOrderLogical] = order;
+        row[ListOptionTable.LegacyValueLogical] = value;
+        byLegacy[value] = svc.Create(row);
+        Console.WriteLine($"  {value} '{label}': created {byLegacy[value]}");
+        order += 10;
+    }
+
+    // Backfill. Every case holding the choice value gets the matching option, so the lookup
+    // is the single answer from here and the fallback in caseOptionLabel is a safety net
+    // rather than the normal path.
+    var cases = svc.RetrieveMultiple(new QueryExpression("al_outcomecase")
+    {
+        ColumnSet = new ColumnSet("al_casereference", "al_productsolutiontype", ListOptionTable.ProductTypeLogical),
+        Criteria =
+        {
+            Conditions =
+            {
+                new ConditionExpression("al_productsolutiontype", ConditionOperator.NotNull),
+                new ConditionExpression(ListOptionTable.ProductTypeLogical, ConditionOperator.Null),
+            },
+        },
+    });
+
+    var filled = 0;
+    var orphaned = new List<string>();
+    foreach (var outcomeCase in cases.Entities)
+    {
+        var chosen = outcomeCase.GetAttributeValue<OptionSetValue>("al_productsolutiontype");
+        if (chosen == null) { continue; }
+
+        Guid optionId;
+        if (!byLegacy.TryGetValue(chosen.Value, out optionId))
+        {
+            // A value no option claims: the choice column was edited and an option removed
+            // after cases were written against it. Left alone and reported, because guessing
+            // a replacement would put a wrong product type on a case nobody would re-check.
+            orphaned.Add(outcomeCase.GetAttributeValue<string>("al_casereference") + " (" + chosen.Value + ")");
+            continue;
+        }
+
+        svc.Update(new Entity("al_outcomecase", outcomeCase.Id)
+        {
+            [ListOptionTable.ProductTypeLogical] = new EntityReference(ListOptionTable.Logical, optionId),
+        });
+        filled += 1;
+    }
+
+    Console.WriteLine($"Backfilled {filled} case(s) of {cases.Entities.Count} carrying a product type.");
+    if (orphaned.Count > 0)
+    {
+        Console.WriteLine(
+            "  left alone, no option claims their choice value: " + string.Join(", ", orphaned));
+    }
+
+    // Read back, because on this project a successful-looking write is not evidence.
+    var after = svc.RetrieveMultiple(new QueryExpression(ListOptionTable.Logical)
+    {
+        ColumnSet = new ColumnSet(ListOptionTable.NameLogical, ListOptionTable.SortOrderLogical, ListOptionTable.LegacyValueLogical),
+        Criteria =
+        {
+            Conditions =
+            {
+                new ConditionExpression(ListOptionTable.ListLogical, ConditionOperator.Equal, ListOptionTable.ProductSolutionType),
+            },
+        },
+    });
+
+    Console.WriteLine($"Product / solution type now has {after.Entities.Count} option(s):");
+    foreach (var row in after.Entities.OrderBy(x => x.GetAttributeValue<int?>(ListOptionTable.SortOrderLogical) ?? int.MaxValue))
+    {
+        Console.WriteLine(
+            $"  {row.GetAttributeValue<int?>(ListOptionTable.SortOrderLogical)}"
+            + $"  {row.GetAttributeValue<string>(ListOptionTable.NameLogical)}"
+            + $"  (was {row.GetAttributeValue<int?>(ListOptionTable.LegacyValueLogical)})");
+    }
+
+    return after.Entities.Count == picklist.OptionSet.Options.Count ? 0 : 1;
+}
+
 int CreateAdviserMappingTable(string orgUrl, string solutionUniqueName)
 {
     using var svc = Connect(orgUrl);
@@ -10590,6 +11064,45 @@ static class NotificationTemplateTable
 
     public const string KeyLogical = "al_notificationtemplatecodekey";
     public const string KeySchema = "al_NotificationTemplateCodeKey";
+
+    public static Label Text(string value) => new Label(value, 1033);
+}
+
+static class ListOptionTable
+{
+    public const string Logical = "al_listoption";
+    public const string Schema = "al_ListOption";
+
+    public const string NameLogical = "al_name";
+    public const string NameSchema = "al_Name";
+
+    public const string ListLogical = "al_list";
+    public const string ListSchema = "al_List";
+
+    public const string SortOrderLogical = "al_sortorder";
+    public const string SortOrderSchema = "al_SortOrder";
+
+    public const string LegacyValueLogical = "al_legacyvalue";
+    public const string LegacyValueSchema = "al_LegacyValue";
+
+    public const string EffectiveFromLogical = "al_effectivefrom";
+    public const string EffectiveFromSchema = "al_EffectiveFrom";
+
+    public const string EffectiveToLogical = "al_effectiveto";
+    public const string EffectiveToSchema = "al_EffectiveTo";
+
+    // The case's chosen option. Named al_producttypeid because al_productsolutiontype is the
+    // choice column it supersedes and the two have to coexist through the migration.
+    public const string ProductTypeLogical = "al_producttypeid";
+    public const string ProductTypeSchema = "al_ProductTypeId";
+    public const string ProductTypeRelationship = "al_listoption_al_outcomecase_producttype";
+
+    // al_list. Kept in step with app/src/features/admin/listOptions.ts, which names the same
+    // four; a fresh block, because 120910814 is the highest value allocated anywhere else.
+    public const int ProductSolutionType = 120910840;
+    public const int SampleSource = 120910841;
+    public const int CaseType = 120910842;
+    public const int PreOrPostCheck = 120910843;
 
     public static Label Text(string value) => new Label(value, 1033);
 }
