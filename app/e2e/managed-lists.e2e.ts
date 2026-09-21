@@ -36,6 +36,8 @@ test.describe('the managed lists on a review page', () => {
 
     // Each of the four single-choice lists. "Not set" alone is the 403 rendered as data,
     // so the bar is at least one REAL option beyond it.
+    const checked: string[] = [];
+
     for (const label of [
       'Case type',
       'Product / solution type',
@@ -53,7 +55,17 @@ test.describe('the managed lists on a review page', () => {
         .filter((t) => t !== '' && t !== 'Not set' && t !== 'Choose…');
 
       expect(real.length, `${label} offered no options - the 403 shape of AD-192`).toBeGreaterThan(0);
+      checked.push(label);
     }
+
+    // The loop above skips a list it cannot find, so with none of the four present it would
+    // assert nothing and pass - which is what AD-192 looked like from the outside, an empty
+    // page reporting success. Third time this suite has made that mistake in a day: an
+    // assertion phrased as an absence has to be anchored to something proved present.
+    expect(
+      checked,
+      'none of the managed lists were on the page - is this an editable review assigned to you?',
+    ).not.toHaveLength(0);
   });
 
   test('offers the Products tick list rather than a free-text box', async ({ page }) => {

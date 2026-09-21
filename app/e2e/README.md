@@ -46,7 +46,8 @@ The Review Instance table permission is **contact-scoped** — "assigned to me".
 assigned to somebody else opens read-only, with no dropdowns and no tick list, so the
 managed-list specs would report the AD-192 defect against a page that is simply not yours to
 edit. It must be a review assigned to the account whose session was captured, and not yet
-submitted. On 2026-09-21 DEV had none for the UAT account, so those two specs skipped.
+submitted. On 2026-09-21 DEV had none for the UAT account until case 900000003 was assigned
+to it, at which point both specs ran green.
 
 ## Choosing `OT_CASE_MAPPED_ELSEWHERE`
 
@@ -66,6 +67,22 @@ Nothing here writes. No spec signs a case off, completes an action or records an
 they are read-only against a shared environment other people are using. The one exception is
 the allowlist spec, which deliberately attempts a write it expects to be **refused** — if
 that ever starts succeeding, the refusal is the finding.
+
+## Three vacuous passes, and the rule they leave
+
+Every one of these was written here, in one day, and every one was green while proving
+nothing:
+
+| Spec | Passed because |
+|---|---|
+| session guard | a signed-out page satisfies `toHaveCount(0)` |
+| Web API allowlist | Power Pages refuses every write without a token, whatever the column list says |
+| managed lists | the loop skips a list it cannot find, so no lists means no assertions |
+
+**An assertion phrased as an absence has to be anchored to something whose presence was
+proved first.** The session guard now proves the portal host and visible navigation; the
+allowlist spec fetches a token and proves the record readable; the list spec records which
+lists it checked and fails on an empty tally. Worth re-reading before adding a spec here.
 
 ## Unconfigured means skipped, not passed
 
