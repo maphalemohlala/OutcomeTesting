@@ -7478,6 +7478,26 @@ int GrantSecurity(string orgUrl)
         GrantTable(svc, role, "powerpagecomponent", read: true);
     }
 
+    // ---- the managed dropdown lists (AD-187..AD-190, 2026-09-21) ----------------------
+    //
+    // al_listoption arrived after these roles were written and nobody came back to them, so
+    // the table was readable by System Administrators only. Every DEV human is one, which is
+    // exactly why it went unseen - the same blind spot as AD-142 above, the third time now.
+    //
+    // What it cost: the four case-header dropdowns and the Products tick list are fed by
+    // this table, so for anyone else they rendered EMPTY and the header fell back to the
+    // free-text column the list replaced. Nothing failed loudly; the fields simply had
+    // nothing to offer, which reads as "the page is still free text" rather than as a
+    // refusal (project owner, 2026-09-21).
+    //
+    // Append and AppendTo, not just read: the products a case covers are a many-to-many, and
+    // Associate needs both ends appendable. The case end already has AppendTo from
+    // writeForEveryone; this is the other end.
+    foreach (var role in new[] { userRole, adminRole })
+    {
+        GrantTable(svc, role, "al_listoption", read: true, append: true, appendTo: true);
+    }
+
     // Admin-only beyond the above: the people and role tables. An ordinary user reads them
     // (the pages name who holds what) and only an administrator writes them, which is the
     // same escalation-safe split al_userrolemapping and al_pagepermission already have.
@@ -7491,6 +7511,16 @@ int GrantSecurity(string orgUrl)
     GrantTable(svc, adminRole, "al_section", read: true, create: true, write: true, append: true, appendTo: true);
     GrantTable(svc, adminRole, "al_role", read: true, create: true, write: true, append: true, appendTo: true);
     GrantTable(svc, adminRole, "al_failreason", read: true, create: true, write: true, append: true, appendTo: true);
+
+    // Delete as well as write, unlike every other admin grant above: the Dropdown options
+    // page offers an outright delete for an option added by mistake and never used. Safe to
+    // grant because it is not this role that decides it - the lookups carry CascadeType
+    // .Restrict, so Dataverse refuses the delete the moment any case holds the option
+    // (AD-187). Without the privilege the refusal would be a permission fault instead, and
+    // an administrator would be told they may not do a thing they may in fact do.
+    GrantTable(
+        svc, adminRole, "al_listoption",
+        read: true, create: true, write: true, delete: true, append: true, appendTo: true);
 
     // Add both roles to the solution for clean ALM promotion (component type 20 = Role).
     AddRoleToSolution(svc, userRole, "OutcomeTesting");
