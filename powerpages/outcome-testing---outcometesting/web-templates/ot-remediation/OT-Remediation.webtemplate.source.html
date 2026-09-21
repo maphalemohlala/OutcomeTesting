@@ -244,6 +244,12 @@
       <attribute name="al_casereference" />
       <attribute name="al_clientname" />
       <attribute name="al_advisername" />
+      {% comment %}
+        The adviser's work email, read for the sign-off gate further down rather than for
+        anything on the screen. It is the key al_advisermapping is keyed on - the name is
+        not, which is the whole reason TcManagerRouting matches on the email server-side.
+      {% endcomment %}
+      <attribute name="al_adviseremail" />
       <attribute name="al_casestatus" />
       {% comment %}
         The route, so the regraded-outcome cell below can say WHY it is empty on a case that
@@ -356,6 +362,52 @@
     </entity>
   </fetch>
   {% endfetchxml %}
+
+  {% comment %}
+    Is the reader the T&C Manager for THIS case's adviser? (Project owner, 2026-09-21:
+    "Supervisors should only see the sign off controls on cases advisers linked to the
+    handled", after finding that "service accounts holds the T&C role but they are not
+    linked to the adviser handling the case".)
+
+    Holding the role is not the question. SignoffRequestPlugin.EnsureMappedToCase refuses a
+    signatory who is not the manager al_advisermapping names for the case's adviser, so a
+    supervisor offered this form on somebody else's adviser is offered a form that cannot
+    succeed. This makes the page agree with the server; the server remains the boundary.
+
+    Filtered on BOTH the adviser email and the manager, although the table permission
+    (Adviser Mapping - advisers I supervise) is contact-scoped and already narrows the rows
+    to this reader's own. The scope is the PRIVACY control - it is why no supervisor can
+    read anyone else's supervision structure. This filter is the ANSWER, and it stays right
+    even if the scope is widened later, or if a Liquid fetch turns out not to enforce one.
+    That last is not a hypothetical worry: AD-195 was exactly an assumption about where this
+    data model stores permissions being wrong.
+
+    Skipped where the case carries no adviser email - an `eq` against an empty value is the
+    F48 shape, and there is nothing to match anyway, since TcManagerRouting returns
+    NoAdviserEmail for the same case and the server refuses it too.
+  {% endcomment %}
+  {% assign ot_is_case_tcmanager = false %}
+  {% assign ot_case_adviser_email = c.al_adviseremail | default: '' %}
+  {% if c and ot_case_adviser_email != '' and user %}
+    {% fetchxml mymapping %}
+    <fetch top="1">
+      <entity name="al_advisermapping">
+        <attribute name="al_advisermappingid" />
+        <filter type="and">
+          <condition attribute="al_adviseremail" operator="eq" value="{{ ot_case_adviser_email | xml_escape }}" />
+          <condition attribute="al_tcmanagerid" operator="eq" value="{{ user.id | xml_escape }}" />
+        </filter>
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+    {% comment %}
+      Read with a loop rather than `entities[0]` or `.size`, for the reason `c` is read that
+      way above: an index past the end of an empty result is one of the shapes this Liquid
+      raises "Index was outside the bounds of the array" for, and an empty result is the
+      normal case here rather than the exception.
+    {% endcomment %}
+    {% for m in mymapping.results.entities %}{% assign ot_is_case_tcmanager = true %}{% endfor %}
+  {% endif %}
 
   <p class="ot-back"><a href="?">&laquo; All cases in remediation</a></p>
 
@@ -1021,15 +1073,46 @@
           not a security claim, and offering one that cannot work spends somebody's time on a
           form they will be refused for filling in.
         {% endcomment %}
+        {% comment %}
+          TWO gates, because the two commands behind these panels have two different rules
+          and a panel that does not mirror its own command is the defect either way round.
+
+          can_regrade - the role alone. RegradeRequestPlugin.EnsureSupervisorRole is the
+          only check al_RegradeCase makes. Requiring the mapping here would hide a control
+          the server would have accepted.
+
+          can_signoff - the role AND the mapping. SignoffRequestPlugin runs
+          EnsureSupervisorRole and then EnsureMappedToCase, so a supervisor who is not this
+          adviser's manager is refused however the form is filled in.
+
+          If the regrade command ever gains the mapping gate, this splits back into one
+          variable. Until it does, the asymmetry is the truth about the system.
+        {% endcomment %}
         {% assign signoff_role = 'AL Portal - T&C Supervisor' %}
+        {% assign can_regrade = false %}
+        {% if user.roles contains signoff_role %}{% assign can_regrade = true %}{% endif %}
         {% assign can_signoff = false %}
-        {% if user.roles contains signoff_role %}{% assign can_signoff = true %}{% endif %}
+        {% if user.roles contains signoff_role and ot_is_case_tcmanager %}{% assign can_signoff = true %}{% endif %}
         {% if signoff_ids != '' and can_signoff == false %}
           <div class="ot-form-submit">
+            {% if can_regrade %}
+            {% comment %}
+              Holds the role, but not for this adviser. Deliberately does not name who the
+              manager IS: the contact-scoped permission means this page could not read the
+              name anyway, and "ask Jane" would leak the supervision structure the scope
+              exists to keep.
+            {% endcomment %}
+            <p class="ot-form-submit__hint">
+              Remedial actions on this case are waiting to be signed off.
+              Signing a case off is the {{ signoff_role | escape }} mapped to its adviser,
+                which your account is not for this one.
+            </p>
+            {% else %}
             <p class="ot-form-submit__hint">
               Remedial actions on this case are waiting to be signed off. Signing off needs
-              the {{ signoff_role | escape }} role, which your account does not hold.
+                the {{ signoff_role | escape }} role, which your account does not hold.
             </p>
+            {% endif %}
           </div>
         {% endif %}
         {% if signoff_ids != '' and can_signoff %}
@@ -1174,7 +1257,7 @@
             </p>
           </div>
         {% endunless %}{% endif %}
-        {% if outcome and outcome.al_initialoutcome and ot_at_recheck and can_signoff %}
+        {% if outcome and outcome.al_initialoutcome and ot_at_recheck and can_regrade %}
           <div class="ot-form-submit" data-ot-regrade
                data-outcome-id="{{ outcome.al_outcomeid }}"
                data-row-version="{{ outcome.versionnumber }}">

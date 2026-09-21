@@ -20,36 +20,47 @@ import reviewListTemplate from '../../../../powerpages/outcome-testing---outcome
 
 const SUPERVISOR_ROLE = 'AL Portal - T&C Supervisor';
 
+/**
+ * Line endings normalised before anything is matched. The working tree carries CRLF under
+ * git's autocrlf while the repository holds LF, so a multi-line expectation written with \n
+ * passes or fails according to how the file was checked out rather than according to what
+ * the template says. That is a test reporting on the wrong thing.
+ */
+const remediation = remediationTemplate.replace(/\r\n/g, '\n');
+const reviewList = reviewListTemplate.replace(/\r\n/g, '\n');
+
 describe('the supervisor-only panels on the remediation page', () => {
   it('reads the role off the list the portal resolved, not off anything the page was told', () => {
     // user.roles is what the access rules are evaluated against. A claim in the markup, a
     // query string or a data- attribute would all be the page deciding who somebody is.
-    expect(remediationTemplate).toContain(`{% assign signoff_role = '${SUPERVISOR_ROLE}' %}`);
-    expect(remediationTemplate).toContain(
-      '{% if user.roles contains signoff_role %}{% assign can_signoff = true %}{% endif %}',
+    expect(remediation).toContain(`{% assign signoff_role = '${SUPERVISOR_ROLE}' %}`);
+    expect(remediation).toContain(
+      '{% if user.roles contains signoff_role %}{% assign can_regrade = true %}{% endif %}',
     );
   });
 
   it('defaults to hiding, so a page that cannot resolve roles offers nothing', () => {
     // The order matters: false first, then set true only on a match. Written the other way
     // round, a failure to read user.roles would leave the panel showing.
-    const defaultAt = remediationTemplate.indexOf('{% assign can_signoff = false %}');
-    const grantAt = remediationTemplate.indexOf('{% assign can_signoff = true %}');
+    const defaultAt = remediation.indexOf('{% assign can_regrade = false %}');
+    const grantAt = remediation.indexOf('{% assign can_regrade = true %}');
     expect(defaultAt).toBeGreaterThan(-1);
     expect(grantAt).toBeGreaterThan(defaultAt);
   });
 
   it('gates the sign-off panel on the role as well as on there being something to sign', () => {
-    expect(remediationTemplate).toContain("{% if signoff_ids != '' and can_signoff %}");
+    expect(remediation).toContain("{% if signoff_ids != '' and can_signoff %}");
     // The old gate, which offered the form to everyone.
-    expect(remediationTemplate).not.toContain("{% if signoff_ids != '' %}\n          <div");
+    expect(remediation).not.toContain("{% if signoff_ids != '' %}\n          <div");
   });
 
-  it('gates the regrade panel on the same role', () => {
-    // The supervisor's other control. Left visible, the rule would look arbitrary rather
-    // than considered - and a regrade is refused for exactly the same reason a sign-off is.
-    expect(remediationTemplate).toContain(
-      '{% if outcome and outcome.al_initialoutcome and ot_at_recheck and can_signoff %}',
+  it('gates the regrade panel on the role ALONE, because that is the rule it has', () => {
+    // Deliberately not can_signoff. RegradeRequestPlugin.EnsureSupervisorRole is the only
+    // gate a regrade passes - there is no EnsureMappedToCase on that side - so requiring the
+    // mapping here would hide a control the server would have accepted, which is the defect
+    // this file exists for, only pointing the other way.
+    expect(remediation).toContain(
+      '{% if outcome and outcome.al_initialoutcome and ot_at_recheck and can_regrade %}',
     );
   });
 
@@ -57,16 +68,84 @@ describe('the supervisor-only panels on the remediation page', () => {
     // A panel that vanishes reads as "there is nothing to do here", which is wrong: there IS
     // something to do and somebody else has to do it. The review list makes the same
     // distinction for the AQS Reviewer role.
-    expect(remediationTemplate).toContain(
-      'Signing off needs\n              the {{ signoff_role | escape }} role, which your account does not hold.',
+    expect(remediation).toContain(
+      'Signing off needs\n                the {{ signoff_role | escape }} role, which your account does not hold.',
     );
   });
 
   it('matches the pattern the review list already uses', () => {
     // One idiom for this on the site, not two. If the review list's changes, this test is
     // the thing that says the remediation page has to follow it.
-    expect(reviewListTemplate).toContain(
+    expect(reviewList).toContain(
       '{% if claim_enabled and user.roles contains claim_role %}{% assign can_claim = true %}{% endif %}',
+    );
+  });
+});
+
+/**
+ * And a supervisor sees the sign-off form only on a case whose adviser they are the T&C
+ * Manager for (project owner, 2026-09-21: "Supervisors should only see the sign off controls
+ * on cases advisers linked to the handled", after finding that "service accounts holds the
+ * T&C role but they are not linked to the adviser handling the case").
+ *
+ * The server settled this first - SignoffRequestPlugin.EnsureMappedToCase - and these pin
+ * that the page now says the same thing rather than offering a form that cannot succeed.
+ * The regrade panel is deliberately NOT included: its command carries no mapping gate.
+ */
+describe('the sign-off panel and the case adviser', () => {
+  it('asks al_advisermapping whether the reader manages THIS case adviser', () => {
+    expect(remediation).toContain('<entity name="al_advisermapping">');
+    expect(remediation).toContain(
+      '<condition attribute="al_adviseremail" operator="eq" value="{{ ot_case_adviser_email | xml_escape }}" />',
+    );
+  });
+
+  it('names the manager in the filter rather than trusting the permission scope to do it', () => {
+    // The table permission is contact-scoped, so the rows come back already narrowed to this
+    // reader. That is the PRIVACY control. This condition is the ANSWER, and it holds even if
+    // the scope is ever widened, or if a Liquid fetch turns out not to enforce one - the sort
+    // of assumption AD-195 caught being wrong about this very data model.
+    expect(remediation).toContain(
+      '<condition attribute="al_tcmanagerid" operator="eq" value="{{ user.id | xml_escape }}" />',
+    );
+  });
+
+  it('carries the adviser email on the case fetch, since the mapping is keyed on it', () => {
+    const fetchStart = remediation.indexOf('{% fetchxml remcase %}');
+    const fetchEnd = remediation.indexOf('{% endfetchxml %}', fetchStart);
+    expect(fetchStart).toBeGreaterThan(-1);
+    expect(remediation.slice(fetchStart, fetchEnd)).toContain(
+      '<attribute name="al_adviseremail" />',
+    );
+  });
+
+  it('defaults to not being the manager, so a failed or skipped fetch signs nothing off', () => {
+    const defaultAt = remediation.indexOf('{% assign ot_is_case_tcmanager = false %}');
+    const grantAt = remediation.indexOf('{% assign ot_is_case_tcmanager = true %}');
+    expect(defaultAt).toBeGreaterThan(-1);
+    expect(grantAt).toBeGreaterThan(defaultAt);
+  });
+
+  it('needs the role AND the mapping for the sign-off panel', () => {
+    expect(remediation).toContain(
+      '{% if user.roles contains signoff_role and ot_is_case_tcmanager %}{% assign can_signoff = true %}{% endif %}',
+    );
+  });
+
+  it('tells a supervisor on another adviser case why, without naming the manager', () => {
+    // Who supervises whom is not this reader's business - the contact-scoped permission means
+    // the page could not name them anyway, and "ask Jane" would leak the very structure the
+    // scope exists to keep.
+    expect(remediation).toContain(
+      'Signing a case off is the {{ signoff_role | escape }} mapped to its adviser,\n                which your account is not for this one.',
+    );
+  });
+
+  it('skips the fetch when the case carries no adviser email', () => {
+    // An `eq` against an empty value is the F48 shape. There is nothing to match either:
+    // TcManagerRouting returns NoAdviserEmail for the same case, so the server refuses it too.
+    expect(remediation).toContain(
+      "{% if c and ot_case_adviser_email != '' and user %}",
     );
   });
 });
