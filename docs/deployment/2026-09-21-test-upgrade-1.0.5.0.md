@@ -78,7 +78,17 @@ straight to DEV on 2026-09-19 and never back-ported, so any environment seeded f
 repository comes up without it, **including PROD**.
 
 Created in TEST with `al_AddQuestion` against the existing `S-TAX` section (same GUID in both).
-**The seed file is still wrong and that is the fix that matters.**
+
+**The seed file has since been fixed** — `Q-TAX-04` and its v1 version are in
+`data/v8-seed/data.xml` (46 → 47 questions). But proving that fix found something larger, and it
+changes how the seed should be thought of: **`importseed` upserts on the ids the package
+carries, and those are not the ids DEV and TEST use.** The seed holds `Q-TAX-03` as
+`44440000-…-0003`; both environments hold it as `ea8d0eec-…`, and only 4 of DEV's 56 questions
+carry a seed GUID at all. A minimal package with just the two new records was imported into TEST
+to test exactly this and failed with `Entity 'al_Section' With Id = 33330000-…-0001 Does Not
+Exist` — the seed's question correctly points at the seed's own section, and that section is not
+there. So the package is coherent and now correct **for a fresh environment**, and is not a
+patching tool for one that already has a checklist.
 
 A promotion consequence worth knowing: `al_AddQuestion` refuses a past effective date — *"a
 question cannot have been owed by a review already answered"* — which is correct. So a promoted
@@ -111,17 +121,38 @@ One demonstration row was created, mirroring DEV's, which proves the table and t
 addresses; mapping each to their actual T&C Manager is the firm's supervision structure, and
 guessing at it in a UAT run would be wrong on the facts and wrong about personal data.
 
-## Not verified, and why
+## Two claims this note made earlier, and the corrections
 
-**The TEST portal has no host of its own.** Its site record carries
-`outcometesting.powerappsportals.com` — DEV's hostname, copied by the import — so there is no
-second site serving it. Everything portal-side above is verified at the data layer: component
-content, permissions, bindings and rows. Nothing was confirmed by loading a page in TEST.
+Both were written from inference and both were wrong. They are corrected here rather than
+edited away, because anyone promoting to PROD will make the same two mistakes otherwise.
 
-**`outcome-testing.css` is not demonstrated to have travelled.** It is a web *file*; its
-component row carries only a 36-byte `filecontent` pointer and the two environments' values
-differ. Push it with `pushwebfile` against TEST before anyone reads the portal there — today
-that matters, because F52's overdue styling and F55's phone-width rule both live in it.
+**The TEST portal DOES have a host of its own: `https://outcometestingtest.powerappsportals.com/`,
+Active, Enhanced model, sign-in configured.** The earlier claim came from reading
+`mspp_primarydomainname` on the site record, which holds `outcometesting.powerappsportals.com` —
+DEV's hostname. That column is stale copied data and is **not** where the serving URL lives; the
+platform site listing (`pac powerpages list --verbose`) is. Do not diagnose a portal from that
+column.
+
+**`outcome-testing.css` did travel.** Fetched from the TEST portal it returns 200 and contains
+all three of the day's rules — `.ot-checklist .meta` (F55), `ot-due--overdue` and `ot-due__flag`
+(F52), `ot-unassigned` (F51). The 36-byte `filecontent` value on the component row is a pointer
+and is not the file; comparing it across environments proves nothing. No `pushwebfile` was
+needed.
+
+## Verified live in TEST after those corrections
+
+- **The F53 lifecycle guard works there**, proved on a throwaway case created and then deleted:
+  illegal `Queued → Closed` refused with *"A case cannot move from Queued to Closed. From Queued
+  it can move to Assigned or No Check Required."*; legal `Queued → Assigned` returned 204.
+- **No OutcomeTesting step is disabled.** All 53 disabled steps in TEST belong to Microsoft
+  first-party solutions.
+- **Code App** `al_ascotlloydoutcometesting_72932` is present, managed and **Ready**.
+- **23 web-role assignments** exist, so testers have roles.
+
+What still cannot be confirmed by browsing is the rendering itself — signing in to TEST needs
+credentials this session does not hold. The templates are byte-identical to DEV and the
+stylesheet is live, so the portal fixes follow by construction; the first tester through should
+still glance at one review page.
 
 ## One consequence of F53 that will surprise somebody
 
