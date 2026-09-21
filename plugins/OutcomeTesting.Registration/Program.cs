@@ -176,7 +176,7 @@ const int StatusFailed = 120910812;
 // row is reported rather than waited on.
 const int DrainWaitSeconds = 120;
 
-ServiceClient Connect(string orgUrl)
+ServiceClient Connect(string orgUrl, Guid caller = default)
 {
     var connectionString =
         $"AuthType=OAuth;Url={orgUrl.TrimEnd('/')};AppId=51f81489-12ee-4a9e-aaae-a2591f45987d;" +
@@ -189,7 +189,103 @@ ServiceClient Connect(string orgUrl)
     }
 
     Console.WriteLine($"Connected as {svc.OAuthUserId}.");
+
+    if (caller != Guid.Empty)
+    {
+        svc.CallerId = caller;
+        Console.WriteLine($"Acting as systemuser {caller:D} - every request below is made as them.");
+    }
+
     return svc;
+}
+
+// Strips "--as <systemuserid>" out of a verb's positional arguments and hands back the
+// caller to impersonate.
+//
+// Every gate in this solution reads the CALLER and not the connection: the application
+// permission gate resolves roles from the caller's work email, and the Dataverse layer
+// beneath it applies the caller's own privileges. So a negative test run as the operator
+// proves nothing at all - and in this environment less than nothing, because the operator
+// is a System Administrator and PermissionHelpers.EnsureAppPermission returns on its first
+// line for one of those (the break-glass short-circuit). Impersonation is what would make
+// "refused for a role that may not do this" a thing that can be observed rather than
+// reasoned about, without holding that person's password.
+//
+// It takes a systemuser id rather than an email on purpose. An email has to be resolved,
+// a resolution can quietly find nobody, and an impersonation that quietly finds nobody
+// runs as the operator and SUCCEEDS - which reads exactly like the rule not being there.
+// A GUID that is wrong fails loudly instead.
+string[] TakeCaller(string[] a, out Guid caller)
+{
+    caller = Guid.Empty;
+    var kept = new List<string>();
+
+    for (var i = 0; i < a.Length; i++)
+    {
+        if (a[i].Equals("--as", StringComparison.OrdinalIgnoreCase))
+        {
+            if (i + 1 >= a.Length || !Guid.TryParse(a[i + 1], out caller))
+            {
+                throw new ArgumentException(
+                    "--as needs a systemuser id (a GUID). Find it with: "
+                    + "webapi <orgUrl> GET systemusers?$select=fullname,internalemailaddress");
+            }
+
+            i++;
+            continue;
+        }
+
+        kept.Add(a[i]);
+    }
+
+    return kept.ToArray();
+}
+
+// Asks the server who it thinks is calling, over the SAME transport and with the SAME
+// headers as the request that follows, and refuses to go on unless the answer is the
+// person we asked to be.
+//
+// This is not defensive padding. Dataverse honours caller impersonation only for a service
+// principal - an application user connecting with a client secret. This tool signs in as a
+// LICENSED HUMAN over interactive OAuth, and on that kind of token the server does not
+// reject MSCRMCallerID, it IGNORES it: HTTP 200, a normal body, no warning, and the request
+// runs as the operator. Every negative test built on that would have come back "succeeded"
+// and been written down as a rule that does not exist.
+//
+// So the flag either impersonates or stops. A tool for proving that somebody else is
+// refused must never be able to quietly prove it about itself.
+bool ImpersonationLanded(
+    ServiceClient svc, Dictionary<string, List<string>> headers, Guid caller)
+{
+    using var probe = svc.ExecuteWebRequest(HttpMethod.Get, "WhoAmI", null, headers);
+    var body = probe.Content == null
+        ? string.Empty
+        : probe.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+    var actual = Guid.Empty;
+    var node = string.IsNullOrWhiteSpace(body) ? null : JsonNode.Parse(body);
+    if (node?["UserId"] != null)
+    {
+        Guid.TryParse(node["UserId"]!.GetValue<string>(), out actual);
+    }
+
+    if (actual == caller)
+    {
+        return true;
+    }
+
+    Console.Error.WriteLine(
+        $"Refusing to run: asked to act as {caller:D}, but the server says the caller is "
+        + (actual == Guid.Empty ? "(WhoAmI did not answer)" : actual.ToString("D")) + ".");
+    Console.Error.WriteLine(
+        "  Dataverse only honours impersonation for an application user authenticating with a");
+    Console.Error.WriteLine(
+        "  client secret. This tool signs in as a licensed user, and on that token the");
+    Console.Error.WriteLine(
+        "  impersonation header is ignored rather than refused - so the request would have run");
+    Console.Error.WriteLine(
+        "  as you and looked like it worked. Testing another role needs a real second account.");
+    return false;
 }
 
 if (args.Length >= 2 && args[0].Equals("verify", StringComparison.OrdinalIgnoreCase))
@@ -738,6 +834,14 @@ int Fetch(string orgUrl, string fetchXmlOrFile)
 // the run exists to show.
 int WebApi(string[] a)
 {
+    a = TakeCaller(a, out var caller);
+    if (a.Length < 4)
+    {
+        Console.Error.WriteLine(
+            "Usage: webapi <orgUrl> <GET|POST|PATCH|DELETE> <path> [<json|@file>] [--as <systemuserid>]");
+        return 1;
+    }
+
     var orgUrl = a[1];
     var verb = a[2].Trim().ToUpperInvariant();
     var path = a[3].TrimStart('/');
@@ -767,7 +871,22 @@ int WebApi(string[] a)
         headers["If-Match"] = new List<string> { "*" };
     }
 
-    using var svc = Connect(orgUrl);
+    // The header, and NOT ServiceClient.CallerId, because ExecuteWebRequest does not carry
+    // CallerId onto the request it builds. Setting the property and sending the call looks
+    // like it worked - HTTP 200, a body, no warning anywhere - and WhoAmI comes back as the
+    // OPERATOR. Which is the worst possible shape for a tool whose whole purpose is proving
+    // that somebody else is refused: every negative test would have passed as a success.
+    if (caller != Guid.Empty)
+    {
+        headers["MSCRMCallerID"] = new List<string> { caller.ToString("D") };
+    }
+
+    using var svc = Connect(orgUrl, caller);
+
+    if (caller != Guid.Empty && !ImpersonationLanded(svc, headers, caller))
+    {
+        return 3;
+    }
 
     try
     {
@@ -1942,6 +2061,14 @@ int SetStepState(string[] a)
 // that can only read would not exercise them.
 int CallApi(string[] a)
 {
+    a = TakeCaller(a, out var caller);
+    if (a.Length < 3)
+    {
+        Console.Error.WriteLine(
+            "Usage: callapi <orgUrl> <apiName> [<name=value> ...] [--as <systemuserid>]");
+        return 1;
+    }
+
     var orgUrl = a[1];
     var apiName = a[2];
 
@@ -1959,7 +2086,22 @@ int CallApi(string[] a)
         request[pair.Substring(0, split)] = pair.Substring(split + 1);
     }
 
-    using var svc = Connect(orgUrl);
+    using var svc = Connect(orgUrl, caller);
+
+    // Same guard as the webapi verb, over the SDK transport this one uses. ServiceClient
+    // .CallerId is likewise ignored on a licensed user's token rather than refused.
+    if (caller != Guid.Empty)
+    {
+        var who = ((WhoAmIResponse)svc.Execute(new WhoAmIRequest())).UserId;
+        if (who != caller)
+        {
+            Console.Error.WriteLine(
+                $"Refusing to run: asked to act as {caller:D}, but the caller is {who:D}. "
+                + "Dataverse honours impersonation only for an application user with a client "
+                + "secret, so this would have run as you and reported success.");
+            return 3;
+        }
+    }
 
     try
     {
