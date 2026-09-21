@@ -103,8 +103,7 @@ namespace OutcomeTesting.Plugins
 
             // The T&C-only pair first: it is refused whatever the action's status is, so it
             // must not sit behind the Completed gate below.
-            var trespass = TcOnlyRefusal(
-                update, CommandHelpers.IsWithinMessageOn(context, "Update", "contact"));
+            var trespass = TcOnlyRefusal(update, IsSignoffInFlight(service));
             if (trespass != null)
             {
                 throw new InvalidPluginExecutionException(trespass);
@@ -126,18 +125,91 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// True when a sign-off is in flight: some contact's <c>al_signoffrequest</c> is set
+        /// right now.
+        ///
+        /// <para>
+        /// <b>Any request, not this action's.</b> The tighter form was written first and was
+        /// wrong: <see cref="SignoffRequestPlugin.RecordFormAnswers"/> answers the whole
+        /// check, writing every sibling action on the case, while the request names only the
+        /// one the supervisor clicked. Matching the id refused the other four.
+        /// </para>
+        ///
+        /// <para>
+        /// <b>State, not provenance, and the third attempt at this.</b> The guard first asked
+        /// whether the parent pipeline was an Update of <c>contact</c>, then whether the
+        /// sign-off had raised a shared variable. Both were proved wrong in DEV on
+        /// 2026-09-21 by printing the chain, and for the same underlying reason: <b>Power
+        /// Pages wraps every write in the same shape.</b> The adviser PATCHing the action and
+        /// the supervisor signing off both arrive as
+        /// <c>Upsert/none(depth 1) -&gt; Update/al_remediationaction(depth 2)</c>, so no
+        /// message name, entity, depth or parent distinguishes them; and a parent's shared
+        /// variables are snapshotted before the plug-in that would set one runs, so the flag
+        /// was never visible either.
+        /// </para>
+        /// <para>
+        /// What IS distinguishable is that a sign-off leaves a record of itself while it
+        /// happens. <see cref="SignoffRequestPlugin"/> writes these columns between the
+        /// contact's request column being set and the same transaction clearing it, so the
+        /// request is on the row for exactly the window this runs in.
+        /// </para>
+        /// <para>
+        /// Forging it buys nothing. Setting <c>al_signoffrequest</c> on your own contact is
+        /// the sign-off, and it runs the role and mapping checks; setting it on anybody
+        /// else's is refused by the Self-scoped contact permission. A caller who could pass
+        /// those checks did not need to forge anything.
+        /// </para>
+        /// <para>
+        /// <b>The residual, stated rather than glossed.</b> Broadened this way, a write could
+        /// ride on somebody ELSE's sign-off happening in the same instant. That is a narrow
+        /// window and it is not reachable from the portal at all, because these two columns
+        /// are no longer in the Web API field list - which is why that change is the first
+        /// line and this is the second. It is recorded here so the next person weighing a
+        /// tighter check knows what it would buy.
+        /// </para>
+        /// <para>
+        /// This is the second line, not the first. The first is that these two columns are no
+        /// longer in <c>Webapi/al_remediationaction/fields</c>, so the portal refuses to carry
+        /// them before any plug-in runs at all.
+        /// </para>
+        /// </summary>
+        public static bool IsSignoffInFlight(IOrganizationService service)
+        {
+            if (service == null)
+            {
+                return false;
+            }
+
+            var query = new QueryExpression("contact")
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition(
+                SignoffRequestPlugin.RequestAttr, ConditionOperator.NotNull);
+
+            return service.RetrieveMultiple(query).Entities.Count > 0;
+        }
+
+        /// <summary>
         /// The refusal for a write that reaches for the T&amp;C Manager's two answers by any
         /// route but the sign-off, or null when there is nothing of theirs in it. Public and
         /// static so the rule is testable without a plug-in context.
         ///
-        /// <paramref name="fromContactPipeline"/> is the whole test, and
-        /// <see cref="CommandHelpers.IsWithinMessageOn"/> records why it is a boundary
-        /// rather than a hint: the only way onto these columns is
-        /// <see cref="SignoffRequestPlugin.Apply"/>, which runs inside the Update of the
-        /// signed-in supervisor's own contact row and has checked their web role before it
-        /// writes. A browser PATCH of an <c>al_remediationaction</c> — which is what the
-        /// adviser's page sends, and what anyone else could send — has no parent context at
-        /// all.
+        /// <paramref name="fromSignoff"/> is the whole test, and
+        /// <see cref="CommandHelpers.IsWithinSignoff"/> records why it is a boundary rather
+        /// than a hint: the only way onto these columns is
+        /// <see cref="SignoffRequestPlugin.Apply"/>, which has checked the supervisor's web
+        /// role AND that they are the T&amp;C Manager mapped to the case before it writes,
+        /// and which sets the flag on itself. A browser PATCH of an
+        /// <c>al_remediationaction</c> — which is what the adviser's page sends, and what
+        /// anyone else could send — sets no flag and carries no such ancestor.
+        ///
+        /// It used to test the parent's MESSAGE NAME instead, and that was wrong on the one
+        /// path that matters: through Power Pages the update arrives as <c>Upsert</c> with no
+        /// primary entity, so a legitimate sign-off was refused and only an SDK caller got
+        /// through. See <see cref="CommandHelpers.IsWithinSignoff"/>
         ///
         /// Refused on PRESENCE, not on change. A write restating the stored value is still an
         /// adviser answering the supervisor's question, and allowing it would mean the guard
@@ -145,9 +217,9 @@ namespace OutcomeTesting.Plugins
         /// <see cref="Refusal"/>, where a restated value is a dropped-response retry and
         /// refusing it would strand the adviser.
         /// </summary>
-        public static string TcOnlyRefusal(Entity update, bool fromContactPipeline)
+        public static string TcOnlyRefusal(Entity update, bool fromSignoff)
         {
-            if (update == null || fromContactPipeline)
+            if (update == null || fromSignoff)
             {
                 return null;
             }
