@@ -306,3 +306,84 @@ it refuses outright. A step narrowed to three would let the refused pair through
   is proved by test and not live.
 - Nothing here has been promoted. TEST still carries 1.0.5.0 and has **no case data** since
   the 2026-09-21 purge, so none of this can be exercised there until cases are imported.
+
+---
+
+## Follow-up the same day: the portal showed a stale checklist (AD-185)
+
+The project owner retyped the five **File Quality - AML and CRA checking points** questions to
+Yes / No / Insufficient evidence and reported that the portal still drew Pass / Fail /
+Insufficient evidence, then: *"the changes should show immediately after they are made"*.
+
+### The change was correct, and so was every renderer
+
+All five questions carry a **v3** on `120910009`, effective 2026-09-21. Running the exact
+in-force filter the renderers use returns five versions, all agreeing, none mixed. Both
+surfaces handle that scale, and both were already taught that a section's **questions**
+override its declared scale - using S-AMLCRA as the worked example. What the page was showing
+was **v2**, a version that existed only from 19 to 21 September.
+
+### Where the staleness is, and where it is not
+
+- **The Code App is already immediate.** `useReviewDetail` reads Dataverse on mount with no
+  cache, so a change shows the moment a review is opened.
+- **A submitted review is pinned, correctly and permanently.** It is read as of its submission
+  day (BR-013), so a review submitted on 20 September will always draw v2.
+- **The portal was the problem.** Power Pages renders from a server-side cache and learns
+  about a write through polled change tracking. Change tracking was re-verified enabled on
+  `al_question`, `al_questionversion` and `al_section`; it makes the portal able to notice,
+  not prompt about it. There is no site setting for it — the only cache settings on this site
+  are `Header/OutputCache/Enabled` and `Footer/OutputCache/Enabled`.
+
+### What was done
+
+The review page now re-reads its own checklist through the **Web API**, which is not the
+Liquid render cache — the same move `OT Remediation` already makes for its stale case-status
+badge. Where a question has been re-versioned since the render, the page repoints the row at
+the live version, redraws its options from the live scale, re-heads the grid where every row
+agrees, and says what happened.
+
+Three things it deliberately does not do:
+
+- **It does not touch a submitted review.** Refreshing one would relabel answered history.
+- **It does not keep a tick the new scale has no option for.** It clears it and says so;
+  coming back to an empty row with no explanation is how a reviewer concludes work was lost.
+- **It does not re-head a grid whose rows disagree.** Leaving the old heading beats inventing
+  one, which is the same test the server makes.
+
+`Webapi/al_questionversion/enabled` was turned on for it. **It grants nothing new:** the
+`Question Version - read` table permission is read-only, and the Web API cannot exceed a table
+permission.
+
+### A gap this turned up: DEV's portal stylesheet was never pushed
+
+Fetching `outcome-testing.css` from the DEV portal showed it missing **yesterday's** rules as
+well as today's — `ot-due--overdue`, `ot-unassigned` and the phone-width `.ot-checklist .meta`
+(F51, F52, F55). Those reached TEST through the managed solution, and the 2026-09-21 TEST note
+records them live there; nobody pushed them to **DEV**, where the portal is hand-maintained
+(`powerpages/` is not a mirror). `pushwebfile` has now sent all of them, 58,238 bytes, and the
+component reads back modified at 14:36:54Z.
+
+The portal was still serving the older copy minutes afterwards — which is the same cache this
+whole section is about, showing itself on a second surface.
+
+### Deployed to DEV
+
+| Step | Result |
+|---|---|
+| `setsitesetting Webapi/al_questionversion/enabled` | `true`, created |
+| `setsitesetting Webapi/al_questionversion/fields` | seven read columns, created |
+| `pushwebtemplate` OT Review Detail | 166,947 → 181,754 chars |
+| `pushwebfile` outcome-testing.css | 58,238 bytes |
+| App tests | **814 passing**, 65 files |
+
+### Not verified live, and why
+
+**The Web API read itself needs a signed-in portal session, which this session does not
+hold.** The configuration is right — the site settings read back, the table permission grants
+read, and change tracking is on — but whether Power Pages serves
+`/_api/al_questionversions` to a checker has not been exercised. Thirteen tests pin the
+script's shape and the scale table against both rendering sources, and a deliberate drift was
+injected into `OT Answer Options` to prove they catch it. **The first tester on the portal
+should open an unsubmitted review, have someone retype a question, and reload.** If the Web
+API is refused, the page simply stays as it renders today — the check fails quietly by design.

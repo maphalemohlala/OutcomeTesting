@@ -1773,3 +1773,27 @@ footer a:focus-visible, .footer a:focus-visible {
   font-size: var(--text-sm);
   color: var(--colour-text-muted);
 }
+
+/*
+ * The checklist-freshness notice on a review page (2026-09-21). Raised only when the page
+ * found that a question had been re-versioned since Power Pages last refreshed its cache,
+ * and it has brought the form up to date in place. Styled as information rather than as an
+ * error: nothing has gone wrong, and a red banner over a form that is now CORRECT would
+ * read as a failure.
+ *
+ * `[hidden]` is honoured explicitly. The element ships hidden and some resets give every
+ * element a display that overrides it.
+ */
+.ot-stale {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid #0b6ea8;
+  background: #eef6fb;
+  color: #16303f;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.ot-stale[hidden] {
+  display: none;
+}

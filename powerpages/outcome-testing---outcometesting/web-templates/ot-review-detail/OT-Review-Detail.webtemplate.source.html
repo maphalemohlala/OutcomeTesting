@@ -556,6 +556,10 @@
           <link-entity name="al_question" from="al_questionid" to="al_questionid" alias="q">
             <attribute name="al_displayorder" />
             <attribute name="al_questioncode" />
+            <!-- The question this version belongs to, which the freshness check below keys
+                 on: it asks Dataverse for the version in force NOW per question, and a
+                 version id alone cannot be looked up that way. -->
+            <attribute name="al_questionid" />
             <link-entity name="al_section" from="al_sectionid" to="al_sectionid" alias="s">
               <attribute name="al_sectionid" />
               <attribute name="al_name" />
@@ -1153,6 +1157,7 @@
           {% elsif blk_layout == 'grid' and rt == blk_rt %}
             <tr data-ot-answer{% if is_suitability %} data-ot-suitability{% endif %}
                 data-question-version="{{ qv_id }}"
+                data-question-id="{{ qv['q.al_questionid'] }}"
                 data-response-id="{{ existing.al_responseid }}"
                 data-response-type="{{ rt }}"
                 data-column="choice">
@@ -1195,6 +1200,8 @@
                    data-ot-answer
                    data-ot-rootcause
                    data-question-version="{{ qv_id }}"
+                   data-question-id="{{ qv['q.al_questionid'] }}"
+                data-question-id="{{ qv['q.al_questionid'] }}"
                    data-response-id="{{ existing.al_responseid }}"
                    data-response-type="{{ rt }}"
                    data-column="choice"{% if hide_rootcause %} hidden{% endif %}>
@@ -1219,6 +1226,7 @@
             {% endcomment %}
             <tr data-ot-answer{% if is_suitability %} data-ot-suitability{% endif %}
                 data-question-version="{{ qv_id }}"
+                data-question-id="{{ qv['q.al_questionid'] }}"
                 data-response-id="{{ existing.al_responseid }}"
                 data-response-type="{{ rt }}"
                 data-column="{{ column }}">
@@ -1335,6 +1343,299 @@
           </table>
         {% endunless %}
         </div>
+        {% unless rv.al_submittedon %}
+        {% comment %}
+          The checklist, re-read live, so an edit made minutes ago is on the form now
+          (project owner, 2026-09-21: "the changes should show immediately after they are
+          made").
+
+          Why this is needed at all. Power Pages renders from a server-side cache and learns
+          about a Dataverse write through change tracking, which is polled and eventually
+          consistent - AD-094 measured the refresh at up to fifteen minutes and AD-117
+          concluded that "a longer delay narrows the window and cannot close it". Change
+          tracking is enabled on al_question, al_questionversion and al_section and was
+          re-verified on 2026-09-21; it makes the portal ABLE to notice, not prompt about it.
+          So a question retyped in the Code App - AD-123 checklist administration - can leave
+          this page drawing the previous scale for a quarter of an hour.
+
+          That is not only untidy. ResponseGuardPlugin refuses an answer written against a
+          superseded version ("This question has been replaced by a newer version"), so a
+          checker working from a stale form ticks a box and is told no, with nothing on the
+          page to explain why. Their answer is never silently lost - the refusal is the
+          server doing its job - but the page has to stop putting them in that position.
+
+          The fix is the one this site already uses for the stale case-status badge on OT
+          Remediation: ask the Web API. The Web API is not the Liquid render cache, which is
+          the whole point of reading through it here. Webapi/al_questionversion/enabled was
+          turned on for this; it grants nothing new, because the Question Version - read
+          table permission is read-only and the Web API cannot exceed it.
+
+          ONLY on an unsubmitted review. A submitted one is read as of its submission day
+          (BR-013) and must keep rendering the versions it was answered against - refreshing
+          it would relabel answered history, which is the opposite of what the versioning is
+          for.
+
+          Progressive enhancement throughout: a failure, a refusal, or a browser that never
+          runs this leaves the server-rendered form exactly as it was. A stale form is what
+          we already have, so there is nothing to lose by failing quietly, and nothing here
+          is a permission decision the page is entitled to make (NFR-SEC-01).
+        {% endcomment %}
+        <p class="ot-stale" data-ot-checklist-stale hidden role="status" aria-live="polite"></p>
+        {% comment %}
+          The scales, emitted from the same literals the rendering uses, so the script does
+          not become a third hand-written copy of them. "inline" matches OT Answer Options,
+          which is what draws every answer cell; "grid" matches the tick-column headings
+          chosen above. 120910006 reads its third option differently on a Tax review
+          (AD-055 amended), so the discipline is resolved here rather than in script.
+          portalChecklistFreshness.test.ts pins these against both sources.
+        {% endcomment %}
+        <script type="application/json" data-ot-scales>
+        {
+          "inline": {
+            "120910005": { "values": [120910300,120910301], "labels": ["PASS","FAIL"] },
+            {% if is_tax_review %}
+            "120910006": { "values": [120910300,120910302,120910301], "labels": ["PASS","PASS WITH ISSUES","FAIL"] },
+            {% else %}
+            "120910006": { "values": [120910300,120910301,120910302], "labels": ["PASS","FAIL","INSUFFICIENT EVIDENCE"] },
+            {% endif %}
+            "120910007": { "values": [120910305,120910306], "labels": ["YES","NO"] },
+            "120910008": { "values": [120910305,120910306,120910307], "labels": ["YES","NO","N/A"] },
+            "120910009": { "values": [120910305,120910306,120910302], "labels": ["YES","NO","INSUFFICIENT EVIDENCE"] },
+            "120910010": { "values": [120910300,120910303,120910302,120910304], "labels": ["PASS","PASS WITH ISSUES","INSUFFICIENT EVIDENCE","POTENTIAL HARM"] }
+          },
+          "grid": {
+            {% if is_tax_review %}
+            "120910006": { "labels": ["Pass","Fail","Pass with issues"] },
+            {% else %}
+            "120910006": { "labels": ["Pass","Fail","Insufficient evidence"] },
+            {% endif %}
+            "120910008": { "labels": ["Yes","No","N/A"] },
+            "120910009": { "labels": ["Yes","No","Insufficient evidence"] }
+          }
+        }
+        </script>
+        <script>
+          (function () {
+            'use strict';
+
+            var notice = document.querySelector('[data-ot-checklist-stale]');
+            var rows = document.querySelectorAll('[data-ot-answer][data-question-id]');
+            if (!notice || !rows.length) { return; }
+
+            var scalesEl = document.querySelector('[data-ot-scales]');
+            if (!scalesEl) { return; }
+            var SCALES;
+            try { SCALES = JSON.parse(scalesEl.textContent); } catch (e) { return; }
+
+            /*
+             * The day the server rendered against, so the client cannot disagree with it
+             * about what "in force" means because of a time zone.
+             */
+            var AS_OF = '{{ as_of }}';
+
+            var ids = [];
+            var seen = {};
+            for (var i = 0; i < rows.length; i += 1) {
+              var qid = rows[i].getAttribute('data-question-id');
+              if (qid && !seen[qid]) { seen[qid] = true; ids.push(qid); }
+            }
+            if (!ids.length) { return; }
+
+            var clauses = [];
+            for (var j = 0; j < ids.length; j += 1) {
+              clauses.push('_al_questionid_value eq ' + ids[j]);
+            }
+
+            var filter = '(al_effectivefrom eq null or al_effectivefrom le ' + AS_OF + ')'
+              + ' and (al_effectiveto eq null or al_effectiveto gt ' + AS_OF + ')'
+              + ' and (' + clauses.join(' or ') + ')';
+
+            var url = '/_api/al_questionversions'
+              + '?$select=al_questionversionid,_al_questionid_value,al_responsetype,al_questiontext'
+              + '&$filter=' + encodeURIComponent(filter);
+
+            var request = new XMLHttpRequest();
+            request.open('GET', url, true);
+            request.setRequestHeader('Accept', 'application/json');
+
+            request.onreadystatechange = function () {
+              if (request.readyState !== 4) { return; }
+              if (request.status < 200 || request.status >= 300) { return; }
+
+              var live;
+              try { live = JSON.parse(request.responseText).value; } catch (e) { return; }
+              if (!live || !live.length) { return; }
+
+              var byQuestion = {};
+              for (var k = 0; k < live.length; k += 1) {
+                byQuestion[live[k]._al_questionid_value] = live[k];
+              }
+
+              apply(byQuestion);
+            };
+
+            try { request.send(); } catch (e) { /* offline; the rendered form stands */ }
+
+            /* The words on a row, so the notice can name what moved rather than count it. */
+            function labelOf(row) {
+              var cell = row.querySelector('td.label, td.lbl');
+              if (!cell) { return 'A question'; }
+              var text = cell.cloneNode(true);
+              var marks = text.querySelectorAll('.ot-required, .ot-answer__status');
+              for (var i = 0; i < marks.length; i += 1) {
+                marks[i].parentNode.removeChild(marks[i]);
+              }
+              return (text.textContent || '').replace(/^\s+|\s+$/g, '');
+            }
+
+            function apply(byQuestion) {
+              var moved = [];
+              var cleared = 0;
+
+              for (var i = 0; i < rows.length; i += 1) {
+                var row = rows[i];
+                var current = byQuestion[row.getAttribute('data-question-id')];
+                if (!current) { continue; }
+
+                var renderedVersion = row.getAttribute('data-question-version');
+                if (current.al_questionversionid === renderedVersion) { continue; }
+
+                var was = labelOf(row);
+                var renderedType = Number(row.getAttribute('data-response-type'));
+                var liveType = Number(current.al_responsetype);
+
+                /*
+                 * The row now answers a different version, whatever else changed: point the
+                 * autosave at it before anything else, so a save made a moment later is
+                 * written against the version the server will accept.
+                 */
+                row.setAttribute('data-question-version', current.al_questionversionid);
+                row.setAttribute('data-response-type', String(liveType));
+
+                retext(row, current.al_questiontext);
+
+                if (liveType !== renderedType) {
+                  if (rebuild(row, liveType, current)) { cleared += 1; }
+                }
+
+                moved.push(was);
+              }
+
+              if (!moved.length) { return; }
+
+              reheadGrids();
+              announce(moved, cleared);
+            }
+
+            /*
+             * The question's own wording, replaced without disturbing the Required marker or
+             * the live status span the autosave writes into.
+             */
+            function retext(row, wording) {
+              if (!wording) { return; }
+              var cell = row.querySelector('td.label, td.lbl');
+              if (!cell) { return; }
+              for (var i = 0; i < cell.childNodes.length; i += 1) {
+                if (cell.childNodes[i].nodeType === 3) {
+                  cell.childNodes[i].nodeValue = wording;
+                  return;
+                }
+              }
+            }
+
+            /*
+             * The answer options, redrawn from the live scale. Returns true when a tick was
+             * dropped because the new scale has no such value - the one consequence a
+             * checker has to be told about.
+             */
+            function rebuild(row, liveType, current) {
+              var opts = row.querySelector('.opts');
+              var scale = SCALES.inline[String(liveType)];
+              if (!opts || !scale) { return false; }
+
+              var chosen = opts.querySelector('input[type="radio"]:checked');
+              var chosenValue = chosen ? chosen.value : null;
+              var wasDisabled = !!opts.querySelector('input[type="radio"][disabled]');
+              var keeps = false;
+              for (var i = 0; i < scale.values.length; i += 1) {
+                if (String(scale.values[i]) === chosenValue) { keeps = true; }
+              }
+
+              var wording = current.al_questiontext || labelOf(row);
+              while (opts.firstChild) { opts.removeChild(opts.firstChild); }
+
+              for (var v = 0; v < scale.values.length; v += 1) {
+                var value = String(scale.values[v]);
+                var label = document.createElement('label');
+                label.className = 'opt';
+                var input = document.createElement('input');
+                input.type = 'radio';
+                input.className = 'cc-box';
+                input.name = 'q-' + current.al_questionversionid;
+                input.value = value;
+                input.setAttribute('data-ot-input', '');
+                input.setAttribute('aria-label', wording + ': ' + scale.labels[v]);
+                if (wasDisabled) { input.disabled = true; }
+                if (keeps && value === chosenValue) { input.checked = true; }
+                label.appendChild(input);
+                label.appendChild(document.createTextNode(' ' + scale.labels[v]));
+                opts.appendChild(label);
+              }
+
+              return chosenValue !== null && !keeps;
+            }
+
+            /*
+             * A tick grid heads its columns from the scale its rows answer on. Re-headed only
+             * where every row in the table now agrees, which is the same test the server
+             * makes: a table whose rows disagree has no honest column heading, and leaving
+             * the old one is better than inventing one.
+             */
+            function reheadGrids() {
+              var grids = document.querySelectorAll('table.grid');
+              for (var g = 0; g < grids.length; g += 1) {
+                var gridRows = grids[g].querySelectorAll('[data-ot-answer][data-response-type]');
+                if (!gridRows.length) { continue; }
+
+                var type = null;
+                var agreed = true;
+                for (var r = 0; r < gridRows.length; r += 1) {
+                  var t = gridRows[r].getAttribute('data-response-type');
+                  if (type === null) { type = t; } else if (type !== t) { agreed = false; break; }
+                }
+                if (!agreed || type === null) { continue; }
+
+                var scale = SCALES.grid[type];
+                var heads = grids[g].querySelectorAll('thead th.opt');
+                if (!scale || heads.length !== scale.labels.length) { continue; }
+                for (var h = 0; h < heads.length; h += 1) {
+                  heads[h].textContent = scale.labels[h];
+                }
+              }
+            }
+
+            function announce(moved, cleared) {
+              var many = moved.length > 1;
+              var text = 'The checklist was updated while this page was open, so '
+                + (many ? moved.length + ' questions have' : '"' + moved[0] + '" has')
+                + ' been brought up to date here.';
+
+              if (cleared > 0) {
+                text += ' ' + (cleared > 1 ? cleared + ' answers no longer' : 'An answer no longer')
+                  + ' had a matching option on the new version and '
+                  + (cleared > 1 ? 'have' : 'has')
+                  + ' been cleared - please answer '
+                  + (cleared > 1 ? 'those questions' : 'that question') + ' again.';
+              } else {
+                text += ' Nothing you had already answered was changed.';
+              }
+
+              notice.textContent = text;
+              notice.hidden = false;
+            }
+          })();
+        </script>
+        {% endunless %}
         {% if editable %}
         <script>
           /*
