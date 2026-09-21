@@ -8,11 +8,24 @@ namespace OutcomeTesting.Plugins
     /// Who the T&amp;C Manager is for a case, for ROUTING only (Fixes 5, AD-162).
     ///
     /// <para>
-    /// <b>This grants no access and restricts none.</b> Every T&amp;C Manager reads every
-    /// case, which is the permission model the owner confirmed in Phase 1, and nothing here
-    /// narrows that. What the mapping decides is who is told a sign-off is waiting and whose
-    /// queue it belongs in - not who is allowed to perform it. A reader looking for an
-    /// authorisation check will not find one, and that is deliberate rather than missing.
+    /// <b>This type still decides nothing.</b> It answers "who is the T&amp;C Manager for this
+    /// case" and returns a recipient and a reason - no role, no permission, no boolean anybody
+    /// could mistake for "may sign off". Every caller here draws its own conclusion.
+    /// </para>
+    /// <para>
+    /// <b>What that answer is used for changed on 2026-09-21.</b> Until then it decided only
+    /// who was TOLD a sign-off was waiting: every T&amp;C Manager could attest to every case,
+    /// which is the Phase 1 model, and this header said so in as many words. The owner
+    /// reversed it on finding that a service account holding the supervisor role could sign
+    /// off a case whose adviser it supervises nothing of. <see cref="SignoffRequestPlugin.EnsureMappedToCase"/>
+    /// now compares the signatory against this mapping. <b>Reading stays open to every
+    /// supervisor; attesting does not.</b>
+    /// </para>
+    /// <para>
+    /// The consequence to keep in view: an adviser with no mapping has no one who may sign
+    /// their cases off. That is intended - an attestation needs a supervisor - but it makes
+    /// <c>al_advisermapping</c> operational data rather than notification convenience, and an
+    /// environment that has not populated it cannot complete a remediation at all (F58).
     /// </para>
     /// <para>
     /// Resolved through <c>al_advisermapping</c>, keyed on the adviser's work EMAIL as the

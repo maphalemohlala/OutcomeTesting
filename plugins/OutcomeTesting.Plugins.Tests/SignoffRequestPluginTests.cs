@@ -17,13 +17,46 @@ namespace OutcomeTesting.Plugins.Tests
     {
         private static readonly Guid ContactId = Guid.Parse("dddddddd-4444-4444-8444-444444444444");
         private static readonly Guid ActionId = Guid.Parse("aaaaaaaa-1111-4111-8111-111111111111");
+        private static readonly Guid CaseId = Guid.Parse("cccccccc-2222-4222-8222-222222222222");
+        private const string Adviser = "adviser@example.com";
 
         private static FakeOrganizationService Holding(params string[] roleNames)
+        {
+            return Holding(ContactId, roleNames);
+        }
+
+        /// <summary>
+        /// A supervisor who may sign THIS case: they hold the role and they are the T&amp;C
+        /// Manager mapped to its adviser. Both are now required (2026-09-21), so the fixture
+        /// has to carry the whole chain - action, case, adviser email, mapping - and the
+        /// tests below that vary one link are the interesting ones.
+        /// </summary>
+        private static FakeOrganizationService Holding(Guid mappedManager, params string[] roleNames)
         {
             var svc = new FakeOrganizationService();
             // The row the page wrote, which the plug-in clears back; the fake refuses an
             // update on a row it has never seen.
             svc.Seed("contact", ContactId, SignoffRequestPlugin.RequestAttr, "{}");
+            svc.Seed("al_remediationaction", ActionId,
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId));
+            svc.Seed("al_outcomecase", CaseId,
+                "al_casereference", "IO-1",
+                TcManagerRouting.CaseAdviserEmailAttr, Adviser);
+            if (mappedManager != Guid.Empty)
+            {
+                if (mappedManager != ContactId)
+                {
+                    // TcManagerRouting reads the manager's work email to decide whether they
+                    // are reachable, so the row has to exist for the routing to resolve at all.
+                    svc.Seed("contact", mappedManager,
+                        "fullname", "Pat Manager", "emailaddress1", "pat@example.com");
+                }
+
+                svc.Seed(TcManagerRouting.MappingEntity, Guid.NewGuid(),
+                    TcManagerRouting.MappingEmailAttr, Adviser,
+                    TcManagerRouting.ManagerAttr, new EntityReference("contact", mappedManager));
+            }
+
             var rows = new List<Entity>();
             foreach (var name in roleNames)
             {
@@ -72,6 +105,112 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal(ContactId, clear.Id);
             Assert.True(clear.Contains(SignoffRequestPlugin.RequestAttr));
             Assert.Null(clear[SignoffRequestPlugin.RequestAttr]);
+        }
+
+        // --- the signatory must be THIS case's supervisor (2026-09-21) --------------------
+
+        [Fact]
+        public void Refuses_a_supervisor_who_is_not_mapped_to_this_cases_adviser()
+        {
+            // The finding that changed the rule: a service account held the T&C Supervisor
+            // role and could therefore attest to a case whose adviser it supervises nothing
+            // of. An attestation from outside that relationship records something that never
+            // happened (BR-008).
+            var someoneElse = Guid.Parse("eeeeeeee-5555-4555-8555-555555555555");
+            var svc = Holding(someoneElse, WebRoleRegistry.TcSupervisorRole);
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => SignoffRequestPlugin.Apply(svc, ContactId, Request(ActionId, 120910720, null)));
+
+            Assert.Contains("mapped to its adviser", error.Message);
+            Assert.StartsWith(CommandHelpers.PreconditionPrefix, error.Message);
+            Assert.Empty(svc.Creates);
+        }
+
+        [Fact]
+        public void Does_not_name_the_adviser_when_somebody_else_is_the_mapped_manager()
+        {
+            // Anyone holding the role can reach this refusal, so a message naming the adviser
+            // would let them enumerate who supervises whom one case at a time.
+            var svc = Holding(
+                Guid.Parse("eeeeeeee-5555-4555-8555-555555555555"), WebRoleRegistry.TcSupervisorRole);
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => SignoffRequestPlugin.Apply(svc, ContactId, Request(ActionId, 120910720, null)));
+
+            Assert.DoesNotContain(Adviser, error.Message);
+        }
+
+        [Fact]
+        public void Refuses_when_no_manager_is_mapped_at_all_and_says_which_adviser()
+        {
+            // Nobody may sign, deliberately. Here the adviser IS named: the gap is in
+            // al_advisermapping, and the person reading this is the one who can have it
+            // filled in (F58). No manager exists to be enumerated.
+            var svc = Holding(Guid.Empty, WebRoleRegistry.TcSupervisorRole);
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => SignoffRequestPlugin.Apply(svc, ContactId, Request(ActionId, 120910720, null)));
+
+            Assert.Contains("No T&C Manager is mapped to the adviser", error.Message);
+            Assert.Contains(Adviser, error.Message);
+            Assert.Empty(svc.Creates);
+        }
+
+        [Fact]
+        public void The_role_is_checked_before_the_mapping()
+        {
+            // Somebody with neither is told they lack the role. Answering "you are not this
+            // adviser's manager" first would send them looking for a mapping they could not
+            // use even once they had it.
+            var svc = Holding(Guid.Empty, WebRoleRegistry.AqsReviewerRole);
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => SignoffRequestPlugin.Apply(svc, ContactId, Request(ActionId, 120910720, null)));
+
+            Assert.Contains("T&C Supervisor", error.Message);
+            Assert.DoesNotContain("mapped to its adviser", error.Message);
+        }
+
+        [Fact]
+        public void A_mapped_manager_with_no_work_email_may_still_sign()
+        {
+            // Whether they can be EMAILED is a routing concern and has nothing to do with
+            // whether they may attest. The fixture's manager contact carries no
+            // emailaddress1, so TcManagerRouting reports ManagerNotReachable - and the gate
+            // compares the manager whenever the mapping resolved one at all.
+            var svc = Holding(ContactId, WebRoleRegistry.TcSupervisorRole);
+
+            SignoffRequestPlugin.Apply(svc, ContactId, Request(ActionId, 120910720, null));
+
+            Assert.Single(svc.Creates);
+        }
+
+        [Fact]
+        public void Refuses_an_action_that_is_attached_to_no_case()
+        {
+            // Nothing to resolve a supervisor from. Refused rather than waved through, which
+            // is what "no case" would otherwise amount to.
+            var svc = new FakeOrganizationService();
+            svc.Seed("contact", ContactId, SignoffRequestPlugin.RequestAttr, "{}");
+            svc.Seed("al_remediationaction", ActionId, "al_name", "orphan");
+            svc.FetchResults.Enqueue(new EntityCollection(new List<Entity>
+            {
+                Role(WebRoleRegistry.TcSupervisorRole),
+            }));
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => SignoffRequestPlugin.Apply(svc, ContactId, Request(ActionId, 120910720, null)));
+
+            Assert.Contains("not attached to a case", error.Message);
+            Assert.Empty(svc.Creates);
+        }
+
+        private static Entity Role(string name)
+        {
+            var row = new Entity("contact", ContactId);
+            row["role.name"] = new AliasedValue("powerpagecomponent", "name", name);
+            return row;
         }
 
         [Fact]

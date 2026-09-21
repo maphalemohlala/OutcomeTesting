@@ -5,7 +5,9 @@ using Xunit;
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// The adviser -> T&amp;C Manager mapping decides who is TOLD, never who is allowed
+    /// The adviser -> T&amp;C Manager mapping: who is TOLD, and - since 2026-09-21 - who is
+    /// allowed to attest. See The_routing_type_still_carries_no_access_decision_of_its_own.
+    /// Formerly: decides who is TOLD, never who is allowed
     /// (Fixes 5, AD-162).
     ///
     /// <para>
@@ -129,12 +131,20 @@ namespace OutcomeTesting.Plugins.Tests
         // ----------------------------------------------------------------- routing only
 
         [Fact]
-        public void The_mapping_carries_no_access_decision_at_all()
+        public void The_routing_type_still_carries_no_access_decision_of_its_own()
         {
-            // The guard against this quietly becoming authorisation later. TcManagerRouting
-            // returns a recipient and a reason and nothing else: no role, no permission, no
-            // boolean anybody could mistake for "may sign off". If a future change adds one,
-            // this test is where the argument has to be had first.
+            // This test used to be the guard against the mapping quietly becoming
+            // authorisation, and said the argument had to be had here first. It was had:
+            // on 2026-09-21 the owner found a service account holding the supervisor role
+            // could sign off a case whose adviser it supervises nothing of, and directed
+            // that the signatory must be the mapped manager. SignoffRequestPlugin
+            // .EnsureMappedToCase makes that call - openly, in the plug-in that enforces it.
+            //
+            // The assertion is kept unchanged, because the property it protects still holds
+            // and is now worth more, not less: Routing returns a recipient and a reason and
+            // nothing else. A caller that wants an access decision has to make it and be seen
+            // to make it. The day this type grows an IsAllowedToSign, the argument gets had
+            // here again.
             var properties = typeof(TcManagerRouting.Routing).GetProperties();
 
             Assert.Equal(

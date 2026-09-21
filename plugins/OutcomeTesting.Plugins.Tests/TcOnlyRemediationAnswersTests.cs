@@ -116,6 +116,17 @@ namespace OutcomeTesting.Plugins.Tests
                 "al_reviewinstanceid", new EntityReference("al_reviewinstance", ReviewId),
                 "statecode", new OptionSetValue(0));
 
+            // The signatory must be the T&C Manager mapped to the case's adviser as well as
+            // holding the role (2026-09-21), so the fixture carries that chain: these tests
+            // are about what a LEGITIMATE sign-off writes, and without it they would be
+            // asserting against a refusal instead.
+            svc.Seed("al_outcomecase", CaseId,
+                "al_casereference", "IO-1",
+                TcManagerRouting.CaseAdviserEmailAttr, "adviser@example.com");
+            svc.Seed(TcManagerRouting.MappingEntity, Guid.NewGuid(),
+                TcManagerRouting.MappingEmailAttr, "adviser@example.com",
+                TcManagerRouting.ManagerAttr, new EntityReference("contact", ContactId));
+
             var rows = new List<Entity>();
             foreach (var name in roleNames)
             {

@@ -138,6 +138,10 @@ namespace OutcomeTesting.Plugins
             // roles' claim request (one allowlist per table), so the check has to be here.
             EnsureSupervisorRole(service, contactId);
 
+            // ...and holding the role is no longer enough: it must be THIS case's supervisor
+            // (project owner, 2026-09-21).
+            EnsureMappedToCase(service, contactId, actionId);
+
             // The two answers only this role may give (project owner, 2026-09-21), written
             // BEFORE the sign-off is created: SignoffProgressPlugin runs on that Create and
             // reads al_recheckrequired to decide whether the case closes here or waits at
@@ -262,8 +266,71 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// BR-008: the signatory must be the T&amp;C Manager mapped to the case's own adviser,
+        /// not merely somebody holding the supervisor role.
+        ///
+        /// <para>
+        /// <b>This reverses the Phase 1 position</b> that <see cref="TcManagerRouting"/> still
+        /// describes for its own purposes: every T&amp;C Manager reads every case, and the
+        /// mapping decided only who was TOLD a sign-off was waiting. The owner changed it on
+        /// 2026-09-21, having found that a service account holding the role could attest to a
+        /// case whose adviser it supervises nothing of: <i>"service accounts holds the T&amp;C
+        /// role but they are not linked to the adviser handling the case, so they should not
+        /// be able to perform sign off"</i>. Reading stays open; attesting does not. An
+        /// attestation is a supervisory act by a named person over a named adviser's work, and
+        /// a signature from outside that relationship records something that never happened.
+        /// </para>
+        /// <para>
+        /// A mapped manager with no work email is still the right person. Whether they can be
+        /// EMAILED is a routing concern - the reason <c>ManagerNotReachable</c> exists - and
+        /// has nothing to do with whether they may sign, so the manager is compared whenever
+        /// the mapping resolved one at all.
+        /// </para>
+        /// <para>
+        /// No mapping means nobody may sign, which is deliberate and is why the refusal
+        /// carries the routing's own sentence: the gap is in <c>al_advisermapping</c> and the
+        /// person reading the message is the one who can have it filled in (F58).
+        /// </para>
+        /// </summary>
+        public static void EnsureMappedToCase(
+            IOrganizationService service, Guid contactId, Guid actionId)
+        {
+            var action = service.Retrieve(ActionEntity, actionId, new ColumnSet(CaseLookup));
+            var caseRef = action.GetAttributeValue<EntityReference>(CaseLookup);
+            if (caseRef == null)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "This remedial action is not attached to a case, so its T&C Manager cannot be resolved.");
+            }
+
+            var routing = TcManagerRouting.ForCase(service, caseRef);
+
+            if (routing.Manager != null && routing.Manager.Id == contactId)
+            {
+                return;
+            }
+
+            // The adviser's own address is NOT echoed when a manager exists: the refusal only
+            // has to say that it is not this account's case to sign, and naming the adviser
+            // would let anyone holding the role enumerate who supervises whom.
+            var detail = routing.Manager == null
+                ? " " + routing.Reason
+                : " Your portal account is not the T&C Manager mapped to this case's adviser.";
+
+            throw new InvalidPluginExecutionException(
+                CommandHelpers.PreconditionPrefix +
+                "Signing a case off is the T&C Manager mapped to its adviser." + detail);
+        }
+
+        /// <summary>
         /// BR-008: only the T&amp;C Supervisor attests. Refused with the same words the page
         /// used to give for a 403, now for the reason that is actually true.
+        ///
+        /// The first of two gates. <see cref="EnsureMappedToCase"/> is the second, and the
+        /// order matters for the message: "you do not hold the role" is a different problem
+        /// from "you hold it but not over this adviser", and answering the second to somebody
+        /// who has neither would send them looking for a mapping they could not use.
         /// </summary>
         public static void EnsureSupervisorRole(IOrganizationService service, Guid contactId)
         {
