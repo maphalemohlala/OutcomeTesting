@@ -1008,12 +1008,31 @@
           decision and notes in one pass.
 
           Whether the signed-in user may actually attest is decided by the create permission
-          on al_signoff, which binds the T&C Supervisor role alone - this renders for anyone
-          and a user without the role is refused on save. Showing it is a worse experience
-          than hiding it, but hiding it by role in Liquid would look like access control and
-          enforce nothing (NFR-SEC-01).
+          on al_signoff and re-checked by SignoffRequestPlugin.EnsureSupervisorRole, both of
+          which bind the T&C Supervisor role alone. The server stays the boundary
+          (NFR-SEC-01); this only stops the page offering a decision it already knows will be
+          refused, and says why instead - the same thing OT Review List does with the AQS
+          Reviewer role before offering "Run checks".
+
+          It used to render for anyone, on the reasoning that hiding it by role in Liquid
+          would look like access control and enforce nothing. Half of that is right and the
+          conclusion does not follow (project owner, 2026-09-21: "If i dont have the
+          permission to do this, then I should not see these controls"). Hiding a control is
+          not a security claim, and offering one that cannot work spends somebody's time on a
+          form they will be refused for filling in.
         {% endcomment %}
-        {% if signoff_ids != '' %}
+        {% assign signoff_role = 'AL Portal - T&C Supervisor' %}
+        {% assign can_signoff = false %}
+        {% if user.roles contains signoff_role %}{% assign can_signoff = true %}{% endif %}
+        {% if signoff_ids != '' and can_signoff == false %}
+          <div class="ot-form-submit">
+            <p class="ot-form-submit__hint">
+              Remedial actions on this case are waiting to be signed off. Signing off needs
+              the {{ signoff_role | escape }} role, which your account does not hold.
+            </p>
+          </div>
+        {% endif %}
+        {% if signoff_ids != '' and can_signoff %}
           <div class="ot-form-submit" data-ot-signoff data-action-ids="{{ signoff_ids }}"
                data-user-name="{{ user.fullname | escape }}">
             <div class="ot-field">
@@ -1105,10 +1124,11 @@
           Offered when the case carries an outcome that has actually been graded: a regrade
           overrides a grade, so there has to be one, and a remediated Tax-only case (AD-055)
           has no outcome row at all. Whether the signed-in user may attest is decided
-          server-side by RegradeRequestPlugin against the contact's web roles - this renders
-          for anyone and a user without the T&C Supervisor role is refused on save, for the
-          same reason the sign-off above does not hide itself: hiding it by role in Liquid
-          would look like access control and enforce nothing (NFR-SEC-01).
+          server-side by RegradeRequestPlugin against the contact's web roles, which stays the
+          boundary (NFR-SEC-01) - and, since 2026-09-21, the panel is offered only to someone
+          holding the role, for the same reason the sign-off above now is. The two moved
+          together deliberately: they are the same person's two controls, and leaving one
+          visible would have made the rule look arbitrary rather than considered.
 
           And offered only where the case has reached its recheck. Hiding by STATE is not
           the same act as hiding by role: the role question is who you are, which Liquid
@@ -1154,7 +1174,7 @@
             </p>
           </div>
         {% endunless %}{% endif %}
-        {% if outcome and outcome.al_initialoutcome and ot_at_recheck %}
+        {% if outcome and outcome.al_initialoutcome and ot_at_recheck and can_signoff %}
           <div class="ot-form-submit" data-ot-regrade
                data-outcome-id="{{ outcome.al_outcomeid }}"
                data-row-version="{{ outcome.versionnumber }}">
