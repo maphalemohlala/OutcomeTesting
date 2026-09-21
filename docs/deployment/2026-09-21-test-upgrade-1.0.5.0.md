@@ -130,3 +130,46 @@ longer be rewound by writing `al_casestatus`; a case moves through legal hops or
 That is the point of it, and it is why the UAT fixture restore in DEV was done *before* this
 build was deployed. Anyone resetting UAT data in TEST or PROD needs to move cases through the
 lifecycle, or deactivate and re-create them.
+
+## Case data purged from TEST (same day, at the project owner's direction)
+
+`purgecasedata` was dry-run first, then run with `--confirm`. **628 of 628 rows deleted**
+across the thirteen case-scoped tables:
+
+| Table | Rows | | Table | Rows |
+|---|---|---|---|---|
+| `al_response` | 208 | | `al_importbatch` | 6 |
+| `al_signoff` | 5 | | `al_exportrecord` | 2 |
+| `al_remediationaction` | 38 | | `al_exportbatch` | 1 |
+| `al_outcome` | 4 | | `al_notification` | 51 |
+| `al_reviewinstance` | 17 | | `al_auditevent` | 213 |
+| `al_caseassignment` | 21 | | `al_outcomecase` | 19 |
+| `al_importexception` | 43 | | | |
+
+The orphan check reported nothing outside the purge list pointing at those rows, before and
+after. **`al_auditevent` was included deliberately and confirmed explicitly** — it is the
+BR-012 / NFR-AUD-01 record, it is case-scoped, and it does not survive the cases it describes.
+None of this is recoverable.
+
+Verified empty afterwards: cases 0, review instances 0, remediation actions 0, audit events 0.
+
+**Reference data and configuration were untouched, as intended**: 55 questions (including
+Q-TAX-04), 16 sections, 3 review routes, 1 adviser mapping, 73 active page permissions, 10 web
+roles, 17 table permissions, 23 web-role assignments, 23 user-role mappings — and the
+`CaseStatusGuardPlugin` step still registered and Enabled.
+
+### One thing noticed while verifying, which the purge did not cause
+
+`al_role` reads **0 in TEST** against 11 in DEV. It is not in the purge list and was not
+touched. It does not break anything: `PermissionHelpers` resolves a caller's grants through
+`al_userrolemapping` → `al_pagepermission`, matching on the **`al_rolecode` text column**, and
+the role names those rows carry are the portal web roles, which are all present. What is
+missing is the catalogue, so the Security configuration page would list no custom roles in
+TEST. Worth seeding before anyone tests role administration there.
+
+### TEST now has no cases
+
+That is the point of the purge, but it is also the next prerequisite: nothing portal-side or
+app-side can be exercised until cases exist again. `importcases` is the verb, and
+`data/outcome-case-upload-sample-valid.csv` and `data/six-route-cases.csv` are in the
+repository for exactly this.
