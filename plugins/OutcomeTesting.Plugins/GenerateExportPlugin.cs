@@ -106,7 +106,8 @@ namespace OutcomeTesting.Plugins
                 ColumnSet = new ColumnSet(
                     "al_casereference", "al_advisername", "al_advisercode", "al_adviseremail",
                     "al_paraplanner", "al_paraplannercode", ImportRules.ParaplannerEmailAttribute,
-                    "al_casetype", "al_productsolutiontype", "al_checkdate", "al_clientname", "al_preorpostcheck",
+                    "al_casetype", "al_productsolutiontype", ListOptionRules.ProductTypeAttribute,
+                    "al_checkdate", "al_clientname", "al_preorpostcheck",
                     CaseReviewRouteAttr),
                 Criteria = new FilterExpression(),
             };
@@ -167,7 +168,7 @@ namespace OutcomeTesting.Plugins
                     // source is the Contact that name resolves to.
                     ["al_paraplanneremail"] = ParaplannerEmail(userService, outcomeCase),
                     ["al_casetype"] = CommandHelpers.Formatted(outcomeCase, "al_casetype"),
-                    ["al_productsolutiontype"] = CommandHelpers.Formatted(outcomeCase, "al_productsolutiontype"),
+                    ["al_productsolutiontype"] = ProductType(outcomeCase),
                     ["al_clientname"] = outcomeCase.GetAttributeValue<string>("al_clientname"),
                     ["al_preorpostcheck"] = CommandHelpers.Formatted(outcomeCase, "al_preorpostcheck"),
                     ["al_advicequalitygrade"] = adviceGrade,
@@ -248,6 +249,34 @@ namespace OutcomeTesting.Plugins
         /// carries no InternalsVisibleTo (see PluginBase), so public is what makes a helper
         /// reachable from the test project.
         /// </summary>
+        /// <summary>
+        /// The case's product / solution type for the export: the managed-list option it
+        /// points at, else the choice column it was imported with (AD-187).
+        /// </summary>
+        /// <remarks>
+        /// The precedence is not cosmetic here. Choosing a managed option writes the lookup
+        /// and leaves the choice column at whatever it last held, so a case moved to an
+        /// option added since the migration still carries the OLD integer. Reading the choice
+        /// column alone would export the previous product type - not a blank, which somebody
+        /// might notice, but a plausible wrong answer on a fixed-position file (AD-039).
+        ///
+        /// The fallback stays because a case never edited since the migration has only the
+        /// integer, and an export that blanked those would be a worse trade.
+        /// </remarks>
+        public static string ProductType(Entity outcomeCase)
+        {
+            if (outcomeCase == null) { return null; }
+
+            var chosen = outcomeCase.GetAttributeValue<EntityReference>(
+                ListOptionRules.ProductTypeAttribute);
+            if (chosen != null && !string.IsNullOrWhiteSpace(chosen.Name))
+            {
+                return chosen.Name.Trim();
+            }
+
+            return CommandHelpers.Formatted(outcomeCase, "al_productsolutiontype");
+        }
+
         public static string ParaplannerEmail(IOrganizationService service, Entity outcomeCase)
         {
             var stored = outcomeCase.GetAttributeValue<string>(
