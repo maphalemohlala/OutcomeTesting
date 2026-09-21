@@ -125,7 +125,11 @@ function opt(value: number | undefined): number | null {
   return value == null ? null : value;
 }
 
-export function toDetail(record: Al_outcomecases, productIds: readonly string[] = []): CaseDetail {
+export function toDetail(
+  record: Al_outcomecases,
+  productIds: readonly string[] = [],
+  productNames: readonly string[] = [],
+): CaseDetail {
   const extra = record as Al_outcomecases & {
     al_priority?: number;
     al_priorityname?: string;
@@ -144,7 +148,9 @@ export function toDetail(record: Al_outcomecases, productIds: readonly string[] 
     dueDate: date(extra.al_duedate),
     rowVersion: record.versionnumber != null ? String(record.versionnumber) : null,
     previousCase: lookupLabel(record, 'al_previouscaseid', record.al_previouscaseidname),
-    header: caseHeaderFields(record),
+    // Names, not ids: the header is read, and the intersect holds only ids. Resolved by
+    // the caller against the catalogue, because the case row cannot answer this one.
+    header: caseHeaderFields(record, productNames),
     checklist: caseChecklist(record),
     edit: {
       al_clientname: text(record.al_clientname) ?? '',

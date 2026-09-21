@@ -26,7 +26,10 @@ import {
   Al_failreasonsService,
   Al_outcomecasesService,
   Al_al_failreason_al_responsesetService,
+  Al_listoption_al_outcomecase_productssetService,
+  Al_listoptionsService,
 } from '../../generated';
+import { heldOptionLabels, listByKey } from '../admin/listOptions';
 import {
   Al_reviewinstancesal_reviewstatus,
   Al_reviewinstancesal_reviewtype,
@@ -266,12 +269,22 @@ export function useReviewDetail(
           ? responses.data.map((response) => response.al_responseid)
           : [];
 
-        const [sections, outcomeCase, linked] = await Promise.all([
+        // The products the case covers are a many-to-many, so they are not on the case row.
+        // Read and joined here exactly as useCaseDetail does, so the header this page draws
+        // and the header the case page draws cannot say different things about one case.
+        const [sections, outcomeCase, linked, caseProducts, catalogue] = await Promise.all([
           Al_sectionsService.getAll({ filter: sectionFilter, top: 100 }),
           header.caseId
             ? Al_outcomecasesService.get(header.caseId).catch(() => null)
             : Promise.resolve(null),
           linkedFailReasons(responseIds).catch(() => new Set<string>()),
+          header.caseId
+            ? Al_listoption_al_outcomecase_productssetService.getAll({
+                filter: `al_outcomecaseid eq ${header.caseId}`,
+                top: 200,
+              }).catch(() => null)
+            : Promise.resolve(null),
+          Al_listoptionsService.getAll({ top: 500 }).catch(() => null),
         ]);
 
         if (cancelled) return;
@@ -282,6 +295,17 @@ export function useReviewDetail(
         // version's is how one review came to list Tax check reason three times. An answer
         // whose version is unknown (the versions read failed) is kept rather than hidden.
         const asOf = new Date(referenceDayValue);
+
+        const productsList = listByKey('products');
+        const productNames =
+          productsList && caseProducts?.success && caseProducts.data && catalogue?.success && catalogue.data
+            ? heldOptionLabels(
+                catalogue.data,
+                productsList,
+                caseProducts.data.map((link) => link.al_listoptionid),
+                asOf,
+              )
+            : [];
         const versionById = new Map<string, Al_questionversions>();
         const effective: Al_questionversions[] = [];
         if (versions.success) {
@@ -307,7 +331,9 @@ export function useReviewDetail(
           detail: {
             header,
             caseHeader:
-              outcomeCase?.success && outcomeCase.data ? caseHeaderFields(outcomeCase.data) : null,
+              outcomeCase?.success && outcomeCase.data
+                ? caseHeaderFields(outcomeCase.data, productNames)
+                : null,
             // Off the case read the header block already makes, not a read of its own: the
             // columns are on the record that was fetched.
             checklist:

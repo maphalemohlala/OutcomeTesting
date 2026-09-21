@@ -18,6 +18,7 @@ import {
   type RawListOption,
   caseOptionLabel,
   choicesIncludingHeld,
+  heldOptionLabels,
   listByKey,
   listByValue,
   lookupFormattedField,
@@ -55,6 +56,63 @@ const SEED: RawListOption[] = [
   raw({ al_listoptionid: '4', al_name: 'Protection', al_sortorder: 40, al_legacyvalue: 120910523 }),
   raw({ al_listoptionid: '5', al_name: 'No change reviews', al_sortorder: 50, al_legacyvalue: 120910524 }),
 ];
+
+describe('heldOptionLabels', () => {
+  // The four single-choice lists resolve their label off the case row, because a lookup
+  // carries its target's name. A set carries nothing, so the header showed the free-text
+  // column it replaced and a ticked product never appeared on screen (project owner,
+  // 2026-09-21: "the product page is still a free text").
+  const PRODUCTS: RawListOption[] = [
+    raw({ al_listoptionid: 'p1', al_name: 'Pension', al_list: LIST_PRODUCTS, al_sortorder: 10 }),
+    raw({ al_listoptionid: 'p2', al_name: 'ISA', al_list: LIST_PRODUCTS, al_sortorder: 20 }),
+    raw({
+      al_listoptionid: 'p3',
+      al_name: 'Endowment',
+      al_list: LIST_PRODUCTS,
+      al_sortorder: 30,
+      al_effectiveto: '2026-01-01',
+    }),
+  ];
+  const products = listByKey('products')!;
+
+  it('names every product the case covers', () => {
+    expect(heldOptionLabels(PRODUCTS, products, ['p1', 'p2'], DAY)).toEqual(['Pension', 'ISA']);
+  });
+
+  it('reads in the list order, not the order the intersect came back in', () => {
+    // Two cases covering the same products must read identically; the intersect has no
+    // meaningful order of its own.
+    expect(heldOptionLabels(PRODUCTS, products, ['p2', 'p1'], DAY)).toEqual(['Pension', 'ISA']);
+  });
+
+  it('still names a product that has since been retired', () => {
+    // A case that covers a withdrawn product still covers it. Dropping it would understate
+    // what was checked, which is the same reason choicesIncludingHeld keeps one offered.
+    expect(heldOptionLabels(PRODUCTS, products, ['p3'], DAY)).toEqual(['Endowment']);
+  });
+
+  it('holds nothing when the case covers nothing', () => {
+    expect(heldOptionLabels(PRODUCTS, products, [], DAY)).toEqual([]);
+    expect(heldOptionLabels(PRODUCTS, products, ['', '  '], DAY)).toEqual([]);
+  });
+
+  it('skips an id the catalogue does not know rather than printing a guid', () => {
+    expect(heldOptionLabels(PRODUCTS, products, ['p1', 'gone'], DAY)).toEqual(['Pension']);
+  });
+
+  it('ignores an option that belongs to another list', () => {
+    // All five lists share one table, so without the filter a sample source attached by
+    // hand would read as a product.
+    expect(heldOptionLabels([...PRODUCTS, ...SEED], products, ['p1', '3'], DAY)).toEqual([
+      'Pension',
+    ]);
+  });
+
+  it('matches ids whatever case the Web API returned them in', () => {
+    // The intersect returns guids lower-cased; a FetchXML read does not.
+    expect(heldOptionLabels(PRODUCTS, products, ['P1'], DAY)).toEqual(['Pension']);
+  });
+});
 
 describe('the managed lists', () => {
   it('names the four the original request named, plus Products', () => {

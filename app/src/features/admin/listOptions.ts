@@ -349,6 +349,33 @@ export function choicesIncludingHeld(
 }
 
 /**
+ * The labels a case holds on a MULTI-choice list, in the list's own order.
+ *
+ * The single-choice lists resolve their label off the case row, because a lookup carries its
+ * target's name with it. A set does not: the case row holds nothing at all, the intersect
+ * holds ids, and so the names have to be joined here against the catalogue.
+ *
+ * Retired options are kept. A case that covers a product withdrawn last month still covers
+ * it, and a header that silently dropped it would understate what was checked - the same
+ * reason choicesIncludingHeld keeps a held option in the dropdown. An id with no matching
+ * row is skipped rather than shown as a guid.
+ */
+export function heldOptionLabels(
+  raw: readonly RawListOption[],
+  list: ManagedList,
+  ids: readonly string[],
+  asOf: Date,
+): string[] {
+  const held = new Set(ids.map((id) => (id ?? '').trim().toLowerCase()).filter((id) => id !== ''));
+  if (held.size === 0) return [];
+
+  return toOptionRows(raw, list, asOf)
+    .filter((row) => held.has(row.id.toLowerCase()))
+    .map((row) => row.label)
+    .filter((label) => label !== '');
+}
+
+/**
  * The label a record carries for a managed-list lookup, or null.
  *
  * Both shapes are read. The Web API expresses a lookup's label as the annotation

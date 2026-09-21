@@ -271,8 +271,16 @@ function headerRoute(record: Al_outcomecases): ReviewRoute | null {
 /**
  * The case header block, field for field in the order the document lays them out. These are
  * Outcome Case columns captured at intake, not checklist questions (checklist-v8.md).
+ *
+ * `products` is the one field the record cannot answer on its own: the products a case
+ * covers are a many-to-many, so their names are resolved by the caller (heldOptionLabels)
+ * and handed in. Absent, the field falls back to the free-text column cases imported before
+ * the list carry - which is what every case showed until a product was ticked.
  */
-export function caseHeaderFields(record: Al_outcomecases): HeaderField[] {
+export function caseHeaderFields(
+  record: Al_outcomecases,
+  products: readonly string[] = [],
+): HeaderField[] {
   return [
     { label: 'Adviser name', value: text(record.al_advisername) },
     {
@@ -286,7 +294,13 @@ export function caseHeaderFields(record: Al_outcomecases): HeaderField[] {
     { label: 'Adviser code', value: text(record.al_advisercode) },
     { label: 'Paraplanner', value: text(record.al_paraplanner) },
     { label: 'Paraplanner code', value: text(record.al_paraplannercode) },
-    { label: 'Product(s)', value: text(record.al_products) },
+    {
+      label: 'Product(s)',
+      // The ticked products first, then the free text. Same precedence as the four lookups
+      // below, for the same reason: reading only the new field would blank the header on
+      // every case imported before the list existed.
+      value: products.length > 0 ? products.join('; ') : text(record.al_products),
+    },
     {
       label: 'Case type',
       value:
@@ -312,10 +326,10 @@ export function caseHeaderFields(record: Al_outcomecases): HeaderField[] {
       value:
         lookupLabelOn(record as unknown as Record<string, unknown>, managedList('sample-source')) ??
         choiceLabel(
-        Al_outcomecasesal_samplesource,
-        record.al_samplesource,
-        record.al_samplesourcename,
-      ),
+          Al_outcomecasesal_samplesource,
+          record.al_samplesource,
+          record.al_samplesourcename,
+        ),
     },
     /*
      * Two checkers, not one (item 2, 2026-09-19). A case taking both a Tax check and an AQS
@@ -341,11 +355,13 @@ export function caseHeaderFields(record: Al_outcomecases): HeaderField[] {
     { label: 'IO reference', value: text(record.al_ioreference) },
     {
       label: 'Pre or post check',
-      value: choiceLabel(
-        Al_outcomecasesal_preorpostcheck,
-        record.al_preorpostcheck,
-        record.al_preorpostcheckname,
-      ),
+      value:
+        lookupLabelOn(record as unknown as Record<string, unknown>, managedList('pre-or-post-check')) ??
+        choiceLabel(
+          Al_outcomecasesal_preorpostcheck,
+          record.al_preorpostcheck,
+          record.al_preorpostcheckname,
+        ),
     },
     {
       label: 'Vulnerable client?',

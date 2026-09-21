@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
   Al_listoption_al_outcomecase_productssetService,
+  Al_listoptionsService,
   Al_outcomecasesService,
 } from '../../generated';
+import { heldOptionLabels, listByKey } from '../admin/listOptions';
 import { logTechnical } from '../../services/errors';
 import { toDetail } from './caseDetailMapping';
 import type { CaseDetail } from './caseDetailMapping';
@@ -53,8 +55,15 @@ export function useCaseDetail(caseId: string | undefined, reloadKey = 0): CaseDe
         logTechnical('case products load', error);
         return { success: false as const, data: undefined };
       }),
+      // The catalogue, to turn those ids into the names the header shows. A handful of rows
+      // shared by all five lists, and read alongside rather than after so a case opens in
+      // one round trip rather than two.
+      Al_listoptionsService.getAll({ top: 500 }).catch((error) => {
+        logTechnical('case product names load', error);
+        return { success: false as const, data: undefined };
+      }),
     ])
-      .then(([result, productResult]) => {
+      .then(([result, productResult, catalogue]) => {
         if (cancelled) return;
         if (!result.success || !result.data) {
           if (!result.success) {
@@ -72,7 +81,13 @@ export function useCaseDetail(caseId: string | undefined, reloadKey = 0): CaseDe
             ? productResult.data.map((link) => link.al_listoptionid)
             : [];
 
-        setState({ status: 'ready', detail: toDetail(result.data, productIds) });
+        const products = listByKey('products');
+        const productNames =
+          products && catalogue.success && catalogue.data
+            ? heldOptionLabels(catalogue.data, products, productIds, new Date())
+            : [];
+
+        setState({ status: 'ready', detail: toDetail(result.data, productIds, productNames) });
       })
       .catch((error) => {
         if (cancelled) return;

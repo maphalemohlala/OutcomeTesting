@@ -198,6 +198,41 @@ describe('caseHeaderFields', () => {
     expect(byLabel.get('For Tax team usage')).toBe('Submit to AQS');
   });
 
+  it('names the products the case covers, not the free text they replaced', () => {
+    // The header read al_products and nothing else, so a checker who ticked two products
+    // saved them, reopened the case and still saw the imported text (project owner,
+    // 2026-09-21: "the product page is still a free text").
+    const byLabel = new Map(
+      caseHeaderFields(record, ['Pension', 'ISA']).map((f) => [f.label, f.value]),
+    );
+    expect(byLabel.get('Product(s)')).toBe('Pension; ISA');
+  });
+
+  it('falls back to the free text for a case that has no products ticked', () => {
+    // Cases imported before the list existed carry their products as text and must keep
+    // showing it; reading only the new field would blank the header on every one of them.
+    const byLabel = new Map(caseHeaderFields(record).map((f) => [f.label, f.value]));
+    expect(byLabel.get('Product(s)')).toBe('ISA');
+  });
+
+  it('prefers the managed option over the choice column on every migrated list', () => {
+    // Pre or post check was left reading its choice column when the other three moved, so
+    // a case pointed at a managed option showed the value it was migrated FROM.
+    const byLabel = new Map(
+      caseHeaderFields({
+        ...record,
+        al_casetypeidname: 'Chosen case type',
+        al_producttypeidname: 'Chosen product type',
+        al_samplesourceidname: 'Chosen sample source',
+        al_preorpostcheckidname: 'Chosen check point',
+      } as unknown as Al_outcomecases).map((f) => [f.label, f.value]),
+    );
+    expect(byLabel.get('Case type')).toBe('Chosen case type');
+    expect(byLabel.get('Product / solution type')).toBe('Chosen product type');
+    expect(byLabel.get('Sample source')).toBe('Chosen sample source');
+    expect(byLabel.get('Pre or post check')).toBe('Chosen check point');
+  });
+
   it('leaves an unrecorded field null rather than putting a raw value on screen', () => {
     const fields = caseHeaderFields({
       al_outcomecaseid: 'c2',
