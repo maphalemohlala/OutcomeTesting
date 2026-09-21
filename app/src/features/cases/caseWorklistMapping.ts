@@ -14,6 +14,7 @@ import {
   Al_outcomesal_initialoutcome,
   type Al_outcomes,
 } from '../../generated/models/Al_outcomesModel';
+import { MIGRATED_LISTS, lookupLabelOn } from '../admin/listOptions';
 import { choiceLabel } from '../../lib/choiceLabel';
 import { lookupLabel } from './lookupLabel';
 
@@ -166,11 +167,15 @@ export function toSummary(record: Al_outcomecases, grades?: CaseOutcomeGrades): 
     taxChecker: record.al_taxcheckername ?? null,
     aqsChecker: record.al_aqscheckername ?? null,
     caseType: choiceLabel(Al_outcomecasesal_casetype, record.al_casetype, record.al_casetypename),
-    productSolutionType: choiceLabel(
-      Al_outcomecasesal_productsolutiontype,
-      record.al_productsolutiontype,
-      record.al_productsolutiontypename,
-    ),
+    // The managed-list lookup first, then the choice column an un-backfilled case still
+    // carries (AD-187).
+    productSolutionType:
+      lookupLabelOn(record as unknown as Record<string, unknown>, MIGRATED_LISTS[0]) ??
+      choiceLabel(
+        Al_outcomecasesal_productsolutiontype,
+        record.al_productsolutiontype,
+        record.al_productsolutiontypename,
+      ),
     products: record.al_products ?? null,
     adviceDate: record.al_advicedate ?? null,
     checkDate: record.al_checkdate ?? null,

@@ -14,9 +14,11 @@ import {
   MIGRATED_LISTS,
   type RawListOption,
   caseOptionLabel,
+  choicesIncludingHeld,
   listByKey,
   listByValue,
   lookupFormattedField,
+  lookupLabelOn,
   lookupValueField,
   offeredOptions,
   toOptionRows,
@@ -317,5 +319,78 @@ describe('the dropdown options page permission', () => {
     expect(can(set, 'page.admin.lists', 'Manage')).toBe(true);
     expect(can(set, 'command.signoff', 'Edit')).toBe(false);
     expect(can(set, 'command.regrade', 'Edit')).toBe(false);
+  });
+});
+
+describe('what an edit control offers', () => {
+  const retired = raw({
+    al_listoptionid: '6',
+    al_name: 'Drawdown',
+    al_sortorder: 60,
+    al_effectiveto: '2026-09-20',
+  });
+  const rows = toOptionRows([...SEED, retired], PRODUCT, DAY);
+
+  it('offers the options in force', () => {
+    expect(choicesIncludingHeld(rows, null).map((row) => row.label)).toEqual([
+      'Accumulation investment',
+      'Accumulation Pension',
+      'IHT',
+      'Protection',
+      'No change reviews',
+    ]);
+  });
+
+  it('also offers the retired option a case actually holds, marked as retired', () => {
+    // Otherwise the case renders as "Not set". The value would survive an untouched save,
+    // but somebody looking at a blank dropdown reads it as a field that needs filling in.
+    const labels = choicesIncludingHeld(rows, '6').map((row) => row.label);
+    expect(labels).toContain('Drawdown (retired)');
+    expect(labels).toHaveLength(6);
+  });
+
+  it('does not offer a retired option to a case that does not hold it', () => {
+    expect(choicesIncludingHeld(rows, '3').map((row) => row.label)).not.toContain(
+      'Drawdown (retired)',
+    );
+  });
+
+  it('does not duplicate an option that is held and still offered', () => {
+    expect(choicesIncludingHeld(rows, '3')).toHaveLength(5);
+  });
+
+  it('ignores a held id no option matches', () => {
+    // An orphan from a deleted option. Nothing honest can be shown for it, and inventing a
+    // row would put a name on a case that never had one.
+    expect(choicesIncludingHeld(rows, 'gone')).toHaveLength(5);
+  });
+});
+
+describe('reading a lookup label off a case record', () => {
+  const ANNOTATION = '_al_producttypeid_value@OData.Community.Display.V1.FormattedValue';
+
+  it('reads the Web API annotation, which is what this app’s reads return', () => {
+    expect(lookupLabelOn({ [ANNOTATION]: 'IHT' }, PRODUCT)).toBe('IHT');
+  });
+
+  it('reads the SDK-style name too', () => {
+    // Reading only one shape is how every adviser mapping came to show "No manager chosen"
+    // for a row that had one (F16). There is no reason to learn that twice.
+    expect(lookupLabelOn({ al_producttypeidname: 'Protection' }, PRODUCT)).toBe('Protection');
+  });
+
+  it('prefers the annotation when both are present', () => {
+    expect(
+      lookupLabelOn({ [ANNOTATION]: 'IHT', al_producttypeidname: 'Stale' }, PRODUCT),
+    ).toBe('IHT');
+  });
+
+  it('is null when the record carries neither, or only blanks', () => {
+    expect(lookupLabelOn({}, PRODUCT)).toBeNull();
+    expect(lookupLabelOn({ [ANNOTATION]: '   ', al_producttypeidname: '' }, PRODUCT)).toBeNull();
+  });
+
+  it('is null for a list that has no lookup yet', () => {
+    expect(lookupLabelOn({ [ANNOTATION]: 'IHT' }, listByValue(LIST_SAMPLE_SOURCE)!)).toBeNull();
   });
 });

@@ -36,6 +36,14 @@ export interface CaseEditValues {
   al_casetype: number | null;
   al_advicedate: string;
   al_productsolutiontype: number | null;
+  /**
+   * The chosen al_listoption row, as a guid, or '' for none.
+   *
+   * A string and not a number because this list's options are rows the checking team
+   * maintains, not choice metadata - see features/admin/listOptions.ts. The choice column
+   * above is kept alongside it while cases exist that were imported before the lookup.
+   */
+  al_producttypeid: string;
   al_samplesource: number | null;
   al_preorpostcheck: number | null;
   al_vulnerableclient: number | null;
@@ -137,6 +145,7 @@ export function toDetail(record: Al_outcomecases): CaseDetail {
       al_casetype: opt(record.al_casetype),
       al_advicedate: ymd(record.al_advicedate),
       al_productsolutiontype: opt(record.al_productsolutiontype),
+      al_producttypeid: text(record._al_producttypeid_value) ?? '',
       al_samplesource: opt(record.al_samplesource),
       al_preorpostcheck: opt(record.al_preorpostcheck),
       al_vulnerableclient: opt(record.al_vulnerableclient),

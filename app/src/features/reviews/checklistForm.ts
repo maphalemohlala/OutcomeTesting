@@ -10,6 +10,10 @@ import {
   type Al_outcomecases,
 } from '../../generated/models/Al_outcomecasesModel';
 import { ADVICE_DATE_LABEL } from '../cases/caseHeaderDates';
+import { MIGRATED_LISTS, lookupLabelOn } from '../admin/listOptions';
+
+/** The only migrated list so far; MIGRATED_LISTS is the single place that says which. */
+const PRODUCT_SOLUTION_TYPE = MIGRATED_LISTS[0];
 import { choiceLabel } from '../../lib/choiceLabel';
 import { date, text } from '../../lib/format';
 import { withoutUnaskedRootCause } from './gradingRules';
@@ -286,11 +290,16 @@ export function caseHeaderFields(record: Al_outcomecases): HeaderField[] {
     { label: ADVICE_DATE_LABEL, value: date(record.al_advicedate) },
     {
       label: 'Product / solution type',
-      value: choiceLabel(
-        Al_outcomecasesal_productsolutiontype,
-        record.al_productsolutiontype,
-        record.al_productsolutiontypename,
-      ),
+      // The managed-list lookup first, then the choice column a case imported before the
+      // lookup existed still carries (AD-187). Not a transitional nicety: until every case
+      // is backfilled, reading only the lookup would blank the field on the older ones.
+      value:
+        lookupLabelOn(record as unknown as Record<string, unknown>, PRODUCT_SOLUTION_TYPE) ??
+        choiceLabel(
+          Al_outcomecasesal_productsolutiontype,
+          record.al_productsolutiontype,
+          record.al_productsolutiontypename,
+        ),
     },
     {
       label: 'Sample source',

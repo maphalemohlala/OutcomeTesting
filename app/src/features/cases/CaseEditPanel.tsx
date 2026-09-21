@@ -16,6 +16,8 @@ import {
   type CommandOutcome,
 } from './caseEditSubmit';
 import { ADVICE_DATE_LABEL, ukToday } from './caseHeaderDates';
+import { MIGRATED_LISTS, choicesIncludingHeld, type ManagedList } from '../admin/listOptions';
+import { useListOptions } from '../admin/useListOptions';
 import { useCaseReviews } from './useCaseReviews';
 import { useUserDirectory } from '../../hooks/useUserDirectory';
 import {
@@ -24,7 +26,6 @@ import {
   Al_outcomecasesal_casetype,
   Al_outcomecasesal_preorpostcheck,
   Al_outcomecasesal_priority,
-  Al_outcomecasesal_productsolutiontype,
   Al_outcomecasesal_samplesource,
   Al_outcomecasesal_taxcheckrequired,
   Al_outcomecasesal_taxteamdisposition,
@@ -43,13 +44,23 @@ import {
 import type { CaseDetail, CaseEditValues } from './useCaseDetail';
 import './CaseEditPanel.css';
 
-type FieldKind = 'text' | 'date' | 'choice' | 'user';
+/**
+ * `listoption` is a dropdown whose choices are ROWS the checking team maintains rather than
+ * choice metadata a developer deploys (project owner, 2026-09-21). Its value is a guid, not
+ * an option value, which is why it cannot just be another 'choice'.
+ */
+type FieldKind = 'text' | 'date' | 'choice' | 'user' | 'listoption';
+
+/** The only migrated list so far; MIGRATED_LISTS is the single place that says which. */
+const PRODUCT_SOLUTION_TYPE = MIGRATED_LISTS[0];
 
 interface FieldDef {
   attr: keyof CaseEditValues;
   label: string;
   kind: FieldKind;
   options?: Record<number, string>;
+  /** For a `listoption` field, which managed list its choices come from. */
+  list?: ManagedList;
   /** A line under the control for a field whose name reads as more than it does. */
   help?: string;
 }
@@ -96,7 +107,13 @@ const SECTIONS: Section[] = [
     heading: 'Advice and product',
     fields: [
       { attr: 'al_casetype', label: 'Case type', kind: 'choice', options: Al_outcomecasesal_casetype },
-      { attr: 'al_productsolutiontype', label: 'Product/solution type', kind: 'choice', options: Al_outcomecasesal_productsolutiontype },
+      {
+        attr: 'al_producttypeid',
+        label: 'Product/solution type',
+        kind: 'listoption',
+        list: PRODUCT_SOLUTION_TYPE,
+        help: 'Maintained under Admin → Dropdown options. A new option appears here as soon as it is added.',
+      },
       { attr: 'al_products', label: 'Products', kind: 'text' },
       { attr: 'al_advicedate', label: ADVICE_DATE_LABEL, kind: 'date' },
       { attr: 'al_samplesource', label: 'Sample source', kind: 'choice', options: Al_outcomecasesal_samplesource },
@@ -215,6 +232,18 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
 
   const candidates = directory.status === 'ready' ? directory.users.filter((u) => u.active) : [];
 
+  /*
+   * The managed dropdown's options, read live so an option added a moment ago on Admin ->
+   * Dropdown options is offerable here without a deployment - which is the whole point of
+   * holding them as rows.
+   *
+   * One hook for the one migrated list. A second migrated list needs its own call rather
+   * than a loop, because hooks cannot be called conditionally; MIGRATED_LISTS is what says
+   * how many there are, and it is asserted in listOptions.test.ts.
+   */
+  const productTypes = useListOptions(PRODUCT_SOLUTION_TYPE);
+  const productTypeRows = productTypes.status === 'ready' ? productTypes.options : [];
+
   const optionLists = useMemo(() => {
     const lists = new Map<keyof CaseEditValues, { value: number; label: string }[]>();
     for (const field of allFields()) {
@@ -245,6 +274,8 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
   function setField(attr: keyof CaseEditValues, kind: FieldKind, raw: string) {
     setForm((prev) => ({
       ...prev,
+      // A listoption carries a guid, so it is stored as the string it is - only 'choice'
+      // fields are numeric option values.
       [attr]: kind === 'choice' ? (raw === '' ? null : Number(raw)) : raw,
     }));
   }
@@ -422,7 +453,29 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
     return (
       <label key={field.attr} className="case-edit__field" htmlFor={inputId}>
         <span>{field.label}</span>
-        {field.kind === 'choice' ? (
+        {field.kind === 'listoption' ? (
+          <select
+            id={inputId}
+            value={typeof value === 'string' ? value : ''}
+            onChange={(e) => setField(field.attr, field.kind, e.target.value)}
+          >
+            <option value="">Not set</option>
+            {/*
+              Only the options offered TODAY. A retired one is not listed, and
+              al_UpdateCaseDetails refuses it anyway - listing it would produce a choice the
+              save rejects. A case already holding a retired option keeps it: the value is
+              simply not among the choices, and leaving the field alone leaves it alone.
+            */}
+            {choicesIncludingHeld(
+              productTypeRows,
+              typeof value === 'string' ? value : null,
+            ).map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        ) : field.kind === 'choice' ? (
           <select
             id={inputId}
             value={value == null ? '' : String(value)}

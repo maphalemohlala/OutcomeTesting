@@ -283,3 +283,63 @@ export function caseOptionLabel(
   const label = (match?.label ?? '').trim();
   return label === '' ? null : label;
 }
+
+/**
+ * The choices an edit control offers for a case that currently holds `heldId`.
+ *
+ * The options in force, plus - only when the case holds one that is not among them - the
+ * retired option it actually holds, marked as retired.
+ *
+ * Without that addition a case holding a retired option would render as "Not set". Nothing
+ * would be lost, because an untouched field is not sent and so the value would survive; but
+ * the person editing the case would be looking at a blank where a product type is, and the
+ * obvious reading of a blank dropdown is that the field is empty and needs filling in. It is
+ * shown, and shown as retired, so what the case says is what the screen says.
+ *
+ * A retired option is never offered to a case that does not already hold it, and the server
+ * refuses one anyway (ListOptionRules.Resolve).
+ */
+export function choicesIncludingHeld(
+  rows: readonly ListOptionRow[],
+  heldId: string | null | undefined,
+): ListOptionRow[] {
+  const offered = offeredOptions(rows);
+  const held = (heldId ?? '').trim();
+  if (held === '' || offered.some((row) => row.id === held)) return offered;
+
+  const stillHeld = rows.find((row) => row.id === held);
+  if (!stillHeld) return offered;
+
+  return [...offered, { ...stillHeld, label: `${stillHeld.label} (retired)` }];
+}
+
+/**
+ * The label a record carries for a managed-list lookup, or null.
+ *
+ * Both shapes are read. The Web API expresses a lookup's label as the annotation
+ * `_al_producttypeid_value@OData.Community.Display.V1.FormattedValue`, while a FetchXML or
+ * SDK read supplies `al_producttypeidname`. Reading only one of them is how the adviser
+ * mapping table came to show "No manager chosen" for every row that had one (F16), and there
+ * is no reason to learn that twice.
+ */
+export function lookupLabelOn(
+  record: Record<string, unknown>,
+  list: ManagedList,
+): string | null {
+  if (list.caseAttribute === null) return null;
+
+  const annotation = lookupFormattedField(list);
+  const candidates = [
+    annotation === null ? undefined : record[annotation],
+    record[`${list.caseAttribute}name`],
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string') {
+      const label = candidate.trim();
+      if (label !== '') return label;
+    }
+  }
+
+  return null;
+}
