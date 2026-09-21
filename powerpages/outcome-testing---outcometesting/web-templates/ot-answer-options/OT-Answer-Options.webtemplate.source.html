@@ -89,6 +89,25 @@
   value locked here and not there would still be saveable and a value locked there and not
   here is simply refused with a sentence.
 {% endcomment %}
+{% comment %}
+  `question_text` names every radio for a screen reader (F54, fixed 2026-09-21), so each one
+  announces "Tax check outcome: PASS" rather than a bare "PASS".
+
+  It is on the INPUT and not on a wrapping group, deliberately. Power Pages injects
+  `role="radiogroup"` onto the value cell and `role="group"` onto the row at RUNTIME - neither
+  is in this solution's markup, and the server-rendered HTML carries neither - and it injects
+  them with no accessible name. That `role="group"` also overrides the native row semantics a
+  screen reader would otherwise have used to read the row header, so the fallback goes with
+  it. Naming the group would mean fighting an attribute we do not emit and cannot see from
+  here; naming each option cannot be undone by anything the platform adds afterwards.
+
+  It is also the pattern this page already proved: the grid-layout branch of OT Review Detail
+  has always emitted an sr-only `<label>` reading "{question}: {option}". This gives the
+  non-grid branch the same guarantee by a route that works whether or not a label element is
+  wanted in the layout.
+
+  Optional, so any caller that does not pass it keeps exactly the markup it had.
+{% endcomment %}
 <div class="opts">
   {% for value in values %}
     {% assign valuekey = '|' | append: value | append: '|' %}
@@ -97,6 +116,7 @@
     <label class="opt{% if is_locked %} opt--locked{% endif %}"><input type="radio" class="cc-box"
              name="q-{{ question }}"
              value="{{ value }}"
+             {% if question_text %}aria-label="{{ question_text | escape }}: {{ labels[forloop.index0] }}"{% endif %}
              data-ot-input{% if is_locked %} data-ot-lockable{% endif %}{% unless editable %} disabled{% endunless %}{% if is_locked %} disabled{% endif %}
              {% if selected and selected == value %}checked{% endif %} /> {{ labels[forloop.index0] }}</label>
   {% endfor %}

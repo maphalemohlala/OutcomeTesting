@@ -872,6 +872,40 @@ footer a:focus-visible, .footer a:focus-visible {
 }
 
 /*
+ * A target date that has passed on an action still open (F52, fixed 2026-09-21). Separate
+ * from .ot-age--breached above because they answer different questions: that one is the
+ * BR-010 ten-working-day threshold measured from when the action opened, this one is the
+ * date the action was actually given. An action can be past its target inside the
+ * threshold, and past the threshold with its target still ahead.
+ *
+ * The word "Overdue" is appended as text, not signalled by colour alone, so it reads the
+ * same to anyone who cannot distinguish the two - the reasoning .ot-age__previous already
+ * records for the reworked-period note.
+ */
+.ot-due--overdue {
+  color: var(--colour-outcome-harm);
+  font-weight: 600;
+}
+
+.ot-due__flag {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+/*
+ * An action whose adviser matched no portal contact (F51, surfaced 2026-09-21). The Owner
+ * column used to fall back to the case's adviser NAME, so an action nobody could act on
+ * looked exactly like an assigned one. Muted rather than alarming: it is a data-quality
+ * problem for a supervisor to correct on the case record, not a failure of the work.
+ */
+.ot-unassigned {
+  color: var(--colour-text-muted);
+  font-style: italic;
+}
+
+/*
  * The period a rejected sign-off ended (OD-018). Set below the current count in weight,
  * because the current period is what the ten-day threshold measures — but it is plain
  * text, not a colour cue, so it reads the same to anyone who cannot distinguish the two.
@@ -939,6 +973,23 @@ footer a:focus-visible, .footer a:focus-visible {
   .ot-tile__count { font-size: 1.375rem; }
   .ot-table-wrap { max-height: none; }
   .ot-table thead th { position: static; }
+}
+
+/* F55, fixed 2026-09-21. The checklist header block is a fixed-column document table with
+   a minimum width around 470px, so below that it made the PAGE scroll sideways rather than
+   scrolling itself: 110px on the review page, 19px on case detail, both from .ot-checklist
+   .meta. Every other wide table on the site already sits in .ot-table-wrap and scrolls
+   inside its card; this one cannot use that class, because .ot-table-wrap also carries a
+   max-height for long worklists and would clip the questionnaire vertically.
+
+   Scoped to 40rem rather than the 48rem block above because the defect is phone-only -
+   measured clean at a 753px viewport on both pages - and a layout that works should not be
+   changed to fix one that does not. display:block turns the table into its own scroll
+   container without touching the markup, which matters here: table.meta is opened and
+   closed across Liquid branches in OT Review Detail, so wrapping it in a div would mean
+   pairing tags across conditionals. */
+@media (max-width: 40rem) {
+  .ot-checklist .meta { display: block; overflow-x: auto; }
 }
 
 /* Support reference on the access-denied page. Deliberately quiet: it is for

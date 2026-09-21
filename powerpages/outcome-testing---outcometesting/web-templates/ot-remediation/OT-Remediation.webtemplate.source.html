@@ -206,7 +206,7 @@
                     All {{ c_total }} complete
                   {% endif %}
                 </td>
-                <td>{{ c_first.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+                <td><span class="ot-due" data-ot-due data-due="{{ c_first.al_duedate | date: 'yyyy-MM-dd' }}" data-completed="{{ c_first.al_completedon | date: 'yyyy-MM-dd' }}">{{ c_first.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</span></td>
                 <td>{% include 'OT Status Badge' status: c.al_casestatus.label %}</td>
                 <td>
                   {% assign clock_start = c_first.al_clockstartedon | default: c_first.createdon %}
@@ -664,8 +664,8 @@
                           {% else %}
                             <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
                           {% endif %}
-                          <td rowspan="{{ ot_count }}">{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
-                          <td rowspan="{{ ot_count }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+                          <td rowspan="{{ ot_count }}">{% if a.al_assignedcontactid %}{{ a.al_assignedcontactid.name | escape }}{% else %}<span class="ot-unassigned" title="The adviser named on this case does not match a portal contact, so nobody can record a response on this action. Correct the adviser on the case record and the open actions move with it.">Nobody assigned{% if c.al_advisername %} &mdash; {{ c.al_advisername | escape }} is not a portal contact{% endif %}</span>{% endif %}</td>
+                          <td rowspan="{{ ot_count }}"><span class="ot-due" data-ot-due data-due="{{ a.al_duedate | date: 'yyyy-MM-dd' }}" data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</span></td>
                           <td rowspan="{{ ot_count }}" data-ot-row-status="{{ a.al_remediationactionid }}">{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
                           <td rowspan="{{ ot_count }}">
                             {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
@@ -730,7 +730,7 @@
                       <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
                     {% endif %}
                     <td>{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
-                    <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
+                    <td><span class="ot-due" data-ot-due data-due="{{ a.al_duedate | date: 'yyyy-MM-dd' }}" data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</span></td>
                     <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
                     <td>
                       {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
@@ -1271,6 +1271,42 @@
         cell.setAttribute('title',
           (existing ? existing + ' ' : '') + 'Past the ten-working-day threshold (BR-010).');
       }
+    }
+
+    /*
+     * Target date missed (F52, fixed 2026-09-21).
+     *
+     * This is a DIFFERENT question from the age beside it and is marked separately on
+     * purpose. The age counts working days against BR-010's ten-day threshold from the day
+     * the action opened - how long the case has been in remediation. This asks whether the
+     * date the action was actually given has passed. An action eleven days past its target
+     * read "1 working day" and carried no indication at all, because nothing on either page
+     * compared al_duedate to today.
+     *
+     * Calendar days, not working days: a target date is a promise about a date, so the day
+     * after it is late whether or not it was a weekend. The ten-day threshold keeps its own
+     * working-day count, and neither is expressed in terms of the other.
+     *
+     * A completed action is never overdue. It was finished, and marking history red says
+     * something about the person rather than about the work.
+     */
+    var dues = document.querySelectorAll('[data-ot-due]');
+    for (var d = 0; d < dues.length; d += 1) {
+      var due = dues[d];
+      var target = midday(due.getAttribute('data-due'));
+      if (!target) { continue; }
+
+      if (midday(due.getAttribute('data-completed'))) { continue; }
+      if (target.getTime() >= today.getTime()) { continue; }
+
+      due.classList.add('ot-due--overdue');
+
+      var flag = document.createElement('span');
+      flag.className = 'ot-due__flag';
+      flag.textContent = ' Overdue';
+      due.appendChild(flag);
+
+      due.setAttribute('title', 'This target date has passed and the action is not complete.');
     }
   })();
 </script>

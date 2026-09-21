@@ -1195,7 +1195,7 @@
                 <tr><th colspan="3">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></th></tr>
                 <tr>
                 {% for v in rcvalues %}
-                  <td><label class="opt wrap"><input type="radio" class="cc-box" name="q-{{ qv_id }}" value="{{ v }}" data-ot-input{% unless editable %} disabled{% endunless %}{% if chosen_value == v %} checked{% endif %} /> {{ rclabels[forloop.index0] }}</label></td>
+                  <td><label class="opt wrap"><input type="radio" class="cc-box" name="q-{{ qv_id }}" value="{{ v }}" aria-label="{{ qv.al_questiontext | escape }}: {{ rclabels[forloop.index0] }}" data-ot-input{% unless editable %} disabled{% endunless %}{% if chosen_value == v %} checked{% endif %} /> {{ rclabels[forloop.index0] }}</label></td>
                   {% if forloop.index == 3 or forloop.index == 6 %}</tr><tr>{% endif %}
                 {% endfor %}
                 </tr>
@@ -1288,7 +1288,7 @@
                 <div class="opts">
                   {% for opt in mvalues %}
                     {% assign optkey = '|' | append: opt | append: '|' %}
-                    <label class="opt"><input type="checkbox" class="cc-box" data-ot-input value="{{ opt }}"{% unless editable %} disabled{% endunless %}{% if chosen contains optkey or existing.al_answerchoices contains opt or existing.al_answerchoices contains mlabels[forloop.index0] %} checked{% endif %} /> {{ mlabels[forloop.index0] }}</label>
+                    <label class="opt"><input type="checkbox" class="cc-box" data-ot-input value="{{ opt }}" aria-label="{{ qv.al_questiontext | escape }}: {{ mlabels[forloop.index0] }}"{% unless editable %} disabled{% endunless %}{% if chosen contains optkey or existing.al_answerchoices contains opt or existing.al_answerchoices contains mlabels[forloop.index0] %} checked{% endif %} /> {{ mlabels[forloop.index0] }}</label>
                   {% endfor %}
                 </div>
 
@@ -1303,7 +1303,7 @@
                 {% if rt == 120910010 and suitability_insufficient %}
                   {% assign locked_values = '|120910300|120910303|' %}
                 {% endif %}
-                {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id editable: editable is_tax: is_tax_review locked: locked_values %}
+                {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id editable: editable is_tax: is_tax_review locked: locked_values question_text: qv.al_questiontext %}
               {% endif %}
               </td>
             </tr>
