@@ -1029,6 +1029,9 @@ namespace OutcomeTesting.Plugins
             // The day the check was done (project owner, 2026-09-21). Stamped here, inside
             // the submit transaction, so a submitted review and the date the case reports
             // for it cannot come apart.
+            // The day the check was done (project owner, 2026-09-21). Stamped here, inside
+            // the submit transaction, so a submitted review and the date the case reports
+            // for it cannot come apart.
             StampCheckDate(service, caseRef.Id);
 
             // OutcomeRules.HopsFor is the single description of the route a submit takes:
@@ -1190,30 +1193,54 @@ namespace OutcomeTesting.Plugins
         /// the Tax check alone (AD-055 amended), so taking the shared label would put wording
         /// in front of the adviser that no checker ever saw.
         ///
-        /// Returns null when the Tax check passed, when there is no Tax review, or when the
-        /// column holds something this solution does not recognise. The last of those is
-        /// deliberately silent rather than throwing: an unreadable Tax result must not stop an
-        /// AQS checker submitting their own work, and the AQS outcome still raises whatever it
-        /// raises on its own account.
+        /// <b>The outcome is not the only way a Tax check owes remediation, and reading it
+        /// alone lost the other one (found 2026-09-21).</b> The Tax submit defers
+        /// <c>taxRequiresRemediation || remedialFlagged</c> - the Q-TAX-02 verdict OR the
+        /// Q-FQTAX-03 tick, which are two different questions. A checker may pass the tax
+        /// outcome and still ask for a remedial action, and until this read Q-FQTAX-03 the
+        /// deferral was one-way: the Tax submit raised nothing because AQS was still to come,
+        /// this returned null because al_taxoutcome said Pass, and the thing the Tax checker
+        /// flagged was never put to the adviser at all. The case closed clean.
+        ///
+        /// Returns null when the Tax check passed AND flagged nothing, when there is no Tax
+        /// review, or when the column holds something this solution does not recognise. The
+        /// last of those is deliberately silent rather than throwing: an unreadable Tax result
+        /// must not stop an AQS checker submitting their own work, and the AQS outcome still
+        /// raises whatever it raises on its own account.
         /// </summary>
         public static DeferredTax DeferredTaxFail(IOrganizationService service, Guid caseId)
         {
-            var row = service.Retrieve(CaseEntity, caseId, new ColumnSet(TaxOutcomeAttr));
-            var outcome = row.GetAttributeValue<OptionSetValue>(TaxOutcomeAttr);
-            if (outcome == null)
-            {
-                return null;
-            }
-
-            bool requiresRemediation;
-            if (!OutcomeRules.TryTaxResultRequiresRemediation(outcome.Value, out requiresRemediation)
-                || !requiresRemediation)
-            {
-                return null;
-            }
-
             var taxReview = SubmittedReviewId(service, caseId, ResponseRules.ReviewTypeTax);
             if (!taxReview.HasValue)
+            {
+                return null;
+            }
+
+            var row = service.Retrieve(CaseEntity, caseId, new ColumnSet(TaxOutcomeAttr));
+            var outcome = row.GetAttributeValue<OptionSetValue>(TaxOutcomeAttr);
+
+            var requiresRemediation = false;
+            if (outcome != null
+                && !OutcomeRules.TryTaxResultRequiresRemediation(outcome.Value, out requiresRemediation))
+            {
+                requiresRemediation = false;
+            }
+
+            if (requiresRemediation)
+            {
+                return new DeferredTax
+                {
+                    ReviewId = taxReview.Value,
+                    Reason = "Tax check: "
+                        + new OptionLabels(service).Label(CaseEntity, TaxOutcomeAttr, outcome.Value),
+                };
+            }
+
+            // The verdict asks for nothing. The tick still might, and it is read from the Tax
+            // review's own response because there is no column on the case carrying it - the
+            // Tax submit consumed it and stamped only the outcome.
+            if (!OutcomeRules.RemedialActionFlagged(
+                    AnswerChoiceFor(service, taxReview.Value, TaxRemedialQuestionCode)))
             {
                 return null;
             }
@@ -1221,8 +1248,11 @@ namespace OutcomeTesting.Plugins
             return new DeferredTax
             {
                 ReviewId = taxReview.Value,
-                Reason = "Tax check: "
-                    + new OptionLabels(service).Label(CaseEntity, TaxOutcomeAttr, outcome.Value),
+
+                // Not the outcome's label: the outcome is a pass, and telling an adviser
+                // "Tax check: Pass" as the reason they have work to do says the opposite of
+                // what happened. This names the question that actually asked for it.
+                Reason = "Tax check: remedial action required",
             };
         }
 

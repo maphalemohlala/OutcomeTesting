@@ -199,6 +199,41 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         /// <summary>
+        /// The same deferral, for a Tax check that PASSED and still asked for a remedial
+        /// action (project owner, 2026-09-21, working "if a tax has remediation it should not
+        /// appear on the Advisers queue and remediation page until the aqs check has been
+        /// submitted").
+        ///
+        /// Q-TAX-02 and Q-FQTAX-03 are two different questions. A Tax checker can pass the
+        /// tax outcome and still tick "Remedial action required?", and the Tax submit already
+        /// treated that as remediation owed - <c>taxRequiresRemediation || remedialFlagged</c>
+        /// is what it defers. What it could not do was hand it on: DeferredTaxFail rebuilt
+        /// the deferral from <c>al_taxoutcome</c> alone, that column said Pass, and the flag
+        /// went nowhere. The case moved on, the AQS submit raised only its own actions, and
+        /// the adviser was never asked for the thing the Tax checker had flagged.
+        /// </summary>
+        [Fact]
+        public void A_tax_pass_that_still_flags_a_remedial_action_reaches_the_adviser()
+        {
+            var svc = Case(ResponseRules.ChoicePass, ResponseRules.ChoicePass);
+            Answer(svc, TaxReviewId, "Q-FQTAX-03", ResponseRules.ChoiceYes);
+
+            Submit(svc, TaxReviewId);
+
+            // Deferred like any other Tax remediation: nothing on the adviser's queue while
+            // the AQS check is still to come.
+            Assert.Equal(CaseLifecycle.Queued, CaseStatus(svc));
+            Assert.Empty(ActionsOn(svc));
+
+            PickUp(svc);
+            Submit(svc, AqsReviewId);
+
+            // Deferred, not discarded. Before the fix this was empty and the case closed.
+            Assert.NotEmpty(ActionsOn(svc));
+            Assert.Equal(CaseLifecycle.AwaitingRemediation, CaseStatus(svc));
+        }
+
+        /// <summary>
         /// The half that deadlocked. Nothing about the AQS review has changed; the only
         /// reason it could not be submitted was a rule that had been retired.
         /// </summary>
