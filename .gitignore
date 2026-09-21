@@ -40,3 +40,10 @@ plugins/**/obj/
 # cannot build until the key is supplied out of band. That is the gap Key Vault injection
 # at build time is meant to close.
 plugins/OutcomeTesting.Plugins/OutcomeTesting.Plugins.snk
+
+# Playwright: a live portal session and run artefacts. The session file is a real
+# signed-in cookie jar - it is never committed, and it expires.
+app/e2e/.auth/
+app/test-results/
+app/playwright-report/
+app/blob-report/
