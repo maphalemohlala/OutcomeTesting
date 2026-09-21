@@ -47,6 +47,15 @@ export interface CaseEditValues {
   al_samplesourceid: string;
   al_casetypeid: string;
   al_preorpostcheckid: string;
+  /**
+   * The products the case covers, as comma-separated al_listoption ids.
+   *
+   * A SET, unlike the four lookups above: a case covers several products, which is what the
+   * free-text "Product(s)" column it replaces already did. Carried as one string because the
+   * command's Fields payload is a map of strings, and the whole set is sent on every save -
+   * a payload of additions could never remove one.
+   */
+  al_productids: string;
   al_samplesource: number | null;
   al_preorpostcheck: number | null;
   al_vulnerableclient: number | null;
@@ -116,7 +125,7 @@ function opt(value: number | undefined): number | null {
   return value == null ? null : value;
 }
 
-export function toDetail(record: Al_outcomecases): CaseDetail {
+export function toDetail(record: Al_outcomecases, productIds: readonly string[] = []): CaseDetail {
   const extra = record as Al_outcomecases & {
     al_priority?: number;
     al_priorityname?: string;
@@ -152,6 +161,9 @@ export function toDetail(record: Al_outcomecases): CaseDetail {
       al_samplesourceid: text(record._al_samplesourceid_value) ?? '',
       al_casetypeid: text(record._al_casetypeid_value) ?? '',
       al_preorpostcheckid: text(record._al_preorpostcheckid_value) ?? '',
+      // Sorted, so the diff that decides whether to send this field does not fire merely
+      // because the intersect came back in a different order.
+      al_productids: [...productIds].sort().join(','),
       al_samplesource: opt(record.al_samplesource),
       al_preorpostcheck: opt(record.al_preorpostcheck),
       al_vulnerableclient: opt(record.al_vulnerableclient),

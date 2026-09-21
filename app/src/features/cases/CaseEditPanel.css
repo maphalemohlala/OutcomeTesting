@@ -151,3 +151,23 @@
   font-weight: 600;
   color: var(--colour-text);
 }
+
+/* A managed list a case may hold several of: every option visible, each its own control.
+   A <select multiple> would hide the rest behind a scroll and lose the selection on a
+   mis-click, which is the wrong trade for a field a checker fills in once. */
+.case-edit__set {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.case-edit__set-item {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  font-weight: 400;
+}
+
+.case-edit__set-item input {
+  flex: none;
+}

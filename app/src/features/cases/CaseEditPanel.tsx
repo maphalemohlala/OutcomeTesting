@@ -16,7 +16,14 @@ import {
   type CommandOutcome,
 } from './caseEditSubmit';
 import { ADVICE_DATE_LABEL, ukToday } from './caseHeaderDates';
-import { MIGRATED_LISTS, choicesIncludingHeld, toOptionRows, type ManagedList } from '../admin/listOptions';
+import {
+  MIGRATED_LISTS,
+  choicesIncludingHeld,
+  setValues,
+  toOptionRows,
+  toggleValue,
+  type ManagedList,
+} from '../admin/listOptions';
 import { useAllListOptions } from '../admin/useListOptions';
 import { useCaseReviews } from './useCaseReviews';
 import { useUserDirectory } from '../../hooks/useUserDirectory';
@@ -46,7 +53,7 @@ import './CaseEditPanel.css';
  * choice metadata a developer deploys (project owner, 2026-09-21). Its value is a guid, not
  * an option value, which is why it cannot just be another 'choice'.
  */
-type FieldKind = 'text' | 'date' | 'choice' | 'user' | 'listoption';
+type FieldKind = 'text' | 'date' | 'choice' | 'user' | 'listoption' | 'listoptionset';
 
 /** MIGRATED_LISTS is the single place that says which lists have a lookup on the case. */
 function managedList(key: string): ManagedList {
@@ -120,7 +127,13 @@ const SECTIONS: Section[] = [
         list: managedList('product-solution-type'),
         help: 'Maintained under Admin → Dropdown options. A new option appears here as soon as it is added.',
       },
-      { attr: 'al_products', label: 'Products', kind: 'text' },
+      {
+        attr: 'al_productids',
+        label: 'Products',
+        kind: 'listoptionset',
+        list: managedList('products'),
+        help: 'Tick every product the case covers. Maintained under Admin → Dropdown options.',
+      },
       { attr: 'al_advicedate', label: ADVICE_DATE_LABEL, kind: 'date' },
       {
         attr: 'al_samplesourceid',
@@ -290,8 +303,8 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
   function setField(attr: keyof CaseEditValues, kind: FieldKind, raw: string) {
     setForm((prev) => ({
       ...prev,
-      // A listoption carries a guid, so it is stored as the string it is - only 'choice'
-      // fields are numeric option values.
+      // A listoption carries a guid and a listoptionset a comma-separated list of them, so
+      // both are stored as the strings they are - only 'choice' fields are numeric values.
       [attr]: kind === 'choice' ? (raw === '' ? null : Number(raw)) : raw,
     }));
   }
@@ -468,8 +481,40 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
 
     return (
       <label key={field.attr} className="case-edit__field" htmlFor={inputId}>
-        <span>{field.label}</span>
-        {field.kind === 'listoption' ? (
+        <span id={`${inputId}-label`}>{field.label}</span>
+        {field.kind === 'listoptionset' ? (
+          /*
+           * Checkboxes rather than a multi-select list box. A case covers several products
+           * and a <select multiple> hides that: it shows a few rows, needs ctrl-click to add
+           * a second, and silently drops the rest of the selection on a mis-click. Every
+           * option is visible here and each is its own control.
+           */
+          <div className="case-edit__set" role="group" aria-labelledby={`${inputId}-label`}>
+            {choicesIncludingHeld(
+              toOptionRows(listRows, field.list!, new Date()),
+              null,
+            ).map((option) => {
+              const chosen = setValues(typeof value === 'string' ? value : '');
+              return (
+                <label key={option.id} className="case-edit__set-item">
+                  <input
+                    type="checkbox"
+                    value={option.id}
+                    checked={chosen.includes(option.id)}
+                    onChange={(e) =>
+                      setField(
+                        field.attr,
+                        field.kind,
+                        toggleValue(chosen, option.id, e.target.checked),
+                      )
+                    }
+                  />
+                  <span>{option.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        ) : field.kind === 'listoption' ? (
           <select
             id={inputId}
             value={typeof value === 'string' ? value : ''}

@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Al_outcomecasesService } from '../../generated';
+import {
+  Al_listoption_al_outcomecase_productssetService,
+  Al_outcomecasesService,
+} from '../../generated';
 import { logTechnical } from '../../services/errors';
 import { toDetail } from './caseDetailMapping';
 import type { CaseDetail } from './caseDetailMapping';
@@ -30,8 +33,28 @@ export function useCaseDetail(caseId: string | undefined, reloadKey = 0): CaseDe
     if (!caseId) return;
     let cancelled = false;
 
-    Al_outcomecasesService.get(caseId)
-      .then((result) => {
+    /*
+     * The products a case covers are a many-to-many through
+     * al_listoption_al_outcomecase_products, so they cannot be read off the case row. The
+     * generated client has no $expand - IGetAllOptions is select/filter/orderBy/top/skip -
+     * so the intersect is queried directly and joined here, which is what useReviewDetail
+     * already does for fail reasons and what ListOptionRules does server-side.
+     *
+     * A failure to read the products is NOT a failure to read the case: the case still
+     * renders, with no products shown. Losing the whole page over one join would be a worse
+     * trade than showing a header field empty.
+     */
+    Promise.all([
+      Al_outcomecasesService.get(caseId),
+      Al_listoption_al_outcomecase_productssetService.getAll({
+        filter: `al_outcomecaseid eq ${caseId}`,
+        top: 200,
+      }).catch((error) => {
+        logTechnical('case products load', error);
+        return { success: false as const, data: undefined };
+      }),
+    ])
+      .then(([result, productResult]) => {
         if (cancelled) return;
         if (!result.success || !result.data) {
           if (!result.success) {
@@ -44,7 +67,12 @@ export function useCaseDetail(caseId: string | undefined, reloadKey = 0): CaseDe
           });
           return;
         }
-        setState({ status: 'ready', detail: toDetail(result.data) });
+        const productIds =
+          productResult.success && productResult.data
+            ? productResult.data.map((link) => link.al_listoptionid)
+            : [];
+
+        setState({ status: 'ready', detail: toDetail(result.data, productIds) });
       })
       .catch((error) => {
         if (cancelled) return;

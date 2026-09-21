@@ -378,3 +378,34 @@ export function lookupLabelOn(
 
   return null;
 }
+
+/**
+ * A comma-separated option-id list as ids, blanks dropped.
+ *
+ * The set a case holds travels as one string because the command's Fields payload is a map
+ * of strings, and the WHOLE set is sent on every save - a payload of additions could never
+ * remove one.
+ */
+export function setValues(raw: string | null | undefined): string[] {
+  return (raw ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => id !== '');
+}
+
+/**
+ * The set with one id added or removed, kept SORTED.
+ *
+ * Sorted so that ticking A then B and ticking B then A produce the same string. Without it
+ * the change detection would fire on a set nobody changed, and the command would be asked to
+ * rewrite associations that already match - which is a write, an audit line and a reviewer
+ * wondering what moved.
+ */
+export function toggleValue(
+  current: readonly string[],
+  id: string,
+  on: boolean,
+): string {
+  const next = on ? [...new Set([...current, id])] : current.filter((held) => held !== id);
+  return [...next].sort().join(',');
+}

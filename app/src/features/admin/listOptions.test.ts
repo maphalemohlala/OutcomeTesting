@@ -24,6 +24,8 @@ import {
   lookupLabelOn,
   lookupValueField,
   offeredOptions,
+  setValues,
+  toggleValue,
   toOptionRows,
   validateDraft,
 } from './listOptions';
@@ -453,5 +455,40 @@ describe('reading a lookup label off a case record', () => {
     expect(
       lookupLabelOn({ [ANNOTATION]: 'IHT' }, { ...PRODUCT, caseAttribute: null }),
     ).toBeNull();
+  });
+});
+
+describe('a list a case may hold several of', () => {
+  it('reads a stored set, ignoring blanks and stray spaces', () => {
+    expect(setValues('a,b')).toEqual(['a', 'b']);
+    expect(setValues(' a , b ,, ')).toEqual(['a', 'b']);
+    expect(setValues('')).toEqual([]);
+    expect(setValues(null)).toEqual([]);
+  });
+
+  it('adds and removes one option at a time', () => {
+    expect(toggleValue(['a'], 'b', true)).toBe('a,b');
+    expect(toggleValue(['a', 'b'], 'a', false)).toBe('b');
+    expect(toggleValue([], 'a', false)).toBe('');
+  });
+
+  it('gives the same string whatever order the boxes were ticked in', () => {
+    // THE reason it sorts. Without it, ticking A then B and B then A produce different
+    // strings, the change detection fires on a set nobody changed, and the command is asked
+    // to rewrite associations that already match - a write, an audit line, and a reviewer
+    // wondering what moved.
+    expect(toggleValue(toggleValue([], 'b', true).split(','), 'a', true)).toBe(
+      toggleValue(toggleValue([], 'a', true).split(','), 'b', true),
+    );
+  });
+
+  it('cannot hold the same option twice', () => {
+    expect(toggleValue(['a'], 'a', true)).toBe('a');
+  });
+
+  it('round-trips through the stored form', () => {
+    const stored = toggleValue(['c', 'a'], 'b', true);
+    expect(stored).toBe('a,b,c');
+    expect(setValues(stored)).toEqual(['a', 'b', 'c']);
   });
 });

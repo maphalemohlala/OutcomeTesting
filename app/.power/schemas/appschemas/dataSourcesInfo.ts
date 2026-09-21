@@ -607,6 +607,13 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "al_listoption_al_outcomecase_productsset": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "al_listoption_al_outcomecase_productsid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "al_listoptions": {
     "tableId": "",
     "version": "",

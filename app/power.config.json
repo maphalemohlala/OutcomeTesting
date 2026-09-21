@@ -133,6 +133,11 @@
           "entitySetName": "al_listoptions",
           "logicalName": "al_listoption",
           "isHidden": false
+        },
+        "al_listoption_al_outcomecase_products": {
+          "entitySetName": "al_listoption_al_outcomecase_productsset",
+          "logicalName": "al_listoption_al_outcomecase_products",
+          "isHidden": false
         }
       },
       "environmentVariableName": ""

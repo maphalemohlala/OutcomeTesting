@@ -1,0 +1,58 @@
+{
+  "name": "al_listoption_al_outcomecase_products",
+  "title": "al_listoption_al_outcomecase_products",
+  "schema": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "x-ms-dataverse-entity": true,
+      "x-ms-dataverse-entityset": "al_listoption_al_outcomecase_productsset",
+      "x-ms-dataverse-primary-id": "al_listoption_al_outcomecase_productsid",
+      "x-ms-dataverse-primary-name": null,
+      "properties": {
+        "al_listoption_al_outcomecase_productsid": {
+          "type": "string",
+          "title": "al_listoption_al_outcomecase_productsid",
+          "x-ms-dataverse-attribute": "al_listoption_al_outcomecase_productsid",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "al_listoption_al_outcomecase_productsId",
+          "x-ms-read-only": true,
+          "x-ms-dataverse-primary-id": true,
+          "required": true,
+          "x-ms-keyType": "primary"
+        },
+        "al_listoptionid": {
+          "type": "string",
+          "title": "al_listoptionid",
+          "x-ms-dataverse-attribute": "al_listoptionid",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "al_listoptionid",
+          "x-ms-read-only": true,
+          "required": true
+        },
+        "al_outcomecaseid": {
+          "type": "string",
+          "title": "al_outcomecaseid",
+          "x-ms-dataverse-attribute": "al_outcomecaseid",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "al_outcomecaseid",
+          "x-ms-read-only": true,
+          "required": true
+        },
+        "versionnumber": {
+          "type": "string",
+          "title": "versionnumber",
+          "x-ms-dataverse-attribute": "versionnumber",
+          "x-ms-dataverse-type": "BigIntType",
+          "x-ms-schema-name": "VersionNumber",
+          "x-ms-read-only": true
+        }
+      },
+      "required": [
+        "al_listoption_al_outcomecase_productsid",
+        "al_listoptionid",
+        "al_outcomecaseid"
+      ]
+    }
+  }
+}
