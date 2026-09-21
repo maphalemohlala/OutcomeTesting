@@ -100,6 +100,19 @@ const TEMPLATES: Record<string, TemplateHint> = {
     body:
       'Your remediation on case {{reference}} has been approved, and the case is now closed with a final outcome of {{finalOutcome}}.{{notes}}',
   },
+  // AD-138's fourth ending, added with F40 on 2026-09-20: the approval closes the case, but
+  // the adviser recorded that no recheck is needed, so there is no grade to quote. The other
+  // three letters all had something to say and this one had nothing, so it borrowed the
+  // recheck wording and told the adviser the case had "moved on to recheck" after it closed.
+  'SIGNOFF-APPROVED-CLOSED-NOGRADE': {
+    name: 'Remediation approved - case closed, no recheck',
+    tokens: ['reference', 'notes'],
+    isHtml: false,
+    subject: 'Remediation approved on case {{reference}}',
+    body:
+      'Your remediation on case {{reference}} has been approved. You recorded that it needs no '
+      + 'further checking, so the case is now closed and nothing more is needed from you.{{notes}}',
+  },
   'SIGNOFF-REJECTED': {
     name: 'Remediation sent back',
     tokens: ['reference', 'notes'],
