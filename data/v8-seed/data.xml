@@ -430,7 +430,13 @@
         <field name="al_displayorder" value="3" />
         <field name="al_sectionid" lookupentity="al_section" value="33330000-0000-4c00-8000-000000000090" />
       </record>
-    </records>
+          <record id="44440000-0000-4c00-8000-000000000095">
+        <field name="al_name" value="Tax Remedial" />
+        <field name="al_questioncode" value="Q-TAX-04" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_sectionid" lookupentity="al_section" value="33330000-0000-4c00-8000-000000000001" />
+      </record>
+</records>
   </entity>
   <entity name="al_questionversion" displayname="Question Version">
     <records>
@@ -940,7 +946,18 @@
         <field name="al_responsetype" value="120910007" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000093" />
       </record>
-    </records>
+          <record id="55550000-0000-4c00-8000-000000000095">
+        <field name="al_name" value="Q-TAX-04 v1" />
+        <field name="al_questionversioncode" value="Q-TAX-04-V1" />
+        <field name="al_questiontext" value="Tax Remedial" />
+        <field name="al_versionnumber" value="1" />
+        <field name="al_displayorder" value="4" />
+        <field name="al_effectivefrom" value="2026-09-19T00:00:00Z" />
+        <field name="al_ismandatory" value="False" />
+        <field name="al_responsetype" value="120910011" />
+        <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000095" />
+      </record>
+</records>
   </entity>
   <entity name="al_failreason" displayname="Fail Reason">
     <records>
