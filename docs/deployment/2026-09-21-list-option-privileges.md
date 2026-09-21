@@ -85,3 +85,68 @@ The **portal** cannot read the table either, but for a different reason: `/_api/
 returns **404**, not 403 — the site has not been restarted since the table was created
 (AD-189). The privilege change does not affect that, and the portal dropdowns stay empty
 until the DEV site is restarted.
+
+---
+
+# And the page itself was not reachable
+
+**Same day, found immediately after the above.** With the privilege granted, the dropdowns
+filled — but the **Administration → Dropdown options** page still did not appear in the nav
+for the reporter. Two separate reasons, both data rather than code.
+
+## The role assignment was inactive
+
+`al_userrolemapping` for Simunye Radingwana, before:
+
+| Role code | State |
+|---|---|
+| AL Portal - Outcome Testing Manager | **Inactive** |
+| AL Portal - Portal Administrator | **Inactive** |
+| AL Portal - AQS Reviewer | Inactive |
+| AL Portal - Tax Reviewer | Inactive |
+| AL Portal - Adviser Remediation | Active |
+| AL Portal - T&C Supervisor | Active |
+
+Neither active role grants any `page.admin.*`, so the whole Administration group was hidden.
+This looks like deliberate role-switching from earlier UAT, not a defect.
+
+Reinstated through the command rather than by writing `statecode`, so the rule check and the
+audit event both ran:
+
+```
+al_SetRoleAssignmentActive  MappingId=c75d30fe-…  Active=true
+→ 200, AuditEventId 56ebd702-…
+```
+
+## page.admin.lists had only one rule
+
+`al_pagepermission` carried exactly **one** rule for `page.admin.lists` — role code
+`Administrators`, Manage. `permissions.ts` declares three. The two missing ones are the two
+that every comparable admin page already has:
+
+| Resource | Rules before | Rules after |
+|---|---|---|
+| page.admin.advisers | Administrators, Portal Administrator, Outcome Testing Manager | unchanged |
+| page.admin.templates | Administrators, Portal Administrator, Outcome Testing Manager | unchanged |
+| **page.admin.lists** | **Administrators only** | Administrators, Portal Administrator, Outcome Testing Manager |
+
+Added through `al_SetPagePermission`, both `Conflict: false`:
+
+```
+RoleCode="AL Portal - Outcome Testing Manager" ResourceKey="page.admin.lists" AccessLevel="Manage"
+RoleCode="AL Portal - Portal Administrator"    ResourceKey="page.admin.lists" AccessLevel="Manage"
+```
+
+Deliberately **not** copied from `page.admin.questions` or `page.admin.security`, which are
+Administrator-only by design. Dropdown options follows advisers and templates: the checking
+team maintains its own lists, which is the entire point of the migration.
+
+`page.admin.lists` is not seeded by any verb — these rows are created by hand or through the
+Security configuration page — so there is nothing in code to harden against a repeat. A new
+admin page needs its rules created alongside it.
+
+## Verified
+
+Signed in as the reporter, after a reload: the Administration group appears, **Dropdown
+options** is in it, the page opens, the list picker offers all five lists, and Products shows
+its four placeholders with Add / Change / Remove.
