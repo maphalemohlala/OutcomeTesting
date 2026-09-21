@@ -162,6 +162,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             var changes = new List<string>();
             UpdateCaseDetailsPlugin.ApplyFields(
+                new FakeOrganizationService(),
                 fields, before, new Entity("al_outcomecase", before.Id), changes,
                 new OptionLabels(new FakeOrganizationService()));
 

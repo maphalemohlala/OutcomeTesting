@@ -118,6 +118,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             var error = Assert.Throws<InvalidPluginExecutionException>(
                 () => UpdateCaseDetailsPlugin.ApplyFields(
+                    new FakeOrganizationService(),
                     fields,
                     new Entity("al_outcomecase", CaseId),
                     new Entity("al_outcomecase", CaseId),

@@ -175,7 +175,10 @@ namespace OutcomeTesting.Plugins
             }
 
             // General editable case fields, addressed by logical name via the Fields payload.
-            ApplyFields(fields, before, update, changes, labels);
+            // The system service, as the labels above already use: validating the chosen option
+            // is reading the reference catalogue, not reading the caller's data, and it must
+            // answer the same way whoever is asking.
+            ApplyFields(systemService, fields, before, update, changes, labels);
 
             // One lifecycle check for both status paths — the legacy Status parameter and
             // the Fields payload both land on the same attribute, so validating after they
@@ -479,19 +482,34 @@ namespace OutcomeTesting.Plugins
             Text,
             Option,
             DateOnly,
+
+            /// <summary>
+            /// A lookup to an al_listoption row: a dropdown whose choices are data the
+            /// checking team maintains, not choice metadata a developer deploys.
+            /// </summary>
+            ListOption,
         }
 
         private sealed class EditableField
         {
-            public EditableField(EditableKind kind, string label)
+            public EditableField(EditableKind kind, string label, int listValue = 0)
             {
                 Kind = kind;
                 Label = label;
+                ListValue = listValue;
             }
 
             public EditableKind Kind { get; }
 
             public string Label { get; }
+
+            /// <summary>
+            /// For <see cref="EditableKind.ListOption"/>, the al_listoption.al_list value this
+            /// field accepts. Every list's options share one table, so without it a sample
+            /// source could be written into the product type and read back as an ordinary
+            /// value.
+            /// </summary>
+            public int ListValue { get; }
         }
 
         // Allowlist of case attributes a manager may edit via the Fields payload, keyed by
@@ -513,7 +531,17 @@ namespace OutcomeTesting.Plugins
                 // trail and the refusals use, and it comes from CaseHeaderRules so the
                 // portal's own header edit words it identically.
                 { "al_advicedate", new EditableField(EditableKind.DateOnly, CaseHeaderRules.AdviceDateLabel) },
+                // The choice column stays editable while cases exist that hold only it. The
+                // lookup below is what a current edit writes; this is the way back for a row
+                // the backfill could not resolve.
                 { "al_productsolutiontype", new EditableField(EditableKind.Option, "Product/solution type") },
+                {
+                    ListOptionRules.ProductTypeAttribute,
+                    new EditableField(
+                        EditableKind.ListOption,
+                        "Product/solution type",
+                        ListOptionRules.ProductSolutionType)
+                },
                 { "al_samplesource", new EditableField(EditableKind.Option, "Sample source") },
                 // al_checkername is deliberately absent (item 2, 2026-09-19). The case header
                 // now carries a Tax Checker and an AQS Checker, and each one REFLECTS the
@@ -787,6 +815,7 @@ namespace OutcomeTesting.Plugins
         /// portal offers a checker a narrower set than an administrator gets here.
         /// </summary>
         public static void ApplyFields(
+            IOrganizationService service,
             Dictionary<string, string> fields,
             Entity before,
             Entity update,
@@ -835,6 +864,38 @@ namespace OutcomeTesting.Plugins
                             update[attr] = new OptionSetValue(option);
                             changes.Add(def.Label + " " + labels.Describe(CaseEntity, attr, before.GetAttributeValue<OptionSetValue>(attr))
                                 + " -> " + labels.Label(CaseEntity, attr, option));
+                            break;
+                        }
+
+                    case EditableKind.ListOption:
+                        {
+                            var was = before.GetAttributeValue<EntityReference>(attr);
+                            var wasName = was == null || string.IsNullOrWhiteSpace(was.Name) ? "(none)" : was.Name;
+
+                            if (value.Length == 0)
+                            {
+                                update[attr] = null;
+                                changes.Add(def.Label + " '" + wasName + "' -> (none)");
+                                break;
+                            }
+
+                            Guid optionId;
+                            if (!Guid.TryParse(value, out optionId))
+                            {
+                                throw new InvalidPluginExecutionException(
+                                    CommandHelpers.ValidationPrefix + def.Label + " is not an option on that list.");
+                            }
+
+                            // The row must exist, belong to THIS list, and be offered today.
+                            // Checked here rather than trusted from the caller: a payload sent
+                            // by hand never goes near the management page.
+                            var option = ListOptionRules.Resolve(
+                                service, optionId, def.ListValue, def.Label, DateTime.UtcNow.Date);
+
+                            update[attr] = new EntityReference(ListOptionRules.Entity, optionId);
+                            changes.Add(
+                                def.Label + " '" + wasName + "' -> '"
+                                + option.GetAttributeValue<string>(ListOptionRules.NameAttribute) + "'");
                             break;
                         }
 

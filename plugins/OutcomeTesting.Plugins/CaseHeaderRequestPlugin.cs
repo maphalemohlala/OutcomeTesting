@@ -216,7 +216,7 @@ namespace OutcomeTesting.Plugins
                 // The Custom API's own applier, so a field coerces and reads the same way
                 // whichever front end sent it.
                 UpdateCaseDetailsPlugin.ApplyFields(
-                    fields, before, update, changes, new OptionLabels(service));
+                    service, fields, before, update, changes, new OptionLabels(service));
             }
 
             if (changes.Count == 0)
