@@ -81,10 +81,9 @@ solution reaches TEST the role XML carries the grant with it, the same way AD-14
 
 ## Still open
 
-The **portal** cannot read the table either, but for a different reason: `/_api/al_listoptions`
-returns **404**, not 403 — the site has not been restarted since the table was created
-(AD-189). The privilege change does not affect that, and the portal dropdowns stay empty
-until the DEV site is restarted.
+The **portal** cannot read the table either, for a reason of its own. See the third section
+below: AD-189's restart has since happened, and what is left is a table permission that is
+not bound to any web role.
 
 ---
 
@@ -150,3 +149,61 @@ admin page needs its rules created alongside it.
 Signed in as the reporter, after a reload: the Administration group appears, **Dropdown
 options** is in it, the page opens, the list picker offers all five lists, and Products shows
 its four placeholders with Add / Change / Remove.
+
+---
+
+# The portal: the restart happened, and a different thing is wrong
+
+**Signed in on the DEV portal as the reporter to check.** `/_api/al_listoptions` now returns
+**403**, not the 404 AD-189 recorded:
+
+```
+90040120  EntityPermissionReadIsMissing
+"You don't have permission to read the al_listoption table."
+```
+
+A 404 meant the site did not know the table existed. A 403 means it does. **The site has been
+restarted since AD-189 was written**, so that blocker is gone and this is a new one.
+
+## What is actually wrong
+
+Not the Web API settings — both exist and are correct:
+
+```
+Webapi/al_listoption/enabled = true
+Webapi/al_listoption/fields  = al_listoptionid,al_name,al_list,al_sortorder,
+                               al_effectivefrom,al_effectiveto
+```
+
+Not the permission record — `List Option - read` is present, active, Global scope, `read: true`.
+
+**The web-role bindings are in the wrong place.** This site uses the enhanced data model, where
+a table permission is a `powerpagecomponent` of type 18 and its web roles live **inside the
+`content` JSON**. Compare the two:
+
+| Component | `adx_entitypermission_webrole` in `content` | `/_api` result |
+|---|---|---|
+| Question Version - read | Administrators, Authenticated Users | **200** |
+| List Option - read | **absent** | **403** |
+
+The nine bindings the upload did create went into `mspp_entitypermission_webrole`, the legacy
+projection, which the runtime does not read. Those nine rows are the **only** rows in that
+intersect in the whole environment — every table permission that works has zero — which is the
+proof that the runtime reads `content` and nothing else.
+
+## The fix, not yet applied
+
+One PATCH, adding the array to the component's `content`:
+
+```
+PATCH powerpagecomponents(a1000000-0000-4000-8000-000000000079)
+content.adx_entitypermission_webrole = [Administrators, Authenticated Users]
+```
+
+**Administrators + Authenticated Users, matching `Question Version - read`**, rather than the
+nine named roles the YAML lists. Every one of the nine is a subset of Authenticated Users, so
+the effect is the same today — and a tenth role added later would otherwise get empty dropdowns
+in silence, which is the exact failure this whole note is about.
+
+This is a write to portal configuration and was refused by the sandbox, so it needs
+authorising before it can be applied.
