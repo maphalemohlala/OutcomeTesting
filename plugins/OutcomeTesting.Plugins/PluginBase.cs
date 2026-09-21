@@ -72,6 +72,37 @@ namespace OutcomeTesting.Plugins
             {
                 localPluginContext.Trace($"Exception: {orgServiceFault.ToString()}");
 
+                // A refusal that crossed a service boundary is still a refusal.
+                //
+                // One command calling another does not receive the inner
+                // InvalidPluginExecutionException - it arrives here as a platform fault, and
+                // this catch used to re-label it as an unexpected crash. So a deliberate
+                // PRECONDITION reached the caller as "UNEXPECTED: <class> could not complete.
+                // OrganizationServiceFault: PRECONDITION: ..." and the prefix branching every
+                // page relies on could not fire, because the message no longer STARTED with
+                // the prefix. Found 2026-09-21 on PRT-093.
+                var carriedRefusal = CommandHelpers.RefusalWithin(orgServiceFault.Message);
+                if (carriedRefusal != null)
+                {
+                    throw new InvalidPluginExecutionException(carriedRefusal, orgServiceFault);
+                }
+
+                // The platform refusing the CALLER is an authorisation answer, not a crash,
+                // and it is the one platform fault a person can actually act on. It is turned
+                // into a sentence here rather than left to leak the user id, the privilege id,
+                // the privilege name and this class's own name to a browser (APP-003,
+                // NFR-OBS-01). Nothing is swallowed: it is still thrown, the transaction still
+                // aborts, and the full fault is on the trace above and in InnerException.
+                if (CommandHelpers.IsPrivilegeDenied(orgServiceFault.Message))
+                {
+                    throw new InvalidPluginExecutionException(
+                        CommandHelpers.PrivilegeDeniedMessage,
+                        orgServiceFault);
+                }
+
+                // Anything else genuinely is unexpected, and keeps saying so. Naming the
+                // plug-in and the fault is what makes an unforeseen failure diagnosable at
+                // all, so this branch is deliberately left alone.
                 throw new InvalidPluginExecutionException(
                     $"UNEXPECTED: {PluginClassName} could not complete. OrganizationServiceFault: {orgServiceFault.Message}",
                     orgServiceFault);

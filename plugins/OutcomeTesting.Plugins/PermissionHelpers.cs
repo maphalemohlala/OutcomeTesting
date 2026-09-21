@@ -24,16 +24,22 @@ namespace OutcomeTesting.Plugins
     /// behind this gate is a Custom API, a Custom API plug-in type has no run-as user of its
     /// own, and <c>PluginUserService</c> is <c>GetOrganizationService(context.UserId)</c> —
     /// which for such a step is the initiating user. The claim was what made AD-142 invisible
-    /// to review: the first line of the gate reads the platform <c>role</c> table, no shipped
-    /// security role grants <c>prvReadRole</c>, and so the gate faulted for every caller who
-    /// was not a Dataverse System Administrator.
+    /// to review: the gate's first act used to be a System Administrator probe against the
+    /// platform <c>role</c> table, no shipped security role granted <c>prvReadRole</c>, and so
+    /// the gate faulted for every caller who was not a Dataverse System Administrator.
     ///
     /// So every table this gate reads must be one the app's own security roles grant —
-    /// <c>role</c>, <c>systemuserroles</c>, <c>systemuser</c>, <c>contact</c>,
-    /// <c>mspp_webrole</c>, <c>powerpagecomponent</c>, <c>al_userrolemapping</c> and
-    /// <c>al_pagepermission</c>. A read that cannot be granted cannot be made here at all,
-    /// because AD-109 forbids the catch that would make it survivable.
-    /// <c>AppPermissionGateTests</c> holds that list against the shipped role definitions.
+    /// <c>systemuser</c>, <c>contact</c>, <c>mspp_webrole</c>, <c>powerpagecomponent</c>,
+    /// <c>al_userrolemapping</c> and <c>al_pagepermission</c>. A read that cannot be granted
+    /// cannot be made here at all, because AD-109 forbids the catch that would make it
+    /// survivable. <c>AppPermissionGateTests</c> holds that list against the shipped role
+    /// definitions.
+    ///
+    /// <c>role</c> and <c>systemuserroles</c> left that list on 2026-09-21 with the System
+    /// Administrator short-circuit that read them (see <see cref="EnsureAppPermission"/>).
+    /// The shipped roles still grant <c>prvReadRole</c>, which is now unnecessary rather than
+    /// harmful; withdrawing it is a change to the managed solution and is left as a separate
+    /// decision.
     /// </summary>
     public static class PermissionHelpers
     {
@@ -51,12 +57,26 @@ namespace OutcomeTesting.Plugins
             string resourceKey,
             int requiredLevel)
         {
-            // Break-glass: a Dataverse System Administrator can always manage access, so
-            // assigning roles can never permanently lock everyone out of configuration.
-            if (IsSystemAdministrator(systemService, context))
-            {
-                return;
-            }
+            // There is NO System Administrator short-circuit. A Dataverse System
+            // Administrator is held to the same application rules as everybody else
+            // (project owner, 2026-09-21).
+            //
+            // This used to begin with a break-glass: an administrator was admitted with no
+            // application configuration at all, justified as making it impossible to lock
+            // everyone out of Security configuration. Two things are wrong with that. It is
+            // not needed - a System Administrator holds every table privilege in the
+            // environment, so they can always write al_userrolemapping and al_pagepermission
+            // DIRECTLY and repair a bad rule that way. Removing the short-circuit does not
+            // strand anybody; it only stops them using the COMMAND to do it, which means the
+            // repair is a platform write on the record rather than a silent pass through an
+            // application gate. And it was inconsistent: al_CompleteRemediation already
+            // refuses an administrator outright ("Only the adviser who owns this remediation
+            // action can complete it"), so the same account was governed by one rule on one
+            // command and a different rule on twenty-seven others.
+            //
+            // The bootstrap below is what genuinely keeps a fresh environment openable, and
+            // it is unchanged: it fires on an empty mapping table, which is the case the
+            // break-glass was justified by and never actually served.
 
             // Bootstrap: before any mapping has ever been created, allow so the first
             // assignment can seed. Dataverse create privilege on al_userrolemapping still
@@ -103,46 +123,6 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.UnauthorizedPrefix +
                     "Your role does not grant the required access for this action (" + resourceKey + ").");
             }
-        }
-
-        /// <summary>
-        /// Whether the caller holds the Dataverse System Administrator role, for the
-        /// break-glass short-circuit only.
-        ///
-        /// This reads the PLATFORM <c>role</c> table, and the caller is who reads it. Every
-        /// command behind this gate is a Custom API, and a Custom API plug-in type has no
-        /// run-as user of its own — <c>PluginUserService</c> resolves to
-        /// <c>context.UserId</c>, which equals <c>InitiatingUserId</c> — so the "system
-        /// service" this class is handed is the caller's own service, whatever the name says.
-        ///
-        /// Until AD-142 no shipped security role granted <c>prvReadRole</c>, so this refused
-        /// every caller who was not already a Dataverse System Administrator — on the gate's
-        /// FIRST line, before any application rule ran, with the platform's own privilege
-        /// fault in place of anything a user could act on. An Import Cases attempt was
-        /// refused exactly that way on 2026-09-16. Both roles now grant read on the role
-        /// table, which is what makes this query answer rather than throw.
-        ///
-        /// Deliberately no try/catch. "Cannot read the role table" and "is not an
-        /// administrator" are the same answer, so absorbing the fault looks correct and is
-        /// the one thing a plug-in may not do — the platform aborts the whole transaction of
-        /// a plug-in that catches an OrganizationService fault and carries on ("ISV code
-        /// reduced the open transaction count", AD-109), and OptionLabels recorded that for a
-        /// READ. The fix is the grant, so there is no failure to absorb.
-        /// </summary>
-        private static bool IsSystemAdministrator(IOrganizationService service, IPluginExecutionContext context)
-        {
-            var query = new QueryExpression("role")
-            {
-                ColumnSet = new ColumnSet(false),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("name", ConditionOperator.Equal, "System Administrator");
-            var userLink = query.AddLink("systemuserroles", "roleid", "roleid");
-            var systemUserLink = userLink.AddLink("systemuser", "systemuserid", "systemuserid");
-            systemUserLink.LinkCriteria.AddCondition("systemuserid", ConditionOperator.Equal, context.InitiatingUserId);
-
-            return service.RetrieveMultiple(query).Entities.Count > 0;
         }
 
         /// <summary>

@@ -28,6 +28,100 @@ namespace OutcomeTesting.Plugins
 
         public const string AuditEntity = "al_auditevent";
 
+        /// <summary>Every prefix a caller is meant to branch on, longest-lived first.</summary>
+        private static readonly string[] RefusalPrefixes =
+        {
+            ConflictPrefix,
+            UnauthorizedPrefix,
+            PreconditionPrefix,
+            ValidationPrefix,
+            NotFoundPrefix,
+        };
+
+        /// <summary>
+        /// The refusal carried inside a fault message, or null when there is none.
+        ///
+        /// <para>A refusal thrown by one command does NOT reach a command that called it as an
+        /// <see cref="InvalidPluginExecutionException"/>. It crosses the service boundary as a
+        /// <c>FaultException&lt;OrganizationServiceFault&gt;</c>, so the outer plug-in's catch
+        /// treated a perfectly good PRECONDITION as an unexpected crash and re-labelled it —
+        /// "UNEXPECTED: OutcomeTesting.Plugins.SignoffRequestPlugin could not complete.
+        /// OrganizationServiceFault: PRECONDITION: This remediation action has already been
+        /// approved." Seen on 2026-09-21 running PRT-093. Three faults with that: the caller's
+        /// prefix branching cannot fire because the message no longer STARTS with the prefix;
+        /// a deliberate refusal reads as a broken command; and the plug-in class name is named
+        /// to whoever asked, which NFR-OBS-01 exists to prevent.</para>
+        ///
+        /// <para>Searching rather than matching the start is deliberate, and it collapses
+        /// nesting of any depth: two commands deep produced two layers of packaging, and
+        /// taking the message from the FIRST prefix onwards yields the original sentence
+        /// whatever wrapped it. The full text still reaches the trace log and InnerException,
+        /// so nothing is lost for diagnosis - only for the person reading the screen.</para>
+        /// </summary>
+        public static string RefusalWithin(string faultMessage)
+        {
+            if (string.IsNullOrEmpty(faultMessage))
+            {
+                return null;
+            }
+
+            var earliest = -1;
+            foreach (var prefix in RefusalPrefixes)
+            {
+                var at = faultMessage.IndexOf(prefix, StringComparison.Ordinal);
+                if (at >= 0 && (earliest < 0 || at < earliest))
+                {
+                    earliest = at;
+                }
+            }
+
+            return earliest < 0 ? null : faultMessage.Substring(earliest);
+        }
+
+        /// <summary>
+        /// Whether a platform fault is the caller being denied a Dataverse privilege.
+        ///
+        /// <para>Two phrasings, because the platform uses both: the security library's
+        /// <c>SecLib::CheckPrivilege failed</c>, and the "Principal user (Id=...) is missing
+        /// prvReadWhatever privilege" form.</para>
+        /// </summary>
+        public static bool IsPrivilegeDenied(string faultMessage)
+        {
+            if (string.IsNullOrEmpty(faultMessage))
+            {
+                return false;
+            }
+
+            return faultMessage.IndexOf("SecLib::CheckPrivilege", StringComparison.OrdinalIgnoreCase) >= 0
+                || (faultMessage.IndexOf("is missing", StringComparison.OrdinalIgnoreCase) >= 0
+                    && faultMessage.IndexOf("privilege", StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        /// <summary>
+        /// What a person is told when the PLATFORM refused them, rather than an application
+        /// rule.
+        ///
+        /// <para>Carries no user id, no privilege id, no privilege name and no plug-in class
+        /// name. The raw fault named all four - "SecLib::CheckPrivilege failed. User:
+        /// 1fae3cf3-..., PrivilegeName: prvReadEntity, PrivilegeId: a3311f47-..." - which is
+        /// unreadable to the person it is shown to and is exactly the internal detail
+        /// NFR-OBS-01 keeps out of a browser. All of it still goes to the trace log and
+        /// InnerException, which is where an administrator looks.</para>
+        ///
+        /// <para>The wording separates the two role systems on purpose. APP-003 found an
+        /// account holding the Outcome Testing application role but NOT the Dataverse
+        /// <c>Basic User</c> role, and the note that this has happened three times in a week
+        /// says the confusion is the common case. Sending somebody to check their application
+        /// role when the platform is what refused them wastes the one place they would have
+        /// looked.</para>
+        /// </summary>
+        public const string PrivilegeDeniedMessage =
+            UnauthorizedPrefix +
+            "Your Dataverse security role does not allow this action. This is a platform " +
+            "privilege rather than an Outcome Testing application role, so the two are worth " +
+            "checking separately: ask an administrator to look at the security roles on your " +
+            "user account. The platform trace log records which privilege was missing.";
+
         /// <summary>
         /// Retrieves a row a CALLER named, and turns "it is not there" into a sentence they
         /// can act on.

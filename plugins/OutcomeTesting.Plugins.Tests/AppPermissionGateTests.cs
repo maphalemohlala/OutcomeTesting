@@ -145,26 +145,59 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         /// <summary>
-        /// And the gate did read the role table on this run. Without this, the test above
-        /// passes just as well when the probe is deleted or never reached, which is exactly
-        /// the false negative that let the defect ship.
+        /// And the gate did read something on this run. Without this, the test above passes
+        /// just as well when the gate is deleted or never reached, which is exactly the false
+        /// negative that let AD-142 ship: a rule about "every table the gate reads" is
+        /// vacuously true of a gate that reads none.
         /// </summary>
         [Fact]
-        public void TheGateReadsTheRoleTableItNeedsGranting()
+        public void TheGateActuallyReadsTheTablesItIsCheckedAgainst()
         {
             var svc = FullyConfiguredCaller();
             PermissionHelpers.EnsureAppPermission(svc, Context(), Resource, PermissionHelpers.AccessEdit);
 
-            Assert.Contains("role", svc.ReadEntities, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains("al_userrolemapping", svc.ReadEntities, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains("systemuser", svc.ReadEntities, StringComparer.OrdinalIgnoreCase);
         }
 
         /// <summary>
-        /// The break-glass itself: an administrator is admitted with no application
-        /// configuration at all, so a bad permission rule can never lock everyone out of
-        /// Security configuration.
+        /// The platform <c>role</c> table is no longer read at all (2026-09-21).
+        ///
+        /// It was read only by the System Administrator short-circuit, and that is gone. This
+        /// is pinned rather than left implicit because the read is the expensive kind: it
+        /// needs <c>prvReadRole</c> granted on every shipped role, and AD-109 means a gate
+        /// read the caller is refused cannot be recovered from - which is precisely how
+        /// AD-142 took down all 27 commands. Re-introducing it should be a deliberate act
+        /// that fails this test first.
         /// </summary>
         [Fact]
-        public void ASystemAdministratorShortCircuitsTheGate()
+        public void TheGateNoLongerReadsThePlatformRoleTable()
+        {
+            var svc = FullyConfiguredCaller();
+            PermissionHelpers.EnsureAppPermission(svc, Context(), Resource, PermissionHelpers.AccessEdit);
+
+            Assert.DoesNotContain("role", svc.ReadEntities, StringComparer.OrdinalIgnoreCase);
+            Assert.DoesNotContain("systemuserroles", svc.ReadEntities, StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// A Dataverse System Administrator gets NOTHING the application has not granted
+        /// them (project owner, 2026-09-21). This is the negative the change has to prove.
+        ///
+        /// The seeding is deliberately the strongest possible case for the old behaviour:
+        /// the caller really does hold the System Administrator role, and a mapping table
+        /// really does exist so the bootstrap cannot fire. Under the break-glass this
+        /// returned on the gate's first line with AccessManage on a resource the caller had
+        /// no mapping for. Now it refuses, like anybody else holding no application role.
+        ///
+        /// Removing the short-circuit strands nobody: a System Administrator holds every
+        /// table privilege, so they can still repair a bad rule by writing
+        /// al_userrolemapping and al_pagepermission directly. What they can no longer do is
+        /// pass this gate without a grant - which is what "the same rules as everybody else"
+        /// means, and what al_CompleteRemediation already did.
+        /// </summary>
+        [Fact]
+        public void ASystemAdministratorIsHeldToTheSameRulesAsEverybodyElse()
         {
             var svc = new FakeOrganizationService();
             var roleId = Guid.NewGuid();
@@ -178,7 +211,11 @@ namespace OutcomeTesting.Plugins.Tests
                 "al_rolecode", "Reviewer",
                 "statecode", new OptionSetValue(0));
 
-            PermissionHelpers.EnsureAppPermission(svc, Context(), Resource, PermissionHelpers.AccessManage);
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => PermissionHelpers.EnsureAppPermission(
+                    svc, Context(), Resource, PermissionHelpers.AccessManage));
+
+            Assert.StartsWith(CommandHelpers.UnauthorizedPrefix, error.Message, StringComparison.Ordinal);
         }
 
         /// <summary>
