@@ -81,6 +81,13 @@ describe('pageResourceForPath', () => {
   it('returns null for an ungated path', () => {
     expect(pageResourceForPath('/nowhere')).toBeNull();
   });
+
+  it('routes the people directory to the administration resource, not the cases one (2026-09-22)', () => {
+    // Required, not cosmetic. The page's Role column writes al_userrolemapping, which is an
+    // authorisation source, so leaving the directory on page.cases would let every
+    // case-worker grant themselves and anyone else access.
+    expect(pageResourceForPath('/admin/people')).toBe('page.admin.users');
+  });
 });
 
 describe('DEFAULT_PERMISSIONS integrity', () => {

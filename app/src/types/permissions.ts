@@ -342,5 +342,8 @@ export function pageResourceForPath(path: string): ResourceKey | null {
   if (path.startsWith('/admin/templates')) return 'page.admin.templates';
   if (path.startsWith('/admin/lists')) return 'page.admin.lists';
   if (path.startsWith('/admin/security')) return 'page.admin.security';
+  // The registry (Task 9, 2026-09-22): its Role column writes al_userrolemapping, an
+  // authorisation source, so it is gated as administration rather than page.cases.
+  if (path.startsWith('/admin/people')) return 'page.admin.users';
   return null;
 }

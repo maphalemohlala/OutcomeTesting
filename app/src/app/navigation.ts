@@ -19,7 +19,6 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/', label: 'Dashboard', resource: 'page.dashboard' },
       { to: '/cases', label: 'Case worklist', resource: 'page.cases' },
-      { to: '/people', label: 'People', resource: 'page.cases' },
     ],
   },
   {
@@ -40,9 +39,11 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/admin/advisers', label: 'Adviser mapping', resource: 'page.admin.advisers' },
       { to: '/admin/templates', label: 'Notification wording', resource: 'page.admin.templates' },
       { to: '/admin/lists', label: 'Dropdown options', resource: 'page.admin.lists' },
-      // Users merged into People (My work): one directory rather than two lists of people
-      // that nothing joined. Its route redirects there.
       { to: '/admin/security', label: 'Security configuration', resource: 'page.admin.security' },
+      // Moved from "My work" (Task 9, 2026-09-22): the Role column writes
+      // al_userrolemapping, an authorisation source, so the directory is gated as
+      // administration rather than as a case view.
+      { to: '/admin/people', label: 'People', resource: 'page.admin.users' },
     ],
   },
 ];

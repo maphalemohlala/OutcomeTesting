@@ -41,7 +41,7 @@ export function PersonCasesPage() {
       <>
         <PageIntro title="Person not found" purpose="That address does not name a known position." />
         <p>
-          <Link to="/people">Back to people</Link>
+          <Link to="/admin/people">Back to people</Link>
         </p>
       </>
     );
@@ -67,7 +67,7 @@ export function PersonCasesPage() {
       />
 
       <p className="people__note">
-        <Link to="/people">Back to people</Link>
+        <Link to="/admin/people">Back to people</Link>
         {' · '}
         <Link to={`/cases?person=${encodeURIComponent(name)}`}>
           Open in the case worklist with all filters

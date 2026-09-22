@@ -76,15 +76,21 @@ export function AppRoutes() {
           path="/cases/:caseId/audit"
           element={<Navigate to=".." relative="path" replace />}
         />
-        {/* People is a view over case data, so it is gated by the same resource (AD-041). */}
+        {/*
+          The registry: who the application knows, what they hold and their employee code
+          (project owner, 2026-09-22). Under administration because the Role column writes
+          al_userrolemapping, which PermissionHelpers reads as an authorisation source - on
+          page.cases, where this page used to live, every case-worker could grant roles.
+        */}
         <Route
-          path="/people"
+          path="/admin/people"
           element={
-            <RequirePermission resource="page.cases">
+            <RequirePermission resource="page.admin.users">
               <PeoplePage />
             </RequirePermission>
           }
         />
+        {/* The caseload drill-down stays a case view: it shows work, not access. */}
         <Route
           path="/people/:role/:name"
           element={
@@ -93,6 +99,7 @@ export function AppRoutes() {
             </RequirePermission>
           }
         />
+        <Route path="/people" element={<Navigate to="/admin/people" replace />} />
         <Route path="/reviews/:reviewId/tax" element={<RequirePermission resource="page.reviews"><ReviewDetailPage reviewType="Tax" /></RequirePermission>} />
         <Route path="/reviews/:reviewId/aqs" element={<RequirePermission resource="page.reviews"><ReviewDetailPage reviewType="AQS" /></RequirePermission>} />
         <Route
@@ -141,7 +148,7 @@ export function AppRoutes() {
           carrying both the caseload view and the registry admin actions. The route is kept
           as a redirect so bookmarks and any link still in the wild keep working.
         */}
-        <Route path="/admin/users" element={<Navigate to="/people" replace />} />
+        <Route path="/admin/users" element={<Navigate to="/admin/people" replace />} />
         <Route
           path="/admin/security"
           element={
