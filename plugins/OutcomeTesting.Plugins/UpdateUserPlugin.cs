@@ -69,8 +69,14 @@ namespace OutcomeTesting.Plugins
                     ContactRegistry.FullNameAttr,
                     ContactRegistry.FirstNameAttr,
                     ContactRegistry.LastNameAttr,
-                    ContactRegistry.EmailAttr));
+                    ContactRegistry.EmailAttr,
+                    // Read so the audit line can say what the code CHANGED FROM. Without it
+                    // a code-only edit produced "Name Jane Adviser -> Jane Adviser", which
+                    // reads as a no-op on a permission-gated administrative write that feeds
+                    // a positional file an external system consumes (2026-09-22 review).
+                    ContactRegistry.StaffCodeAttr));
             var previousName = ContactRegistry.NameOf(before);
+            var previousStaffCode = before.GetAttributeValue<string>(ContactRegistry.StaffCodeAttr);
             var workEmail = before.GetAttributeValue<string>(ContactRegistry.EmailAttr);
 
             var update = new Entity(ContactRegistry.Entity, userId);
@@ -115,11 +121,38 @@ namespace OutcomeTesting.Plugins
             }
 
             var details = "Name " + (previousName ?? string.Empty) + " -> " + fullName;
+
+            // Appended only where the code was actually part of this edit AND actually
+            // moved. An absent StaffCode means the page did not touch it, and a value equal
+            // to the stored one is a name-only save that happened to resend it - saying
+            // "Employee code EMP1 -> EMP1" on either would be the same no-op line the name
+            // clause already was. AD-041 is why this command exists; the audit event is the
+            // only record that a code on a Trail Light file was changed by hand and by whom.
+            var newStaffCode = staffCode == null ? null : staffCode.Trim();
+            if (newStaffCode != null
+                && !string.Equals(newStaffCode, previousStaffCode ?? string.Empty, StringComparison.Ordinal))
+            {
+                details += "; Employee code "
+                    + Shown(previousStaffCode) + " -> " + Shown(newStaffCode);
+            }
+
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandUpdateUser, "UpdateUser " + workEmail, ContactRegistry.Entity, userId,
                 null, details, idempotencyKey, context);
 
             SetResponse(context, userId.ToString("D"), auditId, false);
+        }
+
+        /// <summary>
+        /// A code as the audit line should read it. An empty side is written "(none)" rather
+        /// than left blank: "Employee code  -> EMP1" and "Employee code EMP1 -> " are the two
+        /// transitions a reader most needs to tell apart, and a trailing blank reads like a
+        /// truncated line rather than a cleared value. The case history renders al_details
+        /// verbatim, so the words here are the words somebody sees.
+        /// </summary>
+        private static string Shown(string staffCode)
+        {
+            return string.IsNullOrWhiteSpace(staffCode) ? "(none)" : staffCode.Trim();
         }
 
         private static void SetResponse(IPluginExecutionContext context, string userId, Guid auditId, bool conflict)
