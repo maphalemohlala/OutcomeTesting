@@ -17,8 +17,10 @@ describe('Role assignment from the People page', () => {
     // assignUserRole distinguishes a custom al_Role (RoleCode) from a built-in web role
     // (AppRole). All six of these are custom, so all six need their seeded code.
     expect(ROLE_CODES['Adviser']).toBe('ROLE-ADVISER');
+    expect(ROLE_CODES['Paraplanner']).toBe('ROLE-PARAPLANNER');
     expect(ROLE_CODES['T&C Manager']).toBe('ROLE-T-C-MANAGER');
     expect(ROLE_CODES['Tax Checker']).toBe('ROLE-TAX-CHECKER');
+    expect(ROLE_CODES['AQS Checker']).toBe('ROLE-AQS-CHECKER');
     expect(ROLE_CODES['Senior Checker']).toBe('ROLE-SENIOR-CHECKER');
   });
 
