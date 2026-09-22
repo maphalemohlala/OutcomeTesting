@@ -376,6 +376,7 @@ describe('every parameter a command sends is declared in the schema', () => {
         return updateUser({
           userId: 'u',
           fullName: 'n',
+          staffCode: 's',
           expectedRowVersion: '1',
           idempotencyKey: 'k',
         });
