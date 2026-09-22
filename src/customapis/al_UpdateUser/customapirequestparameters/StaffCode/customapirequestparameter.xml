@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="StaffCode">
+  <description default="The person's staff code, shown as Employee code. Optional; an absent value leaves the stored code unchanged.">
+    <label description="The person's staff code, shown as Employee code. Optional; an absent value leaves the stored code unchanged." languagecode="1033" />
+  </description>
+  <displayname default="Staff code">
+    <label description="Staff code" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>StaffCode</name>
+  <type>10</type>
+</customapirequestparameter>

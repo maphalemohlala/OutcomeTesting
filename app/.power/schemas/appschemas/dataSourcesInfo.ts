@@ -1450,6 +1450,12 @@ export const dataSourcesInfo = {
             "type": "string"
           },
           {
+            "name": "StaffCode",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
             "name": "IdempotencyKey",
             "in": "body",
             "required": true,

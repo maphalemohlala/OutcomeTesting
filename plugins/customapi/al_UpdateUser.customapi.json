@@ -39,6 +39,14 @@
       "isoptional": true
     },
     {
+      "uniquename": "StaffCode",
+      "name": "StaffCode",
+      "displayname": "Staff code",
+      "description": "The person's staff code, shown as Employee code. Optional; an absent value leaves the stored code unchanged.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
       "uniquename": "IdempotencyKey",
       "name": "IdempotencyKey",
       "displayname": "Idempotency key",

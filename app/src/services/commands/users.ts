@@ -37,6 +37,11 @@ export function createUser(input: CreateUserInput): Promise<CommandResult<Create
 export interface UpdateUserInput {
   userId: string;
   fullName: string;
+  /**
+   * The person's staff code, shown as "Employee code". Omit to leave it unchanged; pass
+   * an empty string to clear it.
+   */
+  staffCode?: string | null;
   expectedRowVersion?: string | null;
   idempotencyKey: string;
 }
@@ -54,6 +59,9 @@ export function updateUser(input: UpdateUserInput): Promise<CommandResult<Update
     IdempotencyKey: input.idempotencyKey,
   };
   if (input.expectedRowVersion) body.ExpectedRowVersion = input.expectedRowVersion;
+  if (input.staffCode !== undefined && input.staffCode !== null) {
+    body.StaffCode = input.staffCode;
+  }
   return executeCommand<UpdateUserOutput>('al_UpdateUser', body);
 }
 

@@ -19,6 +19,7 @@ namespace OutcomeTesting.Plugins
         private const string InUserId = "UserId";
         private const string InFullName = "FullName";
         private const string InExpectedRowVersion = "ExpectedRowVersion";
+        private const string InStaffCode = "StaffCode";
         private const string InIdempotencyKey = "IdempotencyKey";
 
         private const string OutUserId = "UserId";
@@ -47,6 +48,7 @@ namespace OutcomeTesting.Plugins
             var fullName = CommandHelpers.GetRequiredString(context, InFullName).Trim();
             var idempotencyKey = CommandHelpers.GetRequiredString(context, InIdempotencyKey);
             var expectedRowVersion = CommandHelpers.GetOptionalString(context, InExpectedRowVersion);
+            var staffCode = CommandHelpers.GetOptionalString(context, InStaffCode);
 
             // Permission check before the idempotency lookup (matching AssignUserRolePlugin):
             // otherwise an unauthorised caller could probe whether a key exists and receive a
@@ -73,6 +75,16 @@ namespace OutcomeTesting.Plugins
 
             var update = new Entity(ContactRegistry.Entity, userId);
             ContactRegistry.SetName(update, fullName);
+
+            // Absent leaves the stored code alone; an explicitly empty string clears it.
+            // The distinction matters because the People page sends only what it edited,
+            // and a save of somebody's NAME must not silently wipe their code.
+            if (staffCode != null)
+            {
+                update[ContactRegistry.StaffCodeAttr] = staffCode.Trim().Length == 0
+                    ? null
+                    : staffCode.Trim();
+            }
 
             if (string.IsNullOrEmpty(expectedRowVersion))
             {
