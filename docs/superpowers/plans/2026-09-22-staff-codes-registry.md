@@ -1993,7 +1993,47 @@ dotnet build plugins/OutcomeTesting.Plugins -c Release
 The `pushassembly` verb uploads `bin/Release` **without building it**, so this step is what
 makes the upload carry today's code. Check the byte count changed.
 
-- [ ] **Step 3: Deploy the solution to DEV**
+- [ ] **Step 3: Upload the portal templates**
+
+Two commits in this body of work changed `powerpages/.../OT-Case-Detail` and
+`OT-Review-Detail` - they stop rendering the `data-ot-hdr="al_advisercode"` and
+`data-ot-hdr="al_paraplannercode"` text boxes - and the deployment sequence omitted them
+entirely, so the portal would have kept serving the old page indefinitely (2026-09-22
+review).
+
+```powershell
+powershell -NoProfile -File .\powerpages\Deploy-Portal.ps1 -OrgUrl <DEV org url>
+```
+
+**Not a bare `pac powerpages upload`.** `powerpages/Deploy-Portal.ps1` is documented in its
+own header as the only safe way to upload to this site, and it is what carries
+`--modelVersion Enhanced` (line 308) - the flag every `pac pages` call against this site
+needs, because on the enhanced model one table holds pages and templates and without it the
+seeded GUIDs collide. Run bare, `pac pages upload` either aborts on a parent-scoped table
+permission part-way through the component list, or completes and **deletes** every table
+permission the manifest lists but the source folder no longer contains - which on
+2026-09-06 left DEV holding 2 of 13 and took out the reviewer write path (OD-034). The
+script moves `table-permissions/` aside, strips those manifest sections, uploads, then
+restores the permissions by direct write and verifies by query.
+
+**Order this with or before the solution import, never after.** The import is what removes
+the two codes from `CaseHeaderRequestPlugin.CheckerEditable`. Import first and the live
+page still offers a checker two editable boxes whose saves the server has just begun
+refusing - a visible control that silently fails, which is worse than the control being
+gone.
+
+- **`powerpages/` here is hand-authored source, not a mirror of the live site.** An upload
+  sends the whole tree and reports success either way, so anything changed on the live site
+  since this folder was last touched is silently overwritten by a stale local copy. Check
+  first rather than after: `-VerifyOnly` reports what is actually deployed without writing
+  anything, and a `pac pages download` into a scratch folder diffed against this tree is
+  what the 2026-09-19 and 2026-09-20 deployment notes did before every upload. If anything
+  but the two templates differs, reconcile before uploading.
+- **A successful-looking upload is not evidence.** On this site components ordered after a
+  failure are silently skipped, so confirm the two templates by query or by opening the
+  page, not by the absence of an error.
+
+- [ ] **Step 4: Deploy the solution to DEV**
 
 ```powershell
 pac solution import --path <packed solution> --environment Env_AQ_Dev --activate-plugins --force-overwrite
@@ -2007,7 +2047,7 @@ another. Two things about this command:
 - **A silent CLI does not mean nothing happened.** The job runs server-side, so confirm by
   querying the `importjob` table rather than trusting the absence of output.
 
-- [ ] **Step 4: Build and push the Code App**
+- [ ] **Step 5: Build and push the Code App**
 
 ```bash
 cd app && npm run build
@@ -2022,7 +2062,7 @@ the push carry today's bundle — check the bundle hash changed. After the push,
 `/app/` URL with the `sourcetime` the push prints; the short `/a/{appId}` URL keeps serving
 the previous bundle and would show you yesterday's page while you verify.
 
-- [ ] **Step 5: Verify against DEV**
+- [ ] **Step 6: Verify against DEV**
 
 1. Open `/admin/people` as an administrator. Confirm the four columns, the role filter and
    the search.
@@ -2037,8 +2077,15 @@ the previous bundle and would show you yesterday's page while you verify.
    codes. Confirm columns B and D carry the codes and that the file still has 20 columns.
 6. Generate one for a case with a named fail-accountable person and confirm their code
    appears in the matching code column, beside their name.
+7. Generate one for a case with NO named fail-accountable person - the common shape, since
+   accountability is otherwise derived from the case's own people. Columns L, N, R and T
+   must carry the REGISTRY code for those people, or be blank where the registry holds
+   none. They must never carry `al_advisercode`/`al_paraplannercode`, which the
+   registration tool still seeds as `ADV-S01`, so a seeded case is the sharpest test.
+8. Open the portal case-detail page as a checker and confirm the adviser code and
+   paraplanner code boxes are gone. If they are still there, Step 3 did not take.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add knowledge/decision-log.md
