@@ -199,6 +199,45 @@
             <Description description="Portal trigger column (AD-099): the T&amp;C attestation as JSON {actionId, decision, notes}, written by the signed-in supervisor onto their own contact row and consumed by SignoffRequestPlugin, which creates the al_signoff and clears this column." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_StaffCode">
+          <Type>nvarchar</Type>
+          <Name>al_staffcode</Name>
+          <LogicalName>al_staffcode</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.7.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>1</IsSearchable>
+          <IsFilterable>1</IsFilterable>
+          <IsRetrievable>1</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>text</Format>
+          <MaxLength>50</MaxLength>
+          <displaynames>
+            <displayname description="Employee code" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The person's staff code, used to fill the Trail Light export's code columns (2026-09-22). Replaces the per-case adviser and paraplanner codes." languagecode="1033" />
+          </Descriptions>
+        </attribute>
       </attributes>
       <EntitySetName>contacts</EntitySetName>
       <IsDuplicateCheckSupported>1</IsDuplicateCheckSupported>

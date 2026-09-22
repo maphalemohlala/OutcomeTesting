@@ -129,4 +129,18 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal("sims@example.com", ContactRegistry.NameOf(emailOnly));
         }
     }
+
+    public class ContactRegistryStaffCodeTests
+    {
+        /// <summary>
+        /// The registry's staff code column (2026-09-22). Named on ContactRegistry for the
+        /// reason every other contact attribute is: the export, the command and the People
+        /// page must not drift apart on the spelling.
+        /// </summary>
+        [Fact]
+        public void The_staff_code_attribute_is_named_once()
+        {
+            Assert.Equal("al_staffcode", ContactRegistry.StaffCodeAttr);
+        }
+    }
 }

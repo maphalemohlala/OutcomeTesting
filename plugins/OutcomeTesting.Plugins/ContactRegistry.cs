@@ -25,6 +25,20 @@ namespace OutcomeTesting.Plugins
         public const string StateCodeAttr = "statecode";
         public const string StatusCodeAttr = "statuscode";
         public const string SecurityStampAttr = "adx_identity_securitystamp";
+        /// <summary>
+        /// The person's staff code (project owner, 2026-09-22), labelled "Employee code" on
+        /// the People page.
+        ///
+        /// Role-agnostic on purpose: a contact does not know whether it is an adviser, a
+        /// para-planner, a checker or a T&amp;C Manager, so one column serves all four. This
+        /// is what replaces the per-case al_advisercode / al_paraplannercode that OD-050
+        /// expected Tax/AQS to type and that nothing ever filled.
+        ///
+        /// Text, not a number. A code that is genuinely numeric is formatted as one on the
+        /// way into the export by trailLight's `code` helper; one carrying letters or
+        /// leading zeros survives intact.
+        /// </summary>
+        public const string StaffCodeAttr = "al_staffcode";
 
         public const int StateActive = 0;
         public const int StateInactive = 1;
