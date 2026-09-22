@@ -323,6 +323,10 @@ namespace OutcomeTesting.Plugins
         ///   al_priority          transition, and by a manager - not a field on the check.
         ///   the two Tax fields   edited on their own path above, which is role-gated,
         ///                        because they decide the route rather than describe the case.
+        ///   the two codes        al_advisercode and al_paraplannercode were retired from
+        ///                        2026-09-22. A code is a property of the PERSON now, held
+        ///                        on contact.al_staffcode and maintained on the People page
+        ///                        - not something to restore here as an apparent omission.
         ///
         /// Checked against this set BEFORE the caller's own permissions, so a checker naming
         /// a field they may never edit is told that, rather than being told they are not
@@ -333,10 +337,8 @@ namespace OutcomeTesting.Plugins
             {
                 "al_clientname",
                 "al_advisername",
-                "al_advisercode",
                 "al_adviserstatus",
                 "al_paraplanner",
-                "al_paraplannercode",
                 "al_products",
                 "al_casetype",
                 "al_advicedate",

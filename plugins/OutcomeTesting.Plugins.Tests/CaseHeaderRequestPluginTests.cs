@@ -109,6 +109,8 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData("al_priority")]
         [InlineData("al_taxcheckrequired")]
         [InlineData("ownerid")]
+        [InlineData("al_advisercode")]
+        [InlineData("al_paraplannercode")]
         public void Refuses_a_field_the_portal_has_no_business_editing(string field)
         {
             // References and IDs identify the case and key the import; the due date is a
@@ -116,7 +118,10 @@ namespace OutcomeTesting.Plugins.Tests
             // managers in codeapps"), so the portal refuses it whoever is asking - a T&C
             // Manager signed in here is refused and allowed in the app; status and priority
             // are the lifecycle and a manager's call; the Tax fields have their own
-            // role-gated path above.
+            // role-gated path above. The two codes were retired from 2026-09-22: a code is
+            // a property of the person now, held on contact.al_staffcode and maintained on
+            // the People page, so the portal's own case-header edit has no business with it
+            // either - pinned here rather than left an apparent omission.
             var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 { field, "anything" },
@@ -131,7 +136,6 @@ namespace OutcomeTesting.Plugins.Tests
         [Theory]
         [InlineData("al_clientname")]
         [InlineData("al_advisername")]
-        [InlineData("al_advisercode")]
         [InlineData("al_paraplanner")]
         [InlineData("al_products")]
         [InlineData("al_advicedate")]
