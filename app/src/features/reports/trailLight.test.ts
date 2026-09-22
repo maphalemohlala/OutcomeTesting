@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  TRAIL_LIGHT_HEADERS,
-  paraplannerEmailIsGenerated,
-  trailLightRow,
-  type ExportRecord,
-} from './trailLight';
+import { TRAIL_LIGHT_HEADERS, trailLightRow, type ExportRecord } from './trailLight';
 
 function record(overrides: Partial<ExportRecord> = {}): ExportRecord {
   return {
@@ -26,40 +21,37 @@ describe('Trail Light contract (AD-039)', () => {
     expect(TRAIL_LIGHT_HEADERS[19]).toBe('Advice Quality Fail Accountable Paraplanner Code');
   });
 
-  it('carries emails in columns B and D, and no code columns there', () => {
-    // Project owner, 2026-09-21: "replace column B & D on the trail light exports with
-    // emails. rather than codes show emails".
-    expect(TRAIL_LIGHT_HEADERS[1]).toBe('Adviser Email');
-    expect(TRAIL_LIGHT_HEADERS[3]).toBe('Paraplanner Email');
+  it('carries codes in columns B and D', () => {
+    // Project owner, 2026-09-22: Trailight could not accommodate the emails put here on
+    // 2026-09-21 (AD-183), so the columns carry codes again. The codes now come from the
+    // registry rather than from the case, which is what makes them non-empty.
+    expect(TRAIL_LIGHT_HEADERS[1]).toBe('Adviser Code');
+    expect(TRAIL_LIGHT_HEADERS[3]).toBe('Paraplanner Code');
   });
 
-  it('is back to twenty columns, the appended adviser email having gone', () => {
-    // Column 21 held Adviser Email from 2026-09-19. With column B carrying it, keeping 21
-    // would only repeat the value; the project owner chose to drop it on 2026-09-21.
-    // Removing the LAST column moves nothing before it.
+  it('is still twenty columns, the meaning of B and D having changed but not their place', () => {
     expect(TRAIL_LIGHT_HEADERS).toHaveLength(20);
-    expect(TRAIL_LIGHT_HEADERS).not.toContain('Adviser Code');
-    expect(TRAIL_LIGHT_HEADERS).not.toContain('Paraplanner Code');
+    expect(TRAIL_LIGHT_HEADERS).not.toContain('Adviser Email');
+    expect(TRAIL_LIGHT_HEADERS).not.toContain('Paraplanner Email');
   });
 
-  it('writes the two emails into columns B and D', () => {
+  it('writes the two codes into columns B and D, numeric ones as numbers', () => {
     const row = trailLightRow(
-      record({
-        al_adviseremail: 'jane.adviser@example.com',
-        al_paraplanneremail: 'sam.paraplanner@example.com',
-      }),
+      record({ al_advisercode: '4471', al_paraplannercode: 'PP-01' }),
     );
 
     expect(row).toHaveLength(20);
-    expect(row[1]).toBe('jane.adviser@example.com');
-    expect(row[3]).toBe('sam.paraplanner@example.com');
+    expect(row[1]).toBe(4471);
+    expect(row[3]).toBe('PP-01');
   });
 
-  it('leaves B or D blank rather than falling back to the code or the name', () => {
-    // AD-039 reads by position, so column D is "Paraplanner Email" on every row or the file
-    // lies about the rows where it is something else. GenerateExportPlugin refuses to guess
-    // between two contacts of one name, so an empty cell is a real outcome here.
-    const row = trailLightRow(record({ al_advisercode: 'ADV-01', al_paraplannercode: 'PP-01' }));
+  it('leaves B or D blank rather than falling back to a name or an address', () => {
+    // AD-039 reads by position: column B is the adviser's code on every row, or the file
+    // lies about the rows where it is something else. A person the registry does not hold
+    // a code for is a real outcome here.
+    const row = trailLightRow(
+      record({ al_advisername: 'Jane Adviser', al_paraplannername: 'Sam Paraplanner' }),
+    );
 
     expect(row[1]).toBe('');
     expect(row[3]).toBe('');
@@ -69,9 +61,9 @@ describe('Trail Light contract (AD-039)', () => {
     const row = trailLightRow(
       record({
         al_advisername: 'Jane Adviser',
-        al_adviseremail: 'jane.adviser@example.com',
+        al_advisercode: '4471',
         al_paraplannername: 'Sam Paraplanner',
-        al_paraplanneremail: 'sam.paraplanner@example.com',
+        al_paraplannercode: 'PP-01',
         al_casetype: 'New advice',
         al_productsolutiontype: 'Accumulation Pension',
         al_checkdate: '2026-02-05T00:00:00Z',
@@ -111,13 +103,5 @@ describe('Trail Light contract (AD-039)', () => {
 
     expect(row[11]).toBe('');
     expect(row[12]).toBe('');
-  });
-
-  it('still hand-declares the paraplanner email column', () => {
-    // Created in DEV on 2026-09-21, ahead of the generated model. When a regeneration adds
-    // it, GeneratedHasParaplannerEmail becomes true, the assignment in trailLight.ts stops
-    // compiling, and this test is the reminder of what to delete: the intersection on
-    // ExportRecord, the guard, and this case.
-    expect(paraplannerEmailIsGenerated).toBe(false);
   });
 });

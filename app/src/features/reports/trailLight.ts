@@ -1,38 +1,8 @@
 import type { CellValue } from '../../lib/tabular';
 import type { Al_exportrecords } from '../../generated/models/Al_exportrecordsModel';
 
-/**
- * The export record as the file builder needs it.
- *
- * `al_adviseremail` is on the generated model: that column was created in DEV on 2026-09-19
- * and the data source regenerated. `al_paraplanneremail` is declared HERE because it was
- * created on 2026-09-21 and the generator has not been re-run against it yet — the same
- * situation AD-158 records for a Custom API parameter, where the runtime accepted a value
- * the generated types did not yet know about.
- *
- * Declared as an intersection rather than edited into `Al_exportrecordsModel.ts`, because
- * that file is generated and a hand-edit is lost the next time anyone regenerates it.
- * `paraplannerEmailIsGenerated` below is the guard: it goes true of its own accord once the
- * generator catches up, and its test says to delete this intersection when it does.
- */
-export type ExportRecord = Al_exportrecords & { al_paraplanneremail?: string };
-
-/**
- * Whether the generated model has caught up and declares `al_paraplanneremail` itself.
- *
- * A type-level check, not a runtime one: an interface has no runtime presence, so asking a
- * value whether it has the key would answer no for ever and guard nothing.
- *
- * It reads `false` today. The moment a regeneration adds the column, this alias becomes
- * `true` and the assignment below stops compiling — which is the point. The typecheck then
- * says, in the one place that knows, that the hand-declared intersection above is redundant
- * and both it and this guard should be deleted.
- */
-type GeneratedHasParaplannerEmail = 'al_paraplanneremail' extends keyof Al_exportrecords
-  ? true
-  : false;
-
-export const paraplannerEmailIsGenerated: GeneratedHasParaplannerEmail = false;
+/** The export record as the file builder needs it. */
+export type ExportRecord = Al_exportrecords;
 
 /**
  * The Trail Light contract fixed by AD-039 (source: `Trailight - Outcome Testing Map.xlsx`):
@@ -41,27 +11,26 @@ export const paraplannerEmailIsGenerated: GeneratedHasParaplannerEmail = false;
  * remove or reorder a column without a decision-log entry — the receiving system reads by
  * position.
  *
- * **Columns B and D carry emails, not codes (project owner, 2026-09-21: "replace column B &
- * D on the trail light exports with emails. rather than codes show emails").** The positions
- * are unchanged, so nothing downstream shifts; what changes is what column B and column D
- * mean, which is a change a positional reader cannot detect for itself. That is why it is
- * written here and in the decision log rather than only in the code.
+ * **Columns B and D carry CODES (project owner, 2026-09-22).** Trailight could not
+ * accommodate the emails put there on 2026-09-21 (AD-183). The positions are unchanged, so
+ * nothing downstream shifts; what changes is what B and D mean, which is a change a
+ * positional reader cannot detect for itself.
  *
- * **Column 21 is gone with it.** Adviser Email was appended there on 2026-09-19 precisely
- * because inserting it beside the adviser's name would have shifted eighteen columns; now
- * that column B carries it, keeping 21 would only repeat the value. Removing the LAST column
- * is as position-safe as adding it was — nothing before it moves — and the project owner
- * chose that over the duplicate on 2026-09-21.
+ * **What makes this workable now, when it was not before.** The codes used to be
+ * `al_outcomecase.al_advisercode` / `al_paraplannercode`, filled only by hand and almost
+ * never filled (OD-050) — which is why the columns were empty and why emails went in. The
+ * code is now held against the PERSON, on `contact.al_staffcode`, and resolved at
+ * generation time.
  *
- * The four fail-accountable code columns (L, N, R, T) are deliberately unchanged. Only B and
- * D were asked for, and those four name a person picked out of a fail rather than the case's
- * own adviser and para-planner.
+ * **Six columns, not two.** The four fail-accountability code columns (L, N, R, T) were
+ * blanked whenever a specific person was named accountable, because a contact carried no
+ * code. They now carry that person's own.
  */
 export const TRAIL_LIGHT_HEADERS = [
   'Adviser name',
-  'Adviser Email',
+  'Adviser Code',
   'Paraplanner Name',
-  'Paraplanner Email',
+  'Paraplanner Code',
   'Case type',
   'Product / solution type',
   'Check date',
@@ -85,8 +54,7 @@ export const TRAIL_LIGHT_HEADERS = [
  * number so Excel does not left-pad or text-align it; anything else is passed through
  * unchanged rather than being silently dropped or coerced to zero.
  *
- * Four columns still use it, not six: columns B and D became emails on 2026-09-21 and an
- * email is text whatever it looks like.
+ * Six columns use it now, not four: columns B and D carry codes again as of 2026-09-22.
  */
 function code(value: string | undefined): CellValue {
   const text = value?.trim();
@@ -105,13 +73,13 @@ function day(value: string | undefined): string {
 export function trailLightRow(record: ExportRecord): CellValue[] {
   return [
     text(record.al_advisername),
-    text(record.al_adviseremail),
+    code(record.al_advisercode),
     text(record.al_paraplannername),
-    // Resolved from the para-planner's name when the export batch was generated, not read
-    // off the case: the case has no para-planner email column. GenerateExportPlugin refuses
-    // to guess between two contacts of one name, so this is empty where the name was
-    // ambiguous or reached nobody.
-    text(record.al_paraplanneremail),
+    // From `contact.al_staffcode`, resolved and snapshotted when the batch was generated
+    // (GenerateExportPlugin.ParaplannerCode). Empty where the registry holds no code for
+    // them — never the name or the address, which a positional reader could not tell apart
+    // from a code.
+    code(record.al_paraplannercode),
     text(record.al_casetype),
     text(record.al_productsolutiontype),
     day(record.al_checkdate),
