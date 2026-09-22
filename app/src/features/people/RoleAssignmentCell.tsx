@@ -1,0 +1,103 @@
+import { useState } from 'react';
+import { ROLE_FILTERS } from './peopleFilters';
+import { ROLE_CODES, mappingFor } from './roleAssignment';
+import type { RoleMappingRow } from '../admin/useSecurityConfig';
+
+interface Props {
+  email: string;
+  roles: string[];
+  mappings: readonly RoleMappingRow[];
+  canManage: boolean;
+  busy: boolean;
+  onGrant: (email: string, role: string) => void;
+  onWithdraw: (mappingId: string, email: string, role: string) => void;
+}
+
+/**
+ * One person's roles, and an administrator's controls to change them.
+ *
+ * Every role they hold is listed, not just one (D8): a T&C Manager who also advises is one
+ * person holding two, and picking one to display would misreport them.
+ *
+ * The control says "grants access" in as many words. This writes al_userrolemapping, which
+ * PermissionHelpers reads when it decides what a caller may do — an administrator tagging
+ * somebody "Adviser" for reporting is also letting them in, and that should not be a
+ * surprise discovered later.
+ */
+export function RoleAssignment({
+  email,
+  roles,
+  mappings,
+  canManage,
+  busy,
+  onGrant,
+  onWithdraw,
+}: Props) {
+  const [choice, setChoice] = useState('');
+
+  if (email === '') {
+    // Someone named on a case who is not in the registry. There is no mapping to hold,
+    // because al_userrolemapping is keyed on work email.
+    return <span className="people__muted">Not in directory</span>;
+  }
+
+  return (
+    <div className="people__roles">
+      {roles.length === 0 ? (
+        <span className="people__muted">No roles</span>
+      ) : (
+        <ul className="people__role-list">
+          {roles.map((role) => {
+            const held = mappingFor(mappings, email, role);
+            return (
+              <li key={role}>
+                <span>{role}</span>
+                {canManage && held ? (
+                  <button
+                    type="button"
+                    className="people__role-withdraw"
+                    disabled={busy}
+                    onClick={() => onWithdraw(held.id, email, role)}
+                  >
+                    Withdraw
+                  </button>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {canManage ? (
+        <div className="people__role-grant">
+          <label className="visually-hidden" htmlFor={`grant-${email}`}>
+            Grant a role to {email}
+          </label>
+          <select
+            id={`grant-${email}`}
+            value={choice}
+            disabled={busy}
+            onChange={(event) => setChoice(event.target.value)}
+          >
+            <option value="">Grant a role&hellip;</option>
+            {ROLE_FILTERS.filter((role) => !mappingFor(mappings, email, role)).map((role) => (
+              <option key={role} value={role}>
+                {role}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={busy || choice === '' || !(choice in ROLE_CODES)}
+            onClick={() => {
+              onGrant(email, choice);
+              setChoice('');
+            }}
+          >
+            Grant
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}

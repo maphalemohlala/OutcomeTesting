@@ -104,3 +104,59 @@
   margin-bottom: var(--space-2);
   font-size: var(--text-lg);
 }
+
+.people__muted {
+  color: var(--colour-text-muted);
+}
+
+.people__roles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.people__role-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.people__role-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.people__role-withdraw {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--colour-action);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.people__role-withdraw:hover:not(:disabled) {
+  color: var(--colour-action-hover);
+}
+
+.people__role-withdraw:disabled {
+  color: var(--colour-text-muted);
+  cursor: default;
+}
+
+.people__role-grant {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.people__role-grant select {
+  font: inherit;
+  font-size: var(--text-xs);
+}

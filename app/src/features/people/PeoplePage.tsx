@@ -10,10 +10,13 @@ import { useUserDirectory, type DirectoryUser } from '../../hooks/useUserDirecto
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { messageForFailure } from '../../services/errors';
 import { setUserActive } from '../../services/commands/users';
+import { assignUserRole, setRoleAssignmentActive } from '../../services/commands/permissions';
 import { useCaseWorklist } from '../cases/useCaseWorklist';
 import { useSecurityConfig } from '../admin/useSecurityConfig';
 import { caseloadByName, type PersonCaseload, type PersonRole } from './peopleDirectory';
 import { ROLE_FILTERS, matchesRole } from './peopleFilters';
+import { ROLE_CODES } from './roleAssignment';
+import { RoleAssignment } from './RoleAssignmentCell';
 import { CreatePersonModal, EditPersonModal } from './PersonModals';
 import './PeoplePage.css';
 import './PeopleAdmin.css';
@@ -79,6 +82,7 @@ export function PeoplePage() {
   const [banner, setBanner] = useState<Banner>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<DirectoryUser | null>(null);
+  const [roleBusy, setRoleBusy] = useState<string | null>(null);
   const intent = useIntentKeys();
 
   const loads = useMemo(
@@ -183,6 +187,44 @@ export function PeoplePage() {
         tone: 'success',
         message: `${user.name} ${user.active ? 'deactivated' : 'reactivated'}.`,
       });
+      reload();
+    } else {
+      setBanner({ tone: 'error', message: messageForFailure(result) });
+    }
+  }
+
+  async function onGrantRole(email: string, role: string) {
+    setBanner(null);
+    setRoleBusy(email);
+    const token = `grant:${email}:${role}`;
+    const result = await assignUserRole({
+      userEmail: email,
+      roleCode: ROLE_CODES[role as keyof typeof ROLE_CODES],
+      idempotencyKey: intent.keyFor(token),
+    });
+    setRoleBusy(null);
+    if (result.ok) {
+      intent.release(token);
+      setBanner({ tone: 'success', message: `${role} granted to ${email}.` });
+      reload();
+    } else {
+      setBanner({ tone: 'error', message: messageForFailure(result) });
+    }
+  }
+
+  async function onWithdrawRole(mappingId: string, email: string, role: string) {
+    setBanner(null);
+    setRoleBusy(email);
+    const token = `withdraw:${mappingId}`;
+    const result = await setRoleAssignmentActive({
+      id: mappingId,
+      active: false,
+      idempotencyKey: intent.keyFor(token),
+    });
+    setRoleBusy(null);
+    if (result.ok) {
+      intent.release(token);
+      setBanner({ tone: 'success', message: `${role} withdrawn from ${email}.` });
       reload();
     } else {
       setBanner({ tone: 'error', message: messageForFailure(result) });
@@ -342,7 +384,17 @@ export function PeoplePage() {
                       <tr key={row.key}>
                         <th scope="row">{to ? <Link to={to}>{row.name}</Link> : row.name}</th>
                         <td>{row.email || '—'}</td>
-                        <td>{row.roles.join(', ') || '—'}</td>
+                        <td>
+                          <RoleAssignment
+                            email={row.email}
+                            roles={row.roles}
+                            mappings={security.status === 'ready' ? security.mappings : []}
+                            canManage={canManage}
+                            busy={roleBusy === row.email}
+                            onGrant={onGrantRole}
+                            onWithdraw={onWithdrawRole}
+                          />
+                        </td>
                         <td>{row.user?.staffCode ?? '—'}</td>
                         {canManage ? (
                           <td className="users__actions">
