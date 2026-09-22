@@ -165,9 +165,7 @@ describe('caseHeaderFields', () => {
     expect(caseHeaderFields(record).map((f) => f.label)).toEqual([
       'Adviser name',
       'Adviser status',
-      'Adviser code',
       'Paraplanner',
-      'Paraplanner code',
       'Product(s)',
       'Case type',
       'Date of meeting - Client contact',

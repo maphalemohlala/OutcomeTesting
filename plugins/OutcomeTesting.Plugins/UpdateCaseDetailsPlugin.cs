@@ -515,15 +515,17 @@ namespace OutcomeTesting.Plugins
         // Allowlist of case attributes a manager may edit via the Fields payload, keyed by
         // logical name. Anything not listed is rejected, so the command can never write an
         // attribute it was not designed to (and route/status keep their audited semantics).
+        //
+        // al_advisercode and al_paraplannercode are deliberately absent from 2026-09-22.
+        // The code is held against the person, on contact.al_staffcode, and the export
+        // resolves it from there. A hand-typed copy on the case could only disagree.
         private static readonly Dictionary<string, EditableField> Editables =
             new Dictionary<string, EditableField>(StringComparer.OrdinalIgnoreCase)
             {
                 { "al_clientname", new EditableField(EditableKind.Text, "Client name") },
                 { "al_advisername", new EditableField(EditableKind.Text, "Adviser") },
-                { "al_advisercode", new EditableField(EditableKind.Text, "Adviser code") },
                 { "al_adviserstatus", new EditableField(EditableKind.Option, "Adviser status") },
                 { "al_paraplanner", new EditableField(EditableKind.Text, "Paraplanner") },
-                { "al_paraplannercode", new EditableField(EditableKind.Text, "Paraplanner code") },
                 { "al_products", new EditableField(EditableKind.Text, "Products") },
                 { "al_casetype", new EditableField(EditableKind.Option, "Case type") },
                 // Display name only (item 9, 2026-09-19). The schema name is unchanged, so

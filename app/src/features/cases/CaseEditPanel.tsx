@@ -105,10 +105,8 @@ const SECTIONS: Section[] = [
     heading: 'Adviser and paraplanner',
     fields: [
       { attr: 'al_advisername', label: 'Adviser', kind: 'user' },
-      { attr: 'al_advisercode', label: 'Adviser code', kind: 'text' },
       { attr: 'al_adviserstatus', label: 'Adviser status', kind: 'choice', options: Al_outcomecasesal_adviserstatus },
       { attr: 'al_paraplanner', label: 'Paraplanner', kind: 'user' },
-      { attr: 'al_paraplannercode', label: 'Paraplanner code', kind: 'text' },
     ],
   },
   {

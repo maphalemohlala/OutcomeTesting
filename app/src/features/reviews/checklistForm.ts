@@ -291,9 +291,7 @@ export function caseHeaderFields(
         record.al_adviserstatusname,
       ),
     },
-    { label: 'Adviser code', value: text(record.al_advisercode) },
     { label: 'Paraplanner', value: text(record.al_paraplanner) },
-    { label: 'Paraplanner code', value: text(record.al_paraplannercode) },
     {
       label: 'Product(s)',
       // The ticked products first, then the free text. Same precedence as the four lookups
