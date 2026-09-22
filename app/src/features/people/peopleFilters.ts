@@ -1,29 +1,21 @@
 /**
- * The roles the People page filters by (project owner, 2026-09-22).
- *
- * These are the roles `al_Role` is seeded with that describe what a person DOES. The three
- * checker roles stay distinct rather than collapsing into one "Checker": that is how they
- * are seeded, and the Tax/AQS review routing already tells them apart, so grouping them
- * here would put a distinction the system relies on behind a label that hides it.
- *
- * Administrator, Outcome Testing Manager, Reviewer and Read Only User are deliberately
- * absent — they describe access to this application rather than a job on a case.
- */
-export const ROLE_FILTERS = [
-  'Adviser',
-  'Paraplanner',
-  'T&C Manager',
-  'Tax Checker',
-  'AQS Checker',
-  'Senior Checker',
-] as const;
-
-/**
  * Whether a person's held roles satisfy the chosen filter.
  *
  * A person may hold several roles, so this asks whether they hold the chosen one at all
  * rather than whether it is their only one. Compared case-insensitively and trimmed,
  * because role mappings are keyed on a hand-entered email and carry a hand-entered label.
+ *
+ * Both sides are Power Pages web role NAMES. There is no second vocabulary to translate
+ * between: `al_rolecode` carries the web role's name, `useRoles` reads the same names off
+ * `mspp_webrole`, and the Role column displays them unchanged.
+ *
+ * This is worth stating because it was wrong until 2026-09-22. The filter offered the six
+ * `al_Role` labels from `data/roles-seed` - Adviser, Paraplanner, T&C Manager and the three
+ * Checkers - and compared them against web role names like "AL Portal - Planner". The two
+ * lists share no member, so every specific role matched nobody and the filter read "0 of 12
+ * people" whatever was chosen. `al_role` is retired: OD-037 recorded on 2026-09-08 that no
+ * `ROLE-*` code appears in `al_userrolemapping` or `al_pagepermission`, and dropping the
+ * last read of it is what allows the table to be deleted.
  */
 export function matchesRole(roles: readonly string[], filter: string): boolean {
   if (filter === 'all') return true;

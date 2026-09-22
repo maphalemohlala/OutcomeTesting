@@ -1,12 +1,19 @@
 import { useState } from 'react';
-import { ROLE_FILTERS } from './peopleFilters';
-import { ROLE_CODES, canWithdraw, mappingFor } from './roleAssignment';
+import { canWithdraw, mappingFor } from './roleAssignment';
 import type { RoleMappingRow } from '../admin/useSecurityConfig';
 
 interface Props {
   email: string;
   roles: string[];
   mappings: readonly RoleMappingRow[];
+  /**
+   * The roles this page may grant: the live web role names from `useRoles`.
+   *
+   * Passed in rather than imported, because the assignable set is server data. A hard-coded
+   * list here sent the retired `al_Role` codes and every Grant was refused with "The role
+   * code does not match an active role" - see peopleFilters.
+   */
+  grantable: readonly string[];
   canManage: boolean;
   busy: boolean;
   onGrant: (email: string, role: string) => void;
@@ -32,6 +39,7 @@ export function RoleAssignment({
   email,
   roles,
   mappings,
+  grantable,
   canManage,
   busy,
   onGrant,
@@ -56,7 +64,7 @@ export function RoleAssignment({
             return (
               <li key={role}>
                 <span>{role}</span>
-                {canManage && held && canWithdraw(role) ? (
+                {canManage && held && canWithdraw(role, grantable) ? (
                   <button
                     type="button"
                     className="people__role-withdraw"
@@ -72,9 +80,9 @@ export function RoleAssignment({
         </ul>
       )}
 
-      {canManage && roles.some((role) => !canWithdraw(role)) ? (
+      {canManage && roles.some((role) => !canWithdraw(role, grantable)) ? (
         <p className="people__muted people__role-note">
-          Application access roles are shown here but granted and withdrawn on Security
+          Roles this page cannot grant back are shown here but managed on Security
           configuration.
         </p>
       ) : null}
@@ -91,15 +99,17 @@ export function RoleAssignment({
             onChange={(event) => setChoice(event.target.value)}
           >
             <option value="">Grant a role&hellip;</option>
-            {ROLE_FILTERS.filter((role) => !mappingFor(mappings, email, role)).map((role) => (
-              <option key={role} value={role}>
-                {role}
-              </option>
-            ))}
+            {grantable
+              .filter((role) => !mappingFor(mappings, email, role))
+              .map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
           </select>
           <button
             type="button"
-            disabled={busy || choice === '' || !(choice in ROLE_CODES)}
+            disabled={busy || choice === '' || !grantable.includes(choice)}
             onClick={() => {
               onGrant(email, choice);
               setChoice('');

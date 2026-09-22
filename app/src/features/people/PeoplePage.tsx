@@ -13,9 +13,9 @@ import { setUserActive } from '../../services/commands/users';
 import { assignUserRole, setRoleAssignmentActive } from '../../services/commands/permissions';
 import { useCaseWorklist } from '../cases/useCaseWorklist';
 import { useSecurityConfig } from '../admin/useSecurityConfig';
+import { useRoles } from '../admin/useRoles';
 import { caseloadByName, type PersonCaseload, type PersonRole } from './peopleDirectory';
-import { ROLE_FILTERS, matchesRole } from './peopleFilters';
-import { ROLE_CODES } from './roleAssignment';
+import { matchesRole } from './peopleFilters';
 import { RoleAssignment } from './RoleAssignmentCell';
 import { CreatePersonModal, EditPersonModal } from './PersonModals';
 import './PeoplePage.css';
@@ -79,6 +79,22 @@ export function PeoplePage() {
   const directory = useUserDirectory(reloadKey);
   const cases = useCaseWorklist();
   const security = useSecurityConfig(reloadKey);
+  const roleList = useRoles(reloadKey);
+
+  /**
+   * The roles this page may filter by and grant: the live Power Pages web roles.
+   *
+   * Read from the server rather than hard-coded, exactly as Security configuration does.
+   * A hard-coded list here carried the retired `al_Role` labels, so the filter matched
+   * nobody and every Grant was refused - see peopleFilters for what that looked like.
+   */
+  const grantable = useMemo(
+    () =>
+      roleList.status === 'ready'
+        ? roleList.roles.filter((role) => role.active).map((role) => role.name)
+        : [],
+    [roleList],
+  );
 
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
@@ -203,7 +219,9 @@ export function PeoplePage() {
     const token = `grant:${email}:${role}`;
     const result = await assignUserRole({
       userEmail: email,
-      roleCode: ROLE_CODES[role as keyof typeof ROLE_CODES],
+      // The web role's NAME is the code al_rolecode carries (AD-044); there is no separate
+      // business key to look up.
+      roleCode: role,
       idempotencyKey: intent.keyFor(token),
     });
     setRoleBusy(null);
@@ -351,7 +369,7 @@ export function PeoplePage() {
                 onChange={(event) => setRoleFilter(event.target.value)}
               >
                 <option value="all">All roles</option>
-                {ROLE_FILTERS.map((role) => (
+                {grantable.map((role) => (
                   <option key={role} value={role}>
                     {role}
                   </option>
@@ -393,6 +411,7 @@ export function PeoplePage() {
                             email={row.email}
                             roles={row.roles}
                             mappings={security.status === 'ready' ? security.mappings : []}
+                            grantable={grantable}
                             canManage={canManage}
                             busy={roleBusy === row.email}
                             onGrant={onGrantRole}
