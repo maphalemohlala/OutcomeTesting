@@ -403,12 +403,15 @@
             <td class="lbl">Adviser name</td><td class="val">{{ c.al_advisername | default: '—' | escape }}</td>
             <td class="lbl">Adviser status</td><td class="val">{{ c.al_adviserstatus.label | default: '—' | escape }}</td>
           </tr>
+          {% comment %}
+            Adviser code and Paraplanner code retired from 2026-09-22. The code is a
+            property of the PERSON now, held on contact.al_staffcode and maintained on the
+            People page. The case column holds only a stale hand-typed value nothing
+            maintains, so it is not shown here - not something to restore as an apparent
+            omission.
+          {% endcomment %}
           <tr>
-            <td class="lbl">Adviser code</td><td class="val">{{ c.al_advisercode | default: '—' | escape }}</td>
             <td class="lbl">Paraplanner</td><td class="val">{{ c.al_paraplanner | default: '—' | escape }}</td>
-          </tr>
-          <tr>
-            <td class="lbl">Paraplanner code</td><td class="val">{{ c.al_paraplannercode | default: '—' | escape }}</td>
             <td class="lbl">Product(s)</td><td class="val">{% comment %}The products the case carries, else the free text it was imported with (AD-190).{% endcomment %}{% assign product_names = "" %}{% for h in case_products.results.entities %}{% if forloop.first %}{% assign product_names = h.al_name %}{% else %}{% assign product_names = product_names | append: '; ' | append: h.al_name %}{% endif %}{% endfor %}{% if product_names != "" %}{{ product_names | escape }}{% else %}{{ c.al_products | default: '—' | escape }}{% endif %}</td>
           </tr>
           <tr>
