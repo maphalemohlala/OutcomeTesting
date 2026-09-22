@@ -103,5 +103,98 @@ namespace OutcomeTesting.Plugins.Tests
                 string.Empty,
                 GenerateExportPlugin.FlaggedText(false, OutcomeCase(), "al_advisercode", null));
         }
+
+        [Fact]
+        public void A_privilege_fault_on_the_contact_read_propagates()
+        {
+            // Narrower than the blanket catch this task's own brief had written (2026-09-22
+            // review): NamedPerson tolerates only a not-found response from the contact
+            // read. A privilege refusal must abort the export rather than be swallowed and
+            // misread as "this person has no code" - that misreading would quietly blank
+            // the accountability code for every named person in the whole batch, with
+            // nothing traced to say why. SecLib::CheckPrivilege faults from a missing app
+            // role have hit this environment repeatedly, so this is not a hypothetical.
+            var service = new FakeOrganizationService();
+            var person = Named(service, "Robin Reviewer", "5150");
+            service.RetrieveThrows = new System.ServiceModel.FaultException<OrganizationServiceFault>(
+                new OrganizationServiceFault
+                {
+                    ErrorCode = -2147220960,
+                    Message = "SecLib::CheckPrivilege failed. Caller does not have Read privilege on Contact.",
+                },
+                "SecLib::CheckPrivilege failed. Caller does not have Read privilege on Contact.");
+
+            Assert.Throws<System.ServiceModel.FaultException<OrganizationServiceFault>>(() =>
+                GenerateExportPlugin.NamedPerson(
+                    service, Outcome(person), GenerateExportPlugin.FqAccountableContactAttr));
+        }
+    }
+
+    /// <summary>
+    /// GenerateExportPlugin.AccountabilityColumns - the exact method the record build calls
+    /// to fill the eight AD-039 fail-accountability columns from fqNamedPerson/aqNamedPerson.
+    ///
+    /// FlaggedText and NamedPerson are both well covered taken alone, but neither can catch
+    /// a mistake in WHICH of the two named-person values feeds WHICH discipline's pair - a
+    /// one-variable swap between fqNamedPerson and aqNamedPerson would still pass every test
+    /// either of them has on its own, because both sides are ordinary AccountablePerson
+    /// values (2026-09-22 review). These tests call the production pairing method directly,
+    /// with a DIFFERENT contact named for each discipline and both disciplines accountable
+    /// simultaneously, so a crossed wire would show up as one person's code sitting beside
+    /// the other person's name.
+    /// </summary>
+    public class AccountabilityColumnWiringTests
+    {
+        private static Entity Case()
+        {
+            var row = new Entity("al_outcomecase", Guid.NewGuid());
+            row["al_advisername"] = "Case Adviser";
+            row["al_advisercode"] = "CASE-ADV";
+            row["al_paraplanner"] = "Case Paraplanner";
+            row["al_paraplannercode"] = "CASE-PP";
+            return row;
+        }
+
+        private static readonly GenerateExportPlugin.AccountablePerson FqPerson =
+            new GenerateExportPlugin.AccountablePerson { Name = "Fiona Quinn", StaffCode = "FQ-1" };
+
+        private static readonly GenerateExportPlugin.AccountablePerson AqPerson =
+            new GenerateExportPlugin.AccountablePerson { Name = "Adam Quill", StaffCode = "AQ-2" };
+
+        [Fact]
+        public void The_adviser_pair_carries_each_disciplines_own_person_and_nobody_elses()
+        {
+            var outcomeRow = new Entity("al_outcome")
+            {
+                [GenerateExportPlugin.FqAdviserFlag] = true,
+                [GenerateExportPlugin.AqAdviserFlag] = true,
+            };
+
+            var columns = GenerateExportPlugin.AccountabilityColumns(
+                outcomeRow, Case(), FqPerson, AqPerson, fileQualityChoice: null, effectiveOutcome: null);
+
+            Assert.Equal("Fiona Quinn", columns["al_fqfailadvisername"]);
+            Assert.Equal("FQ-1", columns["al_fqfailadvisercode"]);
+            Assert.Equal("Adam Quill", columns["al_aqfailadvisername"]);
+            Assert.Equal("AQ-2", columns["al_aqfailadvisercode"]);
+        }
+
+        [Fact]
+        public void The_paraplanner_pair_carries_each_disciplines_own_person_and_nobody_elses()
+        {
+            var outcomeRow = new Entity("al_outcome")
+            {
+                [GenerateExportPlugin.FqParaplannerFlag] = true,
+                [GenerateExportPlugin.AqParaplannerFlag] = true,
+            };
+
+            var columns = GenerateExportPlugin.AccountabilityColumns(
+                outcomeRow, Case(), FqPerson, AqPerson, fileQualityChoice: null, effectiveOutcome: null);
+
+            Assert.Equal("Fiona Quinn", columns["al_fqfailparaplannername"]);
+            Assert.Equal("FQ-1", columns["al_fqfailparaplannercode"]);
+            Assert.Equal("Adam Quill", columns["al_aqfailparaplannername"]);
+            Assert.Equal("AQ-2", columns["al_aqfailparaplannercode"]);
+        }
     }
 }

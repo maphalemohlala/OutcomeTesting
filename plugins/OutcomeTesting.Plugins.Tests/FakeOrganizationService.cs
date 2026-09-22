@@ -141,10 +141,24 @@ namespace OutcomeTesting.Plugins.Tests
             return id;
         }
 
+        /// <summary>
+        /// Set to make Retrieve throw, mirroring <see cref="UpdateThrows"/>/<see
+        /// cref="ExecuteThrows"/>. Reproduces a fault the "row does not exist" branch below
+        /// cannot - a privilege refusal on a table that is seeded and present - which is what
+        /// GenerateExportPlugin.NamedPerson has to tell apart from a genuinely missing
+        /// contact rather than swallow either way.
+        /// </summary>
+        public Exception RetrieveThrows { get; set; }
+
         public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet)
         {
             RetrieveCount += 1;
             RecordRead(entityName);
+            if (RetrieveThrows != null)
+            {
+                throw RetrieveThrows;
+            }
+
             var row = Row(entityName, id);
             if (row == null)
             {

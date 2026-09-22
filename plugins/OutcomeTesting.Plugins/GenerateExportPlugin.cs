@@ -54,6 +54,12 @@ namespace OutcomeTesting.Plugins
         private const int BatchStatusGenerated = 120910771;
         private const int CommandGenerateExport = 120910775;
 
+        // ObjectDoesNotExist - what a Retrieve of a deleted or never-existing row answers
+        // with, and the one fault code NamedPerson tolerates from its contact read. Matches
+        // FakeOrganizationService.Retrieve, which reproduces this exact code for a row
+        // nothing seeded.
+        private const int ContactNotFoundErrorCode = -2147220969;
+
         public GenerateExportPlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(GenerateExportPlugin))
         {
@@ -181,34 +187,21 @@ namespace OutcomeTesting.Plugins
                         outcomeCase, ListOptionRules.PreOrPostCheckAttribute, "al_preorpostcheck"),
                     ["al_advicequalitygrade"] = adviceGrade,
                     ["al_filequalitygrade"] = fileQualityGrade,
-                    ["al_fqfailadvisername"] = FlaggedText(
-                        IsAccountable(outcomeRow, FqAdviserFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_advisername", fqNamedPerson),
-                    ["al_fqfailadvisercode"] = FlaggedText(
-                        IsAccountable(outcomeRow, FqAdviserFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_advisercode", fqNamedPerson),
-                    ["al_fqfailparaplannername"] = FlaggedText(
-                        IsAccountable(outcomeRow, FqParaplannerFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_paraplanner", fqNamedPerson),
-                    ["al_fqfailparaplannercode"] = FlaggedText(
-                        IsAccountable(outcomeRow, FqParaplannerFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_paraplannercode", fqNamedPerson),
-                    ["al_aqfailadvisername"] = FlaggedText(
-                        IsAccountable(outcomeRow, AqAdviserFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_advisername", aqNamedPerson),
-                    ["al_aqfailadvisercode"] = FlaggedText(
-                        IsAccountable(outcomeRow, AqAdviserFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_advisercode", aqNamedPerson),
-                    ["al_aqfailparaplannername"] = FlaggedText(
-                        IsAccountable(outcomeRow, AqParaplannerFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_paraplanner", aqNamedPerson),
-                    ["al_aqfailparaplannercode"] = FlaggedText(
-                        IsAccountable(outcomeRow, AqParaplannerFlag, fileQualityChoice, effectiveOutcome),
-                        outcomeCase, "al_paraplannercode", aqNamedPerson),
                     ["al_separator"] = string.Empty,
                     ["statecode"] = new OptionSetValue(0),
                     ["statuscode"] = new OptionSetValue(1),
                 };
+
+                // Built by a method of its own, not inline here, so the pairing - which of
+                // fqNamedPerson/aqNamedPerson feeds which of the eight columns - is something
+                // a unit test can pin directly against this exact code, rather than trust by
+                // reading the wiring (2026-09-22 review: a one-variable swap here would have
+                // passed every test FlaggedText and NamedPerson had in isolation).
+                foreach (var column in AccountabilityColumns(
+                    outcomeRow, outcomeCase, fqNamedPerson, aqNamedPerson, fileQualityChoice, effectiveOutcome))
+                {
+                    record[column.Key] = column.Value;
+                }
 
                 var checkDate = outcomeCase.GetAttributeValue<DateTime?>("al_checkdate");
                 if (checkDate.HasValue)
@@ -562,6 +555,13 @@ namespace OutcomeTesting.Plugins
         /// <summary>
         /// The contact named as accountable for a discipline, or null where the export
         /// should use the people the case itself names.
+        ///
+        /// The staff-code read tolerates exactly one fault - ObjectDoesNotExist
+        /// (<see cref="ContactNotFoundErrorCode"/>), for a contact deleted since the
+        /// judgement was recorded - and lets every other fault propagate. In particular a
+        /// privilege refusal is NOT swallowed here: it must abort the export rather than be
+        /// read as "this person has no code", which would quietly blank the accountability
+        /// code for every named person in the batch with nothing to show for it afterwards.
         /// </summary>
         public static AccountablePerson NamedPerson(
             IOrganizationService service, Entity outcomeRow, string lookupAttribute)
@@ -579,8 +579,16 @@ namespace OutcomeTesting.Plugins
 
             // Retrieved rather than taken from the lookup's Name alone: the lookup carries a
             // label, never the code. A contact that has been deleted since the judgement was
-            // recorded still has its name on the row, so a failed read leaves the code null
-            // rather than throwing - the name is the part that must survive.
+            // recorded still has its name on the row, so a not-found read leaves the code
+            // null rather than throwing - the name is the part that must survive.
+            //
+            // Only that one fault is tolerated. A privilege refusal reads identically here
+            // unless it is told apart - this environment has hit SecLib::CheckPrivilege
+            // faults from a missing app role repeatedly - and swallowing one would blank the
+            // code for every named person in the whole export batch with nothing traced
+            // afterwards, producing a file that reads as "none of these people have codes"
+            // when the truth is "the export could not read Contact at all" (2026-09-22
+            // review, overruling this task's own brief, which had written the blanket catch).
             string staffCode = null;
             try
             {
@@ -590,12 +598,65 @@ namespace OutcomeTesting.Plugins
                     new ColumnSet(ContactRegistry.StaffCodeAttr));
                 staffCode = contact.GetAttributeValue<string>(ContactRegistry.StaffCodeAttr);
             }
-            catch (System.ServiceModel.FaultException<OrganizationServiceFault>)
+            catch (System.ServiceModel.FaultException<OrganizationServiceFault> fault)
             {
+                if (fault.Detail == null || fault.Detail.ErrorCode != ContactNotFoundErrorCode)
+                {
+                    throw;
+                }
+
                 staffCode = null;
             }
 
             return new AccountablePerson { Name = reference.Name, StaffCode = staffCode };
+        }
+
+        /// <summary>
+        /// The eight AD-039 fail-accountability columns for one export record: the FQ and AQ
+        /// "fail adviser" / "fail paraplanner" name/code pairs (columns 11-20 minus the two
+        /// accountable-contact lookups, which are not exported columns).
+        ///
+        /// Pulled out of the record build so the pairing itself is something a test can call
+        /// directly and pin: <paramref name="fqNamedPerson"/> must feed every al_fqfail*
+        /// column and never an al_aqfail* one, and vice versa for
+        /// <paramref name="aqNamedPerson"/>. A one-variable swap between the two would still
+        /// pass every FlaggedText/NamedPerson test taken alone, because both look identical
+        /// to an AccountablePerson - the defect this method exists to make visible is
+        /// specifically about which slot receives which variable, not about either helper's
+        /// own logic (2026-09-22 review).
+        /// </summary>
+        public static System.Collections.Generic.IDictionary<string, object> AccountabilityColumns(
+            Entity outcomeRow, Entity outcomeCase,
+            AccountablePerson fqNamedPerson, AccountablePerson aqNamedPerson,
+            int? fileQualityChoice, int? effectiveOutcome)
+        {
+            return new System.Collections.Generic.Dictionary<string, object>
+            {
+                ["al_fqfailadvisername"] = FlaggedText(
+                    IsAccountable(outcomeRow, FqAdviserFlag, fileQualityChoice, effectiveOutcome),
+                    outcomeCase, "al_advisername", fqNamedPerson),
+                ["al_fqfailadvisercode"] = FlaggedText(
+                    IsAccountable(outcomeRow, FqAdviserFlag, fileQualityChoice, effectiveOutcome),
+                    outcomeCase, "al_advisercode", fqNamedPerson),
+                ["al_fqfailparaplannername"] = FlaggedText(
+                    IsAccountable(outcomeRow, FqParaplannerFlag, fileQualityChoice, effectiveOutcome),
+                    outcomeCase, "al_paraplanner", fqNamedPerson),
+                ["al_fqfailparaplannercode"] = FlaggedText(
+                    IsAccountable(outcomeRow, FqParaplannerFlag, fileQualityChoice, effectiveOutcome),
+                    outcomeCase, "al_paraplannercode", fqNamedPerson),
+                ["al_aqfailadvisername"] = FlaggedText(
+                    IsAccountable(outcomeRow, AqAdviserFlag, fileQualityChoice, effectiveOutcome),
+                    outcomeCase, "al_advisername", aqNamedPerson),
+                ["al_aqfailadvisercode"] = FlaggedText(
+                    IsAccountable(outcomeRow, AqAdviserFlag, fileQualityChoice, effectiveOutcome),
+                    outcomeCase, "al_advisercode", aqNamedPerson),
+                ["al_aqfailparaplannername"] = FlaggedText(
+                    IsAccountable(outcomeRow, AqParaplannerFlag, fileQualityChoice, effectiveOutcome),
+                    outcomeCase, "al_paraplanner", aqNamedPerson),
+                ["al_aqfailparaplannercode"] = FlaggedText(
+                    IsAccountable(outcomeRow, AqParaplannerFlag, fileQualityChoice, effectiveOutcome),
+                    outcomeCase, "al_paraplannercode", aqNamedPerson),
+            };
         }
 
         /// <summary>
