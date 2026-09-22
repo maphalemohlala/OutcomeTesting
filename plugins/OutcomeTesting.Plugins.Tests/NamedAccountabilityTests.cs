@@ -13,10 +13,13 @@ namespace OutcomeTesting.Plugins.Tests
     /// someone the case does not name, and the extract has no column of its own for them, so
     /// the chosen person is written into whichever of those two slots the flags point at.
     ///
-    /// The CODE column goes empty when a person is named. A contact carries no adviser or
-    /// paraplanner code, and emitting the case's code beside someone else's name would
-    /// attribute the fail to a name and a code belonging to two different people - which is
-    /// worse than a blank, because it reads as complete.
+    /// The CODE column carries THAT PERSON's own code (2026-09-22, see AccountabilityCodeTests
+    /// for the registry-backed round trip through NamedPerson). Before the registry gave a
+    /// contact a code, this column was blanked outright: a contact carried no adviser or
+    /// paraplanner code, and emitting the case's code beside someone else's name would have
+    /// attributed the fail to a name and a code belonging to two different people - which is
+    /// worse than a blank, because it reads as complete. That guard survives as the rule that
+    /// the code must come from the same person as the name.
     /// </summary>
     public class NamedAccountabilityTests
     {
@@ -28,6 +31,11 @@ namespace OutcomeTesting.Plugins.Tests
             row["al_paraplanner"] = "Jessica Bell";
             row["al_paraplannercode"] = "PP-9";
             return row;
+        }
+
+        private static GenerateExportPlugin.AccountablePerson Person(string name, string staffCode)
+        {
+            return new GenerateExportPlugin.AccountablePerson { Name = name, StaffCode = staffCode };
         }
 
         private static Entity Outcome(string fqNamed = null, string aqNamed = null)
@@ -64,19 +72,40 @@ namespace OutcomeTesting.Plugins.Tests
         {
             Assert.Equal(
                 "Clare Hook",
-                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplanner", "Clare Hook"));
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplanner", Person("Clare Hook", "CH-77")));
         }
 
         [Fact]
-        public void Blanks_the_code_beside_a_named_person()
+        public void A_named_persons_own_code_replaces_the_cases_code()
         {
-            // Never "Clare Hook" with "PP-9" beside it: that is Jessica Bell's code.
+            // Changed 2026-09-22: this used to assert string.Empty for both columns. A
+            // contact carried no code then, so blanking was the only safe choice - showing
+            // Jessica Bell's "PP-9" beside Clare Hook's name would have attributed the fail
+            // to a name and a code belonging to two different people. The registry now
+            // holds Clare Hook's own code, so that is what appears instead of a blank -
+            // never "PP-9", which is still someone else's.
+            var namedPerson = Person("Clare Hook", "CH-77");
+
+            Assert.Equal(
+                "CH-77",
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplannercode", namedPerson));
+            Assert.Equal(
+                "CH-77",
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_advisercode", namedPerson));
+        }
+
+        [Fact]
+        public void A_named_person_with_no_code_leaves_the_column_blank()
+        {
+            // Not a fall back to the case's own code (still "PP-9" on this Case()). A named
+            // person who the registry holds no code for leaves the column blank, exactly as
+            // it always did - the difference from the old rule is that a code IS now shown
+            // when that same person's own code exists.
+            var namedPerson = Person("Clare Hook", null);
+
             Assert.Equal(
                 string.Empty,
-                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplannercode", "Clare Hook"));
-            Assert.Equal(
-                string.Empty,
-                GenerateExportPlugin.FlaggedText(true, Case(), "al_advisercode", "Clare Hook"));
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplannercode", namedPerson));
         }
 
         [Fact]
@@ -85,7 +114,7 @@ namespace OutcomeTesting.Plugins.Tests
             // The flag still decides. Naming someone does not put them in both slots.
             Assert.Equal(
                 string.Empty,
-                GenerateExportPlugin.FlaggedText(false, Case(), "al_paraplanner", "Clare Hook"));
+                GenerateExportPlugin.FlaggedText(false, Case(), "al_paraplanner", Person("Clare Hook", "CH-77")));
         }
 
         [Fact]
@@ -93,7 +122,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             Assert.Equal(
                 "Jessica Bell",
-                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplanner", "   "));
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplanner", Person("   ", "CH-77")));
         }
 
         [Fact]
@@ -101,38 +130,51 @@ namespace OutcomeTesting.Plugins.Tests
         {
             Assert.Equal(
                 "Clare Hook",
-                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplanner", "  Clare Hook  "));
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplanner", Person("  Clare Hook  ", "CH-77")));
         }
 
         [Fact]
         public void Reads_the_named_person_off_the_outcome()
         {
-            Assert.Equal(
-                "Clare Hook",
-                GenerateExportPlugin.NamedPerson(
-                    Outcome(fqNamed: "Clare Hook"), GenerateExportPlugin.FqAccountableContactAttr));
+            // The referenced contact is never seeded into the fake, matching a contact
+            // deleted since the judgement was recorded: NamedPerson's Retrieve faults, is
+            // caught, and the name off the lookup survives with a null code - see the
+            // registry-backed round trip in AccountabilityCodeTests for the case where the
+            // contact (and its code) is actually there.
+            var service = new FakeOrganizationService();
+
+            var named = GenerateExportPlugin.NamedPerson(
+                service, Outcome(fqNamed: "Clare Hook"), GenerateExportPlugin.FqAccountableContactAttr);
+
+            Assert.Equal("Clare Hook", named.Name);
+            Assert.Null(named.StaffCode);
         }
 
         [Fact]
         public void Keeps_the_two_disciplines_apart()
         {
+            var service = new FakeOrganizationService();
             var outcome = Outcome(fqNamed: "Clare Hook", aqNamed: "Ruth Maxwell");
 
             Assert.Equal(
                 "Clare Hook",
-                GenerateExportPlugin.NamedPerson(outcome, GenerateExportPlugin.FqAccountableContactAttr));
+                GenerateExportPlugin.NamedPerson(
+                    service, outcome, GenerateExportPlugin.FqAccountableContactAttr).Name);
             Assert.Equal(
                 "Ruth Maxwell",
-                GenerateExportPlugin.NamedPerson(outcome, GenerateExportPlugin.AqAccountableContactAttr));
+                GenerateExportPlugin.NamedPerson(
+                    service, outcome, GenerateExportPlugin.AqAccountableContactAttr).Name);
         }
 
         [Fact]
         public void Names_nobody_on_an_untouched_outcome()
         {
+            var service = new FakeOrganizationService();
+
             Assert.Null(GenerateExportPlugin.NamedPerson(
-                Outcome(), GenerateExportPlugin.FqAccountableContactAttr));
+                service, Outcome(), GenerateExportPlugin.FqAccountableContactAttr));
             Assert.Null(GenerateExportPlugin.NamedPerson(
-                null, GenerateExportPlugin.FqAccountableContactAttr));
+                service, null, GenerateExportPlugin.FqAccountableContactAttr));
         }
     }
 }

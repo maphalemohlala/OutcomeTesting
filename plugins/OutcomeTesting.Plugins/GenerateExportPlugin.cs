@@ -137,8 +137,8 @@ namespace OutcomeTesting.Plugins
                 // Someone named in place of the case's own adviser or paraplanner (project
                 // owner, 2026-09-19). Read once per case; FlaggedText decides per column
                 // whether it applies, since only the slot the flags point at is filled.
-                var fqNamedPerson = NamedPerson(outcomeRow, FqAccountableContactAttr);
-                var aqNamedPerson = NamedPerson(outcomeRow, AqAccountableContactAttr);
+                var fqNamedPerson = NamedPerson(userService, outcomeRow, FqAccountableContactAttr);
+                var aqNamedPerson = NamedPerson(userService, outcomeRow, AqAccountableContactAttr);
                 var code = "EXR-" + batchCode + "-" + caseRef;
 
                 var incomplete = DescribeIncompleteRow(outcomeRow, fileQualityGrade, AqsExpected(userService, outcomeCase));
@@ -507,28 +507,31 @@ namespace OutcomeTesting.Plugins
         /// column names does not carry this fail, and otherwise their name or code.
         ///
         /// <paramref name="namedPerson"/> overrides the case's own value (project owner,
-        /// 2026-09-19). Accountability can now be given to any contact, not only the adviser
-        /// or paraplanner the case names, and the extract has no column of its own for them -
-        /// columns 11-20 are fixed as "fail adviser" and "fail paraplanner" pairs. So the
-        /// chosen person is written into whichever of those slots the flags say they fill,
-        /// in place of the case's own name.
+        /// 2026-09-19). Accountability can be given to any contact, not only the adviser or
+        /// paraplanner the case names, and columns 11-20 are fixed as "fail adviser" and
+        /// "fail paraplanner" pairs, so the chosen person is written into whichever slot the
+        /// flags say they fill.
         ///
-        /// A CODE column is left empty when a person was named. A contact carries no adviser
-        /// or paraplanner code, and emitting the case's code beside someone else's name
-        /// would attribute the fail to a name and a code belonging to two different people -
-        /// worse than a blank, because it reads as complete.
+        /// A CODE column now carries THAT PERSON'S code (2026-09-22). It used to be blanked,
+        /// because a contact carried no code and emitting the case's code beside someone
+        /// else's name would attribute the fail to a name and a code belonging to two
+        /// different people. The registry removed that constraint; the guard against mixing
+        /// two people survives as the rule that the code must come from the same person as
+        /// the name, and is blank when they have none.
         /// </summary>
         public static string FlaggedText(
-            bool accountable, Entity outcomeCase, string caseAttribute, string namedPerson)
+            bool accountable, Entity outcomeCase, string caseAttribute, AccountablePerson namedPerson)
         {
             if (!accountable)
             {
                 return string.Empty;
             }
 
-            if (!string.IsNullOrWhiteSpace(namedPerson))
+            if (namedPerson != null && !string.IsNullOrWhiteSpace(namedPerson.Name))
             {
-                return IsCodeColumn(caseAttribute) ? string.Empty : namedPerson.Trim();
+                return IsCodeColumn(caseAttribute)
+                    ? (namedPerson.StaffCode ?? string.Empty).Trim()
+                    : namedPerson.Name.Trim();
             }
 
             return outcomeCase.GetAttributeValue<string>(caseAttribute) ?? string.Empty;
@@ -541,10 +544,27 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// The name of the contact named as accountable for a discipline, or null where the
-        /// export should use the people the case itself names.
+        /// A contact named as accountable for a discipline: who they are, and their code.
+        ///
+        /// The code is why this is a pair rather than a name. Until 2026-09-22 a contact had
+        /// no code at all, so the four accountability CODE columns were blanked whenever
+        /// somebody was named - see FlaggedText. The registry now holds one.
         /// </summary>
-        public static string NamedPerson(Entity outcomeRow, string lookupAttribute)
+        public sealed class AccountablePerson
+        {
+            /// <summary>The contact's display name, as the lookup reports it.</summary>
+            public string Name { get; set; }
+
+            /// <summary>Their staff code, or null where the registry holds none.</summary>
+            public string StaffCode { get; set; }
+        }
+
+        /// <summary>
+        /// The contact named as accountable for a discipline, or null where the export
+        /// should use the people the case itself names.
+        /// </summary>
+        public static AccountablePerson NamedPerson(
+            IOrganizationService service, Entity outcomeRow, string lookupAttribute)
         {
             if (outcomeRow == null)
             {
@@ -552,7 +572,30 @@ namespace OutcomeTesting.Plugins
             }
 
             var reference = outcomeRow.GetAttributeValue<EntityReference>(lookupAttribute);
-            return reference == null ? null : reference.Name;
+            if (reference == null)
+            {
+                return null;
+            }
+
+            // Retrieved rather than taken from the lookup's Name alone: the lookup carries a
+            // label, never the code. A contact that has been deleted since the judgement was
+            // recorded still has its name on the row, so a failed read leaves the code null
+            // rather than throwing - the name is the part that must survive.
+            string staffCode = null;
+            try
+            {
+                var contact = service.Retrieve(
+                    ContactRegistry.Entity,
+                    reference.Id,
+                    new ColumnSet(ContactRegistry.StaffCodeAttr));
+                staffCode = contact.GetAttributeValue<string>(ContactRegistry.StaffCodeAttr);
+            }
+            catch (System.ServiceModel.FaultException<OrganizationServiceFault>)
+            {
+                staffCode = null;
+            }
+
+            return new AccountablePerson { Name = reference.Name, StaffCode = staffCode };
         }
 
         /// <summary>
