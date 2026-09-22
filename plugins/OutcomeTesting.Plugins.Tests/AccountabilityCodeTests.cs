@@ -161,6 +161,16 @@ namespace OutcomeTesting.Plugins.Tests
         private static readonly GenerateExportPlugin.AccountablePerson AqPerson =
             new GenerateExportPlugin.AccountablePerson { Name = "Adam Quill", StaffCode = "AQ-2" };
 
+        /// <summary>
+        /// What the registry holds for the case's OWN two people, different from the codes
+        /// the case row carries so a read of the retired case columns cannot pass by
+        /// coincidence.
+        /// </summary>
+        private static GenerateExportPlugin.RegistryCodes Registry()
+        {
+            return new GenerateExportPlugin.RegistryCodes { Adviser = "REG-ADV", Paraplanner = "REG-PP" };
+        }
+
         [Fact]
         public void The_adviser_pair_carries_each_disciplines_own_person_and_nobody_elses()
         {
@@ -171,7 +181,8 @@ namespace OutcomeTesting.Plugins.Tests
             };
 
             var columns = GenerateExportPlugin.AccountabilityColumns(
-                outcomeRow, Case(), FqPerson, AqPerson, fileQualityChoice: null, effectiveOutcome: null);
+                outcomeRow, Case(), FqPerson, AqPerson, Registry(),
+                fileQualityChoice: null, effectiveOutcome: null);
 
             Assert.Equal("Fiona Quinn", columns["al_fqfailadvisername"]);
             Assert.Equal("FQ-1", columns["al_fqfailadvisercode"]);
@@ -189,12 +200,78 @@ namespace OutcomeTesting.Plugins.Tests
             };
 
             var columns = GenerateExportPlugin.AccountabilityColumns(
-                outcomeRow, Case(), FqPerson, AqPerson, fileQualityChoice: null, effectiveOutcome: null);
+                outcomeRow, Case(), FqPerson, AqPerson, Registry(),
+                fileQualityChoice: null, effectiveOutcome: null);
 
             Assert.Equal("Fiona Quinn", columns["al_fqfailparaplannername"]);
             Assert.Equal("FQ-1", columns["al_fqfailparaplannercode"]);
             Assert.Equal("Adam Quill", columns["al_aqfailparaplannername"]);
             Assert.Equal("AQ-2", columns["al_aqfailparaplannercode"]);
+        }
+
+        [Fact]
+        public void With_nobody_named_the_code_columns_take_the_registry_and_the_name_columns_the_case()
+        {
+            // The COMMON path. A specific accountable contact is recorded only when a
+            // reviewer names one; otherwise accountability is derived from the case's own
+            // adviser and paraplanner, and this branch used to read al_advisercode /
+            // al_paraplannercode straight off the case - the retired columns, one of which
+            // plugins/OutcomeTesting.Registration still seeds as "ADV-S01". A single Trail
+            // Light row could then carry a registry code in column B and a stale hand-typed
+            // one in column N, for the SAME person, on a file read by position.
+            //
+            // Both disciplines are accountable at once and the registry codes differ from
+            // the case's, so a reverted fallback shows up as "CASE-ADV"/"CASE-PP".
+            var outcomeRow = new Entity("al_outcome")
+            {
+                [GenerateExportPlugin.FqAdviserFlag] = true,
+                [GenerateExportPlugin.FqParaplannerFlag] = true,
+                [GenerateExportPlugin.AqAdviserFlag] = true,
+                [GenerateExportPlugin.AqParaplannerFlag] = true,
+            };
+
+            var columns = GenerateExportPlugin.AccountabilityColumns(
+                outcomeRow, Case(), null, null, Registry(),
+                fileQualityChoice: null, effectiveOutcome: null);
+
+            Assert.Equal("REG-ADV", columns["al_fqfailadvisercode"]);
+            Assert.Equal("REG-PP", columns["al_fqfailparaplannercode"]);
+            Assert.Equal("REG-ADV", columns["al_aqfailadvisercode"]);
+            Assert.Equal("REG-PP", columns["al_aqfailparaplannercode"]);
+
+            // The name columns are unaffected: with nobody named, the fail belongs to the
+            // case's own people and their names are on the case.
+            Assert.Equal("Case Adviser", columns["al_fqfailadvisername"]);
+            Assert.Equal("Case Paraplanner", columns["al_fqfailparaplannername"]);
+            Assert.Equal("Case Adviser", columns["al_aqfailadvisername"]);
+            Assert.Equal("Case Paraplanner", columns["al_aqfailparaplannername"]);
+        }
+
+        [Fact]
+        public void With_nobody_named_and_no_registry_code_the_code_columns_are_blank()
+        {
+            // Blank, never the case's "CASE-ADV"/"CASE-PP". AD-039 is positional and read by
+            // an external system that cannot tell a registry code from a stale one.
+            var outcomeRow = new Entity("al_outcome")
+            {
+                [GenerateExportPlugin.FqAdviserFlag] = true,
+                [GenerateExportPlugin.FqParaplannerFlag] = true,
+                [GenerateExportPlugin.AqAdviserFlag] = true,
+                [GenerateExportPlugin.AqParaplannerFlag] = true,
+            };
+
+            var columns = GenerateExportPlugin.AccountabilityColumns(
+                outcomeRow, Case(), null, null, new GenerateExportPlugin.RegistryCodes(),
+                fileQualityChoice: null, effectiveOutcome: null);
+
+            Assert.Equal(string.Empty, columns["al_fqfailadvisercode"]);
+            Assert.Equal(string.Empty, columns["al_fqfailparaplannercode"]);
+            Assert.Equal(string.Empty, columns["al_aqfailadvisercode"]);
+            Assert.Equal(string.Empty, columns["al_aqfailparaplannercode"]);
+
+            // Still named, though. A blank code does not mean nobody carries the fail.
+            Assert.Equal("Case Adviser", columns["al_fqfailadvisername"]);
+            Assert.Equal("Case Paraplanner", columns["al_aqfailparaplannername"]);
         }
     }
 }

@@ -92,5 +92,48 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.True(string.IsNullOrEmpty(
                 GenerateExportPlugin.AdviserCode(service, outcomeCase)));
         }
+
+        [Fact]
+        public void The_case_own_paraplanner_code_column_is_not_read_either()
+        {
+            // The pair of the adviser pin above, which existed alone. Both retired columns
+            // need one: al_paraplannercode holds whatever was last typed into it, and
+            // nothing has cleared those values - the columns were kept precisely because
+            // they are historical record (AD-207).
+            var service = new FakeOrganizationService();
+            var outcomeCase = Case(null, "nobody@example.com", "Sam Paraplanner");
+            outcomeCase["al_paraplannercode"] = "STALE-77";
+
+            Assert.True(string.IsNullOrEmpty(
+                GenerateExportPlugin.ParaplannerCode(service, outcomeCase)));
+        }
+
+        [Fact]
+        public void The_para_planner_is_resolved_once_for_the_email_and_the_code()
+        {
+            // Column D's email and column D's code are two readings of ONE resolution
+            // (2026-09-22 review). Asking NotificationOutbox.MatchParaplanner separately per
+            // column ran the identical two-row query twice for every case in the batch, and
+            // the record build states the rule in as many words two dozen lines above.
+            var service = new FakeOrganizationService();
+            Contact(service, "Sam Paraplanner", "sam.paraplanner@example.com", "8820");
+            var outcomeCase = Case(null, "sam.paraplanner@example.com", "Sam Paraplanner");
+
+            var before = service.RetrieveMultipleCount;
+            var match = GenerateExportPlugin.ParaplannerMatch(service, outcomeCase);
+            var queries = service.RetrieveMultipleCount - before;
+
+            // Anchor the no-further-reads assertion below to a read that provably happened,
+            // or it would pass on a fake that counts nothing (AD-204).
+            Assert.True(queries > 0, "the resolution itself must have queried");
+
+            Assert.Equal("8820", GenerateExportPlugin.ParaplannerCodeOf(match));
+            Assert.Equal(
+                "sam.paraplanner@example.com",
+                GenerateExportPlugin.ParaplannerEmailOf(match, outcomeCase));
+
+            // Both values, and not a single further read to get the second one.
+            Assert.Equal(queries, service.RetrieveMultipleCount - before);
+        }
     }
 }

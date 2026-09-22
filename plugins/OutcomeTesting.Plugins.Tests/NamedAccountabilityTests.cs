@@ -20,6 +20,12 @@ namespace OutcomeTesting.Plugins.Tests
     /// attributed the fail to a name and a code belonging to two different people - which is
     /// worse than a blank, because it reads as complete. That guard survives as the rule that
     /// the code must come from the same person as the name.
+    ///
+    /// Where NOBODY is named - the common path, since accountability is otherwise derived
+    /// from the people the case already names - the name still comes off the case and the
+    /// CODE comes off the registry (2026-09-22 review). The case's own al_advisercode and
+    /// al_paraplannercode are read by nothing here: they are the retired columns this body
+    /// of work made uneditable, and the registration tool still seeds one of them.
     /// </summary>
     public class NamedAccountabilityTests
     {
@@ -36,6 +42,16 @@ namespace OutcomeTesting.Plugins.Tests
         private static GenerateExportPlugin.AccountablePerson Person(string name, string staffCode)
         {
             return new GenerateExportPlugin.AccountablePerson { Name = name, StaffCode = staffCode };
+        }
+
+        /// <summary>
+        /// What the registry holds for the case's OWN adviser and paraplanner, deliberately
+        /// different from the codes <see cref="Case"/> carries so a fallback to the case
+        /// column cannot pass by coincidence.
+        /// </summary>
+        private static GenerateExportPlugin.RegistryCodes Registry()
+        {
+            return new GenerateExportPlugin.RegistryCodes { Adviser = "REG-ADV", Paraplanner = "REG-PP" };
         }
 
         private static Entity Outcome(string fqNamed = null, string aqNamed = null)
@@ -59,12 +75,48 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void Uses_the_cases_own_person_when_nobody_was_named()
         {
+            // The NAME still comes off the case: with nobody named, the fail belongs to the
+            // case's own paraplanner and their name is on the case.
             Assert.Equal(
                 "Jessica Bell",
-                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplanner", null));
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplanner", null, Registry()));
+
+            // The CODE comes off the REGISTRY, not the case (2026-09-22 review). This
+            // assertion used to read "PP-9" - the case's own al_paraplannercode - which
+            // pinned the defect as intended behaviour: this is the COMMON path, taken
+            // whenever no specific person was named, and it read the very column this work
+            // retired and made uneditable everywhere. A row could then carry a registry
+            // code in column B and a stale hand-typed one in column N for the same person.
             Assert.Equal(
-                "PP-9",
+                "REG-PP",
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplannercode", null, Registry()));
+            Assert.Equal(
+                "REG-ADV",
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_advisercode", null, Registry()));
+        }
+
+        [Fact]
+        public void Blanks_the_code_where_the_registry_holds_none_for_the_cases_own_person()
+        {
+            // Blank, never the case's "PP-9"/"ADV-1". AD-039 reads by position: a code
+            // column carries the registry's answer or nothing at all.
+            var noCodes = new GenerateExportPlugin.RegistryCodes();
+
+            Assert.Equal(
+                string.Empty,
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplannercode", null, noCodes));
+            Assert.Equal(
+                string.Empty,
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_advisercode", null, noCodes));
+
+            // And with no RegistryCodes supplied at all, which is what the shorter overloads
+            // pass - still blank, never the case column.
+            Assert.Equal(
+                string.Empty,
                 GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplannercode", null));
+            Assert.Equal(
+                string.Empty,
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_advisercode"));
         }
 
         [Fact]
@@ -88,10 +140,10 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Equal(
                 "CH-77",
-                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplannercode", namedPerson));
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplannercode", namedPerson, Registry()));
             Assert.Equal(
                 "CH-77",
-                GenerateExportPlugin.FlaggedText(true, Case(), "al_advisercode", namedPerson));
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_advisercode", namedPerson, Registry()));
         }
 
         [Fact]
@@ -103,9 +155,11 @@ namespace OutcomeTesting.Plugins.Tests
             // when that same person's own code exists.
             var namedPerson = Person("Clare Hook", null);
 
+            // Registry() is supplied deliberately: the case's own paraplanner has a registry
+            // code, and it is still NOT what goes here. Clare Hook is somebody else.
             Assert.Equal(
                 string.Empty,
-                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplannercode", namedPerson));
+                GenerateExportPlugin.FlaggedText(true, Case(), "al_paraplannercode", namedPerson, Registry()));
         }
 
         [Fact]

@@ -8,8 +8,9 @@ namespace OutcomeTesting.Plugins
     /// Server-side command GenerateExport (AD-003, AD-039, AD-034 manual only). Registered
     /// against the Custom API <c>al_GenerateExport</c>. Snapshots each Closed case into an
     /// al_exportrecord in the AD-039 20-column Trail Light shape, so the delivered values
-    /// are preserved for reconciliation (BR-012). Columns B and D carry EMAILS from
-    /// 2026-09-21, not codes - see <c>app/src/features/reports/trailLight.ts</c>, which is
+    /// are preserved for reconciliation (BR-012). Columns B and D carry CODES again from
+    /// 2026-09-22 (AD-207, superseding AD-183's emails), resolved from the REGISTRY and
+    /// never from the case - see <c>app/src/features/reports/trailLight.ts</c>, which is
     /// where the file's column order lives. Enforces the caller holds Edit on
     /// <c>export.generate</c>, is idempotent per batch, and writes an Audit Event.
     /// </summary>
@@ -145,6 +146,19 @@ namespace OutcomeTesting.Plugins
                 // whether it applies, since only the slot the flags point at is filled.
                 var fqNamedPerson = NamedPerson(userService, outcomeRow, FqAccountableContactAttr);
                 var aqNamedPerson = NamedPerson(userService, outcomeRow, AqAccountableContactAttr);
+
+                // One resolution per person, reused by every column that needs it (the same
+                // rule the file-quality read above follows). The para-planner's match feeds
+                // BOTH column D's email and column D's code, and the codes resolved here feed
+                // columns B and D as well as the four accountability code columns L, N, R and
+                // T - so asking again per column ran the identical query up to three times
+                // per case for no gain.
+                var paraplannerMatch = ParaplannerMatch(userService, outcomeCase);
+                var registryCodes = new RegistryCodes
+                {
+                    Adviser = AdviserCode(userService, outcomeCase),
+                    Paraplanner = ParaplannerCodeOf(paraplannerMatch),
+                };
                 var code = "EXR-" + batchCode + "-" + caseRef;
 
                 var incomplete = DescribeIncompleteRow(outcomeRow, fileQualityGrade, AqsExpected(userService, outcomeCase));
@@ -164,7 +178,7 @@ namespace OutcomeTesting.Plugins
                     // Trail Light col B, a CODE again from 2026-09-22 (project owner:
                     // Trailight could not accommodate the emails put here on 2026-09-21).
                     // From the registry, not the case - see AdviserCode.
-                    ["al_advisercode"] = AdviserCode(userService, outcomeCase),
+                    ["al_advisercode"] = registryCodes.Adviser,
                     // Trail Light col B from 2026-09-21, having been col 21 since 2026-09-19.
                     // Snapshotted like every other column here rather than read live at
                     // file-build time, so a later correction to the case cannot change what
@@ -172,13 +186,13 @@ namespace OutcomeTesting.Plugins
                     ["al_adviseremail"] = outcomeCase.GetAttributeValue<string>("al_adviseremail"),
                     ["al_paraplannername"] = outcomeCase.GetAttributeValue<string>("al_paraplanner"),
                     // Trail Light col D, a CODE again from 2026-09-22, resolved by address.
-                    ["al_paraplannercode"] = ParaplannerCode(userService, outcomeCase),
+                    ["al_paraplannercode"] = registryCodes.Paraplanner,
                     // Trail Light col D (project owner, 2026-09-21: "replace column B & D
                     // ... rather than codes show emails"). Resolved rather than read: unlike
                     // the adviser, the para-planner has NO email column on the case - the
                     // import carries their name and nothing else (AD-160) - so the only
                     // source is the Contact that name resolves to.
-                    ["al_paraplanneremail"] = ParaplannerEmail(userService, outcomeCase),
+                    ["al_paraplanneremail"] = ParaplannerEmailOf(paraplannerMatch, outcomeCase),
                     ["al_casetype"] = ManagedOption(
                         outcomeCase, ListOptionRules.CaseTypeAttribute, "al_casetype"),
                     ["al_productsolutiontype"] = ProductType(outcomeCase),
@@ -198,7 +212,8 @@ namespace OutcomeTesting.Plugins
                 // reading the wiring (2026-09-22 review: a one-variable swap here would have
                 // passed every test FlaggedText and NamedPerson had in isolation).
                 foreach (var column in AccountabilityColumns(
-                    outcomeRow, outcomeCase, fqNamedPerson, aqNamedPerson, fileQualityChoice, effectiveOutcome))
+                    outcomeRow, outcomeCase, fqNamedPerson, aqNamedPerson, registryCodes,
+                    fileQualityChoice, effectiveOutcome))
                 {
                     record[column.Key] = column.Value;
                 }
@@ -289,11 +304,41 @@ namespace OutcomeTesting.Plugins
 
         public static string ParaplannerEmail(IOrganizationService service, Entity outcomeCase)
         {
+            return ParaplannerEmailOf(ParaplannerMatch(service, outcomeCase), outcomeCase);
+        }
+
+        /// <summary>
+        /// Resolves the case's para-planner to a contact ONCE, for every column that needs
+        /// them.
+        ///
+        /// Column D's email and column D's code are two readings of one resolution, and the
+        /// accountability codes take a third. Asking <see cref="NotificationOutbox.MatchParaplanner"/>
+        /// per column ran the same two-row query repeatedly per case for no gain - the rule
+        /// the file-quality read in the record build already states in as many words.
+        /// </summary>
+        public static NotificationOutbox.PersonMatch ParaplannerMatch(
+            IOrganizationService service, Entity outcomeCase)
+        {
+            if (outcomeCase == null) { return null; }
+
+            return NotificationOutbox.MatchParaplanner(
+                service,
+                outcomeCase.GetAttributeValue<string>(ImportRules.ParaplannerEmailAttribute),
+                outcomeCase.GetAttributeValue<string>("al_paraplanner"));
+        }
+
+        /// <summary>
+        /// Column D's email, read off an already-resolved match. See
+        /// <see cref="ParaplannerEmail(IOrganizationService, Entity)"/> for the rules.
+        /// </summary>
+        public static string ParaplannerEmailOf(
+            NotificationOutbox.PersonMatch match, Entity outcomeCase)
+        {
+            if (outcomeCase == null) { return null; }
+
             var stored = outcomeCase.GetAttributeValue<string>(
                 ImportRules.ParaplannerEmailAttribute);
-            var name = outcomeCase.GetAttributeValue<string>("al_paraplanner");
 
-            var match = NotificationOutbox.MatchParaplanner(service, stored, name);
             if (match != null && match.IsMatch)
             {
                 return match.Email;
@@ -342,14 +387,59 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string ParaplannerCode(IOrganizationService service, Entity outcomeCase)
         {
-            if (outcomeCase == null) { return null; }
+            return ParaplannerCodeOf(ParaplannerMatch(service, outcomeCase));
+        }
 
-            var match = NotificationOutbox.MatchParaplanner(
-                service,
-                outcomeCase.GetAttributeValue<string>(ImportRules.ParaplannerEmailAttribute),
-                outcomeCase.GetAttributeValue<string>("al_paraplanner"));
-
+        /// <summary>
+        /// The para-planner's staff code, read off an already-resolved match. See
+        /// <see cref="ParaplannerCode(IOrganizationService, Entity)"/> for the rules.
+        /// </summary>
+        public static string ParaplannerCodeOf(NotificationOutbox.PersonMatch match)
+        {
             return match != null && match.IsMatch ? match.StaffCode : null;
+        }
+
+        /// <summary>
+        /// The two registry codes a case's own people carry, resolved once per case.
+        ///
+        /// A single object rather than two loose string parameters, deliberately. The codes
+        /// reach <see cref="AccountabilityColumns"/>, which already takes two interchangeable
+        /// <see cref="AccountablePerson"/> values; adding two interchangeable strings beside
+        /// them would let an adviser's code be handed to the para-planner's slot and compile
+        /// without complaint, putting one person's code beside another person's name on a
+        /// file an external system reads by position (2026-09-22 review). Named properties
+        /// cannot be transposed silently.
+        ///
+        /// Null on either side means the registry holds no code for that person, which is a
+        /// BLANK column - never the case's retired al_advisercode / al_paraplannercode, and
+        /// never a name or an address.
+        /// </summary>
+        public sealed class RegistryCodes
+        {
+            /// <summary>The adviser's staff code, or null where the registry holds none.</summary>
+            public string Adviser { get; set; }
+
+            /// <summary>The para-planner's staff code, or null where the registry holds none.</summary>
+            public string Paraplanner { get; set; }
+
+            /// <summary>
+            /// The code belonging to whichever of the two people the given case code column
+            /// names, or null for any other column.
+            /// </summary>
+            public string For(string caseAttribute)
+            {
+                if (string.Equals(caseAttribute, "al_advisercode", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Adviser;
+                }
+
+                if (string.Equals(caseAttribute, "al_paraplannercode", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Paraplanner;
+                }
+
+                return null;
+            }
         }
 
         // AD-039 col 15 Advice Quality grade = final outcome, or initial when not yet
@@ -492,7 +582,18 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string FlaggedText(bool accountable, Entity outcomeCase, string caseAttribute)
         {
-            return FlaggedText(accountable, outcomeCase, caseAttribute, null);
+            return FlaggedText(accountable, outcomeCase, caseAttribute, null, null);
+        }
+
+        /// <summary>
+        /// As the five-argument overload, with no registry codes supplied - so a CODE column
+        /// on the unnamed branch is BLANK. Kept for the name columns and for callers that
+        /// have already resolved the named person; the record build always passes the codes.
+        /// </summary>
+        public static string FlaggedText(
+            bool accountable, Entity outcomeCase, string caseAttribute, AccountablePerson namedPerson)
+        {
+            return FlaggedText(accountable, outcomeCase, caseAttribute, namedPerson, null);
         }
 
         /// <summary>
@@ -511,20 +612,43 @@ namespace OutcomeTesting.Plugins
         /// different people. The registry removed that constraint; the guard against mixing
         /// two people survives as the rule that the code must come from the same person as
         /// the name, and is blank when they have none.
+        ///
+        /// <paramref name="registryCodes"/> is what a CODE column reads on the UNNAMED
+        /// branch, and the case's own al_advisercode / al_paraplannercode is NOT read at all
+        /// (2026-09-22 review). Naming a specific accountable person is the rare path - the
+        /// common one derives accountability from the people the case itself names, and that
+        /// path used to read the case columns this body of work retired and made uneditable
+        /// everywhere. The registration tool still seeds al_advisercode = "ADV-S01" onto
+        /// cases, so a single Trail Light row could carry a registry code in column B and a
+        /// stale hand-typed one in column N, for the same person, on a file read by position
+        /// that cannot tell the two apart. The registry is the only source for a code column
+        /// on BOTH branches; where it holds none the column is blank.
+        ///
+        /// A NAME column is unaffected: with nobody named, the case's own person is who the
+        /// fail belongs to, and their name is on the case.
         /// </summary>
         public static string FlaggedText(
-            bool accountable, Entity outcomeCase, string caseAttribute, AccountablePerson namedPerson)
+            bool accountable, Entity outcomeCase, string caseAttribute,
+            AccountablePerson namedPerson, RegistryCodes registryCodes)
         {
             if (!accountable)
             {
                 return string.Empty;
             }
 
+            var isCodeColumn = IsCodeColumn(caseAttribute);
+
             if (namedPerson != null && !string.IsNullOrWhiteSpace(namedPerson.Name))
             {
-                return IsCodeColumn(caseAttribute)
+                return isCodeColumn
                     ? (namedPerson.StaffCode ?? string.Empty).Trim()
                     : namedPerson.Name.Trim();
+            }
+
+            if (isCodeColumn)
+            {
+                var registryCode = registryCodes == null ? null : registryCodes.For(caseAttribute);
+                return (registryCode ?? string.Empty).Trim();
             }
 
             return outcomeCase.GetAttributeValue<string>(caseAttribute) ?? string.Empty;
@@ -628,6 +752,7 @@ namespace OutcomeTesting.Plugins
         public static System.Collections.Generic.IDictionary<string, object> AccountabilityColumns(
             Entity outcomeRow, Entity outcomeCase,
             AccountablePerson fqNamedPerson, AccountablePerson aqNamedPerson,
+            RegistryCodes registryCodes,
             int? fileQualityChoice, int? effectiveOutcome)
         {
             return new System.Collections.Generic.Dictionary<string, object>
@@ -637,25 +762,25 @@ namespace OutcomeTesting.Plugins
                     outcomeCase, "al_advisername", fqNamedPerson),
                 ["al_fqfailadvisercode"] = FlaggedText(
                     IsAccountable(outcomeRow, FqAdviserFlag, fileQualityChoice, effectiveOutcome),
-                    outcomeCase, "al_advisercode", fqNamedPerson),
+                    outcomeCase, "al_advisercode", fqNamedPerson, registryCodes),
                 ["al_fqfailparaplannername"] = FlaggedText(
                     IsAccountable(outcomeRow, FqParaplannerFlag, fileQualityChoice, effectiveOutcome),
                     outcomeCase, "al_paraplanner", fqNamedPerson),
                 ["al_fqfailparaplannercode"] = FlaggedText(
                     IsAccountable(outcomeRow, FqParaplannerFlag, fileQualityChoice, effectiveOutcome),
-                    outcomeCase, "al_paraplannercode", fqNamedPerson),
+                    outcomeCase, "al_paraplannercode", fqNamedPerson, registryCodes),
                 ["al_aqfailadvisername"] = FlaggedText(
                     IsAccountable(outcomeRow, AqAdviserFlag, fileQualityChoice, effectiveOutcome),
                     outcomeCase, "al_advisername", aqNamedPerson),
                 ["al_aqfailadvisercode"] = FlaggedText(
                     IsAccountable(outcomeRow, AqAdviserFlag, fileQualityChoice, effectiveOutcome),
-                    outcomeCase, "al_advisercode", aqNamedPerson),
+                    outcomeCase, "al_advisercode", aqNamedPerson, registryCodes),
                 ["al_aqfailparaplannername"] = FlaggedText(
                     IsAccountable(outcomeRow, AqParaplannerFlag, fileQualityChoice, effectiveOutcome),
                     outcomeCase, "al_paraplanner", aqNamedPerson),
                 ["al_aqfailparaplannercode"] = FlaggedText(
                     IsAccountable(outcomeRow, AqParaplannerFlag, fileQualityChoice, effectiveOutcome),
-                    outcomeCase, "al_paraplannercode", aqNamedPerson),
+                    outcomeCase, "al_paraplannercode", aqNamedPerson, registryCodes),
             };
         }
 
