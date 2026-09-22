@@ -605,6 +605,16 @@ namespace OutcomeTesting.Plugins
             /// </summary>
             public EntityReference Contact { get; set; }
 
+            /// <summary>
+            /// The matched contact's staff code, set only when <see cref="IsMatch"/>.
+            ///
+            /// Null on every failure kind by construction: an ambiguous name resolved to
+            /// nobody, so there is no code to report. That is the point - a code guessed
+            /// from the first of two Sam Joneses would attribute a fail to the wrong person
+            /// on a file that leaves this system.
+            /// </summary>
+            public string StaffCode { get; set; }
+
             /// <summary>One sentence for the import report, naming the value that failed.</summary>
             public string Reason { get; set; }
 
@@ -703,7 +713,7 @@ namespace OutcomeTesting.Plugins
 
             var query = new QueryExpression("contact")
             {
-                ColumnSet = new ColumnSet("emailaddress1"),
+                ColumnSet = new ColumnSet("emailaddress1", ContactRegistry.StaffCodeAttr),
                 TopCount = 2,
                 Criteria = new FilterExpression(),
             };
@@ -751,6 +761,7 @@ namespace OutcomeTesting.Plugins
                 Kind = PersonMatchKind.Matched,
                 Email = found,
                 Contact = matches[0].ToEntityReference(),
+                StaffCode = matches[0].GetAttributeValue<string>(ContactRegistry.StaffCodeAttr),
             };
         }
 
