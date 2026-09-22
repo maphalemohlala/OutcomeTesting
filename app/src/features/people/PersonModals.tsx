@@ -5,6 +5,7 @@ import { useIntentKeys } from '../../hooks/useIntentKey';
 import type { DirectoryUser } from '../../hooks/useUserDirectory';
 import { messageForFailure } from '../../services/errors';
 import { createUser, updateUser } from '../../services/commands/users';
+import { staffCodeToSend } from './personEdit';
 import './PeopleAdmin.css';
 
 /**
@@ -115,7 +116,8 @@ export function EditPersonModal({
     const result = await updateUser({
       userId: user.id,
       fullName: name.trim(),
-      staffCode: staffCode.trim(),
+      // Only when it moved - see staffCodeToSend, which holds the reasoning and the tests.
+      staffCode: staffCodeToSend(staffCode, user.staffCode),
       expectedRowVersion: user.rowVersion,
       idempotencyKey: intent.keyFor(user.id),
     });

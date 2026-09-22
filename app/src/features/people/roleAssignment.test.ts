@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ROLE_CODES, mappingFor } from './roleAssignment';
+import { ROLE_CODES, canWithdraw, mappingFor } from './roleAssignment';
+import { ROLE_FILTERS } from './peopleFilters';
 import type { RoleMappingRow } from '../admin/useSecurityConfig';
 
 function mapping(overrides: Partial<RoleMappingRow> = {}): RoleMappingRow {
@@ -44,5 +45,40 @@ describe('Role assignment from the People page', () => {
   it('does not confuse one role with another for the same person', () => {
     const found = mappingFor([mapping()], 'jane.adviser@example.com', 'Paraplanner');
     expect(found).toBeNull();
+  });
+});
+
+/**
+ * Which roles the People page may withdraw.
+ *
+ * The Grant dropdown offers only ROLE_FILTERS, but the Role column lists every active
+ * al_userrolemapping row a person holds - so Administrator, Outcome Testing Manager,
+ * Reviewer and Read Only User each got a one-click Withdraw with no confirmation and no way
+ * back from this page (2026-09-22 review). The permission boundary was intact throughout;
+ * the affordance was the defect. These pin the rule that Withdraw and Grant offer the same
+ * set, so the two cannot drift apart again.
+ */
+describe('canWithdraw', () => {
+  it('offers withdrawal for every role this page can grant back', () => {
+    for (const role of ROLE_FILTERS) {
+      expect(canWithdraw(role)).toBe(true);
+    }
+  });
+
+  it('refuses the application access roles the Grant dropdown never offers', () => {
+    for (const role of ['Administrator', 'Outcome Testing Manager', 'Reviewer', 'Read Only User']) {
+      expect(canWithdraw(role)).toBe(false);
+    }
+  });
+
+  it('agrees with the grant dropdown exactly, by construction', () => {
+    // Not a second list to keep in step: a role is withdrawable here precisely when it is
+    // grantable here, which is what stops the two drifting.
+    expect(ROLE_FILTERS.filter((role) => !canWithdraw(role))).toEqual([]);
+  });
+
+  it('matches the hand-entered label case-insensitively and trimmed', () => {
+    expect(canWithdraw('  adviser ')).toBe(true);
+    expect(canWithdraw('ADMINISTRATOR')).toBe(false);
   });
 });

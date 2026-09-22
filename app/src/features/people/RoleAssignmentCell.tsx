@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ROLE_FILTERS } from './peopleFilters';
-import { ROLE_CODES, mappingFor } from './roleAssignment';
+import { ROLE_CODES, canWithdraw, mappingFor } from './roleAssignment';
 import type { RoleMappingRow } from '../admin/useSecurityConfig';
 
 interface Props {
@@ -17,7 +17,11 @@ interface Props {
  * One person's roles, and an administrator's controls to change them.
  *
  * Every role they hold is listed, not just one (D8): a T&C Manager who also advises is one
- * person holding two, and picking one to display would misreport them.
+ * person holding two, and picking one to display would misreport them. That includes the
+ * application-access roles - Administrator, Outcome Testing Manager, Reviewer, Read Only
+ * User - which this page does not grant and therefore does not withdraw either: a one-click
+ * Withdraw beside a role the Grant dropdown cannot offer back is a one-way door, and the
+ * cell says where those are managed instead (2026-09-22 review).
  *
  * The control says "grants access" in as many words. This writes al_userrolemapping, which
  * PermissionHelpers reads when it decides what a caller may do — an administrator tagging
@@ -52,7 +56,7 @@ export function RoleAssignment({
             return (
               <li key={role}>
                 <span>{role}</span>
-                {canManage && held ? (
+                {canManage && held && canWithdraw(role) ? (
                   <button
                     type="button"
                     className="people__role-withdraw"
@@ -67,6 +71,13 @@ export function RoleAssignment({
           })}
         </ul>
       )}
+
+      {canManage && roles.some((role) => !canWithdraw(role)) ? (
+        <p className="people__muted people__role-note">
+          Application access roles are shown here but granted and withdrawn on Security
+          configuration.
+        </p>
+      ) : null}
 
       {canManage ? (
         <div className="people__role-grant">

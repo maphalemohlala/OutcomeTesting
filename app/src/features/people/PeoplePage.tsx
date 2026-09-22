@@ -27,7 +27,11 @@ const EXPORT_HEADERS = [
   'Status',
   'Roles',
   'Positions',
-  'Code',
+  // The REGISTRY's code, the same value the table cell and the search box use. This said
+  // 'Code' and carried row.load?.code - the retired per-case column - so an administrator
+  // read one number on screen and downloaded another (2026-09-22 review). The label follows
+  // the People page's own column heading (D9).
+  'Employee code',
   'Cases',
   'Open',
   'Closed',
@@ -252,7 +256,7 @@ export function PeoplePage() {
                     row.user ? (row.active ? 'Active' : 'Inactive') : 'Not in directory',
                     row.roles.join(', '),
                     (row.load?.roles ?? []).join(', '),
-                    row.load?.code ?? '',
+                    row.user?.staffCode ?? '',
                     row.load?.totalCases ?? 0,
                     row.load?.openCases ?? 0,
                     row.load?.closedCases ?? 0,
