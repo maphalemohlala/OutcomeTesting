@@ -155,14 +155,18 @@ namespace OutcomeTesting.Plugins
                     ["al_exportbatchid"] = batchRef,
                     ["al_outcomecaseid"] = new EntityReference(CaseEntity, outcomeCase.Id),
                     ["al_advisername"] = outcomeCase.GetAttributeValue<string>("al_advisername"),
-                    ["al_advisercode"] = outcomeCase.GetAttributeValue<string>("al_advisercode"),
+                    // Trail Light col B, a CODE again from 2026-09-22 (project owner:
+                    // Trailight could not accommodate the emails put here on 2026-09-21).
+                    // From the registry, not the case - see AdviserCode.
+                    ["al_advisercode"] = AdviserCode(userService, outcomeCase),
                     // Trail Light col B from 2026-09-21, having been col 21 since 2026-09-19.
                     // Snapshotted like every other column here rather than read live at
                     // file-build time, so a later correction to the case cannot change what
                     // an already-delivered batch says it sent.
                     ["al_adviseremail"] = outcomeCase.GetAttributeValue<string>("al_adviseremail"),
                     ["al_paraplannername"] = outcomeCase.GetAttributeValue<string>("al_paraplanner"),
-                    ["al_paraplannercode"] = outcomeCase.GetAttributeValue<string>("al_paraplannercode"),
+                    // Trail Light col D, a CODE again from 2026-09-22, resolved by address.
+                    ["al_paraplannercode"] = ParaplannerCode(userService, outcomeCase),
                     // Trail Light col D (project owner, 2026-09-21: "replace column B & D
                     // ... rather than codes show emails"). Resolved rather than read: unlike
                     // the adviser, the para-planner has NO email column on the case - the
@@ -307,6 +311,52 @@ namespace OutcomeTesting.Plugins
             // directory gap is not a reason to send the Trail Light a blank where a real
             // address exists. This is the same fallback the adviser's letter makes (AD-168).
             return string.IsNullOrWhiteSpace(stored) ? null : stored.Trim();
+        }
+
+        /// <summary>
+        /// The adviser's staff code for this case, or null where the registry does not hold
+        /// one for them.
+        ///
+        /// Resolved from the registry rather than read off the case (project owner,
+        /// 2026-09-22). al_advisercode was only ever filled by hand and almost never was -
+        /// OD-050 expected Tax/AQS to type it - which is why column B was empty before the
+        /// emails went in. A code belongs to a person, so it is held against the person.
+        ///
+        /// An unresolved adviser leaves the column EMPTY rather than falling back to the
+        /// address, the name or the case's old value. AD-039 is positional: column B is the
+        /// adviser's code on every row, or the file lies about the rows where it is not.
+        /// </summary>
+        public static string AdviserCode(IOrganizationService service, Entity outcomeCase)
+        {
+            if (outcomeCase == null) { return null; }
+
+            var match = NotificationOutbox.MatchAdviser(
+                service,
+                outcomeCase.GetAttributeValue<string>("al_adviseremail"),
+                outcomeCase.GetAttributeValue<string>("al_advisername"));
+
+            return match != null && match.IsMatch ? match.StaffCode : null;
+        }
+
+        /// <summary>
+        /// The para-planner's staff code for this case, or null where the registry does not
+        /// hold one for them.
+        ///
+        /// Resolved by ADDRESS first (AD-186). This is what the ParaplannerEmail import
+        /// mapping buys: two active contacts of one name resolve to nobody, so a name-only
+        /// lookup would blank the code on exactly the rows where it is ambiguous - the
+        /// problem this change exists to fix.
+        /// </summary>
+        public static string ParaplannerCode(IOrganizationService service, Entity outcomeCase)
+        {
+            if (outcomeCase == null) { return null; }
+
+            var match = NotificationOutbox.MatchParaplanner(
+                service,
+                outcomeCase.GetAttributeValue<string>(ImportRules.ParaplannerEmailAttribute),
+                outcomeCase.GetAttributeValue<string>("al_paraplanner"));
+
+            return match != null && match.IsMatch ? match.StaffCode : null;
         }
 
         // AD-039 col 15 Advice Quality grade = final outcome, or initial when not yet
