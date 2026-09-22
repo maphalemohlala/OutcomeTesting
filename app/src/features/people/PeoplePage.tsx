@@ -13,6 +13,7 @@ import { setUserActive } from '../../services/commands/users';
 import { useCaseWorklist } from '../cases/useCaseWorklist';
 import { useSecurityConfig } from '../admin/useSecurityConfig';
 import { caseloadByName, type PersonCaseload, type PersonRole } from './peopleDirectory';
+import { ROLE_FILTERS, matchesRole } from './peopleFilters';
 import { CreatePersonModal, EditPersonModal } from './PersonModals';
 import './PeoplePage.css';
 import './PeopleAdmin.css';
@@ -53,12 +54,6 @@ interface PersonRow {
   roles: string[];
 }
 
-function formatDate(iso: string | null): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString();
-}
-
 function zeroes(): Record<string, number> {
   return Object.fromEntries(OUTCOMES.map((outcome) => [outcome, 0]));
 }
@@ -80,6 +75,7 @@ export function PeoplePage() {
 
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
   const [banner, setBanner] = useState<Banner>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<DirectoryUser | null>(null);
@@ -157,15 +153,16 @@ export function PeoplePage() {
     return rows.filter((row) => {
       if (activeFilter === 'active' && !row.active) return false;
       if (activeFilter === 'inactive' && row.active) return false;
-      const haystack = `${row.name} ${row.email} ${row.load?.code ?? ''} ${row.roles.join(' ')}`;
+      if (!matchesRole(row.roles, roleFilter)) return false;
+      const haystack = `${row.name} ${row.email} ${row.user?.staffCode ?? ''} ${row.roles.join(' ')}`;
       if (term && !haystack.toLowerCase().includes(term)) {
         return false;
       }
       return true;
     });
-  }, [rows, search, activeFilter]);
+  }, [rows, search, activeFilter, roleFilter]);
 
-  const isFiltered = search.trim() !== '' || activeFilter !== 'all';
+  const isFiltered = search.trim() !== '' || activeFilter !== 'all' || roleFilter !== 'all';
   const unregisteredCount = rows.filter((row) => row.user === null).length;
 
   function reload() {
@@ -196,7 +193,7 @@ export function PeoplePage() {
     <>
       <PageIntro
         title="People"
-        purpose="The people known to the application and the work they carry. Sourced from Contacts and keyed on work email (AD-010); changes are enforced server-side and recorded in the audit trail (AD-041)."
+        purpose="The people known to the application, their roles and their employee codes. Sourced from Contacts and keyed on work email (AD-010). A role here grants access to this application; changes are enforced server-side and recorded in the audit trail (AD-041)."
         actions={
           <>
             {filtered.length > 0 ? (
@@ -277,6 +274,7 @@ export function PeoplePage() {
             onClear={() => {
               setSearch('');
               setActiveFilter('all');
+              setRoleFilter('all');
             }}
             clearDisabled={!isFiltered}
           >
@@ -300,6 +298,20 @@ export function PeoplePage() {
                 <option value="inactive">Inactive</option>
               </select>
             </FilterField>
+            <FilterField label="Role" htmlFor="people-role">
+              <select
+                id="people-role"
+                value={roleFilter}
+                onChange={(event) => setRoleFilter(event.target.value)}
+              >
+                <option value="all">All roles</option>
+                {ROLE_FILTERS.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
           </FilterBar>
 
           <div className="people__scroll">
@@ -311,66 +323,27 @@ export function PeoplePage() {
                 <tr>
                   <th scope="col">Name</th>
                   <th scope="col">Work email</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Roles</th>
-                  <th scope="col">Positions</th>
-                  <th scope="col" className="people__numeric">
-                    Cases
-                  </th>
-                  <th scope="col" className="people__numeric">
-                    Open
-                  </th>
-                  {OUTCOMES.map((outcome) => (
-                    <th key={outcome} scope="col" className="people__numeric">
-                      {outcome}
-                    </th>
-                  ))}
-                  <th scope="col" className="people__numeric">
-                    Not yet graded
-                  </th>
-                  <th scope="col">Added</th>
+                  <th scope="col">Role</th>
+                  <th scope="col">Employee code</th>
                   {canManage ? <th scope="col">Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9 + OUTCOMES.length + (canManage ? 1 : 0)} className="people__empty">
+                    <td colSpan={4 + (canManage ? 1 : 0)} className="people__empty">
                       No people match your current filters.
                     </td>
                   </tr>
                 ) : (
                   filtered.map((row) => {
-                    const outcomes = row.load?.outcomes ?? zeroes();
                     const to = drillTo(row.load);
                     return (
                       <tr key={row.key}>
                         <th scope="row">{to ? <Link to={to}>{row.name}</Link> : row.name}</th>
                         <td>{row.email || '—'}</td>
-                        <td>
-                          {row.user ? (
-                            <span
-                              className={`users__badge users__badge--${row.active ? 'active' : 'inactive'}`}
-                            >
-                              {row.active ? 'Active' : 'Inactive'}
-                            </span>
-                          ) : (
-                            <span className="users__badge users__badge--inactive">
-                              Not in directory
-                            </span>
-                          )}
-                        </td>
                         <td>{row.roles.join(', ') || '—'}</td>
-                        <td>{(row.load?.roles ?? []).join(', ') || '—'}</td>
-                        <td className="people__numeric">{row.load?.totalCases ?? 0}</td>
-                        <td className="people__numeric">{row.load?.openCases ?? 0}</td>
-                        {OUTCOMES.map((outcome) => (
-                          <td key={outcome} className="people__numeric">
-                            {outcomes[outcome] ?? 0}
-                          </td>
-                        ))}
-                        <td className="people__numeric">{row.load?.notGraded ?? 0}</td>
-                        <td>{formatDate(row.createdOn)}</td>
+                        <td>{row.user?.staffCode ?? '—'}</td>
                         {canManage ? (
                           <td className="users__actions">
                             {row.user ? (

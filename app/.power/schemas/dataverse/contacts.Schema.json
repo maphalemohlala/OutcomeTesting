@@ -1321,6 +1321,14 @@
           "x-ms-schema-name": "Aging90_Base",
           "x-ms-read-only": true
         },
+        "al_staffcode": {
+          "type": "string",
+          "title": "Employee code",
+          "x-ms-dataverse-attribute": "al_staffcode",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_StaffCode",
+          "maxLength": 50
+        },
         "anniversary": {
           "type": "string",
           "title": "Anniversary",

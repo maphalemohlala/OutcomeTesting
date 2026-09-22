@@ -99,6 +99,7 @@ export function EditPersonModal({
   onDone: (message: string) => void;
 }) {
   const [name, setName] = useState(user.name);
+  const [staffCode, setStaffCode] = useState(user.staffCode ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const intent = useIntentKeys();
@@ -114,6 +115,7 @@ export function EditPersonModal({
     const result = await updateUser({
       userId: user.id,
       fullName: name.trim(),
+      staffCode: staffCode.trim(),
       expectedRowVersion: user.rowVersion,
       idempotencyKey: intent.keyFor(user.id),
     });
@@ -133,6 +135,20 @@ export function EditPersonModal({
         <label className="users__field">
           <span>Full name</span>
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
+        </label>
+        <label className="users__field">
+          <span>Employee code</span>
+          <input
+            id="person-staff-code"
+            type="text"
+            value={staffCode}
+            maxLength={50}
+            onChange={(event) => setStaffCode(event.target.value)}
+            autoComplete="off"
+          />
+          <small className="users__hint">
+            Fills this person&rsquo;s code on the Trail Light export. Leave empty if they have none.
+          </small>
         </label>
         <label className="users__field">
           <span>Work email</span>

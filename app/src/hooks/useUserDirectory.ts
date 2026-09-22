@@ -10,7 +10,17 @@ export interface DirectoryUser {
   active: boolean;
   createdOn: string | null;
   rowVersion: string | null;
+  /** The person's staff code, shown as "Employee code". Null where none is held. */
+  staffCode: string | null;
 }
+
+/**
+ * The generated `Contacts` model does not yet declare `al_staffcode` — the generator is
+ * built from Dataverse metadata that lags a new column by hours, and this column was added
+ * in the same body of work as this hook. Widened locally rather than editing the generated
+ * file, which a regeneration would discard.
+ */
+type ContactWithStaffCode = Contacts & { al_staffcode?: string };
 
 export type UserDirectoryState =
   | { status: 'loading' }
@@ -36,7 +46,7 @@ export function contactName(contact: Contacts): string {
 }
 
 /** One contact as a directory row, or null when it cannot serve as an application user. */
-export function toDirectoryUser(contact: Contacts): DirectoryUser | null {
+export function toDirectoryUser(contact: ContactWithStaffCode): DirectoryUser | null {
   const email = contact.emailaddress1?.trim();
   // AD-010 keys the registry on work email, and al_AssignCase resolves both the
   // systemuser and the contact from it. A contact with no email cannot be allocated to,
@@ -50,6 +60,7 @@ export function toDirectoryUser(contact: Contacts): DirectoryUser | null {
     active: Number(contact.statecode) === 0,
     createdOn: contact.createdon ?? null,
     rowVersion: contact.versionnumber != null ? String(contact.versionnumber) : null,
+    staffCode: contact.al_staffcode?.trim() || null,
   };
 }
 
