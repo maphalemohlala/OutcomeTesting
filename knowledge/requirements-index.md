@@ -100,6 +100,18 @@ being implemented from the prose.
 Pack items that raise no new work but were unowned prose until now: §11.4 multiple daily
 uploads and §12.3 the newer Intelligent Office extract, both **OD-047**.
 
+## 23 September 2026 access requirements
+
+Source: `docs/reference/2026-09-23-access-requirements.md`, supplied by the project owner
+2026-09-23. Design: `docs/superpowers/specs/2026-09-23-role-scoped-access-design.md` (AD-218).
+
+| ID | Pack item | Traces to | State 2026-09-23 |
+|---|---|---|---|
+| AR-01 | Tax Team Manager: see, allocate and reallocate all Tax work; monitor workloads | BR-003, FR-004 to FR-006, AD-040, AD-218 | Designed; build plan `docs/superpowers/plans/2026-09-23-role-scoped-access.md` |
+| AR-02 | Tax Specialist sees only cases allocated to them; cannot allocate | BR-012, PP-02, NFR-SEC-01, AD-218 | Designed. Code App half depends on the project owner's role remap (AD-218 residual) |
+| AR-03 | AQS reviewer sees the AQS queue and their own cases; five labelled groups; Tax-reviewed cases first with age shown | BR-003, BR-004, AD-076, AD-113, AD-218 | Designed |
+| AR-04 | Adviser sees only their own cases, only once released for remediation | BR-006, BR-008, BR-012, PP-12, AD-218 | Designed |
+
 ## Traceability matrix columns
 Every implemented story records: requirement ID, source document, actor, workflow step, priority, Given/When/Then acceptance criteria, data entities, screens/routes, commands, flows, security roles affected, tests, and release version.
 
