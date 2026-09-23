@@ -18,6 +18,7 @@ import {
   type RawListOption,
   caseOptionLabel,
   choicesIncludingHeld,
+  describeTickSelection,
   filterTickOptions,
   heldOptionLabels,
   listByKey,
@@ -601,5 +602,67 @@ describe('filtering a long tick list', () => {
   it('returns a copy, so the caller cannot sort the catalogue by accident', () => {
     const shown = filterTickOptions(products, [], '');
     expect(shown).not.toBe(products);
+  });
+});
+
+describe('what a folded tick list says when it is shut', () => {
+  const row = (id: string, label: string) => ({
+    id,
+    label,
+    list: LIST_PRODUCTS,
+    sortOrder: null,
+    legacyValue: null,
+    effectiveFrom: null,
+    effectiveTo: null,
+    retired: false,
+  });
+
+  const five = [
+    row('a', 'AIM ISA'),
+    row('b', 'Cash Deposit'),
+    row('c', 'Offshore Bond'),
+    row('d', 'Relevant Life'),
+    row('e', 'Whole of Life'),
+  ];
+
+  it('says what to do when nothing is ticked, rather than stating a fact', () => {
+    // "None selected" reads as something to accept; "Select products" reads as something
+    // to do, which is what an unanswered field wants to say.
+    expect(describeTickSelection(five, [], 'Select products')).toBe('Select products');
+  });
+
+  it('NAMES what is ticked rather than counting it', () => {
+    // "2 selected" sends somebody back into the panel to find out which two - the whole
+    // cost the fold was meant to save.
+    expect(describeTickSelection(five, ['a', 'c'], 'Select products')).toBe(
+      'AIM ISA, Offshore Bond',
+    );
+  });
+
+  it('counts the rest past three, because the control is one line wide', () => {
+    expect(describeTickSelection(five, ['a', 'b', 'c', 'd', 'e'], 'Select products')).toBe(
+      'AIM ISA, Cash Deposit, Offshore Bond and 2 more',
+    );
+  });
+
+  it('names exactly three without a remainder', () => {
+    // The boundary: three names is the most that fits, so it must not read "and 0 more".
+    expect(describeTickSelection(five, ['a', 'b', 'c'], 'Select products')).toBe(
+      'AIM ISA, Cash Deposit, Offshore Bond',
+    );
+  });
+
+  it('reads in the CATALOGUE order, not the order they were ticked', () => {
+    // Otherwise the summary re-orders itself as somebody works, and a line that rewrites
+    // its own beginning is one nobody trusts at a glance.
+    expect(describeTickSelection(five, ['e', 'a'], 'Select products')).toBe(
+      'AIM ISA, Whole of Life',
+    );
+  });
+
+  it('ignores an id the catalogue no longer offers', () => {
+    // A held id with no row cannot be named, and inventing a placeholder for it would put
+    // a word in the summary that matches nothing in the panel below.
+    expect(describeTickSelection(five, ['a', 'gone'], 'Select products')).toBe('AIM ISA');
   });
 });

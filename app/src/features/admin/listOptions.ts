@@ -376,6 +376,30 @@ export function filterTickOptions(
 }
 
 /**
+ * What a folded-up tick list says about itself when it is shut.
+ *
+ * It NAMES what is ticked rather than counting it. "3 selected" sends somebody back into the
+ * panel to find out which three, which is the whole cost the fold was meant to save. Past
+ * three it counts the remainder, because the control is one line wide and a fourth name is
+ * what pushes it to two.
+ *
+ * The empty case is an instruction, not a state. "None selected" reads as a fact somebody
+ * might be expected to accept; "Select products" reads as a thing to do, which is what an
+ * unanswered mandatory field wants to say.
+ */
+export function describeTickSelection(
+  options: readonly ListOptionRow[],
+  chosen: readonly string[],
+  emptyLabel: string,
+): string {
+  const names = options.filter((o) => chosen.includes(o.id)).map((o) => o.label);
+
+  if (names.length === 0) return emptyLabel;
+  if (names.length <= 3) return names.join(', ');
+  return `${names.slice(0, 3).join(', ')} and ${names.length - 3} more`;
+}
+
+/**
  * The labels a case holds on a MULTI-choice list, in the list's own order.
  *
  * The single-choice lists resolve their label off the case row, because a lookup carries its

@@ -165,6 +165,52 @@
   width: 100%;
 }
 
+/* Shut, the control is one line naming what is ticked. The same shape the portal header
+   gives the same field, so a checker meets one control rather than two. */
+.case-edit__set-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #c7c7c7);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.case-edit__set-toggle:hover {
+  border-color: var(--ink, #333);
+}
+
+/* Drawn rather than typed, so it needs no icon font and no glyph a screen reader reads out
+   as text. */
+.case-edit__set-toggle::after {
+  content: '';
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translate(-0.1rem, -0.1rem);
+}
+
+.case-edit__set-toggle[aria-expanded='true']::after {
+  transform: rotate(-135deg) translate(-0.15rem, -0.15rem);
+}
+
+/* The names, not a count: "3 selected" sends somebody back into the panel to find out which
+   three, which is the whole cost the fold was meant to save. */
+.case-edit__set-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Capped and scrolled, so a long catalogue adds a KNOWN amount of height to the panel
    instead of however much it happens to come to - Products is 55 options from 2026-09-23.
    Two columns where the panel has room; the breakpoint is on the column width rather than

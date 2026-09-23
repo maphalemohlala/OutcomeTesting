@@ -19,6 +19,7 @@ import { ADVICE_DATE_LABEL, ukToday } from './caseHeaderDates';
 import {
   MIGRATED_LISTS,
   choicesIncludingHeld,
+  describeTickSelection,
   filterTickOptions,
   setValues,
   toOptionRows,
@@ -195,57 +196,82 @@ interface Props {
  * needs ctrl-click to add a second and silently drops the rest of the selection on a
  * mis-click, which costs more the more there is to re-pick.
  *
- * What the length does change is that the list can no longer simply be laid out flat. It is
- * capped and scrolled by the stylesheet, and given a filter here once there is enough to be
- * worth searching - below that the box is noise, so it is not rendered at all.
+ * What the length does change is that the list can no longer simply be laid out flat. Past
+ * FOLD_FROM options it folds behind a summary naming what is ticked, with a search box and a
+ * capped, scrolling panel - the same shape the portal's header gives the same field, so a
+ * checker meets one control rather than two. Below that it is just a list: the fold costs a
+ * click, only worth paying when the alternative is scrolling past dozens of options.
  */
-const FILTER_FROM = 12;
+const FOLD_FROM = 12;
 
 function TickSet({
   labelledBy,
+  label,
   options,
   chosen,
   onToggle,
 }: {
   labelledBy: string;
+  label: string;
   options: ListOptionRow[];
   chosen: string[];
   onToggle: (chosen: string[], id: string, on: boolean) => void;
 }) {
   const [term, setTerm] = useState('');
+  const [open, setOpen] = useState(false);
 
-  // filterTickOptions holds the rule that a ticked option is never filtered away, and is
-  // tested directly - it is the one thing here that would break silently.
+  // filterTickOptions and describeTickSelection hold the two rules here that would break
+  // silently, and are tested directly.
   const shown = filterTickOptions(options, chosen, term);
+  const long = options.length >= FOLD_FROM;
+  const summary = describeTickSelection(options, chosen, `Select ${label.toLowerCase()}`);
+
+  const list = (
+    <div className="case-edit__set" role="group" aria-labelledby={labelledBy}>
+      {shown.map((option) => (
+        <label key={option.id} className="case-edit__set-item">
+          <input
+            type="checkbox"
+            value={option.id}
+            checked={chosen.includes(option.id)}
+            onChange={(e) => onToggle(chosen, option.id, e.target.checked)}
+          />
+          <span>{option.label}</span>
+        </label>
+      ))}
+      {shown.length === 0 ? (
+        <p className="case-edit__set-empty">No option matches that search.</p>
+      ) : null}
+    </div>
+  );
+
+  // A short list is just a list. The fold costs a click, which is only worth paying when
+  // the alternative is scrolling past dozens of options to reach the next field.
+  if (!long) return <div className="case-edit__set-wrap">{list}</div>;
 
   return (
     <div className="case-edit__set-wrap">
-      {options.length >= FILTER_FROM ? (
-        <input
-          type="search"
-          className="case-edit__set-search"
-          value={term}
-          placeholder={`Search ${options.length} options`}
-          aria-label="Filter the options"
-          onChange={(e) => setTerm(e.target.value)}
-        />
+      <button
+        type="button"
+        className="case-edit__set-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <span className="case-edit__set-summary">{summary}</span>
+      </button>
+      {open ? (
+        <>
+          <input
+            type="search"
+            className="case-edit__set-search"
+            value={term}
+            placeholder={`Search ${options.length} options`}
+            aria-label={`Search ${label.toLowerCase()}`}
+            onChange={(e) => setTerm(e.target.value)}
+          />
+          {list}
+        </>
       ) : null}
-      <div className="case-edit__set" role="group" aria-labelledby={labelledBy}>
-        {shown.map((option) => (
-          <label key={option.id} className="case-edit__set-item">
-            <input
-              type="checkbox"
-              value={option.id}
-              checked={chosen.includes(option.id)}
-              onChange={(e) => onToggle(chosen, option.id, e.target.checked)}
-            />
-            <span>{option.label}</span>
-          </label>
-        ))}
-        {shown.length === 0 ? (
-          <p className="case-edit__set-empty">No option matches that search.</p>
-        ) : null}
-      </div>
     </div>
   );
 }
@@ -547,6 +573,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
         {field.kind === 'listoptionset' ? (
           <TickSet
             labelledBy={`${inputId}-label`}
+            label={field.label}
             options={choicesIncludingHeld(
               toOptionRows(listRows, field.list!, new Date()),
               null,
