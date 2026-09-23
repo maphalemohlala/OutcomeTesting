@@ -187,6 +187,12 @@ namespace OutcomeTesting.Plugins
             return rows.Count == 1 ? rows[0].GetAttributeValue<EntityReference>("al_tcmanagerid") : null;
         }
 
+        /// <summary>The AQS Team account whose contacts read the AQS queue. Throws if it is missing.</summary>
+        public static EntityReference AqsQueueAccount(IOrganizationService service)
+        {
+            return FindByName(service, "account", AqsQueueAccountName);
+        }
+
         private static EntityReference FindByName(IOrganizationService service, string entity, string name)
         {
             var query = new QueryExpression(entity)
