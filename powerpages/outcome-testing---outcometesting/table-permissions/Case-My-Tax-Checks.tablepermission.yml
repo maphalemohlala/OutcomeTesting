@@ -1,0 +1,16 @@
+# AD-218, AR-02. A Tax specialist reads the cases allocated to them, through the lookup
+# CaseAccessReconciler keeps on the case. Reallocation replaces the lookup, so the previous
+# checker loses the case. Read-only: answering is Review Instance - assigned to me.
+adx_append: false
+adx_appendto: false
+adx_contactrelationship: contact_al_taxcheckercontactid_al_outcomecase
+adx_create: false
+adx_delete: false
+adx_entitylogicalname: al_outcomecase
+adx_entityname: Case - my Tax checks
+adx_entitypermission_webrole:
+- a1000000-0000-4000-8000-000000000090
+adx_entitypermissionid: a1000000-0000-4000-8000-0000000000c0
+adx_read: true
+adx_scope: 756150001
+adx_write: false

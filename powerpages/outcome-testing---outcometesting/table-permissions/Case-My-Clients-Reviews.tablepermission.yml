@@ -1,0 +1,15 @@
+# AD-218. Read-only child of "Case - my clients": the reviews on a case this role can already read.
+adx_append: false
+adx_appendto: false
+adx_create: false
+adx_delete: false
+adx_entitylogicalname: al_reviewinstance
+adx_entityname: Case - my clients / reviews
+adx_entitypermission_webrole:
+- a1000000-0000-4000-8000-000000000092
+adx_entitypermissionid: a1000000-0000-4000-8000-0000000000cf
+adx_parententitypermission: a1000000-0000-4000-8000-0000000000c3
+adx_parentrelationship: al_outcomecase_reviewinstance
+adx_read: true
+adx_scope: 756150003
+adx_write: false
