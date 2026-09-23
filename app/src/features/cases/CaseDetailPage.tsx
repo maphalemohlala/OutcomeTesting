@@ -194,6 +194,15 @@ export function CaseDetailPage() {
                       </section>
                     </PermissionGate>
 
+                    {state.detail.adviserUnmatched ? (
+                      <p className="case-detail__notice" role="status">
+                        Adviser not matched: no single person is named{' '}
+                        {state.detail.edit.al_advisername || 'as the adviser'}, so no adviser can see
+                        this case yet. Correct the adviser name, or the person&apos;s name on the
+                        People page.
+                      </p>
+                    ) : null}
+
                     {state.detail.previousCase ? (
                       <section className="case-detail__lineage" aria-label="Case lineage">
                         <span className="case-detail__summary-label">Replaces</span>

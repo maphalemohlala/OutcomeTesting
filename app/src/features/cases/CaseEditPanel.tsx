@@ -29,6 +29,7 @@ import {
 } from '../admin/listOptions';
 import { useAllListOptions } from '../admin/useListOptions';
 import { useCaseReviews } from './useCaseReviews';
+import { allocatableDisciplines } from './allocationScope';
 import { useUserDirectory } from '../../hooks/useUserDirectory';
 import {
   Al_outcomecasesal_adviserstatus,
@@ -276,7 +277,7 @@ function TickSet({
   );
 }
 export function CaseEditPanel({ detail, onSaved }: Props) {
-  const { can } = usePermissions();
+  const { can, roles } = usePermissions();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<CaseEditValues>(detail.edit);
   const [reason, setReason] = useState('');
@@ -294,6 +295,10 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
   const [checkerBy, setCheckerBy] = useState<Record<Discipline, string>>({ Tax: '', AQS: '' });
 
   const mayAssign = can('command.assign', 'Edit');
+
+  // AD-218: each team manager allocates their own discipline only. al_AssignCase refuses the
+  // rest; this stops the modal offering what the command will refuse.
+  const inScope = allocatableDisciplines(roles);
 
   // Moving a deadline is a manager's act (item 6, 2026-09-19), and page.cases Edit is not
   // the right question: Tax and AQS reviewers hold it so they can complete the header
@@ -718,6 +723,19 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
                           <small className="case-edit__help">
                             Submitted {review.submittedOn}, so it can no longer be
                             reallocated.
+                          </small>
+                        </div>
+                      );
+                    }
+
+                    // AD-218: another team's check is theirs to allocate. Stated, not offered.
+                    if (!inScope.includes(discipline)) {
+                      return (
+                        <div key={discipline} className="case-edit__field">
+                          <span>{discipline} Checker</span>
+                          <p className="case-edit__only-check">{review ? held : 'Not open yet'}</p>
+                          <small className="case-edit__help">
+                            Allocated by the {discipline} team manager.
                           </small>
                         </div>
                       );

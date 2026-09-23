@@ -8,6 +8,7 @@ import {
   pageResourceForPath,
   resolvePermissions,
   resolveRules,
+  RESOURCE_KEYS,
   rulesInForce,
   type AppRole,
   type PermissionRule,
@@ -61,8 +62,9 @@ describe('resolvePermissions', () => {
     expect(can(set, 'page.exports', 'Manage')).toBe(true);
   });
 
-  it('gives every role at least a dashboard view', () => {
-    for (const role of APP_ROLES) {
+  it('gives every role but Planner at least a dashboard view', () => {
+    // AD-218, answer 3: Planners keep their emails and have no access to the system.
+    for (const role of APP_ROLES.filter((r) => r !== 'AL Portal - Planner')) {
       expect(can(resolvePermissions([role]), 'page.dashboard', 'View')).toBe(true);
     }
   });
@@ -115,21 +117,6 @@ describe('DEFAULT_PERMISSIONS integrity', () => {
       expect(can(set, 'page.remediation')).toBe(true);
       expect(can(set, 'remediation.complete', 'Edit')).toBe(false);
     }
-  });
-
-  it('gives the Planner the same remediation authority as Adviser Remediation', () => {
-    // OD-019: the two are separate roles that share remediation routing, and the portal
-    // binds both to the same Contact-scoped permission and page rule.
-    const planner = resolvePermissions(['AL Portal - Planner']);
-    const adviser = resolvePermissions(['AL Portal - Adviser Remediation']);
-
-    expect(can(planner, 'page.remediation', 'Edit')).toBe(true);
-    expect(can(planner, 'remediation.complete', 'Edit')).toBe(true);
-    expect(levelFor(planner, 'page.remediation')).toBe(levelFor(adviser, 'page.remediation'));
-
-    // Sharing remediation is not sharing everything: neither allocates nor administers.
-    expect(can(planner, 'command.assign', 'Edit')).toBe(false);
-    expect(can(planner, 'permission.manage', 'Manage')).toBe(false);
   });
 
   it('excludes the Power Pages system roles from the vocabulary', () => {
@@ -203,5 +190,29 @@ describe('resolveRules', () => {
     // A partial read is not a rulebook. If the call did not succeed, nothing it returned is
     // trusted to decide what the user may see.
     expect(resolveRules(false, stored)).toEqual({ rules: DEFAULT_PERMISSIONS, unavailable: true });
+  });
+});
+
+describe('AD-218 roles', () => {
+  it('each team manager can open the workload page and allocate', () => {
+    for (const role of ['AL Portal - Tax Team Manager', 'AL Portal - AQS Team Manager']) {
+      const set = resolvePermissions([role]);
+      expect(can(set, 'page.workload')).toBe(true);
+      expect(can(set, 'command.assign', 'Edit')).toBe(true);
+      expect(can(set, 'page.cases', 'Edit')).toBe(true);
+    }
+  });
+
+  it('the T&C Supervisor no longer allocates (answer 4a)', () => {
+    expect(can(resolvePermissions(['AL Portal - T&C Supervisor']), 'command.assign', 'Edit')).toBe(false);
+  });
+
+  it('a Planner reaches nothing in the app (answer 3)', () => {
+    const set = resolvePermissions(['AL Portal - Planner']);
+    expect(RESOURCE_KEYS.filter((key) => can(set, key))).toEqual([]);
+  });
+
+  it('maps /workload to page.workload', () => {
+    expect(pageResourceForPath('/workload')).toBe('page.workload');
   });
 });

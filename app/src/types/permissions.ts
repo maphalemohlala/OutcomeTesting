@@ -26,6 +26,9 @@ export const APP_ROLES = [
   'AL Portal - Planner',
   'AL Portal - Portal Administrator',
   'Administrators',
+  // AD-218: the two team managers, who allocate and oversee their own discipline only.
+  'AL Portal - Tax Team Manager',
+  'AL Portal - AQS Team Manager',
 ] as const;
 
 export type AppRole = (typeof APP_ROLES)[number];
@@ -77,6 +80,7 @@ export const RESOURCE_KEYS = [
   'page.remediation',
   'page.reports',
   'page.exports',
+  'page.workload',
   'page.admin.questions',
   'page.admin.advisers',
   'page.admin.templates',
@@ -149,7 +153,13 @@ export type PermissionSet = Partial<Record<ResourceKey, AccessLevel>>;
  */
 export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   // Everyone who can sign in sees their own work.
-  ...APP_ROLES.map((role) => ({ role, resource: 'page.dashboard' as ResourceKey, level: 'View' as AccessLevel })),
+  // Planners keep their emails and have no access to the system (project owner, 2026-09-23,
+  // AD-218), so the role that still exists grants nothing - not even the dashboard.
+  ...APP_ROLES.filter((role) => role !== 'AL Portal - Planner').map((role) => ({
+    role,
+    resource: 'page.dashboard' as ResourceKey,
+    level: 'View' as AccessLevel,
+  })),
 
   // Tax + AQS reviewers work cases and reviews (AD-020 section ownership).
   //
@@ -179,7 +189,6 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   { role: 'AL Portal - T&C Supervisor', resource: 'page.reports', level: 'View' },
   { role: 'AL Portal - T&C Supervisor', resource: 'command.regrade', level: 'Edit' },
   { role: 'AL Portal - T&C Supervisor', resource: 'command.signoff', level: 'Edit' },
-  { role: 'AL Portal - T&C Supervisor', resource: 'command.assign', level: 'Edit' },
 
   // Outcome Testing Manager runs intake, allocation, reporting and exports (AD-040).
   { role: 'AL Portal - Outcome Testing Manager', resource: 'page.cases', level: 'Edit' },
@@ -201,13 +210,14 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   { role: 'AL Portal - Outcome Testing Manager', resource: 'command.assign', level: 'Edit' },
   { role: 'AL Portal - Outcome Testing Manager', resource: 'export.generate', level: 'Edit' },
 
-  // Planner and Adviser Remediation are two roles that share remediation routing
-  // (OD-019, implemented 2026-08-31): the portal binds both to the same Contact-scoped
-  // remediation permission and page rule, so they carry the same authority here. A finer
-  // split between them is a permission-model change, not a gap.
-  { role: 'AL Portal - Planner', resource: 'page.cases', level: 'View' },
-  { role: 'AL Portal - Planner', resource: 'page.remediation', level: 'Edit' },
-  { role: 'AL Portal - Planner', resource: 'remediation.complete', level: 'Edit' },
+  // AD-218: each team manager sees their team's cases, allocates their own discipline, and
+  // watches the team's workload. Their Dataverse security role is what scopes the rows.
+  ...(['AL Portal - Tax Team Manager', 'AL Portal - AQS Team Manager'] as const).flatMap((role) => [
+    { role, resource: 'page.cases' as ResourceKey, level: 'Edit' as AccessLevel },
+    { role, resource: 'page.workload' as ResourceKey, level: 'View' as AccessLevel },
+    { role, resource: 'command.assign' as ResourceKey, level: 'Edit' as AccessLevel },
+  ]),
+  { role: 'AL Portal - Outcome Testing Manager', resource: 'page.workload', level: 'View' },
 
   // Moving a case's due date is a manager's act (project owner, 2026-09-19: "3 days, only
   // editable by managers in codeapps"). Its own key rather than a higher level on
@@ -337,6 +347,7 @@ export function pageResourceForPath(path: string): ResourceKey | null {
   if (path.startsWith('/reviews')) return 'page.reviews';
   if (path.startsWith('/reports')) return 'page.reports';
   if (path.startsWith('/exports')) return 'page.exports';
+  if (path.startsWith('/workload')) return 'page.workload';
   if (path.startsWith('/admin/questions')) return 'page.admin.questions';
   if (path.startsWith('/admin/advisers')) return 'page.admin.advisers';
   if (path.startsWith('/admin/templates')) return 'page.admin.templates';

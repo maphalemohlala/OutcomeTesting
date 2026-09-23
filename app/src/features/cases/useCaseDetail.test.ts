@@ -94,3 +94,14 @@ describe('toDetail checklist items', () => {
     expect(detail.checklist.items).toEqual(['Tax Check']);
   });
 });
+
+describe('toDetail adviser release (AD-218)', () => {
+  it('flags a case in remediation that no adviser contact was matched to', () => {
+    expect(toDetail(record({ al_casestatus: 120910587 })).adviserUnmatched).toBe(true);
+  });
+
+  it('does not flag a case whose adviser contact is set', () => {
+    const matched = { al_casestatus: 120910587, _al_advisercontactid_value: 'contact-1' } as Partial<Al_outcomecases>;
+    expect(toDetail(record(matched)).adviserUnmatched).toBe(false);
+  });
+});

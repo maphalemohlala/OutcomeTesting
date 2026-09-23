@@ -1,4 +1,5 @@
 import type { CaseStatus, ReviewRoute } from '../../types/domain';
+import { adviserUnmatched } from './allocationScope';
 import { REVIEW_ROUTES } from '../../types/domain';
 import {
   Al_outcomecasesal_casestatus,
@@ -80,6 +81,11 @@ export interface CaseDetail {
   rowVersion: string | null;
   previousCase: string | null;
   /**
+   * True when the case is in remediation and no adviser contact was matched to it, so no
+   * adviser can see it (AD-218). Never guessed: the fix is correcting a name.
+   */
+  adviserUnmatched: boolean;
+  /**
    * The case header exactly as the Checker Checklist draws it: eighteen fields, two to a
    * row (project owner, 2026-09-13). One list rather than the four themed groups this page
    * used to show - Client, Adviser and paraplanner, Advice and product, Check and tax -
@@ -134,6 +140,9 @@ export function toDetail(
     al_priority?: number;
     al_priorityname?: string;
     al_duedate?: string;
+    // The generator lags a new column by hours; widened here as useUserDirectory widens
+    // al_staffcode, rather than editing the generated model.
+    _al_advisercontactid_value?: string;
   };
   return {
     id: record.al_outcomecaseid,
@@ -148,6 +157,7 @@ export function toDetail(
     dueDate: date(extra.al_duedate),
     rowVersion: record.versionnumber != null ? String(record.versionnumber) : null,
     previousCase: lookupLabel(record, 'al_previouscaseid', record.al_previouscaseidname),
+    adviserUnmatched: adviserUnmatched(record.al_casestatus, extra._al_advisercontactid_value ?? null),
     // Names, not ids: the header is read, and the intersect holds only ids. Resolved by
     // the caller against the catalogue, because the case row cannot answer this one.
     header: caseHeaderFields(record, productNames),
