@@ -1,0 +1,32 @@
+{
+  "$comment": "Contract for the ReconcileCaseAccess command (AD-218). Deployed via the registration console (registerall). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "customApi": {
+    "uniquename": "al_ReconcileCaseAccess",
+    "name": "al_ReconcileCaseAccess",
+    "displayname": "Reconcile Case Access",
+    "description": "Brings one case's access columns and team shares into line with its current state (AD-218). The backfill and repair path for role-scoped access.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.ReconcileCaseAccessPlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "TargetId",
+      "name": "TargetId",
+      "displayname": "Case id",
+      "description": "Id of the al_outcomecase to reconcile.",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    { "uniquename": "Changed", "name": "Changed", "displayname": "Changed", "description": "Comma-separated access columns that were written; empty when nothing changed.", "type": 10 },
+    { "uniquename": "Released", "name": "Released", "displayname": "Released", "description": "True when the case is released to its adviser.", "type": 0 },
+    { "uniquename": "AdviserUnmatched", "name": "AdviserUnmatched", "displayname": "Adviser unmatched", "description": "True when the case is released but its adviser matched no single contact.", "type": 0 },
+    { "uniquename": "SupervisorUnmatched", "name": "SupervisorUnmatched", "displayname": "Supervisor unmatched", "description": "True when the case is released but no single adviser mapping names a supervisor.", "type": 0 }
+  ]
+}
