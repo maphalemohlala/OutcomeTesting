@@ -378,6 +378,35 @@ that session silently and says so plainly rather than failing oddly.
 
 App tests: **1,030 passed across 77 files**, typecheck clean.
 
+## Fifth pass: the picker is now watched
+
+The Products picker was proved by hand when it was built and by nothing afterwards. The
+vitest beside it reads the template **source** and cannot tell a fold that works from one
+that renders and does nothing, so four browser tests now cover it.
+
+The fourth is the reason for the other three: **a ticked product survives a search term
+that matches nothing**. Searching is for finding the next product, not for deciding what is
+selected, and on a case holding several out of 55 a tick hidden by a filter is not
+recoverable by looking at the screen.
+
+**Read-only throughout.** A product checkbox is wired straight to `saveNow()` - a tick is a
+whole decision, so the header group saves on change with no debounce. A spec that ticked
+one would write to whichever environment it is pointed at, and a spec that failed half-way
+would leave it written. So everything is asserted against the state the page arrives in.
+
+That has a setup cost worth naming: the fourth test **skips** on a case holding no product,
+and a skipped test guards nothing. TEST case 900000001 was given one product first, so the
+rule is covered on both environments rather than only on DEV.
+
+| | DEV | TEST |
+|---|---|---|
+| Portal e2e | **10 passed, 6 skipped, 0 failed** | **10 passed, 6 skipped, 0 failed** |
+
+All four picker tests RUN rather than skip on both. The six skips are the same on each and
+all correct: the server-render lock needs a stored finding (both reviews are clean), and
+the five remediation and allowlist specs need `OT_CASE_*` and `OT_ACTION_ID`, which are set
+for neither.
+
 ## Known-open
 
 **The AQS all-Yes lock withdraws the Breach and Record Keeping reasons too.** The File Quality
