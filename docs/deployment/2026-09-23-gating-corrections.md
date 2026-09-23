@@ -147,6 +147,93 @@ runs.
   not print skip reasons, and this one was briefly misread as "Pass is already locked" — the
   two skips look identical in the output and mean opposite things.
 
+## Second pass: the three audit findings, and a fourth found closing them
+
+The 2026-09-23 audit reported four findings. A was fixed and deployed in the first pass. B, C
+and D were reported and left, and are fixed here. Closing them turned up a fifth thing, which
+is not in the product at all but in the test harness.
+
+| Artefact | DEV | TEST |
+|---|---|---|
+| `OutcomeTesting.Plugins.dll` (321,536 bytes) | 09:58:38Z | 10:00:28Z |
+| `OT Review Detail` (228,640 -> 232,982 chars) | 09:59:28Z | 10:01:38Z |
+| Steps declared in `src/`, present and enabled | **24 / 24** | **24 / 24** |
+| ALL steps registered for the assembly, enabled | **55 / 55** | **55 / 55** |
+
+**Two counts, because they measure different things**, and reading one as the other is how a
+disabled step gets missed. `verifysteps` checks the 24 steps `src/SdkMessageProcessingSteps/`
+declares - the repo's own claim about itself. The 55 is every step registered against the
+assembly's 49 plug-in types in the environment, which is the one an import can quietly switch
+off. Both were checked here; the first pass on this page recorded only the second.
+
+The byte count is unchanged because the assembly is padded to a 512-byte boundary and the
+change is small; the DLL is newer than the edited source, which is the check that matters.
+
+### B - a lock is per option, and rebuild() made it per row (AD-212)
+
+`rebuild()` read `querySelector('input[disabled]')` into ONE boolean and applied it to every
+option it then drew. Right while a lock was all or nothing - a read-only form disables the row
+entire - and wrong from 2026-09-23, when the gating rules started disabling a SINGLE option
+and leaving the rest live. A checker whose checklist was reissued mid-answer got the row
+redrawn with **every** option dead and could not answer the question at all.
+
+Not caught by the gating tests, and would not have been: the two run in **different scripts**,
+and nothing re-runs the gating rules when a row is redrawn under them.
+
+### C - the page wrote to the server when somebody merely opened it (AD-213)
+
+The worst of the three. Opening a review whose file quality outcome was a Pass and whose
+"Remedial action required?" was simply **unanswered** ticked No and dispatched `change`, which
+the autosave turned into a PATCH. **Reading a page answered a mandatory question and recorded
+it against whoever opened it** - including someone who had come only to look.
+
+`syncRemedialAction` now takes `userDriven`. The load path locks the forbidden option, says so
+where it had to untick a stored answer, and returns before it can write. The repair was never
+the page's job: `ResponseProgressPlugin.ReconcileRemedialAction` moves a contradicting answer
+when the outcome is saved, and `ResponseGuardPlugin` refuses a new one.
+
+### D - two round trips per save to answer a question that was already settled (AD-214)
+
+The checklist-version read and the AML and CRA question count ran on **every** review, inside
+the transaction holding a checker's save open. Every Tax review - which has no AML and CRA
+section and never will - paid both to be told a section it does not have is not complete.
+
+They now run only where that section has been answered, which returns the **same** answer:
+with nothing answered, a non-empty expected set cannot be a subset of an empty clean set, and
+an empty expected set fails the count. The new tests assert the round-trip **count**, because
+the result was already right; what was wrong was the cost of reaching it.
+
+### The fifth thing: DEV and TEST are different portals (AD-215)
+
+Found by pointing a DEV session at TEST. They are genuinely separate sites -
+`outcometesting.powerappsportals.com` and `outcometestingtest.powerappsportals.com`,
+distinguishable by the Entra client id each redirects with. The TEST **site record** carries
+DEV's primary domain, copied by an import (PRT-114), so the row cannot be used to tell them
+apart. `e2e/.auth/portal.json` holds one session at a time, so running both suites means
+capturing each in turn.
+
+**`expectSignedIn` did not catch it.** Its host check passes: a Power Pages site with a local
+sign-in page answers an unauthenticated request with `/SignIn` on its OWN host rather than
+redirecting away, and that sign-in page still renders the Main Navigation landmark the second
+check looks for. Every spec then failed on whatever it asserted first - *"the case list page
+has an .ot-page__inner"* - which reads as a broken page rather than a signed-out one. The
+guard now tests the path as well as the host, and says which `OT_PORTAL_URL` to re-auth
+against.
+
+### Verification of the second pass
+
+| | DEV | TEST |
+|---|---|---|
+| Plug-in tests | 1,620 passed | (same assembly) |
+| App tests | 1,011 passed across 77 files | (same build) |
+| Typecheck (`tsc -b`) | clean | clean |
+| Portal e2e | **6 passed, 6 skipped, 0 failed** | **not run - needs a TEST sign-in** |
+
+DEV ran with `OT_ALLOW_WRITES=1`, so the dynamic gating spec is included. The deployed
+template was confirmed **live rather than cached** by reading the raw review HTML back and
+finding `userDriven`, `lockedValues`, `allLocked` and the load-time guard in it - the render
+cache took it immediately this time, which AD-094 says cannot be relied on.
+
 ## Known-open
 
 **The AQS all-Yes lock withdraws the Breach and Record Keeping reasons too.** The File Quality
@@ -156,3 +243,30 @@ passes AML and fails on record keeping has no reason to tick. Raised with a live
 TEST review `8cb7fb72`, `Q-FQ-01` Fail with AML and CRA 5/5 Yes — and **confirmed to stand**
 (project owner, 2026-09-23). Recorded against `AD-209` rather than left in a chat log, because
 it is the same shape as the defect the 2026-09-09 direction reversed.
+
+**The AML and CRA points still offer N/A, and the owner said they offer Insufficient
+evidence.** Checked on 2026-09-23: all five question versions read `120910008` (`YesNoNA`)
+in **DEV and in TEST**, and `data/v8-seed/data.xml` agrees with both. So there is no seed
+drift - nothing anywhere carries the change described on 2026-09-23 ("we've changed the
+options to yes, no, and insufficient evidence"), and an earlier note in `checklist-v8.md`
+saying it had been made in the environment was wrong.
+
+It matters because of how the two scales fail. The gating rule asks whether every point
+reads **Yes** and never which values are not a Yes, so it works on either - but a point a
+checker marks **N/A** today leaves the AQS fail points **open for ever** on that file,
+because "all Yes" can no longer be reached and nothing reports it. That is the same
+fails-open shape as AD-211. Under the described scale the equivalent answer is Insufficient
+evidence, which is visible in the grade.
+
+Cost to close: one PATCH per question version per environment, and **nothing to migrate** -
+there are no stored `al_response` rows against any AML or CRA question in either
+environment. It is held for the project owner because it changes what a checker is offered,
+not because it is difficult.
+
+**The TEST portal e2e has not been run against this build.** TEST is a different host from
+DEV (AD-215) and needs its own `npm run e2e:auth`. The plug-in and template were both pushed
+to TEST and its 24 steps verified enabled, and the assembly and template are byte-identical
+to the ones DEV proved - so what is missing is the browser-level confirmation on TEST, not
+the deployment. TEST also currently has **no unsubmitted review assigned to the Service
+Account** (all four were submitted earlier on 2026-09-23), so a case needs assigning before
+the editable specs can do anything but skip.

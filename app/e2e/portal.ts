@@ -97,6 +97,23 @@ export async function expectSignedIn(page: Page, portal: string): Promise<void> 
     'redirected off the portal - the session has expired, re-run `npm run e2e:auth`',
   ).toBe(new URL(portal).host);
 
+  /*
+   * The same thing again, for the site that does it WITHOUT leaving. A Power Pages site
+   * with a local sign-in page answers an unauthenticated request with /SignIn on its own
+   * host, so the check above sees the host it wanted and waves it through.
+   *
+   * Found on 2026-09-23 pointing a DEV session at the TEST portal - two different hosts,
+   * one session file. Every spec then failed on whatever it happened to assert first
+   * ("the case list page has an .ot-page__inner"), which reads as a broken page rather than
+   * a signed-out one and sent a good half hour after the wrong defect.
+   */
+  const path = new URL(page.url()).pathname.toLowerCase();
+  expect(
+    path === '/signin' || path.startsWith('/signin/') || path.startsWith('/account/login'),
+    'the portal served its sign-in page - this session is for a different portal, or it has '
+      + 'expired; re-run `npm run e2e:auth` against THIS OT_PORTAL_URL',
+  ).toBe(false);
+
   // And the signed-in chrome, which an anonymous page does not render.
   await expect(
     page.getByRole('navigation', { name: 'Main Navigation' }),

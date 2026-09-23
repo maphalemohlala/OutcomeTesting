@@ -97,16 +97,31 @@ Q-TAX-02 is recorded as `PassFailInsufficient`, not `SingleSelect`. Its options 
 
 Owner: AQS checker. All mandatory.
 
-**Response type: retyped to `YesNoInsufficient`.** Transcribed as `YesNoNA` and seeded that
-way; the project owner reported on 2026-09-23 that "we've changed the options to yes, no, and
-insufficient evidence". That is an AD-123 administration change made in the environment, so
-**`data/v8-seed/data.xml` still carries `120910008`** (`YesNoNA`) on all five question
-versions and is out of step with DEV. A reseed would put N/A back. Left as a recorded gap
-rather than edited blind, because changing seed rows that alternate keys resolve is a
-migration decision, not a transcription fix.
+**Response type: `YesNoNA` everywhere, and that is an OPEN GAP.** The project owner
+reported on 2026-09-23 that "we've changed the options to yes, no, and insufficient
+evidence". Checked on 2026-09-23: all five question versions read `120910008` (`YesNoNA`)
+in **DEV and in TEST**, and `data/v8-seed/data.xml` agrees with both. So the seed is not
+drifted - nothing anywhere carries the change the owner described, and an earlier note here
+claiming it had been made in the environment was wrong.
 
-The gating rule below is written so that it does not care which of the two scales the section
-is on: it asks whether every point reads **Yes**, never which values are not a Yes.
+Nothing is blocked on it and no answer is at risk: there are **no stored `al_response` rows
+against any AML or CRA question in either environment**, so the retype is one PATCH per
+question version with nothing to migrate. It needs the owner's say-so because it changes what
+a checker is offered, not because it is difficult.
+
+**Why it is worth closing.** The gating rule does not care which scale the section is on - it
+asks whether every point reads **Yes**, never which values are not a Yes - but the two scales
+offer a checker different ways to not say Yes, and they behave differently:
+
+| Answer | Under `YesNoNA` (live) | Under `YesNoInsufficient` (described) |
+|---|---|---|
+| N/A | offered; never counts as Yes | not offered |
+| Insufficient evidence | not offered | offered; never counts as Yes, **and** trips the Insufficient-anywhere rule below, which takes Pass and Pass with issues off `Q-GR-01` |
+
+So a point a checker marks N/A today leaves the AQS fail points **open for ever** on that
+file, because "all Yes" can no longer be reached and nothing reports it. That is the same
+fails-open shape as AD-211. Under the described scale the equivalent answer is Insufficient
+evidence, which is visible in the grade.
 
 | Code | Question |
 |---|---|
