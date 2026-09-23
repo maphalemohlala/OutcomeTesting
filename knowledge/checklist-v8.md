@@ -95,7 +95,18 @@ Q-TAX-02 is recorded as `PassFailInsufficient`, not `SingleSelect`. Its options 
 
 ## S-AMLCRA — File Quality, AML and CRA checking points
 
-Owner: AQS checker. Response type `YesNoNA` throughout, all mandatory.
+Owner: AQS checker. All mandatory.
+
+**Response type: retyped to `YesNoInsufficient`.** Transcribed as `YesNoNA` and seeded that
+way; the project owner reported on 2026-09-23 that "we've changed the options to yes, no, and
+insufficient evidence". That is an AD-123 administration change made in the environment, so
+**`data/v8-seed/data.xml` still carries `120910008`** (`YesNoNA`) on all five question
+versions and is out of step with DEV. A reseed would put N/A back. Left as a recorded gap
+rather than edited blind, because changing seed rows that alternate keys resolve is a
+migration decision, not a transcription fix.
+
+The gating rule below is written so that it does not care which of the two scales the section
+is on: it asks whether every point reads **Yes**, never which values are not a Yes.
 
 | Code | Question |
 |---|---|
@@ -136,6 +147,57 @@ the two answers can be read against each other.
 | Q-FQTAX-01 | File quality outcome | PassFail | Yes |
 | Q-FQTAX-02 | Fail observation | MultilineText | No |
 | Q-FQTAX-03 | Remedial action required? | YesNo | Yes |
+
+## Which answers the rest of the form leaves available
+
+Four rules of one shape: an answer recorded somewhere takes an option off somewhere else,
+because the two could not both be true of one file. `ChecklistGating` in the plug-in assembly
+is the authority; OT Review Detail mirrors it, in Liquid for the state the page opens in and
+in JavaScript for what changes under the checker. The app's review page carries no copy — it
+is a read-only document (OD-007) and renders no control to restrict.
+
+| Rule | Condition | Effect |
+|---|---|---|
+| Insufficient evidence anywhere | any test point | Pass and Pass with issues off `Q-GR-01` |
+| A No or a Fail anywhere | any test point | Pass off `Q-GR-01` **and** off the file quality outcome |
+| Fail points locked — **Tax** | `Q-TAX-02` is Pass | the standalone fail points block cannot be ticked |
+| Fail points locked — **AQS** | every `S-AMLCRA` point reads Yes | as above |
+| Remedial action required? | the file quality outcome | Pass ⇒ No, Fail ⇒ Yes; **the other answer is disabled** |
+
+"Test point" excludes the five questions that ARE an outcome or a decision — `Q-FQ-01`,
+`Q-FQTAX-01`, `Q-FQ-03`, `Q-FQTAX-03`, `Q-GR-01`. Without that, choosing Pass on the file
+quality outcome would set Remedial action required? to No and the No would take the Pass
+straight back off. `Q-TAX-02` is **not** on that list: the Tax check outcome is a finding
+about the file, and a Fail on it takes Pass off the grade like any other.
+
+**Three of these were corrected on 2026-09-23, a day after they shipped.**
+
+- **The Tax fail points lock on `Q-TAX-02`, the Tax CHECK outcome on S-TAX** — not on
+  `Q-FQTAX-01`, the tax FILE QUALITY outcome on S-FQTAX, which is what the first
+  implementation read. Two questions, two sections, two judgements; S-TAX above already
+  warns that a pair on this form has been conflated in code once. Only a clean Pass locks
+  it — Pass with issues is exactly the verdict whose issues want recording.
+- **The AQS fail points lock when the section is CLEAN, not when it is empty.** They were
+  locked *until* a No, Insufficient evidence or Fail arrived, so a checker who had not yet
+  reached AML and CRA met the block shut — the very thing the Tax rule refuses to do on an
+  unanswered outcome. Open is the resting state on both now. "Every point reads Yes" is
+  counted against the questions **in force on the review's own checklist version**, not
+  against the answers recorded: three Yeses and two blanks is not all Yes, or a half-filled
+  section would close the block. The version scoping matters as much as the count — it is the
+  same scoping `ResponseGuardPlugin` applies before it will accept an answer at all, and
+  without it a later version adding a sixth AML point would put a code in the expected set
+  that an older review can never answer, making "all Yes" unreachable and the lock dead. That
+  failure is **open**, so nothing would report it.
+- **Remedial action required? is a lock, not a default.** It was a default the checker could
+  overrule; the direction was that the other option "needs to be disabled". Enforced in
+  `ResponseGuardPlugin` (refuses the write), `ResponseProgressPlugin` (moves an answer
+  recorded before the outcome changed under it) and the page (disables the option).
+
+**What the third rule closes, deliberately.** A passed file can no longer carry a remedial
+action. That combination was reachable and meant something — AD-184 repaired a Tax check that
+passed and still flagged one. The Tax path AD-184 fixed turns on `Q-TAX-02`, which this rule
+does not read, so it survives; what is now unreachable is a **file quality** Pass beside a
+remedial Yes. Given twice and confirmed.
 
 ## Suitability core checks
 
