@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import pageRules from '../../../../powerpages/outcome-testing---outcometesting/webpagerule.yml?raw';
 
 /**
  * The portal's case boundary as the table permissions draw it (AD-218, AR-02 to AR-04).
@@ -87,5 +88,39 @@ describe('each role reads cases through its own column', () => {
       if (!name.startsWith('Case - ')) continue;
       expect(field(yaml, 'adx_entitypermissionid')).toMatch(/^a1000000-0000-4000-8000-0000000000[cd][0-9a-f]$/);
     }
+  });
+});
+
+const ADMINISTRATORS = 'c53b2908-1fc1-4470-89cd-6f5b95c17ffe';
+const OT_MANAGER = 'a1000000-0000-4000-8000-000000000095';
+const PLANNER = 'a1000000-0000-4000-8000-000000000097';
+const AUTHENTICATED = 'e24b50c5-1443-4725-84c9-70355724547f';
+
+describe('Global read is held by oversight roles only (supersedes OD-022, AD-056)', () => {
+  const CASE_DATA = ['al_outcomecase', 'al_reviewinstance', 'al_response', 'al_remediationaction', 'al_outcome', 'al_signoff'];
+
+  it('no Global read on case data reaches a reviewer, adviser, supervisor or planner', () => {
+    for (const yaml of Object.values(files)) {
+      if (field(yaml, 'adx_scope') !== '756150000') continue;
+      if (!CASE_DATA.includes(field(yaml, 'adx_entitylogicalname') ?? '')) continue;
+      expect(roles(yaml).sort(), field(yaml, 'adx_entityname') ?? '').toEqual([OT_MANAGER, ADMINISTRATORS].sort());
+    }
+  });
+
+  it('outcomes are no longer readable by every signed-in user', () => {
+    for (const yaml of Object.values(files)) {
+      if (field(yaml, 'adx_entitylogicalname') !== 'al_outcome') continue;
+      expect(roles(yaml)).not.toContain(AUTHENTICATED);
+    }
+  });
+
+  it('the Planner role is bound to nothing (answer 3)', () => {
+    for (const yaml of Object.values(files)) {
+      expect(roles(yaml), field(yaml, 'adx_entityname') ?? '').not.toContain(PLANNER);
+    }
+  });
+
+  it('no page rule admits the Planner role', () => {
+    expect(pageRules).not.toContain(PLANNER);
   });
 });

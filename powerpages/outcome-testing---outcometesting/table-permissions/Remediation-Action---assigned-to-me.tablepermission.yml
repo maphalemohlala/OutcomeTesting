@@ -7,7 +7,6 @@ adx_entitylogicalname: al_remediationaction
 adx_entityname: Remediation Action - assigned to me
 adx_entitypermission_webrole:
 - a1000000-0000-4000-8000-000000000092
-- a1000000-0000-4000-8000-000000000097
 - a1000000-0000-4000-8000-000000000093
 adx_entitypermissionid: a1000000-0000-4000-8000-00000000006b
 adx_read: true
