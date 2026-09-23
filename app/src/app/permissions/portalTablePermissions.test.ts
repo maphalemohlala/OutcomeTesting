@@ -124,3 +124,21 @@ describe('Global read is held by oversight roles only (supersedes OD-022, AD-056
     expect(pageRules).not.toContain(PLANNER);
   });
 });
+
+describe('every child permission can take effect', () => {
+  // A Parent-scoped permission grants a role only where its parent grants that role too.
+  // Narrowing a parent's roles therefore silently disables any child that relied on one -
+  // which AD-218's first cut did to the T&C Supervisor's sign-off permission.
+  it('no child names a role its parent does not hold', () => {
+    const byId = new Map(Object.values(files).map((yaml) => [field(yaml, 'adx_entitypermissionid'), yaml]));
+    for (const yaml of Object.values(files)) {
+      const parentId = field(yaml, 'adx_parententitypermission');
+      if (!parentId) continue;
+      const parent = byId.get(parentId);
+      expect(parent, `${field(yaml, 'adx_entityname')} has no parent ${parentId}`).toBeDefined();
+      for (const role of roles(yaml)) {
+        expect(roles(parent!), `${field(yaml, 'adx_entityname')} needs ${role} on ${field(parent!, 'adx_entityname')}`).toContain(role);
+      }
+    }
+  });
+});

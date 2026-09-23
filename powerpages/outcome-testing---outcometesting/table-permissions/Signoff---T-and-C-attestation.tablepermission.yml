@@ -1,3 +1,7 @@
+# AD-218: re-parented from "Remediation Action - read all", which no longer grants the T&C
+# Supervisor (Global read is oversight only). Its parent is now the supervisor's own
+# remedial-action read, so attestation reaches exactly the cases they supervise. A child
+# permission only takes effect where its parent grants the same role.
 adx_append: true
 adx_appendto: false
 adx_create: true
@@ -7,7 +11,7 @@ adx_entityname: Signoff - T&C attestation
 adx_entitypermission_webrole:
 - a1000000-0000-4000-8000-000000000093
 adx_entitypermissionid: a1000000-0000-4000-8000-00000000006c
-adx_parententitypermission: a1000000-0000-4000-8000-000000000062
+adx_parententitypermission: a1000000-0000-4000-8000-0000000000d7
 adx_parentrelationship: al_remediationaction_signoff
 adx_read: true
 adx_scope: 756150003
