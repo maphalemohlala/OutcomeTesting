@@ -7702,6 +7702,13 @@ int GrantTeamSecurity(string orgUrl)
     // al_AssignCase changes the review's owner (AssignCasePlugin.StampReviewInstance).
     GrantAssign(svc, role, "al_reviewinstance", PrivilegeDepth.Basic);
 
+    // al_AssignCase opens a check nobody has started by creating its review OWNED BY THE
+    // ASSIGNEE (ClaimCasePlugin.OpenNextReview), as the caller. Basic Create only lets a
+    // user create rows they own, so every first allocation failed with "CreateAccess ...
+    // BusinessUnitLevel" (found in DEV verification). Create only: Read stays Basic plus
+    // the team share, so this widens what a manager can open, not what they can see.
+    GrantTable(svc, role, "al_reviewinstance", create: true, depth: PrivilegeDepth.Local);
+
     // Create-only and own rows: an audit event that can be edited is not an audit trail.
     GrantTable(svc, role, "al_auditevent", read: true, create: true, append: true, appendTo: true, depth: PrivilegeDepth.Basic);
     GrantTable(svc, role, "al_notification", read: true, create: true, append: true, appendTo: true, depth: PrivilegeDepth.Basic);
