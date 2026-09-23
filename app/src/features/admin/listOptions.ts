@@ -349,6 +349,33 @@ export function choicesIncludingHeld(
 }
 
 /**
+ * A long tick list, narrowed by what somebody typed into its filter box.
+ *
+ * Pure, and exported, because it carries the one rule in the whole control that is not
+ * obvious and would never be noticed if it broke: **a ticked option is never filtered away**.
+ * The filter is for FINDING the next option, not for deciding what is selected. Hiding a
+ * tick behind a search term is how somebody unticks one by accident and never sees it go -
+ * and on Products, where a case may hold several out of 55, the tick they lost is not
+ * recoverable by looking at the screen.
+ *
+ * An empty or whitespace term is not a filter, and matching is case-insensitive on a plain
+ * substring: these are product names, not a query language.
+ */
+export function filterTickOptions(
+  options: readonly ListOptionRow[],
+  chosen: readonly string[],
+  term: string,
+): ListOptionRow[] {
+  const needle = term.trim().toLowerCase();
+  if (needle === '') return [...options];
+
+  return options.filter(
+    (option) =>
+      option.label.toLowerCase().includes(needle) || chosen.includes(option.id),
+  );
+}
+
+/**
  * The labels a case holds on a MULTI-choice list, in the list's own order.
  *
  * The single-choice lists resolve their label off the case row, because a lookup carries its

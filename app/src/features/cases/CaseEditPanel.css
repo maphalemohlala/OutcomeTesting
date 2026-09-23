@@ -155,10 +155,31 @@
 /* A managed list a case may hold several of: every option visible, each its own control.
    A <select multiple> would hide the rest behind a scroll and lose the selection on a
    mis-click, which is the wrong trade for a field a checker fills in once. */
-.case-edit__set {
+.case-edit__set-wrap {
   display: grid;
   gap: var(--space-2);
   padding: var(--space-2) 0;
+}
+
+.case-edit__set-search {
+  width: 100%;
+}
+
+/* Capped and scrolled, so a long catalogue adds a KNOWN amount of height to the panel
+   instead of however much it happens to come to - Products is 55 options from 2026-09-23.
+   Two columns where the panel has room; the breakpoint is on the column width rather than
+   on a screen size, because the names are long. */
+.case-edit__set {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-1) var(--space-3);
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.case-edit__set-empty {
+  margin: 0;
+  font-style: italic;
 }
 
 .case-edit__set-item {

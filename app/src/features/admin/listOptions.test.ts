@@ -18,6 +18,7 @@ import {
   type RawListOption,
   caseOptionLabel,
   choicesIncludingHeld,
+  filterTickOptions,
   heldOptionLabels,
   listByKey,
   listByValue,
@@ -548,5 +549,57 @@ describe('a list a case may hold several of', () => {
     const stored = toggleValue(['c', 'a'], 'b', true);
     expect(stored).toBe('a,b,c');
     expect(setValues(stored)).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('filtering a long tick list', () => {
+  const row = (id: string, label: string) => ({
+    id,
+    label,
+    list: LIST_PRODUCTS,
+    sortOrder: null,
+    legacyValue: null,
+    effectiveFrom: null,
+    effectiveTo: null,
+    retired: false,
+  });
+
+  const products = [
+    row('a', 'AIM ISA'),
+    row('b', 'Offshore Bond'),
+    row('c', 'Existing Offshore Bond - Fund Switch'),
+    row('d', 'Whole of Life'),
+  ];
+
+  it('keeps a TICKED option even when it does not match the search', () => {
+    /*
+     * The one rule here that is not obvious and would never be noticed if it broke. The
+     * filter is for finding the next option, not for deciding what is selected; hiding a
+     * tick behind a search term is how somebody unticks one by accident and never sees it
+     * go. On Products - 55 options from 2026-09-23, several of them held at once - the
+     * tick they lost is not recoverable by looking at the screen.
+     */
+    const shown = filterTickOptions(products, ['d'], 'bond');
+
+    expect(shown.map((o) => o.id)).toEqual(['b', 'c', 'd']);
+  });
+
+  it('matches anywhere in the label, not just the start', () => {
+    // "Existing Offshore Bond - Fund Switch" is found by typing "offshore". Products are
+    // named by what they are, with the qualifier first, so a prefix match finds almost
+    // nothing a checker actually types.
+    expect(filterTickOptions(products, [], 'offshore').map((o) => o.id)).toEqual(['b', 'c']);
+  });
+
+  it('ignores case, and treats a blank or spaces as no filter at all', () => {
+    expect(filterTickOptions(products, [], 'AIM').map((o) => o.id)).toEqual(['a']);
+    expect(filterTickOptions(products, [], 'aim').map((o) => o.id)).toEqual(['a']);
+    expect(filterTickOptions(products, [], '')).toHaveLength(4);
+    expect(filterTickOptions(products, [], '   ')).toHaveLength(4);
+  });
+
+  it('returns a copy, so the caller cannot sort the catalogue by accident', () => {
+    const shown = filterTickOptions(products, [], '');
+    expect(shown).not.toBe(products);
   });
 });

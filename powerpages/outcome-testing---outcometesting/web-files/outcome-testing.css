@@ -1837,3 +1837,120 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-hdr-set__item input {
   flex: none;
 }
+
+/* The same tick list, for a catalogue too long to lay out flat. Products went from four
+   placeholders to 55 real products on 2026-09-23, and 55 stacked checkboxes in a header
+   table cell drag one row taller than the rest of the card put together.
+
+   Still checkboxes, deliberately. The argument above against <select multiple> did not stop
+   being true when the list got longer - it got MORE true, because ctrl-click dropping a
+   selection costs more the more there is to re-pick. What changes is only that the list is
+   folded away behind a summary and given a search box, so the collapsed state is one line
+   and the open state is a fixed height rather than however tall the catalogue happens to
+   be. */
+.ot-picker {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.ot-picker__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: #fff;
+  border: 1px solid var(--ot-border, #c7c7c7);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ot-picker__toggle:hover {
+  border-color: var(--ot-ink, #333);
+}
+
+/* The chevron is drawn rather than typed so it needs no icon font and no glyph that a
+   screen reader would read out as text. */
+.ot-picker__toggle::after {
+  content: '';
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translate(-0.1rem, -0.1rem);
+}
+
+.ot-picker__toggle[aria-expanded='true']::after {
+  transform: rotate(-135deg) translate(-0.15rem, -0.15rem);
+}
+
+.ot-picker__panel {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.ot-picker__search {
+  width: 100%;
+  padding: 0.3rem 0.45rem;
+  font: inherit;
+  border: 1px solid var(--ot-border, #c7c7c7);
+  border-radius: 4px;
+}
+
+/* Capped and scrolled, so an open panel adds a KNOWN amount of height to the row instead of
+   however much 55 products come to. Two columns where there is room: the names are long, so
+   the breakpoint is on the column width rather than on a screen size. */
+.ot-picker__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.15rem 1rem;
+  max-height: 15rem;
+  overflow-y: auto;
+  padding: 0.15rem;
+  border: 1px solid var(--ot-border, #c7c7c7);
+  border-radius: 4px;
+}
+
+.ot-picker__empty {
+  margin: 0;
+  font-size: 0.9em;
+  font-style: italic;
+}
+
+/* A checked product stays legible when the panel is shut and reopened mid-search. */
+.ot-picker__list .ot-hdr-set__item[hidden] {
+  display: none;
+}
+
+@media print {
+  /* Paper has no disclosure. Print every product the case holds and nothing else - the
+     unticked 52 are not information. */
+  .ot-picker__toggle,
+  .ot-picker__search,
+  .ot-picker__empty {
+    display: none;
+  }
+
+  .ot-picker__panel {
+    display: block;
+  }
+
+  .ot-picker__list {
+    display: block;
+    max-height: none;
+    overflow: visible;
+    border: 0;
+  }
+
+  /* The unticked 52 are not information on paper. :has() is already used twice in this
+     sheet, and where it is not supported the whole list prints, which is merely verbose
+     rather than wrong. */
+  .ot-picker__list .ot-hdr-set__item:not(:has(input:checked)) {
+    display: none;
+  }
+}

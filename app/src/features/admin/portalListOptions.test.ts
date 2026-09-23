@@ -312,3 +312,65 @@ describe('reading the products a case carries', () => {
     expect(caseTemplate).toContain("{{ c.al_products | default: '—' | escape }}");
   });
 });
+
+/**
+ * Products became a catalogue of 55 on 2026-09-23 (project owner). Fifty-five stacked
+ * checkboxes in a header table cell drag one row taller than the rest of the card put
+ * together, so the list is folded behind a summary and given a search box.
+ *
+ * These pin the three things about that fold which are load-bearing rather than cosmetic.
+ */
+describe('the Products tick list folds away when the catalogue is long', () => {
+  it('asks for more rows than a default page would give it', () => {
+    /*
+     * The failure this prevents is the quiet one. A fetch that does not say how many rows
+     * it wants takes the platform's default page, and a catalogue cut at its page size
+     * looks exactly like a catalogue that is complete - the product a checker cannot find
+     * is the one they stop looking for.
+     */
+    const offered = reviewTemplate.slice(
+      reviewTemplate.indexOf('{% fetchxml products %}'),
+      reviewTemplate.indexOf('{% endfetchxml %}', reviewTemplate.indexOf('{% fetchxml products %}')),
+    );
+
+    expect(offered).toContain('<fetch count="200">');
+  });
+
+  it('still hangs the whole thing off data-ot-hdr-set, so the collector is unchanged', () => {
+    // The fold is presentation. The collector finds [data-ot-hdr-set] and reads the boxes
+    // inside it, so nesting them deeper must not move that attribute off the wrapper.
+    expect(reviewTemplate).toContain('data-ot-hdr-set="al_productids" data-ot-picker');
+    expect(reviewTemplate).toContain("fields[group.el.getAttribute('data-ot-hdr-set')] = now;");
+  });
+
+  it('renders the panel OPEN and hides the controls, so a page without script still works', () => {
+    /*
+     * Progressive enhancement, and the direction matters. The toggle and the search box
+     * are rendered `hidden` and unhidden by script; the panel itself is NOT hidden in the
+     * markup. A page whose script never runs is therefore the long tick list it always
+     * was - tall, but complete and answerable. Hiding the panel in the markup instead
+     * would mean a script failure took the Products field away entirely.
+     */
+    expect(reviewTemplate).toContain('data-ot-picker-toggle aria-expanded="true" hidden');
+    expect(reviewTemplate).toContain('data-ot-picker-search placeholder="Search products"');
+
+    const panel = reviewTemplate.indexOf('class="ot-picker__panel" data-ot-picker-panel');
+    expect(panel, 'the panel is rendered').toBeGreaterThan(-1);
+    const tag = reviewTemplate.slice(panel, reviewTemplate.indexOf('>', panel));
+    expect(tag, 'the panel must NOT be hidden in the markup').not.toContain('hidden');
+
+    expect(reviewTemplate).toContain('toggle.hidden = false;');
+    expect(reviewTemplate).toContain('open(false);');
+  });
+
+  it('never filters away a product that is ticked', () => {
+    // The same rule filterTickOptions holds for the Code App panel, and for the same
+    // reason: searching is for finding the next product, not for deciding what is chosen.
+    const filter = reviewTemplate.slice(
+      reviewTemplate.indexOf('function filter()'),
+      reviewTemplate.indexOf('toggle.hidden = false;'),
+    );
+
+    expect(filter).toContain("var keep = term === '' || text.indexOf(term) !== -1 || (box && box.checked);");
+  });
+});

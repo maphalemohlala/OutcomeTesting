@@ -495,8 +495,14 @@
   already did ("Product(s)", seeded as "Pension; ISA"). So it is a many-to-many rather than a
   lookup, and needs two reads - the options on offer, and the ones this case already carries.
 {% endcomment %}
+{% comment %}
+  count is explicit because the catalogue is now 55 products (project owner, 2026-09-23) and
+  a fetch that does not say how many it wants takes the platform's default page. A list
+  silently cut at its page size looks exactly like a list that is complete, and the product
+  a checker cannot find is the one they stop looking for.
+{% endcomment %}
 {% fetchxml products %}
-<fetch>
+<fetch count="200">
   <entity name="al_listoption">
     <attribute name="al_listoptionid" />
     <attribute name="al_name" />
@@ -604,12 +610,17 @@
   The container carries data-ot-hdr-SET rather than data-ot-hdr: it is not one input with a
   value, so the collector reads its boxes instead. The whole set is sent, because a payload
   of additions could never remove one.
-{% endcomment %}<div class="ot-hdr-set" data-ot-hdr-set="al_productids" role="group" aria-label="Products">{% for o in products.results.entities %}{% assign okey = '|' | append: o.al_listoptionid | append: '|' %}<label class="ot-hdr-set__item"><input type="checkbox" value="{{ o.al_listoptionid }}" {% if held_product_ids contains okey %}checked{% endif %} /> {{ o.al_name | escape }}</label>{% endfor %}{% comment %}
+{% endcomment %}<div class="ot-picker" data-ot-hdr-set="al_productids" data-ot-picker role="group" aria-label="Products">{% comment %}
+  The toggle and the search box are rendered HIDDEN and unhidden by script, which is the
+  whole progressive-enhancement trade made explicit: with no script the panel is simply
+  open and this is the long tick list it has always been - tall, but complete and usable.
+  It is only the tidying that needs JavaScript, never the answering.
+{% endcomment %}<button type="button" class="ot-picker__toggle" data-ot-picker-toggle aria-expanded="true" hidden><span data-ot-picker-summary>Select products</span></button><div class="ot-picker__panel" data-ot-picker-panel><input type="search" class="ot-picker__search" data-ot-picker-search placeholder="Search products" aria-label="Search products" autocomplete="off" hidden /><p class="ot-picker__empty" data-ot-picker-empty hidden>No product matches that search.</p><div class="ot-picker__list">{% for o in products.results.entities %}{% assign okey = '|' | append: o.al_listoptionid | append: '|' %}<label class="ot-hdr-set__item"><input type="checkbox" value="{{ o.al_listoptionid }}" {% if held_product_ids contains okey %}checked{% endif %} /> {{ o.al_name | escape }}</label>{% endfor %}{% comment %}
   A product the case already carries that is no longer offered stays ticked, so saving any
   other header field does not quietly drop it - the server leaves an already-attached option
   alone for the same reason. Marked "(retired)" only when the offered list actually loaded:
   if it came back empty, all that is known is that the catalogue is unavailable.
-{% endcomment %}{% for h in case_products.results.entities %}{% assign hkey = '|' | append: h.al_listoptionid | append: '|' %}{% unless offered_product_ids contains hkey %}<label class="ot-hdr-set__item"><input type="checkbox" value="{{ h.al_listoptionid }}" checked /> {{ h.al_name | escape }}{% if products_any %} (retired){% endif %}</label>{% endunless %}{% endfor %}</div></td>
+{% endcomment %}{% for h in case_products.results.entities %}{% assign hkey = '|' | append: h.al_listoptionid | append: '|' %}{% unless offered_product_ids contains hkey %}<label class="ot-hdr-set__item"><input type="checkbox" value="{{ h.al_listoptionid }}" checked /> {{ h.al_name | escape }}{% if products_any %} (retired){% endif %}</label>{% endunless %}{% endfor %}</div></div></div></td>
           </tr>
           <tr>
             <td class="lbl">Case type</td><td class="val">{% comment %}Drawn from al_listoption rows (AD-187), not written out by hand.{% endcomment %}<select class="ot-hdr-input" data-ot-hdr="al_casetypeid" aria-label="Case type"><option value="">&mdash;</option>{% assign casetype_offered = false %}{% assign casetype_any = false %}{% for o in case_types.results.entities %}{% assign casetype_any = true %}<option value="{{ o.al_listoptionid }}" {% if held_casetype and o.al_listoptionid == held_casetype %}selected{% assign casetype_offered = true %}{% endif %}>{{ o.al_name | escape }}</option>{% endfor %}{% unless casetype_offered %}{% if held_casetype %}<option value="{{ held_casetype }}" selected>{{ h_casetypeid.name | escape }}{% if casetype_any %} (retired){% endif %}</option>{% endif %}{% endunless %}</select></td>
@@ -4178,6 +4189,105 @@
 
           if (required) { required.addEventListener('change', function () { saveNow(); }); }
           if (disposition) { disposition.addEventListener('change', function () { saveNow(); }); }
+
+          /*
+           * The Products picker (project owner, 2026-09-23, on a catalogue of 55).
+           *
+           * Everything here is TIDYING. The list, the boxes and the collector are already
+           * on the page and already work; this folds the list behind a summary and adds a
+           * search box. The markup renders with the panel OPEN and the toggle hidden, so a
+           * page whose script never runs is the long tick list it always was - tall, but
+           * complete. Nothing a checker has to do depends on this running.
+           *
+           * Written against [data-ot-picker] rather than the Products cell by name, so the
+           * next managed list long enough to need it gets the same behaviour by marking it
+           * up the same way.
+           */
+          var pickers = document.querySelectorAll('[data-ot-picker]');
+          for (var pk = 0; pk < pickers.length; pk++) {
+            (function (picker) {
+              var toggle = picker.querySelector('[data-ot-picker-toggle]');
+              var panel = picker.querySelector('[data-ot-picker-panel]');
+              var search = picker.querySelector('[data-ot-picker-search]');
+              var summary = picker.querySelector('[data-ot-picker-summary]');
+              var empty = picker.querySelector('[data-ot-picker-empty]');
+              var items = picker.querySelectorAll('.ot-hdr-set__item');
+              if (!toggle || !panel) { return; }
+
+              /*
+               * The summary names what is ticked rather than counting it. "3 selected" sends
+               * a checker back into the panel to find out WHICH three, which is the whole
+               * cost the fold was meant to save. Past three it counts the rest, because the
+               * cell is one line wide and a fourth name is what pushes it to two.
+               */
+              function describe() {
+                var names = [];
+                for (var i = 0; i < items.length; i++) {
+                  var box = items[i].querySelector('input[type="checkbox"]');
+                  if (box && box.checked) {
+                    names.push((items[i].textContent || '').replace(/\s+/g, ' ').trim());
+                  }
+                }
+
+                if (names.length === 0) { return 'Select products'; }
+                if (names.length <= 3) { return names.join(', '); }
+                return names.slice(0, 3).join(', ') + ' and ' + (names.length - 3) + ' more';
+              }
+
+              function redescribe() {
+                if (summary) { summary.textContent = describe(); }
+              }
+
+              function open(yes) {
+                toggle.setAttribute('aria-expanded', yes ? 'true' : 'false');
+                panel.hidden = !yes;
+                if (yes && search) { search.focus(); }
+              }
+
+              function filter() {
+                var term = (search && search.value ? search.value : '').toLowerCase().trim();
+                var shown = 0;
+                for (var i = 0; i < items.length; i++) {
+                  var text = (items[i].textContent || '').toLowerCase();
+                  /*
+                   * A ticked product is never filtered out. Searching is for FINDING the
+                   * next one, and hiding a tick behind a search term is how a checker
+                   * unticks something by accident and never sees it go.
+                   */
+                  var box = items[i].querySelector('input[type="checkbox"]');
+                  var keep = term === '' || text.indexOf(term) !== -1 || (box && box.checked);
+                  items[i].hidden = !keep;
+                  if (keep) { shown += 1; }
+                }
+                if (empty) { empty.hidden = shown > 0; }
+              }
+
+              toggle.hidden = false;
+              if (search) { search.hidden = false; }
+              redescribe();
+              open(false);
+
+              toggle.addEventListener('click', function () {
+                open(toggle.getAttribute('aria-expanded') !== 'true');
+              });
+
+              if (search) {
+                search.addEventListener('input', filter);
+                // Escape closes the panel rather than clearing the box, which is what a
+                // native select does and therefore what a checker expects.
+                search.addEventListener('keydown', function (event) {
+                  if (event.key === 'Escape' || event.keyCode === 27) {
+                    open(false);
+                    toggle.focus();
+                  }
+                });
+              }
+
+              // The collector is already listening for change on these boxes; this only
+              // keeps the closed summary honest.
+              picker.addEventListener('change', redescribe);
+            })(pickers[pk]);
+          }
 
           /*
            * What the submit waits on. The header saves itself as it is edited, so by the

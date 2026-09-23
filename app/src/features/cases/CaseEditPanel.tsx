@@ -19,9 +19,11 @@ import { ADVICE_DATE_LABEL, ukToday } from './caseHeaderDates';
 import {
   MIGRATED_LISTS,
   choicesIncludingHeld,
+  filterTickOptions,
   setValues,
   toOptionRows,
   toggleValue,
+  type ListOptionRow,
   type ManagedList,
 } from '../admin/listOptions';
 import { useAllListOptions } from '../admin/useListOptions';
@@ -185,6 +187,68 @@ interface Props {
  * and idempotency, and writes the before/after Audit Event (BR-012). The panel renders only
  * when the caller holds Edit; the server-side command is the real authorization gate.
  */
+/**
+ * A managed list a case may hold several of (AD-190).
+ *
+ * Checkboxes rather than a multi-select list box, and that choice got MORE right when the
+ * Products catalogue went from four placeholders to 55 on 2026-09-23: a <select multiple>
+ * needs ctrl-click to add a second and silently drops the rest of the selection on a
+ * mis-click, which costs more the more there is to re-pick.
+ *
+ * What the length does change is that the list can no longer simply be laid out flat. It is
+ * capped and scrolled by the stylesheet, and given a filter here once there is enough to be
+ * worth searching - below that the box is noise, so it is not rendered at all.
+ */
+const FILTER_FROM = 12;
+
+function TickSet({
+  labelledBy,
+  options,
+  chosen,
+  onToggle,
+}: {
+  labelledBy: string;
+  options: ListOptionRow[];
+  chosen: string[];
+  onToggle: (chosen: string[], id: string, on: boolean) => void;
+}) {
+  const [term, setTerm] = useState('');
+
+  // filterTickOptions holds the rule that a ticked option is never filtered away, and is
+  // tested directly - it is the one thing here that would break silently.
+  const shown = filterTickOptions(options, chosen, term);
+
+  return (
+    <div className="case-edit__set-wrap">
+      {options.length >= FILTER_FROM ? (
+        <input
+          type="search"
+          className="case-edit__set-search"
+          value={term}
+          placeholder={`Search ${options.length} options`}
+          aria-label="Filter the options"
+          onChange={(e) => setTerm(e.target.value)}
+        />
+      ) : null}
+      <div className="case-edit__set" role="group" aria-labelledby={labelledBy}>
+        {shown.map((option) => (
+          <label key={option.id} className="case-edit__set-item">
+            <input
+              type="checkbox"
+              value={option.id}
+              checked={chosen.includes(option.id)}
+              onChange={(e) => onToggle(chosen, option.id, e.target.checked)}
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+        {shown.length === 0 ? (
+          <p className="case-edit__set-empty">No option matches that search.</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 export function CaseEditPanel({ detail, onSaved }: Props) {
   const { can } = usePermissions();
   const [open, setOpen] = useState(false);
@@ -481,37 +545,17 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
       <label key={field.attr} className="case-edit__field" htmlFor={inputId}>
         <span id={`${inputId}-label`}>{field.label}</span>
         {field.kind === 'listoptionset' ? (
-          /*
-           * Checkboxes rather than a multi-select list box. A case covers several products
-           * and a <select multiple> hides that: it shows a few rows, needs ctrl-click to add
-           * a second, and silently drops the rest of the selection on a mis-click. Every
-           * option is visible here and each is its own control.
-           */
-          <div className="case-edit__set" role="group" aria-labelledby={`${inputId}-label`}>
-            {choicesIncludingHeld(
+          <TickSet
+            labelledBy={`${inputId}-label`}
+            options={choicesIncludingHeld(
               toOptionRows(listRows, field.list!, new Date()),
               null,
-            ).map((option) => {
-              const chosen = setValues(typeof value === 'string' ? value : '');
-              return (
-                <label key={option.id} className="case-edit__set-item">
-                  <input
-                    type="checkbox"
-                    value={option.id}
-                    checked={chosen.includes(option.id)}
-                    onChange={(e) =>
-                      setField(
-                        field.attr,
-                        field.kind,
-                        toggleValue(chosen, option.id, e.target.checked),
-                      )
-                    }
-                  />
-                  <span>{option.label}</span>
-                </label>
-              );
-            })}
-          </div>
+            )}
+            chosen={setValues(typeof value === 'string' ? value : '')}
+            onToggle={(chosen, id, on) =>
+              setField(field.attr, field.kind, toggleValue(chosen, id, on))
+            }
+          />
         ) : field.kind === 'listoption' ? (
           <select
             id={inputId}
