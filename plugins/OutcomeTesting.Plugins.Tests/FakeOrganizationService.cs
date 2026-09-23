@@ -96,6 +96,39 @@ namespace OutcomeTesting.Plugins.Tests
             }
         }
 
+        /// <summary>
+        /// Attribute names that are NOT columns on a table, so a ColumnSet naming one is
+        /// refused here the way the platform refuses it.
+        ///
+        /// The fake is schemaless and a projection simply skips an attribute a row does not
+        /// carry, so a ColumnSet naming something that is not a column at all looked exactly
+        /// like a column nobody had seeded. Dataverse does not: it validates the ColumnSet
+        /// against metadata and faults before it reads anything. That difference hid the
+        /// al_productids retrieve in CaseHeaderRequestPlugin from a green test suite while
+        /// every portal header edit that touched Products failed on TEST.
+        /// </summary>
+        private readonly Dictionary<string, HashSet<string>> _notColumns =
+            new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Declares that an attribute is not a column on a table. A Retrieve whose ColumnSet
+        /// names it then faults exactly as Dataverse does.
+        /// </summary>
+        public void NotAColumn(string entityName, params string[] attributes)
+        {
+            HashSet<string> known;
+            if (!_notColumns.TryGetValue(entityName, out known))
+            {
+                known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                _notColumns[entityName] = known;
+            }
+
+            foreach (var attribute in attributes)
+            {
+                known.Add(attribute);
+            }
+        }
+
         /// <summary>Seeds a row directly, bypassing the Create log.</summary>
         public Entity Seed(string logicalName, Guid id, params object[] attributePairs)
         {
@@ -159,6 +192,10 @@ namespace OutcomeTesting.Plugins.Tests
                 throw RetrieveThrows;
             }
 
+            // Metadata before rows, which is the order the platform checks in: a ColumnSet
+            // naming something that is not a column faults whether or not the row exists.
+            RefuseUnknownColumns(entityName, columnSet);
+
             var row = Row(entityName, id);
             if (row == null)
             {
@@ -206,6 +243,40 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         /// <summary>
+        /// Faults on a ColumnSet naming an attribute declared through <see cref="NotAColumn"/>,
+        /// with the platform's own message and error code.
+        /// </summary>
+        private void RefuseUnknownColumns(string entityName, ColumnSet columnSet)
+        {
+            HashSet<string> known;
+            if (columnSet == null
+                || columnSet.AllColumns
+                || !_notColumns.TryGetValue(entityName, out known))
+            {
+                return;
+            }
+
+            foreach (var column in columnSet.Columns)
+            {
+                if (!known.Contains(column))
+                {
+                    continue;
+                }
+
+                var message = "'" + entityName + "' entity doesn't contain attribute with Name = '"
+                    + column + "' and NameMapping = 'Logical'.";
+
+                throw new System.ServiceModel.FaultException<OrganizationServiceFault>(
+                    new OrganizationServiceFault
+                    {
+                        ErrorCode = -2147217149,
+                        Message = message,
+                    },
+                    new System.ServiceModel.FaultReason(message));
+            }
+        }
+
+        /// <summary>
         /// Set to make Update throw. Reproduces a privilege refusal or an AD-057 refusal from
         /// the automatic queue hop landing after the case row itself was already created
         /// successfully - the failure Important 2's fix has to survive without miscounting a
@@ -240,9 +311,20 @@ namespace OutcomeTesting.Plugins.Tests
             Table(entityName).Remove(id);
         }
 
+        /// <summary>
+        /// Set to make RetrieveMultiple throw, the way a missing read privilege does. A guard
+        /// that swallows a read failure on purpose can only be tested against one.
+        /// </summary>
+        public Exception RetrieveMultipleThrows { get; set; }
+
         public EntityCollection RetrieveMultiple(QueryBase query)
         {
             RetrieveMultipleCount++;
+            if (RetrieveMultipleThrows != null)
+            {
+                throw RetrieveMultipleThrows;
+            }
+
 
             var fetch = query as FetchExpression;
             if (fetch != null)

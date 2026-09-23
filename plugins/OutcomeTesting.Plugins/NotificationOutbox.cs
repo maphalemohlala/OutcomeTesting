@@ -825,29 +825,11 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string CaseLink(IOrganizationService service, EntityReference outcomeCase)
         {
-            if (outcomeCase == null)
-            {
-                return null;
-            }
-
-            var sites = service.RetrieveMultiple(new QueryExpression(SiteEntity)
-            {
-                ColumnSet = new ColumnSet(SiteDomainAttr),
-                TopCount = 1,
-            }).Entities;
-
-            if (sites.Count == 0)
-            {
-                return null;
-            }
-
-            var domain = sites[0].GetAttributeValue<string>(SiteDomainAttr);
-            if (string.IsNullOrWhiteSpace(domain))
-            {
-                return null;
-            }
-
-            return "https://" + domain.Trim().TrimEnd('/') + "/case-details?id=" + outcomeCase.Id.ToString("D");
+            // Delegated to PortalSite, which knows that the site row cannot answer this on any
+            // environment but DEV: powerpagesite is a managed solution component, so it carries
+            // DEV's domain wherever the solution is imported. Every letter sent from TEST
+            // linked into DEV until 2026-09-22 for exactly that reason.
+            return outcomeCase == null ? null : PortalSite.CaseLink(service, outcomeCase.Id);
         }
     }
 }

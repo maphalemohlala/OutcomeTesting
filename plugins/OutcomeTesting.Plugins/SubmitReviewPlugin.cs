@@ -904,6 +904,27 @@ namespace OutcomeTesting.Plugins
                     targetId,
                     isAqs ? AqsRemedialQuestionCode : TaxRemedialQuestionCode));
 
+            // What the rest of the form says, read once for both refusals below (project
+            // owner, 2026-09-22). ResponseGuardPlugin already refuses a contradicting outcome
+            // on the way in and the page stops offering it; this is the command that COMPLETES
+            // the review, and it is what catches answers written before the rule existed -
+            // deploying a guard cannot reach back and re-guard rows already saved.
+            var gatingFacts = ChecklistQueries.ReadGatingFacts(service, targetId);
+
+            // The file quality outcome, on both disciplines: a No or a Fail on any test point
+            // takes Pass off it. Refused before the grade so that a Tax review, which has no
+            // grade at all, is still held to it.
+            var fileQualityRefusal = ChecklistGating.FileQualityRefusal(
+                AnswerChoiceFor(
+                    service,
+                    targetId,
+                    isAqs ? FileQuality.QuestionCode : FileQuality.TaxQuestionCode),
+                gatingFacts.NoOrFailAnywhere);
+            if (fileQualityRefusal != null)
+            {
+                throw new InvalidPluginExecutionException(PreconditionPrefix + fileQualityRefusal);
+            }
+
             bool requiresRemediation;
             string remediationReason;
             DeferredTax deferredTaxFail = null;
@@ -924,17 +945,14 @@ namespace OutcomeTesting.Plugins
                         PreconditionPrefix + "The advice quality grade holds a value this solution does not recognise (" + answer.Value + ").");
                 }
 
-                // A Suitability core check answered Insufficient evidence leaves only
-                // Insufficient evidence and Potential harm available (item 10, 2026-09-19).
-                // ResponseGuardPlugin already refuses a contradicting grade on the way in and
-                // the page stops offering it; this is the command that completes the review,
-                // and it is what catches answers written before the rule existed - deploying a
-                // guard cannot reach back and re-guard rows already saved.
-                var suitabilityRefusal = GradingRules.SuitabilityGradeRefusal(
-                    answer.Value, ChecklistQueries.HasSuitabilityInsufficient(service, targetId));
-                if (suitabilityRefusal != null)
+                // Insufficient evidence anywhere leaves only Insufficient evidence and
+                // Potential harm; a No or a Fail on any test point takes Pass off as well
+                // (project owner, 2026-09-22, widening item 10, 2026-09-19).
+                var gradeRefusal = ChecklistGating.GradeRefusal(
+                    answer.Value, gatingFacts.InsufficientAnywhere, gatingFacts.NoOrFailAnywhere);
+                if (gradeRefusal != null)
                 {
-                    throw new InvalidPluginExecutionException(PreconditionPrefix + suitabilityRefusal);
+                    throw new InvalidPluginExecutionException(PreconditionPrefix + gradeRefusal);
                 }
 
                 CreateOutcome(service, targetId, caseRef, caseReference, sequence, outcomeValue);

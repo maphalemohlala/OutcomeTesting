@@ -175,6 +175,20 @@ namespace OutcomeTesting.Plugins
                 EnsureTaxReviewOpen(service, contactId, caseId);
             }
 
+            // The ordinary header does NOT freeze when the Tax check is submitted (project
+            // owner, 2026-09-23: "both teams need to be able to edit the headers"). It did
+            // for one day - added 2026-09-22 so an AQS checker could read the Tax checker's
+            // header but not move it - and that is reversed here. Client name, adviser,
+            // products and dates stay editable by whichever team is assigned, before the
+            // handover and after it.
+            //
+            // The Tax team's own two fields keep their own rule, above: they re-derive the
+            // review route (BR-004, AD-036), so they are not an ordinary header field and
+            // EnsureTaxReviewOpen goes on refusing them once the Tax check is submitted.
+            //
+            // Who may edit at all is still EnsureAssignedToCase's question, and it is asked
+            // for every payload - reversing the freeze widens nothing about WHO.
+
             // Cleared before the case is updated, so the column never keeps a request after
             // it has been acted on and a repeat of the same edit is a real second write
             // rather than an unchanged value Dataverse may not raise an Update for. Both
@@ -190,6 +204,18 @@ namespace OutcomeTesting.Plugins
             };
             foreach (var field in fields.Keys)
             {
+                // A field applied by ASSOCIATION names no column, so it must never reach the
+                // ColumnSet: Dataverse validates a ColumnSet against metadata and faults
+                // before it reads anything, which is what made every portal header edit
+                // touching Products fail on the read - "'al_OutcomeCase' entity doesn't
+                // contain attribute with Name = 'al_productids'" - and take the submit that
+                // flushes the header down with it. ApplyFields still applies the field; it
+                // reads the set from the relationship, not from the row.
+                if (ListOptionRules.AppliedByAssociation(field))
+                {
+                    continue;
+                }
+
                 if (!columns.Contains(field))
                 {
                     columns.Add(field);
@@ -444,6 +470,63 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// Refuses an edit to the TAX TEAM'S OWN FIELDS once the case's Tax check has been
+        /// submitted. Reached through <see cref="EnsureTaxReviewOpen"/>, which is its only
+        /// caller.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Scoped to those two fields, and deliberately. It was briefly the ordinary header's
+        /// rule too - added 2026-09-22 on "once tax have edited the case headers, aqs should
+        /// not be able to edit the headers but see the edits", reversed 2026-09-23 on "both
+        /// teams need to be able to edit the headers". Client name, adviser, products and
+        /// dates are editable by either team throughout; what stays refused is TaxCheckRequired
+        /// and TaxTeamDisposition, which re-derive the review route (BR-004, AD-036) and so
+        /// would reopen a decision the submit already acted on.
+        /// </para>
+        /// <para>
+        /// Keyed on the Tax review's SUBMISSION rather than on a Tax checker having touched a
+        /// field: that needs no new state on the case, and it is the line the rest of the
+        /// solution already draws - BR-012 makes a submitted review immutable, and
+        /// SubmitReviewPlugin acted on the route at that same moment.
+        /// </para>
+        /// <para>
+        /// A case with no Tax review, or one still open, is untouched: a case whose Tax check
+        /// has not been created yet is one where "is a Tax check required?" is exactly the
+        /// question these two fields exist to answer, and while the check is open its own
+        /// checker is the one editing. Who may edit at all is still EnsureAssignedToCase's
+        /// question, not this one.
+        /// </para>
+        /// <para>
+        /// Guarded on the review's status and not the case's, because the case moves on after
+        /// a submit - Queued, Awaiting Remediation, Closed - and each would need its own rule.
+        /// </para>
+        /// </remarks>
+        public static void EnsureTaxCheckNotSubmitted(IOrganizationService service, Guid caseId)
+        {
+            var query = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition(ReviewCaseAttr, ConditionOperator.Equal, caseId);
+            query.Criteria.AddCondition(ReviewTypeAttr, ConditionOperator.Equal, ResponseRules.ReviewTypeTax);
+            query.Criteria.AddCondition(ReviewStatusAttr, ConditionOperator.Equal, StatusSubmitted);
+
+            if (service.RetrieveMultiple(query).Entities.Count == 0)
+            {
+                return;
+            }
+
+            throw new InvalidPluginExecutionException(
+                CommandHelpers.PreconditionPrefix +
+                "The Tax check on this case has been submitted, so the Tax fields can no longer " +
+                "be changed. The rest of the header is still editable.");
+        }
+
+        /// <summary>
         /// Refuses the edit once the case's Tax review has been submitted.
         /// </summary>
         /// <remarks>
@@ -459,23 +542,7 @@ namespace OutcomeTesting.Plugins
         /// </remarks>
         public static void EnsureTaxReviewOpen(IOrganizationService service, Guid contactId, Guid caseId)
         {
-            var query = new QueryExpression(ReviewEntity)
-            {
-                ColumnSet = new ColumnSet(false),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
-            query.Criteria.AddCondition(ReviewCaseAttr, ConditionOperator.Equal, caseId);
-            query.Criteria.AddCondition(ReviewTypeAttr, ConditionOperator.Equal, ResponseRules.ReviewTypeTax);
-            query.Criteria.AddCondition(ReviewStatusAttr, ConditionOperator.Equal, StatusSubmitted);
-
-            if (service.RetrieveMultiple(query).Entities.Count > 0)
-            {
-                throw new InvalidPluginExecutionException(
-                    CommandHelpers.PreconditionPrefix +
-                    "The Tax check on this case has been submitted, so its header fields can no longer be changed.");
-            }
+            EnsureTaxCheckNotSubmitted(service, caseId);
 
             // The caller's own Tax review, not just anybody's (audit finding 2). The check
             // above asks whether the case's Tax work is still open; this asks whether it is

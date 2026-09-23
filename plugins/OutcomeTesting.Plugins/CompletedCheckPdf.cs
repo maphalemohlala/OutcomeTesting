@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Microsoft.Xrm.Sdk;
@@ -73,16 +73,25 @@ namespace OutcomeTesting.Plugins
 
             var reference = row.GetAttributeValue<string>("al_casereference");
 
+            /*
+             * Headed as the form heads itself (project owner, 2026-09-22: "the pdf that goes
+             * to paraplanners needs to match the pdf form in the reviews or export"). It said
+             * "Outcome Testing - completed check", which named the email rather than the
+             * document - and the document is the Checker Checklist.
+             *
+             * The case header is the form's own first block (AD-098), in the order the form
+             * lays it out, so the fields below are the document's and not a covering note's.
+             */
             var blocks = new List<PdfBlock>
             {
-                PdfBlock.Title("Outcome Testing - completed check"),
+                PdfBlock.Title(ChecklistDocument.Title),
                 PdfBlock.Field("Case reference", Or(reference, "not recorded")),
                 PdfBlock.Field("IO reference", Or(row.GetAttributeValue<string>("al_ioreference"), "not recorded")),
-                PdfBlock.Field("Client", Or(row.GetAttributeValue<string>("al_clientname"), "not recorded")),
-                PdfBlock.Field("Adviser", Or(row.GetAttributeValue<string>("al_advisername"), "not recorded")),
+                PdfBlock.Field("Client name / initials", Or(row.GetAttributeValue<string>("al_clientname"), "not recorded")),
+                PdfBlock.Field("Adviser name", Or(row.GetAttributeValue<string>("al_advisername"), "not recorded")),
                 PdfBlock.Field("Para-planner", Or(row.GetAttributeValue<string>("al_paraplanner"), "not recorded")),
                 PdfBlock.Field(
-                    "Date of meeting - Client contact",
+                    CaseHeaderRules.AdviceDateLabel,
                     Date(row.GetAttributeValue<DateTime?>("al_advicedate"))),
                 PdfBlock.Field("Due date", Date(row.GetAttributeValue<DateTime?>("al_duedate"))),
                 PdfBlock.Field("Status", StatusLabel(row.GetAttributeValue<OptionSetValue>("al_casestatus"))),
@@ -120,8 +129,20 @@ namespace OutcomeTesting.Plugins
                 blocks.Add(PdfBlock.Bullet(IndexLine(review)));
             }
 
-            // The check itself, which is what the para-planner is actually being sent
-            // (Change 2, Change 7). Submitted reviews only - see CompletedCheck.
+            /*
+             * The check itself, which is what the para-planner is actually being sent
+             * (Change 2, Change 7). Submitted reviews only - see CompletedCheck.
+             *
+             * Drawn as the FORM from 2026-09-22: the document's blocks, headed and grouped and
+             * ruled the way the checker saw them, with the fail points table in its own place
+             * between the checking points and the File Quality outcome (AD-096). It was a flat
+             * run of section-name-then-answer lines, which carried the same facts in a shape
+             * nobody who had seen the form would recognise.
+             *
+             * The fail points are read per review rather than per case: the intersect is
+             * response-keyed (AD-025), so a case whose Tax and AQS checks each recorded
+             * reasons shows each check its own.
+             */
             foreach (var review in reviews)
             {
                 var submitted = review.GetAttributeValue<DateTime?>("al_submittedon");
@@ -130,7 +151,8 @@ namespace OutcomeTesting.Plugins
                     continue;
                 }
 
-                var answers = CompletedCheck.Answers(service, review.Id, labels);
+                var answers = CompletedCheck.Answers(
+                    service, review.Id, labels, CompletedCheck.FailPoints(service, review.Id));
                 if (answers.Count == 0)
                 {
                     continue;

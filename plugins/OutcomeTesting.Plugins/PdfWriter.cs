@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -32,6 +32,40 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>A bulleted item.</summary>
         Bullet,
+
+        /// <summary>
+        /// One row of a two-column table: a test point on the left and its answer in a
+        /// column of its own on the right.
+        ///
+        /// Added so the para-planner's attachment can be the Checker Checklist rather than a
+        /// description of it (project owner, 2026-09-22: "the pdf that goes to paraplanners
+        /// needs to match the pdf form in the reviews"). The form's own shape is a ruled
+        /// table of test points against a tick column, and a <see cref="Field"/> - which puts
+        /// the answer immediately after the question, wherever that falls - cannot line
+        /// answers up for a reader scanning down them.
+        /// </summary>
+        Row,
+
+        /// <summary>
+        /// The column headings of a <see cref="Row"/> table: the same two columns, bold,
+        /// with a rule under them.
+        /// </summary>
+        TableHead,
+
+        /// <summary>A hairline across the content width, closing a table.</summary>
+        Rule,
+
+        /// <summary>
+        /// A bold line at body size, with no value after it.
+        ///
+        /// The document's subsection rows - "E1. Client Objectives &amp; Information (COBS
+        /// 9.2)" inside Suitability core checks - which are shaded bands on the form. Drawn as
+        /// a <see cref="Paragraph"/> first, where they were indistinguishable from the Outcome
+        /// lens line beneath them; and a <see cref="Field"/> would have put a colon on the end
+        /// of a heading. <see cref="Subheading"/> is a size up and is the BLOCK's, so using it
+        /// here would make a subsection look like a sibling of the block containing it.
+        /// </summary>
+        Label,
 
         /// <summary>Vertical space.</summary>
         Spacer,
@@ -85,6 +119,30 @@ namespace OutcomeTesting.Plugins
             return new PdfBlock { Kind = PdfBlockKind.Bullet, Text = text };
         }
 
+        /// <summary>One row of a two-column table: a test point and its answer.</summary>
+        public static PdfBlock Row(string text, string value)
+        {
+            return new PdfBlock { Kind = PdfBlockKind.Row, Text = text, Value = value };
+        }
+
+        /// <summary>The column headings above a run of <see cref="Row(string, string)"/>.</summary>
+        public static PdfBlock TableHead(string text, string value)
+        {
+            return new PdfBlock { Kind = PdfBlockKind.TableHead, Text = text, Value = value };
+        }
+
+        /// <summary>A hairline across the content width.</summary>
+        public static PdfBlock Rule()
+        {
+            return new PdfBlock { Kind = PdfBlockKind.Rule };
+        }
+
+        /// <summary>A bold line at body size, for the document's subsection rows.</summary>
+        public static PdfBlock Label(string text)
+        {
+            return new PdfBlock { Kind = PdfBlockKind.Label, Text = text };
+        }
+
         /// <summary>Vertical space.</summary>
         public static PdfBlock Spacer()
         {
@@ -119,10 +177,12 @@ namespace OutcomeTesting.Plugins
     /// all, which runs text off the page.
     /// </para>
     /// <para>
-    /// <b>WinAnsi, and what happens outside it.</b> The encoding is WinAnsiEncoding, so a
-    /// character it cannot represent is replaced rather than written raw — a client's name
-    /// carrying a character outside it must not corrupt the file, and a visible '?' is
-    /// honest where a broken document is not.
+    /// <b>WinAnsi, and what happens outside it.</b> The encoding is WinAnsiEncoding, and
+    /// everything it can represent is written as an octal escape — the dashes, the smart
+    /// quotes, the accented letters and the pound sign included. Only a character the
+    /// encoding has no code for at all is replaced: a client's name carrying one must not
+    /// corrupt the file, and a visible '?' is honest where a broken document is not. The
+    /// replacement is the last resort, not the first.
     /// </para>
     /// </summary>
     public static class PdfWriter
@@ -145,6 +205,19 @@ namespace OutcomeTesting.Plugins
         private const double LineGap = 1.35;         // multiplied by the font size
         private const double BlockGap = 6;
         private const double BulletIndent = 14;
+
+        /// <summary>
+        /// The width of a Row table's answer column. 120pt holds the longest answer the
+        /// checklist can record - "Insufficient evidence" at body size is 96pt - with room
+        /// for the padding, so no answer wraps and the column reads as a column.
+        /// </summary>
+        private const double AnswerColumn = 120;
+
+        /// <summary>Space between the two columns, so a long test point cannot touch its answer.</summary>
+        private const double ColumnGap = 10;
+
+        /// <summary>A rule's thickness, in points. Hairline: the form's tables are ruled, not boxed.</summary>
+        private const double RuleWeight = 0.5;
 
         private const string Regular = "F1";
         private const string Bold = "F2";
@@ -169,6 +242,20 @@ namespace OutcomeTesting.Plugins
             public double X;
             public double Y;
             public string Text;
+
+            /// <summary>
+            /// A horizontal rule rather than a run of text. <see cref="Text"/> is null on one
+            /// of these and <see cref="Span"/> is its width.
+            ///
+            /// Carried on the same list as the text so both are laid out by the one pass that
+            /// knows where the page break falls - a rule positioned by a second pass would
+            /// have to re-derive that, and would be wrong the first time a table straddled
+            /// two pages.
+            /// </summary>
+            public bool IsRule;
+
+            /// <summary>How far a rule runs, in points.</summary>
+            public double Span;
         }
 
         private static List<List<Line>> Layout(IEnumerable<PdfBlock> blocks)
@@ -182,6 +269,21 @@ namespace OutcomeTesting.Plugins
                 pages.Add(current);
                 current = new List<Line>();
                 y = PageHeight - Margin;
+            }
+
+            void DrawRule()
+            {
+                // A rule sits just under the line above it rather than claiming a line of its
+                // own, so a ruled table is no taller than an unruled one.
+                var gap = BodySize * 0.35;
+                if (y - gap < Margin)
+                {
+                    NewPage();
+                    return;
+                }
+
+                y -= gap;
+                current.Add(new Line { IsRule = true, X = Margin, Y = y, Span = ContentWidth });
             }
 
             void Emit(string font, double size, double x, string text)
@@ -273,6 +375,66 @@ namespace OutcomeTesting.Plugins
                         }
 
                         break;
+
+                    case PdfBlockKind.Rule:
+                        DrawRule();
+                        break;
+
+                    case PdfBlockKind.Label:
+                        // A little air above it, so a subsection reads as opening something
+                        // rather than as one more row of the table above.
+                        y -= BlockGap / 2;
+                        foreach (var line in Wrap(block.Text, Bold, BodySize, ContentWidth))
+                        {
+                            Emit(Bold, BodySize, Margin, line);
+                        }
+
+                        break;
+
+                    case PdfBlockKind.TableHead:
+                    case PdfBlockKind.Row:
+                        {
+                            var head = block.Kind == PdfBlockKind.TableHead;
+                            var font = head ? Bold : Regular;
+                            var cellWidth = ContentWidth - AnswerColumn - ColumnGap;
+
+                            var cells = Wrap(block.Text, font, BodySize, cellWidth);
+                            if (cells.Count == 0)
+                            {
+                                cells.Add(string.Empty);
+                            }
+
+                            // The answer is not wrapped. AnswerColumn is sized to hold the
+                            // longest the checklist can record, and an answer that did wrap
+                            // would put its second line against the NEXT test point - which
+                            // is worse than running a few points wide.
+                            var answer = block.Value ?? string.Empty;
+
+                            Emit(font, BodySize, Margin, cells[0]);
+                            var first = current[current.Count - 1];
+                            if (answer.Length > 0)
+                            {
+                                current.Add(new Line
+                                {
+                                    Font = font,
+                                    Size = BodySize,
+                                    X = Margin + cellWidth + ColumnGap,
+                                    Y = first.Y,
+                                    Text = answer,
+                                });
+                            }
+
+                            for (var i = 1; i < cells.Count; i++)
+                            {
+                                Emit(font, BodySize, Margin, cells[i]);
+                            }
+
+                            // Under the headings, so the table has a head; and under every row,
+                            // so a reader following a long test point across to its answer has
+                            // a line to follow. That is how the form itself is ruled.
+                            DrawRule();
+                            break;
+                        }
 
                     case PdfBlockKind.Field:
                         var label = (block.Text ?? string.Empty) + ": ";
@@ -457,11 +619,30 @@ namespace OutcomeTesting.Plugins
         private static string Content(List<Line> lines)
         {
             var content = new StringBuilder();
+
+            /*
+             * Rules first, outside the text object. BT ... ET may hold text operators only, so
+             * a path drawn inside one is a malformed content stream - some readers recover and
+             * some show a blank page. They are drawn before the text rather than after because
+             * nothing overlaps: a rule sits in the gap under its row.
+             */
+            foreach (var line in lines)
+            {
+                if (!line.IsRule)
+                {
+                    continue;
+                }
+
+                content.Append(Num(RuleWeight)).Append(" w 0.8 G\n");
+                content.Append(Num(line.X)).Append(' ').Append(Num(line.Y)).Append(" m\n");
+                content.Append(Num(line.X + line.Span)).Append(' ').Append(Num(line.Y)).Append(" l\nS\n");
+            }
+
             content.Append("BT\n");
 
             foreach (var line in lines)
             {
-                if (string.IsNullOrEmpty(line.Text))
+                if (line.IsRule || string.IsNullOrEmpty(line.Text))
                 {
                     continue;
                 }
@@ -479,8 +660,17 @@ namespace OutcomeTesting.Plugins
         /// Text as a PDF literal string.
         ///
         /// The backslash goes first: escaping it last would re-escape the backslashes the
-        /// bracket replacements had just written. Anything outside WinAnsi becomes '?',
-        /// because a character this file cannot represent must not be written raw into it.
+        /// bracket replacements had just written.
+        ///
+        /// Everything WinAnsi can represent is written as an OCTAL ESCAPE rather than a raw
+        /// byte, so the file stays ASCII and every xref offset computed from a string length
+        /// stays right. Only a character the encoding genuinely has no code for becomes '?'.
+        ///
+        /// Until 2026-09-22 everything above '~' did, and the bullet was the single exception.
+        /// That put a visible '?' into the para-planner's copy wherever ordinary British
+        /// punctuation appeared - an en dash in "Tax check – insufficient evidence", a curly
+        /// apostrophe in "the client’s actual needs". Both are in WinAnsi; neither was being
+        /// written. Found by reading a document the deployed build had actually produced.
         /// </summary>
         private static string Escape(string text)
         {
@@ -492,22 +682,76 @@ namespace OutcomeTesting.Plugins
                 {
                     escaped.Append('\\').Append(ch);
                 }
-                else if (ch == '•')
-                {
-                    // The bullet, which WinAnsi carries at 149.
-                    escaped.Append("\\225");
-                }
                 else if (ch >= ' ' && ch <= '~')
                 {
                     escaped.Append(ch);
                 }
                 else
                 {
-                    escaped.Append('?');
+                    var code = WinAnsi(ch);
+                    if (code == 0)
+                    {
+                        escaped.Append('?');
+                    }
+                    else
+                    {
+                        escaped.Append('\\').Append(Convert.ToString(code, 8).PadLeft(3, '0'));
+                    }
                 }
             }
 
             return escaped.ToString();
+        }
+
+        /// <summary>
+        /// The WinAnsiEncoding code for a character above ASCII, or 0 when the encoding has
+        /// no glyph for it.
+        ///
+        /// <para>
+        /// 0xA0-0xFF is Latin-1 and maps to itself, which covers the accented names and the
+        /// pound sign. 0x80-0x9F is the Windows block - the smart quotes, the dashes, the
+        /// bullet, the ellipsis - and those do NOT sit at their Unicode code points, so each
+        /// one has to be named. Getting this wrong is silent: the character simply comes out
+        /// as something else.
+        /// </para>
+        /// </summary>
+        private static int WinAnsi(char ch)
+        {
+            switch (ch)
+            {
+                case '€': return 0x80;   // euro
+                case '‚': return 0x82;   // single low quote
+                case 'ƒ': return 0x83;   // florin
+                case '„': return 0x84;   // double low quote
+                case '…': return 0x85;   // ellipsis
+                case '†': return 0x86;   // dagger
+                case '‡': return 0x87;   // double dagger
+                case 'ˆ': return 0x88;   // modifier circumflex
+                case '‰': return 0x89;   // per mille
+                case 'Š': return 0x8A;   // S caron
+                case '‹': return 0x8B;   // single left angle quote
+                case 'Œ': return 0x8C;   // OE ligature
+                case 'Ž': return 0x8E;   // Z caron
+                case '‘': return 0x91;   // left single quote
+                case '’': return 0x92;   // right single quote - the curly apostrophe
+                case '“': return 0x93;   // left double quote
+                case '”': return 0x94;   // right double quote
+                case '•': return 0x95;   // bullet
+                case '–': return 0x96;   // en dash
+                case '—': return 0x97;   // em dash
+                case '˜': return 0x98;   // small tilde
+                case '™': return 0x99;   // trade mark
+                case 'š': return 0x9A;   // s caron
+                case '›': return 0x9B;   // single right angle quote
+                case 'œ': return 0x9C;   // oe ligature
+                case 'ž': return 0x9E;   // z caron
+                case 'Ÿ': return 0x9F;   // Y diaeresis
+                default:
+                    // Latin-1 from the non-breaking space upwards sits at its own code point.
+                    // Below that is either ASCII, which the caller has already taken, or a
+                    // control character with no glyph to draw.
+                    return ch >= ' ' && ch <= 'ÿ' ? ch : 0;
+            }
         }
 
         private static string Num(double value)

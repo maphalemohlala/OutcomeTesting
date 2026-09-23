@@ -1,12 +1,15 @@
-using System;
+﻿using System;
 
 namespace OutcomeTesting.Plugins
 {
     /// <summary>
     /// Pure decision logic for the AQS Judgement and Grading section: whether the primary
-    /// root cause is owed and whether a recorded one must be let go (item 3, 2026-09-19), and
-    /// which advice quality grades the Suitability core checks still leave available
-    /// (item 10, 2026-09-19).
+    /// root cause is owed and whether a recorded one must be let go (item 3, 2026-09-19).
+    ///
+    /// The rules about which grades the rest of the form still leaves available moved to
+    /// ChecklistGating on 2026-09-22, when they stopped being about the Suitability core
+    /// checks - and about the grade alone. Only GradeAllowedWithInsufficientEvidence stayed,
+    /// because it names the grade's own scale and nothing else.
     ///
     /// Deliberately free of Dataverse types, like ResponseRules and CaseHeaderRules, so the
     /// rule can be tested without a fake organisation service. Mirrored client-side in
@@ -88,53 +91,8 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// The section code every Suitability core check carries: S-E1 to S-E5 in V8, and
-        /// whatever an S-E6 added through checklist administration would be (item 10,
-        /// 2026-09-19).
-        ///
-        /// The batch asked for the section to be identified "by a stable key, not its display
-        /// name", and for the rule to hold across checklist versions. al_sectioncode is that
-        /// key: it is carried forward when a version is reissued, where the name is editable
-        /// through al_UpdateSection and the id is per row. A prefix rather than a fixed list
-        /// for the same reason - the five are a family, and a sixth belongs to it without a
-        /// code change, which is how isOutcomeLens already reads them client-side.
-        ///
-        /// S-CRP and S-CD deliberately do NOT match, though they answer on scales that also
-        /// offer Insufficient evidence. They are separate blocks on the Checker Checklist and
-        /// the batch named the Suitability core checks alone.
-        /// </summary>
-        public const string SuitabilitySectionPrefix = "S-E";
-
-        /// <summary>
-        /// Whether this section is one of the Suitability core checks.
-        ///
-        /// S-E must be followed by a digit, so a section coded S-EXTRA is not swept in by a
-        /// prefix match that never asked what came next.
-        /// </summary>
-        public static bool IsSuitabilitySection(string sectionCode)
-        {
-            if (string.IsNullOrWhiteSpace(sectionCode))
-            {
-                return false;
-            }
-
-            var code = sectionCode.Trim();
-            if (code.Length <= SuitabilitySectionPrefix.Length)
-            {
-                return false;
-            }
-
-            if (!code.StartsWith(SuitabilitySectionPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            return char.IsDigit(code[SuitabilitySectionPrefix.Length]);
-        }
-
-        /// <summary>
-        /// The two grades a review may still carry once any Suitability core check has been
-        /// answered Insufficient evidence (item 10, 2026-09-19).
+        /// The two grades a review may still carry once anything on it has been answered
+        /// Insufficient evidence (item 10, 2026-09-19; widened 2026-09-22).
         ///
         /// Evidence the checker found insufficient on a core check cannot be reconciled with
         /// a file that passed, with or without issues. The grade is not overridden - the
@@ -148,47 +106,5 @@ namespace OutcomeTesting.Plugins
                 || gradeAnswer == ResponseRules.ChoicePotentialHarm;
         }
 
-        /// <summary>
-        /// Why this grade cannot be recorded against these Suitability answers, or null when
-        /// it can. Returns a message with no failure prefix - the caller adds PRECONDITION:.
-        ///
-        /// An absent grade passes: clearing the grade is what this rule does to an invalid one
-        /// already saved, so refusing the cleared state would leave the review unrecoverable.
-        /// </summary>
-        public static string SuitabilityGradeRefusal(int? gradeAnswer, bool suitabilityInsufficient)
-        {
-            if (!suitabilityInsufficient || !gradeAnswer.HasValue)
-            {
-                return null;
-            }
-
-            if (GradeAllowedWithInsufficientEvidence(gradeAnswer.Value))
-            {
-                return null;
-            }
-
-            return "A Suitability core check has been answered Insufficient evidence, so the "
-                + "advice quality grade can only be Insufficient evidence or Potential harm.";
-        }
-
-        /// <summary>
-        /// Whether a grade already recorded must be cleared because a Suitability core check
-        /// has just been answered Insufficient evidence (item 10, 2026-09-19).
-        ///
-        /// The batch's instruction is to clear a now-invalid outcome and prompt, rather than
-        /// to refuse the tick: the checker is recording what they found on the file, and the
-        /// finding is not the thing to argue with. The grade they must now re-make is between
-        /// Insufficient evidence and Potential harm.
-        ///
-        /// Named against the two grades this clears rather than against everything the rule
-        /// disallows, so a value outside the scale is refused at the guard and never quietly
-        /// destroyed here.
-        /// </summary>
-        public static bool GradeClearedBySuitability(int? gradeAnswer)
-        {
-            return gradeAnswer.HasValue
-                && (gradeAnswer.Value == ResponseRules.ChoicePass
-                    || gradeAnswer.Value == ResponseRules.ChoicePassWithIssues);
-        }
     }
 }

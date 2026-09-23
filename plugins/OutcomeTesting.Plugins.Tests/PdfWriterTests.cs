@@ -137,9 +137,9 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void A_character_outside_winansi_is_replaced_rather_than_written_raw()
         {
-            var pdf = Text(PdfWriter.Build(new[] { PdfBlock.Paragraph("Zoë 日本") }));
+            var pdf = Text(PdfWriter.Build(new[] { PdfBlock.Paragraph("Kanji 日本") }));
 
-            Assert.Contains("Zo?", pdf);
+            Assert.Contains("Kanji ??", pdf);
             Assert.DoesNotContain("日", pdf);
         }
 
@@ -150,6 +150,36 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Contains("\\225", pdf);
             Assert.Contains("Tax Check", pdf);
+        }
+
+        /// <summary>
+        /// The punctuation that actually turns up in this checklist, and did NOT survive.
+        ///
+        /// <para>
+        /// Every one of these has a WinAnsi code, and until 2026-09-22 every one of them was
+        /// written as '?' because the writer passed only ASCII and the bullet. The en dash and
+        /// the curly apostrophe are the two that reached a para-planner, in a fail reason and
+        /// in an outcome lens respectively; they are here by name because they are what was
+        /// found in a real document rather than what was imagined.
+        /// </para>
+        /// </summary>
+        [Theory]
+        [InlineData("Tax check – insufficient evidence", "\\226")]   // en dash
+        [InlineData("the client’s actual needs", "\\222")]            // curly apostrophe
+        [InlineData("“Pass with issues”", "\\223")]              // opening quote
+        [InlineData("Fee of £250", "\\243")]                          // pound sign
+        [InlineData("Zoë Smith", "\\353")]                            // e diaeresis
+        [InlineData("cost — benefit", "\\227")]                       // em dash
+        [InlineData("and so on…", "\\205")]                           // ellipsis
+        public void Punctuation_winansi_carries_is_written_not_replaced(string input, string code)
+        {
+            var pdf = Text(PdfWriter.Build(new[] { PdfBlock.Paragraph(input) }));
+
+            Assert.Contains(code, pdf);
+
+            // The point of the fix: no question mark stood in for it. Asserting the code is
+            // present is not enough on its own - a writer that emitted both would pass that.
+            Assert.DoesNotContain("?", pdf);
         }
 
         // ------------------------------------------------------------ layout

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -60,6 +60,23 @@ namespace OutcomeTesting.Plugins
         public const string ProductsField = "al_productids";
 
         public const string ProductsRelationship = "al_listoption_al_outcomecase_products";
+
+        /// <summary>
+        /// Whether a Fields key is applied by ASSOCIATION rather than written to a column.
+        ///
+        /// The one place that answers it. <see cref="ApplyProducts"/> is reached through this
+        /// test, and so is the ColumnSet a caller reads the case with - which is the half that
+        /// was missing: <c>CaseHeaderRequestPlugin</c> put every key it was sent on its
+        /// ColumnSet, and Dataverse faults on a ColumnSet naming something that is not a
+        /// column at all, so every portal header edit touching Products failed on the READ,
+        /// before a single product was looked at. Asking here means a second such field cannot
+        /// be added with only one of the two places taught about it.
+        /// </summary>
+        public static bool AppliedByAssociation(string field)
+        {
+            return string.Equals(field, ProductsField, StringComparison.OrdinalIgnoreCase);
+        }
+
 
         /// <summary>The free-text column the products list replaces, kept for old cases.</summary>
         public const string ProductsLegacyAttribute = "al_products";

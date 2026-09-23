@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Xunit;
@@ -18,7 +18,25 @@ namespace OutcomeTesting.Plugins.Tests
     public class ListOptionRulesTests
     {
         private static readonly Guid CaseId = Guid.Parse("cccccccc-1111-4111-8111-cccccccccccc");
+        /// <summary>
+        /// A fixed day, for the tests that hand <see cref="ListOptionRules.InForce"/> its day
+        /// themselves. Those are pure and deterministic.
+        /// </summary>
         private static readonly DateTime Today = new DateTime(2026, 9, 21);
+
+        /// <summary>
+        /// The real today, for the tests that go through <c>ApplyFields</c>.
+        ///
+        /// <para>
+        /// That path reads <c>DateTime.UtcNow.Date</c> for itself and takes no clock, so a
+        /// window built from the fixed day above is measured against the actual one. It worked
+        /// until the fixed day arrived: on 2026-09-21 "starts tomorrow" became "started today"
+        /// and <see cref="An_option_that_has_not_started_yet_cannot_be_chosen"/> began failing
+        /// for a product that was behaving correctly. Dates aimed at that path have to be
+        /// relative to the same clock it reads.
+        /// </para>
+        /// </summary>
+        private static readonly DateTime RealToday = DateTime.UtcNow.Date;
 
         private static Guid Option(
             FakeOrganizationService service,
@@ -140,7 +158,7 @@ namespace OutcomeTesting.Plugins.Tests
             // not using the page - which is every caller that matters here.
             var service = new FakeOrganizationService();
             var id = Option(
-                service, "Drawdown", ListOptionRules.ProductSolutionType, null, Today.AddDays(-1));
+                service, "Drawdown", ListOptionRules.ProductSolutionType, null, RealToday.AddDays(-1));
 
             var error = Assert.Throws<InvalidPluginExecutionException>(
                 () => Apply(service, id.ToString()));
@@ -154,7 +172,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var service = new FakeOrganizationService();
             var id = Option(
-                service, "Bulk transfer", ListOptionRules.ProductSolutionType, Today.AddDays(1), null);
+                service, "Bulk transfer", ListOptionRules.ProductSolutionType, RealToday.AddDays(1), null);
 
             Assert.Throws<InvalidPluginExecutionException>(() => Apply(service, id.ToString()));
         }
@@ -324,7 +342,7 @@ namespace OutcomeTesting.Plugins.Tests
         public void Every_list_refuses_a_retired_option(string attribute, int list, string legacy)
         {
             var service = new FakeOrganizationService();
-            var id = Option(service, "Gone", list, null, Today.AddDays(-1));
+            var id = Option(service, "Gone", list, null, RealToday.AddDays(-1));
 
             var error = Assert.Throws<InvalidPluginExecutionException>(
                 () => ApplyTo(service, attribute, id.ToString()));

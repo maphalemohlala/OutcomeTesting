@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
@@ -122,7 +122,9 @@ namespace OutcomeTesting.Plugins
             EnsureSectionBelongsToReview(service, questionVersion, review);
             SanitiseRichText(target);
             EnsureAnswerShape(target, pre, responseType.Value);
-            EnsureGradeAgreesWithSuitability(
+            EnsureOutcomeAgreesWithForm(
+                service, target, responseType.Value, questionVersion, reviewRef.Id);
+            EnsureRemedialAgreesWithOutcome(
                 service, target, responseType.Value, questionVersion, reviewRef.Id);
 
             // Stamped server-side, never accepted from the client: al_ResponseCodeKey is what
@@ -138,39 +140,67 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// A Suitability core check answered Insufficient evidence takes Pass and Pass with
-        /// issues off the advice quality grade (item 10, 2026-09-19). This is the "must not be
-        /// saveable" half: the page stops offering them, and this stops a PATCH made by hand,
-        /// a stale tab, or any other front end from writing one anyway (NFR-SEC-01).
+        /// An outcome must agree with the test points recorded under it (project owner,
+        /// 2026-09-22; widening item 10, 2026-09-19).
         ///
-        /// Guarded cheaply then exactly, as ClearRootCauseOnPass is. Only an incoming Pass or
-        /// Pass with issues is looked at, and only on the grade's own scale, which belongs to
-        /// Q-GR-01 alone (AD-055); the question code is then confirmed, because a response type
-        /// is a convention checklist administration could reassign and the code is the AD-122
-        /// contract. Only then is the review's Suitability evidence read.
-        ///
-        /// Note which way round this runs. Writing the GRADE against existing Insufficient
-        /// answers is refused; writing an Insufficient ANSWER against an existing grade is not
-        /// - that clears the grade instead, in ResponseProgressPlugin. The checker is recording
-        /// what they found on the file, and the finding is not the thing to argue with.
-        ///
+        /// <para>
+        /// Two outcomes are guarded. The advice quality grade loses Pass and Pass with issues
+        /// once anything on the review reads Insufficient evidence, and loses Pass once
+        /// anything reads No or Fail. The file quality outcome loses Pass on the same No or
+        /// Fail. <see cref="ChecklistGating"/> holds both rules and says why each is shaped as
+        /// it is.
+        /// </para>
+        /// <para>
+        /// This is the "must not be saveable" half: the page stops offering the option, and
+        /// this stops a PATCH made by hand, a stale tab, or any other front end from writing
+        /// one anyway (NFR-SEC-01).
+        /// </para>
+        /// <para>
+        /// Guarded cheaply then exactly, as ClearRootCauseOnPass is. The response type filters
+        /// first - the grade's scale belongs to Q-GR-01 alone and the Pass / Fail scale to the
+        /// two file quality outcomes (AD-055) - and the question code is then confirmed,
+        /// because a response type is a convention checklist administration could reassign and
+        /// the code is the AD-122 contract. Only then is the rest of the review read, once,
+        /// through <see cref="ChecklistQueries.ReadGatingFacts"/>.
+        /// </para>
+        /// <para>
+        /// Note which way round this runs. Writing the OUTCOME against existing findings is
+        /// refused; writing a finding against an existing outcome is not - that clears the
+        /// outcome instead, in ResponseProgressPlugin. The checker is recording what they
+        /// found on the file, and the finding is not the thing to argue with.
+        /// </para>
+        /// <para>
         /// Public and static so it can be driven with plain Entities, as SectionRefusal is:
         /// the assembly is signed and deliberately carries no InternalsVisibleTo.
+        /// </para>
         /// </summary>
-        public static void EnsureGradeAgreesWithSuitability(
+        public static void EnsureOutcomeAgreesWithForm(
             IOrganizationService service,
             Entity target,
             int responseType,
             Entity questionVersion,
             Guid reviewId)
         {
-            if (responseType != GradingRules.GradeResponseType || !target.Contains("al_answerchoice"))
+            var isGradeScale = responseType == GradingRules.GradeResponseType;
+            var isPassFailScale = responseType == ResponseRules.TypePassFail;
+
+            if ((!isGradeScale && !isPassFailScale) || !target.Contains("al_answerchoice"))
             {
                 return;
             }
 
             var choice = target.GetAttributeValue<OptionSetValue>("al_answerchoice");
-            if (choice == null || GradingRules.GradeAllowedWithInsufficientEvidence(choice.Value))
+            if (choice == null)
+            {
+                return;
+            }
+
+            // Nothing below can refuse a value that is neither Pass nor Pass with issues, so
+            // the read of the rest of the review is skipped for every other answer. Pass with
+            // issues is not on the Pass / Fail scale at all; asking anyway costs nothing and
+            // keeps the test the same on both branches.
+            if (choice.Value != ResponseRules.ChoicePass
+                && choice.Value != ResponseRules.ChoicePassWithIssues)
             {
                 return;
             }
@@ -184,15 +214,113 @@ namespace OutcomeTesting.Plugins
             var question = service.Retrieve(
                 "al_question", questionRef.Id, new ColumnSet("al_questioncode"));
             var code = question == null ? null : question.GetAttributeValue<string>("al_questioncode");
-            if (code == null
-                || !code.Trim().Equals(
-                    GradingRules.GradeQuestionCode, StringComparison.OrdinalIgnoreCase))
+            if (code == null)
             {
                 return;
             }
 
-            var refusal = GradingRules.SuitabilityGradeRefusal(
-                choice.Value, ChecklistQueries.HasSuitabilityInsufficient(service, reviewId));
+            code = code.Trim();
+            var isGrade = isGradeScale
+                && code.Equals(GradingRules.GradeQuestionCode, StringComparison.OrdinalIgnoreCase);
+            var isFileQuality = isPassFailScale
+                && (code.Equals(FileQuality.QuestionCode, StringComparison.OrdinalIgnoreCase)
+                    || code.Equals(FileQuality.TaxQuestionCode, StringComparison.OrdinalIgnoreCase));
+
+            if (!isGrade && !isFileQuality)
+            {
+                return;
+            }
+
+            var facts = ChecklistQueries.ReadGatingFacts(service, reviewId);
+
+            var refusal = isGrade
+                ? ChecklistGating.GradeRefusal(
+                    choice.Value, facts.InsufficientAnywhere, facts.NoOrFailAnywhere)
+                : ChecklistGating.FileQualityRefusal(choice.Value, facts.NoOrFailAnywhere);
+
+            if (refusal != null)
+            {
+                throw new InvalidPluginExecutionException(PreconditionPrefix + refusal);
+            }
+        }
+
+        /// <summary>
+        /// "Remedial action required?" must agree with the file quality outcome above it
+        /// (project owner, 2026-09-23: the answer the outcome does not imply "needs to be
+        /// disabled").
+        ///
+        /// <para>
+        /// The boundary half of a rule the page also renders. Disabling a radio is an
+        /// affordance; the portal writes answers through a contact permission shared with the
+        /// sign-off and the claim, so a PATCH made by hand or a tab left open from before the
+        /// outcome changed would otherwise land the answer anyway (NFR-SEC-01, AD-041).
+        /// </para>
+        /// <para>
+        /// Kept out of <see cref="EnsureOutcomeAgreesWithForm"/> rather than folded into it.
+        /// That method refuses an OUTCOME that the test points under it contradict; this one
+        /// refuses a DECISION that the outcome above it contradicts. They run on different
+        /// scales, in opposite directions, and reading one method that did both would be how
+        /// the next change to either lands in the wrong branch.
+        /// </para>
+        /// <para>
+        /// Guarded cheaply then exactly, as its neighbour is: the Yes / No scale first, the
+        /// question code second - because a scale is a convention AD-123 can reassign and the
+        /// code is the AD-122 contract - and only then the read of the review. A write that
+        /// CLEARS the answer is never refused; shedding an answer is how a review gets back
+        /// out of a state a later edit invalidated.
+        /// </para>
+        /// <para>
+        /// Public and static for the reason the rest of this class is: the assembly is signed
+        /// and deliberately carries no InternalsVisibleTo.
+        /// </para>
+        /// </summary>
+        public static void EnsureRemedialAgreesWithOutcome(
+            IOrganizationService service,
+            Entity target,
+            int responseType,
+            Entity questionVersion,
+            Guid reviewId)
+        {
+            if (responseType != ResponseRules.TypeYesNo || !target.Contains("al_answerchoice"))
+            {
+                return;
+            }
+
+            var choice = target.GetAttributeValue<OptionSetValue>("al_answerchoice");
+            if (choice == null)
+            {
+                return;
+            }
+
+            var questionRef = questionVersion.GetAttributeValue<EntityReference>("al_questionid");
+            if (questionRef == null)
+            {
+                return;
+            }
+
+            var question = service.Retrieve(
+                "al_question", questionRef.Id, new ColumnSet("al_questioncode"));
+            var code = question == null ? null : question.GetAttributeValue<string>("al_questioncode");
+            if (code == null)
+            {
+                return;
+            }
+
+            code = code.Trim();
+            var isRemedial =
+                code.Equals(
+                    ChecklistGating.RemedialActionQuestionCode, StringComparison.OrdinalIgnoreCase)
+                || code.Equals(
+                    ChecklistGating.TaxRemedialActionQuestionCode, StringComparison.OrdinalIgnoreCase);
+
+            if (!isRemedial)
+            {
+                return;
+            }
+
+            var facts = ChecklistQueries.ReadGatingFacts(service, reviewId);
+            var refusal = ChecklistGating.RemedialActionRefusal(facts.FileQualityOutcome, choice.Value);
+
             if (refusal != null)
             {
                 throw new InvalidPluginExecutionException(PreconditionPrefix + refusal);

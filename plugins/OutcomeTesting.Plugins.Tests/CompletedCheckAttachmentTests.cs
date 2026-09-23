@@ -66,10 +66,15 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // The requirement, and what the document withheld until AD-165: "a PDF of the
             // completed checks for that case".
+            //
+            // No colon from 2026-09-22. S-E1 is a Suitability core check, which the document
+            // draws as a ruled table of test points against an answer COLUMN, so the answer is
+            // no longer a value that follows its label on the same run of text. Flat() puts a
+            // space between the two cells, which is what a reader sees.
             var text = Flat(CompletedCheckPdf.Build(Checked(), Ref()));
 
-            Assert.Contains("Client objectives recorded: Pass", text);
-            Assert.Contains("Adviser charges evidenced: Fail", text);
+            Assert.Contains("Client objectives recorded Pass", text);
+            Assert.Contains("Adviser charges evidenced Fail", text);
         }
 
         [Fact]

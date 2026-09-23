@@ -70,7 +70,8 @@ namespace OutcomeTesting.Plugins
             // and the only one that matters - putting it below the gate would mean the root
             // cause was cleared only on a review whose very first answer was its grade.
             ClearRootCauseOnPass(service, target, pre, reviewRef.Id);
-            ClearGradeOnSuitabilityInsufficient(service, target, pre, reviewRef.Id);
+            ClearOutcomesContradictedByAnswer(service, target, pre, reviewRef.Id);
+            ReconcileRemedialAction(service, target, pre, reviewRef.Id);
 
             var review = service.Retrieve(
                 ReviewEntity,
@@ -181,25 +182,38 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Clears the advice quality grade when the answer just saved is a Suitability core
-        /// check of Insufficient evidence and the grade recorded is one that can no longer
-        /// stand beside it (item 10, 2026-09-19).
-        ///
-        /// The batch asked for a now-invalid outcome to be cleared and the user prompted,
-        /// rather than for the tick to be refused, and that is the right way round: the
-        /// checker is recording what they found on the file, and what they found is not the
-        /// thing to argue with. The grade they must now re-make is between Insufficient
-        /// evidence and Potential harm, and ResponseGuardPlugin refuses anything else from
-        /// this moment on.
-        ///
-        /// Only Pass and Pass with issues are cleared - never a grade already Insufficient
-        /// evidence or Potential harm, which still stand, and never an unanswered one.
-        ///
-        /// The clearing Update re-enters this plug-in and stops at the first test, as the root
-        /// cause clearing does: the row it writes holds no choice, so it is not an Insufficient
-        /// evidence answer.
+        /// Clears an outcome the answer just saved has contradicted (project owner,
+        /// 2026-09-22; widening item 10, 2026-09-19).
         /// </summary>
-        public static void ClearGradeOnSuitabilityInsufficient(
+        /// <remarks>
+        /// <para>
+        /// The batch asked throughout for a now-invalid outcome to be cleared and the user
+        /// prompted, rather than for the tick to be refused, and that is the right way round:
+        /// the checker is recording what they found on the file, and what they found is not
+        /// the thing to argue with. ResponseGuardPlugin refuses the contradicting outcome from
+        /// this moment on, and the page says what happened.
+        /// </para>
+        /// <para>
+        /// Two outcomes can be contradicted. An Insufficient evidence anywhere leaves the
+        /// grade only Insufficient evidence or Potential harm; a No or a Fail on any test
+        /// point takes Pass off the grade and off the file quality outcome.
+        /// <see cref="ChecklistGating"/> holds both rules.
+        /// </para>
+        /// <para>
+        /// Only an outcome the rules actually refuse is cleared - never one that still stands,
+        /// and never an unanswered one. The section test this used to make is gone with the
+        /// rule it served: Insufficient evidence on the Consumer Duty overlay is no longer
+        /// something to tell apart from Insufficient evidence on a core check, because the
+        /// instruction of 2026-09-22 was "at any section not just the File quality AML and CRA
+        /// section". What replaces it is the question test - an outcome is not part of the sum
+        /// it is the sum of.
+        /// </para>
+        /// <para>
+        /// The clearing Update re-enters this plug-in and stops at the first test, as the root
+        /// cause clearing does: the row it writes holds no choice, so it is not a finding.
+        /// </para>
+        /// </remarks>
+        public static void ClearOutcomesContradictedByAnswer(
             IOrganizationService service,
             Entity target,
             Entity pre,
@@ -211,7 +225,9 @@ namespace OutcomeTesting.Plugins
             }
 
             var choice = target.GetAttributeValue<OptionSetValue>("al_answerchoice");
-            if (choice == null || choice.Value != ResponseRules.ChoiceInsufficient)
+            if (choice == null
+                || !(ChecklistGating.IsInsufficient(choice.Value)
+                    || ChecklistGating.IsNoOrFail(choice.Value)))
             {
                 return;
             }
@@ -223,29 +239,154 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            // Insufficient evidence sits on the Consumer Duty and Centralised Retirement
-            // Proposition scales too, and neither is a Suitability core check. The section
-            // code is what tells them apart, and GradingRules owns what counts as one.
-            var sectionCode = ChecklistQueries.SectionCodeForVersion(service, questionVersionRef.Id);
-            if (!GradingRules.IsSuitabilitySection(sectionCode))
+            // An outcome contradicts nothing by being answered: it is what the test points add
+            // up to. Saving "Remedial action required? No" must not set about clearing the
+            // Pass that put it there.
+            if (ChecklistGating.IsOutcomeQuestion(
+                    ChecklistQueries.QuestionCodeForVersion(service, questionVersionRef.Id)))
             {
                 return;
             }
+
+            var facts = ChecklistQueries.ReadGatingFacts(service, reviewId);
 
             foreach (var recorded in ChecklistQueries.ChoiceAnswersTo(
                 service, reviewId, GradingRules.GradeQuestionCode))
             {
                 var grade = recorded.GetAttributeValue<OptionSetValue>("al_answerchoice");
-                if (!GradingRules.GradeClearedBySuitability(grade == null ? (int?)null : grade.Value))
+                if (ChecklistGating.GradeCleared(
+                        grade == null ? (int?)null : grade.Value,
+                        facts.InsufficientAnywhere,
+                        facts.NoOrFailAnywhere))
+                {
+                    Clear(service, recorded.Id);
+                }
+            }
+
+            // Both disciplines' file quality outcome, because one review carries only one of
+            // them and asking for the other costs a query that finds nothing.
+            ClearFileQuality(service, reviewId, FileQuality.QuestionCode, facts);
+            ClearFileQuality(service, reviewId, FileQuality.TaxQuestionCode, facts);
+        }
+
+        private static void ClearFileQuality(
+            IOrganizationService service,
+            Guid reviewId,
+            string questionCode,
+            ChecklistQueries.GatingFacts facts)
+        {
+            foreach (var recorded in ChecklistQueries.ChoiceAnswersTo(service, reviewId, questionCode))
+            {
+                var outcome = recorded.GetAttributeValue<OptionSetValue>("al_answerchoice");
+                var refusal = ChecklistGating.FileQualityRefusal(
+                    outcome == null ? (int?)null : outcome.Value, facts.NoOrFailAnywhere);
+
+                if (refusal != null)
+                {
+                    Clear(service, recorded.Id);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Moves "Remedial action required?" to the answer the file quality outcome implies,
+        /// when that outcome is what has just been saved (project owner, 2026-09-23).
+        ///
+        /// <para>
+        /// The third side of the rule. ResponseGuardPlugin refuses a remedial answer the
+        /// outcome contradicts, and the page never offers one - but neither reaches an answer
+        /// recorded BEFORE the outcome moved. A checker who ticks Yes, then settles on Pass,
+        /// would otherwise leave the review holding exactly the pair both other halves exist
+        /// to prevent, with no screen willing to let them correct it.
+        /// </para>
+        /// <para>
+        /// Moved, not cleared, which is the one place this rule departs from its neighbours
+        /// above. They clear a grade or an outcome the form has contradicted, because what it
+        /// should become is a judgement only the checker can make. Here the outcome has
+        /// already made it: on a Pass the answer is No and on a Fail it is Yes, and leaving
+        /// the question blank would only oblige the checker to re-enter the one value it can
+        /// now take (it is mandatory, so the submit would stop them until they did).
+        /// </para>
+        /// <para>
+        /// An answer that is already right is not rewritten, so the ordinary save costs one
+        /// query and no update, and the audit does not fill with entries recording that
+        /// nothing changed. A question with no answer row yet is left alone rather than
+        /// created here: the page writes that one on the checker's behalf through the
+        /// answer's own autosave, where it is audited on the path every other answer takes.
+        /// </para>
+        /// <para>
+        /// This cannot recurse. The write it issues is a Yes / No answer to Q-FQ-03 or
+        /// Q-FQTAX-03, which is not a file quality outcome, so the run it triggers returns at
+        /// the code test below.
+        /// </para>
+        /// </summary>
+        private static void ReconcileRemedialAction(
+            IOrganizationService service, Entity target, Entity pre, Guid reviewId)
+        {
+            var choice = target.GetAttributeValue<OptionSetValue>("al_answerchoice");
+            if (choice == null)
+            {
+                return;
+            }
+
+            var implied = ChecklistGating.RemedialActionDefault(choice.Value);
+            if (!implied.HasValue)
+            {
+                return;
+            }
+
+            var questionVersionRef = target.GetAttributeValue<EntityReference>("al_questionversionid")
+                ?? (pre == null ? null : pre.GetAttributeValue<EntityReference>("al_questionversionid"));
+            if (questionVersionRef == null)
+            {
+                return;
+            }
+
+            // Confirmed on the code and not on the Pass / Fail scale, which AD-123 could put
+            // on any question. Only the two file quality outcomes carry this rule.
+            var code = ChecklistQueries.QuestionCodeForVersion(service, questionVersionRef.Id);
+            if (code == null)
+            {
+                return;
+            }
+
+            code = code.Trim();
+            if (!code.Equals(FileQuality.QuestionCode, StringComparison.OrdinalIgnoreCase)
+                && !code.Equals(FileQuality.TaxQuestionCode, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            // Both disciplines' question, because one review carries only one of them and
+            // asking for the other costs a query that finds nothing.
+            Move(service, reviewId, ChecklistGating.RemedialActionQuestionCode, implied.Value);
+            Move(service, reviewId, ChecklistGating.TaxRemedialActionQuestionCode, implied.Value);
+        }
+
+        private static void Move(
+            IOrganizationService service, Guid reviewId, string questionCode, int answer)
+        {
+            foreach (var recorded in ChecklistQueries.ChoiceAnswersTo(service, reviewId, questionCode))
+            {
+                var current = recorded.GetAttributeValue<OptionSetValue>("al_answerchoice");
+                if (current != null && current.Value == answer)
                 {
                     continue;
                 }
 
                 service.Update(new Entity("al_response", recorded.Id)
                 {
-                    ["al_answerchoice"] = null,
+                    ["al_answerchoice"] = new OptionSetValue(answer),
                 });
             }
+        }
+
+        private static void Clear(IOrganizationService service, Guid responseId)
+        {
+            service.Update(new Entity("al_response", responseId)
+            {
+                ["al_answerchoice"] = null,
+            });
         }
     }
 }
