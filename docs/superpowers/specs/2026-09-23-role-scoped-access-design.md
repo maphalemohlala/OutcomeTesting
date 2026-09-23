@@ -1,7 +1,7 @@
 # Role-scoped access: each person sees their own work
 
 Date: 2026-09-23
-Status: Design approved section by section; written spec awaiting review
+Status: Approved 2026-09-23; amended during planning (see "Amendments made while planning")
 Source: `docs/reference/2026-09-23-access-requirements.md` (AR-01 to AR-04)
 Supersedes: OD-022 (every authenticated portal user reads every case), AD-056 (reviewers read
 everything, write their own), and AD-083's organisation-wide Home counts
@@ -295,6 +295,66 @@ DEV, so negative tests cannot be run without them.
   Code App flags them).
 - A person holding both reviewer roles belongs to the AQS Team account while also checking
   Tax; that is correct, because Account scope grants only the queue.
+
+## Amendments made while planning (2026-09-23)
+
+Reading the code for the plan changed nine points. Where one of these conflicts with an
+earlier section, this section wins.
+
+1. **Roles and permissions are remapped by the project owner, not by this build.** Which
+   Code App rules each role holds, and who holds which Dataverse security role and team, is
+   the project owner's to set (direction, 2026-09-23). This build provides the mechanism: the
+   two teams, the "Outcome Testing Team Manager" security role, and the two web roles. It does
+   **not** change `AssignUserRolePlugin`. Adding a person to a team or giving them a security
+   role from an application command is exactly what AD-144 rejected ("a command gated by an
+   application rule must not confer platform privileges"). The "Membership follows the grant"
+   paragraph in section 3 is withdrawn.
+2. **Known residual, recorded rather than fixed here.** Tax and AQS reviewers hold `page.cases`
+   Edit in the Code App, and must hold `Outcome Testing App User` to be allocated work
+   (AD-144). That role has organisation-wide read (AD-135). Until the project owner's remap
+   takes checkers, advisers and T&C Supervisors off the Code App or off that role, anyone
+   holding it can read every case there. The portal boundary this spec builds does not close
+   that. Only the remap does.
+3. **The reconciler runs from plug-in steps, not from inside five commands.** Status changes
+   are written by `CaseTransitions.MoveThrough` from many commands, so it is registered as a
+   synchronous post-operation step on: `al_outcomecase` Update (filtering `al_casestatus`,
+   `al_reviewrouteid`, `al_advisername`, `al_adviseremail`); `al_reviewinstance` Create and
+   Update (filtering `al_assignedcontactid`, `al_submittedon`, `statecode`); and
+   `al_remediationaction` Create. Every writer is covered, and the step runs inside the
+   writer's transaction. It writes as SYSTEM
+   (`IOrganizationServiceFactory.CreateOrganizationService(null)`), because portal writes
+   arrive as the site's application user (AD-053) and sharing needs a privilege no caller
+   should hold. Its own case update touches only the access columns, which none of the
+   filters name, so it cannot re-trigger itself.
+4. **A sixth column, `al_aqsqueuedon`** (date and time), is stamped when the case enters the
+   AQS queue and cleared when it leaves. It gives *Waiting for AQS* without reading the Tax
+   review, which the queue permission deliberately cannot read. The "Tax review completed"
+   group is the queued cases whose route requires Tax: the queue lookup is only ever set once
+   the Tax review is submitted.
+5. **Release requires a remediation action.** A Pass case goes straight to `Closed`, which is
+   in the release range. So release is: at least one `al_remediationaction` on the case,
+   **and** status `Awaiting Remediation` through `Closed`, **and** no unsubmitted active
+   review. The adviser and supervisor columns are re-resolved while released (so a changed
+   adviser takes the case with them) and cleared if the case leaves the release range.
+6. **Cascade is set on the case relationships only**: `al_outcomecase_reviewinstance`,
+   `al_outcomecase_remediationaction`, `al_outcomecase_outcome`, `al_outcomecase_signoff`,
+   `al_outcomecase_caseassignment`, plus Reparent on `al_reviewinstance_response`, whose Share
+   is already Cascade. Audit events are dropped from the list, because no relationship joins
+   them to the case. `al_reviewinstance_remediationaction` and `al_reviewinstance_outcome`
+   stay `NoCascade`, so remedial actions and outcomes each inherit from one parent only. The
+   case relationship already covers them, and Dataverse restricts tables with more than one
+   cascading parent.
+7. **The share mask is Read, Write, Append, AppendTo and Assign**, not Read alone.
+   `al_AssignCase` writes the review instance, and changes its owner, through the caller's own
+   service, so a manager who can only read the team's cases could not allocate them.
+8. **Portal permission ids get a new band, `c0`–`df`.** The table-permission band `60`–`6f`
+   has seven ids left, and this adds 25. The two manager web roles are created through
+   `al_CreateRole` in DEV rather than minted in `webrole.yml`: they carry no portal
+   permission, and web roles are created live since AD-087.
+9. **Who may allocate is decided by role name, and denied by default.** Outcome Testing
+   Manager and Administrators may allocate either discipline; each team manager only their
+   own. Anyone else holding `command.assign` is refused unless no role mapping exists at all,
+   the same bootstrap `PermissionHelpers.EnsureAppPermission` has.
 
 ## Records
 
