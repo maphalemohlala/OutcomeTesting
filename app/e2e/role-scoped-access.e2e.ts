@@ -33,6 +33,11 @@ const SESSION_ADVISER = 'OT_SESSION_ADVISER';
 const SESSION_TAX_REVIEWER = 'OT_SESSION_TAX_REVIEWER';
 const SESSION_AQS_REVIEWER = 'OT_SESSION_AQS_REVIEWER';
 const SESSION_OVERSIGHT = 'OT_SESSION_OVERSIGHT';
+const SESSION_TC_SUPERVISOR = 'OT_SESSION_TC_SUPERVISOR';
+const SESSION_PLANNER = 'OT_SESSION_PLANNER';
+
+/** A released case whose adviser the T&C Supervisor session supervises. */
+const CASE_I_SUPERVISE = 'OT_CASE_I_SUPERVISE';
 
 /** A case released to the adviser session (at or past Remedial Action Required). */
 const CASE_RELEASED_TO_ME = 'OT_CASE_RELEASED_TO_ME';
@@ -163,6 +168,64 @@ test.describe('an AQS reviewer (AR-03)', () => {
     const portal = requireEnv(PORTAL_URL);
     await openCase(page, portal, requireEnv(CASE_NOT_MINE));
     await expectCaseWithheld(page);
+    await expectApiRefuses(page, portal, requireEnv(CASE_NOT_MINE));
+  });
+
+  // WRITES: allocates the queued case to the signed-in reviewer. Opt-in, like every write in
+  // this suite, and last in the group because it takes the case out of the queue.
+  test('picks a waiting case up, and it leaves the queue for them', async ({ page }) => {
+    test.skip(env('OT_ALLOW_WRITES') === undefined, 'set OT_ALLOW_WRITES=1 to let this claim a real case');
+    const portal = requireEnv(PORTAL_URL);
+    const caseId = requireEnv(CASE_IN_AQS_QUEUE);
+    await page.goto(`${portal.replace(/\/+$/, '')}/aqs-reviews`);
+    await expectSignedIn(page, portal);
+
+    const row = page.getByRole('row').filter({ hasText: requireEnv(CASE_IN_AQS_QUEUE_REF) });
+    await row.getByRole('button', { name: 'Run checks' }).click();
+    await page.getByRole('button', { name: 'Continue' }).click();
+
+    // ClaimCasePlugin allocated it and the page moved on to the checklist.
+    // The page moves to /review/?case=<id>&type=<review type>.
+    await expect(page).toHaveURL(new RegExp(`/review/?\\?case=${caseId}(&|$)`, 'i'));
+    await expectNoLiquidError(page);
+
+    // Still readable - now as their own check rather than through the queue.
+    await openCase(page, portal, caseId);
+    await expectCaseShown(page);
+  });
+});
+
+test.describe('a T&C Supervisor (AR-04, the advisers they supervise)', () => {
+  requires(PORTAL_URL, SESSION_TC_SUPERVISOR, CASE_I_SUPERVISE, CASE_NOT_MINE, CASE_MINE_IN_REVIEW);
+  test.use({ storageState: env(SESSION_TC_SUPERVISOR) });
+
+  test('sees a released case of an adviser they supervise', async ({ page }) => {
+    const portal = requireEnv(PORTAL_URL);
+    await openCase(page, portal, requireEnv(CASE_I_SUPERVISE));
+    await expectCaseShown(page);
+  });
+
+  test('does not see a case they do not supervise, or one still in review', async ({ page }) => {
+    const portal = requireEnv(PORTAL_URL);
+    for (const name of [CASE_NOT_MINE, CASE_MINE_IN_REVIEW]) {
+      await openCase(page, portal, requireEnv(name));
+      await expectCaseWithheld(page);
+      await expectApiRefuses(page, portal, requireEnv(name));
+    }
+  });
+});
+
+test.describe('a Planner (no portal access; emails only)', () => {
+  requires(PORTAL_URL, SESSION_PLANNER, CASE_NOT_MINE);
+  test.use({ storageState: env(SESSION_PLANNER) });
+
+  // Run it a few minutes after the role change: the portal keeps the previous roles for a
+  // short while, and a Planner who was an adviser a moment ago still gets My Work.
+  test('is denied every portal page and every case', async ({ page }) => {
+    const portal = requireEnv(PORTAL_URL);
+    for (const path of ['/', '/cases', '/remediation', `/case-details?id=${requireEnv(CASE_NOT_MINE)}`]) {
+      await expectPageDenied(page, portal, path);
+    }
     await expectApiRefuses(page, portal, requireEnv(CASE_NOT_MINE));
   });
 });
