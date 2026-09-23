@@ -234,6 +234,87 @@ template was confirmed **live rather than cached** by reading the raw review HTM
 finding `userDriven`, `lockedValues`, `allLocked` and the load-time guard in it - the render
 cache took it immediately this time, which AD-094 says cannot be relied on.
 
+## Third pass: the Products catalogue, and why the selections never showed
+
+Products held **four placeholders**. It now holds the **55 products** the project owner
+gave on 2026-09-23, in DEV and TEST, created with `webapimany` in one connection.
+
+The four placeholders are **deactivated, not deleted**: three TEST cases genuinely hold
+them, and the review page already renders a held-but-no-longer-offered option ticked and
+marked "(retired)". Deleting them would have taken those cases' history with them.
+
+### Why the selected products were not showing
+
+Three separate causes, which is why it looked intermittent:
+
+1. **The save was faulting, so nothing was ever written.** This is `AD-210`, and it is the
+   main one. `ListOptionRules.AppliedByAssociation` - the guard that keeps `al_productids`
+   out of the `ColumnSet`, because Products is a many-to-many naming no column - existed
+   **only in the working tree and in no commit**. Every header edit touching Products
+   faulted on the READ, and because the submit flushes the header first, the fault took the
+   submit with it. Deployed 08:29Z on 2026-09-23.
+2. **There was nothing recognisable to select.** Even a save that landed could only record
+   "Product 1 (placeholder)".
+3. **The render cache lags (`AD-094`, up to fifteen minutes).** A correct save can still
+   leave the page showing the box unticked, which looks identical to a save that did
+   nothing. Verify against the Web API, never by eye.
+
+And a fourth thing that is not a defect but made the other three harder to see: on an
+**editable** review the header had no summary at all, only the tick boxes themselves. With
+everything unticked there was nothing on screen to read as "no products selected" rather
+than "this field is broken". The collapsed picker now **names what is ticked**.
+
+Proved end to end on DEV after this deployment, by associating one product and reading the
+review page back:
+
+| | Result |
+|---|---|
+| Shut, cell height | **45px** - one line, summary reads "Offshore Bond" |
+| Open, cell height | **329px** - capped and scrolled, not 55 rows tall |
+| Search "bond" | 5 of 55 shown |
+| Search "zzzz" | **1** shown - the ticked one, never filtered away |
+
+### The three names that were normalised
+
+Whitespace only, no words changed:
+
+| As given | As created |
+|---|---|
+| `Lump Sum Allowance & Death Benefit Allowance ` (trailing space) | `Lump Sum Allowance & Death Benefit Allowance` |
+| `Existing  ISA/GIA Fund Switch` (double space) | `Existing ISA/GIA Fund Switch` |
+| `Personal Pension  - Stakeholder/GPP/ PP` | `Personal Pension - Stakeholder/GPP/PP` |
+
+Say the word if any of those three was deliberate and it is one PATCH each.
+
+### Deployed in this pass
+
+| Artefact | DEV | TEST |
+|---|---|---|
+| `OT Review Detail` (232,982 -> 239,041 chars) | 10:33:12Z | 10:45:54Z |
+| `outcome-testing.css` (65,237 bytes) | 10:33:25Z | 10:46:09Z |
+| `OT Layout` (stylesheet `?v=22` -> `?v=23`) | 10:46:47Z | 10:47:34Z |
+| 55 products created, 4 placeholders retired | yes | yes |
+
+`OT Layout` reports 2,211 -> 2,156 chars, which is **not** content being lost: the file is
+55 lines and the upload normalises CRLF to LF. Checked against TEST before pushing it
+there, and the only difference from the live copy was the `?v=` bump.
+
+### Portal e2e, both environments, for the first time
+
+| | DEV | TEST |
+|---|---|---|
+| Portal e2e | **6 passed, 6 skipped, 0 failed** | **6 passed, 6 skipped, 0 failed** |
+| App tests | 1,019 passed across 77 files | (same build) |
+
+TEST needed its own `npm run e2e:auth` (AD-215). One sign-in covered both because the DEV
+session was copied aside first - `e2e/.auth/` now holds `portal.dev.json` and
+`portal.test.json` beside the live `portal.json`, so switching environments is a copy
+rather than a sign-in. They are live sessions and the directory is gitignored.
+
+**`pa app push` could not run**: `pa auth` reports the sign-in session expired and needs an
+interactive login. The app CHANGE is committed and its tests pass, but the built bundle has
+not been pushed.
+
 ## Known-open
 
 **The AQS all-Yes lock withdraws the Breach and Record Keeping reasons too.** The File Quality
