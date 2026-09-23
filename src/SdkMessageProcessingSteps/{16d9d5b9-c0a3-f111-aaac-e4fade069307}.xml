@@ -14,5 +14,13 @@
   <IsHidden>0</IsHidden>
   <SupportedDeployment>0</SupportedDeployment>
   <IntroducedVersion>1.0.0.0</IntroducedVersion>
+  <!-- Stamped 2026-09-20, audit finding 3. Dataverse imports a step DISABLED
+       unless activation is requested, and an import that forgot the
+       activate-plugins flag switched these off once already (2026-09-02, six
+       al_response steps, unnoticed for a week). The export does not emit these
+       two elements, so round-trip-src.ps1 re-applies them after every export;
+       see Restore-StepState there. Do not remove either without reading that. -->
+  <StateCode>Enabled</StateCode>
+  <StatusCode>Enabled</StatusCode>
   <SdkMessageProcessingStepImages />
 </SdkMessageProcessingStep>
