@@ -181,14 +181,14 @@ describe('the remedial action lock', () => {
   /** syncRemedialAction, which replaced the default on 2026-09-23. */
   const sync = () =>
     script.slice(
-      script.indexOf('var syncRemedialAction = function ()'),
+      script.indexOf('var syncRemedialAction = function (userDriven)'),
       script.indexOf('for (var sr = 0; sr < answerRows.length'),
     );
 
   it('reads No for a Pass and Yes for a Fail', () => {
     const fn = script.slice(
       script.indexOf('var impliedRemedial = function ()'),
-      script.indexOf('var syncRemedialAction = function ()'),
+      script.indexOf('var syncRemedialAction = function (userDriven)'),
     );
 
     expect(fn).toContain('if (outcome === GRADE_PASS) { return NO; }');
@@ -242,8 +242,7 @@ describe('the remedial action lock', () => {
   it('saves through the answer autosave rather than writing on its own', () => {
     // Setting `checked` in script raises no event, and the autosave listens for `change`.
     // Dispatching it means the tick is saved, audited and refused on exactly the path a
-    // checker's own click takes - and it is also what repairs a review already holding the
-    // contradiction, where lockOptions has just unticked the stored answer.
+    // checker's own click takes.
     expect(sync()).toContain("event.initEvent('change', true, false)");
     expect(sync()).toContain('dispatchEvent(event)');
   });
@@ -251,8 +250,46 @@ describe('the remedial action lock', () => {
   it('runs at load as well as on change', () => {
     // A default only had to act when the outcome moved. A lock has to hold on a page opened
     // against an answer already saved - including one saved before the rule existed.
-    expect(script).toContain('syncRemedialAction();');
-    expect(script).toContain("fqInputs[fi].addEventListener('change', syncRemedialAction);");
+    expect(script).toContain('syncRemedialAction(false);');
+    // Wrapped, not passed straight in: a listener is handed the EVENT, which is truthy,
+    // so the bare function as a listener would read as userDriven no matter who called it.
+    expect(script).toContain("fqInputs[fi].addEventListener('change', function () {");
+    expect(script).toContain('syncRemedialAction(true);');
+  });
+
+  it('writes NOTHING at load, however the outcome reads', () => {
+    /*
+     * The defect this closes: opening a review whose file quality outcome was a Pass and
+     * whose "Remedial action required?" was simply UNANSWERED ticked No and dispatched
+     * change, so the autosave PATCHed it. Reading a page answered a mandatory question and
+     * recorded it against whoever opened it.
+     *
+     * The guard has to sit BEFORE the tick loop, not inside it - the loop is what dispatches.
+     */
+    const fn = sync();
+    const guard = fn.indexOf('if (!userDriven) { return; }');
+    expect(guard, 'the load-time path returns before it can write').toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(fn.indexOf('dispatchEvent(event)'));
+  });
+
+  it('says so rather than silently repairing a stored contradiction', () => {
+    // lockOptions has just unticked an answer the outcome forbids. The question is mandatory,
+    // so leaving the row blank with no word for it is the "my work was lost" report that
+    // AD-096 already had once.
+    const fn = sync();
+    expect(fn).toContain('if (cleared && !userDriven) {');
+    expect(fn).toContain('Please answer it again.');
+  });
+
+  it('still locks the row at load, having declined to write to it', () => {
+    // Declining to WRITE is not declining to act: the whole point of the 2026-09-23 change
+    // is that the forbidden option is disabled, and that has to hold on a page opened
+    // against an outcome already saved. So the two lockOptions calls must come BEFORE the
+    // guard that returns, not after it.
+    const fn = sync();
+    expect(fn.indexOf("lockOptions(remedialRow, '|' + unwanted + '|', true);")).toBeLessThan(
+      fn.indexOf('if (!userDriven) { return; }'),
+    );
   });
 
   it('is rendered locked by the server too, before any script runs', () => {

@@ -1897,7 +1897,33 @@
 
               var chosen = opts.querySelector('input[type="radio"]:checked');
               var chosenValue = chosen ? chosen.value : null;
-              var wasDisabled = !!opts.querySelector('input[type="radio"][disabled]');
+
+              /*
+               * WHICH options were locked, one by one - not WHETHER any of them was.
+               *
+               * This read querySelector('[disabled]') into a single flag and applied that
+               * flag to every option it then rebuilt. That was right for as long as a lock
+               * was all or nothing: a read-only form disabled the row entire. Since
+               * 2026-09-23 the gating rules disable a SINGLE option and leave the rest live
+               * - Pass taken away by a finding, Yes taken away by a file quality Pass - so
+               * collapsing it to one flag re-drew the row with EVERY option dead, and a
+               * checker whose checklist was reissued mid-answer could no longer answer the
+               * question at all.
+               *
+               * Read-only still holds, because it is the same rule read honestly: a row
+               * where every option was locked sets allLocked, and any option the new scale
+               * ADDS is locked with it rather than arriving live on a form nobody may edit.
+               */
+              var priorInputs = opts.querySelectorAll('input[type="radio"]');
+              var lockedValues = '|';
+              var lockedCount = 0;
+              for (var d = 0; d < priorInputs.length; d += 1) {
+                if (!priorInputs[d].disabled) { continue; }
+                lockedValues += priorInputs[d].value + '|';
+                lockedCount += 1;
+              }
+              var allLocked = priorInputs.length > 0 && lockedCount === priorInputs.length;
+
               var keeps = false;
               for (var i = 0; i < scale.values.length; i += 1) {
                 if (String(scale.values[i]) === chosenValue) { keeps = true; }
@@ -1917,7 +1943,10 @@
                 input.value = value;
                 input.setAttribute('data-ot-input', '');
                 input.setAttribute('aria-label', wording + ': ' + scale.labels[v]);
-                if (wasDisabled) { input.disabled = true; }
+                if (allLocked || lockedValues.indexOf('|' + value + '|') !== -1) {
+                  input.disabled = true;
+                  label.className = 'opt opt--locked';
+                }
                 if (keeps && value === chosenValue) { input.checked = true; }
                 label.appendChild(input);
                 label.appendChild(document.createTextNode(' ' + scale.labels[v]));
@@ -2863,7 +2892,29 @@
                 return '';
               };
 
-              var syncRemedialAction = function () {
+              /*
+               * `userDriven` says whether a CHECKER moved the outcome just now, and it
+               * decides one thing only: whether this may write.
+               *
+               * On a change it may, and does - ticking the implied answer and saving it is
+               * the convenience this replaced a default with, and the checker is sitting
+               * there having caused it.
+               *
+               * At load it may NOT, and that is the fix of 2026-09-23. Opening a review
+               * whose outcome was a Pass and whose remedial question was simply UNANSWERED
+               * used to tick No and dispatch change, so merely looking at a page answered a
+               * mandatory question, saved it, and stamped the checker's name on an answer
+               * they never gave. A page that is read must stay a page that is read.
+               *
+               * The contradiction a load DOES find - an answer stored against an outcome
+               * since moved under it - is unticked by lockOptions and then said out loud,
+               * rather than repaired behind the checker's back. It is the server's job in
+               * any case: ResponseProgressPlugin.ReconcileRemedialAction moves that answer
+               * when the outcome is saved, and ResponseGuardPlugin refuses a new one
+               * (NFR-SEC-01). The page is the affordance, and an affordance does not write
+               * on its own.
+               */
+              var syncRemedialAction = function (userDriven) {
                 if (!remedialRow) { return; }
 
                 var wanted = impliedRemedial();
@@ -2887,7 +2938,22 @@
                  */
                 var unwanted = wanted === YES ? NO : YES;
                 lockOptions(remedialRow, '|' + wanted + '|', false);
-                lockOptions(remedialRow, '|' + unwanted + '|', true);
+                var cleared = lockOptions(remedialRow, '|' + unwanted + '|', true);
+
+                /*
+                 * Said, not silently repaired. The stored answer has just been unticked on
+                 * screen and the question is mandatory, so the checker is told what happened
+                 * and left to answer it - which saves on the same path their own click takes.
+                 */
+                if (cleared && !userDriven) {
+                  say(remedialRow.querySelector('[data-ot-status]'),
+                    'Remedial action cleared — the file quality outcome on this review is '
+                      + (wanted === NO ? 'a Pass, so no remedial action can be required.'
+                        : 'a Fail, so a remedial action is required.')
+                      + ' Please answer it again.');
+                }
+
+                if (!userDriven) { return; }
 
                 var inputs = remedialRow.querySelectorAll('[data-ot-input]');
                 for (var i = 0; i < inputs.length; i++) {
@@ -2921,7 +2987,13 @@
               if (fileQualityRow) {
                 var fqInputs = fileQualityRow.querySelectorAll('[data-ot-input]');
                 for (var fi = 0; fi < fqInputs.length; fi++) {
-                  fqInputs[fi].addEventListener('change', syncRemedialAction);
+                  // Wrapped rather than passed straight in: a listener is handed the EVENT,
+                  // which is an object and therefore truthy, so `syncRemedialAction` as a
+                  // listener would read every load-time call as user-driven the moment
+                  // anybody refactored the call below into one.
+                  fqInputs[fi].addEventListener('change', function () {
+                    syncRemedialAction(true);
+                  });
                 }
               }
 
@@ -2933,7 +3005,7 @@
                * on a page opened against an answer already saved - including one saved before
                * this rule existed, where the review is sitting on the contradiction now.
                */
-              syncRemedialAction();
+              syncRemedialAction(false);
             }
           })();
         </script>

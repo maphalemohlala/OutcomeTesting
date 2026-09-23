@@ -106,6 +106,42 @@ describe('the review page re-reads its checklist through the Web API', () => {
     expect(repoint).toBeLessThan(rebuild);
   });
 
+  it('re-locks the options that were locked, one by one', () => {
+    /*
+     * Since 2026-09-23 a lock is PER OPTION - a finding takes Pass away and leaves Fail
+     * live; a file quality Pass takes Yes away and leaves No live. rebuild() read
+     * `querySelector('[disabled]')` into one boolean and applied it to every option it then
+     * drew, so a row that had ONE option locked came back with all of them locked, and a
+     * checker whose checklist was reissued mid-answer could not answer the question at all.
+     *
+     * The test is on the rebuild, not on the gating: the gating rules run in a different
+     * script and do not re-run when a row is redrawn under them.
+     */
+    const rebuild = reviewTemplate.slice(
+      reviewTemplate.indexOf('function rebuild(row, liveType, current)'),
+      reviewTemplate.indexOf('function reheadGrids()'),
+    );
+
+    expect(rebuild, 'the single boolean is gone').not.toMatch(/wasDisabled/);
+    expect(rebuild).toContain("lockedValues += priorInputs[d].value + '|';");
+    expect(rebuild).toContain("lockedValues.indexOf('|' + value + '|') !== -1");
+  });
+
+  it('keeps a wholly read-only row read-only, including options the new scale adds', () => {
+    // The case the single boolean got RIGHT, which the per-option rule must not lose: a
+    // read-only form disables the row entire, and a value the new scale introduces has no
+    // predecessor to copy a lock from.
+    const rebuild = reviewTemplate.slice(
+      reviewTemplate.indexOf('function rebuild(row, liveType, current)'),
+      reviewTemplate.indexOf('function reheadGrids()'),
+    );
+
+    expect(rebuild).toContain(
+      'var allLocked = priorInputs.length > 0 && lockedCount === priorInputs.length;',
+    );
+    expect(rebuild).toContain("if (allLocked || lockedValues.indexOf('|' + value + '|') !== -1) {");
+  });
+
   it('starts hidden and survives a page that never runs it', () => {
     // Progressive enhancement: a failure, a refusal or a browser that never runs this
     // leaves the server-rendered form exactly as it was. A stale form is what we already
