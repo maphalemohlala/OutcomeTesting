@@ -20,10 +20,8 @@ namespace OutcomeTesting.Plugins
     /// only resolve through Contact relationships (AD-047). Both are derived from one work
     /// email, the canonical cross-system identifier (OD-003, AD-010).
     ///
-    /// Not addressed, and deliberately so: OD-029 records that per-team scoping is unsolved.
-    /// <c>al_assignedteam</c> is free text and Senior Checker carries no team affiliation,
-    /// so nothing here stops a Tax lead allocating an AQS review. Inventing a team model to
-    /// close that would be inventing a business rule.
+    /// Per-team scoping is enforced here since AD-218 (closing OD-029(c)): see
+    /// <see cref="AllocationScope"/>.
     /// </summary>
     public class AssignCasePlugin : PluginBase
     {
@@ -123,6 +121,13 @@ namespace OutcomeTesting.Plugins
 
             var review = ResolveReviewInstance(userService, systemService, outcomeCase, requestedReviewId, assignee);
             var reviewId = review.Id;
+
+            // AD-218: each team manager allocates their own discipline, and only to someone
+            // holding that discipline's reviewer role. After ResolveReviewInstance because the
+            // discipline is the review's; a refusal rolls back any review it opened.
+            var reviewType = ReviewTypeOf(review) ?? 0;
+            AllocationScope.EnsureCallerMayAllocate(systemService, context, reviewType);
+            AllocationScope.EnsureAssigneeHoldsDiscipline(systemService, assignee, reviewType);
 
             ReleasePriorAssignments(userService, caseId);
 

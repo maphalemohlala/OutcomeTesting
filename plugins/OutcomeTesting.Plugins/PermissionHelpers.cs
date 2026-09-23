@@ -86,13 +86,7 @@ namespace OutcomeTesting.Plugins
             // would re-open the gate for everyone whenever the last mapping is deactivated
             // or a migration lands them inactive — a table that has rows but none active is
             // a configuration to enforce, not a system waiting to be seeded.
-            var anyMapping = new QueryExpression(MappingEntity)
-            {
-                ColumnSet = new ColumnSet(false),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            if (systemService.RetrieveMultiple(anyMapping).Entities.Count == 0)
+            if (!AnyMappingExists(systemService))
             {
                 return;
             }
@@ -123,6 +117,22 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.UnauthorizedPrefix +
                     "Your role does not grant the required access for this action (" + resourceKey + ").");
             }
+        }
+
+        /// <summary>
+        /// Whether any role mapping has ever been created, in any state: the bootstrap test
+        /// EnsureAppPermission and the allocation scope share, so the two cannot disagree
+        /// about whether an environment is still being set up.
+        /// </summary>
+        public static bool AnyMappingExists(IOrganizationService service)
+        {
+            var anyMapping = new QueryExpression(MappingEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            return service.RetrieveMultiple(anyMapping).Entities.Count > 0;
         }
 
         /// <summary>
