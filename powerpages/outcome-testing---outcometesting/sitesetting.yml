@@ -161,10 +161,10 @@
   adx_name: Webapi/al_questionversion/enabled
   adx_sitesettingid: e00c019c-c9b5-f111-aaac-e4fade069307
   adx_value: 'true'
-- adx_description: "Columns the review page's freshness check reads on al_questionversion. Every one of them is already rendered into the page by the Liquid fetch above it, so this exposes nothing the checker cannot already see; it is the effective dates and the response type that let the page tell a superseded version from the one in force."
+- adx_description: "Columns the review page's freshness check reads on al_questionversion. Every one of them is already rendered into the page by the Liquid fetch above it, so this exposes nothing the checker cannot already see; it is the effective dates and the response type that let the page tell a superseded version from the one in force. _al_questionid_value is listed alongside al_questionid because a LOOKUP is allowlisted under the name the query actually SELECTS, and the page selects the _value form. Without it the WHOLE request is refused with 90040101, not just that one column, so the freshness check returned 403 on every page load from the day it shipped (2026-09-21) until 2026-09-22 - and failed silently, because the page renders from the Liquid fetch either way and the only symptom was a stale scale nobody could reproduce."
   adx_name: Webapi/al_questionversion/fields
   adx_sitesettingid: 28a859a4-c9b5-f111-aaac-e4fade069307
-  adx_value: al_questionversionid,al_questiontext,al_responsetype,al_ismandatory,al_effectivefrom,al_effectiveto,al_questionid
+  adx_value: al_questionversionid,al_questiontext,al_responsetype,al_ismandatory,al_effectivefrom,al_effectiveto,al_questionid,_al_questionid_value
 - adx_description: "Exposes al_reviewinstance to the portal Web API so the review page can request a submission. Paired with a one-column allowlist: the only writable column is al_submitrequested, which SubmitRequestPlugin reads. A Custom API cannot be called from a page and this replaces the cloud flow that used to bridge that gap."
   adx_name: Webapi/al_reviewinstance/enabled
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a3

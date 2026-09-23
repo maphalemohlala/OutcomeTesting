@@ -34,6 +34,27 @@ test.describe('the managed lists on a review page', () => {
     await expectSignedIn(page, portal);
     await expectNoLiquidError(page);
 
+    /*
+     * The four lists below are HEADER fields, and from 2026-09-22 the header is frozen once
+     * the Tax check on the case has been submitted. On such a review none of them render at
+     * all - correctly - and the tally at the end of this test then fails, blaming the lists
+     * for a lock that is working.
+     *
+     * So the freeze is detected and named, rather than left to look like the AD-192 defect.
+     * It is anchored on the editable control being ABSENT while the header itself is present,
+     * which a page that failed to render would not satisfy.
+     */
+    const frozen = await page.evaluate(() =>
+      document.querySelectorAll('[data-ot-hdr]').length === 0
+      && /header is now read-only/i.test(document.body.innerText));
+
+    if (frozen) {
+      test.skip(true,
+        'the header on this review is frozen because the Tax check has been submitted; '
+        + 'point OT_REVIEW_URL at a review whose header is still editable');
+      return;
+    }
+
     // Each of the four single-choice lists. "Not set" alone is the 403 rendered as data,
     // so the bar is at least one REAL option beyond it.
     const checked: string[] = [];

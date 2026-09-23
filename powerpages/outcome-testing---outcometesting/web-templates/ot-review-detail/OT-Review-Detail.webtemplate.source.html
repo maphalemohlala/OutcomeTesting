@@ -218,6 +218,30 @@
     {% endif %}
 
     {% comment %}
+      The case header does NOT freeze when the Tax check is submitted (project owner,
+      2026-09-23: "both teams need to be able to edit the headers").
+
+      It did for one day. On 2026-09-22 this page ran a second fetch for a submitted Tax
+      review on the case and forced `header_locked` true when it found one, so an AQS
+      checker picking the case up after the handover read the Tax checker's header but could
+      not correct it. That is reversed, and the fetch is gone with it - a query whose answer
+      no longer changes anything is a query to delete, not to leave wired to a variable
+      nothing reads.
+
+      So the header follows `locked` alone: read-only exactly when THIS review is submitted
+      (PP-11), and editable by whichever team holds the open review otherwise. That matches
+      what the server now does - CaseHeaderRequestPlugin asks EnsureAssignedToCase and
+      nothing else about the ordinary fields - and keeping the two readings identical is
+      what stops the page offering an edit the server refuses, or refusing one it would
+      allow.
+
+      The Tax team's own two fields are the exception and are handled where they are drawn,
+      below: they re-derive the review route (BR-004, AD-036), so EnsureTaxReviewOpen goes
+      on refusing them once the Tax check is submitted.
+    {% endcomment %}
+    {% assign header_locked = locked %}
+
+    {% comment %}
       AD-056: a reviewer reads every review but changes only their own. Because reading
       another reviewer's review is now intended, the page must say so and disable its
       controls - otherwise a checker types into fields that the table permissions will
@@ -555,7 +579,7 @@
             made by hand for any case id and hiding the inputs would enforce nothing
             (NFR-SEC-01).
           {% endcomment %}
-          {% if locked == false %}
+          {% if header_locked == false %}
           <tr>
             <td class="lbl">Adviser name</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_advisername" value="{{ rv['case.al_advisername'] | escape }}" aria-label="Adviser name" /></td>
             <td class="lbl">Adviser status</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_adviserstatus" aria-label="Adviser status"><option value="">&mdash;</option><option value="120910500" {% if h_adviserstatus.value == 120910500 %}selected{% endif %}>PreCAS</option><option value="120910501" {% if h_adviserstatus.value == 120910501 %}selected{% endif %}>CAS</option><option value="120910502" {% if h_adviserstatus.value == 120910502 %}selected{% endif %}>Enhanced</option><option value="120910503" {% if h_adviserstatus.value == 120910503 %}selected{% endif %}>Watchlist</option></select></td>
@@ -717,7 +741,7 @@
             data-case-id lives here because the script needs the case whether or not the Tax
             row above it was rendered.
           {% endcomment %}
-          {% if locked == false %}
+          {% if header_locked == false %}
           <tr id="ot-header-statusrow">
             <td class="lbl">Header</td>
             <td class="val" colspan="3">
@@ -726,6 +750,15 @@
             </td>
           </tr>
           {% endif %}
+          {% comment %}
+            The notice that stood here is gone with the rule it explained (2026-09-23). It
+            told an AQS checker on an open review that a submitted Tax check had made the
+            header read-only; the header is no longer read-only for them, so the only thing
+            it could do now is describe a restriction that is not there.
+
+            A reviewer whose OWN review is submitted still needs no notice: the status badge
+            at the top of the page already says why their fields are text rather than inputs.
+          {% endcomment %}
         </tbody>
       </table>
     {% endcapture %}
@@ -989,11 +1022,65 @@
 
           Accumulated as the loop passes E1 to E5, which it does before Judgement and grading
           - S-GRADE is the last section in display order, and the grade is the only thing this
-          feeds. GradingRules.SuitabilityGradeRefusal is the authority: it refuses the write in
+          feeds. ChecklistGating is the authority: its rules refuse the write in
           ResponseGuardPlugin and again in the submit command, so what this drives is which
           options the page offers, never which ones can be saved.
         {% endcomment %}
-        {% assign suitability_insufficient = false %}
+        {% comment %}
+          What the rest of the form says, worked out BEFORE anything is drawn (project owner,
+          2026-09-22).
+
+          A pass of its own, and it has to be. The document draws File Quality Outcome third,
+          before the five Suitability sections, so a flag accumulated as the rows are rendered
+          would not yet know about a Fail on E3 when the outcome's own options are decided -
+          and the page would open offering a Pass the server refuses. The grade escaped that
+          only because S-GRADE happens to be drawn last, which is a fact about the running
+          order rather than a rule anyone wrote down.
+
+          Cost is one nested walk of answers by question, which the render loop below already
+          pays per row. ChecklistGating is the authority for what each flag means; this decides
+          only which options the page OFFERS, never which may be saved - the guard, the
+          progress step and the submit command each refuse the write (NFR-SEC-01).
+
+          An answer whose question carries one of the five outcome codes is skipped, because
+          those are what the test points add up to. Without that, choosing Pass would default
+          Remedial action required? to No and the No would take the Pass straight back off.
+        {% endcomment %}
+        {% assign form_insufficient = false %}
+        {% assign form_nofail = false %}
+        {% assign form_fq_outcome = 0 %}
+        {% assign outcome_codes = '|Q-FQ-01|Q-FQTAX-01|Q-FQ-03|Q-FQTAX-03|Q-GR-01|' %}
+        {% assign fq_outcome_codes = '|Q-FQ-01|Q-FQTAX-01|' %}
+        {% for scan_qv in qrows %}
+          {% capture scan_code %}|{{ scan_qv['q.al_questioncode'] }}|{% endcapture %}
+          {% for scan_a in arows %}
+            {% if scan_a.al_questionversionid.id == scan_qv.al_questionversionid %}
+              {% assign scan_value = scan_a.al_answerchoice.value %}
+              {% comment %}
+                The file quality outcome is READ here rather than skipped, which is why the
+                outcome-code test moved inside this loop on 2026-09-23. It is one of the five
+                codes that must not count towards the findings - and it is also the answer
+                that decides Remedial action required?, so the scan has to come away holding
+                its value while still leaving it out of the sum.
+              {% endcomment %}
+              {% if fq_outcome_codes contains scan_code and scan_value %}
+                {% assign form_fq_outcome = scan_value %}
+              {% endif %}
+              {% unless outcome_codes contains scan_code %}
+                {% if scan_value == 120910302 %}{% assign form_insufficient = true %}{% endif %}
+                {% if scan_value == 120910301 or scan_value == 120910306 %}{% assign form_nofail = true %}{% endif %}
+              {% endunless %}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+        {% comment %}
+          The AML and CRA tally that stood here is gone (2026-09-23). It recorded whether that
+          section held a finding, for the rule that locked the AQS fail points UNTIL one
+          arrived - a rule now reversed to "locked once every point reads Yes" - and no branch
+          on this page ever read it: the fail points block is drawn open and syncFailPoints
+          settles it on load. Counting a section the server does not use is how a flag drifts
+          out of step with the rule it is named after without any test noticing.
+        {% endcomment %}
         {% comment %}
           Sections outer, that section's questions inner. The rows are matched on the section
           CODE rather than the section id, because the code is a plain string on both sides
@@ -1034,14 +1121,15 @@
           {% assign sid = qv['s.al_sectionid'] %}
           {% assign scode = qv['s.al_sectioncode'] %}
           {% comment %}
-            The Suitability core checks, by section code rather than by display name, as the
-            batch asked. This is a substring test because this site's Liquid has no prefix
-            filter to rely on (see the filter limits recorded for OT Case List); the server's
-            GradingRules.IsSuitabilitySection is the exact rule - S-E followed by a digit -
-            and it is the one that decides. The two agree on every section that exists.
+            The Suitability core checks used to be marked here, so the grade restriction could
+            watch them and no other section. That rule went on 2026-09-22 - "if insufficient
+            evidence is selected at any section not just the File quality AML and CRA section" -
+            and the marker went with it rather than being left on the rows reading as though
+            something still depended on it. Every answer row now carries its question code and
+            its section code, which is what the widened rules key on; GradingRules.
+            IsSuitabilitySection went from the server in the same change and for the same
+            reason.
           {% endcomment %}
-          {% assign is_suitability = false %}
-          {% if scode contains 'S-E' %}{% assign is_suitability = true %}{% endif %}
           {% assign sname = qv['s.al_name'] %}
           {% assign shelp = qv['s.al_helptext'] %}
           {% assign soptional = qv['s.al_isoptional'] %}
@@ -1228,7 +1316,7 @@
           {% if blk != current_blk %}
             {% unless first_row %}
               {% if blk_subsections and prev_help != blank %}
-                <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
+                <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-question-code="{{ lens_tick_code | escape }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_code = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
               {% endif %}
               </tbody>
             </table>
@@ -1262,6 +1350,13 @@
                 {% if a.al_questionversionid.id == qv.al_questionversionid %}{% assign fq_existing = a %}{% endif %}
               {% endfor %}
               <h2>File Quality &ndash; Fail points</h2>
+              {% comment %}
+                Why the ticks below are greyed, when they are (project owner, 2026-09-22).
+                Empty and hidden until the script has something to say, so a checker whose
+                fail points are open never sees it - and one whose are not is told why rather
+                than left clicking a box that does nothing.
+              {% endcomment %}
+              <p class="intro" data-ot-failpoints-note hidden></p>
               <table class="fails" data-ot-failpoints-for="{{ qv.al_questionversionid }}">
                 <thead>
                   <tr>
@@ -1309,7 +1404,7 @@
           {% if sid != current_section %}
             {% if blk_subsections %}
               {% if current_section != '' and prev_help != blank %}
-                <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
+                <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-question-code="{{ lens_tick_code | escape }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_code = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
               {% endif %}
               <tr class="section"><td colspan="{{ ncols }}">{{ scode | remove_first: 'S-' }}. {{ sname | escape }}{% if soptional %} <span class="ot-optional">Optional</span>{% endif %}</td></tr>
             {% endif %}
@@ -1350,10 +1445,6 @@
             {% assign grade_value = chosen_value %}
           {% endif %}
 
-          {% if is_suitability and chosen_value == '120910302' %}
-            {% assign suitability_insufficient = true %}
-          {% endif %}
-
           {% assign qcode = qv['q.al_questioncode'] %}
           {% if qcode contains '-LENS' %}
             {% comment %}
@@ -1363,13 +1454,16 @@
               - there is no status line on that row, and show() already tolerates its absence.
             {% endcomment %}
             {% assign lens_tick_id = qv_id %}
+            {% assign lens_tick_code = qcode %}
             {% assign lens_tick_span = 1 %}
             {% capture lens_tick_cell %}<td class="optcell"><input type="checkbox" class="cc-box" value="120910305" data-ot-input aria-label="{{ qv.al_questiontext | escape }}"{% unless editable %} disabled{% endunless %}{% if chosen_value == '120910305' %} checked{% endif %} /></td>{% endcapture %}
 
           {% elsif blk_layout == 'grid' and rt == blk_rt %}
-            <tr data-ot-answer{% if is_suitability %} data-ot-suitability{% endif %}
+            <tr data-ot-answer
                 data-question-version="{{ qv_id }}"
                 data-question-id="{{ qv['q.al_questionid'] }}"
+                data-question-code="{{ qcode | escape }}"
+                data-section-code="{{ scode | escape }}"
                 data-response-id="{{ existing.al_responseid }}"
                 data-response-type="{{ rt }}"
                 data-column="choice">
@@ -1413,7 +1507,8 @@
                    data-ot-rootcause
                    data-question-version="{{ qv_id }}"
                    data-question-id="{{ qv['q.al_questionid'] }}"
-                data-question-id="{{ qv['q.al_questionid'] }}"
+                   data-question-code="{{ qcode | escape }}"
+                   data-section-code="{{ scode | escape }}"
                    data-response-id="{{ existing.al_responseid }}"
                    data-response-type="{{ rt }}"
                    data-column="choice"{% if hide_rootcause %} hidden{% endif %}>
@@ -1431,14 +1526,11 @@
               <tbody>
 
           {% else %}
-            {% comment %}
-              A Suitability core check reaches this branch too, where AD-146 has taken its
-              block off the grid. The marker goes on both paths, so the grade restriction does
-              not quietly stop watching a section because a question in it was retyped.
-            {% endcomment %}
-            <tr data-ot-answer{% if is_suitability %} data-ot-suitability{% endif %}
+            <tr data-ot-answer
                 data-question-version="{{ qv_id }}"
                 data-question-id="{{ qv['q.al_questionid'] }}"
+                data-question-code="{{ qcode | escape }}"
+                data-section-code="{{ scode | escape }}"
                 data-response-id="{{ existing.al_responseid }}"
                 data-response-type="{{ rt }}"
                 data-column="{{ column }}">
@@ -1526,9 +1618,47 @@
                   script so the page arrives right, and so a submitted review - which renders no
                   script - shows what was actually available.
                 {% endcomment %}
+                {% comment %}
+                  The options the answers have already taken away, as the page opens.
+
+                  Insufficient evidence anywhere leaves the grade only Insufficient evidence
+                  and Potential harm; a No or a Fail on any test point takes PASS off the
+                  grade, and off the file quality outcome too (project owner, 2026-09-22).
+                  ChecklistGating.GradeRefusal and FileQualityRefusal are the authority, and
+                  the script below keeps this up to date as the checker answers.
+                {% endcomment %}
                 {% assign locked_values = '' %}
-                {% if rt == 120910010 and suitability_insufficient %}
-                  {% assign locked_values = '|120910300|120910303|' %}
+                {% if rt == 120910010 %}
+                  {% if form_insufficient %}
+                    {% assign locked_values = '|120910300|120910303|' %}
+                  {% elsif form_nofail %}
+                    {% assign locked_values = '|120910300|' %}
+                  {% endif %}
+                {% elsif form_nofail %}
+                  {% if qcode == 'Q-FQ-01' or qcode == 'Q-FQTAX-01' %}
+                    {% assign locked_values = '|120910300|' %}
+                  {% endif %}
+                {% endif %}
+                {% comment %}
+                  Remedial action required? is decided by the file quality outcome (project
+                  owner, 2026-09-23): a Pass leaves only No, a Fail only Yes.
+
+                  Rendered locked rather than left to syncRemedialAction alone, so the page
+                  arrives with the right option already disabled instead of enabling it for
+                  the moment before the script runs - and so it is still right on a review
+                  whose form is read-only, where no script is emitted at all. The script is
+                  what keeps up with the outcome CHANGING; this is what the page opens on.
+
+                  Its own block and not an elsif on the chain above, because that chain turns
+                  on form_nofail and this rule does not: an outcome of Pass locks Yes here
+                  whether or not anything else on the form reads No or Fail.
+                {% endcomment %}
+                {% if qcode == 'Q-FQ-03' or qcode == 'Q-FQTAX-03' %}
+                  {% if form_fq_outcome == 120910300 %}
+                    {% assign locked_values = '|120910305|' %}
+                  {% elsif form_fq_outcome == 120910301 %}
+                    {% assign locked_values = '|120910306|' %}
+                  {% endif %}
                 {% endif %}
                 {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id editable: editable is_tax: is_tax_review locked: locked_values question_text: qv.al_questiontext %}
               {% endif %}
@@ -1549,7 +1679,7 @@
         {% endcomment %}
         {% unless first_row %}
           {% if blk_subsections and prev_help != blank %}
-            <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
+            <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-question-code="{{ lens_tick_code | escape }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_code = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
           {% endif %}
             </tbody>
           </table>
@@ -2368,12 +2498,19 @@
             var rootCause = document.querySelector('[data-ot-rootcause]');
 
             /*
-             * Guarded on the grade alone. The two rules below both hang off it, and only one
-             * of them needs the root cause block to be on the page - a review whose root cause
-             * is hidden must still have its grade options restricted.
+             * NOT guarded on the grade row.
+             *
+             * It was, while everything here was about the grade. A TAX review has no grade at
+             * all - S-GRADE is AQS-owned and AD-020 filters it out of that form - so a block
+             * opening with `if (gradeRow)` runs on AQS reviews only, and two of the rules added
+             * on 2026-09-22 are the Tax form's: its fail points lock on a Pass, and its
+             * Remedial action required? takes the same default. Each rule below guards on the
+             * row it actually needs instead.
              */
-            if (gradeRow) {
-              var gradeInputs = gradeRow.querySelectorAll('[data-ot-input]');
+            {
+              var gradeInputs = gradeRow
+                ? gradeRow.querySelectorAll('[data-ot-input]')
+                : [];
 
               // Function expressions rather than declarations: this script runs in strict
               // mode, where a function declared inside a block is not something every
@@ -2386,7 +2523,7 @@
               };
 
               var syncRootCause = function () {
-                if (!rootCause) { return; }
+                if (!rootCause || !gradeRow) { return; }
                 var grade = gradeChosen();
                 var owed = grade !== '' && grade !== '120910300';
                 rootCause.hidden = !owed;
@@ -2412,51 +2549,156 @@
               }
 
               /*
-               * Insufficient evidence on a Suitability core check takes PASS and PASS WITH
-               * ISSUES off the grade (item 10, 2026-09-19), as soon as the condition is met
-               * rather than at submit.
+               * What the rest of the form leaves available (project owner, 2026-09-22),
+               * applied as soon as the condition is met rather than at submit.
                *
-               * The server is where this is enforced: ResponseGuardPlugin refuses either value
-               * on the way in, ResponseProgressPlugin clears one already saved when a core
-               * check turns Insufficient, and the submit command refuses a review still
-               * carrying one. This is the AD-041 half - it stops a checker recording a grade
+               *   Insufficient evidence on ANY test point   -> PASS and PASS WITH ISSUES off
+               *                                                the advice quality grade
+               *   A No or a Fail on any test point          -> PASS off the grade AND off the
+               *                                                file quality outcome
+               *
+               * This widens the rule that used to watch [data-ot-suitability] alone (item 10,
+               * 2026-09-19). The instruction was "at any section not just the File quality AML
+               * and CRA section", so the section test is gone; what replaces it is a QUESTION
+               * test, because the answers that ARE the outcome must not be counted as part of
+               * what produces it. ChecklistGating.IsOutcomeQuestion is the authority and this
+               * is its copy - when one changes, change both.
+               *
+               * The two that matter most are Remedial action required? and the file quality
+               * outcome itself: choosing PASS defaults the first to NO, and a scan counting
+               * every No would then grey out the PASS the checker had just chosen.
+               *
+               * The server is where this is enforced: ResponseGuardPlugin refuses a
+               * contradicting outcome on the way in, ResponseProgressPlugin clears one already
+               * saved when a finding arrives, and the submit command refuses a review still
+               * carrying one. This is the AD-041 half - it stops a checker recording something
                * that is about to be taken back off them.
                *
-               * The template has already locked the two options where the stored answers meet
-               * the condition, so this only has to keep up with what changes on the page.
+               * The template has already locked whatever the stored answers require, so this
+               * only has to keep up with what changes on the page.
                */
               var GRADE_PASS = '120910300';
               var GRADE_PASS_WITH_ISSUES = '120910303';
               var INSUFFICIENT = '120910302';
+              var FAIL = '120910301';
+              var YES = '120910305';
+              var NO = '120910306';
 
-              var suitabilityRows = document.querySelectorAll('[data-ot-suitability]');
-              var gradeStatus = gradeRow.querySelector('[data-ot-status]');
+              // ChecklistGating.IsOutcomeQuestion, in the page's own terms.
+              var OUTCOME_CODES = '|Q-FQ-01|Q-FQTAX-01|Q-FQ-03|Q-FQTAX-03|Q-GR-01|';
 
-              var suitabilityInsufficient = function () {
-                for (var r = 0; r < suitabilityRows.length; r++) {
-                  var ticks = suitabilityRows[r].querySelectorAll('[data-ot-input]');
-                  for (var t = 0; t < ticks.length; t++) {
-                    if (ticks[t].checked && ticks[t].value === INSUFFICIENT) { return true; }
-                  }
-                }
-                return false;
+              var codeOf = function (row) {
+                var code = row.getAttribute('data-question-code');
+                return code ? code.replace(/^\s+|\s+$/g, '').toUpperCase() : '';
               };
 
-              var syncGradeOptions = function () {
-                var locked = suitabilityInsufficient();
-                var cleared = false;
+              var isOutcomeQuestion = function (code) {
+                return code !== '' && OUTCOME_CODES.indexOf('|' + code + '|') !== -1;
+              };
 
-                for (var g = 0; g < gradeInputs.length; g++) {
-                  var input = gradeInputs[g];
-                  if (input.value !== GRADE_PASS && input.value !== GRADE_PASS_WITH_ISSUES) {
-                    continue;
-                  }
+              /* The value ticked on a row, or '' where none is. */
+              var tickedOn = function (row) {
+                if (!row) { return ''; }
+                var ticks = row.querySelectorAll('[data-ot-input]');
+                for (var t = 0; t < ticks.length; t++) {
+                  if (ticks[t].checked) { return ticks[t].value; }
+                }
+                return '';
+              };
+
+              /* The row answering one of a set of question codes, or null. */
+              var rowFor = function (rows, codes) {
+                for (var r = 0; r < rows.length; r++) {
+                  if (codes.indexOf('|' + codeOf(rows[r]) + '|') !== -1) { return rows[r]; }
+                }
+                return null;
+              };
+
+              var answerRows = document.querySelectorAll('[data-ot-answer]');
+              var gradeStatus = gradeRow ? gradeRow.querySelector('[data-ot-status]') : null;
+
+              /*
+               * The file quality outcome and Remedial action required?, found by question code
+               * rather than by scale: Pass / Fail and Yes / No are scales a question added
+               * through checklist administration could share, and the code is the AD-122
+               * contract. Either discipline's, because a review carries exactly one of them.
+               */
+              var fileQualityRow = rowFor(answerRows, '|Q-FQ-01|Q-FQTAX-01|');
+              var remedialRow = rowFor(answerRows, '|Q-FQ-03|Q-FQTAX-03|');
+
+              /*
+               * The Tax CHECK outcome, on the Tax check section, which is what locks the Tax
+               * fail points (project owner, 2026-09-23). A different question from the tax
+               * FILE QUALITY outcome above - different section, different judgement - and
+               * this rule read that one until 2026-09-23. The checklist warns that the two
+               * have been conflated before; they are looked up separately here so that a
+               * reader can see which is which.
+               */
+              var taxOutcomeRow = rowFor(answerRows, '|Q-TAX-02|');
+
+              /* Every finding ticked on a test point, as the rules below ask for it. */
+              var findings = function () {
+                var found = {
+                  insufficient: false,
+                  noOrFail: false,
+                  amlCraTotal: 0,
+                  amlCraYes: 0
+                };
+
+                for (var r = 0; r < answerRows.length; r++) {
+                  var row = answerRows[r];
 
                   /*
-                   * Unticked before it is disabled. A disabled radio keeps its checked state,
-                   * so a grade left selected would still read as chosen to anyone looking at
-                   * the page - and would still be sent by the next save of this answer.
+                   * The AML and CRA section is counted, not scanned for a finding (project
+                   * owner, 2026-09-23: "if all the responses are yes, then lock it").
+                   *
+                   * Counted OUTSIDE the ticks loop below, and before the outcome-question
+                   * test, because the question that decides this rule is the UNANSWERED one -
+                   * which has no ticked input to find. A loop over ticks can only ever see
+                   * the answers given, and three Yeses with two blanks would read as all Yes.
                    */
+                  if (row.getAttribute('data-section-code') === 'S-AMLCRA') {
+                    found.amlCraTotal++;
+                    if (tickedOn(row) === YES) { found.amlCraYes++; }
+                  }
+
+                  if (isOutcomeQuestion(codeOf(row))) { continue; }
+
+                  var ticks = row.querySelectorAll('[data-ot-input]');
+                  for (var t = 0; t < ticks.length; t++) {
+                    if (!ticks[t].checked) { continue; }
+
+                    var value = ticks[t].value;
+                    if (value === INSUFFICIENT) { found.insufficient = true; }
+                    if (value === FAIL || value === NO) { found.noOrFail = true; }
+                  }
+                }
+
+                // Clean AND complete. An empty section is not clean: a Tax review, which has
+                // no AML and CRA section at all, reaches this with a total of zero and must
+                // not come out of it locked.
+                found.amlCraAllYes = found.amlCraTotal > 0
+                  && found.amlCraYes === found.amlCraTotal;
+
+                return found;
+              };
+
+              /*
+               * Takes options off a row, unticking one already chosen.
+               *
+               * A disabled radio keeps its checked state, so an answer left selected would
+               * still read as chosen to anyone looking at the page - and would still be sent
+               * by the next save of that answer. Returns whether it cleared anything, so the
+               * caller can say so.
+               */
+              var lockOptions = function (row, values, locked) {
+                var cleared = false;
+                var inputs = row.querySelectorAll('[data-ot-input]');
+
+                for (var i = 0; i < inputs.length; i++) {
+                  var input = inputs[i];
+                  if (values.indexOf('|' + input.value + '|') === -1) { continue; }
+
                   if (locked && input.checked) {
                     input.checked = false;
                     cleared = true;
@@ -2473,31 +2715,225 @@
                   }
                 }
 
+                return cleared;
+              };
+
+              var say = function (status, message) {
+                if (!status) { return; }
+                status.textContent = message;
+                status.className = 'ot-answer__status ot-answer__status--error';
+              };
+
+              /*
+               * The File Quality fail points (project owner, 2026-09-23, correcting the rules
+               * given on 2026-09-22).
+               *
+               *   Tax check  locked once the TAX CHECK outcome - Q-TAX-02, on the Tax check
+               *              section - is a PASS. A file the Tax checker passed has no fail
+               *              to give reasons for. This read the tax FILE QUALITY outcome
+               *              until 2026-09-23; that is a different question on a different
+               *              section, answered later. Only a clean Pass locks it - the Tax
+               *              scale carries Pass with issues too (AD-055), and a file passed
+               *              WITH issues is exactly one whose issues want recording. An
+               *              unanswered outcome does not lock either: the reasons are often
+               *              what a checker works out first, and a form that opens locked
+               *              reads as a page that failed to load.
+               *   AQS check  locked once EVERY AML and CRA point reads Yes - a section with
+               *              nothing wrong in it has no failing for the fail points to
+               *              explain. Reversed on 2026-09-23: it used to be locked UNTIL a
+               *              finding arrived, so a checker who had not reached that section
+               *              yet met the block shut, which is the very thing the Tax rule
+               *              above refuses to do on an unanswered outcome. Open is now the
+               *              resting state on both, and only a positive answer closes it.
+               *
+               * A Tax check has no AML and CRA section at all (AD-020 filters it out of that
+               * form), which is why the AQS rule cannot simply be applied to both: that
+               * review would never count a single point, never be "all Yes", and its fail
+               * points would never lock.
+               *
+               * Ticks already recorded are left ticked when the block locks. They are stored
+               * answers, and greying a stored value is not the same as clearing it -
+               * ReconcileFailReasons is what settles them, and only for ids this page drew.
+               */
+              var failPointsBlock = document.querySelector('[data-ot-failpoints-for]');
+              var failPointsNote = document.querySelector('[data-ot-failpoints-note]');
+              var isTaxReview = {% if is_tax_review %}true{% else %}false{% endif %};
+
+              var syncFailPoints = function (found) {
+                if (!failPointsBlock) { return; }
+
+                var locked = isTaxReview
+                  ? tickedOn(taxOutcomeRow) === GRADE_PASS
+                  : found.amlCraAllYes;
+
+                // Safe to set outright: this whole script is emitted only where `editable`
+                // is true, so a box the template disabled is on a page this never runs on.
+                var boxes = failPointsBlock.querySelectorAll('[data-ot-reason]');
+                for (var b = 0; b < boxes.length; b++) {
+                  boxes[b].disabled = locked;
+                }
+
+                if (failPointsBlock.classList) {
+                  if (locked) {
+                    failPointsBlock.classList.add('fails--locked');
+                  } else {
+                    failPointsBlock.classList.remove('fails--locked');
+                  }
+                }
+
+                if (failPointsNote) {
+                  failPointsNote.textContent = !locked ? '' : (isTaxReview
+                    ? 'The Tax check outcome is a Pass, so there are no fail points to record.'
+                    : 'Every AML and CRA checking point reads Yes, so there are no fail '
+                      + 'points to record.');
+                  failPointsNote.hidden = !locked;
+                }
+              };
+
+              var syncGradeOptions = function () {
+                var found = findings();
+                var gradeCleared = false;
+
+                if (gradeRow) {
+                  gradeCleared = lockOptions(
+                    gradeRow, '|' + GRADE_PASS_WITH_ISSUES + '|', found.insufficient);
+
+                  // PASS goes for either reason, so it is locked on the OR of the two rather
+                  // than by whichever rule happened to run last.
+                  gradeCleared = lockOptions(
+                    gradeRow, '|' + GRADE_PASS + '|', found.insufficient || found.noOrFail)
+                    || gradeCleared;
+                }
+
                 /*
                  * Prompted, because a grade disappearing without a word is the kind of thing a
-                 * checker reports as data loss. Nothing is sent from here: the suitability
-                 * answer's own save is what clears the stored grade server-side, and a second
-                 * request racing it would decide which write landed last.
+                 * checker reports as data loss. Nothing is sent from here: the finding's own
+                 * save is what clears the stored grade server-side, and a second request
+                 * racing it would decide which write landed last.
                  */
-                if (cleared && gradeStatus) {
-                  gradeStatus.textContent =
-                    'Grade cleared \u2014 a Suitability core check reads Insufficient evidence, '
-                    + 'so the grade can only be Insufficient evidence or Potential harm.';
-                  gradeStatus.className = 'ot-answer__status ot-answer__status--error';
+                if (gradeCleared) {
+                  say(gradeStatus, found.insufficient
+                    ? 'Grade cleared \u2014 a check on this review reads Insufficient evidence, '
+                      + 'so the grade can only be Insufficient evidence or Potential harm.'
+                    : 'Grade cleared \u2014 a check on this review reads No or Fail, so the '
+                      + 'grade cannot be Pass.');
                 }
+
+                if (fileQualityRow) {
+                  if (lockOptions(fileQualityRow, '|' + GRADE_PASS + '|', found.noOrFail)) {
+                    say(fileQualityRow.querySelector('[data-ot-status]'),
+                      'File quality outcome cleared \u2014 a check on this review reads No or '
+                      + 'Fail, so it cannot be Pass.');
+                  }
+                }
+
+                syncFailPoints(found);
 
                 // The root cause follows the grade, and the grade may have just been cleared.
                 syncRootCause();
               };
 
-              for (var sr = 0; sr < suitabilityRows.length; sr++) {
-                var ticks = suitabilityRows[sr].querySelectorAll('[data-ot-input]');
+              /*
+               * Remedial action required? is DECIDED by the file quality outcome (project
+               * owner, 2026-09-23): NO on a Pass, YES on a Fail, and the other answer
+               * disabled.
+               *
+               * It was a default until 2026-09-23. The page filled the answer in, the checker
+               * could move it afterwards, and everything below existed to work out whether
+               * they had: `remedialChosenByHand`, which compared the stored answer against
+               * what the outcome implied, and a `defaulting` re-entry flag to stop the default
+               * counting as a choice when it dispatched its own change. Both answered "may
+               * this be overwritten?" - a question with one answer now, so both are gone. The
+               * instruction was that the other option "needs to be disabled".
+               *
+               * What this closes: a passed file can no longer carry a remedial action. That
+               * combination meant something (AD-184 repaired a Tax check that passed and still
+               * flagged one), so it is a deliberate narrowing, given twice and confirmed. The
+               * Tax path AD-184 fixed turns on Q-TAX-02, which this rule does not read.
+               *
+               * The affordance, not the boundary. ChecklistGating.RemedialActionRefusal is
+               * what actually refuses the write, and ResponseProgressPlugin is what moves an
+               * answer recorded before the outcome changed under it (NFR-SEC-01, AD-041).
+               */
+              var impliedRemedial = function () {
+                if (!fileQualityRow) { return ''; }
+                var outcome = tickedOn(fileQualityRow);
+                if (outcome === GRADE_PASS) { return NO; }
+                if (outcome === FAIL) { return YES; }
+                return '';
+              };
+
+              var syncRemedialAction = function () {
+                if (!remedialRow) { return; }
+
+                var wanted = impliedRemedial();
+
+                /*
+                 * No outcome recorded leaves both answers open. A checker working bottom-up
+                 * reaches this question before the outcome above it on plenty of files, and
+                 * there is nothing yet for their answer to contradict - which is exactly what
+                 * the server does with it too.
+                 */
+                if (wanted === '') {
+                  lockOptions(remedialRow, '|' + YES + '|' + NO + '|', false);
+                  return;
+                }
+
+                /*
+                 * Unlocked before locked, and never the other way round. Moving the outcome
+                 * from Pass to Fail has to OPEN Yes before No is taken away; doing it in the
+                 * other order leaves a moment with neither answer selectable, and a disabled
+                 * input cannot be ticked by the lines below.
+                 */
+                var unwanted = wanted === YES ? NO : YES;
+                lockOptions(remedialRow, '|' + wanted + '|', false);
+                lockOptions(remedialRow, '|' + unwanted + '|', true);
+
+                var inputs = remedialRow.querySelectorAll('[data-ot-input]');
+                for (var i = 0; i < inputs.length; i++) {
+                  if (inputs[i].value !== wanted || inputs[i].checked) { continue; }
+
+                  inputs[i].checked = true;
+
+                  /*
+                   * Setting `checked` in script raises no event, and the autosave listens for
+                   * `change`. createEvent rather than new Event(), because everything in this
+                   * file is ES5 and the site serves it to whatever the checker is using.
+                   *
+                   * This is also what repairs a review that already holds the contradiction -
+                   * a Yes stored against an outcome since moved to Pass. lockOptions has just
+                   * unticked it on screen; this saves the replacement, so the page and the
+                   * row agree rather than only looking as though they do.
+                   */
+                  var event = document.createEvent('HTMLEvents');
+                  event.initEvent('change', true, false);
+                  inputs[i].dispatchEvent(event);
+                }
+              };
+
+              for (var sr = 0; sr < answerRows.length; sr++) {
+                var ticks = answerRows[sr].querySelectorAll('[data-ot-input]');
                 for (var st = 0; st < ticks.length; st++) {
                   ticks[st].addEventListener('change', syncGradeOptions);
                 }
               }
 
+              if (fileQualityRow) {
+                var fqInputs = fileQualityRow.querySelectorAll('[data-ot-input]');
+                for (var fi = 0; fi < fqInputs.length; fi++) {
+                  fqInputs[fi].addEventListener('change', syncRemedialAction);
+                }
+              }
+
               syncGradeOptions();
+
+              /*
+               * Run at load as well as on change, which the default it replaced did not need
+               * to be. A default only had to act when the outcome moved; a lock has to hold
+               * on a page opened against an answer already saved - including one saved before
+               * this rule existed, where the review is sitting on the contradiction now.
+               */
+              syncRemedialAction();
             }
           })();
         </script>
@@ -3230,7 +3666,7 @@
       alone. Sending the current value instead would be harmless but would put a field in the
       audit line that nobody moved.
     {% endcomment %}
-    {% if locked == false %}
+    {% if header_locked == false %}
       <script>
         (function () {
           var status = document.getElementById('ot-header-status');
@@ -3250,6 +3686,116 @@
 
           var initialRequired = required ? required.value : '';
           var initialDisposition = disposition ? disposition.value : '';
+
+          /*
+           * CACHE_LAG for the two Tax team selects (reported 2026-09-22: the disposition
+           * "doesn't stick after reload").
+           *
+           * It does stick. What the reader is seeing is the site's render cache: this page
+           * PATCHes contact.al_caseheaderrequest and CaseHeaderRequestPlugin updates the case
+           * as the application user, so the portal's cache is not invalidated by the write and
+           * learns about it through change tracking, which is polled - AD-094 measured up to
+           * fifteen minutes. A reload inside that window re-draws the value the page read
+           * BEFORE the save, under a message that said Saved. Three reports on OT Remediation
+           * turned out to be exactly this (AD-126, AD-127, AD-128).
+           *
+           * The success branch already says so at the moment of saving. What was missing is
+           * the other end: someone who comes back a minute later has no message on screen at
+           * all and simply sees the old value. So the tab remembers what it saved, for this
+           * case, and says so when the page comes back still showing something else.
+           *
+           * It deliberately does NOT re-apply the value, which is the rule the answers'
+           * own cache-lag notice follows: a value on screen that the server did not send is
+           * indistinguishable from one it did, and a reader could not tell which they had.
+           * A sentence they can act on is worth more than a value they cannot trust.
+           */
+          var HEADER_LAG_KEY = 'ot.savedHeader.' + status.getAttribute('data-case-id');
+          var HEADER_LAG_WINDOW_MS = 20 * 60 * 1000;
+
+          function readSavedHeader() {
+            try { return JSON.parse(window.sessionStorage.getItem(HEADER_LAG_KEY) || 'null'); }
+            catch (e) { return null; }
+          }
+
+          function writeSavedHeader(saved) {
+            // Private browsing and a full store both throw. The notice is a courtesy, so
+            // losing it is not worth breaking the save that has just succeeded.
+            try {
+              if (saved === null) {
+                window.sessionStorage.removeItem(HEADER_LAG_KEY);
+              } else {
+                window.sessionStorage.setItem(HEADER_LAG_KEY, JSON.stringify(saved));
+              }
+            } catch (e) { /* no notice this time */ }
+          }
+
+          /** The label of a select's chosen option, for a message a reader can check. */
+          function labelOfSelect(select) {
+            if (!select) { return ''; }
+            var option = select.options[select.selectedIndex];
+            return option ? option.text : '';
+          }
+
+          /*
+           * Says the page is behind, naming what this tab saved. Runs once, before anything is
+           * wired, so the comparison is against what the SERVER rendered rather than against
+           * anything the reader has since touched.
+           */
+          (function reportHeaderLag() {
+            var saved = readSavedHeader();
+            if (!saved) { return; }
+
+            if (Date.now() - saved.at > HEADER_LAG_WINDOW_MS) {
+              writeSavedHeader(null);
+              return;
+            }
+
+            var behind = [];
+            if (required && saved.taxCheckRequired && required.value !== saved.taxCheckRequired) {
+              behind.push('Tax check required');
+            }
+            if (disposition && saved.taxTeamDisposition
+                && disposition.value !== saved.taxTeamDisposition) {
+              behind.push('For Tax team usage');
+            }
+
+            /*
+             * The tick lists, and the reason this notice needed widening at all.
+             *
+             * A product is applied by ASSOCIATION, and the page reads it back through its own
+             * fetch against the intersect. On TEST on 2026-09-22 that fetch returned nothing
+             * for about ten minutes after a save Dataverse had already taken - while the plain
+             * columns beside it were current on the very next reload. So the one header field
+             * that genuinely lags was the one field this notice did not cover, and "products
+             * are not saving" is what that looks like from a chair.
+             *
+             * setValueOf is a function declaration, so it is hoisted and usable here even
+             * though it is written further down.
+             */
+            if (saved.sets) {
+              var lagSets = document.querySelectorAll('[data-ot-hdr-set]');
+              for (var ls = 0; ls < lagSets.length; ls++) {
+                var setName = lagSets[ls].getAttribute('data-ot-hdr-set');
+                if (!saved.sets.hasOwnProperty(setName)) { continue; }
+                if (setValueOf(lagSets[ls]) === saved.sets[setName]) { continue; }
+                behind.push(lagSets[ls].getAttribute('aria-label') || setName);
+              }
+            }
+
+            if (behind.length === 0) {
+              // The page has caught up, so there is nothing left to warn about and nothing
+              // left to remember.
+              writeSavedHeader(null);
+              return;
+            }
+
+            var one = behind.length === 1;
+            show((one ? behind[0] + ' is' : behind.join(' and ') + ' are')
+              + ' not shown here yet. Your change was saved. This site caches pages for up to '
+              + 'fifteen minutes, so a reload can arrive before the page catches up. Do not set '
+              + (one ? 'it' : 'them') + ' again \u2014 reload in a few minutes. What the case '
+              + 'actually holds is what was saved, not what is on screen.', 'error');
+          })();
 
           // The rest of the header, remembered as rendered so an untouched field is never
           // sent. Sending the current value would be harmless but would put a field in the
@@ -3442,6 +3988,33 @@
 
                   if (required) { initialRequired = required.value; }
                   if (disposition) { initialDisposition = disposition.value; }
+
+                  /*
+                   * CACHE_LAG, the write side: the two selects, because they are the two the
+                   * reader comes back to check, and every tick list, because those are the
+                   * ones that are actually behind when they do. A text field they typed is
+                   * one they can see is theirs; a control showing something they did not
+                   * choose is not.
+                   *
+                   * Taken BEFORE the initial values below are reset, or every set would
+                   * compare equal to itself and nothing would ever be remembered.
+                   */
+                  var setsMoved = false;
+                  var snapshotSets = {};
+                  for (var s2 = 0; s2 < headerSets.length; s2++) {
+                    var nowValue = setValueOf(headerSets[s2].el);
+                    snapshotSets[headerSets[s2].el.getAttribute('data-ot-hdr-set')] = nowValue;
+                    if (nowValue !== headerSets[s2].initial) { setsMoved = true; }
+                  }
+
+                  if (routeMayHaveMoved || setsMoved) {
+                    writeSavedHeader({
+                      at: Date.now(),
+                      taxCheckRequired: required ? required.value : '',
+                      taxTeamDisposition: disposition ? disposition.value : '',
+                      sets: snapshotSets
+                    });
+                  }
                   for (var k = 0; k < headerInputs.length; k++) {
                     headerInputs[k].initial = headerInputs[k].el.value;
                   }

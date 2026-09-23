@@ -414,8 +414,20 @@
     <span class="ot-count">{{ total }}</span>
   </h2>
 
+  {% comment %}
+    data-ot-wide asks the page shell for more room (project owner, 2026-09-22).
+
+    A marker rather than a class on the wrapper, because the wrapper this widens is
+    .ot-page__inner in OT Layout, which is rendered BEFORE the content block a page fills -
+    so a page cannot put a class on it. The stylesheet reaches back up with :has(), which it
+    already does twice, and the cap lifts for any page that asks and for no other.
+
+    Thirteen columns is why this one asks. The shared 82rem is set for reading width, which
+    is right for the review form and the remediation pages and leaves this table scrolling
+    sideways on a screen with room to spare.
+  {% endcomment %}
   {% if rows.size > 0 %}
-    <div class="ot-table-wrap">
+    <div class="ot-table-wrap" data-ot-wide>
       <table class="ot-table">
         <caption>Showing {{ rows.size }} of {{ total }} cases, page {{ page_number }}.</caption>
         <thead>

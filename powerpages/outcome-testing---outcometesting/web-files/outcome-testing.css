@@ -309,6 +309,17 @@ footer a:focus-visible, .footer a:focus-visible {
 
 .ot-page__inner { max-width: 82rem; margin: 0 auto; }
 
+/* A page that asks for the room (project owner, 2026-09-22). 82rem is a READING width -
+   right for the review form, the remediation pages and anything mostly prose - and the
+   case list is not prose: thirteen columns were scrolling sideways on screens with room
+   to spare. :has() reaches back up to the shell because OT Layout renders .ot-page__inner
+   before the content block a page fills, so a page cannot class it directly.
+
+   A cap, not a width. Where the window is narrower than this the page simply uses what
+   there is, exactly as it did - so nothing changes on a laptop and the space is there on
+   a desk monitor. */
+.ot-page__inner:has([data-ot-wide]) { max-width: 110rem; }
+
 .ot-breadcrumb {
   font-size: var(--text-xs);
   text-transform: uppercase;
@@ -1302,6 +1313,15 @@ footer a:focus-visible, .footer a:focus-visible {
    The status line beside the question says what. */
 .ot-checklist .opt--locked { opacity: 0.45; }
 .ot-checklist .opt--locked input { cursor: not-allowed; }
+
+/* The fail points, locked by the same family of rules (project owner, 2026-09-22):
+   on a Tax check once the file quality outcome is a Pass, and on an AQS check until
+   AML and CRA records something to explain. Greyed for the reason above, and the
+   note above the table says which rule is holding them. A tick already recorded
+   stays ticked and stays legible - it is a stored answer, not a disabled control. */
+.ot-checklist .fails--locked { opacity: 0.45; }
+.ot-checklist .fails--locked input { cursor: not-allowed; }
+.ot-checklist [data-ot-failpoints-note] { font-style: italic; }
 
 .ot-checklist .sr-only {
   position: absolute;

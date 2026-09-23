@@ -494,11 +494,22 @@ if (Test-Path -LiteralPath $templateDir) {
 }
 
 # Many-to-many intersect tables are not permissioned in their own right by Power
-# Pages - access comes from a read permission on each end of the relationship. Both
-# ends of this one (al_failreason and al_response) are queried as entities in their
-# own right elsewhere, so this assertion still covers them; only the intersect name
-# is exempt.
-$intersectTables = @('al_al_failreason_al_response')
+# Pages - access comes from a read permission on each end of the relationship. Every
+# end named below is queried as an entity in its own right elsewhere, so this
+# assertion still covers them; only the intersect names are exempt.
+#
+#   al_al_failreason_al_response            ends: al_failreason, al_response
+#   al_listoption_al_outcomecase_products   ends: al_listoption, al_outcomecase
+#
+# The second was missing until 2026-09-22 and this gate had been failing on it since
+# the products set went in (AD-190, 2026-09-21): OT Case Detail and OT Review Detail
+# both read a case's products through the intersect. Adding it here is the fix, and
+# NOT adding a table permission for it - Power Pages would not consult one. Both of
+# its ends are granted read today: 'List Option - read' and 'Outcome Case All Read'.
+$intersectTables = @(
+    'al_al_failreason_al_response',
+    'al_listoption_al_outcomecase_products'
+)
 
 $readableTables = @{}
 foreach ($p in $permissions) {
