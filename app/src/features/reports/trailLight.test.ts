@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { TRAIL_LIGHT_HEADERS, trailLightRow, type ExportRecord } from './trailLight';
+import {
+  TRAIL_LIGHT_HEADERS,
+  trailLightFilename,
+  trailLightRow,
+  type ExportRecord,
+} from './trailLight';
 
 function record(overrides: Partial<ExportRecord> = {}): ExportRecord {
   return {
@@ -103,5 +108,54 @@ describe('Trail Light contract (AD-039)', () => {
 
     expect(row[11]).toBe('');
     expect(row[12]).toBe('');
+  });
+});
+
+describe('what a Trail Light download is called', () => {
+  it('is DFALIN1_outcometesting_yyyy_mm_dd, exactly', () => {
+    // The receiving end's name for this feed (project owner, 2026-09-23). A file that
+    // arrives under another name is a file nobody picks up, so this is as much part of the
+    // interface as the twenty columns are.
+    expect(trailLightFilename('xlsx', new Date('2026-09-23T10:00:00Z'))).toBe(
+      'DFALIN1_outcometesting_2026_09_23.xlsx',
+    );
+    expect(trailLightFilename('csv', new Date('2026-09-23T10:00:00Z'))).toBe(
+      'DFALIN1_outcometesting_2026_09_23.csv',
+    );
+  });
+
+  it('uses UNDERSCORES in the date, not the hyphens everything else stamps with', () => {
+    // stampedFilename writes `stem-YYYY-MM-DD.ext`. This is a different convention because
+    // it was given as a different convention, and it is not improved by being made
+    // consistent with something it is not part of.
+    const name = trailLightFilename('csv', new Date('2026-01-05T09:00:00Z'));
+
+    expect(name).toBe('DFALIN1_outcometesting_2026_01_05.csv');
+    expect(name).not.toContain('-');
+  });
+
+  it('pads a single-digit month and day, so the name sorts and parses', () => {
+    expect(trailLightFilename('xlsx', new Date('2026-03-07T12:00:00Z'))).toBe(
+      'DFALIN1_outcometesting_2026_03_07.xlsx',
+    );
+  });
+
+  it('names the UK day, not the browser day', () => {
+    /*
+     * 2026-06-01T23:30Z is already the 2nd of June in London under British Summer Time.
+     * A machine reading UTC would name a daily feed for yesterday, which is the failure
+     * this shares with the case header's date handling - and the same ukToday fixes both.
+     */
+    expect(trailLightFilename('csv', new Date('2026-06-01T23:30:00Z'))).toBe(
+      'DFALIN1_outcometesting_2026_06_02.csv',
+    );
+  });
+
+  it('carries no batch code, so the day has ONE name', () => {
+    // Deliberate: the convention describes the day's file, not the click that made it.
+    const a = trailLightFilename('xlsx', new Date('2026-09-23T08:00:00Z'));
+    const b = trailLightFilename('xlsx', new Date('2026-09-23T17:00:00Z'));
+
+    expect(a).toBe(b);
   });
 });

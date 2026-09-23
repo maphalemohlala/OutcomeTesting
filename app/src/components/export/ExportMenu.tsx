@@ -6,6 +6,13 @@ interface Props {
   label: string;
   /** Filename stem; the download is dated so successive extracts do not overwrite. */
   stem: string;
+  /**
+   * The whole filename, extension and all, for a download whose name is fixed by whatever
+   * receives it rather than by us. Trail Light is one: `DFALIN1_outcometesting_yyyy_mm_dd`
+   * is the receiving end's name for that feed (AD-216), so the stem-plus-date convention
+   * below must not be applied to it. Given this, `stem` is ignored.
+   */
+  filenameFor?: (format: 'xlsx' | 'csv') => string;
   sheetName: string;
   headers: string[];
   rows: CellValue[][];
@@ -24,17 +31,28 @@ interface Props {
  * come from data Dataverse has already returned, a user can only ever export what they
  * are permitted to read (BR-012) — this control is not an access path of its own.
  */
-export function ExportMenu({ label, stem, sheetName, headers, rows, caption, disabled, emptyHint }: Props) {
+export function ExportMenu({
+  label,
+  stem,
+  filenameFor,
+  sheetName,
+  headers,
+  rows,
+  caption,
+  disabled,
+  emptyHint,
+}: Props) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const empty = rows.length === 0;
 
   function run(format: 'xlsx' | 'csv') {
     setOpen(false);
+    const name = filenameFor ? filenameFor(format) : stampedFilename(stem, format);
     if (format === 'xlsx') {
-      downloadWorkbook(stampedFilename(stem, 'xlsx'), [{ name: sheetName, headers, rows }]);
+      downloadWorkbook(name, [{ name: sheetName, headers, rows }]);
     } else {
-      downloadCsv(stampedFilename(stem, 'csv'), headers, rows);
+      downloadCsv(name, headers, rows);
     }
   }
 

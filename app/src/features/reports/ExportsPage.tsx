@@ -6,7 +6,7 @@ import { useExports, type ExportRecordRow } from './useExports';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { createExportBatch, generateExport } from '../../services/commands/exports';
 import { messageForFailure } from '../../services/errors';
-import { TRAIL_LIGHT_HEADERS, trailLightRow } from './trailLight';
+import { TRAIL_LIGHT_HEADERS, trailLightFilename, trailLightRow } from './trailLight';
 import { buildFullExtract, EXTRACT_ROW_LIMIT } from './fullExtract';
 import { downloadWorkbook, stampedFilename } from '../../lib/tabular';
 import './ExportsPage.css';
@@ -286,6 +286,7 @@ export function ExportsPage() {
                               <ExportMenu
                                 label="Download"
                                 stem={`trail-light-${b.code || b.name || 'batch'}`}
+                                filenameFor={(format) => trailLightFilename(format)}
                                 sheetName="Trail Light"
                                 headers={TRAIL_LIGHT_HEADERS}
                                 rows={batchRecords.map((record) => trailLightRow(record.record))}
@@ -317,6 +318,7 @@ export function ExportsPage() {
                 <ExportMenu
                   label="Download filtered rows"
                   stem="trail-light-filtered"
+                  filenameFor={(format) => trailLightFilename(format)}
                   sheetName="Trail Light"
                   headers={TRAIL_LIGHT_HEADERS}
                   rows={filteredRecords.map((record) => trailLightRow(record.record))}

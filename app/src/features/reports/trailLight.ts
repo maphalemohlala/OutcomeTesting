@@ -1,8 +1,33 @@
 import type { CellValue } from '../../lib/tabular';
 import type { Al_exportrecords } from '../../generated/models/Al_exportrecordsModel';
+import { ukToday } from '../cases/caseHeaderDates';
 
 /** The export record as the file builder needs it. */
 export type ExportRecord = Al_exportrecords;
+
+/**
+ * What a Trail Light download is called: `DFALIN1_outcometesting_yyyy_mm_dd` (project
+ * owner, 2026-09-23).
+ *
+ * **Part of the interface, not a nicety.** `DFALIN1` is the receiving end's name for this
+ * feed, the same way the twenty columns above are its shape - a file that arrives under
+ * another name is a file nobody picks up. So this is used EXACTLY as given: no batch code,
+ * no filter, no "(1)". Two Trail Light downloads taken on one day are deliberately the same
+ * name, because the convention describes the day's file rather than the click that made it;
+ * a browser will suffix the second copy and the operator picks the one they meant.
+ *
+ * Underscores in the date, not the hyphens the rest of the app stamps with - `yyyy_mm_dd`
+ * is what was given, and a convention is not improved by being made consistent with things
+ * it is not part of.
+ *
+ * The day is the UK day. Users are in the UK and the browser may not be, and on a British
+ * Summer Time evening a machine reading UTC is a day behind - which for a daily feed means
+ * the file is named for yesterday. `ukToday` is the same helper the case header uses for
+ * the same reason.
+ */
+export function trailLightFilename(extension: string, now: Date = new Date()): string {
+  return `DFALIN1_outcometesting_${ukToday(now).replace(/-/g, '_')}.${extension}`;
+}
 
 /**
  * The Trail Light contract fixed by AD-039 (source: `Trailight - Outcome Testing Map.xlsx`):
