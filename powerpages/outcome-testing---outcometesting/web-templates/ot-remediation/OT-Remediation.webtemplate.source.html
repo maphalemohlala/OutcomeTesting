@@ -47,6 +47,15 @@
 {% endcomment %}
 {% assign f_ref = request.params['ref'] | default: '' %}
 
+{% comment %}
+  Stage (AD-218, AR-04): what an adviser sees split the way they act on it - still to do,
+  waiting on their T&C Manager, finished. Tested against the three values it may be, so an
+  unrecognised one becomes no filter rather than reaching the FetchXML.
+{% endcomment %}
+{% assign f_stage = request.params['stage'] | default: '' %}
+{% if f_stage != 'open' and f_stage != 'signoff' and f_stage != 'closed' %}{% assign f_stage = '' %}{% endif %}
+{% capture stage_qs %}{% if f_stage != '' %}stage={{ f_stage }}&amp;{% endif %}{% endcapture %}
+
 {% assign case_param = request.params['case'] %}
 
 {% comment %}
@@ -92,6 +101,9 @@
       <attribute name="al_advisername" />
       <attribute name="al_casestatus" />
       {% if f_ref != '' %}<filter type="and"><condition attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" /></filter>{% endif %}
+      {% if f_stage == 'open' %}<filter type="or"><condition attribute="al_casestatus" operator="eq" value="120910587" /><condition attribute="al_casestatus" operator="eq" value="120910588" /></filter>{% endif %}
+      {% if f_stage == 'signoff' %}<filter type="and"><condition attribute="al_casestatus" operator="eq" value="120910589" /></filter>{% endif %}
+      {% if f_stage == 'closed' %}<filter type="or"><condition attribute="al_casestatus" operator="eq" value="120910590" /><condition attribute="al_casestatus" operator="eq" value="120910591" /></filter>{% endif %}
       <order attribute="al_casereference" descending="false" />
       <link-entity name="al_remediationaction" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="rem" />
     </entity>
@@ -139,7 +151,15 @@
     A GET form, so a search is a URL that can be bookmarked or sent to someone, and so the
     pager below keeps it.
   {% endcomment %}
+  <nav class="ot-scope" aria-label="Remediation stage">
+    <a class="ot-btn{% if f_stage == '' %} ot-btn--primary{% endif %}" href="?{% if f_ref != '' %}ref={{ f_ref | url_escape }}{% endif %}"{% if f_stage == '' %} aria-current="page"{% endif %}>All</a>
+    <a class="ot-btn{% if f_stage == 'open' %} ot-btn--primary{% endif %}" href="?stage=open{% if f_ref != '' %}&amp;ref={{ f_ref | url_escape }}{% endif %}"{% if f_stage == 'open' %} aria-current="page"{% endif %}>Remedial action required</a>
+    <a class="ot-btn{% if f_stage == 'signoff' %} ot-btn--primary{% endif %}" href="?stage=signoff{% if f_ref != '' %}&amp;ref={{ f_ref | url_escape }}{% endif %}"{% if f_stage == 'signoff' %} aria-current="page"{% endif %}>Awaiting T&amp;C sign-off</a>
+    <a class="ot-btn{% if f_stage == 'closed' %} ot-btn--primary{% endif %}" href="?stage=closed{% if f_ref != '' %}&amp;ref={{ f_ref | url_escape }}{% endif %}"{% if f_stage == 'closed' %} aria-current="page"{% endif %}>Closed</a>
+  </nav>
+
   <form class="ot-filters" method="get" role="search" aria-label="Search remediation by case reference">
+    {% if f_stage != '' %}<input type="hidden" name="stage" value="{{ f_stage }}">{% endif %}
     <div class="ot-filters__grid">
       <div class="ot-field">
         <label for="f-ref">Case reference</label>
@@ -148,7 +168,7 @@
     </div>
     <div class="ot-filters__actions">
       <button type="submit" class="ot-btn ot-btn--primary">Search</button>
-      {% if f_ref != '' %}<a class="ot-btn" href="?">Clear</a>{% endif %}
+      {% if f_ref != '' %}<a class="ot-btn" href="?{% if f_stage != '' %}stage={{ f_stage }}{% endif %}">Clear</a>{% endif %}
     </div>
   </form>
 
@@ -224,10 +244,10 @@
 
       <nav aria-label="Pagination" style="margin-top: 1rem;">
         {% if page_number > 1 %}
-          <a href="?{% if f_ref != '' %}ref={{ f_ref | url_escape }}&amp;{% endif %}page={{ page_number | minus: 1 }}">&laquo; Previous</a>
+          <a href="?{{ stage_qs }}{% if f_ref != '' %}ref={{ f_ref | url_escape }}&amp;{% endif %}page={{ page_number | minus: 1 }}">&laquo; Previous</a>
         {% endif %}
         {% if case_rows.size == page_size %}
-          <a href="?{% if f_ref != '' %}ref={{ f_ref | url_escape }}&amp;{% endif %}page={{ page_number | plus: 1 }}" style="margin-left: 1rem;">Next &raquo;</a>
+          <a href="?{{ stage_qs }}{% if f_ref != '' %}ref={{ f_ref | url_escape }}&amp;{% endif %}page={{ page_number | plus: 1 }}" style="margin-left: 1rem;">Next &raquo;</a>
         {% endif %}
       </nav>
     {% else %}

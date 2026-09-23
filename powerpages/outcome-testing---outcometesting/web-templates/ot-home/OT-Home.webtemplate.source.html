@@ -5,8 +5,9 @@
 
   Two jobs, in order. First a router to the areas open to the signed-in user; the personal
   counts and worklists stay on My Work (PP-03). Then the PP-17 outcome cards, which are
-  reporting rather than routing: they count the whole book and drill into a filtered case
-  list. Full MI and export remain back-office, in the Outcome Testing app.
+  reporting rather than routing: they count the cases the viewer can see (AD-218, superseding
+  AD-083's organisation-wide count, since the table permissions now narrow every read) and
+  drill into a filtered case list. Full MI and export remain back-office, in the Outcome Testing app.
 
   The shell-stage notice this page used to carry is gone. It said role-based navigation and
   assignment filtering were still to come; both landed with the Phase 2 security build
@@ -181,11 +182,11 @@
 
 <section class="ot-card" aria-labelledby="ot-outcomes-heading">
   <h2 class="ot-card__title" id="ot-outcomes-heading">
-    Outcomes
+    Outcomes on your cases
     <span class="ot-count">{{ n_cases }}</span>
   </h2>
   <p>
-    The grade each case currently stands on &mdash; its final outcome, or the initial one
+    The grade each case you can see currently stands on &mdash; its final outcome, or the initial one
     where no final grade has been recorded (BR-005, BR-007). Select a card to open the cases
     behind it. Full management information and the Trail Light export stay in the Outcome
     Testing app.
