@@ -80,6 +80,20 @@ async function expectPageDenied(page: Page, portal: string, path: string): Promi
   await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible();
 }
 
+/** The main menu's links, in order. */
+function menu(page: Page) {
+  return page.locator('nav ul.weblinks > li.weblink > a');
+}
+
+/** Everyone but oversight has no My Work: / sends them on to Cases. */
+async function expectLandsOnCases(page: Page, portal: string): Promise<void> {
+  await page.goto(`${portal.replace(/\/+$/, '')}/`);
+  await expect(page).toHaveURL(/\/cases\/?$/);
+  await expectSignedIn(page, portal);
+  await expectNoLiquidError(page);
+  await expect(page.getByRole('heading', { name: 'Cases', level: 1 })).toBeVisible();
+}
+
 test.describe('an adviser (AR-04)', () => {
   requires(PORTAL_URL, SESSION_ADVISER, CASE_RELEASED_TO_ME, CASE_MINE_IN_REVIEW, CASE_NOT_MINE);
   test.use({ storageState: env(SESSION_ADVISER) });
@@ -104,10 +118,17 @@ test.describe('an adviser (AR-04)', () => {
     await expectApiRefuses(page, portal, requireEnv(CASE_NOT_MINE));
   });
 
-  test('is not given the reviewer pages', async ({ page }) => {
+  test('is not given My Work or the reviewer pages', async ({ page }) => {
     const portal = requireEnv(PORTAL_URL);
+    await expectPageDenied(page, portal, '/my-work');
     await expectPageDenied(page, portal, '/tax-reviews');
     await expectPageDenied(page, portal, '/aqs-reviews');
+  });
+
+  test('lands on Cases, with Cases and Remediation on the menu', async ({ page }) => {
+    const portal = requireEnv(PORTAL_URL);
+    await expectLandsOnCases(page, portal);
+    await expect(menu(page)).toHaveText(['Cases', 'Remediation']);
   });
 });
 
@@ -115,13 +136,17 @@ test.describe('a Tax reviewer (AR-02)', () => {
   requires(PORTAL_URL, SESSION_TAX_REVIEWER, CASE_NOT_MINE, CASE_IN_AQS_QUEUE);
   test.use({ storageState: env(SESSION_TAX_REVIEWER) });
 
-  test('has the Tax review page, scoped to their own reviews', async ({ page }) => {
+  test('lands on Cases, with Cases the only list on the menu', async ({ page }) => {
     const portal = requireEnv(PORTAL_URL);
-    await page.goto(`${portal.replace(/\/+$/, '')}/tax-reviews`);
-    await expectSignedIn(page, portal);
-    await expectNoLiquidError(page);
-    await expect(page.getByRole('heading', { name: 'Tax reviews', level: 1 })).toBeVisible();
-    await expect(page.locator('body')).not.toContainText('All reviews');
+    await expectLandsOnCases(page, portal);
+    await expect(menu(page)).toHaveText(['Cases']);
+  });
+
+  test('is not given My Work, Tax reviews or the other reviewer pages', async ({ page }) => {
+    const portal = requireEnv(PORTAL_URL);
+    for (const path of ['/my-work', '/tax-reviews', '/aqs-reviews', '/remediation']) {
+      await expectPageDenied(page, portal, path);
+    }
   });
 
   test('does not see a case allocated to nobody or to someone else', async ({ page }) => {
@@ -171,6 +196,14 @@ test.describe('an AQS reviewer (AR-03)', () => {
     await expectApiRefuses(page, portal, requireEnv(CASE_NOT_MINE));
   });
 
+  test('lands on Cases, keeps AQS reviews for the queue, and has no My Work or Tax reviews', async ({ page }) => {
+    const portal = requireEnv(PORTAL_URL);
+    await expectLandsOnCases(page, portal);
+    await expect(menu(page)).toHaveText(['Cases', 'AQS reviews']);
+    await expectPageDenied(page, portal, '/my-work');
+    await expectPageDenied(page, portal, '/tax-reviews');
+  });
+
   // WRITES: allocates the queued case to the signed-in reviewer. Opt-in, like every write in
   // this suite, and last in the group because it takes the case out of the queue.
   test('picks a waiting case up, and it leaves the queue for them', async ({ page }) => {
@@ -213,6 +246,13 @@ test.describe('a T&C Supervisor (AR-04, the advisers they supervise)', () => {
       await expectApiRefuses(page, portal, requireEnv(name));
     }
   });
+
+  test('lands on Cases, with Cases and Remediation on the menu', async ({ page }) => {
+    const portal = requireEnv(PORTAL_URL);
+    await expectLandsOnCases(page, portal);
+    await expect(menu(page)).toHaveText(['Cases', 'Remediation']);
+    await expectPageDenied(page, portal, '/my-work');
+  });
 });
 
 test.describe('a Planner (no portal access; emails only)', () => {
@@ -241,4 +281,29 @@ test.describe('an oversight role (Outcome Testing Manager or Administrators)', (
       await expectCaseShown(page);
     }
   });
+
+  test('keeps My Work at / and every page on the menu', async ({ page }) => {
+    const portal = requireEnv(PORTAL_URL);
+    await page.goto(`${portal.replace(/\/+$/, '')}/`);
+    await expectSignedIn(page, portal);
+    await expectNoLiquidError(page);
+    await expect(page).not.toHaveURL(/\/cases/);
+    await expect(page.getByRole('heading', { name: 'My Work', level: 1 })).toBeVisible();
+    await expect(menu(page)).toHaveText(['My Work', 'Cases', 'Tax reviews', 'AQS reviews', 'Remediation']);
+  });
 });
+
+// Profile is no one's: the page is refused and the user menu offers only Sign out.
+for (const session of [SESSION_ADVISER, SESSION_TAX_REVIEWER, SESSION_AQS_REVIEWER, SESSION_TC_SUPERVISOR, SESSION_OVERSIGHT]) {
+  test.describe(`Profile, as ${session}`, () => {
+    requires(PORTAL_URL, session);
+    test.use({ storageState: env(session) });
+
+    test('is refused, and not offered in the user menu', async ({ page }) => {
+      const portal = requireEnv(PORTAL_URL);
+      await expectPageDenied(page, portal, '/profile');
+      await expect(page.locator('.dropdown-menu a', { hasText: 'Profile' })).toHaveCount(0);
+      await expect(page.locator('.dropdown-menu a', { hasText: 'Sign out' })).toHaveCount(1);
+    });
+  });
+}

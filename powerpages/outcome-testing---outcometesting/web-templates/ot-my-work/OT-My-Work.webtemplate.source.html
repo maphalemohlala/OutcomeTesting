@@ -19,6 +19,18 @@
   emit an empty condition value and silently count every row in the table - the exact
   over-report this page exists to stop. Fail closed instead.
 {% endcomment %}
+{% comment %}
+  My Work is an oversight page. Every other role reads only its own cases, so Cases is their
+  one list. /my-work carries its own Restrict read rule; / cannot, because every page inherits
+  Home's rule, so this template sends everyone else on to Cases and renders none of the
+  dashboard for them. The same three roles as the header's menu check.
+{% endcomment %}
+{% assign ot_oversight = false %}
+{% if user.roles contains 'AL Portal - Outcome Testing Manager' or user.roles contains 'AL Portal - Portal Administrator' or user.roles contains 'Administrators' %}{% assign ot_oversight = true %}{% endif %}
+{% if user and ot_oversight == false %}
+  <script>window.location.replace('/cases');</script>
+  <p><a href="/cases">Go to Cases</a></p>
+{% else %}
 {% if user == null %}
   {% include 'OT Empty State' title: 'Sign in to see your work' message: 'This page shows the reviews and remediation actions assigned to you.' %}
 {% else %}
@@ -327,5 +339,6 @@
     {% include 'OT Empty State' title: 'Nothing assigned to you' message: 'Reviews appear here once a team lead allocates one to you.' %}
   {% endif %}
 </section>
+{% endif %}
 {% endif %}
 {% endblock %}
