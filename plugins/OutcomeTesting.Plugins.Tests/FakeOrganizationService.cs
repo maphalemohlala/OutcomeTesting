@@ -664,6 +664,13 @@ namespace OutcomeTesting.Plugins.Tests
                 return new OrganizationResponse();
             }
 
+            // Sharing (AD-218). Recorded in Requests like everything else, so a test asserts
+            // on WHO was granted or revoked rather than on a response nobody reads.
+            if (request.RequestName == "GrantAccess" || request.RequestName == "RevokeAccess")
+            {
+                return new OrganizationResponse();
+            }
+
             if (request.RequestName == "RetrieveAttribute")
             {
                 return RetrieveAttribute(request);
