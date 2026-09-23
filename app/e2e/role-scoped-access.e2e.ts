@@ -45,7 +45,11 @@ const CASE_RELEASED_TO_ME = 'OT_CASE_RELEASED_TO_ME';
 const CASE_MINE_IN_REVIEW = 'OT_CASE_MINE_IN_REVIEW';
 /** A case that belongs to none of the restricted sessions: another adviser, another checker. */
 const CASE_NOT_MINE = 'OT_CASE_NOT_MINE';
-/** A case waiting in the AQS queue, and its reference as the queue lists it. */
+/**
+ * A case waiting in the AQS queue, and its reference as the queue lists it. For the Tax
+ * reviewer group it must be one that session did NOT Tax-check: a Tax checker keeps reading
+ * the case it checked after it moves to the queue, so their own case proves nothing here.
+ */
 const CASE_IN_AQS_QUEUE = 'OT_CASE_IN_AQS_QUEUE';
 const CASE_IN_AQS_QUEUE_REF = 'OT_CASE_IN_AQS_QUEUE_REF';
 
