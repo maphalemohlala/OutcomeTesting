@@ -315,6 +315,69 @@ rather than a sign-in. They are live sessions and the directory is gitignored.
 interactive login. The app CHANGE is committed and its tests pass, but the built bundle has
 not been pushed.
 
+## Fourth pass: the export name, and the app fold done properly
+
+### Trail Light downloads (`AD-217`)
+
+A Trail Light download is now **`DFALIN1_outcometesting_yyyy_mm_dd`**, exactly as given.
+`DFALIN1` is the receiving end's name for this feed, so the filename is part of the
+interface the same way `AD-039`'s twenty columns are.
+
+Two things follow that are deliberate rather than oversights:
+
+- **Underscores in the date**, where every other export stamps `stem-YYYY-MM-DD`. A
+  convention is not improved by being made consistent with something it is not part of.
+- **Two downloads on one day share a name.** The convention describes the day's file, not
+  the click that made it; the browser suffixes the second copy.
+
+The day is the **UK** day, via the same `ukToday` the case header uses. 23:30Z on 1 June is
+already 2 June in London under British Summer Time, so a machine reading UTC would name a
+**daily** feed for yesterday. There is a test at exactly that hour.
+
+**One thing to decide.** The *Download filtered rows* control on the same page is a
+deliberate SUBSET, and it now carries the feed's name too, because the instruction said
+"the trail light exports". So a partial extract is indistinguishable from the day's feed
+by its name alone. If anything downstream picks files up by name, that wants separating -
+it is a one-line change and the test would come with it.
+
+### The app's Products field (`AD-216`)
+
+Reported as *"the app still shows the long list on the products"*, and right on two counts.
+
+It had not been deployed - `pa auth`'s session had expired - but it would not have looked
+much better if it had. The first attempt capped the height and used two columns, which is
+**not what the portal does** and not what "do the same for the app" asked for. The portal
+shuts the list behind a line naming what is ticked; the app now does the same, past twelve
+options, with the same search box and capped panel behind it. One control, not two that
+merely rhyme.
+
+Below twelve it stays a plain list: the fold costs a click, worth paying only when the
+alternative is scrolling past dozens of options to reach the next field.
+
+`describeTickSelection` is pure and tested, because it holds the rule that makes the fold
+worth anything - the summary **names** what is ticked rather than counting it. "3 selected"
+sends somebody back into the panel to find out which three, which is the whole cost the
+fold was meant to save. It reads in catalogue order rather than tick order, so the line
+does not rewrite its own beginning as somebody works.
+
+### Deployed in this pass
+
+| Artefact | Where | When |
+|---|---|---|
+| Code App bundle (`index-EgQPVkaJ.js`, 611,261 bytes) | environment `d50d27e8` | 2026-09-23, `sourcetime=1790161060448` |
+
+**Use the long play URL the push printed, with its `sourcetime`.** The short `/a/{appId}`
+URL keeps serving the previous bundle after a push:
+
+```
+https://apps.powerapps.com/play/e/d50d27e8-cb3b-e718-b6e2-30aa92d944aa/app/5d9fc475-ee75-4386-917e-fc182307b0c2?tenantId=4abde4fc-68ae-44b4-8e80-b575a8c3d5b8&hint=0eeb1568-9283-489f-b209-f5e1f9fc0df2&sourcetime=1790161060448
+```
+
+`pa app push` needed `pa auth login` first, which is interactive - the CLI cannot renew
+that session silently and says so plainly rather than failing oddly.
+
+App tests: **1,030 passed across 77 files**, typecheck clean.
+
 ## Known-open
 
 **The AQS all-Yes lock withdraws the Breach and Record Keeping reasons too.** The File Quality
