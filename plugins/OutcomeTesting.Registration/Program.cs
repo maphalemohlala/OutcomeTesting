@@ -138,6 +138,21 @@ using System.Text.Json.Nodes;
 //   relationship is custom, unmanaged, and its intersect is empty. An intersect with rows in
 //   it is data somebody is relying on, whatever a register says.
 //
+// Cascade sharing: dotnet run -- setcascade <orgUrl> <relationshipSchemaName> [--reparent-only] --confirm <orgUrl>
+//   Sets Share, Unshare and Reparent to Cascade on a one-to-many (AD-218), so a case shared
+//   with a team shares its reviews, answers, actions, outcome, sign-offs and assignments.
+//
+// Access principals: dotnet run -- ensureaccessprincipals <orgUrl> --confirm <orgUrl>
+//   Creates the Tax and AQS owner teams and the AQS Team account the reconciler looks up by
+//   name (AD-218). Idempotent; refuses a duplicated name.
+//
+// Team manager role: dotnet run -- grantteamsecurity <orgUrl>
+//   Creates "Outcome Testing Team Manager": Basic depth on case tables, Global on
+//   configuration (AD-218). Mapping people to it is the project owner's.
+//
+// Backfill access: dotnet run -- reconcileaccess <orgUrl> [--confirm <orgUrl>]
+//   Calls al_ReconcileCaseAccess on every active case and reports unmatched advisers.
+//
 // Add to solution: dotnet run -- addtosolution <orgUrl> [<solutionUniqueName>]
 //   Adds the plug-in assembly (and its plug-in type) to the target solution for clean ALM
 //   promotion. Idempotent. The Custom API is added separately via a solution-file import
@@ -319,6 +334,26 @@ if (args.Length >= 2 && args[0].Equals("addtosolution", StringComparison.Ordinal
 if (args.Length >= 2 && args[0].Equals("grantsecurity", StringComparison.OrdinalIgnoreCase))
 {
     return GrantSecurity(args[1]);
+}
+
+if (args.Length >= 3 && args[0].Equals("setcascade", StringComparison.OrdinalIgnoreCase))
+{
+    return SetCascade(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("ensureaccessprincipals", StringComparison.OrdinalIgnoreCase))
+{
+    return EnsureAccessPrincipals(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("grantteamsecurity", StringComparison.OrdinalIgnoreCase))
+{
+    return GrantTeamSecurity(args[1]);
+}
+
+if (args.Length >= 2 && args[0].Equals("reconcileaccess", StringComparison.OrdinalIgnoreCase))
+{
+    return ReconcileAccess(args);
 }
 
 if (args.Length >= 2 && args[0].Equals("checkassignable", StringComparison.OrdinalIgnoreCase))
@@ -5877,7 +5912,7 @@ string BuildPermissionJson(Dictionary<string, YamlValue> y)
     var parts = new List<string>();
     foreach (var key in new[]
              {
-                 "adx_append", "adx_appendto", "adx_contactrelationship", "adx_create", "adx_delete",
+                 "adx_append", "adx_appendto", "adx_accountrelationship", "adx_contactrelationship", "adx_create", "adx_delete",
                  "adx_entitylogicalname", "adx_entityname", "adx_parententitypermission",
                  "adx_parentrelationship", "adx_read", "adx_scope", "adx_write",
              })
@@ -7530,6 +7565,256 @@ int GrantSecurity(string orgUrl)
     return 0;
 }
 
+// AD-218: a case shared with a team shares its children too. Share, Unshare and Reparent
+// become Cascade; Assign and Delete are left alone, because reassigning a case must never
+// reassign a checker's review. --reparent-only is for al_reviewinstance_response, whose
+// Share is already Cascade. Reads back, because a successful-looking write is not evidence.
+int SetCascade(string[] a)
+{
+    var orgUrl = a[1];
+    if (!ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This changes relationship metadata. Re-run as: setcascade <orgUrl> <relationshipSchemaName> [--reparent-only] --confirm <orgUrl>");
+        return 1;
+    }
+
+    var name = a[2].Trim();
+    var reparentOnly = a.Any(x => x.Equals("--reparent-only", StringComparison.OrdinalIgnoreCase));
+    using var svc = Connect(orgUrl);
+
+    var current = (RetrieveRelationshipResponse)svc.Execute(new RetrieveRelationshipRequest { Name = name });
+    if (current.RelationshipMetadata is not OneToManyRelationshipMetadata oneToMany)
+    {
+        Console.Error.WriteLine($"'{name}' is not a one-to-many relationship. Nothing was changed.");
+        return 1;
+    }
+
+    oneToMany.CascadeConfiguration.Reparent = CascadeType.Cascade;
+    if (!reparentOnly)
+    {
+        oneToMany.CascadeConfiguration.Share = CascadeType.Cascade;
+        oneToMany.CascadeConfiguration.Unshare = CascadeType.Cascade;
+    }
+
+    svc.Execute(new UpdateRelationshipRequest { Relationship = oneToMany, MergeLabels = true });
+
+    var after = (OneToManyRelationshipMetadata)((RetrieveRelationshipResponse)svc.Execute(
+        new RetrieveRelationshipRequest { Name = name })).RelationshipMetadata;
+    Console.WriteLine(
+        $"{name}: Share={after.CascadeConfiguration.Share} Unshare={after.CascadeConfiguration.Unshare} Reparent={after.CascadeConfiguration.Reparent}");
+    return after.CascadeConfiguration.Reparent == CascadeType.Cascade
+        && (reparentOnly || after.CascadeConfiguration.Share == CascadeType.Cascade) ? 0 : 1;
+}
+
+// AD-218: the two owner teams the reconciler shares cases with, and the account AQS
+// reviewers belong to for the queue permission. Data, not solution components: each
+// environment makes its own, and the names are what the plug-in looks them up by
+// (CaseAccessReconciler.TaxTeamName, AqsTeamName, AqsQueueAccountName). Idempotent.
+int EnsureAccessPrincipals(string[] a)
+{
+    var orgUrl = a[1];
+    if (!ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine("This creates teams and an account. Re-run as: ensureaccessprincipals <orgUrl> --confirm <orgUrl>");
+        return 1;
+    }
+
+    using var svc = Connect(orgUrl);
+    var buId = RootBusinessUnitId(svc);
+
+    foreach (var teamName in new[] { "Outcome Testing - Tax Team", "Outcome Testing - AQS Team" })
+    {
+        var found = svc.RetrieveMultiple(new QueryExpression("team")
+        {
+            ColumnSet = new ColumnSet("name"),
+            Criteria = { Conditions = { new ConditionExpression("name", ConditionOperator.Equal, teamName) } },
+        }).Entities;
+
+        if (found.Count > 1)
+        {
+            Console.Error.WriteLine($"  {found.Count} teams are named '{teamName}'. The reconciler refuses an ambiguous name; remove the duplicate.");
+            return 1;
+        }
+
+        if (found.Count == 1)
+        {
+            Console.WriteLine($"  team exists   {teamName} ({found[0].Id:D})");
+            continue;
+        }
+
+        var id = svc.Create(new Entity("team")
+        {
+            ["name"] = teamName,
+            ["teamtype"] = new OptionSetValue(0), // Owner
+            ["businessunitid"] = new EntityReference("businessunit", buId),
+        });
+        Console.WriteLine($"  team created  {teamName} ({id:D})");
+    }
+
+    const string accountName = "Outcome Testing - AQS Team";
+    var accounts = svc.RetrieveMultiple(new QueryExpression("account")
+    {
+        ColumnSet = new ColumnSet("name"),
+        Criteria = { Conditions = { new ConditionExpression("name", ConditionOperator.Equal, accountName) } },
+    }).Entities;
+
+    if (accounts.Count > 1)
+    {
+        Console.Error.WriteLine($"  {accounts.Count} accounts are named '{accountName}'. Remove the duplicate.");
+        return 1;
+    }
+
+    if (accounts.Count == 1)
+    {
+        Console.WriteLine($"  account exists {accountName} ({accounts[0].Id:D})");
+    }
+    else
+    {
+        var id = svc.Create(new Entity("account") { ["name"] = accountName });
+        Console.WriteLine($"  account created {accountName} ({id:D})");
+    }
+
+    return 0;
+}
+
+// AD-218: the security role the two team managers are mapped to by the project owner.
+// Basic (User) depth on the case tables, so a manager reads what is shared with their
+// team and nothing else; Global on configuration and on what the permission gate reads
+// (AD-142), which carries no case data. Always paired with Basic User.
+int GrantTeamSecurity(string orgUrl)
+{
+    using var svc = Connect(orgUrl);
+    var buId = RootBusinessUnitId(svc);
+    var role = EnsureRole(svc, "Outcome Testing Team Manager", buId);
+
+    string[] caseTables =
+    {
+        "al_outcomecase", "al_reviewinstance", "al_response", "al_remediationaction",
+        "al_signoff", "al_outcome", "al_caseassignment",
+    };
+    foreach (var table in caseTables)
+    {
+        GrantTable(svc, role, table, read: true, create: true, write: true, append: true, appendTo: true,
+            depth: PrivilegeDepth.Basic);
+    }
+
+    // al_AssignCase changes the review's owner (AssignCasePlugin.StampReviewInstance).
+    GrantAssign(svc, role, "al_reviewinstance", PrivilegeDepth.Basic);
+
+    // Create-only and own rows: an audit event that can be edited is not an audit trail.
+    GrantTable(svc, role, "al_auditevent", read: true, create: true, append: true, appendTo: true, depth: PrivilegeDepth.Basic);
+    GrantTable(svc, role, "al_notification", read: true, create: true, append: true, appendTo: true, depth: PrivilegeDepth.Basic);
+
+    string[] configuration =
+    {
+        "al_failreason", "al_section", "al_question", "al_questionversion", "al_role",
+        "al_checklist", "al_checklistversion", "al_reviewroute", "al_listoption",
+        "al_userrolemapping", "al_pagepermission", "role", "powerpagecomponent",
+    };
+    foreach (var table in configuration)
+    {
+        GrantTable(svc, role, table, read: true, appendTo: true);
+    }
+
+    GrantTable(svc, role, "contact", read: true, appendTo: true);
+    GrantTable(svc, role, "systemuser", read: true, appendTo: true);
+    GrantTable(svc, role, "mspp_webrole", read: true, appendTo: true);
+
+    AddRoleToSolution(svc, role, "OutcomeTesting");
+    Console.WriteLine("Done. Role ready: 'Outcome Testing Team Manager'. Map the two team managers to it alongside Basic User; do not also give them 'Outcome Testing App User', which reads every case.");
+    return 0;
+}
+
+static void GrantAssign(ServiceClient svc, Guid roleId, string table, PrivilegeDepth depth)
+{
+    var response = (RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = table,
+        EntityFilters = EntityFilters.Privileges,
+    });
+
+    var assign = response.EntityMetadata.Privileges.FirstOrDefault(p => p.PrivilegeType == PrivilegeType.Assign);
+    if (assign == null)
+    {
+        Console.Error.WriteLine($"  SKIPPED assign on {table}: the table carries no Assign privilege.");
+        return;
+    }
+
+    svc.Execute(new AddPrivilegesRoleRequest
+    {
+        RoleId = roleId,
+        Privileges = new[] { new RolePrivilege { PrivilegeId = assign.PrivilegeId, Depth = depth } },
+    });
+}
+
+// AD-218: the backfill. Calls al_ReconcileCaseAccess for every active case, so the server
+// decides exactly as the step does. A dry run lists how many cases would be asked; --confirm
+// asks them and prints each case whose access changed and every case released to an
+// adviser or supervisor nobody could be matched to.
+int ReconcileAccess(string[] a)
+{
+    var orgUrl = a[1];
+    var confirm = ConfirmedFor(a, orgUrl);
+    using var svc = Connect(orgUrl);
+
+    var cases = new List<Entity>();
+    var query = new QueryExpression("al_outcomecase")
+    {
+        ColumnSet = new ColumnSet("al_casereference"),
+        Criteria = { Conditions = { new ConditionExpression("statecode", ConditionOperator.Equal, 0) } },
+        PageInfo = new PagingInfo { Count = 500, PageNumber = 1 },
+    };
+    while (true)
+    {
+        var page = svc.RetrieveMultiple(query);
+        cases.AddRange(page.Entities);
+        if (!page.MoreRecords) break;
+        query.PageInfo.PageNumber++;
+        query.PageInfo.PagingCookie = page.PagingCookie;
+    }
+
+    Console.WriteLine($"{cases.Count} active case(s).");
+    if (!confirm)
+    {
+        Console.WriteLine("Dry run. Re-run as: reconcileaccess <orgUrl> --confirm <orgUrl>");
+        return 0;
+    }
+
+    int changed = 0, unmatched = 0, failed = 0;
+    foreach (var row in cases)
+    {
+        var reference = row.GetAttributeValue<string>("al_casereference") ?? row.Id.ToString("D");
+        try
+        {
+            var response = svc.Execute(new OrganizationRequest("al_ReconcileCaseAccess") { ["TargetId"] = row.Id.ToString("D") });
+            var columns = response.Results.Contains("Changed") ? response.Results["Changed"] as string : null;
+            var adviserUnmatched = response.Results.Contains("AdviserUnmatched") && (bool)response.Results["AdviserUnmatched"];
+            var supervisorUnmatched = response.Results.Contains("SupervisorUnmatched") && (bool)response.Results["SupervisorUnmatched"];
+
+            if (!string.IsNullOrEmpty(columns))
+            {
+                changed++;
+                Console.WriteLine($"  changed   {reference,-20} {columns}");
+            }
+
+            if (adviserUnmatched || supervisorUnmatched)
+            {
+                unmatched++;
+                Console.WriteLine($"  UNMATCHED {reference,-20} {(adviserUnmatched ? "adviser " : "")}{(supervisorUnmatched ? "supervisor" : "")}");
+            }
+        }
+        catch (Exception error)
+        {
+            failed++;
+            Console.Error.WriteLine($"  FAILED    {reference,-20} {error.Message.Split('\n')[0].Trim()}");
+        }
+    }
+
+    Console.WriteLine($"Done. {changed} changed, {unmatched} released with nobody matched, {failed} failed.");
+    return failed == 0 ? 0 : 1;
+}
+
 static void AddRoleToSolution(ServiceClient svc, Guid roleId, string solution)
 {
     try
@@ -7586,7 +7871,8 @@ static void GrantTable(
     bool write = false,
     bool delete = false,
     bool append = false,
-    bool appendTo = false)
+    bool appendTo = false,
+    PrivilegeDepth depth = PrivilegeDepth.Global)
 {
     // Reported rather than thrown: this is called for ~20 tables in a row, and an exception
     // on one would abort the rest and leave a role half-granted - the worst of the three
@@ -7622,7 +7908,7 @@ static void GrantTable(
         };
         if (want)
         {
-            wanted.Add(new RolePrivilege { PrivilegeId = privilege.PrivilegeId, Depth = PrivilegeDepth.Global });
+            wanted.Add(new RolePrivilege { PrivilegeId = privilege.PrivilegeId, Depth = depth });
         }
     }
 
