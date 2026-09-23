@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
 
 namespace OutcomeTesting.Plugins
 {
@@ -31,6 +32,12 @@ namespace OutcomeTesting.Plugins
 
             var caseId = CommandHelpers.ParseRequiredGuid(context, InTargetId);
             var system = localPluginContext.OrgSvcFactory.CreateOrganizationService(null);
+
+            // F37: a case removed since the caller listed it is named, not faulted.
+            CommandHelpers.RetrieveOrNotFound(
+                system, "al_outcomecase", caseId, new ColumnSet(false),
+                "That case no longer exists. Refresh and try again.");
+
             var change = CaseAccessReconciler.Reconcile(system, caseId, DateTime.UtcNow);
 
             context.OutputParameters["Changed"] = string.Join(",", change.ChangedColumns);
