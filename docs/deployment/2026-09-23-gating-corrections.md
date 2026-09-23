@@ -81,7 +81,7 @@ while Dataverse held the association. Verify against the Web API, not the page.
 |---|---|---|
 | Plug-in tests | 1,618 passed | (same assembly) |
 | App tests | 1,006 passed across 77 files | (same build) |
-| Portal e2e | **could not run** | **5 passed, 7 skipped, 0 failed** |
+| Portal e2e | **5 passed, 7 skipped, 0 failed** | **5 passed, 7 skipped, 0 failed** |
 
 On TEST the suite ran against case 900000004's unsubmitted Tax review. The three gating specs
 pass, including the answering script loading with no console error, and both managed-list
@@ -96,21 +96,56 @@ Checked directly on that review, all three corrected rules behave:
 And on the two submitted TEST reviews, the server-rendered lock is right in both directions:
 `Q-FQTAX-01` Pass locks Yes, `Q-FQ-01` Fail locks No.
 
-## Why DEV could not be tested through the browser
+## DEV, and the two things that were not what they looked like
 
-Two independent reasons, both environmental:
+DEV ran green in the end — **5 passed, 7 skipped, 0 failed**, the same shape as TEST — but
+only after two wrong diagnoses, both worth recording because each would mislead the next
+person the same way.
 
-1. **The DEV portal session has expired.** The e2e guard reports *"redirected off the portal —
-   the session has expired, re-run `npm run e2e:auth`"*, which is the guard working. Re-auth
-   is interactive.
-2. **DEV holds no case or review data at all.** `al_outcomecase` and `al_reviewinstance` are
-   both **empty**; `al_listoption` (19), `al_question` (47) and `contact` (9) are seeded. The
-   environment has been refreshed and never re-seeded with working data, so even signed in,
-   every review spec would skip for want of anything to point at.
+**"DEV holds no case data" was wrong.** A `$count=true` query returned 0 against an
+environment that holds cases 900000001–900000005. Ask for the rows themselves
+(`$select=...&$top=5`); do not conclude an environment is empty from a count.
 
-The DEV deployment itself is verified — assembly pushed, template pushed, 55/55 steps
-enabled. It is the browser-level proof that is missing, and it is missing for want of a
-session and a case, not for want of a working build.
+**What was actually missing was a review, not a case.** All five DEV cases sit at
+**Queued** (`120910583`) and `al_reviewinstance` was genuinely empty — a review is created
+when a case is claimed or assigned, so there was nothing for `OT_REVIEW_URL` to point at.
+Created without a browser:
+
+```
+callapi <devUrl> al_AssignCase TargetId=<caseId>   AssigneeEmail=svc.automate.aq@ascotlloyd.co.uk IdempotencyKey=<unique>
+```
+
+That made review `0c46f88a-2db7-f111-aaac-e4fade069307` — an unsubmitted **AQS** check on
+900000001. Usefully it is the opposite discipline to TEST's Tax review, so between the two
+environments both sides of the fail points rule are exercised in a browser.
+
+**The portal session expires separately from `pac auth`.** `app/e2e/.auth/portal.json` is
+its own browser session; `pac auth create` does nothing for it. Re-captured interactively
+with `npm run e2e:auth`, signed in as the account the review is assigned to — the Review
+Instance table permission is contact-scoped, so any other account opens it read-only and
+every gating spec skips rather than runs.
+
+### What DEV proved that TEST did not
+
+With `OT_ALLOW_WRITES=1`, *takes Pass away without a reload when a finding is ticked*
+passes on the AQS review — three runs, three passes. This is the **client-side** half
+(AD-041): the rule runs on `change`, with no save landing. Confirmed by query afterwards —
+the review still holds **zero `al_response` rows**, so the spec writes nothing despite the
+flag's name, and DEV was left exactly as found.
+
+TEST carries the **server-side** half instead: its two submitted reviews render the lock in
+the raw HTML in both directions. Neither environment proves both, and they are different
+failures — a page where only the script works shows a checker Pass for the moment before it
+runs.
+
+### The two specs that still skip on DEV, correctly
+
+- *renders the lock server-side* skips because the review holds no stored finding — there is
+  nothing that ought to be locked, so the absence of a lock is the right render. TEST covers
+  this one.
+- *takes Pass away…* skips unless `OT_ALLOW_WRITES=1` is set. Playwright's list reporter does
+  not print skip reasons, and this one was briefly misread as "Pass is already locked" — the
+  two skips look identical in the output and mean opposite things.
 
 ## Known-open
 
