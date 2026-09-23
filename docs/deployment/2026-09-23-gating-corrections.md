@@ -436,10 +436,8 @@ there are no stored `al_response` rows against any AML or CRA question in either
 environment. It is held for the project owner because it changes what a checker is offered,
 not because it is difficult.
 
-**The TEST portal e2e has not been run against this build.** TEST is a different host from
-DEV (AD-215) and needs its own `npm run e2e:auth`. The plug-in and template were both pushed
-to TEST and its 24 steps verified enabled, and the assembly and template are byte-identical
-to the ones DEV proved - so what is missing is the browser-level confirmation on TEST, not
-the deployment. TEST also currently has **no unsubmitted review assigned to the Service
-Account** (all four were submitted earlier on 2026-09-23), so a case needs assigning before
-the editable specs can do anything but skip.
+**CLOSED 2026-09-23.** This said the TEST portal e2e had not been run. It has: TEST is a
+different host from DEV (AD-215) and took its own `npm run e2e:auth`, after which both
+environments finish **10 passed, 6 skipped, 0 failed**. The case it needed was assigned by
+the project owner. Left here struck through rather than deleted, because an entry that
+quietly disappears is indistinguishable from one nobody checked.
