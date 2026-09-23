@@ -414,6 +414,41 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void Asks_nothing_further_where_the_aml_and_cra_section_is_untouched()
+        {
+            /*
+             * A Tax review has no AML and CRA section and never will, and an AQS review has
+             * not reached it yet. Either way the answer is false, so the two queries that
+             * scope and count the section are two round trips spent to be told so - inside
+             * the transaction holding a checker's save open.
+             *
+             * Pinned on the COUNT rather than on the result, because the result was already
+             * right; what was wrong was the cost of arriving at it.
+             */
+            var service = Checklist();
+            SeedAnswer(service, Guid.NewGuid(), E3VersionId, ResponseRules.ChoicePass);
+
+            var facts = ChecklistQueries.ReadGatingFacts(service, ReviewId);
+
+            Assert.False(facts.AmlCraAllYes);
+            Assert.Equal(1, service.RetrieveMultipleCount);
+        }
+
+        [Fact]
+        public void Asks_the_further_questions_once_the_section_has_been_answered()
+        {
+            // The other half, and the one that stops the short-circuit above being written as
+            // "never ask": an answered section still has to be counted against the questions
+            // in force, or a part-answered section reads as complete.
+            var service = Checklist();
+            SeedAnswer(service, Guid.NewGuid(), AmlVersionId, ResponseRules.ChoiceYes);
+
+            ChecklistQueries.ReadGatingFacts(service, ReviewId);
+
+            Assert.True(service.RetrieveMultipleCount > 1);
+        }
+
+        [Fact]
         public void Reads_the_tax_check_outcome_and_the_file_quality_outcome()
         {
             // The two answers the fail points and Remedial action required? are gated on.

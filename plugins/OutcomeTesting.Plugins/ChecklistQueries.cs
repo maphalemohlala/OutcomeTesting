@@ -86,10 +86,12 @@ namespace OutcomeTesting.Plugins
         /// operator and a predicate is how S-EXTRA once looked like a Suitability core check.
         /// </para>
         /// <para>
-        /// The second reads the AML and CRA questions in force, because "all of them are Yes"
-        /// cannot be seen in the answers alone - an unanswered question leaves no row to find.
-        /// It runs on every review, including a Tax one that has no such section: it comes
-        /// back empty there, AmlCraAllYes is false, and the Tax rule does not read it anyway.
+        /// The second and third read the AML and CRA questions in force, because "all of them
+        /// are Yes" cannot be seen in the answers alone - an unanswered question leaves no row
+        /// to find. They run ONLY where the first query came back with an answer on that
+        /// section. Everywhere else the answer is false whatever they would have returned, so
+        /// asking costs two round trips inside a checker's save to learn nothing: a Tax review
+        /// has no such section at all, and an AQS review has not reached it yet.
         /// </para>
         /// <para>
         /// The links are INNER joins, so a response whose chain to a question and a section
@@ -183,10 +185,22 @@ namespace OutcomeTesting.Plugins
 
             // Clean AND complete. An AML and CRA question with no answer row at all leaves
             // nothing in either set, so it is caught by the count rather than by a value.
-            var expected = AmlCraQuestionCodes(service, ChecklistVersionOf(service, reviewId));
-            facts.AmlCraAllYes = expected.Count > 0
-                && expected.IsSubsetOf(amlCraClean)
-                && amlCraAnswered.IsSubsetOf(amlCraClean);
+            //
+            // Nothing answered on the section at all short-circuits, and gives the SAME
+            // answer the two queries below would: with amlCraClean empty, a non-empty
+            // expected set cannot be a subset of it, and an empty expected set fails the
+            // count - so the result is false either way. It is worth spelling out because
+            // the saving is not small. This runs inside the transaction holding a checker's
+            // save open, and without it every Tax review - which has no AML and CRA section
+            // to answer, ever - paid a Retrieve and a RetrieveMultiple on every keystroke's
+            // save to be told a section it does not have is not complete.
+            if (amlCraAnswered.Count > 0)
+            {
+                var expected = AmlCraQuestionCodes(service, ChecklistVersionOf(service, reviewId));
+                facts.AmlCraAllYes = expected.Count > 0
+                    && expected.IsSubsetOf(amlCraClean)
+                    && amlCraAnswered.IsSubsetOf(amlCraClean);
+            }
 
             return facts;
         }
