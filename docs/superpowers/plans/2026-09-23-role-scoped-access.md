@@ -2938,6 +2938,8 @@ dotnet run -- registerstep <org> OutcomeTesting.Plugins.CaseAccessPlugin Update 
 dotnet run -- registerstep <org> OutcomeTesting.Plugins.CaseAccessPlugin Create al_reviewinstance 40 "" sync
 dotnet run -- registerstep <org> OutcomeTesting.Plugins.CaseAccessPlugin Update al_reviewinstance 40 "al_assignedcontactid,al_submittedon,statecode" sync
 dotnet run -- registerstep <org> OutcomeTesting.Plugins.CaseAccessPlugin Create al_remediationaction 40 "" sync
+dotnet run -- registerstep <org> OutcomeTesting.Plugins.CaseAccessGuardPlugin Create al_outcomecase 20 "" sync
+dotnet run -- registerstep <org> OutcomeTesting.Plugins.CaseAccessGuardPlugin Update al_outcomecase 20 "al_taxcheckercontactid,al_aqscheckercontactid,al_aqsqueueaccountid,al_aqsqueuedon,al_advisercontactid,al_tcsupervisorcontactid" sync
 dotnet run -- verifysteps <org>
 ```
 
@@ -3012,7 +3014,7 @@ Negative checks (a), (d) and (e) need the non-admin test identities the spec nam
 
 - [ ] **Step 12: Write the deployment note and commit**
 
-Write `docs/deployment/2026-09-23-role-scoped-access.md`. Include: target, what was deployed (a table with evidence for each step), backfill output, the Liquid-aggregate finding, verification results with not-run reasons, and the open items: the remap of roles and Dataverse roles by the project owner, the test identities, and TEST promotion.
+Write `docs/deployment/2026-09-23-role-scoped-access.md`. Include: target, what was deployed (a table with evidence for each step), backfill output, the Liquid-aggregate finding, verification results with not-run reasons, and the open items: the remap of roles and Dataverse roles by the project owner, the test identities, and TEST promotion. **TEST promotion hazard:** the `CaseAccessPlugin` steps travel with the solution, and the reconciler refuses every case write where the two teams or the AQS Team account are missing. So `ensureaccessprincipals` must run against TEST *before* the solution import activates those steps. Otherwise every case, review and remediation write in TEST fails.
 
 ```bash
 git add docs/deployment/2026-09-23-role-scoped-access.md src/
