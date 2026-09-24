@@ -50,6 +50,8 @@ Every displayed answerable question is mandatory before its section can be submi
 | `YesNoInsufficient` | Yes, No, Insufficient evidence | Consumer Duty |
 | `YesNo` | Yes, No | remedial action required |
 | `Grade` | Pass, Pass with issues, Insufficient evidence, Potential harm | advice quality grade (BR-005) |
+| `PassFailInsufficientNa` (120910012) | Pass, Fail, Insufficient evidence, N/A | CRP, Q-E4-03 (AD-219, 2026-09-24) |
+| `MultiSelectRootCause` (120910013) | the nine root causes, several permitted | primary root cause, Q-GR-02 v2 (AD-219) |
 
 ## Case header (Outcome Case columns, not questions)
 
@@ -97,28 +99,36 @@ Q-TAX-02 is recorded as `PassFailInsufficient`, not `SingleSelect`. Its options 
 
 Owner: AQS checker. All mandatory.
 
-**Response type: `YesNoNA` everywhere, and that is an OPEN GAP.** The project owner
-reported on 2026-09-23 that "we've changed the options to yes, no, and insufficient
-evidence". Checked on 2026-09-23: all five question versions read `120910008` (`YesNoNA`)
-in **DEV and in TEST**, and `data/v8-seed/data.xml` agrees with both. So the seed is not
-drifted - nothing anywhere carries the change the owner described, and an earlier note here
-claiming it had been made in the environment was wrong.
+**Response type: `YesNoInsufficient` in DEV since 2026-09-21; `YesNoNA` in the seed.** The
+project owner reported on 2026-09-23 that "we've changed the options to yes, no, and
+insufficient evidence", and **they had, in DEV, through the Question library** (AD-122:
+retire and succeed, not retype in place). Each of the five questions carries three versions
+there: v1 `YesNoNA` to 2026-09-19, v2 `PassFailInsufficient` 2026-09-19 to 2026-09-21, and
+v3 `YesNoInsufficient` from 2026-09-21, open-ended. The successors are coded
+`QV-<questionid>-v2` / `-v3`, not `Q-AML-0n-Vn`.
 
-Nothing is blocked on it and no answer is at risk: there are **no stored `al_response` rows
-against any AML or CRA question in either environment**, so the retype is one PATCH per
-question version with nothing to migrate. It needs the owner's say-so because it changes what
-a checker is offered, not because it is difficult.
+The check made on 2026-09-23 that reported "all five read `120910008` in DEV and TEST" read
+the `Q-AML-0n-V1` rows by version code, so it could not see a successor - corrected
+2026-09-24 by reading every version of each question by `_al_questionid_value`, and by the
+live review page, whose AML rows carry `data-response-type="120910009"`. A search for a
+question's versions has to go by question, never by version code. TEST has not been
+re-read the right way.
+
+`data/v8-seed/data.xml` still seeds `YesNoNA` only, so a freshly seeded environment starts
+on the old scale. The page, the Code App and the emailed completed check all follow the
+versions in force (a known grid's declared scale gives way to its questions' shared one),
+so what a checker ticks and what is sent agree whichever scale an environment holds.
 
 **Why it is worth closing.** The gating rule does not care which scale the section is on - it
 asks whether every point reads **Yes**, never which values are not a Yes - but the two scales
 offer a checker different ways to not say Yes, and they behave differently:
 
-| Answer | Under `YesNoNA` (live) | Under `YesNoInsufficient` (described) |
+| Answer | Under `YesNoNA` (seed) | Under `YesNoInsufficient` (DEV) |
 |---|---|---|
 | N/A | offered; never counts as Yes | not offered |
 | Insufficient evidence | not offered | offered; never counts as Yes, **and** trips the Insufficient-anywhere rule below, which takes Pass and Pass with issues off `Q-GR-01` |
 
-So a point a checker marks N/A today leaves the AQS fail points **open for ever** on that
+So on the seed's scale a point marked N/A leaves the AQS fail points **open for ever** on that
 file, because "all Yes" can no longer be reached and nothing reports it. That is the same
 fails-open shape as AD-211. Under the described scale the equivalent answer is Insufficient
 evidence, which is visible in the grade.
@@ -269,6 +279,16 @@ Outcome lens: Is the recommendation clearly suitable, not just technically admis
 
 Outcome lens: Is there credible evidence the client received fair value?
 
+**Q-E4-03 takes N/A** from 2026-09-24 (AD-219): concessions are not always in play. It answers
+on `PassFailInsufficientNa`; the other three E4 rows do not. The Suitability grid therefore
+carries an N/A column, and it is ticked only on this row - every other Suitability test point
+leaves that cell empty.
+
+**Subsections are headed by their names alone** from the same day (project owner):
+"Client Objectives & Information (COBS 9.2)", not "E1. Client Objectives ...". The E-codes
+remain on the sections (`S-E1` to `S-E5`) and in every MI join; only the printed heading lost
+them.
+
 ### S-E5 — Suitability Report & Client Communication (COBS 9.4 / CD Understanding)
 | Code | Question |
 |---|---|
@@ -288,7 +308,14 @@ where retirement income planning or decumulation advice is in scope." It was ren
 literal in both review pages and is now seeded on `al_Section.al_helptext`, as E1 to E5 and
 S-CD already were.
 
-Applicability is derived by the system from the case product/solution type (AD-021). The checker gets no manual applicability control, and the "Mark N/A" branch at step 4.6 of the flow is a system outcome, not a checker decision. Where CRP does not apply, the four responses are written as N/A rather than omitted, so the response set stays complete for MI. Whether ad hoc investment withdrawals trigger CRP is unresolved and tracked as OD-016.
+~~Applicability is derived by the system from the case product/solution type (AD-021).~~
+**From 2026-09-24 the checker answers N/A row by row (AD-219, amending AD-021).** Nothing had
+ever derived applicability, so every check was held until all four rows had a Pass, Fail or
+Insufficient evidence answer, whether or not retirement advice was in scope. The four questions
+now answer on `PassFailInsufficientNa` (120910012), set in place on their existing versions: the
+scale is a superset of the one they were on, so no answer moved. The grid takes an N/A column.
+N/A is never a failure and restricts nothing on the grade. The response set still stays complete
+for MI, because an N/A is an answer.
 
 | Code | Question |
 |---|---|
@@ -299,9 +326,11 @@ Applicability is derived by the system from the case product/solution type (AD-0
 
 ## S-CD — Consumer Duty overlay
 
-Owner: AQS checker. Section help text carries the document's intro in full: "Short yes/no
-judgements only. Record any detail once in section H." Response type `YesNoInsufficient`, all
-mandatory.
+Owner: AQS checker. Response type `YesNoInsufficient`, all mandatory. **No intro line from
+2026-09-24** (project owner; AD-219): the document's "Short yes/no judgements only. Record any
+detail once in section H." is cleared from the section's help text and suppressed in all three
+renderers, so an environment still holding the text does not print it. The paragraph below
+explains why the line never made sense in V8.
 
 | Code | Question |
 |---|---|
@@ -326,7 +355,15 @@ Owner: AQS checker. Regrade of Insufficient evidence and Potential harm is owned
 | Q-GR-03 | Case Notes | MultilineText | No | |
 | Q-GR-04 | Even Better If... | MultilineText | No | |
 
-Q-GR-01 matches the four BR-005 outcomes and the AD-008 colour tokens exactly. Q-GR-02 stays single-select so that trend MI has one dominant cause per case (AD-022).
+Q-GR-01 matches the four BR-005 outcomes and the AD-008 colour tokens exactly. ~~Q-GR-02 stays single-select so that trend MI has one dominant cause per case (AD-022).~~
+
+**Q-GR-02 takes several ticks from 2026-09-24** (project owner: "there can be several";
+AD-219, amending AD-022). A single choice and a set of choices live in different columns
+(`al_answerchoice`, `al_answerchoices`), so the question was not retyped in place: v1 is dated
+out on 2026-09-24 and v2 answers on `MultiSelectRootCause` (120910013) from that day.
+`al_answerchoices` carries the nine causes at the values `al_answerchoice` gives them, so one
+cause is one number in either column. Reviews answered before the change keep their one cause
+on v1 and read as they did. The label still reads "Primary root cause", as the document does.
 
 ## Fail reasons — `al_FailReason` seed rows
 
