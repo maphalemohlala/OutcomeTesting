@@ -43,6 +43,17 @@
 {% assign f_mine = request.params['mine'] | default: '' %}
 {% if user == null %}{% assign f_mine = '' %}{% endif %}
 {% if f_mine != '' and f_mine != '1' %}{% assign f_mine = '' %}{% endif %}
+{% comment %}
+  The scope is an oversight tool (owner, 2026-09-24). Only Outcome Testing Manager and
+  Administrators read every case, so only for them does "All cases" differ from "mine". Every
+  other role already reads just its own cases, and for an adviser or supervisor "mine" - a
+  review allocated to me - is always empty. So nobody else sees the toggle, and an old
+  ?mine=1 link is ignored rather than emptying their list. Presentation only: the table
+  permissions decide what anyone reads.
+{% endcomment %}
+{% assign ot_oversight = false %}
+{% if user.roles contains 'AL Portal - Outcome Testing Manager' or user.roles contains 'Administrators' %}{% assign ot_oversight = true %}{% endif %}
+{% unless ot_oversight %}{% assign f_mine = '' %}{% endunless %}
 
 {% comment %}
   Outcome filter (PP-17). This is the list the outcome cards on Home drill into, so the
@@ -339,7 +350,7 @@
   </div>
 </form>
 
-{% if user %}
+{% if user and ot_oversight %}
   <nav class="ot-scope" aria-label="Case scope">
     <a class="ot-btn{% if f_mine == '1' %} ot-btn--primary{% endif %}" href="/cases?mine=1"
        {% if f_mine == '1' %}aria-current="page"{% endif %}>My cases</a>
@@ -410,7 +421,7 @@
 
 <section class="ot-card" aria-labelledby="ot-cases-heading">
   <h2 class="ot-card__title" id="ot-cases-heading">
-    {% if f_mine == '1' %}{% if has_filter %}My cases, filtered{% else %}My cases{% endif %}{% else %}{% if has_filter %}Filtered cases{% else %}All cases{% endif %}{% endif %}
+    {% if f_mine == '1' %}{% if has_filter %}My cases, filtered{% else %}My cases{% endif %}{% elsif ot_oversight == false %}Your cases{% if has_filter %}, filtered{% endif %}{% else %}{% if has_filter %}Filtered cases{% else %}All cases{% endif %}{% endif %}
     <span class="ot-count">{{ total }}</span>
   </h2>
 
@@ -511,6 +522,8 @@
       different actions.
     {% endcomment %}
     {% include 'OT Empty State' title: 'Nothing assigned to you' message: 'Cases appear here once a team lead allocates one to you, or you claim one from the queue. Choose All cases to see everything.' %}
+  {% elsif ot_oversight == false %}
+    {% include 'OT Empty State' title: 'No cases for you yet' message: 'Cases appear here once one is allocated to you, or released to you for remediation.' %}
   {% else %}
     {% include 'OT Empty State' title: 'No cases found' message: 'Cases appear here once an Intelligent Office extract has been imported and validated.' %}
   {% endif %}

@@ -28,9 +28,17 @@
 {% endcomment %}
 {% assign ot_oversight = false %}
 {% if user.roles contains 'AL Portal - Outcome Testing Manager' or user.roles contains 'Administrators' %}{% assign ot_oversight = true %}{% endif %}
+{% comment %}
+  Where everyone else lands. Cases, except for someone whose only role is AQS Reviewer: an AQS
+  checker works from one page, AQS reviews, which holds the queue and their own checks, and
+  Cases' rule does not admit them (owner, 2026-09-24). Any other role alongside AQS Reviewer
+  brings Cases with it, and they land there.
+{% endcomment %}
+{% assign ot_landing = '/cases' %}
+{% if user.roles contains 'AL Portal - AQS Reviewer' %}{% unless user.roles contains 'AL Portal - Tax Reviewer' or user.roles contains 'AL Portal - Adviser Remediation' or user.roles contains 'AL Portal - T&C Supervisor' or user.roles contains 'AL Portal - Portal Administrator' %}{% assign ot_landing = '/aqs-reviews' %}{% endunless %}{% endif %}
 {% if user and ot_oversight == false %}
-  <script>window.location.replace('/cases');</script>
-  <p><a href="/cases">Go to Cases</a></p>
+  <script>window.location.replace('{{ ot_landing }}');</script>
+  <p><a href="{{ ot_landing }}">Continue</a></p>
 {% else %}
 {% if user == null %}
   {% include 'OT Empty State' title: 'Sign in to see your work' message: 'This page shows the reviews and remediation actions assigned to you.' %}

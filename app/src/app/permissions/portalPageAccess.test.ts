@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import pageRules from '../../../../powerpages/outcome-testing---outcometesting/webpagerule.yml?raw';
 import header from '../../../../powerpages/outcome-testing---outcometesting/web-templates/header/Header.webtemplate.source.html?raw';
 import myWork from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-my-work/OT-My-Work.webtemplate.source.html?raw';
+import caseList from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-case-list/OT-Case-List.webtemplate.source.html?raw';
 
 /**
  * Which pages each role is given (AD-218 follow-on). Every non-oversight role reads only its
@@ -12,6 +13,10 @@ import myWork from '../../../../powerpages/outcome-testing---outcometesting/web-
  * Oversight is the two roles with Global read on case data: Outcome Testing Manager and
  * Administrators. Portal Administrator reads no cases, so it is treated like every other
  * non-oversight role (owner, 2026-09-24): Cases only.
+ *
+ * An AQS checker works from ONE page (owner, 2026-09-24): AQS reviews holds the queue and
+ * their own checks, so someone whose only role is AQS Reviewer is refused Cases and lands on
+ * AQS reviews. The My cases / All cases toggle is an oversight tool and nobody else sees it.
  */
 const ROLE = {
   tax: 'a1000000-0000-4000-8000-000000000090',
@@ -27,6 +32,7 @@ const OVERSIGHT_NAMES = ['AL Portal - Outcome Testing Manager', 'Administrators'
 
 const PAGE = {
   myWork: 'a1000000-0000-4000-8000-000000000030',
+  cases: 'a1000000-0000-4000-8000-000000000031',
   taxReviews: 'a1000000-0000-4000-8000-000000000033',
   aqsReviews: 'a1000000-0000-4000-8000-000000000034',
   remediation: 'a1000000-0000-4000-8000-000000000035',
@@ -86,11 +92,18 @@ describe('page rules', () => {
     expect(restrictRead(PAGE.review).roles.sort()).toEqual([ROLE.tax, ROLE.aqs, ...OVERSIGHT].sort());
   });
 
-  it('Portal Administrator is on no page rule but Home, so it has Cases and nothing else', () => {
-    for (const rule of rules.filter((r) => r.page !== PAGE.home)) {
+  it('Portal Administrator is on no page rule but Home and Cases, so it has Cases and nothing else', () => {
+    for (const rule of rules.filter((r) => r.page !== PAGE.home && r.page !== PAGE.cases)) {
       expect(rule.roles, rule.name).not.toContain(ROLE.portalAdmin);
     }
     expect(restrictRead(PAGE.home).roles).toContain(ROLE.portalAdmin);
+    expect(restrictRead(PAGE.cases).roles).toContain(ROLE.portalAdmin);
+  });
+
+  it('Cases is every portal role but the AQS Reviewer, whose one page is AQS reviews', () => {
+    expect(restrictRead(PAGE.cases).roles.sort()).toEqual(
+      [ROLE.tax, ROLE.adviser, ROLE.supervisor, ROLE.portalAdmin, ...OVERSIGHT].sort(),
+    );
   });
 
   it('Profile is readable by no role', () => {
@@ -125,9 +138,40 @@ describe('the landing page', () => {
     for (const name of OVERSIGHT_NAMES) {
       expect(myWork).toContain(`user.roles contains '${name}'`);
     }
-    expect(myWork).not.toContain("user.roles contains 'AL Portal - Portal Administrator'");
+    // Portal Administrator is named in the landing choice (it brings Cases), never as oversight.
+    const oversightLine = myWork.split(/\r?\n/).find((l) => l.includes('assign ot_oversight = true')) ?? '';
+    expect(oversightLine).not.toBe('');
+    expect(oversightLine).not.toContain('Portal Administrator');
     const redirect = /\{% if user and ot_oversight == false %\}([\s\S]*?)\{% else %\}/.exec(myWork)?.[1] ?? '';
-    expect(redirect).toContain("window.location.replace('/cases')");
+    expect(redirect).toContain("window.location.replace('{{ ot_landing }}')");
     expect(redirect).not.toContain('fetchxml');
+  });
+});
+
+describe('an AQS-only checker lands on AQS reviews', () => {
+  it('sends someone whose only Cases-reading role is missing to /aqs-reviews', () => {
+    const landing = /\{% assign ot_landing = '\/cases' %\}([\s\S]*?)\{% if user and ot_oversight == false %\}/.exec(myWork)?.[1] ?? '';
+    expect(landing).toContain("user.roles contains 'AL Portal - AQS Reviewer'");
+    for (const role of ['AL Portal - Tax Reviewer', 'AL Portal - Adviser Remediation', 'AL Portal - T&C Supervisor', 'AL Portal - Portal Administrator']) {
+      expect(landing).toContain(`user.roles contains '${role}'`);
+    }
+    expect(landing).toContain("{% assign ot_landing = '/aqs-reviews' %}");
+  });
+});
+
+describe('the Cases page scope toggle', () => {
+  it('is offered to oversight only', () => {
+    expect(caseList).toMatch(/\{% if user and ot_oversight %\}\s*<nav class="ot-scope"/);
+    for (const name of OVERSIGHT_NAMES) {
+      expect(caseList).toContain(`user.roles contains '${name}'`);
+    }
+  });
+
+  it('ignores ?mine=1 for everyone else, so an old link cannot empty their list', () => {
+    expect(caseList).toContain("{% unless ot_oversight %}{% assign f_mine = '' %}{% endunless %}");
+  });
+
+  it('calls the list "Your cases" for everyone else, not "All cases"', () => {
+    expect(caseList).toMatch(/\{% elsif ot_oversight == false %\}Your cases/);
   });
 });

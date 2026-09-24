@@ -69,3 +69,15 @@
   adx_webpageaccesscontrolrule_webrole: []
   adx_webpageaccesscontrolruleid: a1000000-0000-4000-8000-0000000000b7
   adx_webpageid: 6b7c4888-877a-41ec-8a9c-2245601999f7
+- adx_name: Restrict read - Cases
+  adx_right: 2
+  adx_scope: 1
+  adx_webpageaccesscontrolrule_webrole:
+  - a1000000-0000-4000-8000-000000000090
+  - a1000000-0000-4000-8000-000000000092
+  - a1000000-0000-4000-8000-000000000093
+  - a1000000-0000-4000-8000-000000000095
+  - a1000000-0000-4000-8000-000000000096
+  - c53b2908-1fc1-4470-89cd-6f5b95c17ffe
+  adx_webpageaccesscontrolruleid: a1000000-0000-4000-8000-0000000000b8
+  adx_webpageid: a1000000-0000-4000-8000-000000000031

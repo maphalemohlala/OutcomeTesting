@@ -200,12 +200,18 @@ test.describe('an AQS reviewer (AR-03)', () => {
     await expectApiRefuses(page, portal, requireEnv(CASE_NOT_MINE));
   });
 
-  test('lands on Cases, keeps AQS reviews for the queue, and has no My Work or Tax reviews', async ({ page }) => {
+  // One page for an AQS checker (owner, 2026-09-24): AQS reviews holds the queue and their own
+  // checks. The session must hold AQS Reviewer ONLY - any other role brings Cases with it.
+  test('lands on AQS reviews, its only page, and is refused Cases, My Work and Tax reviews', async ({ page }) => {
     const portal = requireEnv(PORTAL_URL);
-    await expectLandsOnCases(page, portal);
-    await expect(menu(page)).toHaveText(['Cases', 'AQS reviews']);
-    await expectPageDenied(page, portal, '/my-work');
-    await expectPageDenied(page, portal, '/tax-reviews');
+    await page.goto(`${portal.replace(/\/+$/, '')}/`);
+    await expect(page).toHaveURL(/\/aqs-reviews\/?$/);
+    await expectSignedIn(page, portal);
+    await expect(page.getByRole('heading', { name: 'AQS reviews', level: 1 })).toBeVisible();
+    await expect(menu(page)).toHaveText(['AQS reviews']);
+    for (const path of ['/cases', '/my-work', '/tax-reviews']) {
+      await expectPageDenied(page, portal, path);
+    }
   });
 
   // WRITES: allocates the queued case to the signed-in reviewer. Opt-in, like every write in
