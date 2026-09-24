@@ -44,3 +44,26 @@ describe('the case header autosave', () => {
     expect(script).toMatch(/for \(var w = 0; w < callbacks\.length; w\+\+\) \{ callbacks\[w\]\(/);
   });
 });
+
+/**
+ * The same fault in the accountability boxes' save (2026-09-24): a tick or a name changed while
+ * a save was on its way returned without saving and nothing sent it later, so it stayed unsaved
+ * until the next change. That save sends the WHOLE state each time, so the fix is only to
+ * remember that something moved and save once more when the in-flight save lands.
+ */
+const accountability = /<script>\s*\(function \(\) \{[\s\S]*?\[data-ot-accountability\][\s\S]*?<\/script>/.exec(reviewTemplate)?.[0] ?? '';
+
+describe('the accountability autosave', () => {
+  it('is found, so the checks below are reading the real script', () => {
+    expect(accountability).toContain('al_accountabilityrequest');
+  });
+
+  it('remembers a change made mid-flight instead of dropping it', () => {
+    expect(accountability).not.toMatch(/if \(saving\) \{ return; \}/);
+    expect(accountability).toMatch(/if \(saving\) \{ saveAgain = true; return; \}/);
+  });
+
+  it('saves once more when the in-flight save lands, if anything moved meanwhile', () => {
+    expect(accountability).toMatch(/if \(saveAgain\) \{ saveAgain = false; save\(\); return; \}/);
+  });
+});

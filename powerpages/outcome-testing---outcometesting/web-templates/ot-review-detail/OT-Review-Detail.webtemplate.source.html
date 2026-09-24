@@ -3171,6 +3171,10 @@
           var boxes = root.querySelectorAll('[data-ot-acc]');
           var timer = null;
           var saving = false;
+          // Something moved while a save was on its way. Every save sends the whole state, so
+          // one more save when that one lands is all it takes (2026-09-24, the same fault the
+          // case header had on 900000006).
+          var saveAgain = false;
 
           function show(message, kind) {
             status.textContent = message;
@@ -3220,7 +3224,7 @@
 
           function save() {
             if (timer) { window.clearTimeout(timer); timer = null; }
-            if (saving) { return; }
+            if (saving) { saveAgain = true; return; }
             if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
               show('This page did not load completely. Refresh and try again.', 'error');
               return;
@@ -3259,12 +3263,17 @@
                 saving = false;
 
                 if (request.status >= 200 && request.status < 300) {
+                  // Not "Saved" yet if something moved meanwhile: send it first.
+                  if (saveAgain) { saveAgain = false; save(); return; }
                   var now = new Date();
                   show('Saved ' + ('0' + now.getHours()).slice(-2) + ':'
                     + ('0' + now.getMinutes()).slice(-2), 'success');
                   return;
                 }
 
+                // A failed save is not retried: the error stays on screen, and the next change
+                // sends the whole state again.
+                saveAgain = false;
                 var message = 'That could not be saved (' + request.status + ').';
                 try {
                   var parsed = JSON.parse(request.responseText);
