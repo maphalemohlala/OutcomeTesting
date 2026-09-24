@@ -130,6 +130,7 @@
       <attribute name="al_submittedon" />
       <attribute name="al_checklistversionid" />
       <attribute name="al_assignedcontactid" />
+      <attribute name="al_pendingaccountability" />
       <filter type="and">
         <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | xml_escape }}" />
       </filter>
@@ -3105,6 +3106,7 @@
       <section class="ot-card ot-accountability"
                data-ot-accountability
                data-review-id="{{ rv.al_reviewinstanceid }}"
+               data-ot-acc-saved="{{ rv.al_pendingaccountability | escape }}"
                {% unless ot_fq_failed %}hidden{% endunless %}
                aria-labelledby="ot-accountability-heading">
         <h2 class="ot-card__title" id="ot-accountability-heading">Who carries this fail</h2>
@@ -3222,6 +3224,91 @@
             return stray;
           }
 
+          /** The section as it stands, in the shape a save sends and al_pendingaccountability keeps. */
+          function currentState() {
+            return {
+              fqAdviser: value('fqAdviser'),
+              fqParaplanner: value('fqParaplanner'),
+              aqAdviser: value('aqAdviser'),
+              aqParaplanner: value('aqParaplanner'),
+              fqContactId: person('fq'),
+              aqContactId: person('aq')
+            };
+          }
+
+          /*
+           * Draws the accountability this check already holds (2026-09-24). The page used to
+           * draw four empty boxes and empty names on every visit, and because every save
+           * carries the whole state, the first change after reopening saved that emptiness
+           * over the checker's earlier choices. A saved person is named from the directory by
+           * id; one no longer in it is left blank rather than guessed.
+           */
+          function restoreSaved() {
+            var saved = null;
+            try { saved = JSON.parse(root.getAttribute('data-ot-acc-saved') || 'null'); }
+            catch (e) { saved = null; }
+            if (!saved) { return; }
+
+            for (var r = 0; r < boxes.length; r++) {
+              boxes[r].checked = saved[boxes[r].getAttribute('data-ot-acc')] === true;
+            }
+
+            var sides = ['fq', 'aq'];
+            for (var k = 0; k < sides.length; k++) {
+              var id = saved[sides[k] + 'ContactId'];
+              var input = root.querySelector('[data-ot-acc-person="' + sides[k] + '"]');
+              if (!input || !id) { continue; }
+              for (var o2 = 0; o2 < options.length; o2++) {
+                if (options[o2].getAttribute('data-id') === id) { input.value = options[o2].value; break; }
+              }
+            }
+          }
+
+          /*
+           * CACHE_LAG, as the header and the answers handle it. The save goes through a
+           * plug-in, so the site's render cache learns of it late (AD-094: up to fifteen
+           * minutes) and a reload inside that window draws the state from before the save.
+           * The tab remembers what it saved and says so; it never re-applies it, because a
+           * value on screen the server did not send cannot be told from one it did.
+           */
+          var ACC_LAG_KEY = 'ot.savedAccountability.' + reviewId;
+          var ACC_LAG_WINDOW_MS = 20 * 60 * 1000;
+
+          function readSavedAccountability() {
+            try { return JSON.parse(window.sessionStorage.getItem(ACC_LAG_KEY) || 'null'); }
+            catch (e) { return null; }
+          }
+
+          function writeSavedAccountability(saved) {
+            // Private browsing and a full store both throw; the notice is a courtesy.
+            try {
+              if (saved === null) { window.sessionStorage.removeItem(ACC_LAG_KEY); }
+              else { window.sessionStorage.setItem(ACC_LAG_KEY, JSON.stringify(saved)); }
+            } catch (e) { /* no notice this time */ }
+          }
+
+          function sameState(a, b) {
+            var flags = ['fqAdviser', 'fqParaplanner', 'aqAdviser', 'aqParaplanner'];
+            for (var f = 0; f < flags.length; f++) {
+              if ((a[flags[f]] === true) !== (b[flags[f]] === true)) { return false; }
+            }
+            return (a.fqContactId || '') === (b.fqContactId || '')
+              && (a.aqContactId || '') === (b.aqContactId || '');
+          }
+
+          function reportAccountabilityLag() {
+            var saved = readSavedAccountability();
+            if (!saved || !saved.state) { return; }
+            if (Date.now() - saved.at > ACC_LAG_WINDOW_MS || sameState(saved.state, currentState())) {
+              writeSavedAccountability(null);
+              return;
+            }
+            show('Who carries this fail is not shown here yet. Your last change was saved. This'
+              + ' site caches pages for up to fifteen minutes, so a reload can arrive before the'
+              + ' page catches up. Do not change it again yet — reload in a few minutes, or'
+              + ' the next change would save what is on screen over it.', 'error');
+          }
+
           function save() {
             if (timer) { window.clearTimeout(timer); timer = null; }
             if (saving) { saveAgain = true; return; }
@@ -3240,15 +3327,18 @@
             saving = true;
             show('Saving...', null);
 
+            // What this save sends, kept so a reload inside the cache window can be told apart
+            // from one that has caught up (reportAccountabilityLag).
+            var sent = currentState();
             var body = {
               al_accountabilityrequest: JSON.stringify({
                 reviewId: reviewId,
-                fqAdviser: value('fqAdviser'),
-                fqParaplanner: value('fqParaplanner'),
-                aqAdviser: value('aqAdviser'),
-                aqParaplanner: value('aqParaplanner'),
-                fqContactId: person('fq'),
-                aqContactId: person('aq')
+                fqAdviser: sent.fqAdviser,
+                fqParaplanner: sent.fqParaplanner,
+                aqAdviser: sent.aqAdviser,
+                aqParaplanner: sent.aqParaplanner,
+                fqContactId: sent.fqContactId,
+                aqContactId: sent.aqContactId
               })
             };
 
@@ -3263,6 +3353,7 @@
                 saving = false;
 
                 if (request.status >= 200 && request.status < 300) {
+                  writeSavedAccountability({ at: Date.now(), state: sent });
                   // Not "Saved" yet if something moved meanwhile: send it first.
                   if (saveAgain) { saveAgain = false; save(); return; }
                   var now = new Date();
@@ -3296,6 +3387,10 @@
             if (timer) { window.clearTimeout(timer); }
             timer = window.setTimeout(save, 700);
           }
+
+          // Before anything is wired, so drawing the saved state is not itself a change to save.
+          restoreSaved();
+          reportAccountabilityLag();
 
           for (var i = 0; i < boxes.length; i++) { boxes[i].addEventListener('change', queue); }
 

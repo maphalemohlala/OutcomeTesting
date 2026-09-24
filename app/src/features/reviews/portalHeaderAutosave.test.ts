@@ -67,3 +67,40 @@ describe('the accountability autosave', () => {
     expect(accountability).toMatch(/if \(saveAgain\) \{ saveAgain = false; save\(\); return; \}/);
   });
 });
+
+/**
+ * Saved accountability is drawn back when a check is reopened (2026-09-24). The page never read
+ * al_pendingaccountability, so every visit drew four empty boxes and empty names, and the first
+ * change then saved that empty state over the checker's earlier choices - every save carries
+ * the whole state.
+ *
+ * During the site's render-cache window the page follows the rule the header and the answers
+ * already follow: it draws what the SERVER sent and, if this tab saved something newer, says so
+ * rather than re-applying it.
+ */
+describe('reopening a check draws its saved accountability', () => {
+  it('reads the saved accountability with the review', () => {
+    const fetch = /\{% fetchxml review %\}([\s\S]*?)\{% endfetchxml %\}/.exec(reviewTemplate)?.[1] ?? '';
+    expect(fetch).toContain('<attribute name="al_pendingaccountability" />');
+  });
+
+  it('hands it to the section, escaped, as the server sent it', () => {
+    expect(reviewTemplate).toContain('data-ot-acc-saved="{{ rv.al_pendingaccountability | escape }}"');
+  });
+
+  it('ticks the boxes and fills the names from it before anything is wired', () => {
+    expect(accountability).toMatch(/function restoreSaved\(\) \{[\s\S]*?JSON\.parse\(root\.getAttribute\('data-ot-acc-saved'\)/);
+    expect(accountability).toContain("boxes[r].checked = saved[boxes[r].getAttribute('data-ot-acc')] === true;");
+    expect(accountability).toMatch(/restoreSaved\(\);[\s\S]*?addEventListener\('change', queue\)/);
+  });
+
+  it('names a saved person from the directory by id', () => {
+    expect(accountability).toMatch(/options\[o2\]\.getAttribute\('data-id'\) === id/);
+  });
+
+  it('says the page is behind rather than re-applying what this tab saved', () => {
+    expect(accountability).toContain("var ACC_LAG_KEY = 'ot.savedAccountability.' + reviewId;");
+    expect(accountability).toMatch(/function reportAccountabilityLag\(\) \{[\s\S]*?not shown here yet/);
+    expect(accountability).toMatch(/writeSavedAccountability\(\{ at: Date\.now\(\), state: sent \}\)/);
+  });
+});
