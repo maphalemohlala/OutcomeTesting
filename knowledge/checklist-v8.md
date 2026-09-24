@@ -111,8 +111,9 @@ The check made on 2026-09-23 that reported "all five read `120910008` in DEV and
 the `Q-AML-0n-V1` rows by version code, so it could not see a successor - corrected
 2026-09-24 by reading every version of each question by `_al_questionid_value`, and by the
 live review page, whose AML rows carry `data-response-type="120910009"`. A search for a
-question's versions has to go by question, never by version code. TEST has not been
-re-read the right way.
+question's versions has to go by question, never by version code. **TEST was re-read that
+way the same day and matches DEV**: v3 `YesNoInsufficient` in force from 2026-09-21 on
+Q-AML-01, -02, -03 and -05; Q-AML-04 went straight to `YesNoInsufficient` at v2.
 
 `data/v8-seed/data.xml` still seeds `YesNoNA` only, so a freshly seeded environment starts
 on the old scale. The page, the Code App and the emailed completed check all follow the
