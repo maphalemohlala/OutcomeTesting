@@ -3758,6 +3758,9 @@
           var DEBOUNCE_MS = 900;
           var timer = null;
           var saving = false;
+          // A save asked for while one is in flight, and who is waiting on it (see saveNow).
+          var saveAgain = false;
+          var waiting = [];
 
           /*
            * The Tax team's two selects exist only on an unsubmitted Tax review. Everything
@@ -3769,6 +3772,12 @@
 
           var initialRequired = required ? required.value : '';
           var initialDisposition = disposition ? disposition.value : '';
+
+          /** Whether either Tax team select still differs from what was last saved. */
+          function taxStillMoving() {
+            return (required && required.value !== initialRequired)
+              || (disposition && disposition.value !== initialDisposition);
+          }
 
           /*
            * CACHE_LAG for the two Tax team selects (reported 2026-09-22: the disposition
@@ -4023,7 +4032,14 @@
             done = done || function () {};
 
             if (timer) { window.clearTimeout(timer); timer = null; }
-            if (saving) { done(true); return; }
+            if (saving) {
+              // A change made while a save is on its way (case 900000006, 2026-09-24). It is
+              // sent once that save lands, and whoever asked - the submit included - waits for
+              // it. Answering "done" here is what lost a product and both selects.
+              saveAgain = true;
+              waiting.push(done);
+              return;
+            }
 
             var fields = changedFields();
             var taxMoved = (required && required.value !== initialRequired)
@@ -4055,6 +4071,39 @@
 
             var payload = { al_caseheaderrequest: JSON.stringify(request_body) };
 
+            /*
+             * What THIS request carries. On success the saved baseline moves to these, not to
+             * whatever the controls hold when the reply arrives - a value changed in between
+             * was never sent, and taking it as saved is how it was lost.
+             */
+            var sentInputs = [];
+            for (var si = 0; si < headerInputs.length; si++) { sentInputs.push(headerInputs[si].el.value); }
+            var sentSets = [];
+            for (var ss = 0; ss < headerSets.length; ss++) { sentSets.push(setValueOf(headerSets[ss].el)); }
+            var sentRequired = required ? required.value : '';
+            var sentDisposition = disposition ? disposition.value : '';
+
+            /*
+             * Ends this save: sends anything that moved while it was in flight, then answers
+             * everyone who asked - this caller and any that queued behind it - with the
+             * outcome of the LAST save, so a submit never proceeds over an unsaved change.
+             * A failed save is not retried; the error stays on screen and the next edit or
+             * the submit tries again.
+             */
+            function finish(ok) {
+              var callbacks = [done].concat(waiting);
+              waiting = [];
+              var again = saveAgain;
+              saveAgain = false;
+              if (ok && (again || changedFields() || taxStillMoving())) {
+                saveNow(function (okAgain) {
+                  for (var w = 0; w < callbacks.length; w++) { callbacks[w](okAgain); }
+                });
+                return;
+              }
+              for (var w = 0; w < callbacks.length; w++) { callbacks[w](ok); }
+            }
+
             window.shell.getTokenDeferred().done(function (token) {
               var request = new XMLHttpRequest();
               request.open('PATCH', '/_api/contacts({{ user.id }})', true);
@@ -4066,11 +4115,11 @@
                 saving = false;
 
                 if (request.status >= 200 && request.status < 300) {
-                  var routeMayHaveMoved = (required && required.value !== initialRequired)
-                    || (disposition && disposition.value !== initialDisposition);
+                  var routeMayHaveMoved = (required && sentRequired !== initialRequired)
+                    || (disposition && sentDisposition !== initialDisposition);
 
-                  if (required) { initialRequired = required.value; }
-                  if (disposition) { initialDisposition = disposition.value; }
+                  if (required) { initialRequired = sentRequired; }
+                  if (disposition) { initialDisposition = sentDisposition; }
 
                   /*
                    * CACHE_LAG, the write side: the two selects, because they are the two the
@@ -4085,25 +4134,25 @@
                   var setsMoved = false;
                   var snapshotSets = {};
                   for (var s2 = 0; s2 < headerSets.length; s2++) {
-                    var nowValue = setValueOf(headerSets[s2].el);
-                    snapshotSets[headerSets[s2].el.getAttribute('data-ot-hdr-set')] = nowValue;
-                    if (nowValue !== headerSets[s2].initial) { setsMoved = true; }
+                    var sentValue = sentSets[s2];
+                    snapshotSets[headerSets[s2].el.getAttribute('data-ot-hdr-set')] = sentValue;
+                    if (sentValue !== headerSets[s2].initial) { setsMoved = true; }
                   }
 
                   if (routeMayHaveMoved || setsMoved) {
                     writeSavedHeader({
                       at: Date.now(),
-                      taxCheckRequired: required ? required.value : '',
-                      taxTeamDisposition: disposition ? disposition.value : '',
+                      taxCheckRequired: sentRequired,
+                      taxTeamDisposition: sentDisposition,
                       sets: snapshotSets
                     });
                   }
                   for (var k = 0; k < headerInputs.length; k++) {
-                    headerInputs[k].initial = headerInputs[k].el.value;
+                    headerInputs[k].initial = sentInputs[k];
                   }
                   // The tick lists too, or the next save would re-send a set nobody touched.
                   for (var m = 0; m < headerSets.length; m++) {
-                    headerSets[m].initial = setValueOf(headerSets[m].el);
+                    headerSets[m].initial = sentSets[m];
                   }
 
                   if (!routeMayHaveMoved) {
@@ -4112,7 +4161,7 @@
                     var now = new Date();
                     show('Saved ' + ('0' + now.getHours()).slice(-2) + ':'
                       + ('0' + now.getMinutes()).slice(-2), 'success');
-                    done(true);
+                    finish(true);
                     return;
                   }
                   /*
@@ -4136,25 +4185,25 @@
                     + ' you want that re-read, and if it still looks unchanged the site cache'
                     + ' has not caught up - try again in a moment.', 'success');
                   offerReload();
-                  done(true);
+                  finish(true);
                   return;
                 }
 
                 show(friendly(request.responseText, request.status), 'error');
-                done(false);
+                finish(false);
               };
 
               request.onerror = function () {
                 saving = false;
                 show('The change could not be saved. Check your connection and try again.', 'error');
-                done(false);
+                finish(false);
               };
 
               request.send(JSON.stringify(payload));
             }).fail(function () {
               saving = false;
               show('This page did not load completely. Refresh and try again.', 'error');
-              done(false);
+              finish(false);
             });
           }
 
