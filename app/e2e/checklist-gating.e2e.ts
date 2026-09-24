@@ -149,8 +149,12 @@ test.describe('the review form gating', () => {
 
     // Does the page ALREADY hold a finding? If not there is nothing to have locked, and the
     // absence of a lock is the correct render rather than a failure.
-    const hasFinding = /data-ot-answer[^>]*data-question-code="(?!Q-FQ-01|Q-FQTAX-01|Q-FQ-03|Q-FQTAX-03|Q-GR-01)[^"]+"[\s\S]{0,4000}?value="12091030(?:1)"[^>]*checked/.test(html)
-      || /value="120910306"[^>]*checked/.test(html);
+    // Row by row, so a No is judged by the question it answers: "Remedial action required? No"
+    // (Q-FQ-03) is an outcome, not a finding, and a whole-page match for any ticked No read it
+    // as one - TEST review 177db2f1, 2026-09-24, holding nothing else.
+    const outcomes = new Set(['Q-FQ-01', 'Q-FQTAX-01', 'Q-FQ-03', 'Q-FQTAX-03', 'Q-GR-01']);
+    const hasFinding = [...html.matchAll(/<tr[^>]*data-ot-answer[^>]*data-question-code="([^"]+)"[\s\S]*?<\/tr>/g)]
+      .some(([answer, code]) => !outcomes.has(code) && /value="1209103(?:01|06)"[^>]*checked/.test(answer));
 
     if (!hasFinding) {
       test.skip(true, 'this review holds no No or Fail, so nothing should be locked yet');

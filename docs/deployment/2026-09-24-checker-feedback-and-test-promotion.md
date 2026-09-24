@@ -3,9 +3,9 @@
 Written for: whoever runs the TEST promotion of 1.0.10.0, and whoever reads back what DEV holds.
 
 **Date:** 2026-09-24
-**Environments:** `Env_AQ_Dev` (`org0b075da8`) deployed and verified. `Env_AQ_Test`
-(`org37995f36`) **prepared, not yet promoted**: the steps that create principals and change
-access in TEST were refused to the agent and are the owner's to run, in the order below.
+**Environments:** `Env_AQ_Dev` (`org0b075da8`) and `Env_AQ_Test` (`org37995f36`), both
+deployed and verified. **Two TEST steps remain the owner's** - `grantteamsecurity` and the
+`reconcileaccess --confirm` backfill - plus the AQS reviewers' account (see the end).
 **Commits:** `7ac209c` (the batch), `aa04a47` (its docs), pushed to `feat/change-batch-sep-2026`.
 
 ## What the batch is
@@ -114,7 +114,67 @@ already reads Yes / No / Insufficient evidence (v3 from 2026-09-21, like DEV). C
 Q-GR-02 and S-CD are as seeded. 756 answers held; two open reviews, both the Service
 Account's.
 
-## The TEST runbook, in this order
+## TEST: promoted
+
+| Step | Result |
+|---|---|
+| 1. `ensureaccessprincipals` | teams `Outcome Testing - Tax Team` (`19a8d022…`), `- AQS Team` (`1da8d022…`), account `Outcome Testing - AQS Team` (`21a8d022…`) created |
+| 2. Import 1.0.10.0 managed | `ImportSolutionAsync` through the registration tool's Web API (`pac` revoked), `PublishWorkflows: true` (what `--activate-plugins` sets), `OverwriteUnmanagedCustomizations: false`. Job `e6072477…` succeeded 21:35:15Z |
+| 3. Steps | `verifysteps` 24/24; **all 64 on the assembly enabled**, including the six `CaseAccess*` and two `AqsQueueMembership` steps |
+| 4. `grantteamsecurity` | **refused to the agent** - owner |
+| 5. Question data (`test-data.json`) | 10/10: CRP-01..04 and E4-03 on `120910012`, Q-GR-02 v1 to 2026-09-24 and v2 (`120910013`, DEV's id) from it, S-CD help text cleared - read back |
+| 6. `reconcileaccess` | dry run: 24 active cases. `--confirm` left for after step 4 - owner |
+| Solution / Code App / assembly | 1.0.10.0 managed; `appversion` 2026-09-24T21:32:42Z; sha256 `0d4716f9…` |
+
+### What the import did not reach
+
+**A component pushed directly to TEST earlier carries an unmanaged layer, and a managed import
+sits beneath it.** The import reported success and the lists changed, but the review page was
+still the 23 September one - "E1." bands, no N/A, no way back to the queue. All 50 TEST web
+templates were then diffed against source: **49 identical, one different** - `OT Review
+Detail`, pushed directly on 2026-09-23. The same was true of `outcome-testing.css`, whose only
+difference was the N/A width rule. Both pushed again (`pushwebtemplate` 239,041 -> 252,277
+chars; `pushwebfile` 65,542 bytes), after which TEST serves the committed source.
+
+`OverwriteUnmanagedCustomizations` would have cleared those layers, and was left off on
+purpose: TEST's own site settings - its sign-in configuration among them - are unmanaged too.
+**Diff a pushed component after every import rather than trusting the import's success.**
+
+### Tested on TEST
+
+TEST's portal session had expired; it was re-captured without a password, by signing in
+through the Entra cookies the DEV session already holds (same tenant, same account).
+
+| Suite | Result |
+|---|---|
+| Portal: `checker-feedback`, `checklist-gating`, `managed-lists` | **20 passed, 4 skipped, 0 failed** (review `177db2f1`) |
+| Server-rendered lock, every submitted TEST review | **13 passed** (those holding a finding), **17 skipped** (holding none), 0 failed |
+| Code App (`code-app.e2e.ts`) | **6/6**, served bundle = `dist/` |
+
+**One test was wrong, and is fixed.** `renders the lock server-side` decided whether a review
+held a finding by matching any ticked **No** on the page, so "Remedial action required? No"
+(Q-FQ-03) counted, and on TEST review `177db2f1` - which holds nothing else - it demanded a
+lock that must not be there. It now judges a No by the question it answers, excluding the
+outcome questions exactly as its Fail branch always did.
+
+Not run on TEST: the emailed PDF (TEST delivers real mail - DEV proved it end to end), the
+write specs, and the role groups (no single-role TEST sessions).
+
+## The remaining TEST steps (owner)
+
+Both were refused to the agent as permission changes. In this order, from the repo root:
+
+```powershell
+$env:DOTNET_ROLL_FORWARD='Major'; $R='plugins\OutcomeTesting.Registration\bin\Debug\net8.0\OutcomeTesting.Registration.exe'; $T='https://org37995f36.crm11.dynamics.com'
+& $R grantteamsecurity $T
+& $R reconcileaccess $T --confirm $T
+```
+
+Then step 7 below, the AQS reviewers' account. Until these run, TEST's Administrators and
+oversight roles see everything as before; a single-role checker sees only what the backfill
+has given them, which is nothing yet.
+
+## The TEST runbook as first written, in this order
 
 The order is the whole point. **`CaseAccessPlugin` travels with the solution and refuses every
 case, review and remediation write where the two teams or the AQS Team account are missing** -
@@ -165,7 +225,7 @@ the portal needs a TEST session, `npm run e2e:auth` against `outcometestingtest`
 
 ## Open
 
-- **TEST promotion** - the runbook above.
+- **TEST: `grantteamsecurity`, then `reconcileaccess --confirm`, then the AQS reviewers' account** - steps 4, 6 and 7 above.
 - **Role sessions** for Adviser, Tax reviewer, T&C Supervisor, Planner and an Outcome Testing
   Manager (not an Administrator), so the rest of `role-scoped-access.e2e.ts` can run.
 - **`pac` needs a fresh sign-in** (AADSTS50173, tokens valid from 2026-09-24T05:52:08Z).
