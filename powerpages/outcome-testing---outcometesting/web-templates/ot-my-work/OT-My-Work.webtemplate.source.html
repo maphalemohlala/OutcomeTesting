@@ -23,10 +23,11 @@
   My Work is an oversight page. Every other role reads only its own cases, so Cases is their
   one list. /my-work carries its own Restrict read rule; / cannot, because every page inherits
   Home's rule, so this template sends everyone else on to Cases and renders none of the
-  dashboard for them. The same three roles as the header's menu check.
+  dashboard for them. Oversight is the two roles with Global read on case data - the same
+  check as the header's menu. Portal Administrator reads no cases, so it is not one of them.
 {% endcomment %}
 {% assign ot_oversight = false %}
-{% if user.roles contains 'AL Portal - Outcome Testing Manager' or user.roles contains 'AL Portal - Portal Administrator' or user.roles contains 'Administrators' %}{% assign ot_oversight = true %}{% endif %}
+{% if user.roles contains 'AL Portal - Outcome Testing Manager' or user.roles contains 'Administrators' %}{% assign ot_oversight = true %}{% endif %}
 {% if user and ot_oversight == false %}
   <script>window.location.replace('/cases');</script>
   <p><a href="/cases">Go to Cases</a></p>

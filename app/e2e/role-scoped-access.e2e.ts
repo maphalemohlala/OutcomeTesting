@@ -297,7 +297,9 @@ test.describe('an oversight role (Outcome Testing Manager or Administrators)', (
   });
 });
 
-// Profile is no one's: the page is refused and the user menu offers only Sign out.
+// Profile is no one's: the page is refused and the user menu offers only Sign out. Point the
+// oversight session at an Outcome Testing Manager here, not Administrators: Home's Grant Change
+// rule still opens every page to Administrators, and the owner left that as it is (2026-09-24).
 for (const session of [SESSION_ADVISER, SESSION_TAX_REVIEWER, SESSION_AQS_REVIEWER, SESSION_TC_SUPERVISOR, SESSION_OVERSIGHT]) {
   test.describe(`Profile, as ${session}`, () => {
     requires(PORTAL_URL, session);

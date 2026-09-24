@@ -43,9 +43,11 @@
             page inherits its rule - so its menu link is hidden here instead. Presentation only:
             the table permissions decide what anyone reads. The divider is keyed on links
             actually shown, so hiding the first one leaves no stray divider.
+            Oversight is the two roles with Global read on case data, Outcome Testing Manager and
+            Administrators; Portal Administrator reads no cases, so it is not one of them.
           {% endcomment %}
           {% assign ot_oversight = false %}
-          {% if user.roles contains 'AL Portal - Outcome Testing Manager' or user.roles contains 'AL Portal - Portal Administrator' or user.roles contains 'Administrators' %}{% assign ot_oversight = true %}{% endif %}
+          {% if user.roles contains 'AL Portal - Outcome Testing Manager' or user.roles contains 'Administrators' %}{% assign ot_oversight = true %}{% endif %}
           {% assign ot_links_shown = 0 %}
           <ul class='nav navbar-nav weblinks'>
             {% for link in primary_nav.weblinks %}

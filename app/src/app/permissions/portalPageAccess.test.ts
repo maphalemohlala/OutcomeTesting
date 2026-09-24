@@ -8,6 +8,10 @@ import myWork from '../../../../powerpages/outcome-testing---outcometesting/web-
  * own cases, so Cases is their one list: My Work and Tax reviews are oversight pages, AQS
  * reviews stays for the queue and Remediation for advisers and supervisors. Profile is no
  * one's. Pages and menu only - what anyone can read is still the table permissions.
+ *
+ * Oversight is the two roles with Global read on case data: Outcome Testing Manager and
+ * Administrators. Portal Administrator reads no cases, so it is treated like every other
+ * non-oversight role (owner, 2026-09-24): Cases only.
  */
 const ROLE = {
   tax: 'a1000000-0000-4000-8000-000000000090',
@@ -18,14 +22,16 @@ const ROLE = {
   portalAdmin: 'a1000000-0000-4000-8000-000000000096',
   administrators: 'c53b2908-1fc1-4470-89cd-6f5b95c17ffe',
 };
-const OVERSIGHT = [ROLE.manager, ROLE.portalAdmin, ROLE.administrators];
-const OVERSIGHT_NAMES = ['AL Portal - Outcome Testing Manager', 'AL Portal - Portal Administrator', 'Administrators'];
+const OVERSIGHT = [ROLE.manager, ROLE.administrators];
+const OVERSIGHT_NAMES = ['AL Portal - Outcome Testing Manager', 'Administrators'];
 
 const PAGE = {
   myWork: 'a1000000-0000-4000-8000-000000000030',
   taxReviews: 'a1000000-0000-4000-8000-000000000033',
   aqsReviews: 'a1000000-0000-4000-8000-000000000034',
   remediation: 'a1000000-0000-4000-8000-000000000035',
+  review: 'a1000000-0000-4000-8000-000000000036',
+  home: '52570e2a-4d91-41f8-95c9-d0017a937039',
   profile: '6b7c4888-877a-41ec-8a9c-2245601999f7',
 };
 
@@ -76,6 +82,17 @@ describe('page rules', () => {
     expect(restrictRead(PAGE.remediation).roles.sort()).toEqual([ROLE.adviser, ROLE.supervisor, ...OVERSIGHT].sort());
   });
 
+  it('the Review page stays with the two reviewer roles', () => {
+    expect(restrictRead(PAGE.review).roles.sort()).toEqual([ROLE.tax, ROLE.aqs, ...OVERSIGHT].sort());
+  });
+
+  it('Portal Administrator is on no page rule but Home, so it has Cases and nothing else', () => {
+    for (const rule of rules.filter((r) => r.page !== PAGE.home)) {
+      expect(rule.roles, rule.name).not.toContain(ROLE.portalAdmin);
+    }
+    expect(restrictRead(PAGE.home).roles).toContain(ROLE.portalAdmin);
+  });
+
   it('Profile is readable by no role', () => {
     const rule = restrictRead(PAGE.profile);
     expect(rule.roles).toEqual([]);
@@ -95,6 +112,7 @@ describe('the header', () => {
       expect(header).toContain(`user.roles contains '${name}'`);
     }
     expect(header).toMatch(/link\.url == '\/' and ot_oversight == false/);
+    expect(header).not.toContain("user.roles contains 'AL Portal - Portal Administrator'");
   });
 
   it('counts shown links for the dividers, so a hidden first link leaves no stray divider', () => {
@@ -107,6 +125,7 @@ describe('the landing page', () => {
     for (const name of OVERSIGHT_NAMES) {
       expect(myWork).toContain(`user.roles contains '${name}'`);
     }
+    expect(myWork).not.toContain("user.roles contains 'AL Portal - Portal Administrator'");
     const redirect = /\{% if user and ot_oversight == false %\}([\s\S]*?)\{% else %\}/.exec(myWork)?.[1] ?? '';
     expect(redirect).toContain("window.location.replace('/cases')");
     expect(redirect).not.toContain('fetchxml');
