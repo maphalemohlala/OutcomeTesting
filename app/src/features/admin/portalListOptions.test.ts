@@ -296,8 +296,10 @@ describe('the portal sends the product set', () => {
   });
 
   it('re-baselines the set after a save', () => {
-    // Without this the next save re-sends a set that is already recorded.
-    expect(reviewTemplate).toContain('headerSets[m].initial = setValueOf(headerSets[m].el);');
+    // Without this the next save re-sends a set that is already recorded. To what was SENT,
+    // not to what the boxes hold on reply: a box ticked mid-flight was never sent (900000006,
+    // portalHeaderAutosave.test.ts).
+    expect(reviewTemplate).toContain('headerSets[m].initial = sentSets[m];');
   });
 });
 
