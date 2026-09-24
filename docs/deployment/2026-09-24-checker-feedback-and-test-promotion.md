@@ -4,8 +4,8 @@ Written for: whoever runs the TEST promotion of 1.0.10.0, and whoever reads back
 
 **Date:** 2026-09-24
 **Environments:** `Env_AQ_Dev` (`org0b075da8`) and `Env_AQ_Test` (`org37995f36`), both
-deployed and verified. **Two TEST steps remain the owner's** - `grantteamsecurity` and the
-`reconcileaccess --confirm` backfill - plus the AQS reviewers' account (see the end).
+deployed and verified. On TEST only the AQS reviewers' account (step 7) and the adviser
+mappings the backfill could not match remain - both the owner's.
 **Commits:** `7ac209c` (the batch), `aa04a47` (its docs), pushed to `feat/change-batch-sep-2026`.
 
 ## What the batch is
@@ -121,9 +121,9 @@ Account's.
 | 1. `ensureaccessprincipals` | teams `Outcome Testing - Tax Team` (`19a8d022…`), `- AQS Team` (`1da8d022…`), account `Outcome Testing - AQS Team` (`21a8d022…`) created |
 | 2. Import 1.0.10.0 managed | `ImportSolutionAsync` through the registration tool's Web API (`pac` revoked), `PublishWorkflows: true` (what `--activate-plugins` sets), `OverwriteUnmanagedCustomizations: false`. Job `e6072477…` succeeded 21:35:15Z |
 | 3. Steps | `verifysteps` 24/24; **all 64 on the assembly enabled**, including the six `CaseAccess*` and two `AqsQueueMembership` steps |
-| 4. `grantteamsecurity` | **refused to the agent** - owner |
+| 4. `grantteamsecurity` | refused to the agent; **run by the owner 2026-09-25**: role `Outcome Testing Team Manager` exists, privileges granted on 26 tables. Its solution add was skipped - TEST's solution is managed, as expected |
 | 5. Question data (`test-data.json`) | 10/10: CRP-01..04 and E4-03 on `120910012`, Q-GR-02 v1 to 2026-09-24 and v2 (`120910013`, DEV's id) from it, S-CD help text cleared - read back |
-| 6. `reconcileaccess` | dry run: 24 active cases. `--confirm` left for after step 4 - owner |
+| 6. `reconcileaccess --confirm` | owner's run: 20 changed, **2 FAILED** (300000001, 300000002 - "Database is currently unavailable", transient). Agent re-ran it: those 2 changed, **0 failed**, all 24 cases reconciled. **15 released cases UNMATCHED** (below) |
 | Solution / Code App / assembly | 1.0.10.0 managed; `appversion` 2026-09-24T21:32:42Z; sha256 `0d4716f9…` |
 
 ### What the import did not reach
@@ -160,7 +160,17 @@ outcome questions exactly as its Fail branch always did.
 Not run on TEST: the emailed PDF (TEST delivers real mail - DEV proved it end to end), the
 write specs, and the role groups (no single-role TEST sessions).
 
-## The remaining TEST steps (owner)
+### The unmatched releases
+
+Fifteen cases are released for remediation with nobody matched to see them: 300000002, -04,
+-05, -08 to -14, -17, -18 (adviser **and** supervisor), and 300000006, -16, 900000004
+(supervisor only). The adviser's name or email on the case resolves to no contact, or no
+`al_advisermapping` names their T&C Supervisor - TEST holds one mapping (F58). Nothing is
+broken: oversight and Administrators read these cases as before; the adviser and supervisor
+simply cannot see them on the portal until the people and mappings exist, and the reconciler
+fills the columns in on the next write or `reconcileaccess` run.
+
+## The remaining TEST steps (owner) - done 2026-09-25, kept for the record
 
 Both were refused to the agent as permission changes. In this order, from the repo root:
 
@@ -225,7 +235,8 @@ the portal needs a TEST session, `npm run e2e:auth` against `outcometestingtest`
 
 ## Open
 
-- **TEST: `grantteamsecurity`, then `reconcileaccess --confirm`, then the AQS reviewers' account** - steps 4, 6 and 7 above.
+- **TEST: the AQS reviewers' account** (step 7) - Suresh Gautam and Ruth Maxwell see an empty queue until it is done.
+- **TEST: adviser contacts and mappings** for the 15 unmatched releases (F58).
 - **Role sessions** for Adviser, Tax reviewer, T&C Supervisor, Planner and an Outcome Testing
   Manager (not an Administrator), so the rest of `role-scoped-access.e2e.ts` can run.
 - **`pac` needs a fresh sign-in** (AADSTS50173, tokens valid from 2026-09-24T05:52:08Z).
