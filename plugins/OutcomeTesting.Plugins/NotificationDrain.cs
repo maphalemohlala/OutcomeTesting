@@ -219,26 +219,27 @@ namespace OutcomeTesting.Plugins
             var body = notification.GetAttributeValue<string>(NotificationOutbox.AttachmentBodyAttr);
             var name = notification.GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr);
 
-            if (string.IsNullOrWhiteSpace(body) || string.IsNullOrWhiteSpace(name))
+            // Several files may ride one row (a Tax check, an AQS check, the remediation),
+            // joined in both columns in the same order.
+            foreach (var attachment in NotificationOutbox.UnpackAttachments(name, body))
             {
-                return;
-            }
-
-            try
-            {
-                service.Create(new Entity("activitymimeattachment")
+                try
                 {
-                    ["objectid"] = new EntityReference(EmailEntity, emailId),
-                    ["objecttypecode"] = EmailEntity,
-                    ["subject"] = name,
-                    ["filename"] = name,
-                    ["mimetype"] = "application/pdf",
-                    ["body"] = body,
-                });
-            }
-            catch (Exception)
-            {
-                // Deliberately swallowed; see the summary.
+                    service.Create(new Entity("activitymimeattachment")
+                    {
+                        ["objectid"] = new EntityReference(EmailEntity, emailId),
+                        ["objecttypecode"] = EmailEntity,
+                        ["subject"] = attachment.Key,
+                        ["filename"] = attachment.Key,
+                        ["mimetype"] = "application/pdf",
+                        ["body"] = attachment.Value,
+                    });
+                }
+                catch (Exception)
+                {
+                    // Deliberately swallowed; see the summary. One file that cannot be
+                    // attached does not cost the others.
+                }
             }
         }
 

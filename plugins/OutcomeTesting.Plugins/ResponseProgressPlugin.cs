@@ -179,6 +179,16 @@ namespace OutcomeTesting.Plugins
                     ["al_answerchoice"] = null,
                 });
             }
+
+            // Several causes at once from 2026-09-24, held as ticks.
+            foreach (var recorded in ChecklistQueries.ChoicesAnswersTo(
+                service, reviewId, GradingRules.RootCauseQuestionCode))
+            {
+                service.Update(new Entity("al_response", recorded.Id)
+                {
+                    ["al_answerchoices"] = null,
+                });
+            }
         }
 
         /// <summary>

@@ -69,6 +69,201 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>Vertical space.</summary>
         Spacer,
+
+        /// <summary>
+        /// A ruled table of cells, which may hold tick boxes (project owner, 2026-09-24: the
+        /// emailed PDF "needs to match the pdf form in the system"). The review page prints
+        /// every block of the Checker Checklist as a table with every cell ruled, tick
+        /// columns of empty and ticked squares, shaded heading rows and shaded label cells;
+        /// <see cref="Row"/> could only put an answer's WORD in a column, which is a
+        /// description of the form rather than the form.
+        /// </summary>
+        Table,
+
+        /// <summary>A small line of body text, as the page's document footer line is set.</summary>
+        Note,
+    }
+
+    /// <summary>
+    /// One piece of a table cell's content: a run of text, a tick box, or a line break.
+    /// </summary>
+    public sealed class PdfRun
+    {
+        public string Text { get; set; }
+
+        public bool Bold { get; set; }
+
+        public bool Italic { get; set; }
+
+        /// <summary>A tick box rather than text: false draws it empty, true ticked.</summary>
+        public bool? Box { get; set; }
+
+        /// <summary>Ends the line here.</summary>
+        public bool Break { get; set; }
+
+        public static PdfRun Of(string text, bool bold = false, bool italic = false)
+        {
+            return new PdfRun { Text = text, Bold = bold, Italic = italic };
+        }
+
+        public static PdfRun Tick(bool ticked)
+        {
+            return new PdfRun { Box = ticked };
+        }
+
+        public static PdfRun LineBreak()
+        {
+            return new PdfRun { Break = true };
+        }
+    }
+
+    /// <summary>One cell of a <see cref="PdfTable"/>.</summary>
+    public sealed class PdfCell
+    {
+        public PdfCell()
+        {
+            Runs = new List<PdfRun>();
+            Span = 1;
+        }
+
+        public List<PdfRun> Runs { get; private set; }
+
+        /// <summary>How many columns the cell runs across.</summary>
+        public int Span { get; set; }
+
+        /// <summary>A grey fill, 0 black to 1 white, or null for none.</summary>
+        public double? Fill { get; set; }
+
+        /// <summary>Centred rather than set from the left, as a tick column is.</summary>
+        public bool Centre { get; set; }
+
+        /// <summary>The cell's text, runs joined and ticks written [x] / [ ], for tests and search.</summary>
+        public string Text
+        {
+            get
+            {
+                var text = new StringBuilder();
+                foreach (var run in Runs)
+                {
+                    if (run.Box.HasValue)
+                    {
+                        text.Append(run.Box.Value ? "[x]" : "[ ]");
+                    }
+                    else if (run.Break)
+                    {
+                        text.Append('\n');
+                    }
+                    else
+                    {
+                        text.Append(run.Text);
+                    }
+                }
+
+                return text.ToString();
+            }
+        }
+
+        /// <summary>Plain text.</summary>
+        public static PdfCell Of(string text, int span = 1)
+        {
+            var cell = new PdfCell { Span = span };
+            AddText(cell, text, false);
+            return cell;
+        }
+
+        /// <summary>Bold on a light fill, as the form sets a label cell.</summary>
+        public static PdfCell Label(string text, int span = 1)
+        {
+            var cell = new PdfCell { Span = span, Fill = LabelFill };
+            AddText(cell, text, true);
+            return cell;
+        }
+
+        /// <summary>Bold on the heading fill, as the form sets a column heading.</summary>
+        public static PdfCell Head(string text, int span = 1, bool centre = false)
+        {
+            var cell = new PdfCell { Span = span, Fill = HeadFill, Centre = centre };
+            AddText(cell, text, true);
+            return cell;
+        }
+
+        /// <summary>A lone tick box, centred.</summary>
+        public static PdfCell Box(bool ticked)
+        {
+            var cell = new PdfCell { Centre = true };
+            cell.Runs.Add(PdfRun.Tick(ticked));
+            return cell;
+        }
+
+        /// <summary>A cell with nothing in it.</summary>
+        public static PdfCell Blank(int span = 1)
+        {
+            return new PdfCell { Span = span };
+        }
+
+        public const double HeadFill = 0.85;
+        public const double BandFill = 0.9;
+        public const double LabelFill = 0.95;
+
+        private static void AddText(PdfCell cell, string text, bool bold)
+        {
+            var lines = (text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (i > 0)
+                {
+                    cell.Runs.Add(PdfRun.LineBreak());
+                }
+
+                cell.Runs.Add(PdfRun.Of(lines[i], bold));
+            }
+        }
+    }
+
+    /// <summary>One row of a <see cref="PdfTable"/>.</summary>
+    public sealed class PdfTableRow
+    {
+        public PdfTableRow(params PdfCell[] cells)
+        {
+            Cells = new List<PdfCell>(cells ?? new PdfCell[0]);
+        }
+
+        public List<PdfCell> Cells { get; private set; }
+
+        /// <summary>A heading row, drawn again at the top of a page the table runs onto.</summary>
+        public bool Header { get; set; }
+    }
+
+    /// <summary>A table: column widths as fractions of the line, then its rows.</summary>
+    public sealed class PdfTable
+    {
+        public PdfTable(params double[] widths)
+        {
+            Widths = widths ?? new double[0];
+            Rows = new List<PdfTableRow>();
+            Ruled = true;
+        }
+
+        public double[] Widths { get; private set; }
+
+        public List<PdfTableRow> Rows { get; private set; }
+
+        /// <summary>Every cell ruled, as the checklist's tables are. False for a layout grid.</summary>
+        public bool Ruled { get; set; }
+
+        public PdfTableRow Add(params PdfCell[] cells)
+        {
+            var row = new PdfTableRow(cells);
+            Rows.Add(row);
+            return row;
+        }
+
+        public PdfTableRow AddHeader(params PdfCell[] cells)
+        {
+            var row = Add(cells);
+            row.Header = true;
+            return row;
+        }
     }
 
     /// <summary>One block of a generated document.</summary>
@@ -82,6 +277,21 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>The value, for a <see cref="PdfBlockKind.Field"/>.</summary>
         public string Value { get; set; }
+
+        /// <summary>The table, for a <see cref="PdfBlockKind.Table"/>.</summary>
+        public PdfTable Grid { get; set; }
+
+        /// <summary>A ruled table.</summary>
+        public static PdfBlock Table(PdfTable table)
+        {
+            return new PdfBlock { Kind = PdfBlockKind.Table, Grid = table };
+        }
+
+        /// <summary>A small line of text.</summary>
+        public static PdfBlock Note(string text)
+        {
+            return new PdfBlock { Kind = PdfBlockKind.Note, Text = text };
+        }
 
         /// <summary>A title.</summary>
         public static PdfBlock Title(string text)
@@ -187,11 +397,25 @@ namespace OutcomeTesting.Plugins
     /// </summary>
     public static class PdfWriter
     {
-        // A4 in PDF points (1/72"), which is what the page box is measured in.
-        private const double PageWidth = 595.28;
-        private const double PageHeight = 841.89;
-        private const double Margin = 56.7;          // 20mm
-        private const double ContentWidth = PageWidth - (2 * Margin);
+        // A4 in PDF points (1/72"), which is what the page box is measured in. Portrait unless
+        // a document asks for landscape, which the remediation form does: it is eight columns
+        // wide on the page it copies, and portrait would squeeze each to a word a line.
+        private const double A4Short = 595.28;
+        private const double A4Long = 841.89;
+        private const double Margin = 42.5;          // 15mm
+
+        /// <summary>A table's body text, a point under the running text as the page sets it.</summary>
+        private const double TableSize = 9;
+
+        /// <summary>Space inside a table cell, each side.</summary>
+        private const double CellPad = 4;
+
+        /// <summary>A tick box's side, and the gap after it before its label.</summary>
+        private const double BoxSide = 8;
+        private const double BoxGap = 3.5;
+
+        /// <summary>The grey the text of a <see cref="PdfBlockKind.Note"/> is set in.</summary>
+        private const double NoteSize = 8;
 
         private const double TitleSize = 18;
         private const double HeadingSize = 12;
@@ -221,6 +445,8 @@ namespace OutcomeTesting.Plugins
 
         private const string Regular = "F1";
         private const string Bold = "F2";
+        private const string Italic = "F3";
+        private const string BoldItalic = "F4";
 
         /// <summary>
         /// The document as PDF bytes. Never throws for content reasons: text that cannot be
@@ -228,8 +454,16 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static byte[] Build(IEnumerable<PdfBlock> blocks)
         {
-            var pages = Layout(blocks ?? new PdfBlock[0]);
-            return Assemble(pages);
+            return Build(blocks, false);
+        }
+
+        /// <summary>As <see cref="Build(IEnumerable{PdfBlock})"/>, on landscape pages when asked.</summary>
+        public static byte[] Build(IEnumerable<PdfBlock> blocks, bool landscape)
+        {
+            var width = landscape ? A4Long : A4Short;
+            var height = landscape ? A4Short : A4Long;
+            var pages = Layout(blocks ?? new PdfBlock[0], width, height);
+            return Assemble(pages, width, height);
         }
 
         // ------------------------------------------------------------------ layout
@@ -256,19 +490,39 @@ namespace OutcomeTesting.Plugins
 
             /// <summary>How far a rule runs, in points.</summary>
             public double Span;
+
+            /// <summary>
+            /// A rectangle - a table cell or a tick box - at X, Y (its lower left corner) of
+            /// <see cref="Span"/> by <see cref="Height"/>, filled and/or stroked.
+            /// </summary>
+            public bool IsRect;
+
+            public double Height;
+
+            /// <summary>Fill grey, 0 black to 1 white; negative for no fill.</summary>
+            public double Fill = -1;
+
+            /// <summary>Stroke grey; negative for no outline.</summary>
+            public double Stroke = -1;
+
+            public double Weight = RuleWeight;
+
+            /// <summary>A tick mark drawn in a box whose lower left corner is X, Y.</summary>
+            public bool IsTick;
         }
 
-        private static List<List<Line>> Layout(IEnumerable<PdfBlock> blocks)
+        private static List<List<Line>> Layout(IEnumerable<PdfBlock> blocks, double pageWidth, double pageHeight)
         {
             var pages = new List<List<Line>>();
             var current = new List<Line>();
-            var y = PageHeight - Margin;
+            var y = pageHeight - Margin;
+            var ContentWidth = pageWidth - (2 * Margin);
 
             void NewPage()
             {
                 pages.Add(current);
                 current = new List<Line>();
-                y = PageHeight - Margin;
+                y = pageHeight - Margin;
             }
 
             void DrawRule()
@@ -286,6 +540,157 @@ namespace OutcomeTesting.Plugins
                 current.Add(new Line { IsRule = true, X = Margin, Y = y, Span = ContentWidth });
             }
 
+            /*
+             * A table is laid out a row at a time, and a row is never split: a test point
+             * broken across two pages loses its tick column on one of them. A row that will
+             * not fit starts a new page, and the table's heading rows are drawn again at the
+             * top of it, which is what the browser's print does with the form's thead.
+             */
+            void DrawTable(PdfTable table)
+            {
+                var widths = ColumnWidths(table.Widths, ContentWidth);
+
+                var header = new List<PdfTableRow>();
+                foreach (var row in table.Rows)
+                {
+                    if (!row.Header)
+                    {
+                        break;
+                    }
+
+                    header.Add(row);
+                }
+
+                double headerHeight = 0;
+                foreach (var row in header)
+                {
+                    headerHeight += RowHeight(row, widths);
+                }
+
+                y -= BlockGap / 2;
+                var drawnOnPage = 0;
+
+                for (var i = 0; i < table.Rows.Count; i++)
+                {
+                    var row = table.Rows[i];
+                    var height = RowHeight(row, widths);
+
+                    // Keep the heading with the first row under it, so a table never opens
+                    // with its column headings stranded at the foot of a page.
+                    var needed = height;
+                    if (i == 0 && header.Count > 0 && header.Count < table.Rows.Count)
+                    {
+                        needed = headerHeight + RowHeight(table.Rows[header.Count], widths);
+                    }
+
+                    if (y - needed < Margin && (drawnOnPage > 0 || current.Count > 0))
+                    {
+                        NewPage();
+                        drawnOnPage = 0;
+
+                        if (!row.Header && header.Count > 0)
+                        {
+                            foreach (var repeat in header)
+                            {
+                                PlaceRow(repeat, widths, RowHeight(repeat, widths), table.Ruled);
+                            }
+                        }
+                    }
+
+                    PlaceRow(row, widths, height, table.Ruled);
+                    drawnOnPage++;
+                }
+
+                y -= BlockGap / 2;
+            }
+
+            void PlaceRow(PdfTableRow row, double[] widths, double height, bool ruled)
+            {
+                var top = y;
+                var column = 0;
+                var lineHeight = TableSize * LineGap;
+
+                foreach (var cell in row.Cells)
+                {
+                    if (column >= widths.Length)
+                    {
+                        break;
+                    }
+
+                    var x = Margin;
+                    for (var c = 0; c < column; c++)
+                    {
+                        x += widths[c];
+                    }
+
+                    var span = Math.Max(1, Math.Min(cell.Span, widths.Length - column));
+                    double width = 0;
+                    for (var c = column; c < column + span; c++)
+                    {
+                        width += widths[c];
+                    }
+
+                    column += span;
+
+                    current.Add(new Line
+                    {
+                        IsRect = true,
+                        X = x,
+                        Y = top - height,
+                        Span = width,
+                        Height = height,
+                        Fill = cell.Fill.HasValue ? cell.Fill.Value : -1,
+                        Stroke = ruled ? 0 : -1,
+                    });
+
+                    var lines = Flow(cell, width - (2 * CellPad));
+                    for (var l = 0; l < lines.Count; l++)
+                    {
+                        var baseline = top - CellPad - (l * lineHeight) - (TableSize * 0.95);
+                        var offset = cell.Centre
+                            ? Math.Max(0, (width - (2 * CellPad) - lines[l].Width) / 2)
+                            : 0;
+
+                        foreach (var piece in lines[l].Pieces)
+                        {
+                            var px = x + CellPad + offset + piece.X;
+                            if (piece.Box.HasValue)
+                            {
+                                current.Add(new Line
+                                {
+                                    IsRect = true,
+                                    X = px,
+                                    Y = baseline - 1,
+                                    Span = BoxSide,
+                                    Height = BoxSide,
+                                    Fill = 1,
+                                    Stroke = 0.45,
+                                    Weight = 0.6,
+                                });
+
+                                if (piece.Box.Value)
+                                {
+                                    current.Add(new Line { IsTick = true, X = px, Y = baseline - 1 });
+                                }
+                            }
+                            else if (!string.IsNullOrEmpty(piece.Text))
+                            {
+                                current.Add(new Line
+                                {
+                                    Font = piece.Font,
+                                    Size = TableSize,
+                                    X = px,
+                                    Y = baseline,
+                                    Text = piece.Text,
+                                });
+                            }
+                        }
+                    }
+                }
+
+                y = top - height;
+            }
+
             void Emit(string font, double size, double x, string text)
             {
                 // A line that would start below the margin begins a new page instead of
@@ -299,8 +704,53 @@ namespace OutcomeTesting.Plugins
                 current.Add(new Line { Font = font, Size = size, X = x, Y = y, Text = text });
             }
 
-            foreach (var block in blocks)
+            /*
+             * What has to share a page with a heading: the intro line straight under it, if
+             * there is one, and the opening of the table it heads - that table's heading rows
+             * and its first row. Without it a heading can land alone at the foot of a page with
+             * its table overleaf, which is how "File Quality - Fail points" first arrived.
+             */
+            double Opening(List<PdfBlock> list, int from)
             {
+                double needed = 0;
+                for (var j = from; j < list.Count; j++)
+                {
+                    var next = list[j];
+                    if (next == null)
+                    {
+                        continue;
+                    }
+
+                    if (next.Kind == PdfBlockKind.Paragraph)
+                    {
+                        needed += Wrap(next.Text, Regular, BodySize, ContentWidth).Count * BodySize * LineGap;
+                        continue;
+                    }
+
+                    if (next.Kind == PdfBlockKind.Table && next.Grid != null && next.Grid.Rows.Count > 0)
+                    {
+                        var widths = ColumnWidths(next.Grid.Widths, ContentWidth);
+                        needed += BlockGap / 2;
+                        foreach (var row in next.Grid.Rows)
+                        {
+                            needed += RowHeight(row, widths);
+                            if (!row.Header)
+                            {
+                                break;
+                            }
+                        }
+                    }
+
+                    return needed;
+                }
+
+                return needed;
+            }
+
+            var ordered = new List<PdfBlock>(blocks);
+            for (var index = 0; index < ordered.Count; index++)
+            {
+                var block = ordered[index];
                 if (block == null)
                 {
                     continue;
@@ -322,8 +772,15 @@ namespace OutcomeTesting.Plugins
                         break;
 
                     case PdfBlockKind.Heading:
+                        var headingLines = Wrap(block.Text, Bold, HeadingSize, ContentWidth);
+                        var opening = BlockGap + (headingLines.Count * HeadingSize * LineGap) + Opening(ordered, index + 1);
+                        if (y - opening < Margin && current.Count > 0)
+                        {
+                            NewPage();
+                        }
+
                         y -= BlockGap;
-                        foreach (var line in Wrap(block.Text, Bold, HeadingSize, ContentWidth))
+                        foreach (var line in headingLines)
                         {
                             Emit(Bold, HeadingSize, Margin, line);
                         }
@@ -436,6 +893,23 @@ namespace OutcomeTesting.Plugins
                             break;
                         }
 
+                    case PdfBlockKind.Note:
+                        foreach (var line in Wrap(block.Text, Regular, NoteSize, ContentWidth))
+                        {
+                            Emit(Regular, NoteSize, Margin, line);
+                        }
+
+                        DrawRule();
+                        break;
+
+                    case PdfBlockKind.Table:
+                        if (block.Grid != null && block.Grid.Rows.Count > 0)
+                        {
+                            DrawTable(block.Grid);
+                        }
+
+                        break;
+
                     case PdfBlockKind.Field:
                         var label = (block.Text ?? string.Empty) + ": ";
                         var labelWidth = Width(label, Bold, BodySize);
@@ -517,6 +991,190 @@ namespace OutcomeTesting.Plugins
             return lines;
         }
 
+        // ------------------------------------------------------------------ tables
+
+        /// <summary>One positioned piece of a cell line: a run of text, or a tick box.</summary>
+        private sealed class Piece
+        {
+            public double X;
+            public string Text;
+            public string Font;
+            public bool? Box;
+        }
+
+        private sealed class FlowLine
+        {
+            public readonly List<Piece> Pieces = new List<Piece>();
+            public double Width;
+        }
+
+        /// <summary>The columns in points, from fractions that need not sum to exactly one.</summary>
+        private static double[] ColumnWidths(double[] fractions, double contentWidth)
+        {
+            if (fractions == null || fractions.Length == 0)
+            {
+                return new[] { contentWidth };
+            }
+
+            double total = 0;
+            foreach (var fraction in fractions)
+            {
+                total += Math.Max(0, fraction);
+            }
+
+            var widths = new double[fractions.Length];
+            for (var i = 0; i < fractions.Length; i++)
+            {
+                widths[i] = total <= 0
+                    ? contentWidth / fractions.Length
+                    : contentWidth * Math.Max(0, fractions[i]) / total;
+            }
+
+            return widths;
+        }
+
+        private static double RowHeight(PdfTableRow row, double[] widths)
+        {
+            var lineHeight = TableSize * LineGap;
+            var tallest = 1;
+            var column = 0;
+
+            foreach (var cell in row.Cells)
+            {
+                if (column >= widths.Length)
+                {
+                    break;
+                }
+
+                var span = Math.Max(1, Math.Min(cell.Span, widths.Length - column));
+                double width = 0;
+                for (var c = column; c < column + span; c++)
+                {
+                    width += widths[c];
+                }
+
+                column += span;
+                tallest = Math.Max(tallest, Flow(cell, width - (2 * CellPad)).Count);
+            }
+
+            return (2 * CellPad) + (tallest * lineHeight);
+        }
+
+        /// <summary>
+        /// Sets a cell's runs into lines no wider than the cell.
+        ///
+        /// Words wrap on spaces as <see cref="Wrap"/> wraps them. A tick box travels with the
+        /// label after it - "[ ] PASS" never breaks between the box and its word, because a
+        /// box at the end of one line and its label at the start of the next reads as two
+        /// different options.
+        /// </summary>
+        private static List<FlowLine> Flow(PdfCell cell, double width)
+        {
+            var lines = new List<FlowLine>();
+            var line = new FlowLine();
+            double cursor = 0;
+            var afterBox = false;
+
+            void Finish()
+            {
+                line.Width = cursor;
+                lines.Add(line);
+                line = new FlowLine();
+                cursor = 0;
+                afterBox = false;
+            }
+
+            var runs = cell.Runs;
+            for (var r = 0; r < runs.Count; r++)
+            {
+                var run = runs[r];
+
+                if (run.Break)
+                {
+                    Finish();
+                    continue;
+                }
+
+                if (run.Box.HasValue)
+                {
+                    // The box and the first word of the label after it are measured together.
+                    var gap = cursor > 0 ? BoxGap * 3 : 0;
+                    var next = r + 1 < runs.Count ? runs[r + 1] : null;
+                    var label = next != null && !next.Box.HasValue && !next.Break
+                        ? FirstWord(next.Text)
+                        : null;
+                    var need = gap + BoxSide + (label == null ? 0 : BoxGap + Width(label, FontFor(next), TableSize));
+
+                    if (cursor > 0 && cursor + need > width)
+                    {
+                        Finish();
+                        gap = 0;
+                    }
+
+                    cursor += gap;
+                    line.Pieces.Add(new Piece { X = cursor, Box = run.Box });
+                    cursor += BoxSide;
+                    afterBox = true;
+                    continue;
+                }
+
+                var font = FontFor(run);
+                var space = Width(" ", font, TableSize);
+                var words = (run.Text ?? string.Empty).Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+                for (var w = 0; w < words.Length; w++)
+                {
+                    var word = words[w];
+                    var wordWidth = Width(word, font, TableSize);
+                    var lead = cursor <= 0 ? 0 : (afterBox ? BoxGap : space);
+
+                    // After a box the first word stays with it, whatever the width: the pair
+                    // was measured as one before the box was placed.
+                    if (cursor > 0 && !afterBox && cursor + lead + wordWidth > width)
+                    {
+                        Finish();
+                        lead = 0;
+                    }
+
+                    var last = line.Pieces.Count > 0 ? line.Pieces[line.Pieces.Count - 1] : null;
+                    if (last != null && last.Text != null && last.Font == font && lead == space && w > 0)
+                    {
+                        last.Text += " " + word;
+                    }
+                    else
+                    {
+                        line.Pieces.Add(new Piece { X = cursor + lead, Text = word, Font = font });
+                    }
+
+                    cursor += lead + wordWidth;
+                    afterBox = false;
+                }
+            }
+
+            if (line.Pieces.Count > 0 || lines.Count == 0)
+            {
+                Finish();
+            }
+
+            return lines;
+        }
+
+        private static string FirstWord(string text)
+        {
+            var words = (text ?? string.Empty).Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            return words.Length == 0 ? null : words[0];
+        }
+
+        private static string FontFor(PdfRun run)
+        {
+            if (run.Bold)
+            {
+                return run.Italic ? BoldItalic : Bold;
+            }
+
+            return run.Italic ? Italic : Regular;
+        }
+
         /// <summary>The width of a string at a size, in points.</summary>
         public static double Width(string text, string font, double size)
         {
@@ -525,7 +1183,8 @@ namespace OutcomeTesting.Plugins
                 return 0;
             }
 
-            var widths = font == Bold ? BoldWidths : RegularWidths;
+            // The oblique faces share their upright faces' widths; Adobe's metrics say so.
+            var widths = font == Bold || font == BoldItalic ? BoldWidths : RegularWidths;
             double total = 0;
 
             foreach (var ch in text)
@@ -539,14 +1198,14 @@ namespace OutcomeTesting.Plugins
 
         // ------------------------------------------------------------------ assembly
 
-        private static byte[] Assemble(List<List<Line>> pages)
+        private static byte[] Assemble(List<List<Line>> pages, double pageWidth, double pageHeight)
         {
-            // Object 1 catalog, 2 pages, 3 regular font, 4 bold font, then a content stream
-            // and a page object per page.
+            // Object 1 catalog, 2 pages, 3 to 6 the four faces (regular, bold, italic, bold
+            // italic), then a content stream and a page object per page.
             var objects = new List<string>();
             var pageObjectIds = new List<int>();
 
-            var firstPageObject = 5 + pages.Count;
+            var firstPageObject = FirstStreamObject + pages.Count;
             for (var i = 0; i < pages.Count; i++)
             {
                 pageObjectIds.Add(firstPageObject + i);
@@ -563,6 +1222,8 @@ namespace OutcomeTesting.Plugins
                 + pages.Count.ToString(CultureInfo.InvariantCulture) + " >>");
             objects.Add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
             objects.Add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+            objects.Add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>");
+            objects.Add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-BoldOblique /Encoding /WinAnsiEncoding >>");
 
             var streams = new List<string>();
             foreach (var page in pages)
@@ -570,7 +1231,7 @@ namespace OutcomeTesting.Plugins
                 streams.Add(Content(page));
             }
 
-            // Content streams occupy objects 5 .. 4+pages.Count.
+            // Content streams occupy objects FirstStreamObject onwards, one per page.
             foreach (var stream in streams)
             {
                 objects.Add("<< /Length " + stream.Length.ToString(CultureInfo.InvariantCulture)
@@ -580,9 +1241,9 @@ namespace OutcomeTesting.Plugins
             for (var i = 0; i < pages.Count; i++)
             {
                 objects.Add("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 "
-                    + Num(PageWidth) + " " + Num(PageHeight) + "] "
-                    + "/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents "
-                    + (5 + i).ToString(CultureInfo.InvariantCulture) + " 0 R >>");
+                    + Num(pageWidth) + " " + Num(pageHeight) + "] "
+                    + "/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> >> /Contents "
+                    + (FirstStreamObject + i).ToString(CultureInfo.InvariantCulture) + " 0 R >>");
             }
 
             var pdf = new StringBuilder();
@@ -616,9 +1277,63 @@ namespace OutcomeTesting.Plugins
             return Encoding.GetEncoding(28591).GetBytes(pdf.ToString());
         }
 
+        /// <summary>The object number of the first page's content stream, after the fonts.</summary>
+        private const int FirstStreamObject = 7;
+
         private static string Content(List<Line> lines)
         {
             var content = new StringBuilder();
+
+            /*
+             * Cells and boxes first, so a shaded cell sits under its text rather than over
+             * it, then the ticks inside the boxes. All outside the text object, for the reason
+             * the rules below give.
+             */
+            foreach (var line in lines)
+            {
+                if (!line.IsRect)
+                {
+                    continue;
+                }
+
+                var fill = line.Fill >= 0;
+                var stroke = line.Stroke >= 0;
+                if (!fill && !stroke)
+                {
+                    continue;
+                }
+
+                if (fill)
+                {
+                    content.Append(Num(line.Fill)).Append(" g\n");
+                }
+
+                if (stroke)
+                {
+                    content.Append(Num(line.Weight)).Append(" w ").Append(Num(line.Stroke)).Append(" G\n");
+                }
+
+                content.Append(Num(line.X)).Append(' ').Append(Num(line.Y)).Append(' ')
+                    .Append(Num(line.Span)).Append(' ').Append(Num(line.Height))
+                    .Append(fill && stroke ? " re B\n" : fill ? " re f\n" : " re S\n");
+            }
+
+            foreach (var line in lines)
+            {
+                if (!line.IsTick)
+                {
+                    continue;
+                }
+
+                // A check mark inside the box: down to the lower third, then up to the far corner.
+                content.Append("1.2 w 0 G 1 J 1 j\n");
+                content.Append(Num(line.X + 1.6)).Append(' ').Append(Num(line.Y + 4.3)).Append(" m\n");
+                content.Append(Num(line.X + 3.3)).Append(' ').Append(Num(line.Y + 2.1)).Append(" l\n");
+                content.Append(Num(line.X + 6.7)).Append(' ').Append(Num(line.Y + 6.6)).Append(" l\nS\n");
+                content.Append("0 J 0 j\n");
+            }
+
+            content.Append("0 g\n");
 
             /*
              * Rules first, outside the text object. BT ... ET may hold text operators only, so
@@ -642,7 +1357,7 @@ namespace OutcomeTesting.Plugins
 
             foreach (var line in lines)
             {
-                if (line.IsRule || string.IsNullOrEmpty(line.Text))
+                if (line.IsRule || line.IsRect || line.IsTick || string.IsNullOrEmpty(line.Text))
                 {
                     continue;
                 }

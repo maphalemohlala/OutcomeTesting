@@ -187,7 +187,8 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void Text_wraps_within_the_content_width()
         {
-            // Helvetica at 10pt across a 20mm-margin A4 page. Without real widths this is
+            // Helvetica at 10pt across a 15mm-margin A4 page (20mm until 2026-09-24, when the
+            // form's eight-column tables needed the width the page's own printout gives them). Without real widths this is
             // the assertion that fails: a monospace guess wraps visibly wrongly.
             var words = new StringBuilder();
             for (var i = 0; i < 80; i++)
@@ -200,7 +201,7 @@ namespace OutcomeTesting.Plugins.Tests
             foreach (var line in ExtractDrawnText(pdf))
             {
                 Assert.True(
-                    PdfWriter.Width(line, "F1", 10) <= 595.28 - (2 * 56.7) + 0.5,
+                    PdfWriter.Width(line, "F1", 10) <= 595.28 - (2 * 42.5) + 0.5,
                     "line ran past the margin: " + line);
             }
         }

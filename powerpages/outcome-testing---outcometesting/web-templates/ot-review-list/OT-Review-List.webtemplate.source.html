@@ -88,6 +88,8 @@
       <attribute name="al_casereference" />
       <attribute name="al_clientname" />
       <attribute name="al_advisername" />
+      <attribute name="al_taxcheckername" />
+      <attribute name="al_aqscheckername" />
       <attribute name="al_duedate" />
       {% comment %}
         The route is the case's, so it is read through the case rather than off the review.
@@ -152,6 +154,8 @@
       <attribute name="al_casereference" />
       <attribute name="al_clientname" />
       <attribute name="al_advisername" />
+      <attribute name="al_taxcheckername" />
+      <attribute name="al_aqscheckername" />
       <attribute name="al_duedate" />
       <attribute name="al_aqsqueuedon" />
       <attribute name="createdon" />
@@ -209,6 +213,8 @@
                 <th scope="col">Case reference</th>
                 <th scope="col">Client</th>
                 <th scope="col">Adviser</th>
+                <th scope="col">Tax checker</th>
+                <th scope="col">AQS checker</th>
                 <th scope="col">Days in OTIS</th>
                 <th scope="col">Waiting for AQS</th>
                 <th scope="col">Due</th>
@@ -229,6 +235,10 @@
                     </td>
                     <td>{{ c.al_clientname | escape }}</td>
                     <td>{{ c.al_advisername | escape }}</td>
+                    {% capture tax_checker %}{{ c.al_taxcheckername }}{% endcapture %}
+                    {% capture aqs_checker %}{{ c.al_aqscheckername }}{% endcapture %}
+                    <td>{% if tax_checker != '' %}{{ tax_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
+                    <td>{% if aqs_checker != '' %}{{ aqs_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
                     <td><span data-ot-workdays data-from="{{ c.createdon | date: 'yyyy-MM-dd' }}">—</span></td>
                     <td><span data-ot-workdays data-from="{{ c.al_aqsqueuedon | date: 'yyyy-MM-dd' }}">—</span></td>
                     <td>{{ c.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
@@ -345,6 +355,8 @@
                 <th scope="col">Case reference</th>
                 <th scope="col">Client</th>
                 <th scope="col">Adviser</th>
+                <th scope="col">Tax checker</th>
+                <th scope="col">AQS checker</th>
                 <th scope="col">Route</th>
                 <th scope="col">Review</th>
                 <th scope="col">Sequence</th>
@@ -370,6 +382,11 @@
                   </td>
                   <td>{{ r['case.al_clientname'] | escape }}</td>
                   <td>{{ r['case.al_advisername'] | escape }}</td>
+                  {% comment %}Who each check is allocated to (project owner, 2026-09-24), as the case list shows it.{% endcomment %}
+                  {% capture tax_checker %}{{ r['case.al_taxcheckername'] }}{% endcapture %}
+                  {% capture aqs_checker %}{{ r['case.al_aqscheckername'] }}{% endcapture %}
+                  <td>{% if tax_checker != '' %}{{ tax_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
+                  <td>{% if aqs_checker != '' %}{{ aqs_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
                   <td>{{ r['route.al_name'] | default: '—' | escape }}</td>
                   <td><a href="/review?id={{ r.al_reviewinstanceid }}">{{ r.al_name | default: 'Open review' | escape }}</a></td>
                   <td>{{ r.al_sequence | default: '—' }}</td>

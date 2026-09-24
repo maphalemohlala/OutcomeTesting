@@ -6,6 +6,7 @@ import { OutcomeIndicator } from '../../components/status/OutcomeIndicator';
 import { OUTCOMES } from '../../types/domain';
 import { COMPLETED_CASE_HEADERS, completedCaseRow } from '../cases/caseExport';
 import { useCaseWorklist } from '../cases/useCaseWorklist';
+import { checkerLabel } from '../cases/checkerNames';
 import './CompletedCaseReport.css';
 
 /** The check date is the business date of the report; where it is missing, intake date stands in. */
@@ -137,6 +138,9 @@ export function CompletedCaseReport() {
               <th scope="col">Case</th>
               <th scope="col">Client</th>
               <th scope="col">Adviser</th>
+              {/* Who each check was allocated to (project owner, 2026-09-24). */}
+              <th scope="col">Tax checker</th>
+              <th scope="col">AQS checker</th>
               <th scope="col">Product / solution type</th>
               <th scope="col">Check date</th>
               <th scope="col">Initial outcome</th>
@@ -146,7 +150,7 @@ export function CompletedCaseReport() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="completed__empty">
+                <td colSpan={9} className="completed__empty">
                   No completed cases match your current filters.
                 </td>
               </tr>
@@ -158,6 +162,8 @@ export function CompletedCaseReport() {
                   </th>
                   <td>{item.client ?? '—'}</td>
                   <td>{item.adviser ?? '—'}</td>
+                  <td>{checkerLabel(item.taxChecker, item.route, 'Tax')}</td>
+                  <td>{checkerLabel(item.aqsChecker, item.route, 'AQS')}</td>
                   <td>{item.productSolutionType ?? '—'}</td>
                   <td>{reportDate(item) || '—'}</td>
                   <td>

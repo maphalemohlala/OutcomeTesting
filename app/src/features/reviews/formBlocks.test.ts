@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formBlocks, type FailPoint } from './checklistForm';
+import { formBlocks, offers, onGridScale, type FailPoint } from './checklistForm';
 import type { FormRow, ReviewSection } from './reviewSections';
 
 /**
@@ -63,9 +63,37 @@ describe('formBlocks', () => {
     expect(suitability.options.map((o) => o.label)).toEqual(['Pass', 'Fail', 'Insufficient evidence']);
     expect(suitability.intro).toContain('consistent Pass/Fail format');
     expect(suitability.groups.map((g) => [g.heading, g.lens, g.rows.map((r) => r.key)])).toEqual([
-      ['E1. Client Objectives & Information (COBS 9.2)', 'Lens one', ['e1']],
-      ['E2. Risk, Capacity & Loss (COBS 9.2 / FG)', 'Lens two', ['e2']],
+      // By name alone from 2026-09-24, not "E1. Client Objectives ...".
+      ['Client Objectives & Information (COBS 9.2)', 'Lens one', ['e1']],
+      ['Risk, Capacity & Loss (COBS 9.2 / FG)', 'Lens two', ['e2']],
     ]);
+  });
+
+  it('widens Suitability to an N/A column when one of its rows offers N/A', () => {
+    // Q-E4-03 on 120910012 (2026-09-24). The block opens on E1's plain scale, and the N/A
+    // row further down moves the whole grid onto the widened one rather than off the grid.
+    const widened: ReviewSection[] = [
+      section('S-E1', 'Client Objectives & Information (COBS 9.2)', [row('e1', 120910006)]),
+      section('S-E4', 'Costs, Charges & Value', [row('e4a', 120910006), row('e4c', 120910012)]),
+    ];
+    const suitability = formBlocks(widened, points).find((b) => b.id === 'suitability');
+    expect(suitability?.kind === 'section' && suitability.layout).toBe('grid');
+    expect(suitability?.kind === 'section' && suitability.options.map((o) => o.label)).toEqual([
+      'Pass',
+      'Fail',
+      'Insufficient evidence',
+      'N/A',
+    ]);
+  });
+
+  it('offers N/A only on the rows whose scale carries it', () => {
+    expect(onGridScale(120910006, 120910012)).toBe(true);
+    expect(onGridScale(120910012, 120910012)).toBe(true);
+    expect(onGridScale(120910012, 120910006)).toBe(false);
+    expect(onGridScale(120910008, 120910012)).toBe(false);
+    const na = { value: 120910307, label: 'N/A' };
+    expect(offers(120910012, na)).toBe(true);
+    expect(offers(120910006, na)).toBe(false);
   });
 
   it('heads the AML, CRP and Consumer Duty grids as the document does', () => {
@@ -81,9 +109,10 @@ describe('formBlocks', () => {
       'Centralised Retirement Proposition test point',
       'Complete this section where retirement income planning or decumulation advice is in scope.',
     ]);
+    // No intro from 2026-09-24, even where the section still carries the section H line.
     expect(cd?.kind === 'section' && [cd.columnHeading, cd.intro, cd.options.map((o) => o.label)]).toEqual([
       'Outcome',
-      'Short yes/no judgements only. Record any detail once in section H.',
+      null,
       ['Yes', 'No', 'Insufficient evidence'],
     ]);
   });

@@ -14,7 +14,9 @@ export const Al_questionversionsal_responsetype = {
   120910007: 'Yes / No',
   120910008: 'Yes / No / N/A',
   120910009: 'Yes / No / Insufficient evidence',
-  120910010: 'Grade'
+  120910010: 'Grade',
+  120910012: 'Pass / Fail / Insufficient evidence / N/A',
+  120910013: 'Multi select (root causes)'
 } as const;
 export type Al_questionversionsal_responsetype = keyof typeof Al_questionversionsal_responsetype;
 export const Al_questionversionsstatecode = {

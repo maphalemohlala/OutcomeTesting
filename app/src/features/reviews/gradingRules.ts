@@ -29,6 +29,18 @@ export const ROOT_CAUSE_QUESTION_CODE = 'Q-GR-02';
 export const GRADE_RESPONSE_TYPE = 120910010;
 export const ROOT_CAUSE_RESPONSE_TYPE = 120910003;
 
+/**
+ * The root causes as several ticks (2026-09-24), which Q-GR-02 answers on from its successor
+ * version. The single select stays recognised: reviews submitted before the change hold their
+ * one cause against the earlier version. GradingRules.IsRootCauseResponseType is the server's.
+ */
+export const ROOT_CAUSES_RESPONSE_TYPE = 120910013;
+
+/** Whether a question on this response type is the primary root cause. */
+export function isRootCauseResponseType(responseType: number | null | undefined): boolean {
+  return responseType === ROOT_CAUSE_RESPONSE_TYPE || responseType === ROOT_CAUSES_RESPONSE_TYPE;
+}
+
 /** Pass, as `ResponseRules.ChoicePass` has it. */
 const PASS = 120910300;
 
@@ -107,6 +119,8 @@ export function withoutUnaskedRootCause<T extends SectionedAnswer>(
   if (rootCauseRequired(choiceOn(grade))) return rows;
 
   return rows.filter(
-    (row) => !isQuestion(row, ROOT_CAUSE_RESPONSE_TYPE, ROOT_CAUSE_QUESTION_CODE),
+    (row) =>
+      !isQuestion(row, ROOT_CAUSE_RESPONSE_TYPE, ROOT_CAUSE_QUESTION_CODE) &&
+      !isQuestion(row, ROOT_CAUSES_RESPONSE_TYPE, ROOT_CAUSE_QUESTION_CODE),
   );
 }

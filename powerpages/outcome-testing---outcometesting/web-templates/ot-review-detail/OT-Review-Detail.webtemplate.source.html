@@ -137,6 +137,7 @@
       <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="outer" alias="case">
         <attribute name="al_outcomecaseid" />
         <attribute name="al_casereference" />
+        <attribute name="al_ioreference" />
         <attribute name="al_clientname" />
         <attribute name="al_advisername" />
         <attribute name="al_adviserstatus" />
@@ -669,7 +670,7 @@
           </tr>
           <tr>
             <td class="lbl">Client name / initials</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_clientname" value="{{ rv['case.al_clientname'] | escape }}" aria-label="Client name or initials" /></td>
-            <td class="lbl">IO reference</td><td class="val">{{ rv['case.al_casereference'] | escape }}</td>
+            <td class="lbl">IO reference</td><td class="val">{{ rv['case.al_ioreference'] | escape }}</td>
           </tr>
           <tr>
             <td class="lbl">Pre or post check</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_preorpostcheckid" aria-label="Pre or post check"><option value="">&mdash;</option>{% assign prepost_offered = false %}{% assign prepost_any = false %}{% for o in pre_post_checks.results.entities %}{% assign prepost_any = true %}<option value="{{ o.al_listoptionid }}" {% if held_preorpost and o.al_listoptionid == held_preorpost %}selected{% assign prepost_offered = true %}{% endif %}>{{ o.al_name | escape }}</option>{% endfor %}{% unless prepost_offered %}{% if held_preorpost %}<option value="{{ held_preorpost }}" selected>{{ h_preorpostcheckid.name | escape }}{% if prepost_any %} (retired){% endif %}</option>{% endif %}{% endunless %}</select></td>
@@ -689,7 +690,7 @@
           <tr><td class="lbl">Product / solution type</td><td class="val">{% comment %}The chosen option, else the choice column an un-backfilled case still carries (AD-187).{% endcomment %}{% if h_producttypeid.name %}{{ h_producttypeid.name | escape }}{% else %}{{ h_producttype.label | escape }}{% endif %}</td><td class="lbl">Sample source</td><td class="val">{% if h_samplesourceid.name %}{{ h_samplesourceid.name | escape }}{% else %}{{ h_samplesource.label | escape }}{% endif %}</td></tr>
           <tr><td class="lbl">Tax Checker</td><td class="val">{{ rv['case.al_taxcheckername'] | default: 'Not yet allocated' | escape }}</td><td class="lbl">AQS Checker</td><td class="val">{{ rv['case.al_aqscheckername'] | default: 'Not yet allocated' | escape }}</td></tr>
           <tr><td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' }}</td><td class="lbl"></td><td class="val"></td></tr>
-          <tr><td class="lbl">Client name / initials</td><td class="val">{{ rv['case.al_clientname'] | escape }}</td><td class="lbl">IO reference</td><td class="val">{{ rv['case.al_casereference'] | escape }}</td></tr>
+          <tr><td class="lbl">Client name / initials</td><td class="val">{{ rv['case.al_clientname'] | escape }}</td><td class="lbl">IO reference</td><td class="val">{{ rv['case.al_ioreference'] | escape }}</td></tr>
           <tr><td class="lbl">Pre or post check</td><td class="val">{% if h_preorpostcheckid.name %}{{ h_preorpostcheckid.name | escape }}{% else %}{{ h_prepost.label | escape }}{% endif %}</td><td class="lbl">Vulnerable client?</td><td class="val">{{ h_vulnerable.label | escape }}</td></tr>
           {% endif %}
           {% comment %}
@@ -1104,6 +1105,18 @@
           a loop position. The last block is closed after both loops for the same reason.
         {% endcomment %}
         {% assign first_row = true %}
+        {% comment %}
+          Suitability core checks is one grid across E1 to E5, and its columns are chosen when
+          E1 opens it. The N/A row is in E4 (Q-E4-03), so whether the grid takes an N/A column
+          is decided here, across all five, before the first of them is drawn.
+        {% endcomment %}
+        {% assign suit_na = false %}
+        {% for q in qrows %}
+          {% assign qsc = q['s.al_sectioncode'] %}
+          {% if q.al_responsetype.value == 120910012 %}
+            {% if qsc == 'S-E1' or qsc == 'S-E2' or qsc == 'S-E3' or qsc == 'S-E4' or qsc == 'S-E5' %}{% assign suit_na = true %}{% endif %}
+          {% endif %}
+        {% endfor %}
         {% for sec in sections.results.entities %}
         {% comment %}
           The shape of a section this template does not know, derived once per section
@@ -1114,11 +1127,19 @@
           carries none; sec_mixed is set when two scales meet. Consumed under `unless known`
           below, where the seeded codes have already been recognised.
         {% endcomment %}
+        {% comment %}
+          120910012 is the suitability scale with N/A added (2026-09-24: the CRP rows and the
+          E4 concessions row). It shares a grid with 120910006 rather than breaking it: the
+          scan compares the two as one scale, and a section holding either reads as the N/A
+          scale so its grid takes the fourth column.
+        {% endcomment %}
         {% assign sec_rt = 0 %}
         {% assign sec_mixed = false %}
+        {% assign sec_na = false %}
         {% for q in qrows %}
           {% if q['s.al_sectioncode'] == sec.al_sectioncode %}
             {% assign qrt = q.al_responsetype.value %}
+            {% if qrt == 120910012 %}{% assign sec_na = true %}{% assign qrt = 120910006 %}{% endif %}
             {% if qrt == 120910006 or qrt == 120910008 or qrt == 120910009 %}
               {% if sec_rt == 0 %}
                 {% assign sec_rt = qrt %}
@@ -1128,6 +1149,7 @@
             {% endif %}
           {% endif %}
         {% endfor %}
+        {% if sec_na and sec_rt == 120910006 %}{% assign sec_rt = 120910012 %}{% endif %}
         {% for qv in qrows %}
           {% if qv['s.al_sectioncode'] == sec.al_sectioncode %}
           {% assign sid = qv['s.al_sectionid'] %}
@@ -1208,6 +1230,7 @@
             {% assign blk_title = 'Suitability core checks' %}
             {% assign blk_intro = 'Suitability core checks are shown in a consistent Pass/Fail format against each test point.' %}
             {% assign layout = 'grid' %}{% assign grid_rt = 120910006 %}{% assign grid_col = 'Suitability test point' %}
+            {% if suit_na %}{% assign grid_rt = 120910012 %}{% endif %}
             {% assign subsections = true %}
           {% elsif scode == 'S-CRP' %}
             {% assign known = true %}
@@ -1217,6 +1240,13 @@
           {% elsif scode == 'S-CD' %}
             {% assign known = true %}
             {% assign blk_title = 'Consumer Duty overlay' %}
+            {% comment %}
+              No intro line from 2026-09-24 (project owner): "Short yes/no judgements only.
+              Record any detail once in section H." is gone, and the section H it pointed at
+              never existed in V8. Set here as well as cleared from the section's help text,
+              so an environment still holding the old text does not print it.
+            {% endcomment %}
+            {% assign blk_intro = '' %}
             {% assign layout = 'grid' %}{% assign grid_rt = 120910009 %}{% assign grid_col = 'Outcome' %}
           {% elsif scode == 'S-GRADE' %}
             {% assign known = true %}
@@ -1278,6 +1308,8 @@
             {% if sec_mixed or sec_rt == 0 %}
               {% assign layout = 'inline' %}
               {% assign grid_rt = 0 %}
+            {% elsif grid_rt == 120910012 and sec_rt == 120910006 %}
+              {% comment %}A plain suitability section inside a grid that carries N/A elsewhere: it keeps the N/A grid.{% endcomment %}
             {% elsif sec_rt != grid_rt %}
               {% assign grid_rt = sec_rt %}
             {% endif %}
@@ -1306,6 +1338,13 @@
               {% assign glabels = 'Pass,Fail,Pass with issues' | split: ',' %}
             {% else %}
               {% assign glabels = 'Pass,Fail,Insufficient evidence' | split: ',' %}
+            {% endif %}
+          {% elsif grid_rt == 120910012 %}
+            {% assign gvalues = '120910300,120910301,120910302,120910307' | split: ',' %}
+            {% if is_tax_review %}
+              {% assign glabels = 'Pass,Fail,Pass with issues,N/A' | split: ',' %}
+            {% else %}
+              {% assign glabels = 'Pass,Fail,Insufficient evidence,N/A' | split: ',' %}
             {% endif %}
           {% elsif grid_rt == 120910008 %}
             {% assign gvalues = '120910305,120910306,120910307' | split: ',' %}
@@ -1418,7 +1457,8 @@
               {% if current_section != '' and prev_help != blank %}
                 <tr class="lens"{% if lens_tick_id != '' %} data-ot-answer data-question-version="{{ lens_tick_id }}" data-question-code="{{ lens_tick_code | escape }}" data-response-type="120910007" data-column="choice"{% endif %}><td colspan="{{ ncols | minus: lens_tick_span }}"><em>Outcome lens:</em> {{ prev_help | escape }}</td>{{ lens_tick_cell }}</tr>{% assign lens_tick_id = '' %}{% assign lens_tick_code = '' %}{% assign lens_tick_cell = '' %}{% assign lens_tick_span = 0 %}
               {% endif %}
-              <tr class="section"><td colspan="{{ ncols }}">{{ scode | remove_first: 'S-' }}. {{ sname | escape }}{% if soptional %} <span class="ot-optional">Optional</span>{% endif %}</td></tr>
+              {% comment %}Headed by the section's name alone from 2026-09-24 (project owner): "Client Objectives &amp; Information (COBS 9.2)", not "E1. Client Objectives ...".{% endcomment %}
+              <tr class="section"><td colspan="{{ ncols }}">{{ sname | escape }}{% if soptional %} <span class="ot-optional">Optional</span>{% endif %}</td></tr>
             {% endif %}
             {% assign current_section = sid %}
             {% assign prev_help = shelp %}
@@ -1458,6 +1498,16 @@
           {% endif %}
 
           {% assign qcode = qv['q.al_questioncode'] %}
+          {% comment %}
+            Whether this row draws in the grid's tick columns. A plain suitability row sits on
+            an N/A grid (2026-09-24) and simply leaves the N/A cell empty, because N/A is not
+            one of its answers.
+          {% endcomment %}
+          {% assign on_scale = false %}
+          {% if blk_layout == 'grid' %}
+            {% if rt == blk_rt %}{% assign on_scale = true %}{% endif %}
+            {% if blk_rt == 120910012 and rt == 120910006 %}{% assign on_scale = true %}{% endif %}
+          {% endif %}
           {% if qcode contains '-LENS' %}
             {% comment %}
               One box, not a Yes / No pair, because that is what the document draws: ticked
@@ -1470,7 +1520,7 @@
             {% assign lens_tick_span = 1 %}
             {% capture lens_tick_cell %}<td class="optcell"><input type="checkbox" class="cc-box" value="120910305" data-ot-input aria-label="{{ qv.al_questiontext | escape }}"{% unless editable %} disabled{% endunless %}{% if chosen_value == '120910305' %} checked{% endif %} /></td>{% endcapture %}
 
-          {% elsif blk_layout == 'grid' and rt == blk_rt %}
+          {% elsif on_scale %}
             <tr data-ot-answer
                 data-question-version="{{ qv_id }}"
                 data-question-id="{{ qv['q.al_questionid'] }}"
@@ -1481,11 +1531,15 @@
                 data-column="choice">
               <td class="label">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></td>
               {% for v in gvalues %}
+                {% if v == '120910307' and rt == 120910006 %}
+                <td class="optcell"></td>
+                {% else %}
                 <td class="optcell"><input type="radio" class="cc-box" name="q-{{ qv_id }}" id="q-{{ qv_id }}-{{ v }}" value="{{ v }}" data-ot-input{% unless editable %} disabled{% endunless %}{% if chosen_value == v %} checked{% endif %} /><label class="sr-only" for="q-{{ qv_id }}-{{ v }}">{{ qv.al_questiontext | escape }}: {{ glabels[forloop.index0] }}</label></td>
+                {% endif %}
               {% endfor %}
             </tr>
 
-          {% elsif rt == 120910003 %}
+          {% elsif rt == 120910003 or rt == 120910013 %}
             {% comment %}
               Primary root cause. The document lays its nine causes out as a 3x3 grid under
               their own heading rather than as a row of an adjacent table, so it breaks out
@@ -1510,6 +1564,8 @@
               the grade would be unreached here, and the block is drawn in that case, which is
               the direction that leaves a checker able to answer.
             {% endcomment %}
+            {% assign rc_chosen = '' %}
+            {% for c in existing.al_answerchoices %}{% assign rc_chosen = rc_chosen | append: '|' | append: c.value | append: '|' %}{% endfor %}
             {% assign hide_rootcause = false %}
             {% if grade_seen %}
               {% if grade_value == '' or grade_value == '120910300' %}{% assign hide_rootcause = true %}{% endif %}
@@ -1523,12 +1579,23 @@
                    data-section-code="{{ scode | escape }}"
                    data-response-id="{{ existing.al_responseid }}"
                    data-response-type="{{ rt }}"
-                   data-column="choice"{% if hide_rootcause %} hidden{% endif %}>
+                   data-column="{% if rt == 120910013 %}choices{% else %}choice{% endif %}"{% if hide_rootcause %} hidden{% endif %}>
               <tbody>
                 <tr><th colspan="3">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></th></tr>
                 <tr>
                 {% for v in rcvalues %}
+                  {% comment %}
+                    Several causes may be ticked from 2026-09-24 (project owner: "there can be
+                    several"): Q-GR-02's successor version answers on 120910013 in
+                    al_answerchoices, so its boxes are checkboxes. A review answered on the
+                    earlier version keeps its single radio group and reads as it was saved.
+                  {% endcomment %}
+                  {% if rt == 120910013 %}
+                  {% assign rckey = '|' | append: v | append: '|' %}
+                  <td><label class="opt wrap"><input type="checkbox" class="cc-box" value="{{ v }}" aria-label="{{ qv.al_questiontext | escape }}: {{ rclabels[forloop.index0] }}" data-ot-input{% unless editable %} disabled{% endunless %}{% if rc_chosen contains rckey or existing.al_answerchoices contains v or existing.al_answerchoices contains rclabels[forloop.index0] %} checked{% endif %} /> {{ rclabels[forloop.index0] }}</label></td>
+                  {% else %}
                   <td><label class="opt wrap"><input type="radio" class="cc-box" name="q-{{ qv_id }}" value="{{ v }}" aria-label="{{ qv.al_questiontext | escape }}: {{ rclabels[forloop.index0] }}" data-ot-input{% unless editable %} disabled{% endunless %}{% if chosen_value == v %} checked{% endif %} /> {{ rclabels[forloop.index0] }}</label></td>
+                  {% endif %}
                   {% if forloop.index == 3 or forloop.index == 6 %}</tr><tr>{% endif %}
                 {% endfor %}
                 </tr>
@@ -1755,13 +1822,16 @@
             "120910007": { "values": [120910305,120910306], "labels": ["YES","NO"] },
             "120910008": { "values": [120910305,120910306,120910307], "labels": ["YES","NO","N/A"] },
             "120910009": { "values": [120910305,120910306,120910302], "labels": ["YES","NO","INSUFFICIENT EVIDENCE"] },
-            "120910010": { "values": [120910300,120910303,120910302,120910304], "labels": ["PASS","PASS WITH ISSUES","INSUFFICIENT EVIDENCE","POTENTIAL HARM"] }
+            "120910010": { "values": [120910300,120910303,120910302,120910304], "labels": ["PASS","PASS WITH ISSUES","INSUFFICIENT EVIDENCE","POTENTIAL HARM"] },
+            "120910012": { "values": [120910300,120910301,120910302,120910307], "labels": ["PASS","FAIL","INSUFFICIENT EVIDENCE","N/A"] }
           },
           "grid": {
             {% if is_tax_review %}
             "120910006": { "labels": ["Pass","Fail","Pass with issues"] },
+            "120910012": { "labels": ["Pass","Fail","Pass with issues","N/A"] },
             {% else %}
             "120910006": { "labels": ["Pass","Fail","Insufficient evidence"] },
+            "120910012": { "labels": ["Pass","Fail","Insufficient evidence","N/A"] },
             {% endif %}
             "120910008": { "labels": ["Yes","No","N/A"] },
             "120910009": { "labels": ["Yes","No","Insufficient evidence"] }
@@ -3831,6 +3901,17 @@
         })();
       </script>
     {% endif %}
+
+    {% comment %}
+      Back to the queue the check came from (project owner, 2026-09-24), at the foot of the
+      form where a checker finishes. A Tax check goes back to the Tax reviews page and every
+      other check to the AQS one: those pages hold both the shared queue and the reviews
+      allocated to the checker. A plain link, so it works on a submitted, read-only review as
+      well, and .ot-btn keeps it out of the printed copy.
+    {% endcomment %}
+    <p class="ot-page-foot">
+      <a class="ot-btn" href="{% if is_tax_review %}/tax-reviews{% else %}/aqs-reviews{% endif %}">Back to your queue</a>
+    </p>
 
     {% comment %}
       Saving the Tax team's two header fields. Rendered only where the controls are: a Tax

@@ -27,7 +27,16 @@ export const Al_responsesal_answerchoices = {
   120910341: 'Trust',
   120910342: 'IHT',
   120910343: 'Tax calculation',
-  120910344: 'Other'
+  120910344: 'Other',
+  120910320: 'FactFind quality',
+  120910321: 'Risk / capacity mismatch',
+  120910322: 'Research / rationale',
+  120910323: 'Charges / value',
+  120910324: 'Client communication',
+  120910325: 'Process / documentation',
+  120910326: 'AML / CRA',
+  120910327: 'Retirement Proposition',
+  120910328: 'Adviser judgement'
 } as const;
 export type Al_responsesal_answerchoices = keyof typeof Al_responsesal_answerchoices;
 export const Al_responsesstatecode = {

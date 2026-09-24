@@ -50,6 +50,22 @@ const NA = { value: 120910307, label: 'N/A' };
  * ResponseRules.PermittedChoices, which is the authority. Single select is the Primary
  * root cause list (AD-055); multi select is the Tax check reason list.
  */
+const ROOT_CAUSES: ChoiceOption[] = [
+  { value: 120910320, label: 'FactFind quality' },
+  { value: 120910321, label: 'Risk / capacity mismatch' },
+  { value: 120910322, label: 'Research / rationale' },
+  { value: 120910323, label: 'Charges / value' },
+  { value: 120910324, label: 'Client communication' },
+  { value: 120910325, label: 'Process / documentation' },
+  { value: 120910326, label: 'AML / CRA' },
+  { value: 120910327, label: 'Retirement Proposition' },
+  { value: 120910328, label: 'Adviser judgement' },
+];
+
+/** The suitability scale, and the same scale with N/A (2026-09-24: CRP and Q-E4-03). */
+export const PASS_FAIL_INSUFFICIENT = 120910006;
+export const PASS_FAIL_INSUFFICIENT_NA = 120910012;
+
 export const SCALE_OPTIONS: Record<number, ChoiceOption[]> = {
   120910005: [PASS, FAIL],
   120910006: [PASS, FAIL, INSUFFICIENT],
@@ -57,17 +73,10 @@ export const SCALE_OPTIONS: Record<number, ChoiceOption[]> = {
   120910008: [YES, NO, NA],
   120910009: [YES, NO, INSUFFICIENT],
   120910010: [PASS, PASS_WITH_ISSUES, INSUFFICIENT, POTENTIAL_HARM],
-  120910003: [
-    { value: 120910320, label: 'FactFind quality' },
-    { value: 120910321, label: 'Risk / capacity mismatch' },
-    { value: 120910322, label: 'Research / rationale' },
-    { value: 120910323, label: 'Charges / value' },
-    { value: 120910324, label: 'Client communication' },
-    { value: 120910325, label: 'Process / documentation' },
-    { value: 120910326, label: 'AML / CRA' },
-    { value: 120910327, label: 'Retirement Proposition' },
-    { value: 120910328, label: 'Adviser judgement' },
-  ],
+  120910012: [PASS, FAIL, INSUFFICIENT, NA],
+  120910003: ROOT_CAUSES,
+  // Several root causes at once from 2026-09-24: Q-GR-02's successor version.
+  120910013: ROOT_CAUSES,
   120910004: [
     { value: 120910340, label: 'LSA/LSDBA/TTFAC' },
     { value: 120910341, label: 'Trust' },
@@ -78,7 +87,27 @@ export const SCALE_OPTIONS: Record<number, ChoiceOption[]> = {
 };
 
 /** The three-column scales that the document lays out as a tick grid. */
-const GRID_SCALES = new Set([120910005, 120910006, 120910007, 120910008, 120910009]);
+const GRID_SCALES = new Set([120910005, 120910006, 120910007, 120910008, 120910009, 120910012]);
+
+/**
+ * Whether a row on `rowScale` draws in the tick columns of a grid headed by `gridScale`.
+ *
+ * The same scale, or a plain suitability row on the N/A grid: the N/A scale is the
+ * suitability scale with a fourth column, so the two share one table and a row that does not
+ * offer N/A leaves that cell empty (2026-09-24). The portal and the emailed PDF read it alike.
+ */
+export function onGridScale(rowScale: number | null, gridScale: number | null): boolean {
+  if (rowScale == null || gridScale == null) return false;
+  return (
+    rowScale === gridScale ||
+    (gridScale === PASS_FAIL_INSUFFICIENT_NA && rowScale === PASS_FAIL_INSUFFICIENT)
+  );
+}
+
+/** Whether the row's own scale offers this option, so its grid cell carries a box. */
+export function offers(rowScale: number | null, option: ChoiceOption): boolean {
+  return optionsFor(rowScale).some((own) => own.value === option.value);
+}
 
 export function optionsFor(
   responseTypeValue: number | null,
@@ -112,7 +141,7 @@ export function optionsFor(
  * the option, and only this path applies it. The root cause list is title case in the
  * document and is deliberately absent.
  */
-const UPPER_CASE_INLINE = new Set([120910005, 120910006, 120910007, 120910010]);
+const UPPER_CASE_INLINE = new Set([120910005, 120910006, 120910007, 120910010, 120910012]);
 
 /**
  * The tax check outcome as the document orders it: PASS, PASS WITH ISSUES, FAIL. The
@@ -144,6 +173,7 @@ const INLINE_ORDER: Record<number, number[]> = {
  */
 const INLINE_LABELS: Record<number, Record<number, string>> = {
   120910006: { 120910302: 'Pass with issues' },
+  120910012: { 120910302: 'Pass with issues' },
 };
 
 /**
@@ -194,7 +224,7 @@ export function inlineOptionsFor(
  * three, read left to right.
  */
 export function optionGridColumns(responseTypeValue: number | null): number | null {
-  return responseTypeValue === 120910003 ? 3 : null;
+  return responseTypeValue === 120910003 || responseTypeValue === 120910013 ? 3 : null;
 }
 
 /**
@@ -581,6 +611,12 @@ interface BlockSpec {
   scale?: number;
   /** Each section in the block is a subsection with its own heading row and outcome lens. */
   subsections?: boolean;
+  /**
+   * Prints no intro line even where the section carries help text. Consumer Duty's
+   * "Short yes/no judgements only. Record any detail once in section H." went on
+   * 2026-09-24 (project owner); the section H it named never existed in V8.
+   */
+  noIntro?: boolean;
 }
 
 const SUITABILITY: BlockSpec = {
@@ -625,13 +661,17 @@ const BLOCKS: Record<string, BlockSpec> = {
     layout: 'grid',
     columnHeading: 'Outcome',
     scale: 120910009,
+    noIntro: true,
   },
   'S-GRADE': { id: 'grade', title: 'Checker judgement and grading', layout: 'inline' },
 };
 
 export interface FormGroup<T extends SectionedAnswer = SectionedAnswer> {
   id: string;
-  /** The subsection heading, e.g. "E1. Client Objectives & Information (COBS 9.2)"; null when the block has none. */
+  /**
+   * The subsection heading - the section's name alone, e.g. "Client Objectives & Information
+   * (COBS 9.2)" (2026-09-24; it was "E1. Client ..."); null when the block has none.
+   */
   heading: string | null;
   rows: FormRow<T>[];
   /** The document's "Outcome lens" line under the subsection; null when it has none. */
@@ -704,10 +744,7 @@ export function formBlocks<T extends SectionedAnswer>(
     const visible = withoutUnaskedRootCause(section.rows);
     const group: FormGroup<T> = {
       id: section.id,
-      heading:
-        spec?.subsections && section.code
-          ? `${section.code.replace(/^S-/, '')}. ${section.name}`
-          : null,
+      heading: spec?.subsections ? section.name : null,
       rows: lensTick ? visible.filter((row) => row !== lensTick) : visible,
       lens: spec?.subsections ? section.helpText : null,
       lensTick,
@@ -733,10 +770,20 @@ export function formBlocks<T extends SectionedAnswer>(
     const scaled = group.rows.filter(
       (row) => row.responseTypeValue != null && GRID_SCALES.has(row.responseTypeValue),
     );
+    // The N/A scale widens the suitability scale rather than leaving it: a block declared on
+    // one takes the other's rows, and a row on the N/A scale moves the block onto it.
+    const widened =
+      declared === PASS_FAIL_INSUFFICIENT &&
+      scaled.some((row) => row.responseTypeValue === PASS_FAIL_INSUFFICIENT_NA);
     const fitsDeclared =
       declared == null ||
       scaled.length === 0 ||
-      scaled.every((row) => row.responseTypeValue === declared);
+      scaled.every(
+        (row) =>
+          row.responseTypeValue === declared ||
+          (declared === PASS_FAIL_INSUFFICIENT &&
+            row.responseTypeValue === PASS_FAIL_INSUFFICIENT_NA),
+      );
 
     const last = blocks[blocks.length - 1];
     if (spec && last && last.kind === 'section' && last.id === spec.id) {
@@ -747,6 +794,8 @@ export function formBlocks<T extends SectionedAnswer>(
       if (!fitsDeclared && last.layout === 'grid') {
         last.layout = 'inline';
         last.options = [];
+      } else if (widened && last.layout === 'grid') {
+        last.options = optionsFor(PASS_FAIL_INSUFFICIENT_NA, isTaxReview);
       }
       continue;
     }
@@ -761,7 +810,7 @@ export function formBlocks<T extends SectionedAnswer>(
         kind: 'section',
         id: spec.id,
         title: spec.title,
-        intro: spec.intro ?? (spec.subsections ? null : section.helpText),
+        intro: spec.noIntro ? null : (spec.intro ?? (spec.subsections ? null : section.helpText)),
         layout: derived ? derived.kind : spec.layout,
         columnHeading: spec.columnHeading ?? 'Check',
         options: derived
@@ -770,7 +819,7 @@ export function formBlocks<T extends SectionedAnswer>(
             : []
           : spec.scale == null
             ? []
-            : optionsFor(spec.scale, isTaxReview),
+            : optionsFor(widened ? PASS_FAIL_INSUFFICIENT_NA : spec.scale, isTaxReview),
         groups: [group],
         isTaxReview,
       });

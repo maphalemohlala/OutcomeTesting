@@ -54,6 +54,19 @@ namespace OutcomeTesting.Plugins
         public const int RootCauseResponseType = 120910003;
 
         /// <summary>
+        /// The root causes as several ticks (project owner, 2026-09-24), which Q-GR-02 answers
+        /// on from its successor version. The single select above stays recognised: reviews
+        /// submitted before the change hold their one cause against the earlier version.
+        /// </summary>
+        public const int RootCausesResponseType = ResponseRules.TypeMultiSelectRootCause;
+
+        /// <summary>Whether a question on this response type is the primary root cause.</summary>
+        public static bool IsRootCauseResponseType(int responseType)
+        {
+            return responseType == RootCauseResponseType || responseType == RootCausesResponseType;
+        }
+
+        /// <summary>
         /// Whether this review still owes a primary root cause.
         ///
         /// Owed for every grade but Pass, including a grade outside the scale: an

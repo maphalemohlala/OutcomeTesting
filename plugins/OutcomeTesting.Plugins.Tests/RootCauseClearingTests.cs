@@ -96,6 +96,32 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Null(update["al_answerchoice"]);
         }
 
+        [Fact]
+        public void A_grade_of_pass_clears_several_root_causes_recorded_as_ticks()
+        {
+            // Q-GR-02 answers in al_answerchoices from 2026-09-24, several causes at once.
+            // A clear that only knew the single-choice column would leave every one of them.
+            var service = Checklist();
+            var row = service.Seed(
+                "al_response",
+                RootCauseResponseId,
+                "al_reviewinstanceid", new EntityReference("al_reviewinstance", ReviewId),
+                "al_questionversionid", new EntityReference("al_questionversion", RootCauseVersionId));
+            row["al_answerchoices"] = new OptionSetValueCollection
+            {
+                new OptionSetValue(FactFindQuality),
+                new OptionSetValue(120910326),
+            };
+
+            ResponseProgressPlugin.ClearRootCauseOnPass(
+                service, GradeAnswer(ResponseRules.ChoicePass), null, ReviewId);
+
+            var update = Assert.Single(service.Updates);
+            Assert.Equal(RootCauseResponseId, update.Id);
+            Assert.True(update.Contains("al_answerchoices"));
+            Assert.Null(update["al_answerchoices"]);
+        }
+
         [Theory]
         [InlineData(ResponseRules.ChoicePassWithIssues)]
         [InlineData(ResponseRules.ChoiceInsufficient)]

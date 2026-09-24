@@ -177,6 +177,8 @@
       <attribute name="al_casereference" />
       <attribute name="al_clientname" />
       <attribute name="al_advisername" />
+      <attribute name="al_taxcheckername" />
+      <attribute name="al_aqscheckername" />
       <attribute name="al_duedate" />
       <order attribute="al_duedate" descending="false" />
     </link-entity>
@@ -314,6 +316,8 @@
             <th scope="col">Check</th>
             <th scope="col">Client</th>
             <th scope="col">Adviser</th>
+            <th scope="col">Tax checker</th>
+            <th scope="col">AQS checker</th>
             <th scope="col">Status</th>
             <th scope="col">Due</th>
             <th scope="col">Submitted</th>
@@ -330,6 +334,16 @@
               <td>{{ r.al_reviewtype.label | escape }}</td>
               <td>{{ r['case.al_clientname'] | escape }}</td>
               <td>{{ r['case.al_advisername'] | escape }}</td>
+              {% comment %}
+                Who each check on the case is allocated to (project owner, 2026-09-24: "all case
+                tables need to show who a case is assigned to"), the same two columns the case
+                list carries. Captured rather than defaulted, for the reason OT Case List gives:
+                a null compared to blank renders as nothing here.
+              {% endcomment %}
+              {% capture tax_checker %}{{ r['case.al_taxcheckername'] }}{% endcapture %}
+              {% capture aqs_checker %}{{ r['case.al_aqscheckername'] }}{% endcapture %}
+              <td>{% if tax_checker != '' %}{{ tax_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
+              <td>{% if aqs_checker != '' %}{{ aqs_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
               <td>{% include 'OT Status Badge' status: r.al_reviewstatus.label %}</td>
               <td>{{ r['case.al_duedate'] | date: 'dd MMM yyyy' }}</td>
               <td>{{ r.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>

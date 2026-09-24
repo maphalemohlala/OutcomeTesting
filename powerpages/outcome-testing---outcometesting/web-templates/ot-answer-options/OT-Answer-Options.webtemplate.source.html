@@ -52,6 +52,10 @@
       {% assign values = '120910300,120910301,120910302' | split: ',' %}
       {% assign labels = 'PASS,FAIL,INSUFFICIENT EVIDENCE' | split: ',' %}
     {% endif %}
+  {% when 120910012 %}
+    {% comment %}The suitability scale with N/A (2026-09-24), drawn inline wherever its grid is not.{% endcomment %}
+    {% assign values = '120910300,120910301,120910302,120910307' | split: ',' %}
+    {% assign labels = 'PASS,FAIL,INSUFFICIENT EVIDENCE,N/A' | split: ',' %}
   {% when 120910007 %}
     {% assign values = '120910305,120910306' | split: ',' %}
     {% assign labels = 'YES,NO' | split: ',' %}

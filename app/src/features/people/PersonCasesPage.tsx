@@ -8,6 +8,7 @@ import { OUTCOMES } from '../../types/domain';
 import { CASE_EXPORT_HEADERS, caseExportRow } from '../cases/caseExport';
 import { useCaseWorklist } from '../cases/useCaseWorklist';
 import { casesForPerson, isPersonRole } from './peopleDirectory';
+import { checkerLabel } from '../cases/checkerNames';
 import './PeoplePage.css';
 
 function day(iso: string | null): string {
@@ -117,6 +118,9 @@ export function PersonCasesPage() {
                   <tr>
                     <th scope="col">Case</th>
                     <th scope="col">Client</th>
+                    {/* Who each check is allocated to (project owner, 2026-09-24). */}
+                    <th scope="col">Tax checker</th>
+                    <th scope="col">AQS checker</th>
                     <th scope="col">Product / solution type</th>
                     <th scope="col">Check date</th>
                     <th scope="col">Status</th>
@@ -133,6 +137,8 @@ export function PersonCasesPage() {
                         <Link to={`/cases/${item.id}`}>{item.caseReference}</Link>
                       </th>
                       <td>{item.client ?? '—'}</td>
+                      <td>{checkerLabel(item.taxChecker, item.route, 'Tax')}</td>
+                      <td>{checkerLabel(item.aqsChecker, item.route, 'AQS')}</td>
                       <td>{item.productSolutionType ?? '—'}</td>
                       <td>{day(item.checkDate)}</td>
                       <td>

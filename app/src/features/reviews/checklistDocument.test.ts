@@ -42,6 +42,20 @@ import {
  *    question the document has never had. Recorded as a difference rather than drawn into
  *    the reference for the reason (3) gives, and asserted by name and position below so a
  *    SECOND undocumented question cannot hide behind it.
+ *
+ * Four more from the project owner's direction of 2026-09-24, recorded the same way and for
+ * the same reason - the reference stays as supplied, and each change is named where it is
+ * asserted:
+ *
+ * 5. The Suitability subsections are headed by their names alone: "Client Objectives &
+ *    Information (COBS 9.2)", where the document reads "E1. Client Objectives ...".
+ * 6. Consumer Duty prints no intro line. The document's "Short yes/no judgements only. Record
+ *    any detail once in section H." is gone; its section H never existed in V8.
+ * 7. The Suitability and CRP grids take an N/A column. Every CRP row offers N/A, and in
+ *    Suitability only Q-E4-03 (concessions) does - both on the 120910012 scale.
+ * 8. Primary root cause takes several ticks. Its options are the document's, unchanged; the
+ *    seed carries a second version of Q-GR-02 on the multi-select type from 2026-09-24, so the
+ *    fixture reads the versions in force today rather than every version seeded.
  */
 
 // ---------------------------------------------------------------------------------------
@@ -157,7 +171,11 @@ const seedQuestions: QuestionRef[] = seedRecords('al_question').map((record) => 
   code: record.fields.al_questioncode,
 }));
 
-const seedVersions: VersionRef[] = seedRecords('al_questionversion').map((record) => ({
+/** In force today: Q-GR-02 has a retired first version and its successor (difference 8). */
+const inForceToday = (record: SeedRecord) =>
+  !record.fields.al_effectiveto || new Date(record.fields.al_effectiveto) > new Date();
+
+const seedVersions: VersionRef[] = seedRecords('al_questionversion').filter(inForceToday).map((record) => ({
   id: record.id,
   questionId: record.fields.al_questionid,
   order: Number(record.fields.al_displayorder),
@@ -250,9 +268,11 @@ describe('the checklist the app draws matches the reference document', () => {
     expect(documentFailReasons.length).toBe(20);
     expect(seedSections.length).toBe(12);
 
-    // 47, not the 46 the document draws: Q-TAX-04 is difference (4) above. Asserted as the
-    // document's count plus exactly one, so the number carries its own reason.
+    // 47 in force, not the 46 the document draws: Q-TAX-04 is difference (4) above. Asserted
+    // as the document's count plus exactly one, so the number carries its own reason. The
+    // seed holds one more - Q-GR-02's retired first version (difference 8).
     expect(seedVersions.length).toBe(46 + 1);
+    expect(seedRecords('al_questionversion')).toHaveLength(46 + 1 + 1);
     expect(seedVersions.filter((version) => version.text === 'Tax Remedial')).toHaveLength(1);
   });
 
@@ -280,7 +300,11 @@ describe('the checklist the app draws matches the reference document', () => {
         : [],
     );
 
-    expect(grids).toEqual(documentGridHeadings);
+    // Difference 7: Suitability and CRP take an N/A column after the document's three.
+    const withNa = new Set(['Suitability test point', 'Centralised Retirement Proposition test point']);
+    expect(grids).toEqual(
+      documentGridHeadings.map((heading) => (withNa.has(heading[0]) ? [...heading, 'N/A'] : heading)),
+    );
   });
 
   it('sets each block’s intro line as the document sets it', () => {
@@ -288,7 +312,8 @@ describe('the checklist the app draws matches the reference document', () => {
       block.kind === 'section' && block.intro ? [block.intro] : [],
     );
 
-    expect(intros).toEqual(documentIntros);
+    // Difference 6: Consumer Duty's section H line is not printed.
+    expect(intros).toEqual(documentIntros.filter((intro) => !intro.includes('section H')));
   });
 
   it('splits Suitability core checks into the document’s subsections, rows and outcome lenses', () => {
@@ -301,7 +326,9 @@ describe('the checklist the app draws matches the reference document', () => {
     const expected: { heading: string; rows: string[]; lens: string; lensTick: boolean }[] = [];
     for (const row of documentRows('suit-rows')) {
       if (row.kind === 'section') {
-        expected.push({ heading: row.label, rows: [], lens: '', lensTick: false });
+        // Difference 5: headed by the name alone, without the document's "E1. " prefix.
+        const heading = row.label.replace(/^E\d\. /, '');
+        expected.push({ heading, rows: [], lens: '', lensTick: false });
       } else if (row.kind === 'lens') {
         expected[expected.length - 1].lens = row.label;
         expected[expected.length - 1].lensTick = row.tickbox;

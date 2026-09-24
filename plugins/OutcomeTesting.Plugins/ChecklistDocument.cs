@@ -161,6 +161,237 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// The line printed under a block's heading: the block's own intro where the document
+        /// gives one, else the section's help text - which is how the review page reads it.
+        ///
+        /// Nothing for Suitability, whose sections carry their help text as the Outcome lens
+        /// row instead, and nothing for Consumer Duty from 2026-09-24: the project owner asked
+        /// for "Short yes/no judgements only. Record any detail once in section H." to go, and
+        /// the section H it pointed at never existed in V8.
+        /// </summary>
+        public static string IntroFor(Block block, string sectionHelp)
+        {
+            if (block == null)
+            {
+                return null;
+            }
+
+            if (!string.IsNullOrWhiteSpace(block.Intro))
+            {
+                return block.Intro;
+            }
+
+            if (block.Subsections || string.Equals(block.Id, "cd", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            return string.IsNullOrWhiteSpace(sectionHelp) ? null : sectionHelp.Trim();
+        }
+
+        /// <summary>
+        /// The tick scale a seeded grid block declares, or 0 for a block that declares none.
+        /// </summary>
+        public static int DeclaredScale(Block block)
+        {
+            if (block == null || block.BlockLayout != Layout.Grid)
+            {
+                return 0;
+            }
+
+            switch (block.Id)
+            {
+                case "amlcra":
+                    return ResponseRules.TypeYesNoNa;
+                case "cd":
+                    return ResponseRules.TypeYesNoInsufficient;
+                default:
+                    return ResponseRules.TypePassFailInsufficient;
+            }
+        }
+
+        /// <summary>
+        /// The scales a block of tick columns is drawn from - the review page reads the same
+        /// four. Plain Pass / Fail and plain Yes / No are drawn inline wherever they appear.
+        /// </summary>
+        public static bool IsTickScale(int responseType)
+        {
+            return responseType == ResponseRules.TypePassFailInsufficient
+                || responseType == ResponseRules.TypeYesNoNa
+                || responseType == ResponseRules.TypeYesNoInsufficient
+                || responseType == ResponseRules.TypePassFailInsufficientNa;
+        }
+
+        /// <summary>
+        /// The one scale a set of rows can share a grid on, or 0 where they cannot.
+        ///
+        /// The N/A scale is the suitability scale with a fourth column, so the two share a
+        /// grid: the grid takes the fourth column, and a row that does not offer N/A leaves
+        /// that cell empty. That is how the E4 concessions row takes N/A without the other
+        /// sixteen Suitability test points being offered one (project owner, 2026-09-24).
+        /// </summary>
+        public static int SharedScale(IEnumerable<int> responseTypes)
+        {
+            var seen = new HashSet<int>();
+            foreach (var type in responseTypes)
+            {
+                if (IsTickScale(type))
+                {
+                    seen.Add(type);
+                }
+            }
+
+            if (seen.Count == 0)
+            {
+                return 0;
+            }
+
+            if (seen.Count == 1)
+            {
+                foreach (var only in seen)
+                {
+                    return only;
+                }
+            }
+
+            var suitability = seen.Count == 2
+                && seen.Contains(ResponseRules.TypePassFailInsufficient)
+                && seen.Contains(ResponseRules.TypePassFailInsufficientNa);
+
+            return suitability ? ResponseRules.TypePassFailInsufficientNa : 0;
+        }
+
+        /// <summary>A labelled option.</summary>
+        public struct Option
+        {
+            public Option(int value, string label)
+            {
+                Value = value;
+                Label = label;
+            }
+
+            public int Value { get; private set; }
+
+            public string Label { get; private set; }
+        }
+
+        /// <summary>
+        /// A grid's tick columns, headed in title case as the document heads them. A Tax
+        /// review reads the suitability scale's third value as "Pass with issues" (AD-055
+        /// amended).
+        /// </summary>
+        public static List<Option> GridOptions(int responseType, bool isTaxReview)
+        {
+            var insufficient = isTaxReview ? "Pass with issues" : "Insufficient evidence";
+            switch (responseType)
+            {
+                case ResponseRules.TypePassFailInsufficient:
+                    return Options(
+                        ResponseRules.ChoicePass, "Pass",
+                        ResponseRules.ChoiceFail, "Fail",
+                        ResponseRules.ChoiceInsufficient, insufficient);
+                case ResponseRules.TypePassFailInsufficientNa:
+                    return Options(
+                        ResponseRules.ChoicePass, "Pass",
+                        ResponseRules.ChoiceFail, "Fail",
+                        ResponseRules.ChoiceInsufficient, insufficient,
+                        ResponseRules.ChoiceNa, "N/A");
+                case ResponseRules.TypeYesNoNa:
+                    return Options(
+                        ResponseRules.ChoiceYes, "Yes",
+                        ResponseRules.ChoiceNo, "No",
+                        ResponseRules.ChoiceNa, "N/A");
+                case ResponseRules.TypeYesNoInsufficient:
+                    return Options(
+                        ResponseRules.ChoiceYes, "Yes",
+                        ResponseRules.ChoiceNo, "No",
+                        ResponseRules.ChoiceInsufficient, "Insufficient evidence");
+                default:
+                    return new List<Option>();
+            }
+        }
+
+        /// <summary>
+        /// A question's options drawn inline beside it, in the document's casing and order -
+        /// the review page's OT Answer Options, option for option. Upper case for the outcome
+        /// scales; title case for the two policy lists.
+        /// </summary>
+        public static List<Option> InlineOptions(int responseType, bool isTaxReview)
+        {
+            switch (responseType)
+            {
+                case ResponseRules.TypePassFail:
+                    return Options(ResponseRules.ChoicePass, "PASS", ResponseRules.ChoiceFail, "FAIL");
+                case ResponseRules.TypePassFailInsufficient:
+                    return isTaxReview
+                        ? Options(
+                            ResponseRules.ChoicePass, "PASS",
+                            ResponseRules.ChoiceInsufficient, "PASS WITH ISSUES",
+                            ResponseRules.ChoiceFail, "FAIL")
+                        : Options(
+                            ResponseRules.ChoicePass, "PASS",
+                            ResponseRules.ChoiceFail, "FAIL",
+                            ResponseRules.ChoiceInsufficient, "INSUFFICIENT EVIDENCE");
+                case ResponseRules.TypePassFailInsufficientNa:
+                    return Options(
+                        ResponseRules.ChoicePass, "PASS",
+                        ResponseRules.ChoiceFail, "FAIL",
+                        ResponseRules.ChoiceInsufficient, "INSUFFICIENT EVIDENCE",
+                        ResponseRules.ChoiceNa, "N/A");
+                case ResponseRules.TypeYesNo:
+                    return Options(ResponseRules.ChoiceYes, "YES", ResponseRules.ChoiceNo, "NO");
+                case ResponseRules.TypeYesNoNa:
+                    return Options(
+                        ResponseRules.ChoiceYes, "YES",
+                        ResponseRules.ChoiceNo, "NO",
+                        ResponseRules.ChoiceNa, "N/A");
+                case ResponseRules.TypeYesNoInsufficient:
+                    return Options(
+                        ResponseRules.ChoiceYes, "YES",
+                        ResponseRules.ChoiceNo, "NO",
+                        ResponseRules.ChoiceInsufficient, "INSUFFICIENT EVIDENCE");
+                case ResponseRules.TypeGrade:
+                    return Options(
+                        ResponseRules.ChoicePass, "PASS",
+                        ResponseRules.ChoicePassWithIssues, "PASS WITH ISSUES",
+                        ResponseRules.ChoiceInsufficient, "INSUFFICIENT EVIDENCE",
+                        ResponseRules.ChoicePotentialHarm, "POTENTIAL HARM");
+                case ResponseRules.TypeMultiSelect:
+                    return Options(
+                        120910340, "LSA/LSDBA/TTFAC",
+                        120910341, "Trust",
+                        120910342, "IHT",
+                        120910343, "Tax calculation",
+                        120910344, "Other");
+                case ResponseRules.TypeSingleSelect:
+                case ResponseRules.TypeMultiSelectRootCause:
+                    return Options(
+                        120910320, "FactFind quality",
+                        120910321, "Risk / capacity mismatch",
+                        120910322, "Research / rationale",
+                        120910323, "Charges / value",
+                        120910324, "Client communication",
+                        120910325, "Process / documentation",
+                        120910326, "AML / CRA",
+                        120910327, "Retirement Proposition",
+                        120910328, "Adviser judgement");
+                default:
+                    return new List<Option>();
+            }
+        }
+
+        private static List<Option> Options(params object[] pairs)
+        {
+            var options = new List<Option>();
+            for (var i = 0; i + 1 < pairs.Length; i += 2)
+            {
+                options.Add(new Option((int)pairs[i], (string)pairs[i + 1]));
+            }
+
+            return options;
+        }
+
+        /// <summary>
         /// Whether this is the block the standalone fail points are drawn immediately before.
         ///
         /// The document places them between the checking points and the File Quality outcome

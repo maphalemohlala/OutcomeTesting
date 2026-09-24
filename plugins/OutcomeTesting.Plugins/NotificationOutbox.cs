@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -170,6 +171,72 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>The column holding the attached document, base64 encoded.</summary>
         public const string AttachmentBodyAttr = "al_attachmentbody";
+
+        /// <summary>
+        /// Separates several attachments on one row, in both columns, in the same order
+        /// (2026-09-24: a Tax then AQS case sends each check as its own file, and the
+        /// remediation as a third). The pipe cannot occur in base64, and
+        /// <c>CompletedCheckPdf</c> replaces it out of a file name, so a split can never cut
+        /// a document in two. A row written before the change holds one of each and splits
+        /// into one.
+        /// </summary>
+        public const string AttachmentSeparator = "|";
+
+        /// <summary>The largest name list al_attachmentname holds.</summary>
+        private const int AttachmentNameLength = 200;
+
+        /// <summary>
+        /// The names joined for the row. A list too long for the column is shortened name by
+        /// name rather than cut at 200 characters: a cut would lose a separator and the drain
+        /// would pair the files with the wrong names.
+        /// </summary>
+        private static string PackNames(List<string> names)
+        {
+            var packed = string.Join(AttachmentSeparator, names.ToArray());
+            if (packed.Length <= AttachmentNameLength)
+            {
+                return packed;
+            }
+
+            var shortened = new List<string>();
+            for (var i = 0; i < names.Count; i++)
+            {
+                shortened.Add("Document " + (i + 1).ToString(System.Globalization.CultureInfo.InvariantCulture) + ".pdf");
+            }
+
+            return string.Join(AttachmentSeparator, shortened.ToArray());
+        }
+
+        /// <summary>
+        /// The attachments a row carries, as (name, base64) pairs. Empty where the row
+        /// carries none, or where the two columns do not pair up - a mismatched row is sent
+        /// without attachments rather than with a document under another's name.
+        /// </summary>
+        public static List<KeyValuePair<string, string>> UnpackAttachments(string names, string bodies)
+        {
+            var pairs = new List<KeyValuePair<string, string>>();
+            if (string.IsNullOrWhiteSpace(names) || string.IsNullOrWhiteSpace(bodies))
+            {
+                return pairs;
+            }
+
+            var nameList = names.Split(AttachmentSeparator[0]);
+            var bodyList = bodies.Split(AttachmentSeparator[0]);
+            if (nameList.Length != bodyList.Length)
+            {
+                return pairs;
+            }
+
+            for (var i = 0; i < nameList.Length; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(nameList[i]) && !string.IsNullOrWhiteSpace(bodyList[i]))
+                {
+                    pairs.Add(new KeyValuePair<string, string>(nameList[i].Trim(), bodyList[i].Trim()));
+                }
+            }
+
+            return pairs;
+        }
 
         /// <summary>
         /// Queues a notification and attaches a case summary to it (Change 2, AD-164).
@@ -441,16 +508,24 @@ namespace OutcomeTesting.Plugins
 
             try
             {
-                var pdf = CompletedCheckPdf.Build(service, caseRef);
-                if (pdf == null || pdf.Length == 0)
+                var documents = CompletedCheckPdf.Documents(service, caseRef);
+                if (documents.Count == 0)
                 {
                     return;
                 }
 
+                var names = new List<string>();
+                var bodies = new List<string>();
+                foreach (var document in documents)
+                {
+                    names.Add(document.Name);
+                    bodies.Add(Convert.ToBase64String(document.Content));
+                }
+
                 service.Update(new Entity(NotificationEntity, notificationId)
                 {
-                    [AttachmentNameAttr] = CompletedCheckPdf.FileName(CaseReference(service, caseRef)),
-                    [AttachmentBodyAttr] = Convert.ToBase64String(pdf),
+                    [AttachmentNameAttr] = PackNames(names),
+                    [AttachmentBodyAttr] = string.Join(AttachmentSeparator, bodies.ToArray()),
                 });
             }
             catch (Exception)

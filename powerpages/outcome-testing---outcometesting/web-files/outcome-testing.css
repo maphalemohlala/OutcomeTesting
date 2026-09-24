@@ -1286,6 +1286,10 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-checklist .grid th.label { width: 55%; }
 .ot-checklist .grid th.opt,
 .ot-checklist .grid td.optcell { width: 15%; text-align: center; }
+/* Four values (the N/A grids, 2026-09-24) share the same 45%: at 15% each they claimed
+   115%, and the browser left the last column, N/A, at its minimum width. */
+.ot-checklist .grid:has(thead th:nth-of-type(5)) th.opt,
+.ot-checklist .grid:has(thead th:nth-of-type(5)) td.optcell { width: 11.25%; }
 .ot-checklist .grid tr.section td { background: var(--band); font-weight: 700; }
 .ot-checklist .grid tr.lens td { background: var(--subband); font-size: 10pt; }
 .ot-checklist .grid tr.lens em { font-style: italic; font-weight: 700; }

@@ -36,6 +36,26 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public const int TypeRichText = 120910011;
 
+        /// <summary>
+        /// Pass, Fail, Insufficient evidence or N/A (project owner, 2026-09-24). The CRP rows
+        /// and the E4 concessions row do not apply to every case, and the suitability scale
+        /// gave a checker no honest answer for one that did not. A superset of
+        /// <see cref="TypePassFailInsufficient"/>, so a question moved onto it keeps every
+        /// answer it already holds. N/A is never a failure (Remediation.IsNonPassAnswer) and
+        /// restricts nothing (ChecklistGating reads values, and N/A is neither of its two).
+        /// </summary>
+        public const int TypePassFailInsufficientNa = 120910012;
+
+        /// <summary>
+        /// The primary root causes, several at once (project owner, 2026-09-24: "there can be
+        /// several"). Its own type rather than a reuse of <see cref="TypeMultiSelect"/>,
+        /// because the permitted list is keyed on the type and a shared type would let the Tax
+        /// check reasons and the root causes answer each other's question. Answered in
+        /// al_answerchoices, which carries the nine causes at the same values
+        /// al_answerchoice gives them, so MI reads one number for one cause either way.
+        /// </summary>
+        public const int TypeMultiSelectRootCause = 120910013;
+
         // al_response.al_answerchoice
         public const int ChoicePass = 120910300;
         public const int ChoiceFail = 120910301;
@@ -81,8 +101,10 @@ namespace OutcomeTesting.Plugins
                 case TypeDate:
                     return AnswerColumn.Date;
                 case TypeMultiSelect:
+                case TypeMultiSelectRootCause:
                     return AnswerColumn.Choices;
                 case TypeSingleSelect:
+                case TypePassFailInsufficientNa:
                 case TypePassFail:
                 case TypePassFailInsufficient:
                 case TypeYesNo:
@@ -109,6 +131,8 @@ namespace OutcomeTesting.Plugins
                     return new[] { ChoicePass, ChoiceFail };
                 case TypePassFailInsufficient:
                     return new[] { ChoicePass, ChoiceFail, ChoiceInsufficient };
+                case TypePassFailInsufficientNa:
+                    return new[] { ChoicePass, ChoiceFail, ChoiceInsufficient, ChoiceNa };
                 case TypeYesNo:
                     return new[] { ChoiceYes, ChoiceNo };
                 case TypeYesNoNa:
@@ -124,6 +148,8 @@ namespace OutcomeTesting.Plugins
                     return RootCauses;
                 case TypeMultiSelect:
                     return TaxReasons;
+                case TypeMultiSelectRootCause:
+                    return RootCauses;
                 default:
                     return new int[0];
             }

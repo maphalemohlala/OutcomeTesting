@@ -99,6 +99,8 @@
       <attribute name="al_casereference" />
       <attribute name="al_clientname" />
       <attribute name="al_advisername" />
+      <attribute name="al_taxcheckername" />
+      <attribute name="al_aqscheckername" />
       <attribute name="al_casestatus" />
       {% if f_ref != '' %}<filter type="and"><condition attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" /></filter>{% endif %}
       {% if f_stage == 'open' %}<filter type="or"><condition attribute="al_casestatus" operator="eq" value="120910587" /><condition attribute="al_casestatus" operator="eq" value="120910588" /></filter>{% endif %}
@@ -193,6 +195,8 @@
               <th scope="col">Case</th>
               <th scope="col">Client</th>
               <th scope="col">Adviser</th>
+              <th scope="col">Tax checker</th>
+              <th scope="col">AQS checker</th>
               <th scope="col">Outstanding</th>
               <th scope="col">Earliest target date</th>
               <th scope="col">Case status</th>
@@ -219,6 +223,11 @@
                 </th>
                 <td>{{ c.al_clientname | default: '—' | escape }}</td>
                 <td>{{ c.al_advisername | default: '—' | escape }}</td>
+                {% comment %}Who each check is allocated to (project owner, 2026-09-24), as the case list shows it.{% endcomment %}
+                {% capture tax_checker %}{{ c.al_taxcheckername }}{% endcapture %}
+                {% capture aqs_checker %}{{ c.al_aqscheckername }}{% endcapture %}
+                <td>{% if tax_checker != '' %}{{ tax_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
+                <td>{% if aqs_checker != '' %}{{ aqs_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
                 <td>
                   {% if c_open > 0 %}
                     {{ c_open }} of {{ c_total }} outstanding

@@ -142,6 +142,12 @@ namespace OutcomeTesting.Plugins.Tests
             return e;
         }
 
+        /// <summary>Every row a table holds, for fixtures that look rows up by value.</summary>
+        public IEnumerable<Entity> All(string logicalName)
+        {
+            return new List<Entity>(Table(logicalName).Values);
+        }
+
         public Entity Row(string logicalName, Guid id)
         {
             Entity found;

@@ -164,7 +164,8 @@ describe('the Code App review page draws the document’s headings', () => {
       if (heading === 'File Quality - Tax check section') continue;
       expected.push(`H2  ${heading}`);
       if (heading === 'Suitability core checks') {
-        for (const band of documentBands) expected.push(`BAND  ${band}`);
+        // Headed by name alone from 2026-09-24: the document's "E1. " prefix is dropped.
+        for (const band of documentBands) expected.push(`BAND  ${band.replace(/^E[0-9]\. /, '')}`);
       }
     }
 
@@ -209,8 +210,9 @@ describe('the Code App review page draws the document’s headings', () => {
 
     expect(heads).toEqual([
       ['Check', 'Yes', 'No', 'N/A'],
-      ['Suitability test point', 'Pass', 'Fail', 'Insufficient evidence'],
-      ['Centralised Retirement Proposition test point', 'Pass', 'Fail', 'Insufficient evidence'],
+      // The N/A column (2026-09-24): Q-E4-03 in Suitability, every row of CRP.
+      ['Suitability test point', 'Pass', 'Fail', 'Insufficient evidence', 'N/A'],
+      ['Centralised Retirement Proposition test point', 'Pass', 'Fail', 'Insufficient evidence', 'N/A'],
       ['Outcome', 'Yes', 'No', 'Insufficient evidence'],
     ]);
   });

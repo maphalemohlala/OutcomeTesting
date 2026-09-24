@@ -24,6 +24,10 @@ Nothing about any environment is committed here. Set what you are pointing at:
 | `OT_CASE_MAPPED_ELSEWHERE` | A case **with actions awaiting sign-off** whose adviser maps to somebody else. |
 | `OT_REVIEW_URL` | An **editable** review page — one assigned to the signed-in user. |
 | `OT_ACTION_ID` | A remedial action id, for the Web API allowlist spec. |
+| `OT_CODEAPP_URL` | The Code App's player URL (`https://apps.powerapps.com/play/e/<env>/app/<appId>`), for `code-app.e2e.ts`. The portal session file carries the Entra cookies it needs. |
+| `OT_REVIEW_ID` | An AQS review the Code App opens read-only, for `code-app.e2e.ts`. |
+| `OT_PERSON_NAME` | A checker who holds cases, for the Code App person page. |
+| `OT_KEEP_ROOT_CAUSES` | `1` leaves the two root causes `checker-feedback.e2e.ts` saves, so they can be read back from Dataverse (answers carry no audit history). |
 
 Then:
 

@@ -92,7 +92,7 @@ namespace OutcomeTesting.Plugins.Tests
                 occurrence: null, templateCode: NotificationTemplates.CasePassed);
 
             var row = Queued(service).Single();
-            Assert.Equal("Completed check OT-2026-0417.pdf", row.AttachmentName);
+            Assert.Equal("AQS check OT-2026-0417.pdf", row.AttachmentName);
             Assert.False(string.IsNullOrWhiteSpace(row.AttachmentBody));
         }
 
@@ -169,6 +169,15 @@ namespace OutcomeTesting.Plugins.Tests
                 "al_clientname", "A. Client",
                 "al_advisername", "Adviser User 1",
                 "al_adviseremail", "adviser@example.com",
+                "statecode", 0);
+
+            // A submitted check, which is what there is to attach: one file per check from
+            // 2026-09-24, and a case with none sends its letter with nothing attached.
+            service.Seed("al_reviewinstance", Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_reviewtype", new OptionSetValue(ResponseRules.ReviewTypeAqs),
+                "al_sequence", 1,
+                "al_submittedon", new DateTime(2026, 9, 20, 9, 0, 0, DateTimeKind.Utc),
                 "statecode", 0);
             return service;
         }

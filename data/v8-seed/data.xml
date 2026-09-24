@@ -105,7 +105,6 @@
         <field name="al_displayorder" value="10" />
         <field name="al_ownerrole" value="120910101" />
         <field name="al_isconditional" value="False" />
-        <field name="al_helptext" value="Short yes/no judgements only. Record any detail once in section H." />
         <field name="al_checklistversionid" lookupentity="al_checklistversion" value="22220000-0000-4c00-8000-000000000008" />
       </record>
       <record id="33330000-0000-4c00-8000-000000000011">
@@ -723,7 +722,7 @@
         <field name="al_displayorder" value="3" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000025" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000026">
@@ -789,7 +788,7 @@
         <field name="al_displayorder" value="1" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000031" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000032">
@@ -800,7 +799,7 @@
         <field name="al_displayorder" value="2" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000032" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000033">
@@ -811,7 +810,7 @@
         <field name="al_displayorder" value="3" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000033" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000034">
@@ -822,7 +821,7 @@
         <field name="al_displayorder" value="4" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000034" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000035">
@@ -887,8 +886,20 @@
         <field name="al_versionnumber" value="1" />
         <field name="al_displayorder" value="2" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
+        <field name="al_effectiveto" value="2026-09-24T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
         <field name="al_responsetype" value="120910003" />
+        <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000040" />
+      </record>
+      <record id="55550000-0000-4c00-8000-000000000096">
+        <field name="al_name" value="Q-GR-02 v2" />
+        <field name="al_questionversioncode" value="Q-GR-02-V2" />
+        <field name="al_questiontext" value="Primary root cause" />
+        <field name="al_versionnumber" value="2" />
+        <field name="al_displayorder" value="2" />
+        <field name="al_effectivefrom" value="2026-09-24T00:00:00Z" />
+        <field name="al_ismandatory" value="True" />
+        <field name="al_responsetype" value="120910013" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000040" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000041">

@@ -222,6 +222,7 @@ namespace OutcomeTesting.Plugins
         {
             return responseType == ResponseRules.TypePassFail
                 || responseType == ResponseRules.TypePassFailInsufficient
+                || responseType == ResponseRules.TypePassFailInsufficientNa
                 || responseType == ResponseRules.TypeYesNoInsufficient
                 || responseType == ResponseRules.TypeYesNoNa;
         }
@@ -231,6 +232,7 @@ namespace OutcomeTesting.Plugins
         {
             ResponseRules.TypePassFail,
             ResponseRules.TypePassFailInsufficient,
+            ResponseRules.TypePassFailInsufficientNa,
             ResponseRules.TypeYesNoInsufficient,
             ResponseRules.TypeYesNoNa,
         };

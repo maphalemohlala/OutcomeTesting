@@ -215,6 +215,51 @@
                   <label description="Other" languagecode="1033" />
                 </labels>
               </option>
+              <option value="120910320" IsHidden="0">
+                <labels>
+                  <label description="FactFind quality" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910321" IsHidden="0">
+                <labels>
+                  <label description="Risk / capacity mismatch" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910322" IsHidden="0">
+                <labels>
+                  <label description="Research / rationale" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910323" IsHidden="0">
+                <labels>
+                  <label description="Charges / value" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910324" IsHidden="0">
+                <labels>
+                  <label description="Client communication" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910325" IsHidden="0">
+                <labels>
+                  <label description="Process / documentation" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910326" IsHidden="0">
+                <labels>
+                  <label description="AML / CRA" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910327" IsHidden="0">
+                <labels>
+                  <label description="Retirement Proposition" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910328" IsHidden="0">
+                <labels>
+                  <label description="Adviser judgement" languagecode="1033" />
+                </labels>
+              </option>
             </options>
           </optionset>
           <displaynames>

@@ -1,191 +1,127 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Globalization;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
 namespace OutcomeTesting.Plugins
 {
     /// <summary>
-    /// The completed check attached to the para-planner's email (Change 2, AD-164, AD-165).
+    /// The documents attached to the para-planner's email (Change 2, AD-164, AD-165; split
+    /// into files 2026-09-24).
     ///
     /// <para>
-    /// Built when the notification is QUEUED rather than when it is sent, which makes it a
-    /// snapshot of the case at the moment the review was submitted. That is what a summary
-    /// attached to a submission letter should be: generating it at send time would attach a
-    /// document describing a case that had moved on, and a re-drain would then send a
-    /// different document under the same letter.
+    /// Built when the notification is QUEUED rather than when it is sent, which makes each a
+    /// snapshot of the case at the moment the review was submitted. A re-drain then sends
+    /// the same documents under the same letter.
     /// </para>
     /// <para>
-    /// <b>It carries the completed check and any remedial actions</b> (AD-165). It did not
-    /// until 2026-09-20: the document deliberately withheld the answers and the grade, on a
-    /// reading of AD-020 that treated the para-planner as somebody who could open the review
-    /// page and should not be handed a way round it. The project owner settled that -
-    /// para-planners have no access to the system at all - so the attachment is not a route
-    /// round a screen they could otherwise reach. It is the only sight of the check they get,
-    /// and without the findings it was a covering note for a document nobody was sending.
+    /// <b>One file per check, and one for the remediation</b> (project owner, 2026-09-24:
+    /// "If it is a tax->aqs, then the reciver need to get a tax and aqs pdf, include
+    /// remediation if there were any remediations completed. a seperate file for each").
+    /// A case routed Tax then AQS sends its Tax check and its AQS check as two files when
+    /// the AQS check is submitted; the Remediation and escalation form goes as a third once
+    /// any action on the case has been completed. Until then all of it was one file.
+    /// </para>
+    /// <para>
+    /// Each check is drawn as the review page prints it (<see cref="CompletedCheck"/>), and
+    /// the remediation as its own page prints it (<see cref="RemediationDocument"/>).
     /// </para>
     /// </summary>
     public static class CompletedCheckPdf
     {
         private const string CaseEntity = "al_outcomecase";
 
-        /// <summary>The file name the recipient sees.</summary>
-        public static string FileName(string caseReference)
+        /// <summary>One attachment: the name the recipient sees, and the PDF.</summary>
+        public sealed class Document
+        {
+            public Document(string name, byte[] content)
+            {
+                Name = name;
+                Content = content;
+            }
+
+            public string Name { get; private set; }
+
+            public byte[] Content { get; private set; }
+        }
+
+        /// <summary>The file name the recipient sees: "AQS check 300000006.pdf".</summary>
+        public static string FileName(string documentName, string caseReference)
         {
             var safe = Sanitise(caseReference);
-            return "Completed check " + (safe.Length == 0 ? "unreferenced" : safe) + ".pdf";
+            return documentName + " " + (safe.Length == 0 ? "unreferenced" : safe) + ".pdf";
         }
 
         /// <summary>
-        /// The document for a case, or null when there is no case to describe.
+        /// The documents for a case, in the order the case was checked, the remediation last.
+        /// Empty when there is no case to describe or nothing submitted on it.
         ///
         /// Never throws. A document is worth having and is not worth losing the letter over,
-        /// so the caller treats null as "send without an attachment" (see
-        /// <c>NotificationOutbox.QueueWithCompletedCheck</c>).
+        /// so the caller sends an empty list as a letter without attachments.
         /// </summary>
-        public static byte[] Build(IOrganizationService service, EntityReference caseRef)
+        public static List<Document> Documents(IOrganizationService service, EntityReference caseRef)
         {
-            var blocks = Blocks(service, caseRef);
-            return blocks == null ? null : PdfWriter.Build(blocks);
-        }
-
-        /// <summary>The document's content, exposed so the layout can be tested without bytes.</summary>
-        public static List<PdfBlock> Blocks(IOrganizationService service, EntityReference caseRef)
-        {
+            var documents = new List<Document>();
             if (caseRef == null)
             {
-                return null;
+                return documents;
             }
 
-            Entity row;
+            string reference;
             try
             {
-                row = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet(
-                    "al_casereference", "al_ioreference", "al_clientname", "al_advisername",
-                    "al_paraplanner", "al_advicedate", "al_duedate", "al_checklistitems",
-                    "al_casestatus", "al_taxcheckrequired"));
+                var row = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet("al_casereference"));
+                reference = row.GetAttributeValue<string>("al_casereference");
             }
             catch (Exception)
             {
-                return null;
+                return documents;
             }
 
-            var reference = row.GetAttributeValue<string>("al_casereference");
-
-            /*
-             * Headed as the form heads itself (project owner, 2026-09-22: "the pdf that goes
-             * to paraplanners needs to match the pdf form in the reviews or export"). It said
-             * "Outcome Testing - completed check", which named the email rather than the
-             * document - and the document is the Checker Checklist.
-             *
-             * The case header is the form's own first block (AD-098), in the order the form
-             * lays it out, so the fields below are the document's and not a covering note's.
-             */
-            var blocks = new List<PdfBlock>
+            foreach (var review in SubmittedReviews(service, caseRef))
             {
-                PdfBlock.Title(ChecklistDocument.Title),
-                PdfBlock.Field("Case reference", Or(reference, "not recorded")),
-                PdfBlock.Field("IO reference", Or(row.GetAttributeValue<string>("al_ioreference"), "not recorded")),
-                PdfBlock.Field("Client name / initials", Or(row.GetAttributeValue<string>("al_clientname"), "not recorded")),
-                PdfBlock.Field("Adviser name", Or(row.GetAttributeValue<string>("al_advisername"), "not recorded")),
-                PdfBlock.Field("Para-planner", Or(row.GetAttributeValue<string>("al_paraplanner"), "not recorded")),
-                PdfBlock.Field(
-                    CaseHeaderRules.AdviceDateLabel,
-                    Date(row.GetAttributeValue<DateTime?>("al_advicedate"))),
-                PdfBlock.Field("Due date", Date(row.GetAttributeValue<DateTime?>("al_duedate"))),
-                PdfBlock.Field("Status", StatusLabel(row.GetAttributeValue<OptionSetValue>("al_casestatus"))),
-                PdfBlock.Spacer(),
-            };
-
-            // The same list the checker sees on the case, and the answer to the question a
-            // para-planner is most likely to have: why this case at all (AD-158).
-            var items = Checklist(row.GetAttributeValue<string>("al_checklistitems"));
-            blocks.Add(PdfBlock.Heading("Why this case was selected"));
-            if (items.Count == 0)
-            {
-                blocks.Add(PdfBlock.Paragraph("No checklist items are recorded against this case."));
-            }
-            else
-            {
-                foreach (var item in items)
+                try
                 {
-                    blocks.Add(PdfBlock.Bullet(item));
+                    var blocks = CompletedCheck.Blocks(service, review.Id);
+                    if (blocks.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    var type = review.GetAttributeValue<OptionSetValue>("al_reviewtype");
+                    documents.Add(new Document(
+                        FileName(CompletedCheck.CheckName(type == null ? (int?)null : type.Value), reference),
+                        PdfWriter.Build(blocks)));
+                }
+                catch (Exception)
+                {
+                    // One check that cannot be drawn does not cost the others.
                 }
             }
 
-            var labels = new OptionLabels(service);
-            var reviews = ReviewRows(service, caseRef);
-
-            blocks.Add(PdfBlock.Spacer());
-            blocks.Add(PdfBlock.Heading("Checks on this case"));
-            if (reviews.Count == 0)
+            try
             {
-                blocks.Add(PdfBlock.Bullet("No checks are open on this case."));
-            }
-
-            foreach (var review in reviews)
-            {
-                blocks.Add(PdfBlock.Bullet(IndexLine(review)));
-            }
-
-            /*
-             * The check itself, which is what the para-planner is actually being sent
-             * (Change 2, Change 7). Submitted reviews only - see CompletedCheck.
-             *
-             * Drawn as the FORM from 2026-09-22: the document's blocks, headed and grouped and
-             * ruled the way the checker saw them, with the fail points table in its own place
-             * between the checking points and the File Quality outcome (AD-096). It was a flat
-             * run of section-name-then-answer lines, which carried the same facts in a shape
-             * nobody who had seen the form would recognise.
-             *
-             * The fail points are read per review rather than per case: the intersect is
-             * response-keyed (AD-025), so a case whose Tax and AQS checks each recorded
-             * reasons shows each check its own.
-             */
-            foreach (var review in reviews)
-            {
-                var submitted = review.GetAttributeValue<DateTime?>("al_submittedon");
-                if (!submitted.HasValue)
+                if (RemediationDocument.AnyCompleted(service, caseRef))
                 {
-                    continue;
+                    var blocks = RemediationDocument.Blocks(service, caseRef, DateTime.UtcNow);
+                    if (blocks.Count > 0)
+                    {
+                        documents.Add(new Document(FileName("Remediation", reference), PdfWriter.Build(blocks, true)));
+                    }
                 }
-
-                var answers = CompletedCheck.Answers(
-                    service, review.Id, labels, CompletedCheck.FailPoints(service, review.Id));
-                if (answers.Count == 0)
-                {
-                    continue;
-                }
-
-                blocks.Add(PdfBlock.Spacer());
-                blocks.Add(PdfBlock.Heading(TypeName(review) + " - submitted " + Date(submitted)));
-                blocks.AddRange(answers);
             }
-
-            // Omitted entirely when there are none, which the requirement asks for in as many
-            // words. A heading with nothing under it reads as a document that failed to load.
-            var remedial = CompletedCheck.RemedialActions(service, caseRef, labels);
-            if (remedial.Count > 0)
+            catch (Exception)
             {
-                blocks.Add(PdfBlock.Spacer());
-                blocks.Add(PdfBlock.Heading("Remedial actions"));
-                blocks.AddRange(remedial);
+                // As above.
             }
 
-            blocks.Add(PdfBlock.Spacer());
-            blocks.Add(PdfBlock.Paragraph(
-                "This document was produced when the review was submitted and describes the case as "
-                + "it stood at that moment. The case record in the portal is the live version."));
-
-            return blocks;
+            return documents;
         }
 
-        /// <summary>The case's reviews, in the order they were checked.</summary>
-        private static List<Entity> ReviewRows(IOrganizationService service, EntityReference caseRef)
+        /// <summary>The case's submitted reviews, in the order they were checked.</summary>
+        private static List<Entity> SubmittedReviews(IOrganizationService service, EntityReference caseRef)
         {
             var reviews = new List<Entity>();
-
             try
             {
                 var query = new QueryExpression("al_reviewinstance")
@@ -197,76 +133,20 @@ namespace OutcomeTesting.Plugins
                 query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
                 query.AddOrder("al_sequence", OrderType.Ascending);
 
-                reviews.AddRange(service.RetrieveMultiple(query).Entities);
+                foreach (var review in service.RetrieveMultiple(query).Entities)
+                {
+                    if (review.GetAttributeValue<DateTime?>("al_submittedon").HasValue)
+                    {
+                        reviews.Add(review);
+                    }
+                }
             }
             catch (Exception)
             {
-                // A document missing one section is better than no document, and better than
-                // a submit that failed because one could not be drawn.
-                return reviews;
+                reviews.Clear();
             }
 
             return reviews;
-        }
-
-        /// <summary>Which check this is.</summary>
-        private static string TypeName(Entity review)
-        {
-            var type = review.GetAttributeValue<OptionSetValue>("al_reviewtype");
-            return type != null && type.Value == ResponseRules.ReviewTypeTax ? "Tax check" : "AQS check";
-        }
-
-        /// <summary>One line for the index: which check, and where it has got to.</summary>
-        private static string IndexLine(Entity review)
-        {
-            var submitted = review.GetAttributeValue<DateTime?>("al_submittedon");
-            return TypeName(review) + " - " + (submitted.HasValue
-                ? "submitted " + Date(submitted)
-                : "not yet submitted");
-        }
-
-        /// <summary>The ticked items, one per line, as the case stores them.</summary>
-        private static List<string> Checklist(string raw)
-        {
-            var items = new List<string>();
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                return items;
-            }
-
-            foreach (var line in raw.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
-            {
-                var trimmed = line.Trim();
-                if (trimmed.Length > 0)
-                {
-                    items.Add(trimmed);
-                }
-            }
-
-            return items;
-        }
-
-        private static string StatusLabel(OptionSetValue status)
-        {
-            if (status == null)
-            {
-                return "not recorded";
-            }
-
-            var label = CaseLifecycle.NameOf(status.Value);
-            return string.IsNullOrWhiteSpace(label) ? "not recorded" : label;
-        }
-
-        private static string Date(DateTime? value)
-        {
-            return value.HasValue
-                ? value.Value.ToString("d MMMM yyyy", CultureInfo.InvariantCulture)
-                : "not recorded";
-        }
-
-        private static string Or(string value, string fallback)
-        {
-            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
         }
 
         /// <summary>
@@ -274,7 +154,9 @@ namespace OutcomeTesting.Plugins
         ///
         /// Everything outside letters, digits, spaces, hyphens and underscores becomes a
         /// space, because this reaches a mail client and then somebody's file system, and a
-        /// reference carrying a slash or a colon is a file that will not save.
+        /// reference carrying a slash or a colon is a file that will not save. The pipe goes
+        /// the same way, which matters twice here: it is also what separates several files
+        /// on one outbox row (<see cref="NotificationOutbox"/>).
         ///
         /// Replaced rather than removed, deliberately. Deleting the slash from "IO/300001"
         /// gives "IO300001", which reads as a plausible reference that is not this case's;
@@ -296,8 +178,6 @@ namespace OutcomeTesting.Plugins
                 }
                 else if (safe.Length > 0 && safe[safe.Length - 1] != ' ')
                 {
-                    // One space for a run of them, so "IO//300001" does not become a name
-                    // with a gap in the middle of it.
                     safe.Append(' ');
                 }
             }

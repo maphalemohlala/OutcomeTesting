@@ -127,6 +127,10 @@
 .checklist-doc .grid th.label { width: 55%; }
 .checklist-doc .grid th.opt,
 .checklist-doc .grid td.optcell { width: 15%; text-align: center; }
+/* Four values (the N/A grids, 2026-09-24) share the same 45%: at 15% each they claimed
+   115%, and the browser left the last column, N/A, at its minimum width. */
+.checklist-doc .grid:has(thead th:nth-of-type(5)) th.opt,
+.checklist-doc .grid:has(thead th:nth-of-type(5)) td.optcell { width: 11.25%; }
 .checklist-doc .grid tr.section td { background: var(--band); font-weight: 700; }
 .checklist-doc .grid tr.lens td { background: var(--subband); font-size: 10pt; }
 .checklist-doc .grid tr.lens em { font-style: italic; font-weight: 700; }

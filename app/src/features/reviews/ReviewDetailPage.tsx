@@ -7,12 +7,16 @@ import {
   formBlocks,
   inlineOptionsFor,
   isTicked,
+  offers,
+  onGridScale,
   optionsFor,
+  PASS_FAIL_INSUFFICIENT_NA,
   type ChoiceOption,
   type FailPoint,
   type FormBlock,
   type FormGroup,
 } from './checklistForm';
+import { isRootCauseResponseType } from './gradingRules';
 import { CaseHeaderTable } from './CaseHeaderTable';
 import { ChecklistSection } from './ChecklistSection';
 import '../../styles/document.css';
@@ -24,9 +28,6 @@ interface ReviewDetailPageProps {
 
 /** Yes, the value a ticked outcome-lens box records (checklistForm.ts, Q-E2-LENS). */
 const YES_VALUE = 120910305;
-
-/** Primary root cause, the one list the document lays out as a grid rather than a run. */
-const ROOT_CAUSE = 120910003;
 
 const INTRO: Record<ReviewType, string> = {
   Tax: 'The Tax-owned part of the Checker Checklist as recorded so far (FR-015). Grading is a permissioned write path and is not yet available here (OD-007).',
@@ -98,13 +99,23 @@ function Control({ row, isTaxReview }: { row: FormRow<ReviewResponse>; isTaxRevi
 
 type SectionBlock = Extract<FormBlock<ReviewResponse>, { kind: 'section' }>;
 
-/** Whether a row answers on exactly the block's scale, and so takes the grid's tick columns. */
+/** The option values of a scale, as one comparable string. */
+function valuesOf(options: ChoiceOption[]): string {
+  return options.map((option) => option.value).join(',');
+}
+
+/**
+ * Whether a row takes the grid's tick columns: it answers on exactly the block's scale, or it
+ * is a plain suitability row on a grid the N/A scale has widened (2026-09-24), where its N/A
+ * cell is left empty.
+ */
 function onScale(row: FormRow<ReviewResponse>, block: SectionBlock): boolean {
-  const options = optionsFor(row.responseTypeValue);
+  if (block.layout !== 'grid') return false;
+  const grid = valuesOf(block.options);
   return (
-    block.layout === 'grid' &&
-    options.length === block.options.length &&
-    options.every((option, i) => option.value === block.options[i].value)
+    valuesOf(optionsFor(row.responseTypeValue)) === grid ||
+    (onGridScale(row.responseTypeValue, PASS_FAIL_INSUFFICIENT_NA) &&
+      grid === valuesOf(optionsFor(PASS_FAIL_INSUFFICIENT_NA)))
   );
 }
 
@@ -163,7 +174,9 @@ function GridGroup({ group, block }: { group: FormGroup<ReviewResponse>; block: 
           {onScale(row, block) ? (
             block.options.map((option) => (
               <td key={option.value} className="optcell">
-                <Box ticked={isTicked(row, option)} label={option.label} />
+                {offers(row.responseTypeValue, option) ? (
+                  <Box ticked={isTicked(row, option)} label={option.label} />
+                ) : null}
               </td>
             ))
           ) : (
@@ -202,7 +215,7 @@ function InlineBlock({ block }: { block: SectionBlock }) {
   const chunks: { kind: 'meta' | 'rootcause'; rows: FormRow<ReviewResponse>[] }[] = [];
 
   for (const row of rows) {
-    const kind = row.responseTypeValue === ROOT_CAUSE ? 'rootcause' : 'meta';
+    const kind = isRootCauseResponseType(row.responseTypeValue) ? 'rootcause' : 'meta';
     const last = chunks[chunks.length - 1];
     if (kind === 'meta' && last && last.kind === 'meta') last.rows.push(row);
     else chunks.push({ kind, rows: [row] });

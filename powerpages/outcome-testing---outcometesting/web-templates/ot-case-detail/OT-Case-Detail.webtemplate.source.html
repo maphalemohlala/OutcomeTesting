@@ -498,6 +498,7 @@
                 <th scope="col">Sequence</th>
                 <th scope="col">Review</th>
                 <th scope="col">Type</th>
+                <th scope="col">Assigned to</th>
                 <th scope="col">Status</th>
                 <th scope="col">Started</th>
                 <th scope="col">Submitted</th>
@@ -510,6 +511,7 @@
                     <td>{{ tax_review.al_sequence | default: 1 }}</td>
                     <td><a href="/review?id={{ tax_review.al_reviewinstanceid }}">{{ tax_review.al_name | default: 'Open review' | escape }}</a></td>
                     <td>{{ tax_review.al_reviewtype.label | escape }}</td>
+                    <td>{% if tax_checker != '' %}{{ tax_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
                     <td>{% include 'OT Status Badge' status: tax_review.al_reviewstatus.label %}</td>
                     <td>{{ tax_review.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</td>
                     <td>{{ tax_review.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>
@@ -519,6 +521,7 @@
                     <td>1</td>
                     <td>Tax check</td>
                     <td>Tax</td>
+                    <td>{% if tax_checker != '' %}{{ tax_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
                     <td>{% include 'OT Status Badge' status: 'Not started' %}</td>
                     <td>—</td>
                     <td>—</td>
@@ -531,6 +534,7 @@
                     <td>{{ aqs_review.al_sequence | default: 2 }}</td>
                     <td><a href="/review?id={{ aqs_review.al_reviewinstanceid }}">{{ aqs_review.al_name | default: 'Open review' | escape }}</a></td>
                     <td>{{ aqs_review.al_reviewtype.label | escape }}</td>
+                    <td>{% if aqs_checker != '' %}{{ aqs_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
                     <td>{% include 'OT Status Badge' status: aqs_review.al_reviewstatus.label %}</td>
                     <td>{{ aqs_review.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</td>
                     <td>{{ aqs_review.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>
@@ -540,6 +544,7 @@
                     <td>2</td>
                     <td>AQS check</td>
                     <td>AQS</td>
+                    <td>{% if aqs_checker != '' %}{{ aqs_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
                     <td>{% include 'OT Status Badge' status: 'Not started' %}</td>
                     <td>—</td>
                     <td>—</td>

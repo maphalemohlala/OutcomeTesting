@@ -383,13 +383,31 @@ namespace OutcomeTesting.Plugins
         public static IEnumerable<Entity> ChoiceAnswersTo(
             IOrganizationService service, Guid reviewId, string questionCode)
         {
+            return AnswersHolding(service, reviewId, questionCode, "al_answerchoice");
+        }
+
+        /// <summary>
+        /// As <see cref="ChoiceAnswersTo"/>, for the rows holding ticks in al_answerchoices -
+        /// which is where Q-GR-02 answers from 2026-09-24, when the primary root cause became
+        /// several ticks rather than one. Its earlier versions still answer in al_answerchoice,
+        /// so a caller letting go of a root cause asks both.
+        /// </summary>
+        public static IEnumerable<Entity> ChoicesAnswersTo(
+            IOrganizationService service, Guid reviewId, string questionCode)
+        {
+            return AnswersHolding(service, reviewId, questionCode, "al_answerchoices");
+        }
+
+        private static IEnumerable<Entity> AnswersHolding(
+            IOrganizationService service, Guid reviewId, string questionCode, string column)
+        {
             var query = new QueryExpression("al_response")
             {
-                ColumnSet = new ColumnSet("al_answerchoice"),
+                ColumnSet = new ColumnSet(column),
                 Criteria = new FilterExpression(),
             };
             query.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
-            query.Criteria.AddCondition("al_answerchoice", ConditionOperator.NotNull);
+            query.Criteria.AddCondition(column, ConditionOperator.NotNull);
 
             var versionLink = query.AddLink(VersionEntity, "al_questionversionid", "al_questionversionid");
             var questionLink = versionLink.AddLink(QuestionEntity, "al_questionid", "al_questionid");
