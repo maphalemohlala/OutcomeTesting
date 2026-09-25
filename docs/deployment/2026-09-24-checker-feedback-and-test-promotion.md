@@ -375,8 +375,10 @@ false`, job `d03ffaea…` succeeded 08:18:32Z.
 | Remaining, not gaps | DEV's "Test Role" residue; team membership (people) |
 | Portal e2e on TEST (`checker-feedback`, `checklist-gating`, `managed-lists`, review `177db2f1`) | **17 passed, 5 skipped (writes off), 0 failed** |
 
-**Not seen in a browser:** the Code App in either environment. The Entra cookies in the saved
-sessions have expired (the player asks for the service account's password) though the portal
-cookies still work; `npm run e2e:auth` re-captures them. The Code App is proven at the package
-instead: TEST's `appversion` moved with the import, and the package carries the exact `dist/`
-bundle.
+**The Code App in a browser, both environments** (after the owner re-captured the session;
+TEST's session minted from it through SSO): `code-app.e2e.ts` **6/6 on DEV and 6/6 on TEST**,
+including "serves the bundle that was built" and the review and person pages (DEV review
+`d1aa12b9…` / Dev Account; TEST review `a600b271…` / Ruth Maxwell). The menus are identical,
+the same 11 entries in both with no Team workload, and `#/workload` answers "Page not found" in
+both. The Entra cookies in a saved session expire before the portal's, so a live portal session
+does not prove the Code App will open.
