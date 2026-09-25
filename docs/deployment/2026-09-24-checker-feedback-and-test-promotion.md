@@ -327,3 +327,8 @@ environment's data, so two environments can be compared without submitting anyth
 ```powershell
 $env:DOTNET_ROLL_FORWARD='Major'; & plugins\OutcomeTesting.Registration\bin\Debug\net8.0\OutcomeTesting.Registration.exe callapi https://org0b075da8.crm11.dynamics.com al_RetireAndSucceedQuestion QuestionId=ea8d0eec-64a1-f111-b8dd-e4fade069307 "NewWording=Case notes" ResponseType=120910001 IdempotencyKey=restore-qtax03-multiline-2026-09-25
 ```
+
+**Done by the owner, 2026-09-25.** DEV's Q-TAX-03 now reads v1 Multiline (to 2026-09-20),
+v2 Text (2026-09-20 to 2026-09-25), **v3 Multiline from 2026-09-25**, matching TEST. Reviews
+answered under v2 keep it, so case 900000003's PDF is unchanged (re-rendered, same bytes); a
+review started from today draws Case notes as TEST does.
