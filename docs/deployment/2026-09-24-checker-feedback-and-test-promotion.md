@@ -332,3 +332,51 @@ $env:DOTNET_ROLL_FORWARD='Major'; & plugins\OutcomeTesting.Registration\bin\Debu
 v2 Text (2026-09-20 to 2026-09-25), **v3 Multiline from 2026-09-25**, matching TEST. Reviews
 answered under v2 keep it, so case 900000003's PDF is unchanged (re-rendered, same bytes); a
 review started from today draws Case notes as TEST does.
+
+## 2026-09-25: 1.0.11.0 into TEST - the app and the portal
+
+Carries AD-221 (adviser works from Remediation), AD-222 (no Team workload page) and today's
+data alignment. Audit, package, import and checks, in that order.
+
+**Solution membership (DEV), checked by type before the export - nothing missing:** 297 portal
+components, site and language; 32 `al_` custom APIs with 140 parameters and 115 properties;
+32 SDK steps, all enabled (plus the 32 generated implementation steps); 28 tables with their
+subcomponents (`metadatamembership`); 3 security roles; the assembly; the Code App. The three
+known non-gaps reported as before (`al_PortalBaseUrl`, `AlmHandler`, implementation steps).
+
+**The package**, exported managed through the Web API and staged at
+`artifacts/2026-09-25-test-promotion/`:
+
+| | |
+|---|---|
+| Version / managed | 1.0.11.0 / yes |
+| Code App bundle | `index-Yc39x7PU.js`, byte-identical to a fresh `npm run build` of HEAD; no `/workload` route |
+| Plug-in DLL | sha256 `0d4716f9…`, unchanged |
+| Power Pages components | 297; `Restrict read - Cases` without Adviser Remediation |
+| Custom APIs | 32 |
+
+The only "workload" left in it is prose: the two Team Manager web roles' descriptions
+("monitors their workload").
+
+**Import:** `ImportSolutionAsync`, `PublishWorkflows: true`, `OverwriteUnmanagedCustomizations:
+false`, job `d03ffaea…` succeeded 08:18:32Z.
+
+**TEST after the import:**
+
+| Check | Result |
+|---|---|
+| Solution | 1.0.11.0 managed |
+| Code App `appversion` | 2026-09-25T08:18:18Z (was 2026-09-24T21:32:42Z) |
+| Assembly | sha256 `0d4716f9…`; all 64 steps on it enabled |
+| Portal components vs DEV, by content | 297 identical; TEST's own four `Authentication/*` settings and its `AllowContactMappingWithEmail` differ, as intended |
+| Letter templates, list options, sections, fail reasons, routes, checklist version, security roles | identical |
+| Questions in force today | **47 of 47 identical** (Q-TAX-03 now Multiline in both). Dated history differs, as each environment changed on different days |
+| Code App page rules (active) | identical but for TEST's extra Administrators command.assign Manage |
+| Remaining, not gaps | DEV's "Test Role" residue; team membership (people) |
+| Portal e2e on TEST (`checker-feedback`, `checklist-gating`, `managed-lists`, review `177db2f1`) | **17 passed, 5 skipped (writes off), 0 failed** |
+
+**Not seen in a browser:** the Code App in either environment. The Entra cookies in the saved
+sessions have expired (the player asks for the service account's password) though the portal
+cookies still work; `npm run e2e:auth` re-captures them. The Code App is proven at the package
+instead: TEST's `appversion` moved with the import, and the package carries the exact `dist/`
+bundle.
