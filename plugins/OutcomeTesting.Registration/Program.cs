@@ -423,6 +423,11 @@ if (args.Length >= 2 && args[0].Equals("seednotificationtemplates", StringCompar
         args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
 }
 
+if (args.Length >= 4 && args[0].Equals("renderpdf", StringComparison.OrdinalIgnoreCase))
+{
+    return RenderPdf(args[1], args[2], args[3]);
+}
+
 if (args.Length >= 2 && args[0].Equals("addmemocolumn", StringComparison.OrdinalIgnoreCase))
 {
     return AddMemoColumn(args);
@@ -995,6 +1000,36 @@ int WebApi(string[] a)
 // for writes and useless for reads - a query whose answer is the point of the call
 // came back unparseable. Both, rather than one or the other: the console says what
 // happened while it happens, the file holds what came back.
+// renderpdf <org> <case reference> <folder>: the documents a letter on the case would carry,
+// drawn by the plug-in's own source (linked in the csproj) from that environment's data, and
+// written to the folder. Read-only: nothing is queued or sent. It exists to compare what two
+// environments send without submitting a review in either.
+int RenderPdf(string orgUrl, string caseReference, string folder)
+{
+    using var svc = Connect(orgUrl);
+
+    var query = new QueryExpression("al_outcomecase") { ColumnSet = new ColumnSet(false), TopCount = 2 };
+    query.Criteria.AddCondition("al_casereference", ConditionOperator.Equal, caseReference);
+    var cases = svc.RetrieveMultiple(query).Entities;
+    if (cases.Count != 1)
+    {
+        Console.WriteLine($"Expected one case '{caseReference}', found {cases.Count}.");
+        return 1;
+    }
+
+    Directory.CreateDirectory(folder);
+    var documents = OutcomeTesting.Plugins.CompletedCheckPdf.Documents(svc, cases[0].ToEntityReference());
+    foreach (var document in documents)
+    {
+        var path = Path.Combine(folder, document.Name);
+        File.WriteAllBytes(path, document.Content);
+        Console.WriteLine($"{path} ({document.Content.Length} bytes)");
+    }
+
+    Console.WriteLine($"{documents.Count} documents.");
+    return documents.Count == 0 ? 1 : 0;
+}
+
 int WebApiMany(string orgUrl, string requestsFile, string? outFile)
 {
     var transcript = new JsonArray();

@@ -285,8 +285,45 @@ Compared after the fix, read-only, by content rather than by id:
 | Security roles - Team Manager, App User, App Admin | identical, privilege by privilege and depth by depth (85 / 97 / 133) |
 | Solution, plug-ins, steps, custom APIs, Code App | identical (1.0.10.0) |
 | Sections, fail reasons, review routes, checklist version, list options (by name) | identical |
-| Questions in force today | 46 of 47 identical. **Q-TAX-03 "Case notes"**: DEV answers on `120910000`, TEST on `120910001` (both administered in each environment's Question library) |
-| **Letter templates (`al_notificationtemplate`)** | **DEV 12, TEST 0.** TEST sends every letter in the compiled wording and its Letters page is empty. Seed with `seednotificationtemplates`, or copy DEV's rows if their wording was edited there |
-| **Code App page rules (`al_pagepermission`)** | TEST has none for **AL Portal - Tax Team Manager** or **AQS Team Manager** (DEV: page.dashboard View, page.cases Edit, command.assign Edit each). Because TEST stores rules, the coded defaults do not apply, so a team manager in TEST reaches nothing in the app. TEST additionally gives Administrators command.assign Manage |
+| Questions in force today | 46 of 47 identical. **Q-TAX-03 "Case notes"**: DEV answers on `120910000`, TEST on `120910001` (both administered in each environment's Question library). **DEV drifted** - see below |
+| **Letter templates (`al_notificationtemplate`)** | **Copied to TEST 2026-09-25, see below.** Was: **DEV 12, TEST 0.** TEST sends every letter in the compiled wording and its Letters page is empty. Seed with `seednotificationtemplates`, or copy DEV's rows if their wording was edited there |
+| **Code App page rules (`al_pagepermission`)** | **Copied to TEST 2026-09-25, see below.** Was: TEST has none for **AL Portal - Tax Team Manager** or **AQS Team Manager** (DEV: page.dashboard View, page.cases Edit, command.assign Edit each). Because TEST stores rules, the coded defaults do not apply, so a team manager in TEST reaches nothing in the app. TEST additionally gives Administrators command.assign Manage |
 | AD-218 owner teams | DEV's Tax Team holds Simunye; TEST's two teams are empty - people, environment-specific |
 | `al_role` | DEV carries an extra "Test Role" - test residue, not a gap |
+
+## 2026-09-25: letters, team-manager rules and the PDF brought into line
+
+The owner approved copying DEV's letter templates and team-manager page rules to TEST, and
+asked that the PDF TEST sends match DEV's.
+
+**Copied to TEST** (`artifacts/test-letters-and-manager-rules.json`, DEV's ids kept, 18 writes,
+0 failed):
+
+- The 12 `al_notificationtemplate` rows. Re-read: 12 in each, 0 fields differ.
+- The six Code App page rules for AL Portal - Tax Team Manager and AQS Team Manager
+  (page.dashboard View, page.cases Edit, command.assign Edit each). Active rules now differ
+  only by TEST's extra Administrators command.assign Manage, which is harmless and left in place.
+
+**The PDF.** A new read-only verb, `renderpdf <org> <case reference> <folder>`, draws a case's
+attachments with the plug-in's own source (linked into the registration tool) from that
+environment's data, so two environments can be compared without submitting anything.
+
+- It was checked against DEV first: case 900000003's Tax and AQS checks came out with text
+  identical to the PDFs DEV queued on 2026-09-24.
+- The plug-in assembly is byte-identical in DEV, TEST and the local Release build
+  (sha256 `0d4716f9…`).
+- TEST's newest queued PDFs predate the 1.0.10.0 import (the last is 2026-09-23, still one
+  "Completed check" file), so any PDF received from TEST before now is the old layout. Rendered
+  from TEST now, cases 300000011, 300000016 and 300000018 produce the same files as DEV (Tax
+  check, AQS check and Remediation as separate files), and every line that differs from DEV's is
+  case data: names, dates, references and answers.
+- **The one structural difference is Q-TAX-03 "Case notes"**, and DEV is the one that drifted.
+  The design (checklist v8, the seed, the portal plan) is Multiline text, which is TEST's only
+  version. DEV's v2 on Text was made on 2026-09-20 by the Question library test APP-114 and
+  never reverted, so DEV's PDF draws Case notes as a single short cell where TEST's draws the
+  three-line box. Restoring DEV (a v3 on Multiline through `al_RetireAndSucceedQuestion`) was
+  refused to the agent by the permission classifier and is handed to the owner:
+
+```powershell
+$env:DOTNET_ROLL_FORWARD='Major'; & plugins\OutcomeTesting.Registration\bin\Debug\net8.0\OutcomeTesting.Registration.exe callapi https://org0b075da8.crm11.dynamics.com al_RetireAndSucceedQuestion QuestionId=ea8d0eec-64a1-f111-b8dd-e4fade069307 "NewWording=Case notes" ResponseType=120910001 IdempotencyKey=restore-qtax03-multiline-2026-09-25
+```

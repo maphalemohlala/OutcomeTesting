@@ -40,4 +40,25 @@
              Link="Linked\NotificationTemplates.cs" />
   </ItemGroup>
 
+  <!--
+    The letter's documents, linked for the same reason: `renderpdf` draws a case's PDFs with
+    exactly the code the plug-in runs, so two environments' output can be compared without a
+    submission in either.
+  -->
+  <ItemGroup>
+    <Compile Include="..\OutcomeTesting.Plugins\CompletedCheckPdf.cs" Link="Linked\CompletedCheckPdf.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\CompletedCheck.cs" Link="Linked\CompletedCheck.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\RemediationDocument.cs" Link="Linked\RemediationDocument.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\PdfWriter.cs" Link="Linked\PdfWriter.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\ChecklistDocument.cs" Link="Linked\ChecklistDocument.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\OptionLabels.cs" Link="Linked\OptionLabels.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\CommandHelpers.cs" Link="Linked\CommandHelpers.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\OutcomeRules.cs" Link="Linked\OutcomeRules.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\CaseLifecycle.cs" Link="Linked\CaseLifecycle.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\CaseHeaderRules.cs" Link="Linked\CaseHeaderRules.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\GradingRules.cs" Link="Linked\GradingRules.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\ResponseRules.cs" Link="Linked\ResponseRules.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\SectionRules.cs" Link="Linked\SectionRules.cs" />
+  </ItemGroup>
+
 </Project>
