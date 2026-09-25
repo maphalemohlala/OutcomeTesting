@@ -129,10 +129,16 @@ test.describe('an adviser (AR-04)', () => {
     await expectPageDenied(page, portal, '/aqs-reviews');
   });
 
-  test('lands on Cases, with Cases and Remediation on the menu', async ({ page }) => {
+  // One page for an adviser (owner, 2026-09-25): Cases listed the same cases as Remediation.
+  // The session must hold Adviser Remediation ONLY - Tax Reviewer or T&C Supervisor bring Cases.
+  test('lands on Remediation, its only page, and is refused Cases', async ({ page }) => {
     const portal = requireEnv(PORTAL_URL);
-    await expectLandsOnCases(page, portal);
-    await expect(menu(page)).toHaveText(['Cases', 'Remediation']);
+    await page.goto(`${portal.replace(/\/+$/, '')}/`);
+    await expect(page).toHaveURL(/\/remediation\/?$/);
+    await expectSignedIn(page, portal);
+    await expectNoLiquidError(page);
+    await expect(menu(page)).toHaveText(['Remediation']);
+    await expectPageDenied(page, portal, '/cases');
   });
 });
 

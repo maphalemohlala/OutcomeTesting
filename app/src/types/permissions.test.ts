@@ -194,10 +194,9 @@ describe('resolveRules', () => {
 });
 
 describe('AD-218 roles', () => {
-  it('each team manager can open the workload page and allocate', () => {
+  it('each team manager can allocate', () => {
     for (const role of ['AL Portal - Tax Team Manager', 'AL Portal - AQS Team Manager']) {
       const set = resolvePermissions([role]);
-      expect(can(set, 'page.workload')).toBe(true);
       expect(can(set, 'command.assign', 'Edit')).toBe(true);
       expect(can(set, 'page.cases', 'Edit')).toBe(true);
     }
@@ -212,7 +211,10 @@ describe('AD-218 roles', () => {
     expect(RESOURCE_KEYS.filter((key) => can(set, key))).toEqual([]);
   });
 
-  it('maps /workload to page.workload', () => {
-    expect(pageResourceForPath('/workload')).toBe('page.workload');
+  // The team workload page was withdrawn on 2026-09-25 (project owner: "it is not needed").
+  it('has no workload page: no resource, no gate, nobody granted it', () => {
+    expect(RESOURCE_KEYS).not.toContain('page.workload');
+    expect(pageResourceForPath('/workload')).toBeNull();
+    expect(DEFAULT_PERMISSIONS.some((rule) => String(rule.resource).includes('workload'))).toBe(false);
   });
 });

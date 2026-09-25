@@ -56,3 +56,12 @@ describe('every route is permission-gated', () => {
     expect(dashboard).toContain('resource="page.dashboard"');
   });
 });
+
+// The team workload page was withdrawn on 2026-09-25 (project owner: "it is not needed").
+describe('the team workload page', () => {
+  it('has no route and no menu entry', async () => {
+    const { NAV_GROUPS } = await import('./navigation');
+    expect(source).not.toContain('/workload');
+    expect(NAV_GROUPS.flatMap((group) => group.items).map((item) => item.to)).not.toContain('/workload');
+  });
+});

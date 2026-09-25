@@ -241,3 +241,52 @@ the portal needs a TEST session, `npm run e2e:auth` against `outcometestingtest`
   Manager (not an Administrator), so the rest of `role-scoped-access.e2e.ts` can run.
 - **`pac` needs a fresh sign-in** (AADSTS50173, tokens valid from 2026-09-24T05:52:08Z).
 - **The seed still carries AML on `YesNoNA`**; both environments are on v3 `YesNoInsufficient`.
+
+## 2026-09-25: every TEST checker could still read every case
+
+**Reported:** signed in to TEST as Simunye holding Tax Reviewer, then Adviser Remediation, the
+portal still listed every case.
+
+**Cause.** Seven table permissions in TEST still held their pre-AD-218 roles, though the
+import carried the narrowed ones: `Outcome Case`, `Review Instance`, `Response` and
+`Remediation Action - read all` granted Global read to all seven portal roles (DEV: Outcome
+Testing Manager and Administrators only), `Outcome - read all` to every authenticated user,
+`Remediation Action - assigned to me` still named Planner, and `Signoff - T&C attestation`
+still hung off the old parent. The same unmanaged-layer masking as OT Review Detail: those
+permissions had been written to TEST directly (AD-195's `restoretablepermissions` runs), so
+the managed import landed beneath them.
+
+**Fix.** The 44 committed permission files were first checked field by field against DEV - 0
+differences - then `restoretablepermissions` wrote them to TEST. A full re-diff of all 297
+portal components now finds TEST identical to DEV except the four `Authentication/*` site
+settings, which are TEST's own sign-in configuration and stay.
+
+Power Pages caches permissions; if a signed-in session still shows every case, sign out and in
+again, or clear the portal cache.
+
+## 2026-09-25: two changes from the owner
+
+- **AD-221 - an adviser works from Remediation only.** `Restrict read - Cases` no longer admits
+  Adviser Remediation, and `OT My Work` lands an adviser-only user on `/remediation`. Pushed
+  to DEV and TEST (template and page rule). Not yet seen in a browser as an adviser: there is
+  no adviser-only session.
+- **AD-222 - the Code App's Team workload page is withdrawn.** Route, menu and `page.workload`
+  removed; DEV's four stored `page.workload` rules deleted. Built (`index-Yc39x7PU.js`);
+  needs `pa app push` for DEV, and reaches TEST with the next solution import. TEST never
+  showed it - it stores no rule for it.
+
+## 2026-09-25: what else differs between DEV and TEST
+
+Compared after the fix, read-only, by content rather than by id:
+
+| Area | Result |
+|---|---|
+| Portal components (297) | identical but for TEST's four sign-in site settings |
+| Security roles - Team Manager, App User, App Admin | identical, privilege by privilege and depth by depth (85 / 97 / 133) |
+| Solution, plug-ins, steps, custom APIs, Code App | identical (1.0.10.0) |
+| Sections, fail reasons, review routes, checklist version, list options (by name) | identical |
+| Questions in force today | 46 of 47 identical. **Q-TAX-03 "Case notes"**: DEV answers on `120910000`, TEST on `120910001` (both administered in each environment's Question library) |
+| **Letter templates (`al_notificationtemplate`)** | **DEV 12, TEST 0.** TEST sends every letter in the compiled wording and its Letters page is empty. Seed with `seednotificationtemplates`, or copy DEV's rows if their wording was edited there |
+| **Code App page rules (`al_pagepermission`)** | TEST has none for **AL Portal - Tax Team Manager** or **AQS Team Manager** (DEV: page.dashboard View, page.cases Edit, command.assign Edit each). Because TEST stores rules, the coded defaults do not apply, so a team manager in TEST reaches nothing in the app. TEST additionally gives Administrators command.assign Manage |
+| AD-218 owner teams | DEV's Tax Team holds Simunye; TEST's two teams are empty - people, environment-specific |
+| `al_role` | DEV carries an extra "Test Role" - test residue, not a gap |

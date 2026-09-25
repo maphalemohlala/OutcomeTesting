@@ -80,7 +80,6 @@ export const RESOURCE_KEYS = [
   'page.remediation',
   'page.reports',
   'page.exports',
-  'page.workload',
   'page.admin.questions',
   'page.admin.advisers',
   'page.admin.templates',
@@ -210,14 +209,13 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   { role: 'AL Portal - Outcome Testing Manager', resource: 'command.assign', level: 'Edit' },
   { role: 'AL Portal - Outcome Testing Manager', resource: 'export.generate', level: 'Edit' },
 
-  // AD-218: each team manager sees their team's cases, allocates their own discipline, and
-  // watches the team's workload. Their Dataverse security role is what scopes the rows.
+  // AD-218: each team manager sees their team's cases and allocates their own discipline.
+  // Their Dataverse security role is what scopes the rows. The team workload page this also
+  // opened was withdrawn on 2026-09-25 (project owner: "it is not needed").
   ...(['AL Portal - Tax Team Manager', 'AL Portal - AQS Team Manager'] as const).flatMap((role) => [
     { role, resource: 'page.cases' as ResourceKey, level: 'Edit' as AccessLevel },
-    { role, resource: 'page.workload' as ResourceKey, level: 'View' as AccessLevel },
     { role, resource: 'command.assign' as ResourceKey, level: 'Edit' as AccessLevel },
   ]),
-  { role: 'AL Portal - Outcome Testing Manager', resource: 'page.workload', level: 'View' },
 
   // Moving a case's due date is a manager's act (project owner, 2026-09-19: "3 days, only
   // editable by managers in codeapps"). Its own key rather than a higher level on
@@ -347,7 +345,6 @@ export function pageResourceForPath(path: string): ResourceKey | null {
   if (path.startsWith('/reviews')) return 'page.reviews';
   if (path.startsWith('/reports')) return 'page.reports';
   if (path.startsWith('/exports')) return 'page.exports';
-  if (path.startsWith('/workload')) return 'page.workload';
   if (path.startsWith('/admin/questions')) return 'page.admin.questions';
   if (path.startsWith('/admin/advisers')) return 'page.admin.advisers';
   if (path.startsWith('/admin/templates')) return 'page.admin.templates';

@@ -19,7 +19,6 @@ import { ReviewDetailPage } from '../features/reviews/ReviewDetailPage';
 import { RemediationPage } from '../features/remediation/RemediationPage';
 import { ReportsPage } from '../features/reports/ReportsPage';
 import { ExportsPage } from '../features/reports/ExportsPage';
-import { WorkloadPage } from '../features/workload/WorkloadPage';
 
 /** Routes follow 09-Application-Screens. Screens without a data source say so explicitly. */
 export function AppRoutes() {
@@ -46,8 +45,6 @@ export function AppRoutes() {
         />
         <Route path="/cases" element={<RequirePermission resource="page.cases"><CaseWorklistPage /></RequirePermission>} />
         <Route path="/cases/:caseId" element={<RequirePermission resource="page.cases"><CaseDetailPage /></RequirePermission>} />
-        {/* AD-218, AR-01: each team manager's view of who holds what. */}
-        <Route path="/workload" element={<RequirePermission resource="page.workload"><WorkloadPage /></RequirePermission>} />
         {/* Allocation moved into the case edit modal on 2026-09-10 (project owner
             direction): one place to change who holds a case, rather than a screen for the
             allocation and a dialog for everything else. Kept as a redirect so bookmarks

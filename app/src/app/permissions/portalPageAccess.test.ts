@@ -17,6 +17,10 @@ import caseList from '../../../../powerpages/outcome-testing---outcometesting/we
  * An AQS checker works from ONE page (owner, 2026-09-24): AQS reviews holds the queue and
  * their own checks, so someone whose only role is AQS Reviewer is refused Cases and lands on
  * AQS reviews. The My cases / All cases toggle is an oversight tool and nobody else sees it.
+ *
+ * An adviser likewise works from ONE page (owner, 2026-09-25: "as an adviser I have cases and
+ * remediation pages and they show the same data"): Remediation. Adviser Remediation no longer
+ * admits Cases, and someone whose only list role is Adviser Remediation lands on Remediation.
  */
 const ROLE = {
   tax: 'a1000000-0000-4000-8000-000000000090',
@@ -100,9 +104,9 @@ describe('page rules', () => {
     expect(restrictRead(PAGE.cases).roles).toContain(ROLE.portalAdmin);
   });
 
-  it('Cases is every portal role but the AQS Reviewer, whose one page is AQS reviews', () => {
+  it('Cases is every portal role but the AQS Reviewer and the adviser, who each work from one page', () => {
     expect(restrictRead(PAGE.cases).roles.sort()).toEqual(
-      [ROLE.tax, ROLE.adviser, ROLE.supervisor, ROLE.portalAdmin, ...OVERSIGHT].sort(),
+      [ROLE.tax, ROLE.supervisor, ROLE.portalAdmin, ...OVERSIGHT].sort(),
     );
   });
 
@@ -148,14 +152,23 @@ describe('the landing page', () => {
   });
 });
 
-describe('an AQS-only checker lands on AQS reviews', () => {
-  it('sends someone whose only Cases-reading role is missing to /aqs-reviews', () => {
-    const landing = /\{% assign ot_landing = '\/cases' %\}([\s\S]*?)\{% if user and ot_oversight == false %\}/.exec(myWork)?.[1] ?? '';
-    expect(landing).toContain("user.roles contains 'AL Portal - AQS Reviewer'");
-    for (const role of ['AL Portal - Tax Reviewer', 'AL Portal - Adviser Remediation', 'AL Portal - T&C Supervisor', 'AL Portal - Portal Administrator']) {
-      expect(landing).toContain(`user.roles contains '${role}'`);
+describe('someone Cases does not admit lands on their one page', () => {
+  const landing = /\{% assign ot_landing = '\/cases' %\}([\s\S]*?)\{% if user and ot_oversight == false %\}/.exec(myWork)?.[1] ?? '';
+
+  it('keeps Cases for anyone holding a role that Cases admits', () => {
+    const guard = /\{% unless ([^%]*) %\}/.exec(landing)?.[1] ?? '';
+    for (const role of ['AL Portal - Tax Reviewer', 'AL Portal - T&C Supervisor', 'AL Portal - Portal Administrator']) {
+      expect(guard).toContain(`user.roles contains '${role}'`);
     }
-    expect(landing).toContain("{% assign ot_landing = '/aqs-reviews' %}");
+    expect(guard).not.toContain('Adviser Remediation');
+  });
+
+  it('sends an AQS checker to /aqs-reviews', () => {
+    expect(landing).toMatch(/user\.roles contains 'AL Portal - AQS Reviewer' %\}\{% assign ot_landing = '\/aqs-reviews' %\}/);
+  });
+
+  it('sends an adviser to /remediation', () => {
+    expect(landing).toMatch(/user\.roles contains 'AL Portal - Adviser Remediation' %\}\{% assign ot_landing = '\/remediation' %\}/);
   });
 });
 

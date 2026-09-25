@@ -29,13 +29,17 @@
 {% assign ot_oversight = false %}
 {% if user.roles contains 'AL Portal - Outcome Testing Manager' or user.roles contains 'Administrators' %}{% assign ot_oversight = true %}{% endif %}
 {% comment %}
-  Where everyone else lands. Cases, except for someone whose only role is AQS Reviewer: an AQS
-  checker works from one page, AQS reviews, which holds the queue and their own checks, and
-  Cases' rule does not admit them (owner, 2026-09-24). Any other role alongside AQS Reviewer
-  brings Cases with it, and they land there.
+  Where everyone else lands. Cases, for anyone holding a role Cases' rule admits - Tax
+  Reviewer, T&C Supervisor, Portal Administrator. Two roles work from one page of their own
+  instead, and Cases does not admit them: an AQS checker, AQS reviews, which holds the queue
+  and their own checks (owner, 2026-09-24); and an adviser, Remediation, which lists the same
+  cases Cases did (owner, 2026-09-25). Anyone holding both lands on AQS reviews and still has
+  Remediation on the menu.
 {% endcomment %}
 {% assign ot_landing = '/cases' %}
-{% if user.roles contains 'AL Portal - AQS Reviewer' %}{% unless user.roles contains 'AL Portal - Tax Reviewer' or user.roles contains 'AL Portal - Adviser Remediation' or user.roles contains 'AL Portal - T&C Supervisor' or user.roles contains 'AL Portal - Portal Administrator' %}{% assign ot_landing = '/aqs-reviews' %}{% endunless %}{% endif %}
+{% unless user.roles contains 'AL Portal - Tax Reviewer' or user.roles contains 'AL Portal - T&C Supervisor' or user.roles contains 'AL Portal - Portal Administrator' %}
+  {% if user.roles contains 'AL Portal - AQS Reviewer' %}{% assign ot_landing = '/aqs-reviews' %}{% elsif user.roles contains 'AL Portal - Adviser Remediation' %}{% assign ot_landing = '/remediation' %}{% endif %}
+{% endunless %}
 {% if user and ot_oversight == false %}
   <script>window.location.replace('{{ ot_landing }}');</script>
   <p><a href="{{ ot_landing }}">Continue</a></p>
