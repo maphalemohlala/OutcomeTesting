@@ -227,8 +227,9 @@ namespace OutcomeTesting.Plugins
         ///
         /// The N/A scale is the suitability scale with a fourth column, so the two share a
         /// grid: the grid takes the fourth column, and a row that does not offer N/A leaves
-        /// that cell empty. That is how the E4 concessions row takes N/A without the other
-        /// sixteen Suitability test points being offered one (project owner, 2026-09-24).
+        /// that cell empty. That is how the E4 concessions row first took N/A alone (project
+        /// owner, 2026-09-24); since AD-223 (2026-09-25) every Suitability test point offers it,
+        /// and the empty cell is left for a row the Question library moves back.
         /// </summary>
         public static int SharedScale(IEnumerable<int> responseTypes)
         {

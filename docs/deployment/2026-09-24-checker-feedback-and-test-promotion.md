@@ -382,3 +382,21 @@ including "serves the bundle that was built" and the review and person pages (DE
 the same 11 entries in both with no Team workload, and `#/workload` answers "Page not found" in
 both. The Entra cookies in a saved session expire before the portal's, so a live portal session
 does not prove the Code App will open.
+
+## 2026-09-25: N/A on every Suitability test point (AD-223)
+
+**Reported:** on an AQS check, Suitability core checks had an N/A column with no box in it. As
+built: one grid spans E1-E5, and Q-E4-03 alone was on the N/A scale, so the grid took the
+column and the other eighteen rows left it empty. The owner chose N/A on every row.
+
+| | DEV | TEST |
+|---|---|---|
+| 18 versions in force, `120910006` -> `120910012` in place (`artifacts/suitability-na.<org>.json`) | 18/18 | 18/18 |
+| Versions on the N/A scale afterwards (19 Suitability + 4 CRP) | 23 | 23 |
+| `checker-feedback.e2e.ts`: every Suitability and CRP row has an N/A box | passed | passed (9 passed, 2 write specs skipped) |
+| **Captured:** N/A ticked on Q-E1-01 through the page, review `0c46f88a…` | saved; `al_response` reads back `al_answerchoice` **120910307** | not written - same code, same data |
+
+Also: `data/v8-seed` moves the same 18 versions (23 on `120910012`); two plug-in tests that
+pinned "only the concessions row" are rewritten, and a retyped row still leaving its N/A cell
+empty is pinned separately. Plug-in tests **1,682 passed**; app unit tests **1,107 passed**. No
+code deployed: the change is data, and every surface already reads each row's own type.

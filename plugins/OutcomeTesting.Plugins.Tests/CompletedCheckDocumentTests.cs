@@ -99,8 +99,10 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void The_suitability_grid_takes_an_na_column_that_only_the_concessions_row_ticks()
+        public void Every_suitability_test_point_offers_na()
         {
+            // AD-223 (2026-09-25): all nineteen test points answer on the N/A scale. With only
+            // the concessions row on it, the other eighteen sat under an N/A heading with no box.
             var suitability = Grid(CompletedCheck.Blocks(Case(), AqsReviewId), "Suitability test point");
 
             Assert.Equal(
@@ -110,7 +112,26 @@ namespace OutcomeTesting.Plugins.Tests
             var concessions = Row(suitability, "Any concessions / off-tariff pricing approved and recorded");
             Assert.Equal("[x]", concessions.Cells[4].Text);
 
-            // A row on the plain suitability scale is not offered N/A: its cell is empty.
+            var charges = Row(suitability, "Adviser charges clearly disclosed and evidenced");
+            Assert.Equal(new[] { "[x]", "[ ]", "[ ]", "[ ]" }, charges.Cells.Skip(1).Select(c => c.Text).ToArray());
+        }
+
+        [Fact]
+        public void A_suitability_row_retyped_without_na_leaves_its_na_cell_empty()
+        {
+            // The grid still shares one heading between the two scales, so a test point the
+            // Question library later moves back to Pass / Fail / Insufficient evidence draws an
+            // empty cell under N/A rather than a box it cannot save.
+            var service = Case();
+            foreach (var version in service.All("al_questionversion")
+                .Where(v => (v.GetAttributeValue<string>("al_questionversioncode") ?? string.Empty).StartsWith("Q-E4-01", StringComparison.Ordinal)))
+            {
+                version["al_responsetype"] = new OptionSetValue(ResponseRules.TypePassFailInsufficient);
+            }
+
+            var suitability = Grid(CompletedCheck.Blocks(service, AqsReviewId), "Suitability test point");
+
+            Assert.Equal("N/A", suitability.Rows[0].Cells[4].Text);
             var charges = Row(suitability, "Adviser charges clearly disclosed and evidenced");
             Assert.Equal(string.Empty, charges.Cells[4].Text);
             Assert.Equal("[x]", charges.Cells[1].Text);
@@ -133,7 +154,7 @@ namespace OutcomeTesting.Plugins.Tests
             var suitability = Grid(CompletedCheck.Blocks(Case(), AqsReviewId), "Suitability test point");
 
             var unanswered = Row(suitability, "Language is clear, fair and not misleading");
-            Assert.Equal(new[] { "[ ]", "[ ]", "[ ]", string.Empty }, unanswered.Cells.Skip(1).Select(c => c.Text).ToArray());
+            Assert.Equal(new[] { "[ ]", "[ ]", "[ ]", "[ ]" }, unanswered.Cells.Skip(1).Select(c => c.Text).ToArray());
         }
 
         [Fact]

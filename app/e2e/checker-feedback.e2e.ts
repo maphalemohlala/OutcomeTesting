@@ -51,7 +51,7 @@ test.describe('the review page after the 2026-09-24 feedback', () => {
     expect(bands.some((band) => /^E\d\./.test(band.trim()))).toBe(false);
   });
 
-  test('gives Suitability and CRP an N/A column, ticked only where the row offers it', async ({ page }) => {
+  test('gives every Suitability and CRP row an N/A box', async ({ page }) => {
     const heads = await page.locator('table.grid thead tr').evaluateAll((rows) =>
       rows.map((row) => [...row.querySelectorAll('th')].map((th) => th.textContent?.trim())),
     );
@@ -64,8 +64,16 @@ test.describe('the review page after the 2026-09-24 feedback', () => {
       .locator('thead th').evaluateAll((ths) => ths.map((th) => th.getBoundingClientRect().width));
     expect(Math.abs(widths[4] - widths[1]), `N/A ${widths[4]}px against Pass ${widths[1]}px`).toBeLessThan(4);
 
-    await expect(page.locator('tr[data-question-code="Q-E4-03"] input[value="120910307"]')).toHaveCount(1);
-    await expect(page.locator('tr[data-question-code="Q-E4-01"] input[value="120910307"]')).toHaveCount(0);
+    // AD-223 (2026-09-25): N/A is on every Suitability test point, not the E4-03 row alone -
+    // one row offering it left the other eighteen under an N/A heading with no box.
+    const suitability = await page.locator('tr[data-question-code^="Q-E"]').evaluateAll((rows) =>
+      rows
+        .map((row) => row.getAttribute('data-question-code') ?? '')
+        .filter((code) => /^Q-E[1-5]-\d/.test(code)));
+    expect(suitability, 'the page draws the nineteen Suitability test points').toHaveLength(19);
+    for (const code of suitability) {
+      await expect(page.locator(`tr[data-question-code="${code}"] input[value="120910307"]`), code).toHaveCount(1);
+    }
     for (const code of ['Q-CRP-01', 'Q-CRP-02', 'Q-CRP-03', 'Q-CRP-04']) {
       await expect(page.locator(`tr[data-question-code="${code}"] input[value="120910307"]`)).toHaveCount(1);
     }
@@ -150,6 +158,28 @@ test.describe('saving the new answer types through the page', () => {
     await table.locator('[data-ot-status]').evaluate((element) => { element.textContent = ''; });
     await tick(false);
     await expect(table.locator('[data-ot-status]')).toHaveText(/^Saved/, { timeout: 30_000 });
+
+    expect(errors, 'the answering script raised no errors').toEqual([]);
+  });
+
+  // 2026-09-25 (AD-223): every Suitability core checks row offers N/A, not only E4-03.
+  // Q-E1-01 is the first of the eighteen moved; the save is what proves the server takes it.
+  test('N/A on a Suitability row is accepted by the server', async ({ page }) => {
+    test.skip(env('OT_ALLOW_WRITES') !== '1', 'writes are opt-in: set OT_ALLOW_WRITES=1');
+    const errors = watchConsole(page);
+
+    await page.goto(requireEnv(REVIEW_URL));
+    await expectSignedIn(page, requireEnv(PORTAL_URL));
+
+    const row = page.locator('tr[data-question-code="Q-E1-01"]');
+    const status = row.locator('[data-ot-status]');
+    if (await row.locator('input[value="120910307"]').isChecked()) {
+      await row.locator('input[value="120910300"]').check();
+      await expect(status).toHaveText(/^Saved/, { timeout: 30_000 });
+      await status.evaluate((element) => { element.textContent = ''; });
+    }
+    await row.locator('input[value="120910307"]').check();
+    await expect(status).toHaveText(/^Saved/, { timeout: 30_000 });
 
     expect(errors, 'the answering script raised no errors').toEqual([]);
   });

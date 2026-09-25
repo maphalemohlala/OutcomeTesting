@@ -50,7 +50,7 @@ Every displayed answerable question is mandatory before its section can be submi
 | `YesNoInsufficient` | Yes, No, Insufficient evidence | Consumer Duty |
 | `YesNo` | Yes, No | remedial action required |
 | `Grade` | Pass, Pass with issues, Insufficient evidence, Potential harm | advice quality grade (BR-005) |
-| `PassFailInsufficientNa` (120910012) | Pass, Fail, Insufficient evidence, N/A | CRP, Q-E4-03 (AD-219, 2026-09-24) |
+| `PassFailInsufficientNa` (120910012) | Pass, Fail, Insufficient evidence, N/A | CRP (AD-219, 2026-09-24); every Suitability test point, Q-E1-01 to Q-E5-04 (Q-E4-03 from 2026-09-24, the rest from 2026-09-25, AD-223) |
 | `MultiSelectRootCause` (120910013) | the nine root causes, several permitted | primary root cause, Q-GR-02 v2 (AD-219) |
 
 ## Case header (Outcome Case columns, not questions)
@@ -280,10 +280,12 @@ Outcome lens: Is the recommendation clearly suitable, not just technically admis
 
 Outcome lens: Is there credible evidence the client received fair value?
 
-**Q-E4-03 takes N/A** from 2026-09-24 (AD-219): concessions are not always in play. It answers
-on `PassFailInsufficientNa`; the other three E4 rows do not. The Suitability grid therefore
-carries an N/A column, and it is ticked only on this row - every other Suitability test point
-leaves that cell empty.
+**Every Suitability test point takes N/A** (AD-223, 2026-09-25). Q-E4-03 was first, alone, on
+2026-09-24 (AD-219: concessions are not always in play); with one row on
+`PassFailInsufficientNa` the whole grid carried an N/A heading and the other eighteen rows
+showed no box under it, which read as broken. All nineteen now answer on
+`PassFailInsufficientNa`, set in place on the versions in force (a superset of the old scale,
+so no answer moves), in DEV, TEST and the seed alike. The outcome lens rows are unchanged.
 
 **Subsections are headed by their names alone** from the same day (project owner):
 "Client Objectives & Information (COBS 9.2)", not "E1. Client Objectives ...". The E-codes

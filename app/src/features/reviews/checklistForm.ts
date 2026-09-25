@@ -62,7 +62,7 @@ const ROOT_CAUSES: ChoiceOption[] = [
   { value: 120910328, label: 'Adviser judgement' },
 ];
 
-/** The suitability scale, and the same scale with N/A (2026-09-24: CRP and Q-E4-03). */
+/** The suitability scale, and the same scale with N/A (CRP and Q-E4-03 on 2026-09-24; every Suitability test point from 2026-09-25, AD-223). */
 export const PASS_FAIL_INSUFFICIENT = 120910006;
 export const PASS_FAIL_INSUFFICIENT_NA = 120910012;
 

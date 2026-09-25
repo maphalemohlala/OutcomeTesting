@@ -568,7 +568,7 @@
         <field name="al_displayorder" value="1" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000012" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000013">
@@ -579,7 +579,7 @@
         <field name="al_displayorder" value="2" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000013" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000014">
@@ -590,7 +590,7 @@
         <field name="al_displayorder" value="3" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000014" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000015">
@@ -601,7 +601,7 @@
         <field name="al_displayorder" value="4" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000015" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000016">
@@ -612,7 +612,7 @@
         <field name="al_displayorder" value="1" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000016" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000017">
@@ -623,7 +623,7 @@
         <field name="al_displayorder" value="2" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000017" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000018">
@@ -634,7 +634,7 @@
         <field name="al_displayorder" value="3" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000018" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000094">
@@ -656,7 +656,7 @@
         <field name="al_displayorder" value="1" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000019" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000020">
@@ -667,7 +667,7 @@
         <field name="al_displayorder" value="2" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000020" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000021">
@@ -678,7 +678,7 @@
         <field name="al_displayorder" value="3" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000021" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000022">
@@ -689,7 +689,7 @@
         <field name="al_displayorder" value="4" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000022" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000023">
@@ -700,7 +700,7 @@
         <field name="al_displayorder" value="1" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000023" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000024">
@@ -711,7 +711,7 @@
         <field name="al_displayorder" value="2" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000024" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000025">
@@ -733,7 +733,7 @@
         <field name="al_displayorder" value="4" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000026" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000027">
@@ -744,7 +744,7 @@
         <field name="al_displayorder" value="1" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000027" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000028">
@@ -755,7 +755,7 @@
         <field name="al_displayorder" value="2" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000028" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000029">
@@ -766,7 +766,7 @@
         <field name="al_displayorder" value="3" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000029" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000030">
@@ -777,7 +777,7 @@
         <field name="al_displayorder" value="4" />
         <field name="al_effectivefrom" value="2026-08-26T00:00:00Z" />
         <field name="al_ismandatory" value="True" />
-        <field name="al_responsetype" value="120910006" />
+        <field name="al_responsetype" value="120910012" />
         <field name="al_questionid" lookupentity="al_question" value="44440000-0000-4c00-8000-000000000030" />
       </record>
       <record id="55550000-0000-4c00-8000-000000000031">
