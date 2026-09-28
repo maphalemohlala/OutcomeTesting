@@ -3,6 +3,7 @@ import { PageIntro } from '../../components/layout/PageIntro';
 import { useQuestionLibrary, type LibraryQuestion, type LibrarySection } from './useQuestionLibrary';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import { protectedReason } from './protectedQuestions';
+import { QuestionHistoryModal, SectionHistoryModal } from './HistoryModal';
 import { QuestionModal } from './QuestionModal';
 import { RetireModal } from './RetireModal';
 import { SectionModal } from './SectionModal';
@@ -17,6 +18,8 @@ type Editing =
   | { kind: 'add-question'; sectionId: string }
   | { kind: 'edit-question'; sectionId: string; question: LibraryQuestion }
   | { kind: 'retire-question'; question: LibraryQuestion }
+  | { kind: 'question-history'; question: LibraryQuestion }
+  | { kind: 'section-history'; section: LibrarySection }
   | { kind: 'add-section' }
   | { kind: 'edit-section'; section: LibrarySection }
   | { kind: 'retire-section'; section: LibrarySection };
@@ -26,11 +29,13 @@ function QuestionRow({
   canEdit,
   onEdit,
   onRetire,
+  onHistory,
 }: {
   question: LibraryQuestion;
   canEdit: boolean;
   onEdit: () => void;
   onRetire: () => void;
+  onHistory: () => void;
 }) {
   const guarded = protectedReason(question.code);
 
@@ -70,6 +75,12 @@ function QuestionRow({
             Retire
           </button>
         ) : null}
+
+        {/* Offered to everyone who can see the library, retired questions included: a
+            retired question's history is exactly what somebody asks about afterwards. */}
+        <button type="button" className="library__btn library__btn--ghost" onClick={onHistory}>
+          History
+        </button>
       </div>
     </li>
   );
@@ -81,16 +92,20 @@ function SectionBlock({
   onAddQuestion,
   onEditQuestion,
   onRetireQuestion,
+  onQuestionHistory,
   onEditSection,
   onRetireSection,
+  onSectionHistory,
 }: {
   section: LibrarySection;
   canEdit: boolean;
   onAddQuestion: () => void;
   onEditQuestion: (question: LibraryQuestion) => void;
   onRetireQuestion: (question: LibraryQuestion) => void;
+  onQuestionHistory: (question: LibraryQuestion) => void;
   onEditSection: () => void;
   onRetireSection: () => void;
+  onSectionHistory: () => void;
 }) {
   const live = section.questions.filter((question) => !question.retired);
   const retired = section.questions.filter((question) => question.retired);
@@ -120,6 +135,10 @@ function SectionBlock({
               </button>
             </>
           ) : null}
+          {/* Everyone who can read the library, retired sections included, as for questions. */}
+          <button type="button" className="library__btn library__btn--ghost" onClick={onSectionHistory}>
+            Section history
+          </button>
         </div>
       </header>
 
@@ -134,6 +153,7 @@ function SectionBlock({
               canEdit={canEdit}
               onEdit={() => onEditQuestion(question)}
               onRetire={() => onRetireQuestion(question)}
+              onHistory={() => onQuestionHistory(question)}
             />
           ))}
         </ol>
@@ -150,6 +170,7 @@ function SectionBlock({
                 canEdit={canEdit}
                 onEdit={() => onEditQuestion(question)}
                 onRetire={() => onRetireQuestion(question)}
+                onHistory={() => onQuestionHistory(question)}
               />
             ))}
           </ol>
@@ -179,8 +200,10 @@ export function QuestionLibraryPage() {
         setEditing({ kind: 'edit-question', sectionId: section.id, question })
       }
       onRetireQuestion={(question) => setEditing({ kind: 'retire-question', question })}
+      onQuestionHistory={(question) => setEditing({ kind: 'question-history', question })}
       onEditSection={() => setEditing({ kind: 'edit-section', section })}
       onRetireSection={() => setEditing({ kind: 'retire-section', section })}
+      onSectionHistory={() => setEditing({ kind: 'section-history', section })}
     />
   );
 
@@ -287,6 +310,14 @@ export function QuestionLibraryPage() {
             reload();
           }}
         />
+      ) : null}
+
+      {editing.kind === 'question-history' ? (
+        <QuestionHistoryModal question={editing.question} onClose={close} />
+      ) : null}
+
+      {editing.kind === 'section-history' ? (
+        <SectionHistoryModal section={editing.section} onClose={close} />
       ) : null}
 
       {editing.kind === 'add-question' || editing.kind === 'edit-question' ? (
