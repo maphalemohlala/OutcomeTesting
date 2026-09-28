@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { OutcomeIndicator } from '../../components/status/OutcomeIndicator';
@@ -6,7 +7,11 @@ import type { Outcome } from '../../types/domain';
 import { stageTone } from '../../types/domain';
 import { REMEDIATION_THRESHOLD_WORKING_DAYS } from '../../lib/workingDays';
 import { proportion } from './dashboardShares';
-import { useCaseDashboard, type DashboardData } from './useCaseDashboard';
+import { aggregate, useCaseDashboard, type DashboardData } from './useCaseDashboard';
+import { toSummary } from '../cases/caseWorklistMapping';
+import { casesInScope, narrowToScope, worklistLink, type ReportFilters } from './reportFilters';
+import { ReportFilterBar } from './ReportFilterBar';
+import { useReportFilters } from './useReportFilters';
 import './DashboardPage.css';
 
 /** Matches the OutcomeIndicator silhouettes so the bar reinforces the same grade. */
@@ -115,12 +120,55 @@ export function DashboardPage() {
         </section>
       ) : null}
 
-      {state.status === 'ready' ? <DashboardBody data={state.data} /> : null}
+      {state.status === 'ready' ? (
+        <FilteredDashboard
+          cases={state.cases}
+          outcomes={state.outcomes}
+          actions={state.actions}
+        />
+      ) : null}
     </>
   );
 }
 
-function DashboardBody({ data }: { data: DashboardData }) {
+type ReadyState = Extract<ReturnType<typeof useCaseDashboard>, { status: 'ready' }>;
+
+function FilteredDashboard({ cases, outcomes, actions }: Omit<ReadyState, 'status'>) {
+  const [filters, setFilter, clearFilters] = useReportFilters();
+
+  const summaries = useMemo(() => cases.map((record) => toSummary(record)), [cases]);
+  const scope = useMemo(() => casesInScope(summaries, filters), [summaries, filters]);
+
+  const data = useMemo(
+    () =>
+      aggregate(
+        narrowToScope(cases, scope, (record) => record.al_outcomecaseid),
+        narrowToScope(outcomes, scope, (record) => record._al_outcomecaseid_value),
+        narrowToScope(actions, scope, (record) => record._al_outcomecaseid_value),
+      ),
+    [cases, outcomes, actions, scope],
+  );
+
+  return (
+    <>
+      <ReportFilterBar
+        idPrefix="dashboard"
+        cases={summaries}
+        inScope={scope ? scope.size : cases.length}
+        filters={filters}
+        onChange={setFilter}
+        onClear={clearFilters}
+      />
+      <DashboardBody data={data} filters={filters} />
+    </>
+  );
+}
+
+function DashboardBody({ data, filters }: { data: DashboardData; filters: ReportFilters }) {
+  // Every worklist and report link carries the filters, so a figure opens the list it
+  // counted and the report opens on the same cases.
+  const cases = (to: string) => worklistLink(to, filters);
+
   // Every case the caller can see, open or closed: the whole the outcome and stage bars
   // are drawn against, so a stage's bar and an outcome's bar are on the same scale.
   const totalCases = data.completedTotal + data.ungraded;
@@ -129,13 +177,13 @@ function DashboardBody({ data }: { data: DashboardData }) {
   return (
     <>
       <section className="dashboard__strip" aria-label="Work in hand">
-        <Figure value={data.totalOpen} label="Open cases" to="/cases" />
+        <Figure value={data.totalOpen} label="Open cases" to={cases('/cases')} />
         <Figure
           value={data.validationFailed}
           label="Failed validation"
-          to="/cases?status=Validation+Failed"
+          to={cases('/cases?status=Validation+Failed')}
         />
-        <Figure value={data.unrouted} label="Awaiting a route" to="/cases?route=none" />
+        <Figure value={data.unrouted} label="Awaiting a route" to={cases('/cases?route=none')} />
         <Figure
           value={data.oldestOpenDays}
           unit="days"
@@ -185,7 +233,7 @@ function DashboardBody({ data }: { data: DashboardData }) {
                 count={entry.count}
                 share={proportion(entry.count, totalCases)}
                 tone={OUTCOME_VARIANT[entry.outcome]}
-                to={`/cases?outcome=${encodeURIComponent(entry.outcome)}`}
+                to={cases(`/cases?outcome=${encodeURIComponent(entry.outcome)}`)}
               />
             ))}
             <LedgerRow
@@ -193,7 +241,7 @@ function DashboardBody({ data }: { data: DashboardData }) {
               count={data.ungraded}
               share={proportion(data.ungraded, totalCases)}
               tone="none"
-              to="/cases?outcome=none"
+              to={cases('/cases?outcome=none')}
             />
           </ul>
         </section>
@@ -201,7 +249,7 @@ function DashboardBody({ data }: { data: DashboardData }) {
         <section className="dashboard__panel" aria-labelledby="dashboard-remediation">
           <div className="dashboard__panel-heading">
             <h2 id="dashboard-remediation">Remediation</h2>
-            <Link className="dashboard__link" to="/reports">
+            <Link className="dashboard__link" to={cases('/reports')}>
               Report
             </Link>
           </div>
@@ -217,7 +265,7 @@ function DashboardBody({ data }: { data: DashboardData }) {
                 </span>
               }
               count={data.remediationOpen}
-              to="/cases?status=Awaiting+Remediation"
+              to={cases('/cases?status=Awaiting+Remediation')}
             />
             <LedgerRow
               label={
@@ -229,7 +277,7 @@ function DashboardBody({ data }: { data: DashboardData }) {
                 </span>
               }
               count={data.remediationOverdue}
-              to="/reports"
+              to={cases('/reports')}
             />
             <LedgerRow
               label={
@@ -241,7 +289,7 @@ function DashboardBody({ data }: { data: DashboardData }) {
                 </span>
               }
               count={data.remediationBreached}
-              to="/reports"
+              to={cases('/reports')}
             />
             <LedgerRow
               label={
@@ -279,7 +327,7 @@ function DashboardBody({ data }: { data: DashboardData }) {
                     count={entry.count}
                     share={proportion(entry.count, totalCases)}
                     tone={stageTone(entry.status)}
-                    to={`/cases?status=${encodeURIComponent(entry.status)}`}
+                    to={cases(`/cases?status=${encodeURIComponent(entry.status)}`)}
                   />
                 ))}
               </ul>

@@ -96,3 +96,40 @@ describe('remediation ageing counts an action raised today', () => {
     expect(data.remediationAgeing.reduce((n, b) => n + b.count, 0)).toBe(0);
   });
 });
+
+describe('open remediation is reported in cases as well as actions', () => {
+  /**
+   * TEST, 2026-09-28: the tile read 84 and was taken as 84 cases. It was 84 actions - one per
+   * test point marked down - on 11 cases. The case count is what the worklist filter lists,
+   * so it is the number the tile leads with.
+   */
+  it('counts a case once however many of its actions are open', () => {
+    const data = aggregate(
+      [],
+      [
+        action({ _al_outcomecaseid_value: 'case-1' }),
+        action({ _al_outcomecaseid_value: 'case-1' }),
+        action({ _al_outcomecaseid_value: 'case-2' }),
+      ],
+      [],
+    );
+
+    expect(data.openRemediation).toBe(3);
+    expect(data.openRemediationCases).toBe(2);
+  });
+
+  it('counts a case as completed only when none of its actions is open', () => {
+    const data = aggregate(
+      [],
+      [
+        action({ _al_outcomecaseid_value: 'case-1', al_actionstatusname: 'Completed' }),
+        action({ _al_outcomecaseid_value: 'case-1' }),
+        action({ _al_outcomecaseid_value: 'case-2', al_actionstatusname: 'Completed' }),
+      ],
+      [],
+    );
+
+    expect(data.openRemediationCases).toBe(1);
+    expect(data.completedRemediationCases).toBe(1);
+  });
+});

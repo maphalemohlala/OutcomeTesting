@@ -573,7 +573,13 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
     }
 
     return (
-      <label key={field.attr} className="case-edit__field" htmlFor={inputId}>
+      <label
+        key={field.attr}
+        className={
+          field.kind === 'listoptionset' ? 'case-edit__field case-edit__field--wide' : 'case-edit__field'
+        }
+        htmlFor={inputId}
+      >
         <span id={`${inputId}-label`}>{field.label}</span>
         {field.kind === 'listoptionset' ? (
           <TickSet

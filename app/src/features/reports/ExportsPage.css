@@ -53,6 +53,12 @@
   font-size: var(--text-lg);
 }
 
+.exports__note {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
 .exports__section-head {
   display: flex;
   flex-wrap: wrap;

@@ -95,6 +95,21 @@ function day(value: string | undefined): string {
   return value ? value.slice(0, 10) : '';
 }
 
+/**
+ * Whether a row's check date (column G) falls in the range chosen for a download, inclusive
+ * at both ends; an empty bound is open. Each batch snapshots every closed case, so the range
+ * is how a download is cut to a period (2026-09-28). A row with no check date cannot be shown
+ * to fall inside a range, so it is left out once one is set.
+ */
+export function withinCheckDates(record: ExportRecord, from: string, to: string): boolean {
+  if (!from && !to) return true;
+  const checked = day(record.al_checkdate);
+  if (!checked) return false;
+  if (from && checked < from) return false;
+  if (to && checked > to) return false;
+  return true;
+}
+
 export function trailLightRow(record: ExportRecord): CellValue[] {
   return [
     text(record.al_advisername),

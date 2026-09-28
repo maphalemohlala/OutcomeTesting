@@ -16,6 +16,7 @@ import {
   Al_signoffsal_signoffdecision,
   type Al_signoffs,
 } from '../../generated/models/Al_signoffsModel';
+import { remediationByCase } from '../cases/caseRemediation';
 
 /**
  * The BR-010 aggregation, kept apart from the hook that fetches for it.
@@ -46,6 +47,13 @@ export interface ReportData {
   outcomeVolumes: OutcomeVolume[];
   /** BR-006 remediation ageing on actions that are not yet Completed. */
   openRemediation: number;
+  /**
+   * The same, in cases: what the worklist's remediation filter lists. The action count read
+   * as cases on TEST (84 actions, 11 cases, 2026-09-28), so the tile now leads with this.
+   */
+  openRemediationCases: number;
+  /** Cases whose every action is Completed - approved as a whole. */
+  completedRemediationCases: number;
   overdueRemediation: number;
   remediationAgeing: AgeingBucket[];
   /** BR-008 accountability: T&C sign-off decisions. */
@@ -136,6 +144,10 @@ export function aggregate(
     if (bandIndex >= 0) bands[bandIndex].count += 1;
   }
 
+  const byCase = [...remediationByCase(actions).values()];
+  const openRemediationCases = byCase.filter((entry) => entry.state === 'open').length;
+  const completedRemediationCases = byCase.length - openRemediationCases;
+
   let signoffApproved = 0;
   let signoffRejected = 0;
   for (const record of signoffs) {
@@ -151,6 +163,8 @@ export function aggregate(
     regradedCount,
     outcomeVolumes: OUTCOMES.map((outcome) => ({ outcome, count: volumes.get(outcome) ?? 0 })),
     openRemediation,
+    openRemediationCases,
+    completedRemediationCases,
     overdueRemediation,
     remediationAgeing: bands,
     signoffApproved,

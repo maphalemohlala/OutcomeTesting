@@ -94,3 +94,9 @@
 .worklist__checker--not-required {
   font-style: italic;
 }
+
+/* The action count beside a remediation state, and a case that raised none: supporting
+   detail, so it recedes behind the state itself. */
+.worklist__muted {
+  color: var(--colour-text-muted);
+}

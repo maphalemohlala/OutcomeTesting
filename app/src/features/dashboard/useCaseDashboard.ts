@@ -53,7 +53,16 @@ export interface DashboardData {
 export type DashboardState =
   | { status: 'unavailable'; reason: string }
   | { status: 'loading' }
-  | { status: 'ready'; data: DashboardData };
+  | {
+      status: 'ready';
+      /**
+       * The rows, not the totals: the page filters the cases and narrows the rest to them
+       * before counting (reportFilters), so the counting runs once per filter change.
+       */
+      cases: Al_outcomecases[];
+      outcomes: Al_outcomes[];
+      actions: Al_remediationactions[];
+    };
 
 function ageInDays(createdOn: string | undefined): number {
   if (!createdOn) return 0;
@@ -69,7 +78,7 @@ const AGEING_BANDS: { label: string; min: number; max: number }[] = [
   { label: 'Over 30 days', min: 31, max: Infinity },
 ];
 
-function aggregate(
+export function aggregate(
   records: Al_outcomecases[],
   outcomes: Al_outcomes[],
   actions: Al_remediationactions[],
@@ -174,11 +183,9 @@ export function useCaseDashboard(): DashboardState {
         // dashboard, because a caller may hold case read without holding either.
         setState({
           status: 'ready',
-          data: aggregate(
-            cases.data,
-            outcomes.success ? outcomes.data : [],
-            actions.success ? actions.data : [],
-          ),
+          cases: cases.data,
+          outcomes: outcomes.success ? outcomes.data : [],
+          actions: actions.success ? actions.data : [],
         });
       })
       .catch(() => {

@@ -6,7 +6,7 @@ import { useExports, type ExportRecordRow } from './useExports';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { createExportBatch, generateExport } from '../../services/commands/exports';
 import { messageForFailure } from '../../services/errors';
-import { TRAIL_LIGHT_HEADERS, trailLightFilename, trailLightRow } from './trailLight';
+import { TRAIL_LIGHT_HEADERS, trailLightFilename, trailLightRow, withinCheckDates } from './trailLight';
 import { buildFullExtract, EXTRACT_ROW_LIMIT } from './fullExtract';
 import { downloadWorkbook, stampedFilename } from '../../lib/tabular';
 import './ExportsPage.css';
@@ -40,6 +40,13 @@ export function ExportsPage() {
   const [batchTo, setBatchTo] = useState('');
   const [recordSearch, setRecordSearch] = useState('');
   const [recordGrade, setRecordGrade] = useState('');
+  // The range a Trail Light download is cut to, on check date (column G). One range for
+  // every download on the page, so a batch's file and the filtered rows answer the same
+  // period (2026-09-28). Each batch snapshots every closed case, so this is what makes a
+  // download cover a month rather than everything closed to date.
+  const [checkFrom, setCheckFrom] = useState('');
+  const [checkTo, setCheckTo] = useState('');
+  const ranged = checkFrom !== '' || checkTo !== '';
 
   const batches = useMemo(() => (state.status === 'ready' ? state.batches : []), [state]);
   const records = useMemo(() => (state.status === 'ready' ? state.records : []), [state]);
@@ -68,12 +75,19 @@ export function ExportsPage() {
     return records.filter(
       (r) =>
         (!recordGrade || r.adviceGrade === recordGrade) &&
+        withinCheckDates(r.record, checkFrom, checkTo) &&
         (!term || `${r.adviser} ${r.client} ${r.batchName}`.toLowerCase().includes(term)),
     );
-  }, [records, recordSearch, recordGrade]);
+  }, [records, recordSearch, recordGrade, checkFrom, checkTo]);
 
   const batchesFiltered = batchStatus !== '' || batchFrom !== '' || batchTo !== '';
-  const recordsFiltered = recordSearch.trim() !== '' || recordGrade !== '';
+  const recordsFiltered = recordSearch.trim() !== '' || recordGrade !== '' || ranged;
+
+  function rangeCaption(): string {
+    if (checkFrom && checkTo) return `checked ${checkFrom} to ${checkTo}`;
+    if (checkFrom) return `checked on or after ${checkFrom}`;
+    return `checked on or before ${checkTo}`;
+  }
 
   const recordsByBatch = useMemo(() => {
     const grouped = new Map<string, ExportRecordRow[]>();
@@ -192,6 +206,43 @@ export function ExportsPage() {
 
       {state.status === 'ready' ? (
         <>
+          <section aria-labelledby="range-heading">
+            <h2 id="range-heading" className="exports__heading">
+              Trail Light date range
+            </h2>
+            <p className="exports__note">
+              Cut every Trail Light download below to the cases checked in this range. Leave it
+              empty to download everything in the batch.
+            </p>
+            <FilterBar
+              summary={ranged ? `Downloads cover cases ${rangeCaption()}` : 'No range: downloads cover every row'}
+              onClear={() => {
+                setCheckFrom('');
+                setCheckTo('');
+              }}
+              clearDisabled={!ranged}
+            >
+              <FilterField label="Check date from" htmlFor="check-from">
+                <input
+                  id="check-from"
+                  type="date"
+                  value={checkFrom}
+                  max={checkTo || undefined}
+                  onChange={(e) => setCheckFrom(e.target.value)}
+                />
+              </FilterField>
+              <FilterField label="Check date to" htmlFor="check-to">
+                <input
+                  id="check-to"
+                  type="date"
+                  value={checkTo}
+                  min={checkFrom || undefined}
+                  onChange={(e) => setCheckTo(e.target.value)}
+                />
+              </FilterField>
+            </FilterBar>
+          </section>
+
           <section aria-labelledby="batches-heading">
             <h2 id="batches-heading" className="exports__heading">
               Export batches
@@ -259,7 +310,10 @@ export function ExportsPage() {
                       </tr>
                     ) : (
                       filteredBatches.map((b) => {
-                        const batchRecords = recordsByBatch.get(b.id) ?? [];
+                        const allBatchRecords = recordsByBatch.get(b.id) ?? [];
+                        const batchRecords = allBatchRecords.filter((record) =>
+                          withinCheckDates(record.record, checkFrom, checkTo),
+                        );
                         // AD-042: only a Draft batch may be generated. Leaving the button
                         // live made the plug-in's refusal the way users discovered that.
                         const isDraft = b.status === 'Draft';
@@ -290,12 +344,18 @@ export function ExportsPage() {
                                 sheetName="Trail Light"
                                 headers={TRAIL_LIGHT_HEADERS}
                                 rows={batchRecords.map((record) => trailLightRow(record.record))}
-                                caption={`${batchRecords.length} row(s) in the AD-039 20-column order`}
+                                caption={
+                                  ranged
+                                    ? `${batchRecords.length} of ${allBatchRecords.length} row(s), ${rangeCaption()}, in the AD-039 20-column order`
+                                    : `${batchRecords.length} row(s) in the AD-039 20-column order`
+                                }
                                 disabled={busy}
                                 emptyHint={
                                   isDraft
                                     ? 'This batch has not been generated yet.'
-                                    : 'This batch generated 0 rows, because no cases are at status Closed.'
+                                    : allBatchRecords.length > 0
+                                      ? `None of this batch's ${allBatchRecords.length} row(s) were ${rangeCaption()}.`
+                                      : 'This batch generated 0 rows, because no cases are at status Closed.'
                                 }
                               />
                             </td>
@@ -322,7 +382,7 @@ export function ExportsPage() {
                   sheetName="Trail Light"
                   headers={TRAIL_LIGHT_HEADERS}
                   rows={filteredRecords.map((record) => trailLightRow(record.record))}
-                  caption={`${filteredRecords.length} row(s) in the AD-039 20-column order`}
+                  caption={`${filteredRecords.length} row(s)${ranged ? `, ${rangeCaption()},` : ''} in the AD-039 20-column order`}
                 />
               ) : null}
             </div>
@@ -335,6 +395,8 @@ export function ExportsPage() {
                   onClear={() => {
                     setRecordSearch('');
                     setRecordGrade('');
+                    setCheckFrom('');
+                    setCheckTo('');
                   }}
                   clearDisabled={!recordsFiltered}
                 >

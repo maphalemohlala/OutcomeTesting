@@ -31,7 +31,10 @@
   color: var(--colour-text-muted);
 }
 
+/* A fieldset's default min-inline-size is min-content, so without the reset it widens to
+   the longest unbreakable line inside it and runs out of the 36rem modal. */
 .case-edit__section {
+  min-width: 0;
   margin: 0 0 var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--colour-border);
@@ -56,11 +59,21 @@
   margin-bottom: var(--space-3);
 }
 
+/* min-width: 0 because a grid item defaults to its content's min width, and a nowrap
+   summary naming every ticked product is one very long word - it pushed the cell, and the
+   panel, sideways instead of ellipsing. */
 .case-edit__field {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-width: 0;
   font-size: var(--text-sm);
+}
+
+/* A tick set takes the whole row: its options are laid out in 16rem columns, which do not
+   fit in a 12rem grid cell. */
+.case-edit__field--wide {
+  grid-column: 1 / -1;
 }
 
 .case-edit__field > span {
@@ -157,6 +170,7 @@
    mis-click, which is the wrong trade for a field a checker fills in once. */
 .case-edit__set-wrap {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   padding: var(--space-2) 0;
 }
@@ -206,6 +220,7 @@
 /* The names, not a count: "3 selected" sends somebody back into the panel to find out which
    three, which is the whole cost the fold was meant to save. */
 .case-edit__set-summary {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -217,7 +232,7 @@
    on a screen size, because the names are long. */
 .case-edit__set {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
   gap: var(--space-1) var(--space-3);
   max-height: 16rem;
   overflow-y: auto;

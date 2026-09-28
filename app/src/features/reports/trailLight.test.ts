@@ -3,6 +3,7 @@ import {
   TRAIL_LIGHT_HEADERS,
   trailLightFilename,
   trailLightRow,
+  withinCheckDates,
   type ExportRecord,
 } from './trailLight';
 
@@ -157,5 +158,29 @@ describe('what a Trail Light download is called', () => {
     const b = trailLightFilename('xlsx', new Date('2026-09-23T17:00:00Z'));
 
     expect(a).toBe(b);
+  });
+});
+
+describe('the check-date range on a Trail Light download', () => {
+  it('keeps the rows checked inside the range, inclusive at both ends', () => {
+    const rows = [
+      record({ al_exportrecordid: 'before', al_checkdate: '2026-08-31' }),
+      record({ al_exportrecordid: 'first', al_checkdate: '2026-09-01' }),
+      record({ al_exportrecordid: 'last', al_checkdate: '2026-09-30T00:00:00Z' }),
+      record({ al_exportrecordid: 'after', al_checkdate: '2026-10-01' }),
+    ];
+
+    expect(
+      rows.filter((r) => withinCheckDates(r, '2026-09-01', '2026-09-30')).map((r) => r.al_exportrecordid),
+    ).toEqual(['first', 'last']);
+  });
+
+  it('keeps every row when no range is set, including a row with no check date', () => {
+    expect(withinCheckDates(record(), '', '')).toBe(true);
+  });
+
+  it('leaves out a row with no check date once a range is set', () => {
+    // It cannot be shown to fall inside the range, and the file is what gets reconciled.
+    expect(withinCheckDates(record(), '2026-09-01', '')).toBe(false);
   });
 });

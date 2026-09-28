@@ -5,7 +5,7 @@ import { ExportMenu } from '../../components/export/ExportMenu';
 import { OutcomeIndicator } from '../../components/status/OutcomeIndicator';
 import { OUTCOMES } from '../../types/domain';
 import { COMPLETED_CASE_HEADERS, completedCaseRow } from '../cases/caseExport';
-import { useCaseWorklist } from '../cases/useCaseWorklist';
+import type { CaseSummary } from '../cases/caseWorklistMapping';
 import { checkerLabel } from '../cases/checkerNames';
 import './CompletedCaseReport.css';
 
@@ -20,8 +20,15 @@ function reportDate(item: { checkDate: string | null; createdOn: string | null }
  * an Outcome exists for it — closure is a separate lifecycle step, so filtering on Closed
  * alone would leave graded cases still in remediation out of the count.
  */
-export function CompletedCaseReport() {
-  const state = useCaseWorklist();
+export function CompletedCaseReport({
+  cases,
+  scope,
+}: {
+  /** The page's cases, read once for the page's filters and this report alike. */
+  cases: CaseSummary[];
+  /** The page's filters (reportFilters); null when nothing is filtered there. */
+  scope: Set<string> | null;
+}) {
   const [outcome, setOutcome] = useState('');
   const [product, setProduct] = useState('');
   const [from, setFrom] = useState('');
@@ -29,8 +36,8 @@ export function CompletedCaseReport() {
   const [closedOnly, setClosedOnly] = useState(false);
 
   const completed = useMemo(
-    () => (state.status === 'ready' ? state.cases.filter((item) => item.latestOutcome) : []),
-    [state],
+    () => cases.filter((item) => item.latestOutcome && (!scope || scope.has(item.id))),
+    [cases, scope],
   );
 
   const products = useMemo(
@@ -54,8 +61,6 @@ export function CompletedCaseReport() {
   );
 
   const isFiltered = Boolean(outcome || product || from || to || closedOnly);
-
-  if (state.status !== 'ready') return null;
 
   return (
     <section className="completed" aria-labelledby="completed-heading">

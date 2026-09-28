@@ -17,6 +17,7 @@ import {
 import { MIGRATED_LISTS, lookupLabelOn } from '../admin/listOptions';
 import { choiceLabel } from '../../lib/choiceLabel';
 import { lookupLabel } from './lookupLabel';
+import type { CaseRemediation } from './caseRemediation';
 
 /**
  * Pure record-to-row mapping, kept free of the generated services so it stays unit
@@ -73,6 +74,11 @@ export interface CaseSummary {
   checkDate: string | null;
   preOrPostCheck: string | null;
   dueDate: string | null;
+  /**
+   * Where the case's remediation stands, per case (caseRemediation). Null when it has raised
+   * none; absent where the caller did not load remediation actions.
+   */
+  remediation?: CaseRemediation | null;
 }
 
 /** Short guidance derived from the canonical lifecycle; presentational, not a business rule. */

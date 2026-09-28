@@ -9,62 +9,10 @@ import { CASE_STATUSES, OUTCOMES, REVIEW_ROUTES } from '../../types/domain';
 import type { ReviewRoute, ReviewType } from '../../types/domain';
 import { CHECKER_LABELS, checkerState } from './checkerNames';
 import { CASE_EXPORT_HEADERS, caseExportRow } from './caseExport';
-import { useCaseWorklist, type CaseSummary } from './useCaseWorklist';
+import { useCaseWorklist } from './useCaseWorklist';
+import type { CaseRemediation } from './caseRemediation';
+import { applyFilters, FILTER_KEYS, type FilterKey, type Filters } from './worklistFilters';
 import './CaseWorklistPage.css';
-
-/**
- * Filters live in the URL so a dashboard card or a person view can link straight to the
- * list it counted, and so the view a manager exports is the view they can share back.
- */
-const FILTER_KEYS = ['q', 'status', 'route', 'priority', 'outcome', 'person', 'from', 'to'] as const;
-
-type FilterKey = (typeof FILTER_KEYS)[number];
-
-type Filters = Record<FilterKey, string>;
-
-function withinRange(createdOn: string | null, from: string, to: string): boolean {
-  if (!from && !to) return true;
-  if (!createdOn) return false;
-  const created = createdOn.slice(0, 10);
-  if (from && created < from) return false;
-  if (to && created > to) return false;
-  return true;
-}
-
-function matchesPerson(item: CaseSummary, person: string): boolean {
-  const name = person.toLowerCase();
-  // Both checkers, so a search for a name finds the case whichever discipline that
-  // person holds (item 2, 2026-09-19). Searching one column used to miss the other.
-  return [item.adviser, item.paraplanner, item.taxChecker, item.aqsChecker, item.owner].some(
-    (value) => (value ?? '').toLowerCase() === name,
-  );
-}
-
-function applyFilters(cases: CaseSummary[], filters: Filters): CaseSummary[] {
-  const search = filters.q.trim().toLowerCase();
-  return cases.filter((item) => {
-    if (filters.status && item.status !== filters.status) return false;
-    if (filters.route === 'none' && item.route) return false;
-    if (filters.route && filters.route !== 'none' && item.route !== filters.route) {
-      return false;
-    }
-    if (filters.priority && (item.priority ?? '') !== filters.priority) return false;
-    // "Not yet graded" is what the Outcome cell says, and that cell shows the Tax grade where
-    // a case has no BR-005 outcome (AD-055), so a Tax-graded case is not ungraded.
-    if (filters.outcome === 'none' && (item.latestOutcome || item.taxOutcome)) return false;
-    if (filters.outcome && filters.outcome !== 'none' && item.latestOutcome !== filters.outcome) {
-      return false;
-    }
-    if (filters.person && !matchesPerson(item, filters.person)) return false;
-    if (!withinRange(item.createdOn, filters.from, filters.to)) return false;
-    if (search) {
-      const haystack =
-        `${item.caseReference} ${item.owner ?? ''} ${item.client ?? ''} ${item.adviser ?? ''}`.toLowerCase();
-      if (!haystack.includes(search)) return false;
-    }
-    return true;
-  });
-}
 
 /**
  * One discipline's checker.
@@ -100,6 +48,33 @@ function CheckerCell({
   );
 }
 
+/**
+ * Where the case's remediation stands, in actions, so a list filtered to Open or Complete
+ * shows why each case is in it. Actions, not cases, are what the reporting tile used to
+ * count - naming them here keeps the two numbers from being mistaken for each other again.
+ */
+function RemediationCell({ remediation }: { remediation: CaseRemediation | null | undefined }) {
+  if (!remediation) return <td className="worklist__muted">None</td>;
+  if (remediation.state === 'complete') {
+    return (
+      <td>
+        Complete{' '}
+        <span className="worklist__muted">
+          ({remediation.total} action{remediation.total === 1 ? '' : 's'})
+        </span>
+      </td>
+    );
+  }
+  return (
+    <td>
+      Open{' '}
+      <span className="worklist__muted">
+        ({remediation.open} of {remediation.total} action{remediation.total === 1 ? '' : 's'})
+      </span>
+    </td>
+  );
+}
+
 export function CaseWorklistPage() {
   const state = useCaseWorklist();
   const [params, setParams] = useSearchParams();
@@ -110,6 +85,7 @@ export function CaseWorklistPage() {
   );
 
   const allCases = useMemo(() => (state.status === 'ready' ? state.cases : []), [state]);
+  const remediationKnown = state.status === 'ready' && state.remediationKnown;
 
   const priorities = useMemo(
     () =>
@@ -204,6 +180,20 @@ export function CaseWorklistPage() {
                 <option value="none">Not yet graded</option>
               </select>
             </FilterField>
+            {remediationKnown ? (
+              <FilterField label="Remediation" htmlFor="worklist-remediation">
+                <select
+                  id="worklist-remediation"
+                  value={filters.remediation}
+                  onChange={(e) => set('remediation', e.target.value)}
+                >
+                  <option value="">All cases</option>
+                  <option value="open">Open</option>
+                  <option value="complete">Complete</option>
+                  <option value="none">None raised</option>
+                </select>
+              </FilterField>
+            ) : null}
             <FilterField label="Route" htmlFor="worklist-route">
               <select
                 id="worklist-route"
@@ -253,6 +243,26 @@ export function CaseWorklistPage() {
             </FilterField>
           </FilterBar>
 
+          {filters.adviser || filters.checker ? (
+            <p className="worklist__scope" role="status">
+              Showing cases{filters.adviser ? <> advised by <strong>{filters.adviser}</strong></> : null}
+              {filters.adviser && filters.checker ? ' and' : null}
+              {filters.checker ? <> checked by <strong>{filters.checker}</strong></> : null}.{' '}
+              <button
+                type="button"
+                className="worklist__scope-clear"
+                onClick={() => {
+                  const next = new URLSearchParams(params);
+                  next.delete('adviser');
+                  next.delete('checker');
+                  setParams(next, { replace: true });
+                }}
+              >
+                Show everyone
+              </button>
+            </p>
+          ) : null}
+
           {filters.person ? (
             <p className="worklist__scope" role="status">
               Showing cases involving <strong>{filters.person}</strong>.{' '}
@@ -293,12 +303,13 @@ export function CaseWorklistPage() {
                     Age
                   </th>
                   <th scope="col">Latest outcome</th>
+                  {remediationKnown ? <th scope="col">Remediation</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="worklist__empty">
+                    <td colSpan={remediationKnown ? 10 : 9} className="worklist__empty">
                       No cases match your current filters.
                     </td>
                   </tr>
@@ -338,6 +349,7 @@ export function CaseWorklistPage() {
                           'Not yet graded'
                         )}
                       </td>
+                      {remediationKnown ? <RemediationCell remediation={item.remediation} /> : null}
                     </tr>
                   ))
                 )}

@@ -34,6 +34,32 @@
   border-left-color: var(--colour-stage-waiting);
 }
 
+.reports__stat[data-tone='closed'] {
+  border-left-color: var(--colour-stage-closed);
+}
+
+/* A tile that opens the worklist it counted. */
+.reports__stat--link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.reports__stat--link:hover,
+.reports__stat--link:focus-visible {
+  border-color: var(--colour-action);
+}
+
+.reports__stat--link:hover .reports__stat-value {
+  color: var(--colour-action);
+}
+
+/* What the headline is not: the action count under the case count, so neither is read as
+   the other again. */
+.reports__stat-detail {
+  font-size: var(--text-sm);
+  color: var(--colour-text-muted);
+}
+
 .reports__stat-value {
   font-family: var(--font-heading);
   font-size: var(--text-2xl);
