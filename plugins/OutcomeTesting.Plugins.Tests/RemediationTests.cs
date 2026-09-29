@@ -721,5 +721,118 @@ namespace OutcomeTesting.Plugins.Tests
                 Remediation.StatusCompleted,
                 service.Row("al_remediationaction", existing).GetAttributeValue<OptionSetValue>("al_actionstatus").Value);
         }
+
+        [Fact]
+        public void Stamps_each_action_with_the_checkers_remedial_action()
+        {
+            var service = new FakeOrganizationService();
+
+            Remediation.Raise(
+                service,
+                new EntityReference("al_outcomecase", Guid.NewGuid()),
+                "IO-020",
+                Guid.NewGuid(),
+                1,
+                "Fail",
+                null,
+                new List<string> { "First issue", "Second issue" },
+                null,
+                Monday,
+                new List<string> { "Fix the first.", "Fix the second." });
+
+            Assert.Equal(
+                new[] { "Fix the first.", "Fix the second." },
+                service.Creates.Select(c => c.GetAttributeValue<string>(RemedialActions.ActionAttr)).ToArray());
+        }
+
+        [Fact]
+        public void Keeps_each_remedial_action_with_its_item_when_a_blank_item_is_skipped()
+        {
+            var service = new FakeOrganizationService();
+
+            Remediation.Raise(
+                service,
+                new EntityReference("al_outcomecase", Guid.NewGuid()),
+                "IO-021",
+                Guid.NewGuid(),
+                1,
+                "Fail",
+                null,
+                new List<string> { "First issue", "  ", "Third issue" },
+                null,
+                Monday,
+                new List<string> { "Fix the first.", "ignored", "Fix the third." });
+
+            Assert.Equal(
+                new[] { "Fix the first.", "Fix the third." },
+                service.Creates.Select(c => c.GetAttributeValue<string>(RemedialActions.ActionAttr)).ToArray());
+        }
+
+        [Fact]
+        public void Stamps_the_single_action_with_the_overall_remedial_action()
+        {
+            var service = new FakeOrganizationService();
+
+            Remediation.Raise(
+                service,
+                new EntityReference("al_outcomecase", Guid.NewGuid()),
+                "IO-022",
+                Guid.NewGuid(),
+                1,
+                "Pass with issues",
+                null,
+                new List<string>(),
+                null,
+                Monday,
+                null,
+                "Explain the rationale to the client.");
+
+            Assert.Equal(
+                "Explain the rationale to the client.",
+                Assert.Single(service.Creates).GetAttributeValue<string>(RemedialActions.ActionAttr));
+        }
+
+        [Fact]
+        public void Leaves_the_column_absent_when_the_checker_wrote_nothing()
+        {
+            var service = new FakeOrganizationService();
+
+            Remediation.Raise(
+                service,
+                new EntityReference("al_outcomecase", Guid.NewGuid()),
+                "IO-023",
+                Guid.NewGuid(),
+                1,
+                "Fail",
+                null,
+                new List<string> { "First issue" },
+                null,
+                Monday);
+
+            Assert.False(Assert.Single(service.Creates).Contains(RemedialActions.ActionAttr));
+        }
+
+        [Fact]
+        public void Clips_an_over_long_remedial_action_to_the_column()
+        {
+            var service = new FakeOrganizationService();
+
+            Remediation.Raise(
+                service,
+                new EntityReference("al_outcomecase", Guid.NewGuid()),
+                "IO-024",
+                Guid.NewGuid(),
+                1,
+                "Fail",
+                null,
+                new List<string> { "First issue" },
+                null,
+                Monday,
+                new List<string> { new string('x', RemedialActions.MaxLength + 10) });
+
+            Assert.Equal(
+                RemedialActions.MaxLength,
+                Assert.Single(service.Creates).GetAttributeValue<string>(RemedialActions.ActionAttr).Length);
+        }
     }
 }

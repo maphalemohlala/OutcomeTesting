@@ -678,6 +678,11 @@ namespace OutcomeTesting.Plugins
         /// <see cref="AdviserContact"/> refuses to guess, and an unassigned action is far
         /// better than no action - the remediation is on the worklist for a manager to
         /// route, rather than lost to a directory gap.
+        ///
+        /// <paramref name="remedialActions"/> is the checker's remedial action for each item,
+        /// parallel to <paramref name="items"/>, and <paramref name="overallRemedialAction"/> is
+        /// the one for a check with nothing itemised (project owner, 2026-09-29). Either may be
+        /// null: an action raised without words still raises, and the adviser can still answer it.
         /// </summary>
         public static IList<Guid> Raise(
             IOrganizationService service,
@@ -689,7 +694,9 @@ namespace OutcomeTesting.Plugins
             string observation,
             IList<string> items,
             EntityReference adviserContact,
-            DateTime raisedOn)
+            DateTime raisedOn,
+            IList<string> remedialActions = null,
+            string overallRemedialAction = null)
         {
             var raised = new List<Guid>();
 
@@ -706,13 +713,18 @@ namespace OutcomeTesting.Plugins
                     ActionCode(caseReference, sequence),
                     Describe(reason, observation, null),
                     adviserContact,
-                    raisedOn));
+                    raisedOn,
+                    overallRemedialAction));
                 return raised;
             }
 
+            // Indexed by position in the list the checker's words were aligned to, which
+            // includes any blank item - so a skipped blank does not shift every later action
+            // onto its neighbour's words.
             var index = 0;
-            foreach (var item in items)
+            for (var position = 0; position < items.Count; position++)
             {
+                var item = items[position];
                 if (string.IsNullOrWhiteSpace(item))
                 {
                     continue;
@@ -727,7 +739,8 @@ namespace OutcomeTesting.Plugins
                     ActionCode(caseReference, sequence, index),
                     DescribeItem(reason, observation, item),
                     adviserContact,
-                    raisedOn));
+                    raisedOn,
+                    remedialActions != null && position < remedialActions.Count ? remedialActions[position] : null));
             }
 
             // Every item was blank, which the list should never carry - fall back to the one
@@ -742,7 +755,8 @@ namespace OutcomeTesting.Plugins
                     ActionCode(caseReference, sequence),
                     Describe(reason, observation, null),
                     adviserContact,
-                    raisedOn));
+                    raisedOn,
+                    overallRemedialAction));
             }
 
             return raised;
@@ -764,7 +778,8 @@ namespace OutcomeTesting.Plugins
             string code,
             string description,
             EntityReference adviserContact,
-            DateTime raisedOn)
+            DateTime raisedOn,
+            string remedialAction)
         {
             var existing = FindByCode(service, code);
             if (existing != Guid.Empty)
@@ -788,6 +803,16 @@ namespace OutcomeTesting.Plugins
                 ["al_actionstatus"] = new OptionSetValue(StatusOpen),
                 ["al_duedate"] = AddWorkingDays(raisedOn, ThresholdWorkingDays),
             };
+
+            // The checker's words, written once, here. RemediationResponseGuardPlugin refuses
+            // every later write to the column, so this is the only moment it can be set.
+            var remedial = (remedialAction ?? string.Empty).Trim();
+            if (remedial.Length > 0)
+            {
+                action[RemedialActions.ActionAttr] = remedial.Length <= RemedialActions.MaxLength
+                    ? remedial
+                    : remedial.Substring(0, RemedialActions.MaxLength);
+            }
 
             // Set only when resolved. Writing an explicit null would be the same row to
             // Dataverse, but leaving the column absent keeps "we could not identify the
