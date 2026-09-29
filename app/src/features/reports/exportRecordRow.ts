@@ -6,6 +6,9 @@ export interface ExportRecordRow {
   name: string;
   batchId: string | null;
   batchName: string;
+  /** The case the row was snapshotted from, so the batch page can link to it. */
+  caseId: string | null;
+  caseReference: string;
   adviser: string;
   client: string;
   adviceGrade: string;
@@ -24,6 +27,7 @@ export interface ExportRecordRow {
  */
 export function toExportRecordRow(r: Al_exportrecords, batchNames: Map<string, string>): ExportRecordRow {
   const batchId = r._al_exportbatchid_value ?? null;
+  const caseId = r._al_outcomecaseid_value ?? null;
   return {
     id: r.al_exportrecordid,
     name: r.al_name ?? '',
@@ -32,6 +36,8 @@ export function toExportRecordRow(r: Al_exportrecords, batchNames: Map<string, s
       lookupLabel(r, 'al_exportbatchid', r.al_exportbatchidname) ??
       (batchId ? batchNames.get(batchId) : undefined) ??
       '',
+    caseId,
+    caseReference: lookupLabel(r, 'al_outcomecaseid', r.al_outcomecaseidname) ?? '',
     adviser: r.al_advisername ?? '',
     client: r.al_clientname ?? '',
     adviceGrade: r.al_advicequalitygrade ?? '',

@@ -3,6 +3,8 @@ import {
   TRAIL_LIGHT_HEADERS,
   trailLightFilename,
   trailLightRow,
+  describeCheckRange,
+  fileContentsSummary,
   withinCheckDates,
   type ExportRecord,
 } from './trailLight';
@@ -183,5 +185,43 @@ describe('the check-date range on a Trail Light download', () => {
   it('leaves out a row with no check date once a range is set', () => {
     // It cannot be shown to fall inside the range, and the file is what gets reconciled.
     expect(withinCheckDates(record(), '2026-09-01', '')).toBe(false);
+  });
+});
+
+describe('how the range is put into words on a batch page', () => {
+  // 2026-09-29: users could not tell what the range did. The page now says, in dates they
+  // would write, exactly which cases the file will hold.
+  it('names both ends of a range', () => {
+    expect(describeCheckRange('2026-09-28', '2026-09-29')).toBe('checked 28 Sep 2026 to 29 Sep 2026');
+  });
+
+  it('names one day once', () => {
+    expect(describeCheckRange('2026-09-28', '2026-09-28')).toBe('checked on 28 Sep 2026');
+  });
+
+  it('names an open end as "on or after" or "on or before"', () => {
+    expect(describeCheckRange('2026-09-28', '')).toBe('checked on or after 28 Sep 2026');
+    expect(describeCheckRange('', '2026-09-29')).toBe('checked on or before 29 Sep 2026');
+  });
+
+  it('says nothing when no range is set', () => {
+    expect(describeCheckRange('', '')).toBe('');
+  });
+
+  it('says how many of the batch go in the file, and which', () => {
+    expect(fileContentsSummary(3, 8, '2026-09-28', '2026-09-29')).toBe(
+      'The file will contain 3 of the 8 cases in this batch: those checked 28 Sep 2026 to 29 Sep 2026.',
+    );
+  });
+
+  it('says the file holds the whole batch when no range is set', () => {
+    expect(fileContentsSummary(8, 8, '', '')).toBe('The file will contain all 8 cases in this batch.');
+    expect(fileContentsSummary(1, 1, '', '')).toBe('The file will contain the 1 case in this batch.');
+  });
+
+  it('says plainly when the range leaves nothing', () => {
+    expect(fileContentsSummary(0, 8, '2026-10-01', '')).toBe(
+      'None of the 8 cases in this batch were checked on or after 1 Oct 2026, so there is nothing to download.',
+    );
   });
 });

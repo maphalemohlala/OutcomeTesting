@@ -111,6 +111,39 @@ export function withinCheckDates(record: ExportRecord, from: string, to: string)
   return true;
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** `2026-09-28` as `28 Sep 2026`, read from the digits so no time zone can move the day. */
+export function ukDay(isoDay: string): string {
+  const [year, month, dayOfMonth] = isoDay.split('-').map(Number);
+  return `${dayOfMonth} ${MONTHS[month - 1]} ${year}`;
+}
+
+/**
+ * The range a batch download is cut to, in words (2026-09-29). Users could not tell what the
+ * two date boxes did, so the batch page says it in the dates they would write themselves.
+ */
+export function describeCheckRange(from: string, to: string): string {
+  if (from && to) return from === to ? `checked on ${ukDay(from)}` : `checked ${ukDay(from)} to ${ukDay(to)}`;
+  if (from) return `checked on or after ${ukDay(from)}`;
+  if (to) return `checked on or before ${ukDay(to)}`;
+  return '';
+}
+
+/** One sentence saying which of a batch's cases the file will hold. */
+export function fileContentsSummary(inRange: number, total: number, from: string, to: string): string {
+  const range = describeCheckRange(from, to);
+  if (!range) {
+    return total === 1
+      ? 'The file will contain the 1 case in this batch.'
+      : `The file will contain all ${total} cases in this batch.`;
+  }
+  if (inRange === 0) {
+    return `None of the ${total} cases in this batch were ${range}, so there is nothing to download.`;
+  }
+  return `The file will contain ${inRange} of the ${total} cases in this batch: those ${range}.`;
+}
+
 export function trailLightRow(record: ExportRecord): CellValue[] {
   return [
     text(record.al_advisername),

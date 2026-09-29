@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import { ExportMenu } from '../../components/export/ExportMenu';
@@ -6,7 +7,7 @@ import { useExports, type ExportRecordRow } from './useExports';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { createExportBatch, generateExport } from '../../services/commands/exports';
 import { messageForFailure } from '../../services/errors';
-import { TRAIL_LIGHT_HEADERS, trailLightFilename, trailLightRow, withinCheckDates } from './trailLight';
+import { TRAIL_LIGHT_HEADERS, trailLightFilename, trailLightRow } from './trailLight';
 import { buildFullExtract, EXTRACT_ROW_LIMIT } from './fullExtract';
 import { downloadWorkbook, stampedFilename } from '../../lib/tabular';
 import './ExportsPage.css';
@@ -38,16 +39,6 @@ export function ExportsPage() {
   const [batchStatus, setBatchStatus] = useState('');
   const [batchFrom, setBatchFrom] = useState('');
   const [batchTo, setBatchTo] = useState('');
-  const [recordSearch, setRecordSearch] = useState('');
-  const [recordGrade, setRecordGrade] = useState('');
-  // The range a Trail Light download is cut to, on check date (column G). One range for
-  // every download on the page, so a batch's file and the filtered rows answer the same
-  // period (2026-09-28). Each batch snapshots every closed case, so this is what makes a
-  // download cover a month rather than everything closed to date.
-  const [checkFrom, setCheckFrom] = useState('');
-  const [checkTo, setCheckTo] = useState('');
-  const ranged = checkFrom !== '' || checkTo !== '';
-
   const batches = useMemo(() => (state.status === 'ready' ? state.batches : []), [state]);
   const records = useMemo(() => (state.status === 'ready' ? state.records : []), [state]);
 
@@ -55,11 +46,6 @@ export function ExportsPage() {
     () => [...new Set(batches.map((b) => b.status).filter(Boolean))].sort(),
     [batches],
   );
-  const recordGrades = useMemo(
-    () => [...new Set(records.map((r) => r.adviceGrade).filter(Boolean))].sort(),
-    [records],
-  );
-
   const filteredBatches = useMemo(
     () =>
       batches.filter(
@@ -70,25 +56,7 @@ export function ExportsPage() {
     [batches, batchStatus, batchFrom, batchTo],
   );
 
-  const filteredRecords = useMemo(() => {
-    const term = recordSearch.trim().toLowerCase();
-    return records.filter(
-      (r) =>
-        (!recordGrade || r.adviceGrade === recordGrade) &&
-        withinCheckDates(r.record, checkFrom, checkTo) &&
-        (!term || `${r.adviser} ${r.client} ${r.batchName}`.toLowerCase().includes(term)),
-    );
-  }, [records, recordSearch, recordGrade, checkFrom, checkTo]);
-
   const batchesFiltered = batchStatus !== '' || batchFrom !== '' || batchTo !== '';
-  const recordsFiltered = recordSearch.trim() !== '' || recordGrade !== '' || ranged;
-
-  function rangeCaption(): string {
-    if (checkFrom && checkTo) return `checked ${checkFrom} to ${checkTo}`;
-    if (checkFrom) return `checked on or after ${checkFrom}`;
-    return `checked on or before ${checkTo}`;
-  }
-
   const recordsByBatch = useMemo(() => {
     const grouped = new Map<string, ExportRecordRow[]>();
     for (const record of records) {
@@ -176,7 +144,7 @@ export function ExportsPage() {
     <>
       <PageIntro
         title="Exports"
-        purpose="Produce the Trail Light export on demand. Each batch snapshots the closed cases into the 20-column contract for reconciliation (AD-039, AD-034 manual only)."
+        purpose="Produce the Trail Light export on demand. Each batch snapshots the closed cases for reconciliation (AD-039, AD-034 manual only). Open a batch to see its cases and download them for a range of check dates."
         actions={
           <>
             <button type="button" className="exports__btn exports__btn--ghost" onClick={onFullExtract} disabled={busy}>
@@ -206,43 +174,6 @@ export function ExportsPage() {
 
       {state.status === 'ready' ? (
         <>
-          <section aria-labelledby="range-heading">
-            <h2 id="range-heading" className="exports__heading">
-              Trail Light date range
-            </h2>
-            <p className="exports__note">
-              Cut every Trail Light download below to the cases checked in this range. Leave it
-              empty to download everything in the batch.
-            </p>
-            <FilterBar
-              summary={ranged ? `Downloads cover cases ${rangeCaption()}` : 'No range: downloads cover every row'}
-              onClear={() => {
-                setCheckFrom('');
-                setCheckTo('');
-              }}
-              clearDisabled={!ranged}
-            >
-              <FilterField label="Check date from" htmlFor="check-from">
-                <input
-                  id="check-from"
-                  type="date"
-                  value={checkFrom}
-                  max={checkTo || undefined}
-                  onChange={(e) => setCheckFrom(e.target.value)}
-                />
-              </FilterField>
-              <FilterField label="Check date to" htmlFor="check-to">
-                <input
-                  id="check-to"
-                  type="date"
-                  value={checkTo}
-                  min={checkFrom || undefined}
-                  onChange={(e) => setCheckTo(e.target.value)}
-                />
-              </FilterField>
-            </FilterBar>
-          </section>
-
           <section aria-labelledby="batches-heading">
             <h2 id="batches-heading" className="exports__heading">
               Export batches
@@ -310,16 +241,15 @@ export function ExportsPage() {
                       </tr>
                     ) : (
                       filteredBatches.map((b) => {
-                        const allBatchRecords = recordsByBatch.get(b.id) ?? [];
-                        const batchRecords = allBatchRecords.filter((record) =>
-                          withinCheckDates(record.record, checkFrom, checkTo),
-                        );
+                        const batchRecords = recordsByBatch.get(b.id) ?? [];
                         // AD-042: only a Draft batch may be generated. Leaving the button
                         // live made the plug-in's refusal the way users discovered that.
                         const isDraft = b.status === 'Draft';
                         return (
                           <tr key={b.id}>
-                            <td>{b.name}</td>
+                            <td>
+                              <Link to={`/exports/${b.id}`}>{b.name || b.code || 'Export batch'}</Link>
+                            </td>
                             <td>{b.status}</td>
                             <td>{formatDate(b.generatedOn)}</td>
                             <td>{b.rowCount}</td>
@@ -344,18 +274,12 @@ export function ExportsPage() {
                                 sheetName="Trail Light"
                                 headers={TRAIL_LIGHT_HEADERS}
                                 rows={batchRecords.map((record) => trailLightRow(record.record))}
-                                caption={
-                                  ranged
-                                    ? `${batchRecords.length} of ${allBatchRecords.length} row(s), ${rangeCaption()}, in the AD-039 20-column order`
-                                    : `${batchRecords.length} row(s) in the AD-039 20-column order`
-                                }
+                                caption={`All ${batchRecords.length} row(s) in the batch. Open the batch to choose a check-date range.`}
                                 disabled={busy}
                                 emptyHint={
                                   isDraft
                                     ? 'This batch has not been generated yet.'
-                                    : allBatchRecords.length > 0
-                                      ? `None of this batch's ${allBatchRecords.length} row(s) were ${rangeCaption()}.`
-                                      : 'This batch generated 0 rows, because no cases are at status Closed.'
+                                    : 'This batch generated 0 rows, because no cases are at status Closed.'
                                 }
                               />
                             </td>
@@ -369,92 +293,6 @@ export function ExportsPage() {
             )}
           </section>
 
-          <section aria-labelledby="records-heading">
-            <div className="exports__section-head">
-              <h2 id="records-heading" className="exports__heading">
-                Export records
-              </h2>
-              {filteredRecords.length > 0 ? (
-                <ExportMenu
-                  label="Download filtered rows"
-                  stem="trail-light-filtered"
-                  filenameFor={(format) => trailLightFilename(format)}
-                  sheetName="Trail Light"
-                  headers={TRAIL_LIGHT_HEADERS}
-                  rows={filteredRecords.map((record) => trailLightRow(record.record))}
-                  caption={`${filteredRecords.length} row(s)${ranged ? `, ${rangeCaption()},` : ''} in the AD-039 20-column order`}
-                />
-              ) : null}
-            </div>
-            {state.records.length === 0 ? (
-              <p>No export records yet. Generate a batch to populate them.</p>
-            ) : (
-              <>
-                <FilterBar
-                  summary={`${filteredRecords.length} of ${records.length} records`}
-                  onClear={() => {
-                    setRecordSearch('');
-                    setRecordGrade('');
-                    setCheckFrom('');
-                    setCheckTo('');
-                  }}
-                  clearDisabled={!recordsFiltered}
-                >
-                  <FilterField label="Search" htmlFor="record-search">
-                    <input
-                      id="record-search"
-                      type="search"
-                      value={recordSearch}
-                      onChange={(e) => setRecordSearch(e.target.value)}
-                      placeholder="Adviser, client or batch"
-                    />
-                  </FilterField>
-                  <FilterField label="Advice quality grade" htmlFor="record-grade">
-                    <select
-                      id="record-grade"
-                      value={recordGrade}
-                      onChange={(e) => setRecordGrade(e.target.value)}
-                    >
-                      <option value="">All grades</option>
-                      {recordGrades.map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
-                      ))}
-                    </select>
-                  </FilterField>
-                </FilterBar>
-                <table className="exports__table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Batch</th>
-                      <th scope="col">Adviser</th>
-                      <th scope="col">Client</th>
-                      <th scope="col">Advice quality grade</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredRecords.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="exports__empty">
-                          No records match your current filters.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredRecords.map((r) => (
-                        <tr key={r.id}>
-                          <td>{r.batchName}</td>
-                          <td>{r.adviser}</td>
-                          <td>{r.client}</td>
-                          <td>{r.adviceGrade}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </>
-            )}
-          </section>
         </>
       ) : null}
     </>

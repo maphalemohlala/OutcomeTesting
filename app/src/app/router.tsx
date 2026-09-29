@@ -19,6 +19,7 @@ import { ReviewDetailPage } from '../features/reviews/ReviewDetailPage';
 import { RemediationPage } from '../features/remediation/RemediationPage';
 import { ReportsPage } from '../features/reports/ReportsPage';
 import { ExportsPage } from '../features/reports/ExportsPage';
+import { ExportBatchPage } from '../features/reports/ExportBatchPage';
 
 /** Routes follow 09-Application-Screens. Screens without a data source say so explicitly. */
 export function AppRoutes() {
@@ -115,6 +116,14 @@ export function AppRoutes() {
           element={
             <RequirePermission resource="page.exports">
               <ExportsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/exports/:batchId"
+          element={
+            <RequirePermission resource="page.exports">
+              <ExportBatchPage />
             </RequirePermission>
           }
         />
