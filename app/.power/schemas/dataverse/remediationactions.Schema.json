@@ -10,6 +10,37 @@
       "x-ms-dataverse-primary-id": "al_remediationactionid",
       "x-ms-dataverse-primary-name": "al_name",
       "properties": {
+        "al_actionperformed": {
+          "type": "string",
+          "title": "Action performed",
+          "x-ms-dataverse-attribute": "al_actionperformed",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "al_ActionPerformed",
+          "enum": [
+            "Yes",
+            "No"
+          ],
+          "x-ms-enum-values": [
+            120910815,
+            120910816
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "ac9cceb9-f9bb-f111-aaad-e4fade0775c0",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Action performed",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "al_actionperformedname": {
+          "type": "string",
+          "title": "al_actionperformedname",
+          "x-ms-dataverse-attribute": "al_actionperformedname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "al_actionperformedName",
+          "x-ms-read-only": true
+        },
         "al_actionstatus": {
           "type": "string",
           "title": "Action status",
@@ -269,6 +300,14 @@
           "x-ms-dataverse-type": "VirtualType",
           "x-ms-schema-name": "al_recheckrequiredName",
           "x-ms-read-only": true
+        },
+        "al_remedialaction": {
+          "type": "string",
+          "title": "Remedial action",
+          "x-ms-dataverse-attribute": "al_remedialaction",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "al_RemedialAction",
+          "maxLength": 4000
         },
         "al_remediationactioncode": {
           "type": "string",
