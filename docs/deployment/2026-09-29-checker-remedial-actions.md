@@ -252,6 +252,26 @@ Radingwana) to Service Account, but the portal's form records one decision for e
 so approving one row and rejecting another there also needs the per-action PATCH of step 2,
 with that case's action ids.
 
+## Solution membership (DEV, 2026-09-29, after the fix wave)
+
+Checked by type against the environment, not by trusting the solution. **Nothing of ours is
+missing**: OutcomeTesting 1.0.13.0 (unmanaged) holds 659 components.
+
+| Component type | In DEV | Members |
+|---|---|---|
+| Portal components / site / language | 297 / 1 / 1 | 297 / 1 / 1 (includes the three templates, `OT Layout`, the CSS, both allowlists) |
+| `al_` custom APIs / request parameters / response properties | 32 / 140 / 115 | all |
+| SDK steps on `OutcomeTesting.Plugins` | 65 | 33, all enabled; the other 32 are generated `CustomApi ... implementation` steps, which travel with their API. This includes the new `RemedialActionsRequestPlugin` step and the guard step with its seven-column filter |
+| Plug-in assembly, Code App, unmanaged root roles | 1, 1, 3 | all |
+| `al_` tables | 28 | all: 26 with subcomponents, so `al_pendingremedialactions`, `al_remedialaction` and `al_actionperformed` travel with `al_reviewinstance` and `al_remediationaction`; the 2 intersect tables through an end (`metadatamembership`) |
+| `contact` `al_` columns | 7 | all, including `al_remedialactionsrequest` (`contact` is a shell member, so its columns are held one by one) |
+
+Reported but not gaps: the platform's own `adx_` / `msdyn_` / `msa_` / `mspp_` columns on
+`contact`, `account` and `email`; six `msdyn_` / `powerpages_` environment variables and two
+`msdyn_` connection references (all platform-created); `al_PortalBaseUrl` (each environment
+keeps its own). No `al_` web resources, global choices, model-driven apps or unmanaged
+workflows exist.
+
 ## Left for the owner
 
 - **The sign-off runbook just above** (I5 a/b), and a fresh portal session for the Code App
