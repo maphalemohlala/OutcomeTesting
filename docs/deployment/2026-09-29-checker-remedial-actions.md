@@ -169,6 +169,22 @@ is not claimed here.
   completed, **Awaiting Sign-off**.
 - Both can be signed off or rejected by a T&C Supervisor to exercise the sign-off leg, which
   this change did not alter.
+- Case **920929002** (created 2026-09-29 evening as the fixture for
+  `app/e2e/remedial-actions.e2e.ts`): Tax review `4a08d54e-1cbc-f111-aaad-e4fade0775c0`
+  assigned to Service Account, outcome **Fail**, no fail point ticked, so its card holds one
+  blank **Overall** row. Leave it unsubmitted: the spec's refused-submit test needs that blank
+  row.
+
+## Playwright run (2026-09-29, evening)
+
+`app/e2e/remedial-actions.e2e.ts` against the DEV portal as Service Account: **6 passed**.
+It covers the card drawing one editable box per row; Submit refused naming the blank Overall
+row, with a route guard proving no write was sent; a submitted review with no card and no
+Submit; the nine columns in order on `OT Remediation` and `OT Case Detail` (920929001), with
+the checker's words on every row, both a Yes and a No, and nothing editable on completed rows;
+and a portal Web API PATCH of `al_remedialaction` refused. The existing `remediation-gate`
+spec (sign-off controls, 900000001 mapped to me / 920929001 not) passed 4 of 4 on the same
+deploy.
 
 ## Fix wave redeploy (2026-09-29, afternoon)
 

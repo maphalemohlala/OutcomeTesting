@@ -27,6 +27,10 @@ Nothing about any environment is committed here. Set what you are pointing at:
 | `OT_CODEAPP_URL` | The Code App's player URL (`https://apps.powerapps.com/play/e/<env>/app/<appId>`), for `code-app.e2e.ts`. The portal session file carries the Entra cookies it needs. |
 | `OT_REVIEW_ID` | An AQS review the Code App opens read-only, for `code-app.e2e.ts`. |
 | `OT_PERSON_NAME` | A checker who holds cases, for the Code App person page. |
+| `OT_REMEDIAL_REVIEW_URL` | For `remedial-actions.e2e.ts`: an **editable** review assigned to the signed-in user that owes a remediation and still has a blank row in "Fail points and remedial actions". A Tax review with the outcome at Fail and no fail point ticked gives one blank **Overall** row. Allow up to 15 minutes after answering for the portal cache (AD-094) before the card shows on a fresh load. |
+| `OT_SUBMITTED_REVIEW_URL` | A submitted review, for the same spec. |
+| `OT_REMEDIAL_CASE` | A case whose actions carry the checker's remedial action and an Action performed answer, **both a Yes and a No**. |
+| `OT_REMEDIAL_ACTION_ID` | One of that case's actions, for the write-once check. |
 | `OT_KEEP_ROOT_CAUSES` | `1` leaves the two root causes `checker-feedback.e2e.ts` saves, so they can be read back from Dataverse (answers carry no audit history). |
 
 Then:
