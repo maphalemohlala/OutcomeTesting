@@ -137,6 +137,7 @@ export function ActionsTable({
           <th scope="col">No.</th>
           <th scope="col">Issue / fail reason</th>
           <th scope="col">Remedial action</th>
+          <th scope="col">Action performed</th>
           <th scope="col">Owner</th>
           <th scope="col">Target date</th>
           <th scope="col">Status</th>
@@ -149,7 +150,7 @@ export function ActionsTable({
           <Fragment key={action.id}>
             {heading ? (
               <tr className="remediation__group">
-                <th scope="colgroup" colSpan={8}>
+                <th scope="colgroup" colSpan={9}>
                   {heading}
                 </th>
               </tr>
@@ -161,6 +162,12 @@ export function ActionsTable({
                 {index === 0 ? (
                   <>
                     <td rowSpan={lines.length}>{action.remedialAction ?? '—'}</td>
+                    <td rowSpan={lines.length}>
+                      {action.actionPerformed ?? '—'}
+                      {action.adviserNote ? (
+                        <span className="remediation__form-note"> {action.adviserNote}</span>
+                      ) : null}
+                    </td>
                     {/*
                       An action nobody has been given still has an adviser: the case names
                       one, and the portal falls back to it rather than saying "Unassigned"

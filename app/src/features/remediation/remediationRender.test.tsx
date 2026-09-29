@@ -47,6 +47,8 @@ function action(id: string, description: string): RemediationActionRow {
     owner: null,
     rowVersion: null,
     remedialAction: null,
+    actionPerformed: null,
+    adviserNote: null,
     evidenceReference: null,
     clientContactRequired: null,
     recheckRequired: null,
@@ -113,16 +115,32 @@ describe('the remediation actions table', () => {
 
   it('spans the action’s own columns across its items rather than repeating them', () => {
     const markup = draw([action('a1', DESCRIPTION)]);
-    // Six columns follow the issue: remedial action, owner, target date, status, age and
+    // Seven columns follow the issue: remedial action, action performed, owner, target date, status, age and
     // sign-off. The four that carried the adviser's answers are gone - they are the form
     // block under the table now - and so is the complete button: every action is completed
     // and signed off on the portal, so this table reports and never writes (2026-09-10).
     // React’s server renderer writes the attribute as rowSpan; HTML parses it either way.
-    expect([...markup.matchAll(/rowspan="4"/gi)]).toHaveLength(6);
+    expect([...markup.matchAll(/rowspan="4"/gi)]).toHaveLength(7);
 
     const body = rows(markup).slice(1);
-    expect(body[0]).toHaveLength(8);
+    expect(body[0]).toHaveLength(9);
     expect(body[1]).toHaveLength(2);
+  });
+
+  it('draws Action performed beside the checker remedial action with the adviser note under it', () => {
+    const answered = {
+      ...action('a1', DESCRIPTION),
+      remedialAction: 'Re-verify the client ID',
+      actionPerformed: 'Yes',
+      adviserNote: 'Done 26 Sep',
+    };
+    const markup = draw([answered]);
+    const header = rows(markup)[0];
+    const first = rows(markup)[1];
+
+    expect(header.slice(2, 5)).toEqual(['Remedial action', 'Action performed', 'Owner']);
+    expect(first[2]).toBe('Re-verify the client ID');
+    expect(first[3]).toBe('Yes Done 26 Sep');
   });
 
   it('draws no context row under the items at all', () => {

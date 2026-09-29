@@ -25,6 +25,10 @@ export interface RemediationActionRow {
   owner: string | null;
   rowVersion: string | null;
   remedialAction: string | null;
+  /** The adviser's Yes / No, on rows carrying the checker's remedial action (2026-09-29). */
+  actionPerformed: string | null;
+  /** The adviser's optional note beside it. Null on rows raised before that change. */
+  adviserNote: string | null;
   evidenceReference: string | null;
   clientContactRequired: string | null;
   recheckRequired: string | null;
@@ -78,6 +82,8 @@ export const CLIENT_CONTACT_REQUIRED: Record<number, string> = {
 };
 export const RECHECK_REQUIRED: Record<number, string> = { 120910796: 'Yes', 120910797: 'No' };
 export const CHANGES_ADVICE: Record<number, string> = { 120910798: 'Yes', 120910799: 'No' };
+/** al_actionperformed; the same two values the plug-ins and the portal use. */
+export const ACTION_PERFORMED: Record<number, string> = { 120910815: 'Yes', 120910816: 'No' };
 
 /** The SDK returns an empty choice as null, and the generated model does not know these columns yet. */
 function choice(record: Al_remediationactions, attr: string, labels: Record<number, string>): string | null {
@@ -100,7 +106,16 @@ export function toAction(record: Al_remediationactions): RemediationActionRow {
     triggeredBy: lookupLabel(record, 'al_reviewinstanceid', record.al_reviewinstanceidname),
     owner: lookupLabel(record, 'ownerid', record.owneridname),
     assignedTo: text(extra.al_assignedcontactidname as string | undefined),
-    remedialAction: text(extra.al_adviserresponse as string | undefined),
+    // The checker writes the remedial action from 2026-09-29 and the adviser's text becomes
+    // their note. A row raised before that carries no checker's words, so its remedial action
+    // is still the adviser's own, and it has no note.
+    remedialAction:
+      text(extra.al_remedialaction as string | undefined) ??
+      text(extra.al_adviserresponse as string | undefined),
+    actionPerformed: choice(record, 'al_actionperformed', ACTION_PERFORMED),
+    adviserNote: text(extra.al_remedialaction as string | undefined)
+      ? text(extra.al_adviserresponse as string | undefined)
+      : null,
     evidenceReference: text(extra.al_evidencereference as string | undefined),
     clientContactRequired: choice(record, 'al_clientcontactrequired', CLIENT_CONTACT_REQUIRED),
     recheckRequired: choice(record, 'al_recheckrequired', RECHECK_REQUIRED),

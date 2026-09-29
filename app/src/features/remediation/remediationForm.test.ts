@@ -22,6 +22,8 @@ function action(over: Partial<RemediationActionRow> = {}): RemediationActionRow 
     owner: null,
     rowVersion: null,
     remedialAction: null,
+    actionPerformed: null,
+    adviserNote: null,
     evidenceReference: null,
     clientContactRequired: null,
     recheckRequired: null,

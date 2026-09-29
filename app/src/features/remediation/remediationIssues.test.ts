@@ -134,6 +134,8 @@ function action(id: string, description: string): RemediationActionRow {
     owner: null,
     rowVersion: null,
     remedialAction: null,
+    actionPerformed: null,
+    adviserNote: null,
     evidenceReference: null,
     clientContactRequired: null,
     recheckRequired: null,

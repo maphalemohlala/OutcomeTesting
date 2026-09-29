@@ -60,4 +60,24 @@ describe('toAction', () => {
     expect(row.status).toBe('In progress');
     expect(row.dueOn).toBe('20 Sept 2026');
   });
+
+  it('reads the checker\'s remedial action, the adviser\'s answer and their note', () => {
+    const row = toAction(
+      action({
+        al_remedialaction: 'Re-verify the client ID',
+        al_actionperformed: 120910816,
+        al_adviserresponse: 'Client unreachable',
+      }),
+    );
+    expect(row.remedialAction).toBe('Re-verify the client ID');
+    expect(row.actionPerformed).toBe('No');
+    expect(row.adviserNote).toBe('Client unreachable');
+  });
+
+  it('keeps the adviser\'s words as the remedial action on a row raised before the change', () => {
+    const row = toAction(action({ al_adviserresponse: 'Reissued the report', al_actionperformed: null }));
+    expect(row.remedialAction).toBe('Reissued the report');
+    expect(row.actionPerformed).toBeNull();
+    expect(row.adviserNote).toBeNull();
+  });
 });
