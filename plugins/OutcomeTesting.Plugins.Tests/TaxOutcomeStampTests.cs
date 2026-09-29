@@ -54,6 +54,7 @@ namespace OutcomeTesting.Plugins.Tests
                 "al_reviewstatus", new OptionSetValue(ResponseRules.StatusInProgress),
                 "al_checklistversionid", new EntityReference("al_checklistversion", ChecklistVersionId),
                 "al_sequence", 1,
+                "al_pendingremedialactions", "[{\"item\":\"__overall__\",\"text\":\"Put it right.\"}]",
                 "statecode", new OptionSetValue(0));
 
             svc.Seed("al_question", QuestionId, "al_questioncode", "Q-TAX-02");

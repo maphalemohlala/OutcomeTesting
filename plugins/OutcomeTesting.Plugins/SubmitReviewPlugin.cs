@@ -955,6 +955,14 @@ namespace OutcomeTesting.Plugins
                     throw new InvalidPluginExecutionException(PreconditionPrefix + gradeRefusal);
                 }
 
+                // The checker's remedial actions (project owner, 2026-09-29). Checked before the
+                // outcome is created so a refusal leaves nothing half-written - the whole submit
+                // is one transaction, but a refusal this early is also one the page can explain.
+                if (OutcomeRules.RequiresRemediation(outcomeValue, remedialFlagged))
+                {
+                    RemedialActions.EnsureWritten(service, targetId, DateTime.UtcNow);
+                }
+
                 CreateOutcome(service, targetId, caseRef, caseReference, sequence, outcomeValue);
 
                 // The Tax fail this case may be carrying (project owner, 2026-09-20). The Tax
@@ -993,6 +1001,13 @@ namespace OutcomeTesting.Plugins
                 {
                     throw new InvalidPluginExecutionException(
                         PreconditionPrefix + "The tax check outcome holds a value this solution does not recognise (" + answer.Value + ").");
+                }
+
+                // Checked whether or not the raising is deferred to the AQS submit (AD-184): the
+                // Tax checker is the one who can write these, and after this submit they cannot.
+                if (taxRequiresRemediation || remedialFlagged)
+                {
+                    RemedialActions.EnsureWritten(service, targetId, DateTime.UtcNow);
                 }
 
                 var aqsStillToCome = AqsStillToCome(service, caseRef.Id);
@@ -1320,17 +1335,20 @@ namespace OutcomeTesting.Plugins
             DeferredTax deferredTax)
         {
             var items = new List<string>();
+            var texts = new List<string>();
+            var overall = new List<string>();
+            var drained = new List<Guid>();
             string observation = null;
 
             // Tax first: it was checked first, and an adviser reading a combined list will
             // look for the Tax points where the Tax check left them.
             if (deferredTax != null)
             {
-                items.AddRange(Remediation.NonPassItems(service, deferredTax.ReviewId, DateTime.UtcNow));
+                Collect(service, deferredTax.ReviewId, items, texts, overall, drained);
                 observation = AnswerTextFor(service, deferredTax.ReviewId, TaxObservationQuestionCode);
             }
 
-            items.AddRange(Remediation.NonPassItems(service, reviewId, DateTime.UtcNow));
+            Collect(service, reviewId, items, texts, overall, drained);
 
             var own = AnswerTextFor(service, reviewId, observationQuestionCode);
             if (!string.IsNullOrWhiteSpace(own))
@@ -1349,7 +1367,49 @@ namespace OutcomeTesting.Plugins
                 observation,
                 items,
                 Remediation.AdviserContact(service, caseRef),
-                DateTime.UtcNow);
+                DateTime.UtcNow,
+                texts,
+                overall.Count == 0 ? null : string.Join(Environment.NewLine + Environment.NewLine, overall));
+
+            // Cleared once raised, on every review the words came from - the deferred Tax leg's
+            // included - so a later regrade cannot raise from words about a result that no
+            // longer stands.
+            foreach (var drainedId in drained)
+            {
+                service.Update(new Entity(ReviewEntity, drainedId) { [RemedialActions.PendingAttr] = null });
+            }
+        }
+
+        /// <summary>
+        /// One review's items and the words its own checker parked for them, added to the
+        /// running lists. Aligned per review rather than across the combined list, because a
+        /// Tax-then-AQS case can tick the same fail point on both checks, and each action must
+        /// carry the words of the checker who marked it.
+        /// </summary>
+        private static void Collect(
+            IOrganizationService service,
+            Guid reviewId,
+            List<string> items,
+            List<string> texts,
+            List<string> overall,
+            List<Guid> drained)
+        {
+            var reviewItems = Remediation.NonPassItems(service, reviewId, DateTime.UtcNow);
+            var map = RemedialActions.Pending(service, reviewId);
+
+            items.AddRange(reviewItems);
+            texts.AddRange(RemedialActions.Align(reviewItems, map));
+
+            var general = RemedialActions.TextFor(map, RemedialActions.OverallKey);
+            if (general != null)
+            {
+                overall.Add(general);
+            }
+
+            if (map.Count > 0)
+            {
+                drained.Add(reviewId);
+            }
         }
 
         /// <summary>
