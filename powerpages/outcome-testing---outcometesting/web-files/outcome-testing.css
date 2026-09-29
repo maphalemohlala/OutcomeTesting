@@ -1109,6 +1109,24 @@ footer a:focus-visible, .footer a:focus-visible {
 /* The paper prints these in brackets beside the label, lighter than the label itself. */
 .ot-remedial-form__note { font-weight: 400; font-style: italic; font-size: 9.5pt; }
 
+/* The adviser's Action performed Yes / No (project owner, 2026-09-29). A fieldset for the
+   legend screen readers need, not for the browser's box: inside a ruled table cell the
+   default border and padding read as a second cell. The two options sit side by side, as
+   .ot-accountability__set .opt lays out its own. */
+.ot-performed {
+  margin: 0 0 var(--space-1);
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.ot-performed .opt {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin-right: var(--space-3);
+}
+
 /* =========================================================================================
    The Checker Checklist, drawn as the document
 

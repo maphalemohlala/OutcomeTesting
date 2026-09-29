@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import remediationTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-remediation/OT-Remediation.webtemplate.source.html?raw';
 import caseTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-case-detail/OT-Case-Detail.webtemplate.source.html?raw';
+import portalCssRaw from '../../../../powerpages/outcome-testing---outcometesting/web-files/outcome-testing.css?raw';
+import layoutTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-layout/OT-Layout.webtemplate.source.html?raw';
 
 /**
  * The remediation form gains "Action performed" between Remedial action and Owner (project
@@ -58,5 +60,28 @@ describe('the adviser\'s controls on OT Remediation', () => {
 
   it('collects both kinds of row in document order', () => {
     expect(remediation).toContain("var cells = document.querySelectorAll('[data-ot-response], [data-ot-performed]');");
+  });
+});
+
+/**
+ * The Yes / No pair reads as two inline options, not a bordered box inside a table cell
+ * (T8, 2026-09-29) - the same treatment as the accountability options.
+ */
+describe('the Action performed pair is styled', () => {
+  const css = portalCssRaw.replace(/\r\n/g, '\n');
+
+  it('drops the fieldset border and padding', () => {
+    expect(css).toMatch(/\.ot-performed \{[^}]*border: 0;[^}]*\}/);
+    expect(css).toMatch(/\.ot-performed \{[^}]*padding: 0;[^}]*\}/);
+  });
+
+  it('sets the two labels inline with a small gap', () => {
+    expect(css).toMatch(/\.ot-performed \.opt \{[^}]*display: inline-flex;[^}]*gap: var\(--space-1\);[^}]*\}/);
+  });
+
+  it('moves the stylesheet version with it', () => {
+    const version = /outcome-testing\.css\?v=(\d+)/.exec(layoutTemplate);
+    expect(version).not.toBeNull();
+    expect(Number(version![1])).toBeGreaterThanOrEqual(24);
   });
 });
