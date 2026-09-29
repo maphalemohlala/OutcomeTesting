@@ -1323,6 +1323,16 @@ namespace OutcomeTesting.Plugins
         /// The observation is the checker's own words from the discipline's fail observation
         /// question, which AD-019 leaves optional - so the description has to stand without
         /// it, and with a combined action there may be two of them.
+        ///
+        /// The checker's remedial actions are collected the same way (project owner,
+        /// 2026-09-29): each review's words are aligned against that review's own parked map,
+        /// not the combined item list, because a Tax-then-AQS case can tick the same fail
+        /// point on both checks and each action must carry the words of the checker who
+        /// marked it there. A review with nothing itemised hands over its overall words
+        /// instead. This method writes to a second entity as a side effect of raising: once
+        /// the words are read, the parked map is cleared on every review that had one -
+        /// including the deferred Tax review, a different row from <paramref name="reviewId"/>
+        /// - so a later regrade cannot raise from words about a result that no longer stands.
         /// </summary>
         private static void RaiseRemediation(
             IOrganizationService service,
