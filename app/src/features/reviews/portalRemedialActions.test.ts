@@ -133,3 +133,124 @@ describe('the card on the page', () => {
     expect(header).toBeGreaterThan(flush);
   });
 });
+
+/** The card's own script, from its first line to the closing tag. */
+function cardScript(): string {
+  const start = template.indexOf("var root = document.querySelector('[data-ot-remedial]');");
+  expect(start).toBeGreaterThan(-1);
+  const end = template.indexOf('</script>', start);
+  return template.slice(start, end);
+}
+
+/** A named function's source out of a script, up to the next line at its own indent closing it. */
+function fn(script: string, signature: string): string {
+  const start = script.indexOf(signature);
+  expect(start).toBeGreaterThan(-1);
+  const lineStart = script.lastIndexOf('\n', start) + 1;
+  const indent = script.slice(lineStart, start);
+  const end = script.indexOf(`\n${indent}}`, start);
+  expect(end).toBeGreaterThan(start);
+  return script.slice(start, end + indent.length + 2);
+}
+
+/**
+ * A question retired and succeeded while the review is open (I3, 2026-09-29). The freshness
+ * check moves the row onto the successor's version and wording; the server keys the item by
+ * the successor's text, so the card must too, or the submit is refused naming a row the card
+ * does not show.
+ */
+describe('the freshness check keeps the card in step', () => {
+  const apply = fn(template, 'function apply(byQuestion) {');
+
+  it('re-keys the row by the successor\'s wording', () => {
+    expect(apply).toContain("row.setAttribute('data-question-text', current.al_questiontext || '');");
+  });
+
+  it('redraws the card once rows have moved, if the card is on the page', () => {
+    const moved = apply.indexOf('if (!moved.length) { return; }');
+    const redraw = apply.indexOf('window.otRemedial.redraw();');
+    expect(moved).toBeGreaterThan(-1);
+    expect(redraw).toBeGreaterThan(moved);
+    expect(apply).toContain("if (window.otRemedial && typeof window.otRemedial.redraw === 'function') { window.otRemedial.redraw(); }");
+  });
+
+  it('redraws the card after the gating rules untick an option without a change event', () => {
+    const sync = fn(template, 'var syncGradeOptions = function () {');
+    expect(sync).toContain("if (window.otRemedial && typeof window.otRemedial.redraw === 'function') { window.otRemedial.redraw(); }");
+  });
+
+  it('is offered a redraw by the card', () => {
+    expect(cardScript()).toMatch(/window\.otRemedial = \{[\s\S]*?redraw: draw,/);
+  });
+});
+
+/**
+ * CACHE_LAG on the card (I4, 2026-09-29). The save goes through a plug-in that writes the
+ * review, so a reload inside AD-094's fifteen minutes can draw an older map - and the next
+ * save would send that stale map over the newer one, which a submit then stamps into the
+ * write-once column. The page's stance, as for the header, answers and accountability: the
+ * tab remembers what it saved and warns; it never re-applies it.
+ */
+describe('the card after a reload inside the cache window', () => {
+  const card = cardScript();
+
+  it('remembers what this tab last saved, per review, for twenty minutes', () => {
+    expect(card).toContain("var REMEDIAL_LAG_KEY = 'ot.savedRemedial.' + reviewId;");
+    expect(card).toContain('var REMEDIAL_LAG_WINDOW_MS = 20 * 60 * 1000;');
+    expect(card).toMatch(/writeSavedRemedial\(\{ at: Date\.now\(\), map: canonical\(sent\) \}\)/);
+  });
+
+  it('never lets storage stop the card', () => {
+    expect(fn(card, 'function readSavedRemedial() {')).toMatch(/try \{[\s\S]*window\.sessionStorage\.getItem\(REMEDIAL_LAG_KEY\)[\s\S]*catch \(e\)/);
+    expect(fn(card, 'function writeSavedRemedial(')).toMatch(/try \{[\s\S]*window\.sessionStorage\.setItem\(REMEDIAL_LAG_KEY[\s\S]*catch \(e\)/);
+  });
+
+  it('warns after drawing when the drawn map differs, and forgets once it matches or the window passes', () => {
+    const report = fn(card, 'function reportRemedialLag() {');
+    expect(report).toContain('Date.now() - remembered.at > REMEDIAL_LAG_WINDOW_MS || remembered.map === rendered');
+    expect(report).toContain('writeSavedRemedial(null);');
+    expect(report).toContain('Your remedial actions are not shown here yet. Your last change was saved.');
+    expect(report).toContain('reload in a few minutes');
+    expect(card).toMatch(/\n\s*draw\(\);\n\s*reportRemedialLag\(\);/);
+  });
+
+  it('does not re-apply the remembered map', () => {
+    const report = fn(card, 'function reportRemedialLag() {');
+    expect(report).not.toMatch(/texts\[/);
+    expect(report).not.toContain('save(');
+  });
+
+  it('compares maps as the server stores them: trimmed, blanks dropped, in key order', () => {
+    const start = template.indexOf('/* ot-remedial-canonical:start */');
+    const end = template.indexOf('/* ot-remedial-canonical:end */');
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const canonical = new Function(`${template.slice(start, end)}; return canonical;`)() as (
+      entries: unknown,
+    ) => string;
+
+    expect(canonical([{ item: 'B', text: ' two ' }, { item: 'A', text: 'one' }, { item: 'C', text: '  ' }])).toBe(
+      canonical([{ item: 'A', text: 'one' }, { item: 'B', text: 'two' }]),
+    );
+    expect(canonical([{ item: 'A', text: 'one' }])).not.toBe(canonical([{ item: 'A', text: 'changed' }]));
+    expect(canonical(null)).toBe(canonical([]));
+  });
+});
+
+/** A submitted review locks the card with the questionnaire (M1, 2026-09-29). */
+describe('the card once the review is submitted', () => {
+  it('is locked by lockPage', () => {
+    const lock = fn(template, 'function lockPage() {');
+    expect(lock).toContain("if (window.otRemedial && typeof window.otRemedial.lock === 'function') { window.otRemedial.lock(); }");
+  });
+
+  it('disables its boxes, cancels a pending save and keeps a redraw disabled', () => {
+    const card = cardScript();
+    const lock = fn(card, 'function lock() {');
+    expect(lock).toContain('window.clearTimeout(timer);');
+    expect(lock).toContain('locked = true;');
+    expect(lock).toMatch(/boxes\[b\]\.disabled = true;/);
+    expect(card).toContain('box.disabled = locked;');
+    expect(card).toMatch(/window\.otRemedial = \{[\s\S]*?lock: lock,/);
+  });
+});

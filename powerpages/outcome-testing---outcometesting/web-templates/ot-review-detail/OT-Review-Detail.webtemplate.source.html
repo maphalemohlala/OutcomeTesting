@@ -1941,6 +1941,14 @@
 
                 retext(row, current.al_questiontext);
 
+                /*
+                 * And the text the remedial-actions card keys this row's item by. The server
+                 * names the item by the version in force, so a card still keyed by the old
+                 * wording would have the submit refused naming a row it does not show. Blank
+                 * where the successor has no wording, which the server skips as well.
+                 */
+                row.setAttribute('data-question-text', current.al_questiontext || '');
+
                 if (liveType !== renderedType) {
                   if (rebuild(row, liveType, current)) { cleared += 1; }
                 }
@@ -1952,6 +1960,10 @@
 
               reheadGrids();
               announce(moved, cleared);
+
+              // Nothing above fires a change event - a re-keyed row, or a tick rebuild()
+              // dropped - so the card is told directly. Absent on a read-only review.
+              if (window.otRemedial && typeof window.otRemedial.redraw === 'function') { window.otRemedial.redraw(); }
             }
 
             /*
@@ -2945,6 +2957,11 @@
 
                 // The root cause follows the grade, and the grade may have just been cleared.
                 syncRootCause();
+
+                // lockOptions unticks without a change event, and a cleared grade moves whether
+                // remediation is owed, so the remedial-actions card is redrawn from what is
+                // ticked now. Guarded: at load this runs before the card's script has.
+                if (window.otRemedial && typeof window.otRemedial.redraw === 'function') { window.otRemedial.redraw(); }
               };
 
               /*
@@ -3650,18 +3667,74 @@
            * not lose them; the server ignores keys that are no longer items.
            */
           var texts = {};
+          var saved = [];
           try {
-            var saved = JSON.parse(root.getAttribute('data-ot-remedial-saved') || '[]') || [];
+            saved = JSON.parse(root.getAttribute('data-ot-remedial-saved') || '[]') || [];
             for (var s = 0; s < saved.length; s++) {
               if (saved[s] && saved[s].item) { texts[saved[s].item] = saved[s].text || ''; }
             }
-          } catch (e) { texts = {}; }
+          } catch (e) { texts = {}; saved = []; }
+
+          /* ot-remedial-canonical:start */
+          /*
+           * A map as RemedialActionsRequestPlugin stores it - trimmed, blank entries dropped,
+           * in key order - so what this tab sent and what the server later drew compare equal
+           * whenever they say the same thing. Executed by portalRemedialActions.test.ts.
+           */
+          function canonical(entries) {
+            var map = {};
+            var keys = [];
+            var list = entries || [];
+            for (var i = 0; i < list.length; i++) {
+              var entry = list[i];
+              if (!entry) { continue; }
+              var key = String(entry.item || '').trim();
+              var text = String(entry.text || '').trim();
+              if (!key || !text) { continue; }
+              if (!Object.prototype.hasOwnProperty.call(map, key)) { keys.push(key); }
+              map[key] = text;
+            }
+            keys.sort();
+            var pairs = [];
+            for (var k = 0; k < keys.length; k++) { pairs.push([keys[k], map[keys[k]]]); }
+            return JSON.stringify(pairs);
+          }
+          /* ot-remedial-canonical:end */
+
+          // What the server sent, fixed at load: the thing a remembered save is compared to.
+          var rendered = canonical(saved);
+
+          /*
+           * CACHE_LAG, as the header, the answers and "Who carries this fail" handle it. The
+           * save goes through a plug-in that writes the review, so the site's render cache
+           * learns of it late (AD-094: up to fifteen minutes) and a reload inside that window
+           * draws the map from before the save - which the next save would then send over the
+           * newer one, and a submit would stamp into the write-once al_remedialaction. The tab
+           * remembers what it saved and says so; it never re-applies it, because words on
+           * screen the server did not send cannot be told from words it did.
+           */
+          var REMEDIAL_LAG_KEY = 'ot.savedRemedial.' + reviewId;
+          var REMEDIAL_LAG_WINDOW_MS = 20 * 60 * 1000;
+
+          function readSavedRemedial() {
+            try { return JSON.parse(window.sessionStorage.getItem(REMEDIAL_LAG_KEY) || 'null'); }
+            catch (e) { return null; }
+          }
+
+          function writeSavedRemedial(remembered) {
+            // Private browsing and a full store both throw; the notice is a courtesy.
+            try {
+              if (remembered === null) { window.sessionStorage.removeItem(REMEDIAL_LAG_KEY); }
+              else { window.sessionStorage.setItem(REMEDIAL_LAG_KEY, JSON.stringify(remembered)); }
+            } catch (e) { /* no notice this time */ }
+          }
 
           var current = [];
           var timer = null;
           var saving = false;
           var saveAgain = false;
           var waiting = [];
+          var locked = false;
 
           function finish(ok) {
             var list = waiting;
@@ -3685,6 +3758,9 @@
                 entries.push({ item: key, text: texts[key] });
               }
             }
+            // What this save sends, kept so a reload inside the cache window can be told apart
+            // from one that has caught up (reportRemedialLag).
+            var sent = entries;
 
             saving = true;
             show('Saving...', null);
@@ -3699,6 +3775,7 @@
                 saving = false;
 
                 if (request.status >= 200 && request.status < 300) {
+                  writeSavedRemedial({ at: Date.now(), map: canonical(sent) });
                   if (saveAgain) { saveAgain = false; save(null); return; }
                   var now = new Date();
                   show('Saved ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2), 'success');
@@ -3762,6 +3839,8 @@
               box.setAttribute('aria-label', 'Remedial action for ' + (keys[i] === OVERALL ? 'this check' : keys[i]));
               box.setAttribute('data-ot-remedial-item', keys[i]);
               box.value = texts[keys[i]] || '';
+              // A redraw after submit must not hand back a live box (lock).
+              box.disabled = locked;
               box.addEventListener('input', onInput);
               box.addEventListener('blur', function () { save(null); });
               cell.appendChild(box);
@@ -3784,15 +3863,43 @@
             return null;
           }
 
+          function reportRemedialLag() {
+            var remembered = readSavedRemedial();
+            if (!remembered || typeof remembered.at !== 'number') { return; }
+            if (Date.now() - remembered.at > REMEDIAL_LAG_WINDOW_MS || remembered.map === rendered) {
+              writeSavedRemedial(null);
+              return;
+            }
+            show('Your remedial actions are not shown here yet. Your last change was saved. This'
+              + ' site caches pages for up to fifteen minutes, so a reload can arrive before the'
+              + ' page catches up. Do not change them again yet — reload in a few minutes, or'
+              + ' the next change would save what is on screen over it.', 'error');
+          }
+
+          /*
+           * The review has been submitted (lockPage). The card sits outside the questionnaire,
+           * so the page's own lock does not reach it: its boxes are disabled here and a save
+           * still in its debounce is dropped - the server would refuse it for a submitted check.
+           */
+          function lock() {
+            locked = true;
+            if (timer) { window.clearTimeout(timer); timer = null; }
+            var boxes = body.querySelectorAll('textarea');
+            for (var b = 0; b < boxes.length; b++) { boxes[b].disabled = true; }
+          }
+
           // Any change outside the card may move the list: an answer, a fail point tick.
           document.addEventListener('change', function (event) {
             if (event.target && !root.contains(event.target)) { draw(); }
           });
 
           draw();
+          reportRemedialLag();
 
           window.otRemedial = {
             missing: missing,
+            redraw: draw,
+            lock: lock,
             flush: function (done) {
               if (root.hidden) { done(true); return; }
               save(done);
@@ -4090,6 +4197,9 @@
             var controls = document.querySelectorAll(
               '[data-ot-questionnaire] input, [data-ot-questionnaire] textarea, [data-ot-questionnaire] select, [data-ot-questionnaire] button');
             for (var i = 0; i < controls.length; i++) { controls[i].disabled = true; }
+            // The remedial-actions card sits outside the questionnaire; a word typed into it
+            // now would only be refused by the server, the check being submitted.
+            if (window.otRemedial && typeof window.otRemedial.lock === 'function') { window.otRemedial.lock(); }
             button.disabled = true;
             button.textContent = 'Submitted';
             button.setAttribute('aria-busy', 'false');
