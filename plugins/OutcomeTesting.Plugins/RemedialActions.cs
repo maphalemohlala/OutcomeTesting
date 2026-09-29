@@ -26,7 +26,7 @@ namespace OutcomeTesting.Plugins
     /// DataContractJsonSerializer writes a dictionary as key/value pairs, and an array is a
     /// shape the page can write without knowing that.
     /// </summary>
-    public static class RemedialActions
+    public static partial class RemedialActions
     {
         /// <summary>The single action a check with no itemised fail point owes.</summary>
         public const string OverallKey = "__overall__";
@@ -207,21 +207,6 @@ namespace OutcomeTesting.Plugins
         {
             var review = service.Retrieve("al_reviewinstance", reviewId, new ColumnSet(PendingAttr));
             return Parse(review.GetAttributeValue<string>(PendingAttr));
-        }
-
-        /// <summary>
-        /// The submit gate: refuses a review that owes a remediation while any item it will
-        /// raise has no remedial action. Called by SubmitReviewPlugin only where remediation is
-        /// owed, including a Tax fail that defers its raising to the AQS submit (AD-184) -
-        /// checked at the Tax submit, while the Tax checker can still fix it.
-        /// </summary>
-        public static void EnsureWritten(IOrganizationService service, Guid reviewId, DateTime asOf)
-        {
-            var refusal = Refusal(Remediation.NonPassItems(service, reviewId, asOf), Pending(service, reviewId));
-            if (refusal != null)
-            {
-                throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + refusal);
-            }
         }
 
         /// <summary>
