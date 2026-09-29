@@ -929,6 +929,13 @@ namespace OutcomeTesting.Plugins
             string remediationReason;
             DeferredTax deferredTaxFail = null;
 
+            // This leg's own share of the remediation, apart from any deferred Tax fail: whether
+            // it owes one on its own account, and the reason it would give. RaiseRemediation
+            // needs both to tell the checker's words that are owed from words abandoned when a
+            // grade changed, and to name the row a leg with nothing itemised is raised against.
+            bool ownOwesRemediation;
+            string ownReason;
+
             if (isAqs)
             {
                 var answer = AnswerChoiceFor(service, targetId, GradeQuestionCode);
@@ -978,6 +985,8 @@ namespace OutcomeTesting.Plugins
                     OutcomeRules.RequiresRemediation(outcomeValue, remedialFlagged) || deferredTaxFail != null;
 
                 var aqsReason = new OptionLabels(service).Label(OutcomeEntity, "al_initialoutcome", outcomeValue);
+                ownOwesRemediation = OutcomeRules.RequiresRemediation(outcomeValue, remedialFlagged);
+                ownReason = aqsReason;
 
                 // Both reasons when both failed, so the adviser is told what they are putting
                 // right rather than only the half that happened to be submitted last.
@@ -1030,6 +1039,11 @@ namespace OutcomeTesting.Plugins
                 remediationReason = "Tax check: "
                     + new OptionLabels(service).Label(CaseEntity, TaxOutcomeAttr, answer.Value);
 
+                // A Tax submit that raises does so on its own account; one that defers raises
+                // nothing here, and the AQS submit reads it back as the deferred leg.
+                ownOwesRemediation = requiresRemediation;
+                ownReason = remediationReason;
+
                 StampTaxOutcome(service, caseRef.Id, answer.Value);
             }
 
@@ -1049,7 +1063,9 @@ namespace OutcomeTesting.Plugins
                     sequence,
                     remediationReason,
                     isAqs ? AqsObservationQuestionCode : TaxObservationQuestionCode,
-                    deferredTaxFail);
+                    deferredTaxFail,
+                    ownOwesRemediation,
+                    ownReason);
             }
             else if (OutcomeRules.EarnsPassNotification(nextStatus, requiresRemediation))
             {
@@ -1328,11 +1344,26 @@ namespace OutcomeTesting.Plugins
         /// 2026-09-29): each review's words are aligned against that review's own parked map,
         /// not the combined item list, because a Tax-then-AQS case can tick the same fail
         /// point on both checks and each action must carry the words of the checker who
-        /// marked it there. A review with nothing itemised hands over its overall words
-        /// instead. This method writes to a second entity as a side effect of raising: once
-        /// the words are read, the parked map is cleared on every review that had one -
-        /// including the deferred Tax review, a different row from <paramref name="reviewId"/>
-        /// - so a later regrade cannot raise from words about a result that no longer stands.
+        /// marked it there.
+        ///
+        /// A leg with nothing itemised owes its checker's overall words instead, and where the
+        /// other leg itemised something those words get a row of their own, named by the leg's
+        /// reason ("Tax check: Fail"). Before this they were handed over only when the COMBINED
+        /// list was empty, so a Tax fail with no fail point beside an AQS leg with one - the
+        /// Tax checker made to write the overall action by the gate - raised nothing carrying
+        /// the Tax words at all. When nothing on either leg is itemised the single un-indexed
+        /// action carries every owed leg's overall words, as it always has.
+        ///
+        /// Words are taken only from legs that owe remediation: the deferred Tax leg always
+        /// does (<see cref="DeferredTaxFail"/> returned it), the submitting leg only when
+        /// <paramref name="ownOwes"/> says so. An AQS checker who wrote an overall action and
+        /// then graded Pass left words about a result that no longer stands, and joining them
+        /// into the Tax fail's action would put them in front of the adviser as if owed.
+        ///
+        /// This method writes to a second entity as a side effect of raising: once the words
+        /// are read, the parked map is cleared on every review that had one - including the
+        /// deferred Tax review, a different row from <paramref name="reviewId"/> - so a later
+        /// regrade cannot raise from words about a result that no longer stands.
         /// </summary>
         private static void RaiseRemediation(
             IOrganizationService service,
@@ -1342,29 +1373,57 @@ namespace OutcomeTesting.Plugins
             int sequence,
             string reason,
             string observationQuestionCode,
-            DeferredTax deferredTax)
+            DeferredTax deferredTax,
+            bool ownOwes,
+            string ownReason)
         {
-            var items = new List<string>();
-            var texts = new List<string>();
-            var overall = new List<string>();
-            var drained = new List<Guid>();
+            var legs = new List<RemediationLeg>();
             string observation = null;
 
             // Tax first: it was checked first, and an adviser reading a combined list will
             // look for the Tax points where the Tax check left them.
             if (deferredTax != null)
             {
-                Collect(service, deferredTax.ReviewId, items, texts, overall, drained);
+                legs.Add(Collect(service, deferredTax.ReviewId, deferredTax.Reason, true));
                 observation = AnswerTextFor(service, deferredTax.ReviewId, TaxObservationQuestionCode);
             }
 
-            Collect(service, reviewId, items, texts, overall, drained);
+            legs.Add(Collect(service, reviewId, ownReason, ownOwes));
 
             var own = AnswerTextFor(service, reviewId, observationQuestionCode);
             if (!string.IsNullOrWhiteSpace(own))
             {
                 // Both checkers' words when both wrote some, rather than one silently winning.
                 observation = string.IsNullOrWhiteSpace(observation) ? own : observation + " " + own;
+            }
+
+            var itemised = false;
+            foreach (var leg in legs)
+            {
+                itemised |= leg.Items.Count > 0;
+            }
+
+            var items = new List<string>();
+            var texts = new List<string>();
+            var overall = new List<string>();
+            foreach (var leg in legs)
+            {
+                if (leg.Items.Count > 0)
+                {
+                    items.AddRange(leg.Items);
+                    texts.AddRange(leg.Texts);
+                }
+                else if (leg.Overall != null && itemised)
+                {
+                    // The other leg's items would otherwise be the only rows, and these words
+                    // would reach no action.
+                    items.Add(string.IsNullOrWhiteSpace(leg.Reason) ? "Overall" : leg.Reason);
+                    texts.Add(leg.Overall);
+                }
+                else if (leg.Overall != null)
+                {
+                    overall.Add(leg.Overall);
+                }
             }
 
             Remediation.Raise(
@@ -1382,44 +1441,58 @@ namespace OutcomeTesting.Plugins
                 overall.Count == 0 ? null : string.Join(Environment.NewLine + Environment.NewLine, overall));
 
             // Cleared once raised, on every review the words came from - the deferred Tax leg's
-            // included - so a later regrade cannot raise from words about a result that no
-            // longer stands.
-            foreach (var drainedId in drained)
+            // included, and a leg whose words were not owed - so a later regrade cannot raise
+            // from words about a result that no longer stands.
+            foreach (var leg in legs)
             {
-                service.Update(new Entity(ReviewEntity, drainedId) { [RemedialActions.PendingAttr] = null });
+                if (leg.HadWords)
+                {
+                    service.Update(new Entity(ReviewEntity, leg.ReviewId) { [RemedialActions.PendingAttr] = null });
+                }
             }
         }
 
         /// <summary>
-        /// One review's items and the words its own checker parked for them, added to the
-        /// running lists. Aligned per review rather than across the combined list, because a
-        /// Tax-then-AQS case can tick the same fail point on both checks, and each action must
-        /// carry the words of the checker who marked it.
+        /// One review's share of a remediation: its items, the words its own checker parked
+        /// for them, and its overall words - read once, so RaiseRemediation can decide where
+        /// the overall words go only after it has seen whether the other leg itemised anything.
         /// </summary>
-        private static void Collect(
+        private sealed class RemediationLeg
+        {
+            public Guid ReviewId;
+            public string Reason;
+            public List<string> Items;
+            public List<string> Texts;
+            public string Overall;
+            public bool HadWords;
+        }
+
+        /// <summary>
+        /// One review's items and the words its own checker parked for them. Aligned per review
+        /// rather than across the combined list, because a Tax-then-AQS case can tick the same
+        /// fail point on both checks, and each action must carry the words of the checker who
+        /// marked it. A leg that does not owe remediation contributes its items (as it always
+        /// has) but none of its words: the card that took them is hidden once the leg stops
+        /// owing, so whatever is parked is left over from a result that no longer stands.
+        /// </summary>
+        private static RemediationLeg Collect(
             IOrganizationService service,
             Guid reviewId,
-            List<string> items,
-            List<string> texts,
-            List<string> overall,
-            List<Guid> drained)
+            string reason,
+            bool owes)
         {
             var reviewItems = Remediation.NonPassItems(service, reviewId, DateTime.UtcNow);
             var map = RemedialActions.Pending(service, reviewId);
 
-            items.AddRange(reviewItems);
-            texts.AddRange(RemedialActions.Align(reviewItems, map));
-
-            var general = RemedialActions.TextFor(map, RemedialActions.OverallKey);
-            if (general != null)
+            return new RemediationLeg
             {
-                overall.Add(general);
-            }
-
-            if (map.Count > 0)
-            {
-                drained.Add(reviewId);
-            }
+                ReviewId = reviewId,
+                Reason = reason,
+                Items = reviewItems,
+                Texts = RemedialActions.Align(reviewItems, owes ? map : null),
+                Overall = owes ? RemedialActions.TextFor(map, RemedialActions.OverallKey) : null,
+                HadWords = map.Count > 0,
+            };
         }
 
         /// <summary>

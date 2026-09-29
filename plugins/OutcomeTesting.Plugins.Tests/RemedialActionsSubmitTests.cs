@@ -51,18 +51,60 @@ namespace OutcomeTesting.Plugins.Tests
                 "statecode", new OptionSetValue(0));
         }
 
-        private static void Answer(FakeOrganizationService svc, Guid reviewId, string questionCode, int choice)
+        private static Guid Answer(FakeOrganizationService svc, Guid reviewId, string questionCode, int choice)
         {
             var questionId = Guid.NewGuid();
             var versionId = Guid.NewGuid();
+            var responseId = Guid.NewGuid();
             svc.Seed("al_question", questionId, "al_questioncode", questionCode);
             svc.Seed("al_questionversion", versionId, "al_questionid", new EntityReference("al_question", questionId));
             svc.Seed(
-                "al_response", Guid.NewGuid(),
+                "al_response", responseId,
                 "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
                 "al_questionversionid", new EntityReference("al_questionversion", versionId),
                 "al_answerchoice", new OptionSetValue(choice),
                 "statecode", new OptionSetValue(0));
+            return responseId;
+        }
+
+        /// <summary>
+        /// A File Quality fail point ticked on the given review's answer to a question. The
+        /// fail points are read across every answer on a review (AD-096), so any answer the
+        /// review holds carries one.
+        /// </summary>
+        private static void Tick(FakeOrganizationService svc, Guid reviewId, Guid reasonId)
+        {
+            var query = new QueryExpression("al_response") { ColumnSet = new ColumnSet(false), Criteria = new FilterExpression() };
+            query.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
+            var response = svc.RetrieveMultiple(query).Entities.First();
+            svc.Seed("al_al_failreason_al_response", Guid.NewGuid(), "al_responseid", response.Id, "al_failreasonid", reasonId);
+        }
+
+        private static Guid FailReason(FakeOrganizationService svc, string name)
+        {
+            var id = Guid.NewGuid();
+            svc.Seed("al_failreason", id, "al_name", name, "al_displayorder", 1);
+            return id;
+        }
+
+        /// <summary>Parks a whole map: item, words, item, words.</summary>
+        private static void ParkMap(FakeOrganizationService svc, Guid reviewId, params string[] pairs)
+        {
+            var entries = new System.Collections.Generic.List<string>();
+            for (var i = 0; i < pairs.Length; i += 2)
+            {
+                entries.Add("{\"item\":\"" + pairs[i] + "\",\"text\":\"" + pairs[i + 1] + "\"}");
+            }
+
+            svc.Row("al_reviewinstance", reviewId)[RemedialActions.PendingAttr] = "[" + string.Join(",", entries) + "]";
+        }
+
+        private static string[] WordsOn(FakeOrganizationService svc)
+        {
+            return ActionsOn(svc)
+                .Select(a => a.GetAttributeValue<string>(RemedialActions.ActionAttr))
+                .OrderBy(t => t, StringComparer.Ordinal)
+                .ToArray();
         }
 
         private static void Park(FakeOrganizationService svc, Guid reviewId, string overall)
@@ -151,6 +193,81 @@ namespace OutcomeTesting.Plugins.Tests
             Submit(svc, AqsReviewId);
 
             Assert.Empty(ActionsOn(svc));
+        }
+
+        [Fact]
+        public void A_tax_fail_with_nothing_itemised_keeps_its_words_beside_the_aqs_items()
+        {
+            // The Tax checker failed the tax outcome without ticking a fail point, so they were
+            // made to write the overall action. The AQS leg itemised one. Before 2026-09-29's
+            // fix the overall words reached an action only when the COMBINED list was empty,
+            // so here they reached none.
+            var svc = Case(ResponseRules.ChoiceFail, ResponseRules.ChoicePassWithIssues);
+            var reason = FailReason(svc, "Record Keeping - TOB not provided or out of date");
+            Park(svc, TaxReviewId, "Correct the tax wrapper.");
+            Tick(svc, AqsReviewId, reason);
+            ParkMap(svc, AqsReviewId, "Record Keeping - TOB not provided or out of date", "Issue the current TOB.");
+
+            Submit(svc, TaxReviewId);
+            CaseTransitions.MoveThrough(svc, CaseId, CaseLifecycle.Assigned);
+            Submit(svc, AqsReviewId);
+
+            Assert.Equal(new[] { "Correct the tax wrapper.", "Issue the current TOB." }, WordsOn(svc));
+        }
+
+        [Fact]
+        public void An_aqs_grade_with_nothing_itemised_keeps_its_words_beside_the_tax_items()
+        {
+            // The reverse: the AQS grade owes remediation with no fail point behind it, while
+            // the deferred Tax leg itemised one.
+            var svc = Case(ResponseRules.ChoiceFail, ResponseRules.ChoicePassWithIssues);
+            var reason = FailReason(svc, "Tax - wrapper not suitable");
+            Tick(svc, TaxReviewId, reason);
+            ParkMap(svc, TaxReviewId, "Tax - wrapper not suitable", "Correct the tax wrapper.");
+            Park(svc, AqsReviewId, "Rewrite the suitability report.");
+
+            Submit(svc, TaxReviewId);
+            CaseTransitions.MoveThrough(svc, CaseId, CaseLifecycle.Assigned);
+            Submit(svc, AqsReviewId);
+
+            Assert.Equal(new[] { "Correct the tax wrapper.", "Rewrite the suitability report." }, WordsOn(svc));
+        }
+
+        [Fact]
+        public void Overall_words_from_a_leg_that_owes_nothing_are_not_raised()
+        {
+            // The AQS checker wrote an overall action while the grade owed one, then graded
+            // Pass. Those words answer a result that no longer stands; only the Tax fail is owed.
+            var svc = Case(ResponseRules.ChoiceFail, ResponseRules.ChoicePass);
+            Park(svc, TaxReviewId, "Correct the tax wrapper.");
+            Park(svc, AqsReviewId, "Words for a grade that was changed.");
+
+            Submit(svc, TaxReviewId);
+            CaseTransitions.MoveThrough(svc, CaseId, CaseLifecycle.Assigned);
+            Submit(svc, AqsReviewId);
+
+            Assert.Equal(new[] { "Correct the tax wrapper." }, WordsOn(svc));
+            Assert.Null(svc.Row("al_reviewinstance", AqsReviewId).GetAttributeValue<string>(RemedialActions.PendingAttr));
+        }
+
+        [Fact]
+        public void The_same_fail_point_on_both_checks_carries_each_checkers_own_words()
+        {
+            // Both checkers ticked the same fail point, so both legs produce the same item text.
+            // Each action must carry the words of the checker who marked it on THAT check -
+            // aligning against the combined list would hand both actions one checker's words.
+            var svc = Case(ResponseRules.ChoiceFail, ResponseRules.ChoicePassWithIssues);
+            var reason = FailReason(svc, "Record Keeping - TOB not provided or out of date");
+            Tick(svc, TaxReviewId, reason);
+            Tick(svc, AqsReviewId, reason);
+            ParkMap(svc, TaxReviewId, "Record Keeping - TOB not provided or out of date", "Tax: reissue the TOB.");
+            ParkMap(svc, AqsReviewId, "Record Keeping - TOB not provided or out of date", "AQS: evidence the TOB.");
+
+            Submit(svc, TaxReviewId);
+            CaseTransitions.MoveThrough(svc, CaseId, CaseLifecycle.Assigned);
+            Submit(svc, AqsReviewId);
+
+            Assert.Equal(new[] { "AQS: evidence the TOB.", "Tax: reissue the TOB." }, WordsOn(svc));
         }
     }
 }
