@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import reviewTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-review-detail/OT-Review-Detail.webtemplate.source.html?raw';
+import reviewTemplateRaw from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-review-detail/OT-Review-Detail.webtemplate.source.html?raw';
+
+// Normalised because the patterns below match on "\n" and indentation: a CRLF checkout
+// (core.autocrlf=true on Windows) otherwise finds nothing and every check reads an empty string.
+const reviewTemplate = reviewTemplateRaw.replace(/\r\n/g, '\n');
 
 /**
  * The case header autosave on OT Review Detail must not lose a change made while an earlier
