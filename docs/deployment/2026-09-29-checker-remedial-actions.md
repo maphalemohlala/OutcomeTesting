@@ -170,10 +170,95 @@ is not claimed here.
 - Both can be signed off or rejected by a T&C Supervisor to exercise the sign-off leg, which
   this change did not alter.
 
+## Fix wave redeploy (2026-09-29, afternoon)
+
+The final review's fixes (`d3d28c6`..`8a10e91`, listed in
+`.superpowers/sdd/2026-09-29-checker-remedial-actions/final-fix-report.md`) were redeployed to
+`Env_AQ_Dev` only, from `8a10e91`, as `svc.automate.aq`. The registration tool builds at `HEAD`
+again (`dotnet build plugins/OutcomeTesting.Registration -c Debug`: 0 errors), so the
+"no longer builds" note above is resolved and `renderpdf` works.
+
+### What ran
+
+| # | Artefact | Command | Result |
+|---|---|---|---|
+| 1 | Plug-in assembly | `dotnet build ...Plugins.csproj -c Release --no-incremental`, then `pushassembly` | `378368 bytes`, modified 13:34:20Z. **sha256 of `pluginassembly.content` = local DLL = `f05b55d13d88cf4e249f9bd25c29f4e5489c3aef300bc14873dba064caf71a46`**; the decoded bytes contain `RemediationLeg`, `SectionDrawn` and `ReviewTypeOf` (I1, I2). No new types or steps |
+| 2 | `OT Review Detail` | diff, then `pushwebtemplate ... a1000000-...-00000000001b` | Before: DEV equalled the source at `bcf926e` (the first deployment). **266,652 -> 272,672 chars** (272,700 bytes UTF-8, no BOM). Read back: equals `HEAD` |
+| 3 | `OT Layout` | diff, then `pushwebtemplate ... a1000000-...-000000000010` | Before: DEV equalled the source at `b56425c`. **2,156 -> 2,156 chars** (2,156 bytes): the one change is `outcome-testing.css?v=23` -> `?v=24`. Read back: equals `HEAD` |
+| 4 | `outcome-testing.css` | diff, then `pushwebfile ... a1000000-...-000000000050` | Before: DEV equalled the source at `7ac209c`. Pushed the `HEAD` blob with LF endings (what DEV already held): **63,582 -> 64,124 bytes** (63,575 -> 64,117 chars). Read back (`filecontent/$value`): equals `HEAD` |
+
+Nothing in DEV was overwritten that source did not already hold. OT Remediation, OT Case
+Detail, the Code App and the site settings were not touched (unchanged in the wave).
+
+### What was proved, and how
+
+| Check | How | Observed |
+|---|---|---|
+| The portal serves the new layout and css | Browser (read-only, saved Service Account session) | Every page links `/outcome-testing.css?v=24`; the served css holds `.ot-performed .opt { display: inline-flex ... }` |
+| The portal serves the new `OT Review Detail` | Read-back only | DEV's stored source equals `HEAD`. The card's script renders only on an **editable** review, and no open review is assigned to Service Account in DEV, so the new I3/I4/M1 code was not seen executing in a browser |
+| **The remediation PDF draws Action performed** | Server-side: `renderpdf https://org0b075da8.crm11.dynamics.com/ 920929001 <folder>` (reads only; renders locally) | `Remediation 920929001.pdf` (11,337 bytes) has the nine-column header with **Action performed**: row 1 `Yes` + "Done 29 Sep: documents received from the client and filed.", row 2 **`No`** + "Not done: the tax evidence is still with the provider; chased 29 Sep.", rows 3-5 `Yes` with no note. Status Completed, "Adviser completed 29 Sep 2026; awaiting supervisor". This is the pre-sign-off state |
+
+### Not proved in this run
+
+- **The sign-off leg (review finding I5, parts a and b).** Case 920929001's adviser is
+  `svc.automate.aq@ascotlloyd.co.uk`, and no `al_advisermapping` names a T&C Manager for that
+  email, so `SignoffRequestPlugin.EnsureMappedToCase` refuses every sign-off on it. Creating
+  that mapping (Service Account's contact `5ac28998-68a7-f111-aaac-e4fade069307` as the
+  manager) was **refused by the permission gate** as a permission grant, and further work
+  towards the same sign-off was then refused too. So no approval, no rejection, no reopen and no
+  rework was made, and nothing changed on either case. The owner's runbook is below.
+- **The Code App's served bundle.** Opening the `/app/` URL with `sourcetime=1790682547944`
+  headlessly with the saved session landed on `login.microsoftonline.com` (the Entra cookies
+  have expired again), so the served bundle and the Action performed column there are still
+  not observed. Re-capturing the session needs the user to sign in (`npm run e2e:auth` from
+  `app/`).
+- **The I1 smoke test** (a fresh Tax-then-AQS case with a Tax Fail carrying only an Overall
+  action beside AQS items). Skipped: it needs a new case imported, detailed, assigned twice,
+  answered and submitted twice, which is the heavy seeding the brief said to skip. The unit
+  tests in `RemedialActionsSubmitTests` are the evidence for I1.
+- The PDF after a rejection and rework - it depends on the sign-off leg.
+
+### The sign-off runbook for the owner
+
+Run in PowerShell. Each line of the tool is one process; run them one at a time.
+
+```powershell
+$env:DOTNET_ROLL_FORWARD='Major'
+$T='C:\Users\rsimu\OutcomeTesting\plugins\OutcomeTesting.Registration\bin\Debug\net8.0\OutcomeTesting.Registration.exe'
+$U='https://org0b075da8.crm11.dynamics.com/'
+$D="$env:TEMP\ot-signoff"; New-Item -ItemType Directory -Force $D | Out-Null
+
+# 1. Map Service Account as the T&C Manager for the adviser on case 920929001 (the refused write).
+[IO.File]::WriteAllText("$D\map.json", '{"al_adviseremail":"svc.automate.aq@ascotlloyd.co.uk","al_TcManagerId@odata.bind":"/contacts(5ac28998-68a7-f111-aaac-e4fade069307)"}')
+& $T webapi $U POST al_advisermappings "@$D\map.json"
+
+# 2. Approve REM-920929001-2-1 and reject REM-920929001-2-2, as the portal's own PATCH on the
+#    signatory's contact row (SignoffRequestPlugin creates the al_signoff).
+[IO.File]::WriteAllText("$D\approve.json", '{"al_signoffrequest":"{\"actionId\":\"5818eb29-03bc-f111-aaad-e4fade0775c0\",\"decision\":120910720,\"notes\":\"I5 run: approved.\",\"finalOutcome\":0,\"recheckRequired\":120910796,\"changesAdvice\":120910799}"}')
+& $T webapi $U PATCH "contacts(5ac28998-68a7-f111-aaac-e4fade069307)" "@$D\approve.json"
+[IO.File]::WriteAllText("$D\reject.json", '{"al_signoffrequest":"{\"actionId\":\"5c18eb29-03bc-f111-aaad-e4fade0775c0\",\"decision\":120910721,\"notes\":\"I5 run: the tax evidence is still outstanding - obtain it and answer again.\",\"finalOutcome\":0,\"recheckRequired\":0,\"changesAdvice\":0}"}')
+& $T webapi $U PATCH "contacts(5ac28998-68a7-f111-aaac-e4fade069307)" "@$D\reject.json"
+
+# 3. Read back: 2-2 should be In progress (120910601), the case Awaiting Remediation.
+& $T webapi $U GET 'al_remediationactions?$filter=_al_outcomecaseid_value eq 281e5a2a-ffbb-f111-aaad-e4fade0775c0&$select=al_remediationactioncode,al_actionstatus,al_actionperformed,al_adviserresponse'
+& $T webapi $U GET 'al_outcomecases(281e5a2a-ffbb-f111-aaad-e4fade0775c0)?$select=al_casestatus'
+```
+
+After step 3, the adviser's rework (Service Account is the adviser on 920929001, so it can be
+done in the browser on `OT Remediation`: change row 2 from No to Yes, add a note, press the
+form's button) and a second `renderpdf ... 920929001` finish I5. That can go back to an agent
+once the mapping exists. Instead of step 1, case 900000001 already maps its adviser (Simunye
+Radingwana) to Service Account, but the portal's form records one decision for every action,
+so approving one row and rejecting another there also needs the per-action PATCH of step 2,
+with that case's action ids.
+
 ## Left for the owner
 
+- **The sign-off runbook just above** (I5 a/b), and a fresh portal session for the Code App
+  check.
 - **Promotion to TEST** - the owner's call each time. What it needs: a solution export
-  carrying the four columns, the assembly, the new step, and the three templates;
+  carrying the four columns, the assembly, the new step, the three templates, and (from the fix
+  wave) `OT Layout` and the `outcome-testing.css` web file;
   import **with `--activate-plugins`**; then diff the three templates against source (a
   direct push to TEST masks a managed import); then widen TEST's two allowlists **from TEST's
   own values** (read them first) with `setsitesetting`. Agent imports to TEST are refused
@@ -182,4 +267,5 @@ is not claimed here.
   points and remedial actions" card: the open page has no card, so its Submit is refused by
   the new server gate with nowhere on screen to write the words.
 - **Open the Code App URL above** and confirm the served bundle.
-- Nothing else: no `--confirm` verb was refused.
+- In the first run no `--confirm` verb was refused; in the fix wave redeploy one write was
+  refused (the `al_advisermapping` create in the runbook above).
