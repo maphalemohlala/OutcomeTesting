@@ -296,10 +296,28 @@ namespace OutcomeTesting.Plugins.Tests
             var first = table.Rows.First(r => r.Cells[0].Text == "1");
             Assert.Equal("ID verification completed and retained for all relevant clients/parties.: No", first.Cells[1].Text);
             Assert.Equal("ID re-verified and retained on file.", first.Cells[2].Text);
-            Assert.Equal("Adviser completed 26 Sep 2026; awaiting supervisor", first.Cells[7].Text);
+            Assert.Equal("Adviser completed 26 Sep 2026; awaiting supervisor", first.Cells[8].Text);
             Assert.Equal("2", table.Rows.First(r => r.Cells[0].Text == "2").Cells[0].Text);
 
             Assert.Contains("OUTCOME\nInsufficient evidence", Tables(blocks).First().Rows[0].Cells[2].Text);
+        }
+
+        [Fact]
+        public void The_remediation_form_draws_the_checkers_action_and_whether_it_was_performed()
+        {
+            var service = Case();
+            var action = Action(service, completed: true);
+            action[RemedialActions.ActionAttr] = "Re-verify the client's ID.";
+            action[RemedialActions.ActionPerformedAttr] = new OptionSetValue(RemedialActions.ActionPerformedYes);
+            action["al_adviserresponse"] = "Done on 26 Sep.";
+
+            var blocks = RemediationDocument.Blocks(service, Ref(), new DateTime(2026, 9, 29));
+            var table = Tables(blocks).First(t => t.Rows[0].Cells[0].Text == "No.");
+
+            Assert.Equal("Action performed", table.Rows[0].Cells[3].Text);
+            var first = table.Rows.First(r => r.Cells[0].Text == "1");
+            Assert.Equal("Re-verify the client's ID.", first.Cells[2].Text);
+            Assert.Equal("Yes\nDone on 26 Sep.", first.Cells[3].Text);
         }
 
         [Fact]

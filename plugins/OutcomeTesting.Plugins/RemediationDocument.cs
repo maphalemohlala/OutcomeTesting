@@ -86,11 +86,11 @@ namespace OutcomeTesting.Plugins
                 return blocks;
             }
 
-            var table = new PdfTable(0.04, 0.2, 0.2, 0.1, 0.09, 0.09, 0.09, 0.19);
+            var table = new PdfTable(0.04, 0.18, 0.18, 0.1, 0.08, 0.08, 0.08, 0.08, 0.18);
             table.AddHeader(
                 PdfCell.Head("No."), PdfCell.Head("Issue / fail reason"), PdfCell.Head("Remedial action"),
-                PdfCell.Head("Owner"), PdfCell.Head("Target date"), PdfCell.Head("Status"),
-                PdfCell.Head("Age"), PdfCell.Head("Sign-off"));
+                PdfCell.Head("Action performed"), PdfCell.Head("Owner"), PdfCell.Head("Target date"),
+                PdfCell.Head("Status"), PdfCell.Head("Age"), PdfCell.Head("Sign-off"));
 
             var number = 0;
             string group = null;
@@ -106,7 +106,7 @@ namespace OutcomeTesting.Plugins
                 if (thisGroup != group)
                 {
                     group = thisGroup;
-                    var band = new PdfCell { Span = 8, Fill = PdfCell.BandFill };
+                    var band = new PdfCell { Span = 9, Fill = PdfCell.BandFill };
                     band.Runs.Add(PdfRun.Of(group, true));
                     table.Add(band);
                 }
@@ -142,9 +142,15 @@ namespace OutcomeTesting.Plugins
                 var opened = action.GetAttributeValue<DateTime?>("al_clockstartedon")
                     ?? action.GetAttributeValue<DateTime?>("createdon");
 
+                var checkerAction = action.GetAttributeValue<string>(RemedialActions.ActionAttr);
+                var adviserText = action.GetAttributeValue<string>("al_adviserresponse");
+
                 var details = new[]
                 {
-                    Text(action.GetAttributeValue<string>("al_adviserresponse")),
+                    // The checker's words where the row has them (2026-09-29); a row raised
+                    // before that carries the adviser's own remedial action, as it always did.
+                    Text(string.IsNullOrWhiteSpace(checkerAction) ? adviserText : checkerAction),
+                    Performed(action, checkerAction, adviserText),
                     owner != null && !string.IsNullOrWhiteSpace(owner.Name) ? owner.Name : "Nobody assigned",
                     Day(action.GetAttributeValue<DateTime?>("al_duedate")),
                     status == null ? "—" : labels.Label("al_remediationaction", "al_actionstatus", status.Value),
@@ -188,12 +194,12 @@ namespace OutcomeTesting.Plugins
                 PdfCell.Label("Client contact required?", 2),
                 PdfCell.Of(Choice(formSource, "al_clientcontactrequired", labels, "—"), 2),
                 PdfCell.Label("Recheck required?", 2),
-                PdfCell.Of(Choice(formSource, "al_recheckrequired", labels, AtSignOff), 2));
+                PdfCell.Of(Choice(formSource, "al_recheckrequired", labels, AtSignOff), 3));
             table.Add(
                 PdfCell.Label("Do the remedial actions change the advice?", 2),
                 PdfCell.Of(Choice(formSource, "al_changesadvice", labels, AtSignOff), 2),
                 PdfCell.Label("All remedial actions checked and approved?", 2),
-                PdfCell.Of(allApproved ? "Yes" : anyRejected ? "No" : "—", 2));
+                PdfCell.Of(allApproved ? "Yes" : anyRejected ? "No" : "—", 3));
             blocks.Add(PdfBlock.Table(table));
 
             var regraded = new PdfTable(0.3, 0.7);
@@ -245,7 +251,8 @@ namespace OutcomeTesting.Plugins
                         "al_description", "al_actionstatus", "al_duedate", "al_completedon",
                         "al_adviserresponse", "al_assignedcontactid", "al_clientcontactrequired",
                         "al_recheckrequired", "al_changesadvice", "al_clockstartedon",
-                        "al_reviewinstanceid", "createdon"),
+                        "al_reviewinstanceid", "createdon", RemedialActions.ActionAttr,
+                        RemedialActions.ActionPerformedAttr),
                     Criteria = new FilterExpression(),
                 };
                 query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseRef.Id);
@@ -456,6 +463,22 @@ namespace OutcomeTesting.Plugins
         {
             var value = action == null ? null : action.GetAttributeValue<OptionSetValue>(attribute);
             return value == null ? fallback : labels.Label("al_remediationaction", attribute, value.Value);
+        }
+
+        /// <summary>
+        /// The Action performed cell: the adviser's Yes / No with their optional note under it.
+        /// A row raised before the checker wrote remedial actions has nothing to answer here.
+        /// </summary>
+        private static string Performed(Entity action, string checkerAction, string adviserText)
+        {
+            if (string.IsNullOrWhiteSpace(checkerAction))
+            {
+                return "—";
+            }
+
+            var answer = action.GetAttributeValue<OptionSetValue>(RemedialActions.ActionPerformedAttr);
+            var label = RemedialActions.ActionPerformedLabel(answer == null ? (int?)null : answer.Value) ?? "—";
+            return string.IsNullOrWhiteSpace(adviserText) ? label : label + "\n" + adviserText.Trim();
         }
 
         /// <summary>
