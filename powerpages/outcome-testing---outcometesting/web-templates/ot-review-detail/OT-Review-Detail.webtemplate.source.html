@@ -131,6 +131,7 @@
       <attribute name="al_checklistversionid" />
       <attribute name="al_assignedcontactid" />
       <attribute name="al_pendingaccountability" />
+      <attribute name="al_pendingremedialactions" />
       <filter type="and">
         <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | xml_escape }}" />
       </filter>
@@ -1525,6 +1526,7 @@
                 data-question-version="{{ qv_id }}"
                 data-question-id="{{ qv['q.al_questionid'] }}"
                 data-question-code="{{ qcode | escape }}"
+                data-question-text="{{ qv.al_questiontext | escape }}"
                 data-section-code="{{ scode | escape }}"
                 data-response-id="{{ existing.al_responseid }}"
                 data-response-type="{{ rt }}"
@@ -1609,6 +1611,7 @@
                 data-question-version="{{ qv_id }}"
                 data-question-id="{{ qv['q.al_questionid'] }}"
                 data-question-code="{{ qcode | escape }}"
+                data-question-text="{{ qv.al_questiontext | escape }}"
                 data-section-code="{{ scode | escape }}"
                 data-response-id="{{ existing.al_responseid }}"
                 data-response-type="{{ rt }}"
@@ -3511,6 +3514,295 @@
     {% endif %}
 
     {% if editable %}
+      {% comment %}
+        Fail points and remedial actions (project owner, 2026-09-29). The checker writes what
+        the adviser is to do about each thing they marked down; the submit copies each one onto
+        the remediation action it raises, and the adviser then says whether it was performed.
+
+        Drawn by the script, not the Liquid: the rows are the fail points as they stand, and a
+        tick autosaves without re-rendering the page, so a server-drawn list would be stale the
+        moment the checker changed an answer (the same fault "Who carries this fail" had on
+        IO-SEED-TAX-01). The list mirrors Remediation.NonPassItems; the server recomputes it at
+        submit and refuses a missing row by name, so the mirror is a convenience, not the rule.
+
+        Hidden until the check owes a remediation, and not rendered on a submitted review.
+      {% endcomment %}
+      <section class="ot-card ot-remedial"
+               data-ot-remedial
+               data-review-id="{{ rv.al_reviewinstanceid }}"
+               data-review-kind="{% if is_tax_review %}tax{% else %}aqs{% endif %}"
+               data-ot-remedial-saved="{{ rv.al_pendingremedialactions | escape }}"
+               hidden
+               aria-labelledby="ot-remedial-heading">
+        <h2 class="ot-card__title" id="ot-remedial-heading">Fail points and remedial actions</h2>
+        <p>
+          Each fail point below goes to the adviser with the remedial action you write for it.
+          Write one for every row before you submit. The adviser answers whether it was performed.
+        </p>
+        <div class="ot-table-wrap">
+          <table>
+            <caption class="ot-visually-hidden">Remedial action for each fail point</caption>
+            <thead>
+              <tr>
+                <th scope="col">No.</th>
+                <th scope="col">Fail point</th>
+                <th scope="col">Remedial action</th>
+              </tr>
+            </thead>
+            <tbody data-ot-remedial-rows></tbody>
+          </table>
+        </div>
+        <p class="ot-accountability__status" data-ot-remedial-status role="status" aria-live="polite"></p>
+      </section>
+
+      <script>
+        (function () {
+          'use strict';
+          var root = document.querySelector('[data-ot-remedial]');
+          if (!root) { return; }
+
+          var body = root.querySelector('[data-ot-remedial-rows]');
+          var status = root.querySelector('[data-ot-remedial-status]');
+          var reviewId = root.getAttribute('data-review-id');
+          var isTax = root.getAttribute('data-review-kind') === 'tax';
+          var OVERALL = '__overall__';
+
+          /* ot-remedial-items:start */
+          /*
+           * The items the submit will raise, and whether it will raise any. Mirrors
+           * Remediation.NonPassItems and SubmitReviewPlugin's remediation rules; executed by
+           * portalRemedialActions.test.ts. Labels are al_response's own, not the page's: the
+           * Tax grid prints 120910302 as "Pass with issues", the server writes "Insufficient
+           * evidence", and the key has to be the server's.
+           */
+          function otRemedialItems(answers, failPoints, isTax) {
+            var LABELS = { '120910301': 'Fail', '120910302': 'Insufficient evidence', '120910304': 'Potential harm', '120910306': 'No' };
+            var OUTCOME = { 'Q-TAX-02': true, 'Q-FQ-01': true, 'Q-FQTAX-01': true };
+            var SCALE = { '120910005': 'pf', '120910006': 'pf', '120910012': 'pf', '120910009': 'yni', '120910008': 'ynn' };
+
+            function nonPass(type, value) {
+              var scale = SCALE[type];
+              if (!scale) { return false; }
+              if (scale === 'ynn') { return value === '120910306'; }
+              if (scale === 'yni') { return value === '120910306' || value === '120910302'; }
+              return value === '120910301' || value === '120910302' || value === '120910304';
+            }
+
+            var items = [];
+            var owed = false;
+            for (var i = 0; i < answers.length; i++) {
+              var a = answers[i];
+              var code = (a.code || '').toUpperCase();
+              if (code === 'Q-FQ-03' || code === 'Q-FQTAX-03') {
+                if (a.value === '120910305') { owed = true; }
+                continue;
+              }
+              if (!isTax && code === 'Q-GR-01' && a.value && a.value !== '120910300') { owed = true; }
+              if (isTax && code === 'Q-TAX-02' && (a.value === '120910301' || a.value === '120910302')) { owed = true; }
+              if (OUTCOME[code] || !a.value || !nonPass(a.type, a.value)) { continue; }
+              var text = (a.text || '').trim();
+              if (text) { items.push(text + ': ' + LABELS[a.value]); }
+            }
+
+            for (var f = 0; f < failPoints.length; f++) {
+              var name = (failPoints[f] || '').trim();
+              if (name) { items.push(name); }
+            }
+
+            return { owed: owed, items: items };
+          }
+          /* ot-remedial-items:end */
+
+          function answers() {
+            var roots = document.querySelectorAll('[data-ot-answer]');
+            var found = [];
+            for (var i = 0; i < roots.length; i++) {
+              var picked = roots[i].querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked');
+              var select = roots[i].querySelector('select');
+              found.push({
+                code: roots[i].getAttribute('data-question-code') || '',
+                type: roots[i].getAttribute('data-response-type') || '',
+                text: roots[i].getAttribute('data-question-text') || '',
+                value: picked ? picked.value : (select ? select.value : '')
+              });
+            }
+            return found;
+          }
+
+          function failPoints() {
+            var ticked = document.querySelectorAll('[data-ot-failpoints-for] [data-ot-reason]:checked');
+            var names = [];
+            for (var i = 0; i < ticked.length; i++) {
+              var label = document.querySelector('label[for="' + ticked[i].id + '"]');
+              names.push(label ? label.textContent : '');
+            }
+            return names;
+          }
+
+          function show(message, kind) {
+            status.textContent = message;
+            status.className = 'ot-accountability__status' + (kind ? ' ot-inline-status--' + kind : '');
+          }
+
+          /*
+           * Every text the checker has written on this review, drawn or not. A row that drops
+           * out of the list keeps its words here, so unticking and re-ticking a fail point does
+           * not lose them; the server ignores keys that are no longer items.
+           */
+          var texts = {};
+          try {
+            var saved = JSON.parse(root.getAttribute('data-ot-remedial-saved') || '[]') || [];
+            for (var s = 0; s < saved.length; s++) {
+              if (saved[s] && saved[s].item) { texts[saved[s].item] = saved[s].text || ''; }
+            }
+          } catch (e) { texts = {}; }
+
+          var current = [];
+          var timer = null;
+          var saving = false;
+          var saveAgain = false;
+          var waiting = [];
+
+          function finish(ok) {
+            var list = waiting;
+            waiting = [];
+            for (var i = 0; i < list.length; i++) { list[i](ok); }
+          }
+
+          function save(done) {
+            if (done) { waiting.push(done); }
+            if (timer) { window.clearTimeout(timer); timer = null; }
+            if (saving) { saveAgain = true; return; }
+            if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
+              show('This page did not load completely. Refresh and try again.', 'error');
+              finish(false);
+              return;
+            }
+
+            var entries = [];
+            for (var key in texts) {
+              if (Object.prototype.hasOwnProperty.call(texts, key) && (texts[key] || '').trim()) {
+                entries.push({ item: key, text: texts[key] });
+              }
+            }
+
+            saving = true;
+            show('Saving...', null);
+
+            window.shell.getTokenDeferred().done(function (token) {
+              var request = new XMLHttpRequest();
+              request.open('PATCH', '/_api/contacts({{ user.id }})', true);
+              request.setRequestHeader('Content-Type', 'application/json');
+              request.setRequestHeader('__RequestVerificationToken', token);
+              request.onreadystatechange = function () {
+                if (request.readyState !== 4) { return; }
+                saving = false;
+
+                if (request.status >= 200 && request.status < 300) {
+                  if (saveAgain) { saveAgain = false; save(null); return; }
+                  var now = new Date();
+                  show('Saved ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2), 'success');
+                  finish(true);
+                  return;
+                }
+
+                saveAgain = false;
+                var message = 'Your remedial actions could not be saved (' + request.status + ').';
+                try {
+                  var parsed = JSON.parse(request.responseText);
+                  if (parsed && parsed.error && parsed.error.message) {
+                    message = parsed.error.message
+                      .replace('PRECONDITION: ', '').replace('VALIDATION: ', '').replace('UNAUTHORIZED: ', '');
+                  }
+                } catch (e) { /* the status code is all there is */ }
+                show(message, 'error');
+                finish(false);
+              };
+              request.send(JSON.stringify({
+                al_remedialactionsrequest: JSON.stringify({ reviewId: reviewId, actions: entries })
+              }));
+            }).fail(function () {
+              saving = false;
+              show('This page did not load completely. Refresh and try again.', 'error');
+              finish(false);
+            });
+          }
+
+          function queue() {
+            if (timer) { window.clearTimeout(timer); }
+            timer = window.setTimeout(function () { save(null); }, 700);
+          }
+
+          function onInput(event) {
+            texts[event.target.getAttribute('data-ot-remedial-item')] = event.target.value;
+            queue();
+          }
+
+          function draw() {
+            var result = otRemedialItems(answers(), failPoints(), isTax);
+            root.hidden = !result.owed;
+
+            var keys = result.items.length ? result.items : [OVERALL];
+            if (keys.join('\n') === current.join('\n')) { return; }
+            current = keys;
+
+            while (body.firstChild) { body.removeChild(body.firstChild); }
+            for (var i = 0; i < keys.length; i++) {
+              var row = document.createElement('tr');
+              var number = document.createElement('td');
+              number.textContent = String(i + 1);
+              var label = document.createElement('td');
+              label.textContent = keys[i] === OVERALL ? 'Overall' : keys[i];
+              var cell = document.createElement('td');
+              var box = document.createElement('textarea');
+              box.rows = 3;
+              box.maxLength = 4000;
+              box.required = true;
+              box.className = 'ot-response-cell__text';
+              box.setAttribute('aria-label', 'Remedial action for ' + (keys[i] === OVERALL ? 'this check' : keys[i]));
+              box.setAttribute('data-ot-remedial-item', keys[i]);
+              box.value = texts[keys[i]] || '';
+              box.addEventListener('input', onInput);
+              box.addEventListener('blur', function () { save(null); });
+              cell.appendChild(box);
+              row.appendChild(number);
+              row.appendChild(label);
+              row.appendChild(cell);
+              body.appendChild(row);
+            }
+          }
+
+          function missing() {
+            if (root.hidden) { return null; }
+            for (var i = 0; i < current.length; i++) {
+              if (!(texts[current[i]] || '').trim()) {
+                return current[i] === OVERALL
+                  ? 'Write the overall remedial action under "Fail points and remedial actions" before submitting.'
+                  : 'Write the remedial action for "' + current[i] + '" before submitting.';
+              }
+            }
+            return null;
+          }
+
+          // Any change outside the card may move the list: an answer, a fail point tick.
+          document.addEventListener('change', function (event) {
+            if (event.target && !root.contains(event.target)) { draw(); }
+          });
+
+          draw();
+
+          window.otRemedial = {
+            missing: missing,
+            flush: function (done) {
+              if (root.hidden) { done(true); return; }
+              save(done);
+            }
+          };
+        })();
+      </script>
+    {% endif %}
+
+    {% if editable %}
       <section class="ot-card ot-submit"
                data-ot-submit
                data-review-id="{{ rv.al_reviewinstanceid }}"
@@ -3829,6 +4121,37 @@
               window.otAccountability.flush(null);
             }
 
+            /*
+             * The remedial actions next (project owner, 2026-09-29). Checked here so the
+             * checker is told before a round trip, and saved with a callback rather than fired
+             * and forgotten: the submit reads them off the review, so a save still in its
+             * debounce when Submit is pressed would be refused by the server as missing.
+             */
+            if (window.otRemedial) {
+              var unwritten = window.otRemedial.missing();
+              if (unwritten) {
+                show(unwritten, 'error');
+                return;
+              }
+
+              setBusy(true);
+              show('Saving your remedial actions...', 'info');
+              window.otRemedial.flush(function (ok) {
+                if (!ok) {
+                  show('Your remedial actions could not be saved, so the review was not submitted.'
+                    + ' The message under them says why.', 'error');
+                  setBusy(false);
+                  return;
+                }
+                afterRemedial();
+              });
+              return;
+            }
+
+            afterRemedial();
+          });
+
+          function afterRemedial() {
             if (window.otHeader && typeof window.otHeader.flush === 'function') {
               setBusy(true);
               show('Saving your header changes...', 'info');
@@ -3846,7 +4169,7 @@
             }
 
             submit();
-          });
+          }
 
           function submit() {
             setBusy(true);
