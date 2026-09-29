@@ -73,9 +73,11 @@ actions already raised.
 |---|---|---|
 | `al_remedialactionsrequest` | Multiline text (JSON) | The portal's trigger column, the same shape as `al_accountabilityrequest`: `{ reviewId, actions: { <item>: <text>, ... } }`. Cleared by the plug-in. |
 
-All four columns go into the OutcomeTesting solution. The Self-scoped contact table permission
-gains `al_remedialactionsrequest`; the remediation action's Contact-scoped write permission gains
-`al_actionperformed`. `al_remedialaction` is readable on the portal and writable by no permission.
+All four columns go into the OutcomeTesting solution. The portal's Web API allowlists gain one
+column each: `Webapi/contact/fields` gains `al_remedialactionsrequest` (written through the
+existing Self-scoped contact permission), and `Webapi/al_remediationaction/fields` gains
+`al_actionperformed` (written through the existing Contact-scoped action permission).
+`al_remedialaction` is kept off the allowlist, so the portal cannot write it at all.
 
 ## Components
 
@@ -151,8 +153,9 @@ Status · Age · Sign-off
 - Group-heading `colspan` goes from 8 to 9 everywhere.
 - The adviser's single form button (AD-128's `otRemediationRows`) sends `al_actionperformed`
   and the note on each request instead of the response text. Its pre-flight check becomes
-  "Answer Action performed for issue N before signing off." `completed()` rewrites the Action
-  performed cell in place, as it rewrites the status and decision cells.
+  "Answer Action performed for issue N before signing off." After a sign-off, `markSaved()`
+  disables the Yes / No and makes the note read-only, so the cell shows what was saved in
+  place, and no reload is needed (AD-128).
 
 A row without `al_remedialaction` that is still open keeps the old editable response cell and
 the old completion rule, so no remediation already in flight becomes impossible to finish.
