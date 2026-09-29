@@ -25,6 +25,9 @@ namespace OutcomeTesting.Plugins
     /// Stored as an array of entries rather than a JSON object because
     /// DataContractJsonSerializer writes a dictionary as key/value pairs, and an array is a
     /// shape the page can write without knowing that.
+    ///
+    /// The submit gate, and anything else that needs <see cref="Remediation"/>, lives in
+    /// RemedialActionsSubmitGate.cs, so the Registration tool can link this file on its own.
     /// </summary>
     public static partial class RemedialActions
     {

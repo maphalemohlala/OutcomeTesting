@@ -152,6 +152,11 @@ is not claimed here.
   line endings; the `OT Review Detail` working copy was rewritten at 13:03 with CRLF. The
   committed blob is LF and matches. The deployed template is the LF content (the push
   normalises line endings), identical to `HEAD`.
+- **One registration tool process hung and was killed.** Mid-run, while seeding case
+  920929001, a tool process sat at "Connecting…" after the sign-in window had closed. It was
+  killed (pid 26592); it had never connected, so nothing it was asked to do had run. The same
+  step (`al_UpdateCaseDetails`) was then re-run once and succeeded. This is the known
+  one-process-at-a-time token contention, not a fault in anything this change deployed.
 - **The regenerated Code App model and schema** (`Al_remediationactionsModel.ts`,
   `remediationactions.Schema.json`) are left uncommitted in the working tree for the owner of
   the branch to commit; the code reads both columns without them, and the bundle was built
@@ -172,6 +177,9 @@ is not claimed here.
   import **with `--activate-plugins`**; then diff the three templates against source (a
   direct push to TEST masks a managed import); then widen TEST's two allowlists **from TEST's
   own values** (read them first) with `setsitesetting`. Agent imports to TEST are refused
-  since 2026-09-28, so that is an owner runbook.
+  since 2026-09-28, so that is an owner runbook. After the import, tell TEST's checkers that
+  **a review page left open from before the deploy must be reloaded** to show the "Fail
+  points and remedial actions" card: the open page has no card, so its Submit is refused by
+  the new server gate with nowhere on screen to write the words.
 - **Open the Code App URL above** and confirm the served bundle.
 - Nothing else: no `--confirm` verb was refused.
