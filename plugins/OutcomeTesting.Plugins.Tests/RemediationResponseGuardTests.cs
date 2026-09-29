@@ -148,5 +148,43 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.NotNull(RemediationResponseGuardPlugin.Refusal(ActionWithAnswers(Remediation.StatusCompleted), update));
         }
+
+        [Fact]
+        public void The_checkers_remedial_action_cannot_be_written_after_it_is_raised()
+        {
+            var update = new Entity("al_remediationaction", ActionId) { [RemedialActions.ActionAttr] = "Changed." };
+
+            var refusal = RemediationResponseGuardPlugin.WriteOnceRefusal(update);
+
+            Assert.NotNull(refusal);
+            Assert.StartsWith(CommandHelpers.PreconditionPrefix, refusal);
+            Assert.Null(RemediationResponseGuardPlugin.WriteOnceRefusal(Write(response: "A note.")));
+        }
+
+        [Fact]
+        public void Action_performed_freezes_once_the_action_is_completed()
+        {
+            var current = Action(Remediation.StatusCompleted);
+            current[RemedialActions.ActionPerformedAttr] = new OptionSetValue(RemedialActions.ActionPerformedYes);
+            var update = new Entity("al_remediationaction", ActionId)
+            {
+                [RemedialActions.ActionPerformedAttr] = new OptionSetValue(RemedialActions.ActionPerformedNo),
+            };
+
+            Assert.NotNull(RemediationResponseGuardPlugin.Refusal(current, update));
+        }
+
+        [Fact]
+        public void Action_performed_opens_again_when_a_rejection_reopens_the_action()
+        {
+            var current = Action(Remediation.StatusInProgress);
+            current[RemedialActions.ActionPerformedAttr] = new OptionSetValue(RemedialActions.ActionPerformedYes);
+            var update = new Entity("al_remediationaction", ActionId)
+            {
+                [RemedialActions.ActionPerformedAttr] = new OptionSetValue(RemedialActions.ActionPerformedNo),
+            };
+
+            Assert.Null(RemediationResponseGuardPlugin.Refusal(current, update));
+        }
     }
 }

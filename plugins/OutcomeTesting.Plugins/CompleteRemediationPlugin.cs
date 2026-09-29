@@ -135,7 +135,8 @@ namespace OutcomeTesting.Plugins
                 service,
                 ActionEntity,
                 targetId,
-                new ColumnSet(ActionStatus, "ownerid", ActionAdviserResponse, "al_outcomecaseid", ReviewLookup),
+                new ColumnSet(ActionStatus, "ownerid", ActionAdviserResponse, "al_outcomecaseid", ReviewLookup,
+                    RemedialActions.ActionAttr, RemedialActions.ActionPerformedAttr),
                 "That remediation action no longer exists. Refresh the case and try again.");
 
             if (requireCallerOwnsAction)
@@ -164,10 +165,10 @@ namespace OutcomeTesting.Plugins
                     PreconditionPrefix + "A remediation action can only be completed from Open or In progress.");
             }
 
-            if (string.IsNullOrWhiteSpace(action.GetAttributeValue<string>(ActionAdviserResponse)))
+            var completionRefusal = CompletionRefusal(action);
+            if (completionRefusal != null)
             {
-                throw new InvalidPluginExecutionException(
-                    PreconditionPrefix + "Record what you did about this action before marking it complete.");
+                throw new InvalidPluginExecutionException(PreconditionPrefix + completionRefusal);
             }
 
             var update = new Entity(ActionEntity, targetId)
@@ -484,6 +485,29 @@ namespace OutcomeTesting.Plugins
             }
 
             return service.Create(audit);
+        }
+
+        /// <summary>
+        /// What an action still needs before it can be completed, or null when nothing.
+        ///
+        /// Two rules, chosen by the row (project owner, 2026-09-29). A row carrying the
+        /// checker's remedial action asks the adviser only whether it was performed - Yes or
+        /// No, and a No still completes, because the supervisor decides what a No means. A row
+        /// raised before the change has no checker's words, so the adviser's own text is still
+        /// the thing the supervisor attests to (BR-008) and is still required.
+        /// </summary>
+        public static string CompletionRefusal(Entity action)
+        {
+            if (!string.IsNullOrWhiteSpace(action.GetAttributeValue<string>(RemedialActions.ActionAttr)))
+            {
+                return action.GetAttributeValue<OptionSetValue>(RemedialActions.ActionPerformedAttr) == null
+                    ? "Answer 'Action performed' (Yes or No) for this action before marking it complete."
+                    : null;
+            }
+
+            return string.IsNullOrWhiteSpace(action.GetAttributeValue<string>(ActionAdviserResponse))
+                ? "Record what you did about this action before marking it complete."
+                : null;
         }
 
         private static string StatusName(int status)

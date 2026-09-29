@@ -18,10 +18,11 @@ namespace OutcomeTesting.Plugins
     ///
     /// Register with:
     /// <c>registerstep &lt;orgUrl&gt; OutcomeTesting.Plugins.RemediationResponseGuardPlugin
-    /// Update al_remediationaction 20 al_adviserresponse,al_evidencereference,al_clientcontactrequired,al_recheckrequired,al_changesadvice</c>.
-    /// <b>All five filtering attributes are still required</b>, and now for two reasons: the
-    /// first three are the adviser's response this freezes at completion, and the last two
-    /// are the pair it refuses outright. A step narrowed to the three would let the refused
+    /// Update al_remediationaction 20 al_adviserresponse,al_evidencereference,al_clientcontactrequired,al_recheckrequired,al_changesadvice,al_actionperformed,al_remedialaction</c>.
+    /// <b>All seven filtering attributes are still required</b>, and now for two reasons: the
+    /// first three are the adviser's response this freezes at completion, and the next two
+    /// are the pair it refuses outright. The last two are the write-once checker's action and
+    /// the freeze-at-completion answer on it. A step narrowed to the three would let the refused
     /// pair through unseen.
     ///
     /// Who may write the response at all is not decided here, for the reason AD-053 gives:
@@ -38,20 +39,25 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>
         /// The columns that carry the adviser's submission: the remedial action text, the
-        /// Intelligent Office reference, and the one remediation-form answer that is still
-        /// theirs to give (AD-095, narrowed 2026-09-21).
+        /// Intelligent Office reference, the one remediation-form answer that is still
+        /// theirs to give (AD-095, narrowed 2026-09-21), and the adviser's Yes / No
+        /// answer on the checker's remedial action.
         ///
         /// <c>al_recheckrequired</c> and <c>al_changesadvice</c> USED to be here. They are
         /// now <see cref="TcOnlyColumns"/>: the project owner directed on 2026-09-21 that
         /// "Recheck required?" and "Do the remedial actions change the advice?" are the T&amp;C
         /// Manager's answers, not the adviser's. They are no longer frozen at completion,
         /// because they are no longer written before it.
+        ///
+        /// <c>al_actionperformed</c> joined on 2026-09-29: the adviser's Yes / No is what the
+        /// supervisor attests to on a row carrying the checker's remedial action.
         /// </summary>
         public static readonly string[] ResponseColumns =
         {
             "al_adviserresponse",
             "al_evidencereference",
             "al_clientcontactrequired",
+            "al_actionperformed",
         };
 
         /// <summary>
@@ -107,6 +113,12 @@ namespace OutcomeTesting.Plugins
             if (trespass != null)
             {
                 throw new InvalidPluginExecutionException(trespass);
+            }
+
+            var rewrite = WriteOnceRefusal(update);
+            if (rewrite != null)
+            {
+                throw new InvalidPluginExecutionException(rewrite);
             }
 
             if (!CarriesResponse(update))
@@ -238,6 +250,26 @@ namespace OutcomeTesting.Plugins
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// The refusal for any write to the checker's remedial action after it was raised, or
+        /// null when the write does not touch it.
+        ///
+        /// <c>Remediation.Raise</c> sets the column on Create, and there is no legitimate later
+        /// writer: the words are the checker's, the check is submitted, and a portal write
+        /// cannot say who made it (AD-053). So this is refused on presence, for the reason
+        /// <see cref="TcOnlyRefusal"/> gives, rather than on change.
+        /// </summary>
+        public static string WriteOnceRefusal(Entity update)
+        {
+            if (update == null || !update.Contains(RemedialActions.ActionAttr))
+            {
+                return null;
+            }
+
+            return CommandHelpers.PreconditionPrefix +
+                "The remedial action is the checker's, set when the check was submitted, and cannot be changed here.";
         }
 
         /// <summary>

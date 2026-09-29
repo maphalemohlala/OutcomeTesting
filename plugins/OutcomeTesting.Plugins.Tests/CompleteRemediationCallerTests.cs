@@ -257,5 +257,44 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal("Completed", result.Status);
             Assert.Empty(svc.Updates);
         }
+
+        [Fact]
+        public void A_row_carrying_the_checkers_action_completes_on_an_answer_not_on_text()
+        {
+            var action = new Entity("al_remediationaction", ActionId)
+            {
+                [RemedialActions.ActionAttr] = "Re-verify the ID.",
+            };
+            Assert.Contains("Action performed", CompleteRemediationPlugin.CompletionRefusal(action));
+
+            action[RemedialActions.ActionPerformedAttr] = new OptionSetValue(RemedialActions.ActionPerformedNo);
+            Assert.Null(CompleteRemediationPlugin.CompletionRefusal(action));
+        }
+
+        [Fact]
+        public void A_row_raised_before_the_change_still_needs_the_advisers_words()
+        {
+            var action = new Entity("al_remediationaction", ActionId);
+            Assert.Contains("Record what you did", CompleteRemediationPlugin.CompletionRefusal(action));
+
+            action["al_adviserresponse"] = "Rebuilt the report.";
+            Assert.Null(CompleteRemediationPlugin.CompletionRefusal(action));
+        }
+
+        [Fact]
+        public void A_no_with_no_note_completes()
+        {
+            // A No goes to the supervisor, who can reject it back (project owner, 2026-09-29).
+            var svc = Action(response: null);
+            svc.Row("al_remediationaction", ActionId)[RemedialActions.ActionAttr] = "Re-verify the ID.";
+            svc.Row("al_remediationaction", ActionId)[RemedialActions.ActionPerformedAttr] =
+                new OptionSetValue(RemedialActions.ActionPerformedNo);
+
+            Complete(svc, OwnerId, requireCallerOwnsAction: true);
+
+            Assert.Equal(
+                StatusCompleted,
+                svc.Row("al_remediationaction", ActionId).GetAttributeValue<OptionSetValue>("al_actionstatus").Value);
+        }
     }
 }
