@@ -834,5 +834,81 @@ namespace OutcomeTesting.Plugins.Tests
                 RemedialActions.MaxLength,
                 Assert.Single(service.Creates).GetAttributeValue<string>(RemedialActions.ActionAttr).Length);
         }
+
+        /// <summary>
+        /// An AQS review holding one Fail in each of three sections - one in force and the
+        /// AQS team's, one retired, one handed to the Tax team - plus a fail point ticked on
+        /// the answer in each of the last two. Only what the review page can draw is listed.
+        /// </summary>
+        private static FakeOrganizationService SectionFixture(Guid reviewId)
+        {
+            var service = new FakeOrganizationService();
+            service.SeedOptionSet("al_response", "al_answerchoice", ResponseRules.ChoiceFail, "Fail");
+            service.Seed("al_reviewinstance", reviewId, "al_reviewtype", new OptionSetValue(ResponseRules.ReviewTypeAqs));
+
+            var sections = new[]
+            {
+                new { Text = "Adviser charges clearly disclosed and evidenced", Role = ResponseRules.OwnerRoleAqsChecker, To = (DateTime?)null, Reason = (string)null },
+                new { Text = "A question in a retired section", Role = ResponseRules.OwnerRoleAqsChecker, To = (DateTime?)new DateTime(2026, 9, 1), Reason = "AML - retired section's fail point" },
+                new { Text = "A question the Tax team now owns", Role = ResponseRules.OwnerRoleTaxTeam, To = (DateTime?)null, Reason = "Tax - other team's fail point" },
+            };
+
+            var order = 1;
+            foreach (var spec in sections)
+            {
+                var sectionId = Guid.NewGuid();
+                var questionId = Guid.NewGuid();
+                var versionId = Guid.NewGuid();
+                var responseId = Guid.NewGuid();
+                service.Seed("al_section", sectionId,
+                    "al_displayorder", order,
+                    "al_ownerrole", new OptionSetValue(spec.Role),
+                    "al_effectiveto", spec.To);
+                service.Seed("al_question", questionId, "al_sectionid", new EntityReference("al_section", sectionId));
+                service.Seed("al_questionversion", versionId,
+                    "al_questiontext", spec.Text,
+                    "al_displayorder", order++,
+                    "al_responsetype", new OptionSetValue(ResponseRules.TypePassFailInsufficient),
+                    "al_questionid", new EntityReference("al_question", questionId));
+                service.Seed("al_response", responseId,
+                    "al_reviewinstanceid", new EntityReference("al_reviewinstance", reviewId),
+                    "al_questionversionid", new EntityReference("al_questionversion", versionId),
+                    "al_answerchoice", new OptionSetValue(ResponseRules.ChoiceFail));
+
+                if (spec.Reason != null)
+                {
+                    var reasonId = Guid.NewGuid();
+                    service.Seed("al_failreason", reasonId, "al_name", spec.Reason, "al_displayorder", order);
+                    service.Seed("al_al_failreason_al_response", Guid.NewGuid(), "al_responseid", responseId, "al_failreasonid", reasonId);
+                }
+            }
+
+            return service;
+        }
+
+        [Fact]
+        public void Leaves_out_an_answer_in_a_retired_section()
+        {
+            // RetireSection takes a section off the form and out of the submit's mandatory
+            // gate while its question versions stay in force. An answer left there cannot be
+            // drawn on the card, so listing it would make the gate demand words for a row the
+            // checker can never see - a review that could never be submitted.
+            var reviewId = Guid.NewGuid();
+            var items = Remediation.NonPassItems(SectionFixture(reviewId), reviewId, new DateTime(2026, 9, 9, 12, 0, 0, DateTimeKind.Utc));
+
+            Assert.DoesNotContain("A question in a retired section: Fail", items);
+            Assert.DoesNotContain("AML - retired section's fail point", items);
+        }
+
+        [Fact]
+        public void Leaves_out_an_answer_in_a_section_the_other_team_owns()
+        {
+            // UpdateSection can hand a section to the other discipline; the page then stops
+            // drawing it on this review, and so must the list.
+            var reviewId = Guid.NewGuid();
+            var items = Remediation.NonPassItems(SectionFixture(reviewId), reviewId, new DateTime(2026, 9, 9, 12, 0, 0, DateTimeKind.Utc));
+
+            Assert.Equal(new[] { "Adviser charges clearly disclosed and evidenced: Fail" }, items);
+        }
     }
 }

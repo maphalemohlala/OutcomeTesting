@@ -317,12 +317,18 @@ namespace OutcomeTesting.Plugins
         /// checklist change (FR-030) reaches here without a code change. A retired version's
         /// answer is left out for the reason SubmitReviewPlugin.AnswerFor records: it is not
         /// the answer the review gave.
+        ///
+        /// So is an answer, or a fail point ticked on one, in a section the review page does
+        /// not draw for this review on <paramref name="asOf"/> - retired, or owned by the other
+        /// discipline (<see cref="SectionDrawn"/>). The checker's card is built from what the
+        /// page draws and the submit gate from this list, so the two must agree on it.
         /// </summary>
         public static List<string> NonPassItems(IOrganizationService service, Guid reviewId, DateTime asOf)
         {
             var labels = new OptionLabels(service);
             var answers = new List<RankedItem>();
             var responseIds = new List<object>();
+            var versionOfResponse = new Dictionary<Guid, Guid>();
 
             var responses = new QueryExpression("al_response")
             {
@@ -340,19 +346,51 @@ namespace OutcomeTesting.Plugins
             {
                 responseIds.Add(response.Id);
 
-                var choice = response.GetAttributeValue<OptionSetValue>("al_answerchoice");
-                if (choice == null || !CouldBeNonPass(choice.Value))
+                var versionRef = response.GetAttributeValue<EntityReference>("al_questionversionid");
+                if (versionRef != null)
                 {
-                    continue;
+                    versionOfResponse[response.Id] = versionRef.Id;
                 }
 
-                var versionRef = response.GetAttributeValue<EntityReference>("al_questionversionid");
-                if (versionRef == null)
+                var choice = response.GetAttributeValue<OptionSetValue>("al_answerchoice");
+                if (choice == null || !CouldBeNonPass(choice.Value) || versionRef == null)
                 {
                     continue;
                 }
 
                 candidates.Add(new KeyValuePair<Guid, OptionSetValue>(versionRef.Id, choice));
+            }
+
+            // The fail points are keyed by response (AD-025) but are one block of the
+            // checklist (AD-096), so they are read across every answer on the review and
+            // listed once each. Read here, ahead of the versions, because the answer each one
+            // hangs off decides whether the page can draw it - see the section test below.
+            var links = new List<KeyValuePair<Guid, Guid>>();
+            if (responseIds.Count > 0)
+            {
+                var linkQuery = new QueryExpression("al_al_failreason_al_response")
+                {
+                    ColumnSet = new ColumnSet("al_failreasonid", "al_responseid"),
+                    Criteria = new FilterExpression(),
+                };
+                linkQuery.Criteria.AddCondition("al_responseid", ConditionOperator.In, responseIds.ToArray());
+
+                foreach (var link in service.RetrieveMultiple(linkQuery).Entities)
+                {
+                    links.Add(new KeyValuePair<Guid, Guid>(
+                        link.GetAttributeValue<Guid>("al_responseid"),
+                        link.GetAttributeValue<Guid>("al_failreasonid")));
+                }
+            }
+
+            var versionIds = Ids(candidates);
+            foreach (var link in links)
+            {
+                Guid hostVersion;
+                if (versionOfResponse.TryGetValue(link.Key, out hostVersion) && !versionIds.Contains(hostVersion))
+                {
+                    versionIds.Add(hostVersion);
+                }
             }
 
             // One query each for the versions, their questions and those questions' sections,
@@ -362,7 +400,7 @@ namespace OutcomeTesting.Plugins
                 service,
                 "al_questionversion",
                 new ColumnSet("al_questiontext", "al_responsetype", "al_effectivefrom", "al_effectiveto", "al_displayorder", "al_questionid"),
-                Ids(candidates));
+                versionIds);
 
             var questionIds = new List<Guid>();
             foreach (var version in versions.Values)
@@ -388,7 +426,12 @@ namespace OutcomeTesting.Plugins
             }
 
             var sections = ByIdIn(
-                service, "al_section", new ColumnSet("al_displayorder"), sectionIds);
+                service,
+                "al_section",
+                new ColumnSet("al_displayorder", "al_effectivefrom", "al_effectiveto", "al_ownerrole"),
+                sectionIds);
+
+            var reviewType = ReviewTypeOf(service, reviewId);
 
             foreach (var candidate in candidates)
             {
@@ -433,6 +476,10 @@ namespace OutcomeTesting.Plugins
                 }
 
                 var section = Lookup(sections, question, "al_sectionid");
+                if (!SectionDrawn(section, reviewType, asOf))
+                {
+                    continue;
+                }
 
                 answers.Add(new RankedItem
                 {
@@ -449,30 +496,36 @@ namespace OutcomeTesting.Plugins
                 items.Add(answer.Text);
             }
 
-            if (responseIds.Count == 0)
+            if (links.Count == 0)
             {
                 return items;
             }
 
-            // The fail points are keyed by response (AD-025) but are one block of the
-            // checklist (AD-096), so they are read across every answer on the review and
-            // listed once each.
-            var links = new QueryExpression("al_al_failreason_al_response")
-            {
-                ColumnSet = new ColumnSet("al_failreasonid"),
-                Criteria = new FilterExpression(),
-            };
-            links.Criteria.AddCondition("al_responseid", ConditionOperator.In, responseIds.ToArray());
-
+            // A tick is drawn with the File Quality block, which sits in its section, so a
+            // tick on an answer whose section the page no longer draws is left out for the
+            // same reason as the answer itself. An answer whose version or section cannot be
+            // resolved keeps its ticks: nothing says the page hides it.
             var seen = new HashSet<Guid>();
             var ticked = new List<Guid>();
-            foreach (var link in service.RetrieveMultiple(links).Entities)
+            foreach (var link in links)
             {
-                var reasonId = link.GetAttributeValue<Guid>("al_failreasonid");
-                if (reasonId != Guid.Empty && seen.Add(reasonId))
+                var reasonId = link.Value;
+                if (reasonId == Guid.Empty || seen.Contains(reasonId))
                 {
-                    ticked.Add(reasonId);
+                    continue;
                 }
+
+                Guid hostVersion;
+                Entity host;
+                if (versionOfResponse.TryGetValue(link.Key, out hostVersion)
+                    && versions.TryGetValue(hostVersion, out host)
+                    && !SectionDrawn(Lookup(sections, Lookup(questions, host, "al_questionid"), "al_sectionid"), reviewType, asOf))
+                {
+                    continue;
+                }
+
+                seen.Add(reasonId);
+                ticked.Add(reasonId);
             }
 
             // One query for the ticked reasons, not one Retrieve each. AD-096 defines twenty
@@ -515,6 +568,63 @@ namespace OutcomeTesting.Plugins
             }
 
             return items;
+        }
+
+        /// <summary>
+        /// Whether the review page draws a section for this review on <paramref name="asOf"/>:
+        /// in force, and owned by the review's discipline or by Both. The same two tests the
+        /// page's section fetch and SubmitReviewPlugin's mandatory-question query apply
+        /// (AD-020, AD-123), so the list never names an answer the checker's card cannot show.
+        /// Without them a section retired (RetireSection) or handed to the other team
+        /// (UpdateSection) while a review held a non-pass answer there left the submit gate
+        /// demanding words for a row nobody could see, and the review could never be submitted.
+        ///
+        /// Lenient where the facts are missing, never where they are present: an unresolved
+        /// section, a section with no owner role, or a review whose discipline is unknown is
+        /// counted as drawn. al_ownerrole is required on al_section, so the platform never
+        /// holds the null case; treating it as served keeps a fixture or an old row from
+        /// silently losing items, which is the direction a gate should fail in.
+        /// </summary>
+        private static bool SectionDrawn(Entity section, int? reviewType, DateTime asOf)
+        {
+            if (section == null)
+            {
+                return true;
+            }
+
+            if (!SectionRules.IsSectionEffective(
+                section.GetAttributeValue<DateTime?>("al_effectivefrom"),
+                section.GetAttributeValue<DateTime?>("al_effectiveto"),
+                asOf))
+            {
+                return false;
+            }
+
+            var ownerRole = section.GetAttributeValue<OptionSetValue>("al_ownerrole");
+            if (ownerRole == null || !reviewType.HasValue)
+            {
+                return true;
+            }
+
+            return SectionRules.OwnerRoleServes(ownerRole.Value, reviewType.Value);
+        }
+
+        /// <summary>
+        /// The review's discipline, or null when the review or its type cannot be read. Read by
+        /// query rather than Retrieve so a caller holding only responses - as the tests do -
+        /// gets the unfiltered list rather than a fault.
+        /// </summary>
+        private static int? ReviewTypeOf(IOrganizationService service, Guid reviewId)
+        {
+            Entity review;
+            if (!ByIdIn(service, "al_reviewinstance", new ColumnSet("al_reviewtype"), new List<Guid> { reviewId })
+                .TryGetValue(reviewId, out review))
+            {
+                return null;
+            }
+
+            var type = review.GetAttributeValue<OptionSetValue>("al_reviewtype");
+            return type == null ? (int?)null : type.Value;
         }
 
         /// <summary>The version ids of a candidate list, in order and with repeats kept out.</summary>
