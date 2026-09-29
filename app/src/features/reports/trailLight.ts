@@ -10,7 +10,7 @@ export type ExportRecord = Al_exportrecords;
  * owner, 2026-09-23).
  *
  * **Part of the interface, not a nicety.** `DFALIN1` is the receiving end's name for this
- * feed, the same way the twenty columns above are its shape - a file that arrives under
+ * feed, the same way the nineteen columns below are its shape - a file that arrives under
  * another name is a file nobody picks up. So this is used EXACTLY as given: no batch code,
  * no filter, no "(1)". Two Trail Light downloads taken on one day are deliberately the same
  * name, because the convention describes the day's file rather than the click that made it;
@@ -31,10 +31,12 @@ export function trailLightFilename(extension: string, now: Date = new Date()): s
 
 /**
  * The Trail Light contract fixed by AD-039 (source: `Trailight - Outcome Testing Map.xlsx`):
- * one row per case. Twenty columns in the supplied template's exact order, with column 16 an
- * intentional blank separator preserved so every downstream position matches. Do not add,
- * remove or reorder a column without a decision-log entry — the receiving system reads by
- * position.
+ * one row per case, in the supplied template's order. Do not add, remove or reorder a column
+ * without a decision-log entry — the receiving system reads by position.
+ *
+ * **Nineteen columns, not twenty (AD-224, project owner, 2026-09-29).** The template's
+ * column 16 was a blank separator, kept so every later position matched. It is removed:
+ * the Advice Quality accountable pairs now sit in P to S, not Q to T.
  *
  * **Columns B and D carry CODES (project owner, 2026-09-22).** Trailight could not
  * accommodate the emails put there on 2026-09-21 (AD-183). The positions are unchanged, so
@@ -47,7 +49,7 @@ export function trailLightFilename(extension: string, now: Date = new Date()): s
  * code is now held against the PERSON, on `contact.al_staffcode`, and resolved at
  * generation time.
  *
- * **Six columns, not two.** The four fail-accountability code columns (L, N, R, T) were
+ * **Six columns, not two.** The four fail-accountability code columns (L, N, Q, S) were
  * blanked whenever a specific person was named accountable, because a contact carried no
  * code. They now carry that person's own.
  */
@@ -67,7 +69,6 @@ export const TRAIL_LIGHT_HEADERS = [
   'File Quality Fail Accountable Paraplanner Name',
   'File Quality Fail Accountable Paraplanner Code',
   'Advice Quality Grade',
-  '',
   'Advice Quality Fail Accountable Adviser Name',
   'Advice Quality Fail Accountable Adviser Code',
   'Advice Quality Fail Accountable Paraplanner Name',
@@ -131,7 +132,6 @@ export function trailLightRow(record: ExportRecord): CellValue[] {
     text(record.al_fqfailparaplannername),
     code(record.al_fqfailparaplannercode),
     text(record.al_advicequalitygrade),
-    text(record.al_separator),
     text(record.al_aqfailadvisername),
     code(record.al_aqfailadvisercode),
     text(record.al_aqfailparaplannername),

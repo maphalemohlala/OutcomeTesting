@@ -9,7 +9,7 @@ export interface ExportRecordRow {
   adviser: string;
   client: string;
   adviceGrade: string;
-  /** Kept whole so the AD-039 twenty-column file is written from what was snapshotted. */
+  /** Kept whole so the AD-039 Trail Light file is written from what was snapshotted. */
   record: Al_exportrecords;
 }
 

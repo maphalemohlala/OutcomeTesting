@@ -17,14 +17,14 @@ function record(overrides: Partial<ExportRecord> = {}): ExportRecord {
 }
 
 describe('Trail Light contract (AD-039)', () => {
-  it('holds the AD-039 twenty in their fixed positions', () => {
+  it('holds the AD-039 columns in their fixed positions', () => {
     // The receiving system reads by position, so these five are the contract. Changing what
     // a column MEANS is allowed by direction; moving one is not.
     expect(TRAIL_LIGHT_HEADERS[0]).toBe('Adviser name');
     expect(TRAIL_LIGHT_HEADERS[9]).toBe('File Quality Grade');
     expect(TRAIL_LIGHT_HEADERS[14]).toBe('Advice Quality Grade');
-    expect(TRAIL_LIGHT_HEADERS[15]).toBe('');
-    expect(TRAIL_LIGHT_HEADERS[19]).toBe('Advice Quality Fail Accountable Paraplanner Code');
+    expect(TRAIL_LIGHT_HEADERS[15]).toBe('Advice Quality Fail Accountable Adviser Name');
+    expect(TRAIL_LIGHT_HEADERS[18]).toBe('Advice Quality Fail Accountable Paraplanner Code');
   });
 
   it('carries codes in columns B and D', () => {
@@ -35,8 +35,9 @@ describe('Trail Light contract (AD-039)', () => {
     expect(TRAIL_LIGHT_HEADERS[3]).toBe('Paraplanner Code');
   });
 
-  it('is still twenty columns, the meaning of B and D having changed but not their place', () => {
-    expect(TRAIL_LIGHT_HEADERS).toHaveLength(20);
+  it('is nineteen columns, the blank separator at P removed (AD-224)', () => {
+    expect(TRAIL_LIGHT_HEADERS).toHaveLength(19);
+    expect(TRAIL_LIGHT_HEADERS).not.toContain('');
     expect(TRAIL_LIGHT_HEADERS).not.toContain('Adviser Email');
     expect(TRAIL_LIGHT_HEADERS).not.toContain('Paraplanner Email');
   });
@@ -46,7 +47,7 @@ describe('Trail Light contract (AD-039)', () => {
       record({ al_advisercode: '4471', al_paraplannercode: 'PP-01' }),
     );
 
-    expect(row).toHaveLength(20);
+    expect(row).toHaveLength(19);
     expect(row[1]).toBe(4471);
     expect(row[3]).toBe('PP-01');
   });
@@ -89,8 +90,8 @@ describe('Trail Light contract (AD-039)', () => {
     expect(row[6]).toBe('2026-02-05');
     expect(row[9]).toBe('Fail');
     expect(row[14]).toBe('Potential harm');
-    expect(row[15]).toBe('');
-    expect(row[19]).toBe(5678);
+    expect(row[17]).toBe('Sam Paraplanner');
+    expect(row[18]).toBe(5678);
   });
 
   it('still types the four fail-accountable codes as numbers', () => {
@@ -101,7 +102,7 @@ describe('Trail Light contract (AD-039)', () => {
     );
 
     expect(row[11]).toBe(42);
-    expect(row[19]).toBe('ADV-01');
+    expect(row[18]).toBe('ADV-01');
   });
 
   it('leaves the accountable pair blank where nobody is accountable', () => {
@@ -116,7 +117,7 @@ describe('what a Trail Light download is called', () => {
   it('is DFALIN1_outcometesting_yyyy_mm_dd, exactly', () => {
     // The receiving end's name for this feed (project owner, 2026-09-23). A file that
     // arrives under another name is a file nobody picks up, so this is as much part of the
-    // interface as the twenty columns are.
+    // interface as the columns are.
     expect(trailLightFilename('xlsx', new Date('2026-09-23T10:00:00Z'))).toBe(
       'DFALIN1_outcometesting_2026_09_23.xlsx',
     );
