@@ -165,6 +165,8 @@
         <attribute name="al_duedate" />
         <attribute name="al_completedon" />
         <attribute name="al_adviserresponse" />
+        <attribute name="al_remedialaction" />
+        <attribute name="al_actionperformed" />
         <attribute name="al_evidencereference" />
         <attribute name="al_assignedcontactid" />
         <attribute name="al_clientcontactrequired" />
@@ -698,6 +700,7 @@
                 <th scope="col">No.</th>
                 <th scope="col">Issue / fail reason</th>
                 <th scope="col">Remedial action</th>
+                <th scope="col">Action performed</th>
                 <th scope="col">Owner</th>
                 <th scope="col">Target date</th>
                 <th scope="col">Status</th>
@@ -733,7 +736,7 @@
                 {% if this_group != ot_group %}
                   {% assign ot_group = this_group %}
                   <tr class="ot-remedial-group{% if is_settled %} ot-remedial-group--settled{% endif %}">
-                    <th scope="colgroup" colspan="8">
+                    <th scope="colgroup" colspan="9">
                       {{ ot_group | escape }}{% if is_settled %}<span class="ot-remedial-form__note"> · every action approved, closed</span>{% endif %}
                     </th>
                   </tr>
@@ -782,7 +785,13 @@
                         <td>{{ row_no }}</td>
                         <td>{{ rest | escape }}</td>
                         {% if ot_shown == 1 %}
-                          <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                          {% if a.al_remedialaction %}
+                            <td rowspan="{{ ot_count }}">{{ a.al_remedialaction | escape | newline_to_br }}</td>
+                            <td rowspan="{{ ot_count }}">{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}</td>
+                          {% else %}
+                            <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                            <td rowspan="{{ ot_count }}">—</td>
+                          {% endif %}
                           <td rowspan="{{ ot_count }}">{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
                           <td rowspan="{{ ot_count }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
                           <td rowspan="{{ ot_count }}">{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
@@ -817,7 +826,13 @@
                   <tr>
                     <td>{{ row_no }}</td>
                     <td>—</td>
-                    <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                    {% if a.al_remedialaction %}
+                      <td>{{ a.al_remedialaction | escape | newline_to_br }}</td>
+                      <td>{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}</td>
+                    {% else %}
+                      <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                      <td>—</td>
+                    {% endif %}
                     <td>{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
                     <td>{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</td>
                     <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>

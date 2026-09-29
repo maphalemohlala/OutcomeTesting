@@ -319,6 +319,8 @@
       <attribute name="al_duedate" />
       <attribute name="al_completedon" />
       <attribute name="al_adviserresponse" />
+      <attribute name="al_remedialaction" />
+      <attribute name="al_actionperformed" />
       <attribute name="al_assignedcontactid" />
       <attribute name="al_clientcontactrequired" />
       <attribute name="al_recheckrequired" />
@@ -543,6 +545,7 @@
                 <th scope="col">No.</th>
                 <th scope="col">Issue / fail reason</th>
                 <th scope="col">Remedial action</th>
+                <th scope="col">Action performed</th>
                 <th scope="col">Owner</th>
                 <th scope="col">Target date</th>
                 <th scope="col">Status</th>
@@ -699,7 +702,7 @@
                 {% if this_group != ot_group %}
                   {% assign ot_group = this_group %}
                   <tr class="ot-remedial-group{% if is_settled %} ot-remedial-group--settled{% endif %}">
-                    <th scope="colgroup" colspan="8">
+                    <th scope="colgroup" colspan="9">
                       {{ ot_group | escape }}{% if is_settled %}<span class="ot-remedial-form__note"> · every action approved, closed</span>{% endif %}
                     </th>
                   </tr>
@@ -734,7 +737,31 @@
                             be written (AD-069) and CompleteRemediationPlugin re-checks the
                             status and the response server-side.
                           {% endcomment %}
-                          {% if user and a.al_assignedcontactid.id == user.id and a.al_actionstatus.value != 120910602 %}
+                          {% comment %}
+                            From 2026-09-29 the checker writes the remedial action and the
+                            adviser answers whether it was performed, with an optional note in
+                            al_adviserresponse. A row raised before that has no checker's words
+                            and keeps the adviser's own editable remedial action, so a
+                            remediation already in flight can still be finished.
+                          {% endcomment %}
+                          {% assign ot_mine_open = false %}
+                          {% if user and a.al_assignedcontactid.id == user.id and a.al_actionstatus.value != 120910602 %}{% assign ot_mine_open = true %}{% endif %}
+                          {% if a.al_remedialaction %}
+                            <td rowspan="{{ ot_count }}">{{ a.al_remedialaction | escape | newline_to_br }}</td>
+                            {% if ot_mine_open %}
+                              <td rowspan="{{ ot_count }}" class="ot-response-cell" data-ot-performed data-action-id="{{ a.al_remediationactionid }}" data-row-no="{{ row_no }}">
+                                <fieldset class="ot-performed">
+                                  <legend class="ot-visually-hidden">Action performed for issue {{ row_no }}</legend>
+                                  <label class="opt"><input type="radio" name="ot-performed-{{ a.al_remediationactionid }}" value="120910815" data-ot-performed-choice{% if a.al_actionperformed.value == 120910815 %} checked{% endif %} /> Yes</label>
+                                  <label class="opt"><input type="radio" name="ot-performed-{{ a.al_remediationactionid }}" value="120910816" data-ot-performed-choice{% if a.al_actionperformed.value == 120910816 %} checked{% endif %} /> No</label>
+                                </fieldset>
+                                <label class="ot-remedial-form__note" for="ot-note-{{ a.al_remediationactionid }}">Note (optional)</label>
+                                <textarea id="ot-note-{{ a.al_remediationactionid }}" rows="2" class="ot-response-cell__text" data-ot-performed-note>{{ a.al_adviserresponse | escape }}</textarea>
+                              </td>
+                            {% else %}
+                              <td rowspan="{{ ot_count }}">{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}</td>
+                            {% endif %}
+                          {% elsif ot_mine_open %}
                             <td rowspan="{{ ot_count }}" class="ot-response-cell" data-ot-response data-action-id="{{ a.al_remediationactionid }}" data-row-no="{{ row_no }}">
                               <label class="ot-visually-hidden" for="ot-response-{{ a.al_remediationactionid }}">Remedial action for issue {{ row_no }}</label>
                               <textarea id="ot-response-{{ a.al_remediationactionid }}"
@@ -742,8 +769,10 @@
                                         class="ot-response-cell__text"
                                         data-ot-response-text>{{ a.al_adviserresponse | escape }}</textarea>
                             </td>
+                            <td rowspan="{{ ot_count }}">—</td>
                           {% else %}
                             <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                            <td rowspan="{{ ot_count }}">—</td>
                           {% endif %}
                           <td rowspan="{{ ot_count }}">{% if a.al_assignedcontactid %}{{ a.al_assignedcontactid.name | escape }}{% else %}<span class="ot-unassigned" title="The adviser named on this case does not match a portal contact, so nobody can record a response on this action. Correct the adviser on the case record and the open actions move with it.">Nobody assigned{% if c.al_advisername %} &mdash; {{ c.al_advisername | escape }} is not a portal contact{% endif %}</span>{% endif %}</td>
                           <td rowspan="{{ ot_count }}"><span class="ot-due" data-ot-due data-due="{{ a.al_duedate | date: 'yyyy-MM-dd' }}" data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</span></td>
@@ -799,7 +828,31 @@
                       permission decides whose action can be written (AD-069) and
                       CompleteRemediationPlugin re-checks status and response server-side.
                     {% endcomment %}
-                    {% if user and a.al_assignedcontactid.id == user.id and a.al_actionstatus.value != 120910602 %}
+                    {% comment %}
+                      From 2026-09-29 the checker writes the remedial action and the
+                      adviser answers whether it was performed, with an optional note in
+                      al_adviserresponse. A row raised before that has no checker's words
+                      and keeps the adviser's own editable remedial action, so a
+                      remediation already in flight can still be finished.
+                    {% endcomment %}
+                    {% assign ot_mine_open = false %}
+                    {% if user and a.al_assignedcontactid.id == user.id and a.al_actionstatus.value != 120910602 %}{% assign ot_mine_open = true %}{% endif %}
+                    {% if a.al_remedialaction %}
+                      <td>{{ a.al_remedialaction | escape | newline_to_br }}</td>
+                      {% if ot_mine_open %}
+                        <td class="ot-response-cell" data-ot-performed data-action-id="{{ a.al_remediationactionid }}" data-row-no="{{ row_no }}">
+                          <fieldset class="ot-performed">
+                            <legend class="ot-visually-hidden">Action performed for issue {{ row_no }}</legend>
+                            <label class="opt"><input type="radio" name="ot-performed-{{ a.al_remediationactionid }}" value="120910815" data-ot-performed-choice{% if a.al_actionperformed.value == 120910815 %} checked{% endif %} /> Yes</label>
+                            <label class="opt"><input type="radio" name="ot-performed-{{ a.al_remediationactionid }}" value="120910816" data-ot-performed-choice{% if a.al_actionperformed.value == 120910816 %} checked{% endif %} /> No</label>
+                          </fieldset>
+                          <label class="ot-remedial-form__note" for="ot-note-{{ a.al_remediationactionid }}">Note (optional)</label>
+                          <textarea id="ot-note-{{ a.al_remediationactionid }}" rows="2" class="ot-response-cell__text" data-ot-performed-note>{{ a.al_adviserresponse | escape }}</textarea>
+                        </td>
+                      {% else %}
+                        <td>{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}</td>
+                      {% endif %}
+                    {% elsif ot_mine_open %}
                       <td class="ot-response-cell" data-ot-response data-action-id="{{ a.al_remediationactionid }}" data-row-no="{{ row_no }}">
                         <label class="ot-visually-hidden" for="ot-response-{{ a.al_remediationactionid }}">Remedial action for issue {{ row_no }}</label>
                         <textarea id="ot-response-{{ a.al_remediationactionid }}"
@@ -807,8 +860,10 @@
                                   class="ot-response-cell__text"
                                   data-ot-response-text>{{ a.al_adviserresponse | escape }}</textarea>
                       </td>
+                      <td>—</td>
                     {% else %}
                       <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                      <td>—</td>
                     {% endif %}
                     <td>{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
                     <td><span class="ot-due" data-ot-due data-due="{{ a.al_duedate | date: 'yyyy-MM-dd' }}" data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</span></td>
@@ -1821,7 +1876,7 @@
     if (!submit) { return; }
 
     var status = document.querySelector('[data-ot-form-status]');
-    var cells = document.querySelectorAll('[data-ot-response]');
+    var cells = document.querySelectorAll('[data-ot-response], [data-ot-performed]');
 
     /*
      * The server's own words, out of the response body.
@@ -1912,10 +1967,14 @@
     function rows() {
       var found = [];
       for (var i = 0; i < cells.length; i += 1) {
-        var text = cells[i].querySelector('[data-ot-response-text]');
+        var performed = cells[i].hasAttribute('data-ot-performed');
+        var text = cells[i].querySelector(performed ? '[data-ot-performed-note]' : '[data-ot-response-text]');
+        var choice = performed ? cells[i].querySelector('[data-ot-performed-choice]:checked') : null;
         found.push({
           id: cells[i].getAttribute('data-action-id'),
           number: cells[i].getAttribute('data-row-no') || String(i + 1),
+          performed: performed,
+          choice: choice ? Number(choice.value) : null,
           text: text ? text.value : ''
         });
       }
@@ -1952,8 +2011,10 @@
      */
     function markSaved() {
       for (var i = 0; i < cells.length; i += 1) {
-        var text = cells[i].querySelector('[data-ot-response-text]');
+        var text = cells[i].querySelector('[data-ot-response-text], [data-ot-performed-note]');
         if (text) { text.readOnly = true; }
+        var choices = cells[i].querySelectorAll('[data-ot-performed-choice]');
+        for (var c = 0; c < choices.length; c += 1) { choices[c].disabled = true; }
       }
 
       var radios = document.querySelectorAll('[data-ot-fq]');
@@ -2002,7 +2063,12 @@
         // Checked here only so the adviser is told before a round trip; the plug-in
         // refuses a completion with no response regardless.
         for (var i = 0; i < pending.length; i += 1) {
-          if (!pending[i].text.replace(/^\s+|\s+$/g, '')) {
+          if (pending[i].performed) {
+            if (pending[i].choice === null) {
+              show('Answer "Action performed" for issue ' + pending[i].number + ' before signing off.', 'error');
+              return;
+            }
+          } else if (!pending[i].text.replace(/^\s+|\s+$/g, '')) {
             show('Record the remedial action for issue ' + pending[i].number + ' before signing off.', 'error');
             return;
           }
@@ -2092,6 +2158,7 @@
            * is what keeps a legitimate save from failing rather than a workaround.
            */
           var payload = { al_adviserresponse: row.text };
+          if (row.performed && row.choice !== null) { payload.al_actionperformed = row.choice; }
           var cc = answer('clientcontact');
           if (cc !== null) { payload.al_clientcontactrequired = cc; }
           if (markComplete) { payload.al_completerequested = true; }
