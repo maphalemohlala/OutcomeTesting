@@ -93,7 +93,7 @@ namespace OutcomeTesting.Plugins
                         "al_advicedate", "al_productsolutiontype", "al_producttypeid",
                         "al_samplesource", "al_samplesourceid", "al_taxcheckername",
                         "al_aqscheckername", "al_checkdate", "al_ioreference",
-                        "al_preorpostcheck", "al_preorpostcheckid", "al_vulnerableclient",
+                        "al_preorpostcheck", "al_preorpostcheckid", "al_vulnerableclient", "al_vulnerableclientid",
                         "al_taxcheckrequired", "al_taxteamdisposition", "al_checklistitems"));
                 }
                 catch (Exception)
@@ -243,7 +243,7 @@ namespace OutcomeTesting.Plugins
             table.Add(PdfCell.Label("Client name / initials"), PdfCell.Of(Text("al_clientname")),
                 PdfCell.Label("IO reference"), PdfCell.Of(Text("al_ioreference")));
             table.Add(PdfCell.Label("Pre or post check"), PdfCell.Of(Lookup("al_preorpostcheckid", "al_preorpostcheck")),
-                PdfCell.Label("Vulnerable client?"), PdfCell.Of(Choice("al_vulnerableclient")));
+                PdfCell.Label("Vulnerable client?"), PdfCell.Of(Lookup("al_vulnerableclientid", "al_vulnerableclient")));
             table.Add(PdfCell.Label("Tax check required\n(Tax team to complete)"), PdfCell.Of(Choice("al_taxcheckrequired")),
                 PdfCell.Label("For Tax team usage"), PdfCell.Of(Choice("al_taxteamdisposition")));
 

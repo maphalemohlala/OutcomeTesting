@@ -49,6 +49,10 @@ namespace OutcomeTesting.Plugins
         public const string PreOrPostCheckAttribute = "al_preorpostcheckid";
         public const string PreOrPostCheckLegacyAttribute = "al_preorpostcheck";
 
+        /// <summary>From 2026-09-30 (the sixth list): "Vulnerable client?".</summary>
+        public const string VulnerableClientAttribute = "al_vulnerableclientid";
+        public const string VulnerableClientLegacyAttribute = "al_vulnerableclient";
+
         /// <summary>
         /// The Fields key naming the products a case covers, as comma-separated option ids.
         ///
@@ -87,6 +91,7 @@ namespace OutcomeTesting.Plugins
         public const int CaseType = 120910842;
         public const int PreOrPostCheck = 120910843;
         public const int Products = 120910844;
+        public const int VulnerableClient = 120910845;
 
         /// <summary>
         /// Whether an option is offered on a given day: <c>from &lt;= day &lt; to</c>.

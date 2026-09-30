@@ -556,6 +556,10 @@ namespace OutcomeTesting.Plugins
                     ListOptionRules.PreOrPostCheckAttribute,
                     new EditableField(EditableKind.ListOption, "Pre or post check", ListOptionRules.PreOrPostCheck)
                 },
+                {
+                    ListOptionRules.VulnerableClientAttribute,
+                    new EditableField(EditableKind.ListOption, "Vulnerable client", ListOptionRules.VulnerableClient)
+                },
                 { "al_samplesource", new EditableField(EditableKind.Option, "Sample source") },
                 // al_checkername is deliberately absent (item 2, 2026-09-19). The case header
                 // now carries a Tax Checker and an AQS Checker, and each one REFLECTS the

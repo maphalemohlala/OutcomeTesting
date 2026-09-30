@@ -56,6 +56,22 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal("Service Account", Row(header, "Tax Checker").Cells[3].Text);
         }
 
+        [Fact]
+        public void The_header_names_the_vulnerable_client_option_the_case_holds()
+        {
+            // A managed list from 2026-09-30: the option's own name, not the legacy choice.
+            var service = Case();
+            service.Row("al_outcomecase", CaseId)["al_vulnerableclientid"] =
+                new EntityReference("al_listoption", Guid.NewGuid()) { Name = "Potentially vulnerable" };
+
+            var header = Tables(CompletedCheck.Blocks(service, AqsReviewId))
+                .First(t => t.Rows.Any(r => r.Cells.Any(c => c.Text == "Adviser name")));
+
+            var row = Row(header, "Pre or post check");
+            Assert.Equal("Vulnerable client?", row.Cells[2].Text);
+            Assert.Equal("Potentially vulnerable", row.Cells[3].Text);
+        }
+
         // ================================================================== the form
 
         [Fact]

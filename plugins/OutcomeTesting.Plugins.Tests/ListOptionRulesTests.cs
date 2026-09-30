@@ -287,6 +287,7 @@ namespace OutcomeTesting.Plugins.Tests
                 { ListOptionRules.SampleSourceAttribute, ListOptionRules.SampleSource, ListOptionRules.SampleSourceLegacyAttribute },
                 { ListOptionRules.CaseTypeAttribute, ListOptionRules.CaseType, ListOptionRules.CaseTypeLegacyAttribute },
                 { ListOptionRules.PreOrPostCheckAttribute, ListOptionRules.PreOrPostCheck, ListOptionRules.PreOrPostCheckLegacyAttribute },
+                { ListOptionRules.VulnerableClientAttribute, ListOptionRules.VulnerableClient, ListOptionRules.VulnerableClientLegacyAttribute },
             };
         }
 
@@ -353,6 +354,29 @@ namespace OutcomeTesting.Plugins.Tests
 
         [Theory]
         [MemberData(nameof(EveryList))]
+        public void Every_list_can_be_cleared(string attribute, int list, string legacy)
+        {
+            // Choosing the dash sends an empty value; it must clear the lookup, not be refused.
+            var service = new FakeOrganizationService();
+            var update = new Entity("al_outcomecase", CaseId);
+            var changes = new List<string>();
+
+            UpdateCaseDetailsPlugin.ApplyFields(
+                service,
+                new Dictionary<string, string> { { attribute, string.Empty } },
+                new Entity("al_outcomecase", CaseId),
+                update,
+                changes,
+                new OptionLabels(service));
+
+            Assert.True(update.Contains(attribute));
+            Assert.Null(update[attribute]);
+            Assert.True(list > 0);
+            Assert.NotNull(legacy);
+        }
+
+        [Theory]
+        [MemberData(nameof(EveryList))]
         public void Every_list_may_still_be_sent_from_the_portal(string attribute, int list, string legacy)
         {
             CaseHeaderRequestPlugin.EnsureCheckerEditable(
@@ -373,6 +397,7 @@ namespace OutcomeTesting.Plugins.Tests
                 ListOptionRules.SampleSourceAttribute,
                 ListOptionRules.CaseTypeAttribute,
                 ListOptionRules.PreOrPostCheckAttribute,
+                ListOptionRules.VulnerableClientAttribute,
             };
             var legacies = new[]
             {
@@ -380,6 +405,7 @@ namespace OutcomeTesting.Plugins.Tests
                 ListOptionRules.SampleSourceLegacyAttribute,
                 ListOptionRules.CaseTypeLegacyAttribute,
                 ListOptionRules.PreOrPostCheckLegacyAttribute,
+                ListOptionRules.VulnerableClientLegacyAttribute,
             };
 
             Assert.Equal(lookups.Length, new HashSet<string>(lookups).Count);
