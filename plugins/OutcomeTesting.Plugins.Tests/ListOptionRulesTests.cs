@@ -356,7 +356,10 @@ namespace OutcomeTesting.Plugins.Tests
         [MemberData(nameof(EveryList))]
         public void Every_list_can_be_cleared(string attribute, int list, string legacy)
         {
-            // Choosing the dash sends an empty value; it must clear the lookup, not be refused.
+            // Choosing the dash sends an empty value; it must clear the lookup, not be refused -
+            // and the choice column it superseded too. The backfill leaves that populated, and every
+            // reader falls back to it, so clearing only the lookup would save and still show the
+            // old value (and the next seedlistoptions would put it back).
             var service = new FakeOrganizationService();
             var update = new Entity("al_outcomecase", CaseId);
             var changes = new List<string>();
@@ -371,8 +374,11 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.True(update.Contains(attribute));
             Assert.Null(update[attribute]);
+            Assert.True(update.Contains(legacy), legacy + " should be cleared with the lookup");
+            Assert.Null(update[legacy]);
+            Assert.Single(changes);
+            Assert.EndsWith("-> (none)", changes[0]);
             Assert.True(list > 0);
-            Assert.NotNull(legacy);
         }
 
         [Theory]

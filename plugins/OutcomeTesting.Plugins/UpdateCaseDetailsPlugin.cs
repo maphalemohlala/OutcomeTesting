@@ -492,11 +492,12 @@ namespace OutcomeTesting.Plugins
 
         private sealed class EditableField
         {
-            public EditableField(EditableKind kind, string label, int listValue = 0)
+            public EditableField(EditableKind kind, string label, int listValue = 0, string legacyAttribute = null)
             {
                 Kind = kind;
                 Label = label;
                 ListValue = listValue;
+                LegacyAttribute = legacyAttribute;
             }
 
             public EditableKind Kind { get; }
@@ -510,6 +511,13 @@ namespace OutcomeTesting.Plugins
             /// value.
             /// </summary>
             public int ListValue { get; }
+
+            /// <summary>
+            /// For <see cref="EditableKind.ListOption"/>, the choice column the lookup superseded.
+            /// Cleared with the lookup: the backfill leaves it populated and every reader falls
+            /// back to it, so clearing the lookup alone would save and still show the old value.
+            /// </summary>
+            public string LegacyAttribute { get; }
         }
 
         // Allowlist of case attributes a manager may edit via the Fields payload, keyed by
@@ -542,23 +550,28 @@ namespace OutcomeTesting.Plugins
                     new EditableField(
                         EditableKind.ListOption,
                         "Product/solution type",
-                        ListOptionRules.ProductSolutionType)
+                        ListOptionRules.ProductSolutionType,
+                        ListOptionRules.ProductTypeLegacyAttribute)
                 },
                 {
                     ListOptionRules.SampleSourceAttribute,
-                    new EditableField(EditableKind.ListOption, "Sample source", ListOptionRules.SampleSource)
+                    new EditableField(EditableKind.ListOption, "Sample source", ListOptionRules.SampleSource,
+                        ListOptionRules.SampleSourceLegacyAttribute)
                 },
                 {
                     ListOptionRules.CaseTypeAttribute,
-                    new EditableField(EditableKind.ListOption, "Case type", ListOptionRules.CaseType)
+                    new EditableField(EditableKind.ListOption, "Case type", ListOptionRules.CaseType,
+                        ListOptionRules.CaseTypeLegacyAttribute)
                 },
                 {
                     ListOptionRules.PreOrPostCheckAttribute,
-                    new EditableField(EditableKind.ListOption, "Pre or post check", ListOptionRules.PreOrPostCheck)
+                    new EditableField(EditableKind.ListOption, "Pre or post check", ListOptionRules.PreOrPostCheck,
+                        ListOptionRules.PreOrPostCheckLegacyAttribute)
                 },
                 {
                     ListOptionRules.VulnerableClientAttribute,
-                    new EditableField(EditableKind.ListOption, "Vulnerable client", ListOptionRules.VulnerableClient)
+                    new EditableField(EditableKind.ListOption, "Vulnerable client", ListOptionRules.VulnerableClient,
+                        ListOptionRules.VulnerableClientLegacyAttribute)
                 },
                 { "al_samplesource", new EditableField(EditableKind.Option, "Sample source") },
                 // al_checkername is deliberately absent (item 2, 2026-09-19). The case header
@@ -904,6 +917,11 @@ namespace OutcomeTesting.Plugins
                             if (value.Length == 0)
                             {
                                 update[attr] = null;
+                                if (def.LegacyAttribute != null)
+                                {
+                                    update[def.LegacyAttribute] = null;
+                                }
+
                                 changes.Add(def.Label + " '" + wasName + "' -> (none)");
                                 break;
                             }
