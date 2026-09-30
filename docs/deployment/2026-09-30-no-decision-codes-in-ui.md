@@ -47,3 +47,5 @@ Tests: plug-ins 1754/1754, app 1217/1217, `tsc -b` clean.
    ```
 
    The file lives in `artifacts/`, which is git-ignored. It was built from TEST's current rows on 2026-09-30.
+
+**Run by the owner, 2026-09-30.** All three updates succeeded. Read back from TEST: 12 template rows, **0** with a code. The three sentences now read "...is locked to further edits.", "...and assigned to you." and "...has restarted from today."
