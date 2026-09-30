@@ -255,6 +255,34 @@ export interface OptionDraft {
 }
 
 /**
+ * The columns an edit writes, with a cleared value as null.
+ *
+ * Null, never undefined: the Power Apps client serialises an update with JSON.stringify, which
+ * drops an undefined key, so a blanked date or sort order was sent as nothing at all and the
+ * old value stayed. Only null tells Dataverse to clear a column. A create can leave a blank
+ * out - there is nothing there to clear - so this is for updates only.
+ */
+export interface OptionUpdateFields {
+  al_name: string;
+  al_sortorder: number | null;
+  al_effectivefrom: string | null;
+  al_effectiveto: string | null;
+}
+
+export function optionUpdateFields(draft: OptionDraft): OptionUpdateFields {
+  const order = draft.sortOrder.trim();
+  return {
+    al_name: draft.label.trim(),
+    al_sortorder: order === '' ? null : Number(order),
+    al_effectivefrom: draft.effectiveFrom ?? null,
+    al_effectiveto: draft.effectiveTo ?? null,
+  };
+}
+
+/** Reinstating clears the retired date - as null, for the reason optionUpdateFields gives. */
+export const REINSTATE_FIELDS: { readonly al_effectiveto: null } = { al_effectiveto: null };
+
+/**
  * Why a draft cannot be saved, as a sentence to show the administrator, or null.
  *
  * Rendering only, in the sense NFR-SEC-01 means it: this decides what the page says, never

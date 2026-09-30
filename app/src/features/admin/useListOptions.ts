@@ -3,6 +3,8 @@ import { Al_listoptionsService } from '../../generated';
 import { logTechnical } from '../../services/errors';
 import { today } from './effectiveDay';
 import {
+  REINSTATE_FIELDS,
+  optionUpdateFields,
   toOptionRows,
   type ListOptionRow,
   type ManagedList,
@@ -84,6 +86,16 @@ function sortOrderOf(draft: OptionDraft): number | undefined {
 }
 
 /**
+ * The generated model types every column as optional and never null, which is what made
+ * `undefined` look like the way to clear one - and JSON.stringify drops it, so nothing was
+ * cleared. The fields handed in here use null for a cleared value (see optionUpdateFields);
+ * the cast only tells the generated signature what Dataverse already accepts.
+ */
+function asUpdate(fields: object): Parameters<typeof Al_listoptionsService.update>[1] {
+  return fields as Parameters<typeof Al_listoptionsService.update>[1];
+}
+
+/**
  * Adds an option, or saves an edit to one.
  *
  * `al_legacyvalue` is never written here. It records which choice value an option was
@@ -98,12 +110,7 @@ export async function saveListOption(
 
   try {
     const result = draft.id
-      ? await Al_listoptionsService.update(draft.id, {
-          al_name: label,
-          al_sortorder: sortOrderOf(draft),
-          al_effectivefrom: draft.effectiveFrom ?? undefined,
-          al_effectiveto: draft.effectiveTo ?? undefined,
-        })
+      ? await Al_listoptionsService.update(draft.id, asUpdate(optionUpdateFields(draft)))
       : await Al_listoptionsService.create({
           al_name: label,
           al_list: list.value,
@@ -156,7 +163,7 @@ export async function reinstateListOption(
   id: string,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   try {
-    const result = await Al_listoptionsService.update(id, { al_effectiveto: undefined });
+    const result = await Al_listoptionsService.update(id, asUpdate(REINSTATE_FIELDS));
     if (!result.success) {
       logTechnical('list option reinstate', result.error);
       return { ok: false, reason: describeSaveFailure(result.error) };
