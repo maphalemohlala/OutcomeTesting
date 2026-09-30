@@ -52,7 +52,7 @@ namespace OutcomeTesting.Plugins
                 CaseEntity,
                 caseId,
                 new ColumnSet(
-                    "al_casestatus", "al_reviewrouteid", "al_adviseremail",
+                    "al_casestatus", "al_reviewrouteid", "al_adviseremail", CaseAdviser.NameAttr,
                     TaxCheckerAttr, AqsCheckerAttr, QueueAccountAttr, QueuedOnAttr, AdviserAttr, SupervisorAttr));
 
             var status = outcomeCase.GetAttributeValue<OptionSetValue>("al_casestatus");
@@ -85,7 +85,12 @@ namespace OutcomeTesting.Plugins
             {
                 var caseRef = new EntityReference(CaseEntity, caseId);
                 input.ResolvedAdviser = Remediation.AdviserContact(service, caseRef);
-                input.ResolvedSupervisor = SupervisorFor(service, outcomeCase.GetAttributeValue<string>("al_adviseremail"));
+                // The same adviser email sign-off routes by (CaseAdviser), so the supervisor who
+                // can read the case is the one who can sign it off.
+                input.ResolvedSupervisor = SupervisorFor(service, CaseAdviser.EmailFor(
+                    service,
+                    outcomeCase.GetAttributeValue<string>("al_adviseremail"),
+                    outcomeCase.GetAttributeValue<string>(CaseAdviser.NameAttr)));
             }
 
             var decided = CaseAccess.Decide(input);

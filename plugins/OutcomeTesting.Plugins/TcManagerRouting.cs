@@ -110,8 +110,13 @@ namespace OutcomeTesting.Plugins
                 };
             }
 
-            var row = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet(CaseAdviserEmailAttr));
-            return ForAdviserEmail(service, row.GetAttributeValue<string>(CaseAdviserEmailAttr));
+            // The stored email, or the email of the contact the adviser's name resolves to
+            // (CaseAdviser): a case imported with a name and no address still has a manager.
+            var row = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet(CaseAdviserEmailAttr, CaseAdviser.NameAttr));
+            return ForAdviserEmail(service, CaseAdviser.EmailFor(
+                service,
+                row.GetAttributeValue<string>(CaseAdviserEmailAttr),
+                row.GetAttributeValue<string>(CaseAdviser.NameAttr)));
         }
 
         /// <summary>The T&amp;C Manager mapped to this adviser email, or why there is none.</summary>

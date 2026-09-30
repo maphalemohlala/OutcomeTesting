@@ -611,7 +611,7 @@ namespace OutcomeTesting.Plugins
 
         private static ColumnSet BuildBeforeColumnSet()
         {
-            var columns = new List<string> { StatusAttr, RouteAttr, PriorityAttr, DueDateAttr };
+            var columns = new List<string> { StatusAttr, RouteAttr, PriorityAttr, DueDateAttr, CaseAdviser.EmailAttr };
             foreach (var key in Editables.Keys)
             {
                 if (!columns.Contains(key))
@@ -977,6 +977,10 @@ namespace OutcomeTesting.Plugins
                         }
                 }
             }
+
+            // A new adviser brings their own email, which is what sign-off and the T&C
+            // Manager are looked up by (CaseAdviser). Both front ends reach here.
+            CaseAdviser.FollowName(service, before, update, changes);
         }
 
         /// <summary>

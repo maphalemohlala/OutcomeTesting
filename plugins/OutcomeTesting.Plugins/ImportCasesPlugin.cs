@@ -176,6 +176,13 @@ namespace OutcomeTesting.Plugins
 
                 try
                 {
+                    // A row naming the adviser without an address gets the address of the
+                    // contact the name resolves to (CaseAdviser): the T&C Manager, sign-off and
+                    // the supervisor's access are all keyed on it. The 29 Sep file carried no
+                    // addresses and left 24 cases that nobody could sign off. Read as the system
+                    // user, for the reason the matches below give.
+                    CaseAdviser.FillMissingEmail(systemService, record);
+
                     var result = CreateRoutedCase(userService, findRoute, record);
                     imported++;
 

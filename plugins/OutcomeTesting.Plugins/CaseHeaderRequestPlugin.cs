@@ -200,7 +200,7 @@ namespace OutcomeTesting.Plugins
 
             var columns = new List<string>
             {
-                TaxRequiredAttr, DispositionAttr, "al_reviewrouteid", "al_casestatus",
+                TaxRequiredAttr, DispositionAttr, "al_reviewrouteid", "al_casestatus", CaseAdviser.EmailAttr,
             };
             foreach (var field in fields.Keys)
             {
@@ -261,6 +261,19 @@ namespace OutcomeTesting.Plugins
             service.Update(update);
 
             UpdateCaseDetailsPlugin.RequeueAfterRouteChange(service, before, update, changes);
+
+            // The adviser named on the case routes remediation (BR-006), so a new adviser takes
+            // the open actions with them - as the Code App's edit already did. Until 2026-09-30
+            // this path moved neither the actions nor the email (CaseAdviser).
+            if (update.Contains(CaseAdviser.NameAttr))
+            {
+                var moved = Remediation.AssignOpenActions(
+                    service, new EntityReference(CaseEntity, caseId), context.CorrelationId);
+                if (moved > 0)
+                {
+                    changes.Add("Assigned " + moved + " open remediation action(s) to the adviser now named");
+                }
+            }
 
             // Named to the contact, not the caller: a portal write reaches Dataverse as the
             // site's application user (AD-053), the same reason SignoffProgressPlugin and

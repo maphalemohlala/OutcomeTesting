@@ -571,6 +571,11 @@ if (args.Length >= 2 && args[0].Equals("backfilltaxoutcome", StringComparison.Or
     return BackfillTaxOutcome(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
 }
 
+if (args.Length >= 2 && args[0].Equals("backfilladviseremail", StringComparison.OrdinalIgnoreCase))
+{
+    return BackfillAdviserEmail(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+}
+
 if (args.Length >= 2 && args[0].Equals("backfillioreference", StringComparison.OrdinalIgnoreCase))
 {
     return BackfillIoReference(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
@@ -10125,6 +10130,96 @@ int RepointRemediation(string orgUrl, string caseReference, bool confirm)
 // Idempotent and additive. A case that already carries a value is left alone, so a re-run
 // after a later submit cannot overwrite a fresher grade with an older review's answer, and
 // the newest submitted review wins where a case somehow carries two Tax legs.
+/// <summary>
+/// Gives every case that names its adviser but carries no adviser email the email of the one
+/// active contact that name resolves to (project owner, 2026-09-30; CaseAdviser in the plug-ins).
+///
+/// The email is what al_advisermapping is keyed by, so without it nobody can sign the case off,
+/// regrade it, or be its supervisor. TEST's 29 Sep import carried names and no addresses and
+/// left 24 such cases. From 2026-09-30 the import and the adviser edit fill it; this is for the
+/// cases created before. A name matching no contact, two, or one without an email is reported
+/// and left alone - never guessed. A case that already carries an email is never touched, so
+/// the verb is safe to re-run. The write fires CaseAccessPlugin (its filter names the adviser
+/// email), which re-resolves the supervisor on the same case.
+/// </summary>
+int BackfillAdviserEmail(string orgUrl, bool confirm)
+{
+    using var svc = Connect(orgUrl);
+
+    var rows = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_outcomecase\">" +
+        "<attribute name=\"al_outcomecaseid\"/>" +
+        "<attribute name=\"al_casereference\"/>" +
+        "<attribute name=\"al_advisername\"/>" +
+        "<filter><condition attribute=\"al_adviseremail\" operator=\"null\"/>" +
+        "<condition attribute=\"al_advisername\" operator=\"not-null\"/></filter>" +
+        "<order attribute=\"al_casereference\"/>" +
+        "</entity></fetch>")).Entities;
+
+    var emails = new Dictionary<string, (string Email, string Problem)>(StringComparer.OrdinalIgnoreCase);
+    var pending = new List<(Guid Id, string Reference, string Name, string Email)>();
+    var skipped = new List<string>();
+
+    foreach (var row in rows)
+    {
+        var name = (row.GetAttributeValue<string>("al_advisername") ?? string.Empty).Trim();
+        var reference = row.GetAttributeValue<string>("al_casereference") ?? row.Id.ToString("D");
+        if (name.Length == 0)
+        {
+            continue;
+        }
+
+        if (!emails.TryGetValue(name, out var found))
+        {
+            var query = new QueryExpression("contact") { ColumnSet = new ColumnSet("emailaddress1"), TopCount = 2 };
+            query.Criteria.AddCondition("fullname", ConditionOperator.Equal, name);
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            var matches = svc.RetrieveMultiple(query).Entities;
+            var email = matches.Count == 1 ? matches[0].GetAttributeValue<string>("emailaddress1") : null;
+            found = matches.Count == 0 ? (null, "no active contact of that name")
+                : matches.Count > 1 ? (null, "two or more active contacts of that name")
+                : string.IsNullOrWhiteSpace(email) ? (null, "the contact has no email")
+                : (email.Trim(), null);
+            emails[name] = found;
+        }
+
+        if (found.Email == null)
+        {
+            skipped.Add($"{reference}  {name}: {found.Problem}");
+            continue;
+        }
+
+        pending.Add((row.Id, reference, name, found.Email));
+    }
+
+    Console.WriteLine($"{rows.Count} case(s) name an adviser with no adviser email; {pending.Count} to write; {skipped.Count} left alone.");
+    foreach (var p in pending)
+    {
+        Console.WriteLine($"   {p.Reference}  {p.Name}  <- {p.Email}");
+    }
+
+    foreach (var s in skipped)
+    {
+        Console.WriteLine($"   LEFT ALONE {s}");
+    }
+
+    if (!confirm)
+    {
+        Console.WriteLine("Dry run. Re-run with --confirm to write.");
+        return 0;
+    }
+
+    var written = 0;
+    foreach (var p in pending)
+    {
+        svc.Update(new Entity("al_outcomecase", p.Id) { ["al_adviseremail"] = p.Email });
+        written++;
+    }
+
+    Console.WriteLine($"Wrote the adviser email on {written} case(s).");
+    return 0;
+}
+
 /// <summary>
 /// Stamps al_ioreference on cases imported before that column existed.
 ///

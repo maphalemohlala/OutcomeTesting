@@ -162,5 +162,35 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.False(change.AdviserUnmatched);
             Assert.False(change.SupervisorUnmatched);
         }
+
+        [Fact]
+        public void A_released_case_with_no_adviser_email_names_the_supervisor_through_the_adviser_contact()
+        {
+            // TEST's 29 Sep import: the name, no address. The supervisor who can read the case
+            // must be the one sign-off routes to (CaseAdviser), not nobody.
+            var svc = Environment(CaseLifecycle.AwaitingRemediation, false, true);
+            svc.Row("al_outcomecase", CaseId)["al_adviseremail"] = null;
+            svc.Seed(
+                "al_reviewinstance", Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_reviewtype", new OptionSetValue(ResponseRules.ReviewTypeAqs),
+                "al_submittedon", Now.AddDays(-1),
+                "al_sequence", 1,
+                "statecode", new OptionSetValue(0));
+            svc.Seed("al_remediationaction", Guid.NewGuid(), "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId));
+            var supervisor = Guid.NewGuid();
+            svc.Seed("contact", Guid.NewGuid(), "fullname", "Ann Adviser", "emailaddress1", "ann@example.com", "statecode", new OptionSetValue(0));
+            svc.Seed(
+                "al_advisermapping", Guid.NewGuid(),
+                "al_adviseremail", "ann@example.com",
+                "al_tcmanagerid", new EntityReference("contact", supervisor),
+                "statecode", new OptionSetValue(0));
+
+            var change = CaseAccessReconciler.Reconcile(svc, CaseId, Now);
+
+            Assert.Equal(supervisor, svc.Row("al_outcomecase", CaseId)
+                .GetAttributeValue<EntityReference>(CaseAccessReconciler.SupervisorAttr).Id);
+            Assert.False(change.SupervisorUnmatched);
+        }
     }
 }
