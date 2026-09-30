@@ -95,6 +95,17 @@ describe('toDetail checklist items', () => {
   });
 });
 
+describe('toDetail managed lists', () => {
+  it('carries the Vulnerable client option the case holds, for the edit panel', () => {
+    const detail = toDetail(record({ _al_vulnerableclientid_value: 'vc-1' }));
+    expect(detail.edit.al_vulnerableclientid).toBe('vc-1');
+  });
+
+  it('reports no Vulnerable client option as empty, so the panel offers the dash', () => {
+    expect(toDetail(record({})).edit.al_vulnerableclientid).toBe('');
+  });
+});
+
 describe('toDetail adviser release (AD-218)', () => {
   it('flags a case in remediation that no adviser contact was matched to', () => {
     expect(toDetail(record({ al_casestatus: 120910587 })).adviserUnmatched).toBe(true);

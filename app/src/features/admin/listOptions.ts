@@ -39,6 +39,7 @@ export const LIST_SAMPLE_SOURCE = 120910841 as const;
 export const LIST_CASE_TYPE = 120910842 as const;
 export const LIST_PRE_OR_POST_CHECK = 120910843 as const;
 export const LIST_PRODUCTS = 120910844 as const;
+export const LIST_VULNERABLE_CLIENT = 120910845 as const;
 
 /**
  * The four values, as literals rather than `number`.
@@ -54,7 +55,8 @@ export type ListValue =
   | typeof LIST_SAMPLE_SOURCE
   | typeof LIST_CASE_TYPE
   | typeof LIST_PRE_OR_POST_CHECK
-  | typeof LIST_PRODUCTS;
+  | typeof LIST_PRODUCTS
+  | typeof LIST_VULNERABLE_CLIENT;
 
 export interface ManagedList {
   /** al_listoption.al_list */
@@ -129,6 +131,14 @@ export const MANAGED_LISTS: readonly ManagedList[] = [
     label: 'Products',
     caseAttribute: null,
     legacyAttribute: 'al_products',
+  },
+  {
+    value: LIST_VULNERABLE_CLIENT,
+    key: 'vulnerable-client',
+    caseRelationship: null,
+    label: 'Vulnerable client',
+    caseAttribute: 'al_vulnerableclientid',
+    legacyAttribute: 'al_vulnerableclient',
   },
 ];
 

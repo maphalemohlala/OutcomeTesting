@@ -393,11 +393,13 @@ export function caseHeaderFields(
     },
     {
       label: 'Vulnerable client?',
-      value: choiceLabel(
-        Al_outcomecasesal_vulnerableclient,
-        record.al_vulnerableclient,
-        record.al_vulnerableclientname,
-      ),
+      value:
+        lookupLabelOn(record as unknown as Record<string, unknown>, managedList('vulnerable-client')) ??
+        choiceLabel(
+          Al_outcomecasesal_vulnerableclient,
+          record.al_vulnerableclient,
+          record.al_vulnerableclientname,
+        ),
     },
     {
       label: 'Tax check required',

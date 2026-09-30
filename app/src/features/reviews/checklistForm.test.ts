@@ -223,12 +223,24 @@ describe('caseHeaderFields', () => {
         al_producttypeidname: 'Chosen product type',
         al_samplesourceidname: 'Chosen sample source',
         al_preorpostcheckidname: 'Chosen check point',
+        al_vulnerableclientidname: 'Chosen vulnerability',
       } as unknown as Al_outcomecases).map((f) => [f.label, f.value]),
     );
     expect(byLabel.get('Case type')).toBe('Chosen case type');
     expect(byLabel.get('Product / solution type')).toBe('Chosen product type');
     expect(byLabel.get('Sample source')).toBe('Chosen sample source');
     expect(byLabel.get('Pre or post check')).toBe('Chosen check point');
+    expect(byLabel.get('Vulnerable client?')).toBe('Chosen vulnerability');
+  });
+
+  it('still reads the legacy Vulnerable client choice on a case the backfill has not reached', () => {
+    const byLabel = new Map(
+      caseHeaderFields({
+        ...record,
+        al_vulnerableclient: 120910552,
+      } as unknown as Al_outcomecases).map((f) => [f.label, f.value]),
+    );
+    expect(byLabel.get('Vulnerable client?')).toBe('Potentially vulnerable');
   });
 
   it('leaves an unrecorded field null rather than putting a raw value on screen', () => {

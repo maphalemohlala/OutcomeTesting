@@ -37,7 +37,6 @@ import {
   Al_outcomecasesal_priority,
   Al_outcomecasesal_taxcheckrequired,
   Al_outcomecasesal_taxteamdisposition,
-  Al_outcomecasesal_vulnerableclient,
 } from '../../generated/models/Al_outcomecasesModel';
 import { nextStatuses, type CaseStatus } from '../../types/domain';
 import {
@@ -102,7 +101,13 @@ const SECTIONS: Section[] = [
     heading: 'Client',
     fields: [
       { attr: 'al_clientname', label: 'Client', kind: 'text' },
-      { attr: 'al_vulnerableclient', label: 'Vulnerable client', kind: 'choice', options: Al_outcomecasesal_vulnerableclient },
+      {
+        attr: 'al_vulnerableclientid',
+        label: 'Vulnerable client',
+        kind: 'listoption',
+        list: managedList('vulnerable-client'),
+        help: 'Maintained under Admin → Dropdown options.',
+      },
     ],
   },
   {

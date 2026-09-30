@@ -48,6 +48,7 @@ export interface CaseEditValues {
   al_samplesourceid: string;
   al_casetypeid: string;
   al_preorpostcheckid: string;
+  al_vulnerableclientid: string;
   /**
    * The products the case covers, as comma-separated al_listoption ids.
    *
@@ -177,6 +178,7 @@ export function toDetail(
       al_samplesourceid: text(record._al_samplesourceid_value) ?? '',
       al_casetypeid: text(record._al_casetypeid_value) ?? '',
       al_preorpostcheckid: text(record._al_preorpostcheckid_value) ?? '',
+      al_vulnerableclientid: text(record._al_vulnerableclientid_value) ?? '',
       // Sorted, so the diff that decides whether to send this field does not fire merely
       // because the intersect came back in a different order.
       al_productids: [...productIds].sort().join(','),

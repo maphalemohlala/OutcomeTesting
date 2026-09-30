@@ -11,6 +11,7 @@ import {
   LIST_PRODUCTS,
   LIST_PRODUCT_SOLUTION_TYPE,
   LIST_SAMPLE_SOURCE,
+  LIST_VULNERABLE_CLIENT,
   MANAGED_LISTS,
   MIGRATED_LISTS,
   MULTI_CHOICE_LISTS,
@@ -117,7 +118,7 @@ describe('heldOptionLabels', () => {
 });
 
 describe('the managed lists', () => {
-  it('names the four the original request named, plus Products', () => {
+  it('names the four the original request named, plus Products and Vulnerable client', () => {
     // The first four are the ones the owner listed on 2026-09-21. Products was added after,
     // on the same day, when the free-text "Product(s)" field became a dropdown too.
     expect(MANAGED_LISTS.map((list) => list.label)).toEqual([
@@ -126,6 +127,7 @@ describe('the managed lists', () => {
       'Case type',
       'Pre or post check',
       'Products',
+      'Vulnerable client',
     ]);
   });
 
@@ -147,6 +149,7 @@ describe('the managed lists', () => {
       LIST_CASE_TYPE,
       LIST_PRE_OR_POST_CHECK,
       LIST_PRODUCTS,
+      LIST_VULNERABLE_CLIENT,
     ]);
 
     // A lookup OR a many-to-many. Products has the latter, and is manageable on exactly the
@@ -169,6 +172,7 @@ describe('the managed lists', () => {
       'sample-source',
       'case-type',
       'pre-or-post-check',
+      'vulnerable-client',
     ]);
 
     // Never both: the two are different storage and a list claiming each would be written
@@ -199,6 +203,7 @@ describe('the managed lists', () => {
       'al_casetype',
       'al_preorpostcheck',
       'al_products',
+      'al_vulnerableclient',
     ]);
   });
 
@@ -217,6 +222,7 @@ describe('the managed lists', () => {
     expect(lookupValueField(listByValue(LIST_SAMPLE_SOURCE)!)).toBe('_al_samplesourceid_value');
     expect(lookupValueField(listByValue(LIST_CASE_TYPE)!)).toBe('_al_casetypeid_value');
     expect(lookupValueField(listByValue(LIST_PRE_OR_POST_CHECK)!)).toBe('_al_preorpostcheckid_value');
+    expect(lookupValueField(listByValue(LIST_VULNERABLE_CLIENT)!)).toBe('_al_vulnerableclientid_value');
   });
 
   it('names a lookup distinctly from the choice column it supersedes', () => {

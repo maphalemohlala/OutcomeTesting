@@ -46,6 +46,14 @@ const DROPDOWNS = [
     oldValues: [120910540, 120910541],
     oldLabels: [] as string[],
   },
+  {
+    label: 'Vulnerable client',
+    attr: 'al_vulnerableclientid',
+    fetch: 'vulnerable_clients',
+    list: 120910845,
+    oldValues: [120910550, 120910551, 120910552, 120910553],
+    oldLabels: ['Potentially vulnerable'],
+  },
 ] as const;
 
 /** One editable header cell's <select>, tags and Liquid intact. */
@@ -198,6 +206,7 @@ describe('reading a case’s managed values on the portal', () => {
       ['h_casetypeid', 'h_casetype'],
       ['h_samplesourceid', 'h_samplesource'],
       ['h_preorpostcheckid', 'h_prepost'],
+      ['h_vulnerableclientid', 'h_vulnerable'],
     ];
 
     for (const [lookup, legacy] of reviewPairs) {

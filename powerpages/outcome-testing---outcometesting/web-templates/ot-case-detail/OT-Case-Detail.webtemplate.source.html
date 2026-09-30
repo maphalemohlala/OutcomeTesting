@@ -66,6 +66,7 @@
       <attribute name="al_samplesourceid" />
       <attribute name="al_casetypeid" />
       <attribute name="al_preorpostcheckid" />
+      <attribute name="al_vulnerableclientid" />
       <attribute name="al_taxcheckrequired" />
       <attribute name="al_taxteamdisposition" />
       <attribute name="al_taxcheckername" />
@@ -442,7 +443,7 @@
           </tr>
           <tr>
             <td class="lbl">Pre or post check</td><td class="val">{% if c.al_preorpostcheckid.name %}{{ c.al_preorpostcheckid.name | escape }}{% else %}{{ c.al_preorpostcheck.label | default: '—' | escape }}{% endif %}</td>
-            <td class="lbl">Vulnerable client?</td><td class="val">{{ c.al_vulnerableclient.label | default: '—' | escape }}</td>
+            <td class="lbl">Vulnerable client?</td><td class="val">{% if c.al_vulnerableclientid.name %}{{ c.al_vulnerableclientid.name | escape }}{% else %}{{ c.al_vulnerableclient.label | default: '—' | escape }}{% endif %}</td>
           </tr>
           <tr>
             <td class="lbl">Tax check required</td><td class="val">{{ c.al_taxcheckrequired.label | default: '—' | escape }}</td>

@@ -159,6 +159,7 @@
         <attribute name="al_checkdate" />
         <attribute name="al_preorpostcheck" />
         <attribute name="al_vulnerableclient" />
+        <attribute name="al_vulnerableclientid" />
         <attribute name="al_taxcheckrequired" />
         <attribute name="al_taxteamdisposition" />
         <attribute name="al_checklistitems" />
@@ -393,6 +394,8 @@
     {% assign held_casetype = h_casetypeid.id %}
     {% assign h_preorpostcheckid = rv['case.al_preorpostcheckid'] %}
     {% assign held_preorpost = h_preorpostcheckid.id %}
+    {% assign h_vulnerableclientid = rv['case.al_vulnerableclientid'] %}
+    {% assign held_vulnerable = h_vulnerableclientid.id %}
     {% comment %}
       TODAY, not the review's as_of. as_of answers "which question version was this review
       answered against", which is a question about history; this answers "what may be chosen
@@ -432,6 +435,29 @@
         <filter type="and">
           <condition attribute="statecode" operator="eq" value="0" />
           <condition attribute="al_list" operator="eq" value="120910841" />
+          <filter type="or">
+            <condition attribute="al_effectivefrom" operator="null" />
+            <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ product_day }}" />
+          </filter>
+          <filter type="or">
+            <condition attribute="al_effectiveto" operator="null" />
+            <condition attribute="al_effectiveto" operator="gt" value="{{ product_day }}" />
+          </filter>
+        </filter>
+        <order attribute="al_sortorder" />
+        <order attribute="al_name" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+{% fetchxml vulnerable_clients %}
+    <fetch>
+      <entity name="al_listoption">
+        <attribute name="al_listoptionid" />
+        <attribute name="al_name" />
+        <attribute name="al_sortorder" />
+        <filter type="and">
+          <condition attribute="statecode" operator="eq" value="0" />
+          <condition attribute="al_list" operator="eq" value="120910845" />
           <filter type="or">
             <condition attribute="al_effectivefrom" operator="null" />
             <condition attribute="al_effectivefrom" operator="on-or-before" value="{{ product_day }}" />
@@ -675,7 +701,7 @@
           </tr>
           <tr>
             <td class="lbl">Pre or post check</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_preorpostcheckid" aria-label="Pre or post check"><option value="">&mdash;</option>{% assign prepost_offered = false %}{% assign prepost_any = false %}{% for o in pre_post_checks.results.entities %}{% assign prepost_any = true %}<option value="{{ o.al_listoptionid }}" {% if held_preorpost and o.al_listoptionid == held_preorpost %}selected{% assign prepost_offered = true %}{% endif %}>{{ o.al_name | escape }}</option>{% endfor %}{% unless prepost_offered %}{% if held_preorpost %}<option value="{{ held_preorpost }}" selected>{{ h_preorpostcheckid.name | escape }}{% if prepost_any %} (retired){% endif %}</option>{% endif %}{% endunless %}</select></td>
-            <td class="lbl">Vulnerable client?</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_vulnerableclient" aria-label="Vulnerable client"><option value="">&mdash;</option><option value="120910550" {% if h_vulnerable.value == 120910550 %}selected{% endif %}>Yes</option><option value="120910551" {% if h_vulnerable.value == 120910551 %}selected{% endif %}>No</option><option value="120910552" {% if h_vulnerable.value == 120910552 %}selected{% endif %}>Potentially vulnerable</option><option value="120910553" {% if h_vulnerable.value == 120910553 %}selected{% endif %}>N/A</option></select></td>
+            <td class="lbl">Vulnerable client?</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_vulnerableclientid" aria-label="Vulnerable client"><option value="">&mdash;</option>{% assign vulnerable_offered = false %}{% assign vulnerable_any = false %}{% for o in vulnerable_clients.results.entities %}{% assign vulnerable_any = true %}<option value="{{ o.al_listoptionid }}" {% if held_vulnerable and o.al_listoptionid == held_vulnerable %}selected{% assign vulnerable_offered = true %}{% endif %}>{{ o.al_name | escape }}</option>{% endfor %}{% unless vulnerable_offered %}{% if held_vulnerable %}<option value="{{ held_vulnerable }}" selected>{{ h_vulnerableclientid.name | escape }}{% if vulnerable_any %} (retired){% endif %}</option>{% endif %}{% endunless %}</select></td>
           </tr>
           {% else %}
           <tr><td class="lbl">Adviser name</td><td class="val">{{ rv['case.al_advisername'] | escape }}</td><td class="lbl">Adviser status</td><td class="val">{{ h_adviserstatus.label | escape }}</td></tr>
@@ -692,7 +718,7 @@
           <tr><td class="lbl">Tax Checker</td><td class="val">{{ rv['case.al_taxcheckername'] | default: 'Not yet allocated' | escape }}</td><td class="lbl">AQS Checker</td><td class="val">{{ rv['case.al_aqscheckername'] | default: 'Not yet allocated' | escape }}</td></tr>
           <tr><td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' }}</td><td class="lbl"></td><td class="val"></td></tr>
           <tr><td class="lbl">Client name / initials</td><td class="val">{{ rv['case.al_clientname'] | escape }}</td><td class="lbl">IO reference</td><td class="val">{{ rv['case.al_ioreference'] | escape }}</td></tr>
-          <tr><td class="lbl">Pre or post check</td><td class="val">{% if h_preorpostcheckid.name %}{{ h_preorpostcheckid.name | escape }}{% else %}{{ h_prepost.label | escape }}{% endif %}</td><td class="lbl">Vulnerable client?</td><td class="val">{{ h_vulnerable.label | escape }}</td></tr>
+          <tr><td class="lbl">Pre or post check</td><td class="val">{% if h_preorpostcheckid.name %}{{ h_preorpostcheckid.name | escape }}{% else %}{{ h_prepost.label | escape }}{% endif %}</td><td class="lbl">Vulnerable client?</td><td class="val">{% if h_vulnerableclientid.name %}{{ h_vulnerableclientid.name | escape }}{% else %}{{ h_vulnerable.label | escape }}{% endif %}</td></tr>
           {% endif %}
           {% comment %}
             The Tax team's own two fields (project owner, 2026-09-13). The document labels
