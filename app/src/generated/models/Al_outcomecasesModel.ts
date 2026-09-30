@@ -115,10 +115,14 @@ export type Al_outcomecasesstatuscode = keyof typeof Al_outcomecasesstatuscode;
 export interface Al_outcomecasesBase {
   al_advicedate?: string;
   al_advisercode?: string;
+  "al_AdviserContactId@odata.bind"?: string;
   al_adviseremail?: string;
   al_advisername?: string;
   al_adviserstatus?: Al_outcomecasesal_adviserstatus;
+  "al_AqsCheckerContactId@odata.bind"?: string;
   al_aqscheckername?: string;
+  "al_AqsQueueAccountId@odata.bind"?: string;
+  al_aqsqueuedon?: string;
   al_casereference: string;
   al_casestatus: Al_outcomecasesal_casestatus;
   al_casetype?: Al_outcomecasesal_casetype;
@@ -158,11 +162,14 @@ export interface Al_outcomecasesBase {
   al_servicestatus?: string;
   al_taskstartdate?: string;
   al_tasktype?: string;
+  "al_TaxCheckerContactId@odata.bind"?: string;
   al_taxcheckername?: string;
   al_taxcheckrequired?: Al_outcomecasesal_taxcheckrequired;
   al_taxoutcome?: Al_outcomecasesal_taxoutcome;
   al_taxteamdisposition?: Al_outcomecasesal_taxteamdisposition;
+  "al_TcSupervisorContactId@odata.bind"?: string;
   al_vulnerableclient?: Al_outcomecasesal_vulnerableclient;
+  "al_VulnerableClientId@odata.bind"?: string;
   al_workflowname?: string;
   importsequencenumber?: number;
   overriddencreatedon?: string;
@@ -173,7 +180,13 @@ export interface Al_outcomecasesBase {
 }
 
 export interface Al_outcomecases extends Al_outcomecasesBase {
+  al_advisercontactidname?: string;
+  al_advisercontactidyominame?: string;
   al_adviserstatusname?: string;
+  al_aqscheckercontactidname?: string;
+  al_aqscheckercontactidyominame?: string;
+  al_aqsqueueaccountidname?: string;
+  al_aqsqueueaccountidyominame?: string;
   al_casestatusname?: string;
   al_casetypeidname?: string;
   al_casetypename?: string;
@@ -189,9 +202,14 @@ export interface Al_outcomecases extends Al_outcomecasesBase {
   al_reviewrouteidname?: string;
   al_samplesourceidname?: string;
   al_samplesourcename?: string;
+  al_taxcheckercontactidname?: string;
+  al_taxcheckercontactidyominame?: string;
   al_taxcheckrequiredname?: string;
   al_taxoutcomename?: string;
   al_taxteamdispositionname?: string;
+  al_tcsupervisorcontactidname?: string;
+  al_tcsupervisorcontactidyominame?: string;
+  al_vulnerableclientidname?: string;
   al_vulnerableclientname?: string;
   createdbyname?: string;
   createdbyyominame: string;
@@ -211,6 +229,12 @@ export interface Al_outcomecases extends Al_outcomecasesBase {
   statecodename?: string;
   statuscodename?: string;
   versionnumber?: number;
+  al_advisercontactid?: object;
+  _al_advisercontactid_value?: string;
+  al_aqscheckercontactid?: object;
+  _al_aqscheckercontactid_value?: string;
+  al_aqsqueueaccountid?: object;
+  _al_aqsqueueaccountid_value?: string;
   al_casetypeid?: object;
   _al_casetypeid_value?: string;
   al_preorpostcheckid?: object;
@@ -223,6 +247,12 @@ export interface Al_outcomecases extends Al_outcomecasesBase {
   _al_reviewrouteid_value?: string;
   al_samplesourceid?: object;
   _al_samplesourceid_value?: string;
+  al_taxcheckercontactid?: object;
+  _al_taxcheckercontactid_value?: string;
+  al_tcsupervisorcontactid?: object;
+  _al_tcsupervisorcontactid_value?: string;
+  al_vulnerableclientid?: object;
+  _al_vulnerableclientid_value?: string;
   createdby?: object;
   _createdby_value?: string;
   createdonbehalfby?: object;

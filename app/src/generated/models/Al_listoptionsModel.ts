@@ -7,7 +7,8 @@ export const Al_listoptionsal_list = {
   120910841: 'Sample source',
   120910842: 'Case type',
   120910843: 'Pre or post check',
-  120910844: 'Products'
+  120910844: 'Products',
+  120910845: 'Vulnerable client'
 } as const;
 export type Al_listoptionsal_list = keyof typeof Al_listoptionsal_list;
 export const Al_listoptionsstatecode = {

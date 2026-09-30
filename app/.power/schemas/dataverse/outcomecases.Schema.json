@@ -25,6 +25,31 @@
           "x-ms-schema-name": "al_AdviserCode",
           "maxLength": 100
         },
+        "al_advisercontactid": {
+          "type": "string",
+          "title": "Adviser (access)",
+          "x-ms-dataverse-attribute": "al_advisercontactid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_AdviserContactId"
+        },
+        "al_advisercontactidname": {
+          "type": "string",
+          "title": "al_advisercontactidname",
+          "x-ms-dataverse-attribute": "al_advisercontactidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_AdviserContactIdName",
+          "x-ms-read-only": true,
+          "maxLength": 160
+        },
+        "al_advisercontactidyominame": {
+          "type": "string",
+          "title": "al_advisercontactidyominame",
+          "x-ms-dataverse-attribute": "al_advisercontactidyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_AdviserContactIdYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 450
+        },
         "al_adviseremail": {
           "type": "string",
           "title": "Adviser email",
@@ -78,6 +103,31 @@
           "x-ms-schema-name": "al_adviserstatusName",
           "x-ms-read-only": true
         },
+        "al_aqscheckercontactid": {
+          "type": "string",
+          "title": "AQS checker (access)",
+          "x-ms-dataverse-attribute": "al_aqscheckercontactid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_AqsCheckerContactId"
+        },
+        "al_aqscheckercontactidname": {
+          "type": "string",
+          "title": "al_aqscheckercontactidname",
+          "x-ms-dataverse-attribute": "al_aqscheckercontactidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_AqsCheckerContactIdName",
+          "x-ms-read-only": true,
+          "maxLength": 160
+        },
+        "al_aqscheckercontactidyominame": {
+          "type": "string",
+          "title": "al_aqscheckercontactidyominame",
+          "x-ms-dataverse-attribute": "al_aqscheckercontactidyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_AqsCheckerContactIdYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 450
+        },
         "al_aqscheckername": {
           "type": "string",
           "title": "AQS Checker",
@@ -85,6 +135,38 @@
           "x-ms-dataverse-type": "StringType",
           "x-ms-schema-name": "al_AqsCheckerName",
           "maxLength": 100
+        },
+        "al_aqsqueueaccountid": {
+          "type": "string",
+          "title": "AQS queue (access)",
+          "x-ms-dataverse-attribute": "al_aqsqueueaccountid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_AqsQueueAccountId"
+        },
+        "al_aqsqueueaccountidname": {
+          "type": "string",
+          "title": "al_aqsqueueaccountidname",
+          "x-ms-dataverse-attribute": "al_aqsqueueaccountidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_AqsQueueAccountIdName",
+          "x-ms-read-only": true,
+          "maxLength": 160
+        },
+        "al_aqsqueueaccountidyominame": {
+          "type": "string",
+          "title": "al_aqsqueueaccountidyominame",
+          "x-ms-dataverse-attribute": "al_aqsqueueaccountidyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_AqsQueueAccountIdYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 160
+        },
+        "al_aqsqueuedon": {
+          "type": "string",
+          "title": "Joined the AQS queue",
+          "x-ms-dataverse-attribute": "al_aqsqueuedon",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "al_AqsQueuedOn"
         },
         "al_casereference": {
           "type": "string",
@@ -725,6 +807,31 @@
           "x-ms-schema-name": "al_TaskType",
           "maxLength": 100
         },
+        "al_taxcheckercontactid": {
+          "type": "string",
+          "title": "Tax checker (access)",
+          "x-ms-dataverse-attribute": "al_taxcheckercontactid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_TaxCheckerContactId"
+        },
+        "al_taxcheckercontactidname": {
+          "type": "string",
+          "title": "al_taxcheckercontactidname",
+          "x-ms-dataverse-attribute": "al_taxcheckercontactidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_TaxCheckerContactIdName",
+          "x-ms-read-only": true,
+          "maxLength": 160
+        },
+        "al_taxcheckercontactidyominame": {
+          "type": "string",
+          "title": "al_taxcheckercontactidyominame",
+          "x-ms-dataverse-attribute": "al_taxcheckercontactidyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_TaxCheckerContactIdYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 450
+        },
         "al_taxcheckername": {
           "type": "string",
           "title": "Tax Checker",
@@ -829,6 +936,31 @@
           "x-ms-schema-name": "al_taxteamdispositionName",
           "x-ms-read-only": true
         },
+        "al_tcsupervisorcontactid": {
+          "type": "string",
+          "title": "T&C Supervisor (access)",
+          "x-ms-dataverse-attribute": "al_tcsupervisorcontactid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_TcSupervisorContactId"
+        },
+        "al_tcsupervisorcontactidname": {
+          "type": "string",
+          "title": "al_tcsupervisorcontactidname",
+          "x-ms-dataverse-attribute": "al_tcsupervisorcontactidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_TcSupervisorContactIdName",
+          "x-ms-read-only": true,
+          "maxLength": 160
+        },
+        "al_tcsupervisorcontactidyominame": {
+          "type": "string",
+          "title": "al_tcsupervisorcontactidyominame",
+          "x-ms-dataverse-attribute": "al_tcsupervisorcontactidyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_TcSupervisorContactIdYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 450
+        },
         "al_vulnerableclient": {
           "type": "string",
           "title": "Vulnerable client",
@@ -857,6 +989,22 @@
           "x-ms-isGlobal": false,
           "x-ms-optionsetdisplayname": "Vulnerable client",
           "x-ms-optionSetType": "Picklist"
+        },
+        "al_vulnerableclientid": {
+          "type": "string",
+          "title": "Vulnerable client",
+          "x-ms-dataverse-attribute": "al_vulnerableclientid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "al_VulnerableClientId"
+        },
+        "al_vulnerableclientidname": {
+          "type": "string",
+          "title": "al_vulnerableclientidname",
+          "x-ms-dataverse-attribute": "al_vulnerableclientidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_VulnerableClientIdName",
+          "x-ms-read-only": true,
+          "maxLength": 200
         },
         "al_vulnerableclientname": {
           "type": "string",

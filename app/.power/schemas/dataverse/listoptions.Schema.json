@@ -43,16 +43,19 @@
             "Sample source",
             "Case type",
             "Pre or post check",
-            "Products"
+            "Products",
+            "Vulnerable client"
           ],
           "x-ms-enum-values": [
             120910840,
             120910841,
             120910842,
             120910843,
-            120910844
+            120910844,
+            120910845
           ],
           "Color": [
+            null,
             null,
             null,
             null,
