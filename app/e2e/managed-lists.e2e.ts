@@ -56,7 +56,7 @@ test.describe('the managed lists on a review page', () => {
       return;
     }
 
-    // Each of the four single-choice lists. "Not set" alone is the 403 rendered as data,
+    // Each of the five single-choice lists. "Not set" alone is the 403 rendered as data,
     // so the bar is at least one REAL option beyond it.
     const checked: string[] = [];
 
@@ -65,6 +65,7 @@ test.describe('the managed lists on a review page', () => {
       'Product / solution type',
       'Sample source',
       'Pre or post check',
+      'Vulnerable client',
     ]) {
       const select = page.getByLabel(label, { exact: false }).first();
       if ((await select.count()) === 0) {
@@ -88,6 +89,32 @@ test.describe('the managed lists on a review page', () => {
       checked,
       'none of the managed lists were on the page - is this an editable review assigned to you?',
     ).not.toHaveLength(0);
+  });
+
+  test('draws Vulnerable client from its managed list, not from four hand-written options', async ({ page }) => {
+    // 2026-09-30: the sixth list. Before it the select carried the choice column's raw values,
+    // so an option added on Dropdown options would never have reached the portal.
+    const portal = requireEnv(PORTAL_URL);
+    await page.goto(requireEnv(REVIEW_URL));
+    await expectSignedIn(page, portal);
+    await expectNoLiquidError(page);
+
+    const select = page.locator('select[data-ot-hdr="al_vulnerableclientid"]');
+    if ((await select.count()) === 0) {
+      test.skip(true, 'the header on this review is not editable; point OT_REVIEW_URL at one that is');
+      return;
+    }
+
+    const offered = (await select.locator('option').allTextContents()).map((t) => t.trim());
+    for (const name of ['Yes', 'No', 'Potentially vulnerable', 'N/A']) {
+      expect(offered, name).toContain(name);
+    }
+    // Every value is a row id, never a choice value such as 120910550.
+    const values = await select.locator('option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value));
+    for (const value of values.filter((v) => v !== '')) {
+      expect(value).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/);
+    }
+    expect(await page.locator('select[data-ot-hdr="al_vulnerableclient"]').count()).toBe(0);
   });
 
   test('offers the Products tick list rather than a free-text box', async ({ page }) => {
