@@ -316,16 +316,10 @@ Entra cookies did not sign in to TEST silently this time.
 
 - **The sign-off runbook just above** (I5 a/b), and a fresh portal session for the Code App
   check.
-- **Promotion to TEST** - the owner's call each time. What it needs: a solution export
-  carrying the four columns, the assembly, the new step, the three templates, and (from the fix
-  wave) `OT Layout` and the `outcome-testing.css` web file;
-  import **with `--activate-plugins`**; then diff the three templates against source (a
-  direct push to TEST masks a managed import); then widen TEST's two allowlists **from TEST's
-  own values** (read them first) with `setsitesetting`. Agent imports to TEST are refused
-  since 2026-09-28, so that is an owner runbook. After the import, tell TEST's checkers that
-  **a review page left open from before the deploy must be reloaded** to show the "Fail
-  points and remedial actions" card: the open page has no card, so its Submit is refused by
-  the new server gate with nowhere on screen to write the words.
+- **Promotion to TEST** - done 2026-09-30 (see "TEST - 1.0.14.0" above). The allowlists came
+  with the import, identical to DEV, so no `setsitesetting` was needed. Still to do: tell
+  TEST's checkers that **a review page left open from before 07:09Z must be reloaded** to
+  show the "Fail points and remedial actions" card.
 - **Open the Code App URL above** and confirm the served bundle.
 - In the first run no `--confirm` verb was refused; in the fix wave redeploy one write was
   refused (the `al_advisermapping` create in the runbook above).
