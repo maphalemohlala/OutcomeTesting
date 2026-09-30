@@ -85,8 +85,8 @@
   {% endcomment %}
   {% assign ot_tax_note_count = 0 %}
   {% for r in ot_tax_notes.results.entities %}
-    {% assign ot_note_text = r.al_answertext | strip %}
-    {% assign ot_note_rich = r.al_answerrichtext | strip %}
+    {% assign ot_note_text = r.al_answertext | default: '' | strip %}
+    {% assign ot_note_rich = r.al_answerrichtext | default: '' | strip %}
     {% if ot_note_text != '' or ot_note_rich != '' %}
       {% assign ot_tax_note_count = ot_tax_note_count | plus: 1 %}
     {% endif %}
@@ -99,8 +99,8 @@
       Recorded by the Tax checker when the Tax check was submitted. Read-only here.
     </p>
     {% for r in ot_tax_notes.results.entities %}
-      {% assign ot_note_text = r.al_answertext | strip %}
-      {% assign ot_note_rich = r.al_answerrichtext | strip %}
+      {% assign ot_note_text = r.al_answertext | default: '' | strip %}
+      {% assign ot_note_rich = r.al_answerrichtext | default: '' | strip %}
       {% assign ot_note_code = r['q.al_questioncode'] %}
       {% if ot_note_text != '' or ot_note_rich != '' %}
       <div class="ot-tax-notes__item">

@@ -75,8 +75,8 @@
   {% assign ot_aqs_first_review = '' %}
   {% assign ot_aqs_multi = false %}
   {% for r in ot_aqs_notes.results.entities %}
-    {% assign ot_note_text = r.al_answertext | strip %}
-    {% assign ot_note_rich = r.al_answerrichtext | strip %}
+    {% assign ot_note_text = r.al_answertext | default: '' | strip %}
+    {% assign ot_note_rich = r.al_answerrichtext | default: '' | strip %}
     {% if ot_note_text != '' or ot_note_rich != '' %}
       {% assign ot_aqs_note_count = ot_aqs_note_count | plus: 1 %}
       {% assign ot_note_review = r['ri.al_reviewinstanceid'] | append: '' %}
@@ -98,8 +98,8 @@
     {% assign ot_aqs_codes = 'Q-GR-03,Q-GR-04' | split: ',' %}
     {% for ot_code in ot_aqs_codes %}
       {% for r in ot_aqs_notes.results.entities %}
-        {% assign ot_note_text = r.al_answertext | strip %}
-        {% assign ot_note_rich = r.al_answerrichtext | strip %}
+        {% assign ot_note_text = r.al_answertext | default: '' | strip %}
+        {% assign ot_note_rich = r.al_answerrichtext | default: '' | strip %}
         {% if r['q.al_questioncode'] == ot_code %}{% if ot_note_text != '' or ot_note_rich != '' %}
       <div class="ot-tax-notes__item">
         <p class="ot-tax-notes__meta">

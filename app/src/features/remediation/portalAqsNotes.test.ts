@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import aqsNotes from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-aqs-notes/OT-AQS-Notes.webtemplate.source.html?raw';
+import taxNotes from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-tax-notes/OT-Tax-Notes.webtemplate.source.html?raw';
 import aqsNotesMeta from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-aqs-notes/OT-AQS-Notes.webtemplate.yml?raw';
 import remediation from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-remediation/OT-Remediation.webtemplate.source.html?raw';
 import caseDetail from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-case-detail/OT-Case-Detail.webtemplate.source.html?raw';
@@ -76,5 +77,24 @@ describe('where the AQS notes appear', () => {
     const remediationSection = caseDetail.indexOf('<section aria-labelledby="ot-case-remediation">');
     expect(aqs).toBeGreaterThan(-1);
     expect(remediationSection).toBeGreaterThan(aqs);
+  });
+});
+
+describe('a note whose other column is empty', () => {
+  // Found on DEV, 2026-09-30: a plain-text note has no rich text, the column comes back null,
+  // and on this site null != '' is TRUE. Both panels then took the rich-text branch and drew
+  // an empty box where the note should be - the Tax panel had done so for every Tax "Case
+  // notes" since it was built. Reading each column through default: '' makes a missing
+  // value the empty string the comparisons expect.
+  it.each([
+    ['OT AQS Notes', aqsNotes],
+    ['OT Tax Notes', taxNotes],
+  ])('%s treats a missing column as empty before testing it', (_name, template) => {
+    const live = template.replace(/\{% comment %\}[\s\S]*?\{% endcomment %\}/g, '');
+    const reads = live.match(/\{% assign ot_note_(text|rich) = [^%]*%\}/g) ?? [];
+    expect(reads.length).toBeGreaterThanOrEqual(4);
+    for (const read of reads) {
+      expect(read.endsWith("| default: '' | strip %}"), read).toBe(true);
+    }
   });
 });
