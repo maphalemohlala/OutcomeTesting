@@ -312,7 +312,7 @@ export function RemediationPage() {
         <>
           <PageIntro
             title="Remediation and sign-off"
-            purpose="Track the actions raised for a non-pass outcome (BR-006), the preserved initial and final outcomes (BR-007) and the T&C Manager sign-off (BR-008, FR-023). Completing, regrading and signing off are permissioned write paths handled server-side (AD-031)."
+            purpose="Track the actions raised for a non-pass outcome, the preserved initial and final outcomes and the T&C Manager sign-off. Completing, regrading and signing off are permissioned write paths handled server-side."
           />
 
           {/*

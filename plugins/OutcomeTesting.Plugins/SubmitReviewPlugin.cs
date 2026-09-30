@@ -549,7 +549,7 @@ namespace OutcomeTesting.Plugins
             if (service.RetrieveMultiple(query).Entities.Count > 0)
             {
                 throw new InvalidPluginExecutionException(
-                    PreconditionPrefix + "The Tax check on this case has not been submitted yet. Tax must be completed before the AQS review (BR-004).");
+                    PreconditionPrefix + "The Tax check on this case has not been submitted yet. Tax must be completed before the AQS review.");
             }
 
             // No unsubmitted Tax instance. That is either "Tax has been submitted" or
@@ -575,7 +575,7 @@ namespace OutcomeTesting.Plugins
                 if (service.RetrieveMultiple(anyTax).Entities.Count == 0)
                 {
                     throw new InvalidPluginExecutionException(
-                        PreconditionPrefix + "This case requires a Tax check and none has been created yet. Tax must be completed before the AQS review (BR-004).");
+                        PreconditionPrefix + "This case requires a Tax check and none has been created yet. Tax must be completed before the AQS review.");
                 }
             }
 

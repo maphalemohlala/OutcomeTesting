@@ -163,7 +163,7 @@ namespace OutcomeTesting.Plugins
             }
 
             var details = (adopt ? "Adopt " : "Revoke ") + trimmedRole + " for " + trimmedEmail +
-                ". Reconciled a role held in two places (AD-089).";
+                ". Reconciled a role held in two places.";
 
             if (adopt)
             {
@@ -178,7 +178,7 @@ namespace OutcomeTesting.Plugins
                     throw new InvalidPluginExecutionException(
                         CommandHelpers.ValidationPrefix + "The role " + trimmedRole +
                         " is granted automatically to every signed-in user, so it cannot be " +
-                        "adopted as an application role (AD-090).");
+                        "adopted as an application role.");
                 }
 
                 // Row first, then association: a failure between the two leaves a mapping

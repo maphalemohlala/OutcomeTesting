@@ -630,7 +630,7 @@ namespace OutcomeTesting.Plugins
 
                 Plain(ReviewSubmitted, "Review submitted",
                     "Review submitted on case {{reference}}",
-                    "The review on case {{reference}} has been submitted and is locked to further edits (FR-017).",
+                    "The review on case {{reference}} has been submitted and is locked to further edits.",
                     TokenReference),
 
                 Html(RemediationPassWithIssues, "Remedial needed - pass with issues",
@@ -647,7 +647,7 @@ namespace OutcomeTesting.Plugins
 
                 Plain(RemediationOther, "Remediation raised (other grading)",
                     "Remediation required on case {{reference}}",
-                    "Remediation has been raised against case {{reference}} and assigned to you (BR-006).{{dueText}}"
+                    "Remediation has been raised against case {{reference}} and assigned to you.{{dueText}}"
                         + " Record your response against each item in the portal.",
                     TokenReference, TokenDueText),
 
@@ -682,7 +682,7 @@ namespace OutcomeTesting.Plugins
                 Plain(SignoffRejected, "Remediation sent back",
                     "Remediation sent back on case {{reference}}",
                     "Your remediation on case {{reference}} has been sent back for further work. "
-                        + "The ten-working-day clock has restarted from today (OD-018).{{notes}}",
+                        + "The ten-working-day clock has restarted from today.{{notes}}",
                     TokenReference, TokenNotes),
 
                 Plain(RecheckDue, "Final outcome owed",

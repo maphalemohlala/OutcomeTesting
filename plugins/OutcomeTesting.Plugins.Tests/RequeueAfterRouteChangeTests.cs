@@ -91,7 +91,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.True(moved);
             Assert.Equal(CaseLifecycle.Queued, Status(svc));
-            Assert.Contains(changes, line => line.Contains("Tax") && line.Contains("OD-048"));
+            Assert.Contains(changes, line => line.Contains("Tax") && line.Contains("returned to the queue"));
         }
 
         [Fact]

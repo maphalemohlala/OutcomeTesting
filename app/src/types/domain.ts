@@ -184,7 +184,7 @@ export function guardRegradeCase(input: { role: string; reason: string }): Comma
   if (!isValidCorrectionReason(input.reason)) {
     return {
       allowed: false,
-      reason: 'A regrade requires a mandatory reason for the audit event (BR-012, NFR-AUD-01).',
+      reason: 'A regrade requires a mandatory reason for the audit event.',
     };
   }
   return { allowed: true };
@@ -210,7 +210,7 @@ export function guardSignOffRemediation(input: {
   if (input.decision === 'Rejected' && input.notes.trim().length === 0) {
     return {
       allowed: false,
-      reason: 'A rejected sign-off must record notes explaining the return (BR-008).',
+      reason: 'A rejected sign-off must record notes explaining the return.',
     };
   }
   return { allowed: true };

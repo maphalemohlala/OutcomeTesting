@@ -194,7 +194,7 @@ namespace OutcomeTesting.Plugins
             }
             else
             {
-                message.Append(fromName).Append(" is a final state. Reopening or regrading a closed case is a privileged correction that requires a reason (AD-031).");
+                message.Append(fromName).Append(" is a final state. Reopening or regrading a closed case is a privileged correction that requires a reason.");
             }
 
             return message.ToString();

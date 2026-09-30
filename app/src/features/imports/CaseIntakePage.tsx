@@ -34,7 +34,7 @@ export function CaseIntakePage() {
     <>
       <PageIntro
         title="Case intake"
-        purpose="Track uploaded Intelligent Office extracts and resolve the rows that failed validation (FR-001 to FR-003)."
+        purpose="Track uploaded Intelligent Office extracts and resolve the rows that failed validation."
         actions={
           // No template to download any more: the extract is produced from Intelligent
           // Office, not filled in here (2026-09-12 design, D1).

@@ -148,7 +148,7 @@ namespace OutcomeTesting.Plugins
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.UnauthorizedPrefix +
-                    "Your account has no work email, which is required to resolve your role (AD-010).");
+                    "Your account has no work email, which is required to resolve your role.");
             }
             return email;
         }

@@ -218,7 +218,7 @@ export function QuestionLibraryPage() {
     <>
       <PageIntro
         title="Question library"
-        purpose="The checklist as reviewers answer it today. Editing creates a new version and retires the old one, so answers already given keep the version they were answered against (FR-030, FR-031)."
+        purpose="The checklist as reviewers answer it today. Editing creates a new version and retires the old one, so answers already given keep the version they were answered against."
       />
 
       {state.status === 'loading' ? <p role="status">Loading the question library…</p> : null}

@@ -319,7 +319,7 @@ export function RoleDetailPage() {
         title={role.name}
         purpose={
           role.description?.trim() ||
-          'What this role grants and who holds it. Changes are enforced server-side and recorded in the audit trail (AD-041).'
+          'What this role grants and who holds it. Changes are enforced server-side and recorded in the audit trail.'
         }
         actions={
           canManage ? (
@@ -464,7 +464,7 @@ export function RoleDetailPage() {
           <p className="security__hint">
             Both sources at once: assignments made here, and web roles granted directly in Power
             Pages. A role granted in Power Pages already grants access; adopting it records the
-            decision in the audit trail, and revoking it removes the access (AD-089).
+            decision in the audit trail, and revoking it removes the access.
           </p>
           {assignNotice && !assignOpen ? (
             <p className={`security__notice security__notice--${assignNotice.tone}`} role="status">

@@ -510,7 +510,7 @@ namespace OutcomeTesting.Plugins
             {
                 return aqsExpected
                     ? "has an outcome carrying neither an initial nor a final grade, so the "
-                        + "Advice Quality grade would be blank (BR-007)."
+                        + "Advice Quality grade would be blank."
                     : null;
             }
 

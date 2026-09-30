@@ -113,7 +113,7 @@ namespace OutcomeTesting.Plugins
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix
                     + "An AQS reviewer reads the AQS queue through the \"" + CaseAccessReconciler.AqsQueueAccountName
-                    + "\" account (AD-218), but this person's contact already belongs to another account. "
+                    + "\" account, but this person's contact already belongs to another account. "
                     + "Clear their company on the contact, then grant the role again.");
             }
 

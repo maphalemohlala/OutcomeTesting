@@ -39,7 +39,7 @@ export function ReportsPage() {
     <>
       <PageIntro
         title="Management reporting"
-        purpose="Outcome volumes, remediation ageing and sign-off accountability, read from live case data (BR-010)."
+        purpose="Outcome volumes, remediation ageing and sign-off accountability, read from live case data."
         actions={
           <Link className="reports__link" to="/exports">
             Go to Trail Light exports
@@ -112,7 +112,7 @@ export function ReportsPage() {
             <section className="reports__panel" aria-labelledby="reports-outcomes">
               <h2 id="reports-outcomes">Outcome volumes</h2>
               <p className="reports__note">
-                Counted on the final outcome, or the initial outcome where none is set yet (BR-007).
+                Counted on the final outcome, or the initial outcome where none is set yet.
               </p>
               {data.outcomeTotal === 0 ? (
                 <p className="reports__empty">No outcomes are visible to you yet.</p>
@@ -125,7 +125,7 @@ export function ReportsPage() {
                     </li>
                   ))}
                   <li className="reports__list-summary">
-                    <span className="reports__list-label">Regraded (BR-007)</span>
+                    <span className="reports__list-label">Regraded</span>
                     <span className="reports__count">{data.regradedCount}</span>
                   </li>
                 </ul>
@@ -135,7 +135,7 @@ export function ReportsPage() {
             <section className="reports__panel" aria-labelledby="reports-ageing">
               <h2 id="reports-ageing">Remediation ageing</h2>
               <p className="reports__note">
-                Actions not yet completed, by working days since they were raised (BR-010). Bank
+                Actions not yet completed, by working days since they were raised. Bank
                 holidays are not excluded, so a span over one reads a day older than it is.
               </p>
               <ul className="reports__list">
@@ -150,7 +150,7 @@ export function ReportsPage() {
 
             <section className="reports__panel" aria-labelledby="reports-accountability">
               <h2 id="reports-accountability">Sign-off accountability</h2>
-              <p className="reports__note">T&amp;C Manager validation decisions (BR-008, FR-023).</p>
+              <p className="reports__note">T&amp;C Manager validation decisions.</p>
               <ul className="reports__list">
                 <li>
                   <span className="reports__list-label">Approved</span>

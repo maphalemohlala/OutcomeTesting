@@ -138,7 +138,7 @@ export function ExportBatchPage() {
                     sheetName="Trail Light"
                     headers={TRAIL_LIGHT_HEADERS}
                     rows={records.map((r) => trailLightRow(r.record))}
-                    caption={`${records.length} row(s)${range ? `, ${range},` : ''} in the AD-039 column order`}
+                    caption={`${records.length} row(s)${range ? `, ${range},` : ''} in the Trail Light column order`}
                     emptyHint={
                       allRecords.length === 0
                         ? 'This batch generated 0 rows, because no cases were at status Closed.'

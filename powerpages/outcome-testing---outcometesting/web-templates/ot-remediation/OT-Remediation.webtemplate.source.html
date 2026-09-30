@@ -1274,7 +1274,7 @@
             <p class="ot-form-submit__hint">
               Records your decision against every remedial action awaiting sign-off. Notes
               are required when rejecting: the adviser needs to know what to put right
-              (BR-008), and a rejection returns the actions to them.
+, and a rejection returns the actions to them.
             </p>
           </div>
         {% endif %}
@@ -1362,7 +1362,7 @@
               <strong>{{ initial_label | default: 'not recorded' | escape }}</strong>{% if final_label != '' %},
               regraded to <strong>{{ final_label | escape }}</strong>{% if outcome.al_regradedon %}
               on {{ outcome.al_regradedon | date: 'dd MMM yyyy' }}{% endif %}{% endif %}. Recording a final
-              outcome does not change it — both are kept (BR-007).
+              outcome does not change it — both are kept.
             </p>
             <div class="ot-field">
               <label for="ot-regrade-outcome">Final outcome</label>
@@ -1383,8 +1383,8 @@
             </button>
             <p class="ot-response__status" data-ot-regrade-status aria-live="polite"></p>
             <p class="ot-form-submit__hint">
-              The initial outcome is kept whatever you record here (BR-007), and the reason
-              is written to the case's audit history (AD-031). A case waiting at Awaiting
+              The initial outcome is kept whatever you record here, and the reason
+              is written to the case's audit history. A case waiting at Awaiting
               Recheck is closed by this.
             </p>
           </div>
@@ -1486,14 +1486,14 @@
           (previous === 1 ? ' working day)' : ' working days)');
         cell.appendChild(note);
         cell.setAttribute('title',
-          'Sent back after sign-off. The ten-working-day threshold runs from the restart (OD-018).');
+          'Sent back after sign-off. The ten-working-day threshold runs from the restart.');
       }
 
       if (!completed && age > THRESHOLD) {
         cell.classList.add('ot-age--breached');
         var existing = cell.getAttribute('title');
         cell.setAttribute('title',
-          (existing ? existing + ' ' : '') + 'Past the ten-working-day threshold (BR-010).');
+          (existing ? existing + ' ' : '') + 'Past the ten-working-day threshold.');
       }
     }
 
@@ -2624,7 +2624,7 @@
         var finalNode = document.createElement('strong');
         finalNode.textContent = label;
         hint.appendChild(finalNode);
-        hint.appendChild(document.createTextNode(' just now. Recording a final outcome does not change it — both are kept (BR-007).'));
+        hint.appendChild(document.createTextNode(' just now. Recording a final outcome does not change it — both are kept.'));
       }
 
       save.addEventListener('click', function () {

@@ -227,7 +227,7 @@ namespace OutcomeTesting.Plugins
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.ValidationPrefix + "The role " + roleCode +
                     " is granted automatically to every signed-in user, so it cannot be " +
-                    "assigned as an application role (AD-090).");
+                    "assigned as an application role.");
             }
         }
 

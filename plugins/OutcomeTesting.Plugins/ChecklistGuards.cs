@@ -26,8 +26,8 @@ namespace OutcomeTesting.Plugins
                 { "Q-FQTAX-01", "Q-FQTAX-01 is the Tax file quality outcome." },
                 { "Q-FQ-02", "Q-FQ-02 is the AQS checker observation, carried into the remediation description." },
                 { "Q-FQTAX-02", "Q-FQTAX-02 is the Tax checker observation, carried into the remediation description." },
-                { "Q-FQ-03", "Q-FQ-03 is the AQS \"Remedial action required?\" answer, which raises remediation under BR-006." },
-                { "Q-FQTAX-03", "Q-FQTAX-03 is the Tax \"Remedial action required?\" answer, which raises remediation under BR-006." },
+                { "Q-FQ-03", "Q-FQ-03 is the AQS \"Remedial action required?\" answer, which raises remediation." },
+                { "Q-FQTAX-03", "Q-FQTAX-03 is the Tax \"Remedial action required?\" answer, which raises remediation." },
             };
 
         /// <summary>Every protected code, for tests and for an administration screen.</summary>

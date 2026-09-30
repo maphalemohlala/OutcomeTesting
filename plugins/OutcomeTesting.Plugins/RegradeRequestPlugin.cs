@@ -109,7 +109,7 @@ namespace OutcomeTesting.Plugins
             if (string.IsNullOrWhiteSpace(payload.FinalOutcome))
             {
                 throw new InvalidPluginExecutionException(
-                    CommandHelpers.ValidationPrefix + "A regrade must record the final outcome (BR-005).");
+                    CommandHelpers.ValidationPrefix + "A regrade must record the final outcome.");
             }
 
             // AD-031 makes the reason mandatory and RegradeCasePlugin refuses without one.
@@ -118,7 +118,7 @@ namespace OutcomeTesting.Plugins
             if (string.IsNullOrWhiteSpace(payload.Reason))
             {
                 throw new InvalidPluginExecutionException(
-                    CommandHelpers.ValidationPrefix + "A regrade must record why the outcome was changed (AD-031).");
+                    CommandHelpers.ValidationPrefix + "A regrade must record why the outcome was changed.");
             }
 
             // The role is the contact's, read from the platform, never a claim in the

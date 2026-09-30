@@ -94,7 +94,7 @@ namespace OutcomeTesting.Plugins
             ChecklistQueries.EnsureQuestionCodesAreFree(userService, codes);
 
             var checklistVersionId = ChecklistQueries.ChecklistVersionInForce(
-                userService, "No checklist version is in force, so a section cannot be added (BR-013).");
+                userService, "No checklist version is in force, so a section cannot be added.");
             var displayOrder = ResolveDisplayOrder(userService, checklistVersionId, displayOrderArg);
 
             var section = new Entity(SectionEntity)

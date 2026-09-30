@@ -62,7 +62,7 @@ namespace OutcomeTesting.Plugins
                 {
                     throw new InvalidPluginExecutionException(
                         CommandHelpers.UnauthorizedPrefix
-                        + "Who can see a case is worked out from the case itself and cannot be set directly (AD-218). "
+                        + "Who can see a case is worked out from the case itself and cannot be set directly. "
                         + "Allocate the check, or correct the adviser, and access follows.");
                 }
             }

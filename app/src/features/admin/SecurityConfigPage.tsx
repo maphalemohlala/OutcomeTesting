@@ -365,7 +365,7 @@ export function SecurityConfigPage() {
     <>
       <PageIntro
         title="Security configuration"
-        purpose="Assign application roles to people and set what each role can see and do. Changes are enforced server-side and recorded in the audit trail (AD-041)."
+        purpose="Assign application roles to people and set what each role can see and do. Changes are enforced server-side and recorded in the audit trail."
       />
 
       <div className="security">

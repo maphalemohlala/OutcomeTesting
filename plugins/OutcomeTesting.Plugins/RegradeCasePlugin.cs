@@ -125,7 +125,7 @@ namespace OutcomeTesting.Plugins
             if (string.IsNullOrWhiteSpace(reason))
             {
                 throw new InvalidPluginExecutionException(
-                    CommandHelpers.ValidationPrefix + "A regrade must record why the outcome was changed (AD-031).");
+                    CommandHelpers.ValidationPrefix + "A regrade must record why the outcome was changed.");
             }
 
             reason = reason.Trim();

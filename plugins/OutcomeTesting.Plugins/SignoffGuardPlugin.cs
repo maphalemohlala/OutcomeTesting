@@ -106,7 +106,7 @@ namespace OutcomeTesting.Plugins
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix +
-                    "This remediation action has already been approved. Reopening an approved sign-off is a privileged correction (AD-031).");
+                    "This remediation action has already been approved. Reopening an approved sign-off is a privileged correction.");
             }
 
             signoff["al_name"] = "SignOff " + actionRef.Id.ToString("D");
@@ -172,7 +172,7 @@ namespace OutcomeTesting.Plugins
 
             if (noNotes)
             {
-                return CommandHelpers.PreconditionPrefix + "Recording a final outcome must say why the grade was set (AD-031).";
+                return CommandHelpers.PreconditionPrefix + "Recording a final outcome must say why the grade was set.";
             }
 
             return null;

@@ -30,8 +30,8 @@ interface ReviewDetailPageProps {
 const YES_VALUE = 120910305;
 
 const INTRO: Record<ReviewType, string> = {
-  Tax: 'The Tax-owned part of the Checker Checklist as recorded so far (FR-015). Grading is a permissioned write path and is not yet available here (OD-007).',
-  AQS: 'The Checker Checklist as recorded so far (FR-011, BR-005). Grading is a permissioned write path and is not yet available here (OD-007).',
+  Tax: 'The Tax-owned part of the Checker Checklist as recorded so far. Grading is a permissioned write path and is not yet available here.',
+  AQS: 'The Checker Checklist as recorded so far. Grading is a permissioned write path and is not yet available here.',
 };
 
 /**

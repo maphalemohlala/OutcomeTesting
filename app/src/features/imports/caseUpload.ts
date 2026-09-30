@@ -414,7 +414,7 @@ export function parseCaseCsv(text: string): ParseResult {
 
     const reference = cellOf('TaskID');
     if (!reference) {
-      invalid.push({ rowNumber, caseReference: null, reason: 'Missing TaskID (BR-001).', raw });
+      invalid.push({ rowNumber, caseReference: null, reason: 'Missing TaskID.', raw });
       continue;
     }
     // One task is one case, so two tasks on one service case both import. It is a repeated

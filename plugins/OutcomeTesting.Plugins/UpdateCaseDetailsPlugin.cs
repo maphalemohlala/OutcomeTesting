@@ -411,7 +411,7 @@ namespace OutcomeTesting.Plugins
             }
 
             update[RouteAttr] = new EntityReference(RouteEntity, routeId.Value);
-            changes.Add("Route " + Describe(currentRoute) + " -> " + code + " (derived BR-004)");
+            changes.Add("Route " + Describe(currentRoute) + " -> " + code + " (derived from the case)");
         }
 
         /// <summary>
@@ -828,7 +828,7 @@ namespace OutcomeTesting.Plugins
                 "Status " + CaseLifecycle.NameOf(status.Value) + " -> " + CaseLifecycle.NameOf(CaseLifecycle.Queued)
                 + " (returned to the queue: the new route owes a "
                 + (due == ResponseRules.ReviewTypeTax ? "Tax" : "AQS")
-                + " check that has not been opened, OD-048)");
+                + " check that has not been opened)");
 
             return true;
         }

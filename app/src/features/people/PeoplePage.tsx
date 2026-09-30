@@ -257,7 +257,7 @@ export function PeoplePage() {
     <>
       <PageIntro
         title="People"
-        purpose="The people known to the application, their roles and their employee codes. Sourced from Contacts and keyed on work email (AD-010). A role here grants access to this application; changes are enforced server-side and recorded in the audit trail (AD-041)."
+        purpose="The people known to the application, their roles and their employee codes. Sourced from Contacts and keyed on work email. A role here grants access to this application; changes are enforced server-side and recorded in the audit trail."
         actions={
           <>
             {filtered.length > 0 ? (
@@ -320,7 +320,7 @@ export function PeoplePage() {
           <p className="people__note">
             The directory is the Contacts in this environment. Caseload is joined by the name
             recorded on the case — adviser, paraplanner and checker come from the intake extract,
-            owner is the person the case is allocated to (BR-003, AD-029).
+            owner is the person the case is allocated to.
             {canManage ? (
               <>
                 {' '}

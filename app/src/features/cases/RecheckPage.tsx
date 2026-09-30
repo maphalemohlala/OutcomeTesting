@@ -121,7 +121,7 @@ export function RecheckPage() {
 
       <PageIntro
         title="Recheck and regrade"
-        purpose="Record a recheck and set the final outcome while preserving the initial one (FR-024, BR-007)."
+        purpose="Record a recheck and set the final outcome while preserving the initial one."
       />
 
       {detail.status === 'unavailable' ? (
@@ -174,7 +174,7 @@ export function RecheckPage() {
               </select>
               <p className="recheck__hint">
                 This case carries an outcome for each check, so choose the one being corrected
-                (BR-004).
+.
               </p>
             </div>
           ) : null}
@@ -195,8 +195,8 @@ export function RecheckPage() {
             </select>
             <p className="recheck__hint">
               {chosen
-                ? `The initial outcome stays ${chosen.initialOutcome} and is not overwritten (BR-007).`
-                : 'The initial outcome is never overwritten (BR-007).'}
+                ? `The initial outcome stays ${chosen.initialOutcome} and is not overwritten.`
+                : 'The initial outcome is never overwritten.'}
             </p>
           </div>
 
@@ -211,7 +211,7 @@ export function RecheckPage() {
             />
             <p className="recheck__hint" id="recheck-reason-hint">
               Mandatory. Recorded on the outcome and on an immutable Audit Event that cannot
-              later be edited (BR-012, NFR-AUD-01, AD-031).
+              later be edited.
             </p>
           </div>
 

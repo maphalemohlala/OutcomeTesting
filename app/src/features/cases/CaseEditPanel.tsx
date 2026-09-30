@@ -678,7 +678,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
           <p className="case-edit__intro">
             Amend any case field, and allocate a check to a named checker. Only the fields
             you change are saved, each recorded in the audit history with the change itself
-            and your reason where you give one (BR-012). Adviser, paraplanner and checker
+            and your reason where you give one. Adviser, paraplanner and checker
             can be changed at any point, including after a check has started.
           </p>
 
@@ -715,7 +715,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
                   <p className="case-edit__help">
                     This case has no review route yet, so it owes no checks. Answer
                     <strong> Tax check required</strong> above and the checks it owes appear
-                    here (BR-004).
+                    here.
                   </p>
                 ) : null}
 
@@ -769,8 +769,8 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
                           <p className="case-edit__only-check">{review ? held : 'Not open yet'}</p>
                           <small className="case-edit__help">
                             {review
-                              ? `This check cannot be reallocated until the ${blocker} check has been submitted (BR-004).`
-                              : `This check opens once the ${blocker} check has been submitted (BR-004).`}
+                              ? `This check cannot be reallocated until the ${blocker} check has been submitted.`
+                              : `This check opens once the ${blocker} check has been submitted.`}
                           </small>
                         </div>
                       );

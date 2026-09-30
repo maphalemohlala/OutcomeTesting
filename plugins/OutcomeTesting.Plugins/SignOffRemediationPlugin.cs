@@ -191,7 +191,7 @@ namespace OutcomeTesting.Plugins
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix +
-                    "This remediation action has already been approved. Reopening an approved sign-off is a privileged correction (AD-031).");
+                    "This remediation action has already been approved. Reopening an approved sign-off is a privileged correction.");
             }
 
             // The version the manager attested to. The action is not written by this

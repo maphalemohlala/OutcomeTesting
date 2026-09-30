@@ -144,7 +144,7 @@ export function ExportsPage() {
     <>
       <PageIntro
         title="Exports"
-        purpose="Produce the Trail Light export on demand. Each batch snapshots the closed cases for reconciliation (AD-039, AD-034 manual only). Open a batch to see its cases and download them for a range of check dates."
+        purpose="Produce the Trail Light export on demand. Each batch snapshots the closed cases for reconciliation. Open a batch to see its cases and download them for a range of check dates."
         actions={
           <>
             <button type="button" className="exports__btn exports__btn--ghost" onClick={onFullExtract} disabled={busy}>

@@ -494,7 +494,7 @@
         <div class="ot-table-wrap">
           <table>
             <caption>
-              {% if rt %}Route: {{ rt.al_name | escape }}. {% endif %}Tax runs before AQS when both are required (BR-004).
+              {% if rt %}Route: {{ rt.al_name | escape }}. {% endif %}Tax runs before AQS when both are required.
             </caption>
             <thead>
               <tr>
@@ -565,7 +565,7 @@
         {% endcomment %}
         {% if requires_tax and aqs_review and tax_review == null %}
           <p class="ot-note ot-note--blocked">
-            This case owes a Tax check that has not been created yet, and BR-004 requires it
+            This case owes a Tax check that has not been created yet, and Tax must be completed
             before AQS. The AQS check below cannot be submitted until the Tax check is in.
           </p>
         {% endif %}
@@ -1023,14 +1023,14 @@
                   (previous === 1 ? ' working day)' : ' working days)');
                 cell.appendChild(note);
                 cell.setAttribute('title',
-                  'Sent back after sign-off. The ten-working-day threshold runs from the restart (OD-018).');
+                  'Sent back after sign-off. The ten-working-day threshold runs from the restart.');
               }
 
               if (!completed && age > THRESHOLD) {
                 cell.classList.add('ot-age--breached');
                 var existing = cell.getAttribute('title');
                 cell.setAttribute('title',
-                  (existing ? existing + ' ' : '') + 'Past the ten-working-day threshold (BR-010).');
+                  (existing ? existing + ' ' : '') + 'Past the ten-working-day threshold.');
               }
             }
           })();

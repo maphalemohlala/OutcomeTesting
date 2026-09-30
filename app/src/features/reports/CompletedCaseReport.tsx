@@ -80,7 +80,7 @@ export function CompletedCaseReport({
 
       <p className="completed__note">
         Cases that have reached a grade, with the product advised on and the outcome recorded
-        (BR-005, BR-007). Filter by check date, product or outcome before exporting. Restrict to
+. Filter by check date, product or outcome before exporting. Restrict to
         Closed if you need only cases whose lifecycle has finished.
       </p>
 

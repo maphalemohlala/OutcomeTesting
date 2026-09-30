@@ -157,7 +157,7 @@ namespace OutcomeTesting.Plugins
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.ValidationPrefix +
-                    "A web role cannot be renamed: its name is the code every role assignment and permission rule references (AD-087). Create a new role and move the assignments instead.");
+                    "A web role cannot be renamed: its name is the code every role assignment and permission rule references. Create a new role and move the assignments instead.");
             }
 
             if (description != null && description.Trim() != (previousDescription ?? string.Empty))

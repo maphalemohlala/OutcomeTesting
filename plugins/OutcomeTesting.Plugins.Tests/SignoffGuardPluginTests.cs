@@ -142,7 +142,7 @@ namespace OutcomeTesting.Plugins.Tests
         public void A_final_outcome_must_be_on_the_final_scale_and_must_be_explained()
         {
             Assert.Contains("must be Pass", SignoffGuardPlugin.DecisionRefusal(Approved, 1, "Why."));
-            Assert.Contains("AD-031", SignoffGuardPlugin.DecisionRefusal(Approved, OutcomeRules.FinalOutcomePassWithIssues, null));
+            Assert.Contains("must say why the grade was set", SignoffGuardPlugin.DecisionRefusal(Approved, OutcomeRules.FinalOutcomePassWithIssues, null));
         }
 
         [Fact]

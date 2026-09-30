@@ -423,7 +423,7 @@ namespace OutcomeTesting.Plugins
         {
             return ChecklistQueries.ChecklistVersionInForce(
                 service,
-                "No checklist version is in force, so a check cannot be opened. Ask an administrator to publish one (BR-013).");
+                "No checklist version is in force, so a check cannot be opened. Ask an administrator to publish one.");
         }
 
         /// <summary>
@@ -457,7 +457,7 @@ namespace OutcomeTesting.Plugins
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix +
-                    "This case has no review route, so which check is due cannot be determined. Ask a manager to set the route (BR-004).");
+                    "This case has no review route, so which check is due cannot be determined. Ask a manager to set the route.");
             }
 
             var route = service.Retrieve(

@@ -108,7 +108,7 @@ namespace OutcomeTesting.Plugins
                 // is parked where a person can see it — not sent to a plausible address.
                 return Fail(service, notification.Id,
                     "No recipient address. The event was queued with nobody to send it to, "
-                    + "so nothing was sent (OD-030).");
+                    + "so nothing was sent.");
             }
 
             if (sender == null)

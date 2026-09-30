@@ -60,7 +60,7 @@ namespace OutcomeTesting.Plugins.Tests
                     requireCallerOwnsReview: false,
                     details: "reproduction"));
 
-            Assert.Contains("BR-004", error.Message);
+            Assert.Contains("Tax must be completed before the AQS review", error.Message);
         }
     }
 }

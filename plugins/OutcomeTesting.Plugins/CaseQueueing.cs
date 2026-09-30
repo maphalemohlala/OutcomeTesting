@@ -85,7 +85,7 @@ namespace OutcomeTesting.Plugins
             CaseTransitions.MoveThrough(service, caseId, status, HopsToQueue(status));
 
             changes.Add("Status " + CaseLifecycle.NameOf(status.Value) + " -> " + CaseLifecycle.NameOf(CaseLifecycle.Queued)
-                + " (queued automatically: route set, AD-093)");
+                + " (queued automatically: route set)");
             return true;
         }
     }

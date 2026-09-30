@@ -50,7 +50,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     isHtml: false,
     subject: 'Review submitted on case {{reference}}',
     body:
-      'The review on case {{reference}} has been submitted and is locked to further edits (FR-017).',
+      'The review on case {{reference}} has been submitted and is locked to further edits.',
   },
   'REMEDIATION-PASS-WITH-ISSUES': {
     name: 'Remedial needed - pass with issues',
@@ -74,7 +74,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     isHtml: false,
     subject: 'Remediation required on case {{reference}}',
     body:
-      'Remediation has been raised against case {{reference}} and assigned to you (BR-006).{{dueText}} Record your response against each item in the portal.',
+      'Remediation has been raised against case {{reference}} and assigned to you.{{dueText}} Record your response against each item in the portal.',
   },
   'CASE-PASSED': {
     name: 'Case check - Pass',
@@ -119,7 +119,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     isHtml: false,
     subject: 'Remediation sent back on case {{reference}}',
     body:
-      'Your remediation on case {{reference}} has been sent back for further work. The ten-working-day clock has restarted from today (OD-018).{{notes}}',
+      'Your remediation on case {{reference}} has been sent back for further work. The ten-working-day clock has restarted from today.{{notes}}',
   },
   'RECHECK-DUE': {
     name: 'Final outcome owed',
