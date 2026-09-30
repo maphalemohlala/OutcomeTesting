@@ -1976,3 +1976,15 @@ footer a:focus-visible, .footer a:focus-visible {
     display: none;
   }
 }
+
+/* The checker's "Fail points and remedial actions" card on the review (2026-09-29).
+   The table is an .ot-table; this only sizes its columns: a narrow number column that
+   never wraps, the fail point at about a third, and the rest for the remedial action,
+   so the box the checker writes in is as wide as the card allows. */
+.ot-remedial__table th:first-child,
+.ot-remedial__table td:first-child {
+  width: 3rem;
+  white-space: nowrap;
+}
+.ot-remedial__table th:nth-child(2),
+.ot-remedial__table td:nth-child(2) { width: 35%; }

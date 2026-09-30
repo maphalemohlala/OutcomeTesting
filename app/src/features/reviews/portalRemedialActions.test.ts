@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import reviewTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-review-detail/OT-Review-Detail.webtemplate.source.html?raw';
+import layoutTemplate from '../../../../powerpages/outcome-testing---outcometesting/web-templates/ot-layout/OT-Layout.webtemplate.source.html?raw';
+import portalCssRaw from '../../../../powerpages/outcome-testing---outcometesting/web-files/outcome-testing.css?raw';
 
 /**
  * The checker writes a remedial action for every fail point before submitting (project
@@ -98,6 +100,20 @@ describe('the card on the page', () => {
     expect(card).toBeGreaterThan(accountability);
     expect(submit).toBeGreaterThan(card);
     expect(template).toContain('<h2 class="ot-card__title" id="ot-remedial-heading">Fail points and remedial actions</h2>');
+  });
+
+  it('lays its rows out like the other tables, with the numbers clear of the card edge', () => {
+    // Unstyled, the table fell back to the browser's 1px cell padding, sat hard against the
+    // card's left border and stopped short of its right one (project owner, 2026-09-30).
+    // ot-table is the house table: full width, padded cells, a rule under each row.
+    expect(template).toMatch(/<section class="ot-card ot-remedial"[\s\S]*?<table class="ot-table ot-remedial__table">/);
+    const css = portalCssRaw.replace(/\r\n/g, '\n');
+    expect(css).toMatch(/\.ot-remedial__table th:first-child,\n\.ot-remedial__table td:first-child \{[^}]*white-space: nowrap;/);
+  });
+
+  it('moved the stylesheet version with the CSS change', () => {
+    const version = /outcome-testing\.css\?v=(\d+)/.exec(layoutTemplate);
+    expect(Number(version![1])).toBeGreaterThanOrEqual(25);
   });
 
   it('draws what the checker already parked, from the review', () => {
