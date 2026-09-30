@@ -574,6 +574,12 @@
       {% endif %}
     </section>
 
+    {% comment %}
+      The AQS check's Case Notes and Even Better If (project owner, 2026-09-30), so an adviser
+      reading their case sees what the AQS checker wrote without opening the review.
+    {% endcomment %}
+    {% include 'OT AQS Notes' case_id: c.al_outcomecaseid %}
+
     <section aria-labelledby="ot-case-remediation">
       <h2 id="ot-case-remediation">Remediation and escalation</h2>
       {% assign case_actions = actions.results.entities %}

@@ -1,0 +1,120 @@
+{% comment %}
+  The AQS check's notes, read-only, for the adviser (project owner, 2026-09-30: "Case Notes
+  and Even better if need to show on the remedial page for the adviser"). Include with:
+
+    (% include 'OT AQS Notes' case_id: cid %)
+
+  TWO questions, both in the AQS grading section, both plain text:
+
+    Q-GR-03  "Case Notes"
+    Q-GR-04  "Even Better If..."
+
+  Modelled on 'OT Tax Notes', and it keeps that template's rules for the same reasons:
+
+  - Only SUBMITTED AQS reviews are read. A draft is work in progress, and a half-written note
+    in front of an adviser as though it were the finding is worse than nothing.
+  - Nothing is drawn when both boxes are empty, or the case has no submitted AQS check yet: an
+    empty panel headed "AQS check notes" reads as a fault.
+  - Every submitted AQS review is rendered, not one. A recheck leaves a case with more than
+    one, and this Liquid applies no cross-entity order, so "the latest" would be an arbitrary
+    one. When there is more than one, each note carries its check's submission date.
+  - Plain text is escaped with its line breaks kept. A rich-text answer is emitted as markup,
+    exactly as the Tax panel does, because al_answerrichtext is reduced to an allow-list by
+    HtmlSanitiser pre-operation on al_response; today both questions are plain text, and this
+    only keeps the panel right if a later checklist version changes that.
+
+  Unlike the Tax panel, every note is labelled, not only when there are several: the two
+  questions ask different things, and an adviser should not have to guess which one a
+  paragraph answers.
+
+  Styled with the Tax panel's classes (ot-tax-notes__*) so the two panels read as a pair and
+  the site's stylesheet did not need to change.
+
+  Nothing here is editable. The AQS review is submitted and locked by the time either page
+  that includes this is read.
+{% endcomment %}
+
+{% if case_id and case_id != '' %}
+  {% fetchxml ot_aqs_notes %}
+  <fetch>
+    <entity name="al_response">
+      <attribute name="al_responseid" />
+      <attribute name="al_answertext" />
+      <attribute name="al_answerrichtext" />
+      <link-entity name="al_questionversion" from="al_questionversionid" to="al_questionversionid" alias="qv">
+        <link-entity name="al_question" from="al_questionid" to="al_questionid" alias="q">
+          <attribute name="al_questioncode" />
+          <filter type="and">
+            <condition attribute="al_questioncode" operator="in">
+              <value>Q-GR-03</value>
+              <value>Q-GR-04</value>
+            </condition>
+          </filter>
+        </link-entity>
+      </link-entity>
+      <link-entity name="al_reviewinstance" from="al_reviewinstanceid" to="al_reviewinstanceid" alias="ri">
+        <attribute name="al_reviewinstanceid" />
+        <attribute name="al_submittedon" />
+        <filter type="and">
+          <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
+          <condition attribute="al_reviewtype" operator="eq" value="120910201" />
+          <condition attribute="al_submittedon" operator="not-null" />
+        </filter>
+      </link-entity>
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+
+  {% comment %}
+    Counted before anything is drawn, so a check whose boxes were left empty opens no panel.
+    A response row can exist carrying a blank answer - the form writes one as soon as a
+    question is touched - so the test is on the text, not on the row. The same pass notes
+    whether the notes come from more than one check, which decides whether they are dated.
+  {% endcomment %}
+  {% assign ot_aqs_note_count = 0 %}
+  {% assign ot_aqs_first_review = '' %}
+  {% assign ot_aqs_multi = false %}
+  {% for r in ot_aqs_notes.results.entities %}
+    {% assign ot_note_text = r.al_answertext | strip %}
+    {% assign ot_note_rich = r.al_answerrichtext | strip %}
+    {% if ot_note_text != '' or ot_note_rich != '' %}
+      {% assign ot_aqs_note_count = ot_aqs_note_count | plus: 1 %}
+      {% assign ot_note_review = r['ri.al_reviewinstanceid'] | append: '' %}
+      {% if ot_aqs_first_review == '' %}
+        {% assign ot_aqs_first_review = ot_note_review %}
+      {% elsif ot_note_review != ot_aqs_first_review %}
+        {% assign ot_aqs_multi = true %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+
+  {% if ot_aqs_note_count > 0 %}
+  <section class="ot-card ot-tax-notes ot-aqs-notes" aria-labelledby="ot-aqs-notes-heading">
+    <h2 class="ot-card__title" id="ot-aqs-notes-heading">AQS check notes</h2>
+    <p class="ot-tax-notes__intro">
+      Recorded by the AQS checker when the AQS check was submitted. Read-only here.
+    </p>
+    {% comment %}Case Notes first, then Even Better If, whatever order the rows came back in.{% endcomment %}
+    {% assign ot_aqs_codes = 'Q-GR-03,Q-GR-04' | split: ',' %}
+    {% for ot_code in ot_aqs_codes %}
+      {% for r in ot_aqs_notes.results.entities %}
+        {% assign ot_note_text = r.al_answertext | strip %}
+        {% assign ot_note_rich = r.al_answerrichtext | strip %}
+        {% if r['q.al_questioncode'] == ot_code %}{% if ot_note_text != '' or ot_note_rich != '' %}
+      <div class="ot-tax-notes__item">
+        <p class="ot-tax-notes__meta">
+          {% if ot_code == 'Q-GR-04' %}Even Better If...{% else %}Case Notes{% endif %}{% if ot_aqs_multi %} &mdash;
+          AQS check submitted {{ r['ri.al_submittedon'] | date: 'dd MMM yyyy' | default: 'date not recorded' }}{% endif %}
+        </p>
+        {% if ot_note_rich != '' %}
+        <div class="ot-tax-notes__text ot-rte__read">{{ ot_note_rich }}</div>
+        {% else %}
+        <p class="ot-tax-notes__text">{{ ot_note_text | escape | newline_to_br }}</p>
+        {% endif %}
+      </div>
+        {% endif %}{% endif %}
+      {% endfor %}
+    {% endfor %}
+  </section>
+  {% endif %}
+{% endif %}

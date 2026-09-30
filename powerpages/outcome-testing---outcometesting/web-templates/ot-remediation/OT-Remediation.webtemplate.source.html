@@ -462,6 +462,11 @@
       and not any one thing the adviser owes.
     {% endcomment %}
     {% include 'OT Tax Notes' case_id: c.al_outcomecaseid %}
+    {% comment %}
+      The AQS check's Case Notes and Even Better If (project owner, 2026-09-30), under the Tax
+      notes for the same reason: context for the whole check, not for any one action.
+    {% endcomment %}
+    {% include 'OT AQS Notes' case_id: c.al_outcomecaseid %}
 
     <section class="ot-card" aria-labelledby="ot-remediation-heading">
       <h2 class="ot-card__title" id="ot-remediation-heading">
