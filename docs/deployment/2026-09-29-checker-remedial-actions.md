@@ -288,6 +288,30 @@ Reported but not gaps: the platform's own `adx_` / `msdyn_` / `msa_` / `mspp_` c
 keeps its own). No `al_` web resources, global choices, model-driven apps or unmanaged
 workflows exist.
 
+## TEST - 1.0.14.0 (2026-09-30)
+
+DEV's solution bumped 1.0.13.0 -> **1.0.14.0** and exported managed through the Web API; staged
+at `artifacts/2026-09-30-test-promotion/`. The package carried the assembly (sha256
+`f05b55d1...71a46`, the one verified in DEV), the four columns, the new step, the templates, the
+CSS, both allowlists and the Code App bundle `index-CSIADLZ9.js`. Imported by the agent with
+`scripts/Import-Solution.ps1 -Managed` at the owner's instruction.
+
+| Check (read back from TEST) | Result |
+|---|---|
+| Solution | 1.0.14.0 managed |
+| Columns | `contact.al_remedialactionsrequest`, `al_reviewinstance.al_pendingremedialactions`, `al_remediationaction.al_remedialaction` and `al_actionperformed` present |
+| Plug-in steps | 33 of 33, as in DEV, all enabled. `RemedialActionsRequestPlugin` filters on `al_remedialactionsrequest`; the guard step's filter has all seven columns. The script's own check reads its step list from `src/`, which is behind DEV (M5), so it verified 24; the rest were checked directly |
+| Code App | `appversion` 2026-09-30T06:37:36Z |
+| Portal components vs DEV, by content | 274 identical, including OT Remediation, OT Case Detail and both allowlists. Differ as intended: TEST's `Authentication/*` sign-in settings and its hand-made "New Role" |
+| **Masked by earlier direct pushes** | **OT Review Detail, OT Layout, `outcome-testing.css`**: the import did not replace them (see the 2026-09-24 masking note). The owner pushed all three from source at 07:08-07:09Z; read back afterwards, all three are identical to DEV and to the repo |
+
+Between the import (06:40Z) and the owner's push (07:09Z), TEST's server gate was live while
+its review page had no card, so a failed check could not be submitted there for about half an
+hour. Checkers with a review page left open from before 07:09Z must reload it.
+
+**Not run on TEST:** the Playwright specs. They need a TEST portal session; the DEV session's
+Entra cookies did not sign in to TEST silently this time.
+
 ## Left for the owner
 
 - **The sign-off runbook just above** (I5 a/b), and a fresh portal session for the Code App
