@@ -87,3 +87,14 @@ $env:DOTNET_ROLL_FORWARD='Major'; & plugins\OutcomeTesting.Registration\bin\Debu
 
 Each write fires CaseAccessPlugin, which re-resolves the supervisor on that case. After it runs,
 Adam's sign-off form appears on 256617620.
+
+**Run by the owner, 2026-09-30.** Read back from TEST:
+
+| Cases | State |
+|---|---|
+| All 24 | adviser email filled; **0** TEST cases now name an adviser with no email |
+| 256617620, 256497637 (Awaiting Sign-off, adviser Adam) | adviser contact **Adam**, supervisor **Adam**: the portal's sign-off gate (T&C Supervisor role, mapping, stored email, actions awaiting sign-off) is now met for him |
+| 373925362 (Awaiting Sign-off, adviser Zoe Ramwell) | supervisor **Adam** (Zoe's mapped T&C Manager) |
+| The other 21 (not yet in remediation) | email filled; the adviser and supervisor access columns are set only once a case is released to remediation (`CaseAccess.IsReleased`), and will resolve then |
+
+Not driven in a browser as Adam: the agent has no session for his account.
