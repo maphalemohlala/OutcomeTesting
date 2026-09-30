@@ -309,6 +309,11 @@ Between the import (06:40Z) and the owner's push (07:09Z), TEST's server gate wa
 its review page had no card, so a failed check could not be submitted there for about half an
 hour. Checkers with a review page left open from before 07:09Z must reload it.
 
+**Card styling fix (`6ec33a9`, 2026-09-30):** the "Fail points and remedial actions" table
+is now an `.ot-table` with a narrow number column, and the stylesheet is at v=25. It went to DEV
+by push. On TEST the owner pushed the three files at 12:03Z; read back, all three are identical
+to the repo.
+
 **Not run on TEST:** the Playwright specs. They need a TEST portal session; the DEV session's
 Entra cookies did not sign in to TEST silently this time.
 
