@@ -8487,6 +8487,7 @@ int CreateListOptionTable(string orgUrl, string solutionUniqueName)
                         new OptionMetadata(ListOptionTable.Text("Sample source"), ListOptionTable.SampleSource),
                         new OptionMetadata(ListOptionTable.Text("Case type"), ListOptionTable.CaseType),
                         new OptionMetadata(ListOptionTable.Text("Pre or post check"), ListOptionTable.PreOrPostCheck),
+                        new OptionMetadata(ListOptionTable.Text("Vulnerable client"), ListOptionTable.VulnerableClient),
                     },
                 },
             },
@@ -11730,7 +11731,7 @@ static class ListOptionTable
     }
 
     /// <summary>
-    /// The four lists, in step with app/src/features/admin/listOptions.ts and
+    /// The five lists, in step with app/src/features/admin/listOptions.ts and
     /// OutcomeTesting.Plugins.ListOptionRules. Three places name these; a drift between them
     /// would not fail loudly, it would make one list silently read as another.
     /// </summary>
@@ -11744,6 +11745,8 @@ static class ListOptionTable
             "al_listoption_al_outcomecase_casetype", "Case type", "al_casetype"),
         new Def(PreOrPostCheck, "al_preorpostcheckid", "al_PreOrPostCheckId",
             "al_listoption_al_outcomecase_preorpostcheck", "Pre or post check", "al_preorpostcheck"),
+        new Def(VulnerableClient, "al_vulnerableclientid", "al_VulnerableClientId",
+            "al_listoption_al_outcomecase_vulnerableclient", "Vulnerable client", "al_vulnerableclient"),
     };
 
     // al_list. Kept in step with app/src/features/admin/listOptions.ts, which names the same
@@ -11753,6 +11756,7 @@ static class ListOptionTable
     public const int CaseType = 120910842;
     public const int PreOrPostCheck = 120910843;
     public const int Products = 120910844;
+    public const int VulnerableClient = 120910845;
 
     // A case covers several products, so this list attaches through a many-to-many rather
     // than a lookup: the column it replaces is labelled "Product(s)" and holds "Pension; ISA".
