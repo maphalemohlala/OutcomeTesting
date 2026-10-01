@@ -292,6 +292,18 @@ internal static class PeopleOnboarding
                 failures.Add($"{email}: {ex.Message}");
                 Console.Error.WriteLine($"  FAILED   {email}: {ex.Message}");
                 Count("failed");
+
+                // The role command lets the first grant through while no application role
+                // exists anywhere, and refuses every one after it unless the account running
+                // this holds one itself (PROD, 2026-10-01). Every later person would fail the
+                // same way, so stop rather than log the same refusal 170 times.
+                if (ex.Message.Contains("UNAUTHORIZED", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.Error.WriteLine();
+                    Console.Error.WriteLine("Stopped: the account running this has no application role here, so al_AssignUserRole " +
+                                            "refuses it. Give it one (TEST: an al_userrolemapping row, role code 'Administrators'), then run again.");
+                    return 1;
+                }
             }
         }
 
