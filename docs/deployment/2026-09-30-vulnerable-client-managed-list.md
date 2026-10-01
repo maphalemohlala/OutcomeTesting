@@ -54,7 +54,21 @@ In the browser (portal session, Service Account):
 
 **Portal cache.** The case record at first kept showing "No" after the change. Power Pages had cached the page's fetch result from a visit made before the change. The same page requested with the case id in upper case (a different query text, so not cached) showed the new value at once. The cache clears on its own.
 
-**Not driven.** The spec lists these as DEV proofs, so they are still owed before TEST unless the owner waives them:
+**Driven 2026-10-01** (Code App in the player as Service Account, bundle `index-Cfg8omD4.js`;
+script `app/e2e/.auth/vc-codeapp-proof.mjs`, local only). The save itself was run by the owner,
+because the agent's case write was refused:
+
+| Proof | Result |
+|---|---|
+| Admin → Dropdown options, Vulnerable client | Yes 10, No 20, Potentially vulnerable 30, N/A 40, all in force |
+| Case 900000006 edit panel, before | Reads **No**; offers Not set, Yes, No, Potentially vulnerable, N/A |
+| Chose "Potentially vulnerable" and saved | DEV lookup `9c43c273…` (Potentially vulnerable); the legacy column stayed at No (120910551). A fresh load of the panel reads **Potentially vulnerable**, so the panel reads the lookup, not the fallback |
+| PDF (`renderpdf`, the case's submitted Tax check) | "Vulnerable client? **No**" before; "Vulnerable client? **Potentially vulnerable**" after. The PDF reads the lookup too |
+| Put back to No through the same panel | Saved; the open session showed No without a reload. DEV read back: lookup `9b43c273…` (No), as before the proof |
+
+These two proofs were listed as owed below; both are now done.
+
+**Not driven (as of 2026-09-30).** The spec lists these as DEV proofs, so they are still owed before TEST unless the owner waives them:
 - **The Code App in a browser**: the list on Dropdown options, and the case panel reading and choosing an option. Its Entra sign-in has expired, and a fresh sign-in is the owner's. The unit tests cover it (`listOptions`, `checklistForm`, `useCaseDetail`).
 - **A PDF.** DEV has no completed check on a case with a value. `CompletedCheckDocumentTests` covers the option name.
 
