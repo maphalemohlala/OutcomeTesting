@@ -1,0 +1,107 @@
+# OTIS in PROD, Outcome Testing in DEV and TEST (1.0.18.0)
+
+Date: 2026-10-01. Spec: `docs/superpowers/specs/2026-10-01-otis-product-name-design.md`.
+
+## What was asked
+
+The owner wants the app, the portal and the solution called **OTIS** in PROD only. DEV and TEST
+keep "Outcome Testing". In PROD the change covers titles, document headings, role names and team
+names. The solution changes its display name only, and the portal gets a new address. The owner
+chose one per-environment setting over editing PROD by hand.
+
+## What changed
+
+| Part | Change |
+|---|---|
+| Plug-ins | `ProductName` reads `al_ProductName`, with a fallback of "Outcome Testing". Every name that carries the product is derived from it: the manager web role, the App User, App Admin and Team Manager roles, the Tax and AQS teams, the queue account, and the checklist and remediation headings. `EnvironmentVariable` is the shared reader; `PortalSite` now uses it too. The privilege-denied message no longer names the product. |
+| Registration tool | `grantapprole`, `checkassignable`, `grantsecurity`, `grantteamsecurity`, `ensureaccessprincipals`, `fixpermissions` and the web-role seed read the target environment's name. New verb `brandpackage <in.zip> <out.zip> <product>`. |
+| Code App | `app/product/` holds the derived names, a store and a loader. The loader reads `al_ProductName` through two new data sources. The shell header, page title, document headings, error page, allocation scope and fallback permission rules follow it. |
+| Portal | Eight templates read `settings['OT/ProductName'] \| default: 'Outcome Testing'`: Header, OT Access Denied, OT Case Detail, OT Case List, OT Home, OT My Work, OT Remediation and OT Review Detail. Header, OT Case List and OT My Work also derive `ot_manager_role`. |
+| Solution | New environment variable `al_ProductName`, with the default "Outcome Testing". |
+
+**Packaged labels.** Seven labels are fixed in the package: the solution display name, the
+three security roles, the Code App display name, the manager web role and the site name. The
+PROD package rewrites them with `brandpackage`. Run against the real 1.0.17.0 and 1.0.18.0
+exports, it changed exactly those 7 labels in 4 files and left the other 610 and 611 files
+byte-identical.
+
+**The `StaffCode` declaration.** Adding the two data sources regenerated
+`dataSourcesInfo.ts`, which dropped the hand-declared `StaffCode` parameter of `al_UpdateUser`
+again. It was restored, and its guard tests pass.
+
+## Tests
+
+- **Plug-ins:** 1765/1765, including 11 new `ProductNameTests`: today's literals under the
+  default, the OTIS forms, allocation, reconciler lookups, and the fallbacks.
+- **Code App:** 1242/1242, and `tsc -b` is clean. New tests:
+  - `productName.test.ts` (8);
+  - `productNameDerived.test.ts` (5). It fails if a template, app string or plug-in string
+    writes the name out. It was proved by planting a literal in OT Home.
+- **Updated tests:** `portalPageAccess.test.ts` now asserts the derived manager check.
+- **`Check-PortalTemplates.ps1`:** passes for every edited template. It reports one failure in
+  OT AQS Notes: without `-OrgUrl` it cannot type Q-GR-03 and Q-GR-04. That predates this
+  change.
+
+## DEV
+
+| Step | Result |
+|---|---|
+| `al_ProductName` | Created with the default "Outcome Testing"; `addcomponent` 380, in OutcomeTesting |
+| Assembly | Release built and pushed. sha256 `965e689a…`, read back from DEV |
+| Eight templates | Pushed. DEV's copies were identical to the repo before the push |
+| Code App | `index-fDUUEYvN.js`, pushed; the player serves it |
+| Browser, as Service Account | Code App header and title "Outcome Testing", full 11-item menu. Portal case list: 16 rows and the oversight toggle. Review page headed "Outcome Testing - Checker Checklist" |
+
+## TEST - 1.0.18.0
+
+Exported managed to `artifacts/2026-10-01-otis/` and imported by the agent: operation
+`0fe25db8…` succeeded at 08:41Z. The full comparison was then run again:
+
+| Check | Result |
+|---|---|
+| Solution | 1.0.18.0 managed; components identical by type and name |
+| Assembly | `965e689a…`, identical to DEV; 65 steps, all enabled |
+| APIs, schema, roles, site settings | identical |
+| `al_ProductName` | present, default "Outcome Testing", no value |
+| Templates against the repo | 49 of 51. OT Review Detail and OT My Work keep TEST-only copies from earlier direct pushes, so the import cannot reach them. Their literal role check means the same thing on TEST |
+
+**Owner, TEST:** the agent's re-push was refused ("Production Deploy"). Push both templates so
+future imports reach them:
+
+```powershell
+$env:DOTNET_ROLL_FORWARD='Major'; $t='plugins\OutcomeTesting.Registration\bin\Debug\net8.0\OutcomeTesting.Registration.exe'; $w='powerpages\outcome-testing---outcometesting\web-templates'
+& $t pushwebtemplate https://org37995f36.crm11.dynamics.com a1000000-0000-4000-8000-00000000001b "$w\ot-review-detail\OT-Review-Detail.webtemplate.source.html"
+& $t pushwebtemplate https://org37995f36.crm11.dynamics.com a1000000-0000-4000-8000-000000000013 "$w\ot-my-work\OT-My-Work.webtemplate.source.html"
+```
+
+## PROD (`https://org3461d426.crm11.dynamics.com/`)
+
+**Surveyed read-only on 2026-10-01.** Nothing of this project is there yet: no `al_` publisher,
+tables, portal site or Code App. The Power Pages platform solutions are present and newer than
+TEST's. `svc.automate.aq` is System Administrator.
+
+The branded package `artifacts/2026-10-01-otis/OTIS_1_0_18_0_managed.zip` is ready. The agent's
+import was refused, and so was writing its request file, so every PROD write below is the
+owner's. After each one, the agent can check the result read-only.
+
+1. **Import the package.** Power Apps → PROD → Solutions → Import → that zip. Alternatively,
+   re-authenticate `pac` and run
+   `.\scripts\Import-Solution.ps1 -Environment https://org3461d426.crm11.dynamics.com/ -ZipFile artifacts\2026-10-01-otis\OTIS_1_0_18_0_managed.zip -Managed`.
+2. **Name the product.** Run `webapimany` with
+   `artifacts\2026-10-01-otis\prod-product-name.json`. It sets `al_ProductName` to OTIS, by
+   schema name.
+3. **Create the teams and the queue account.** Run `ensureaccessprincipals <PROD> --confirm <PROD>`.
+   It prints the product name it read; this must say OTIS. It then creates the OTIS Tax and
+   AQS teams and the queue account.
+4. **Portal: decisions needed.** These must happen in Power Pages and Entra:
+   - reactivate the imported site at the new address;
+   - give it its own Entra sign-in (app registration and the `Authentication/*` settings);
+   - add the site setting `OT/ProductName` = OTIS, kept out of the solution.
+   - add `al_PortalBaseUrl`, created per environment and never shipped.
+5. **Configuration seed: decision needed.** The seed covers routes, the checklist, fail
+   reasons, list options with legacy values, notification templates, `al_role`, and page
+   permissions with the manager role written as `AL Portal - OTIS Manager`. Before it can be
+   built, the owner must choose which environment's checklist PROD starts from: DEV's or TEST's.
+6. **People: decision needed.** Role mappings, adviser mappings, and `OTIS App User` plus
+   Basic User for each person.
+7. **Email.** Approve and enable the sending mailbox.
