@@ -45,8 +45,6 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public const string BaseUrlVariable = "al_PortalBaseUrl";
 
-        private const string DefinitionEntity = "environmentvariabledefinition";
-        private const string ValueEntity = "environmentvariablevalue";
         private const string SiteEntity = "powerpagesite";
         private const string SiteDomainAttr = "primarydomainname";
 
@@ -79,61 +77,11 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>
         /// The environment variable's current value, falling back to the default the
-        /// definition carries.
-        ///
-        /// A definition with no value row is the ordinary state straight after an import, and
-        /// the default is what the solution shipped - which is why both are read. Swallowed
-        /// rather than thrown: see the remarks on the class.
+        /// definition carries. Swallowed rather than thrown: see the remarks on the class.
         /// </summary>
         private static string FromVariable(IOrganizationService service)
         {
-            try
-            {
-                var definitions = new QueryExpression(DefinitionEntity)
-                {
-                    ColumnSet = new ColumnSet("defaultvalue"),
-                    TopCount = 1,
-                    Criteria = new FilterExpression(),
-                };
-                definitions.Criteria.AddCondition(
-                    "schemaname", ConditionOperator.Equal, BaseUrlVariable);
-
-                var found = service.RetrieveMultiple(definitions).Entities;
-                if (found.Count == 0)
-                {
-                    return null;
-                }
-
-                var definition = found[0];
-
-                // Two reads rather than an outer join. The value row is usually there and its
-                // absence is the ordinary state straight after an import, so the join would
-                // have to be a LeftOuter - and a join whose whole purpose is to tolerate a
-                // missing row is harder to read, and harder to be sure of, than asking twice.
-                var values = new QueryExpression(ValueEntity)
-                {
-                    ColumnSet = new ColumnSet("value"),
-                    TopCount = 1,
-                    Criteria = new FilterExpression(),
-                };
-                values.Criteria.AddCondition(
-                    "environmentvariabledefinitionid", ConditionOperator.Equal, definition.Id);
-
-                var set = service.RetrieveMultiple(values).Entities;
-                var current = set.Count == 0
-                    ? null
-                    : set[0].GetAttributeValue<string>("value");
-
-                // The shipped default is what the solution carried, and it is the right answer
-                // where nobody has set one - which is how DEV can work with no configuration.
-                return string.IsNullOrWhiteSpace(current)
-                    ? definition.GetAttributeValue<string>("defaultvalue")
-                    : current;
-            }
-            catch (Exception)
-            {
-                return null;
-            }
+            return EnvironmentVariable.Read(service, BaseUrlVariable);
         }
 
         /// <summary>

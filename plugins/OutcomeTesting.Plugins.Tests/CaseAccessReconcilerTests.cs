@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk;
@@ -19,9 +19,9 @@ namespace OutcomeTesting.Plugins.Tests
         private static FakeOrganizationService Environment(int status, bool tax, bool aqs)
         {
             var svc = new FakeOrganizationService();
-            svc.Seed("team", TaxTeam, "name", CaseAccessReconciler.TaxTeamName);
-            svc.Seed("team", AqsTeam, "name", CaseAccessReconciler.AqsTeamName);
-            svc.Seed("account", QueueAccount, "name", CaseAccessReconciler.AqsQueueAccountName);
+            svc.Seed("team", TaxTeam, "name", ProductName.TaxTeam(ProductName.Default));
+            svc.Seed("team", AqsTeam, "name", ProductName.AqsTeam(ProductName.Default));
+            svc.Seed("account", QueueAccount, "name", ProductName.AqsQueueAccount(ProductName.Default));
             svc.Seed("al_reviewroute", RouteId, "al_requirestaxreview", tax, "al_requiresaqsreview", aqs);
             svc.Seed(
                 "al_outcomecase", CaseId,
@@ -108,7 +108,7 @@ namespace OutcomeTesting.Plugins.Tests
                 () => CaseAccessReconciler.Reconcile(svc, CaseId, Now));
 
             Assert.StartsWith(CommandHelpers.PreconditionPrefix, refusal.Message);
-            Assert.Contains(CaseAccessReconciler.TaxTeamName, refusal.Message);
+            Assert.Contains(ProductName.TaxTeam(ProductName.Default), refusal.Message);
         }
 
         [Fact]

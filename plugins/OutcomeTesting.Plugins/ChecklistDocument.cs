@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace OutcomeTesting.Plugins
@@ -38,8 +38,7 @@ namespace OutcomeTesting.Plugins
     /// </remarks>
     public static class ChecklistDocument
     {
-        /// <summary>The document's title, as the form heads itself.</summary>
-        public const string Title = "Outcome Testing - Checker Checklist";
+        // The document's title carries the product name: ProductName.ChecklistTitle.
 
         /// <summary>The heading over the standalone fail points table.</summary>
         public const string FailPointsTitle = "File Quality - Fail points";

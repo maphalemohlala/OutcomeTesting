@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
@@ -18,16 +18,20 @@ namespace OutcomeTesting.Plugins
     {
         public const string TaxTeamManagerRole = "AL Portal - Tax Team Manager";
         public const string AqsTeamManagerRole = "AL Portal - AQS Team Manager";
-        private const string OutcomeTestingManagerRole = "AL Portal - Outcome Testing Manager";
         private const string AdministratorsRole = "Administrators";
 
-        public static bool MayAllocate(IEnumerable<string> roleCodes, int reviewType)
+        /// <param name="product">
+        /// This environment's product name (<see cref="ProductName"/>): the manager role is
+        /// "AL Portal - Outcome Testing Manager" in DEV and TEST and "AL Portal - OTIS Manager"
+        /// in PROD. The two team manager roles carry no product name.
+        /// </param>
+        public static bool MayAllocate(IEnumerable<string> roleCodes, int reviewType, string product = ProductName.Default)
         {
             var roles = new HashSet<string>(
                 (roleCodes ?? Enumerable.Empty<string>()).Where(r => r != null).Select(r => r.Trim()),
                 StringComparer.OrdinalIgnoreCase);
 
-            if (roles.Contains(OutcomeTestingManagerRole) || roles.Contains(AdministratorsRole))
+            if (roles.Contains(ProductName.ManagerWebRole(product)) || roles.Contains(AdministratorsRole))
             {
                 return true;
             }
@@ -57,7 +61,7 @@ namespace OutcomeTesting.Plugins
 
             var roles = PermissionHelpers.ResolveRoleCodesForEmail(
                 systemService, PermissionHelpers.GetCallerEmail(systemService, context));
-            if (MayAllocate(roles, reviewType))
+            if (MayAllocate(roles, reviewType, ProductName.Read(systemService)))
             {
                 return;
             }

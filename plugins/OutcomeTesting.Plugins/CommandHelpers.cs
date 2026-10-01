@@ -118,7 +118,7 @@ namespace OutcomeTesting.Plugins
         public const string PrivilegeDeniedMessage =
             UnauthorizedPrefix +
             "Your Dataverse security role does not allow this action. This is a platform " +
-            "privilege rather than an Outcome Testing application role, so the two are worth " +
+            "privilege rather than one of this app's application roles, so the two are worth " +
             "checking separately: ask an administrator to look at the security roles on your " +
             "user account. The platform trace log records which privilege was missing.";
 

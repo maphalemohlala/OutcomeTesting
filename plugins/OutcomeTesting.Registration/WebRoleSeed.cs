@@ -1,4 +1,4 @@
-using Microsoft.Xrm.Sdk;
+﻿using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
 namespace OutcomeTesting.Registration;
@@ -31,15 +31,15 @@ public static class WebRoleSeed
     private const string AqsReviewer = "AL Portal - AQS Reviewer";
     private const string AdviserRemediation = "AL Portal - Adviser Remediation";
     private const string TcSupervisor = "AL Portal - T&C Supervisor";
-    private const string OutcomeTestingManager = "AL Portal - Outcome Testing Manager";
     private const string Planner = "AL Portal - Planner";
     private const string PortalAdministrator = "AL Portal - Portal Administrator";
     private const string Administrators = "Administrators";
 
-    private static readonly string[] AllRoles =
+    // The manager role carries the environment's product name (ProductName.ManagerWebRole).
+    private static string[] AllRoles(string outcomeTestingManager) => new[]
     {
         TaxReviewer, AqsReviewer, AdviserRemediation, TcSupervisor,
-        OutcomeTestingManager, Planner, PortalAdministrator, Administrators,
+        outcomeTestingManager, Planner, PortalAdministrator, Administrators,
     };
 
     /// <summary>
@@ -48,9 +48,9 @@ public static class WebRoleSeed
     /// client mirror and the server seed of one decision, and they have to be edited
     /// together.
     /// </summary>
-    private static IEnumerable<(string Role, string Resource, int Level)> Matrix()
+    private static IEnumerable<(string Role, string Resource, int Level)> Matrix(string OutcomeTestingManager)
     {
-        foreach (var role in AllRoles)
+        foreach (var role in AllRoles(OutcomeTestingManager))
         {
             yield return (role, "page.dashboard", AccessView);
         }
@@ -189,7 +189,7 @@ public static class WebRoleSeed
         Console.WriteLine("2. Seeding al_pagepermission rules for the web roles…");
 
         var written = 0;
-        foreach (var (role, resource, level) in Matrix())
+        foreach (var (role, resource, level) in Matrix(OutcomeTesting.Plugins.ProductName.ManagerWebRole(OutcomeTesting.Plugins.ProductName.Read(svc))))
         {
             var code = "PP-" + Slug(role) + "-" + resource;
             var rule = new Entity(PermissionEntity)

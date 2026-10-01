@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -37,8 +37,8 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Contains("High Risk Item 1", text);
 
             var note = blocks.First(b => b.Kind == PdfBlockKind.Note);
-            Assert.Equal(CompletedCheck.FormFooter, note.Text);
-            Assert.Equal(ChecklistDocument.Title, blocks.First(b => b.Kind == PdfBlockKind.Title).Text);
+            Assert.Equal(ProductName.ChecklistFooter(ProductName.Default), note.Text);
+            Assert.Equal(ProductName.ChecklistTitle(ProductName.Default), blocks.First(b => b.Kind == PdfBlockKind.Title).Text);
         }
 
         [Fact]

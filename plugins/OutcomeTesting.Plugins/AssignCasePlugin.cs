@@ -49,8 +49,7 @@ namespace OutcomeTesting.Plugins
         // AD-144: the security roles that carry read on al_reviewinstance, which is what
         // Dataverse's owner check requires of an assignee. Named, not derived - see
         // EnsureCanHoldWork for why the privilege cannot be resolved from inside the gate.
-        private const string AppUserRoleName = "Outcome Testing App User";
-        private const string AppAdminRoleName = "Outcome Testing App Admin";
+        // The two app roles carry the product name (ProductName.AppUserRole/AppAdminRole).
         private const string SystemAdministratorRoleName = "System Administrator";
 
         private const string AssignedUserAttr = "al_assigneduserid";
@@ -314,6 +313,10 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            var product = ProductName.Read(service);
+            var appUserRoleName = ProductName.AppUserRole(product);
+            var appAdminRoleName = ProductName.AppAdminRole(product);
+
             foreach (var role in held)
             {
                 var name = role.GetAttributeValue<string>("name");
@@ -323,8 +326,8 @@ namespace OutcomeTesting.Plugins
                 }
 
                 var trimmed = name.Trim();
-                if (trimmed.Equals(AppUserRoleName, StringComparison.OrdinalIgnoreCase)
-                    || trimmed.Equals(AppAdminRoleName, StringComparison.OrdinalIgnoreCase)
+                if (trimmed.Equals(appUserRoleName, StringComparison.OrdinalIgnoreCase)
+                    || trimmed.Equals(appAdminRoleName, StringComparison.OrdinalIgnoreCase)
                     || trimmed.Equals(SystemAdministratorRoleName, StringComparison.OrdinalIgnoreCase))
                 {
                     return;
@@ -333,8 +336,8 @@ namespace OutcomeTesting.Plugins
 
             throw new InvalidPluginExecutionException(
                 CommandHelpers.PreconditionPrefix +
-                userName + " has no Outcome Testing security role in Dataverse, so they cannot be made the owner of a review. " +
-                "Ask an administrator to assign \"" + AppUserRoleName + "\" alongside Basic User, then allocate again.");
+                userName + " has no " + product + " security role in Dataverse, so they cannot be made the owner of a review. " +
+                "Ask an administrator to assign \"" + appUserRoleName + "\" alongside Basic User, then allocate again.");
         }
 
         /// <summary>

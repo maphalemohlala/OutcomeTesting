@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -112,7 +112,7 @@ namespace OutcomeTesting.Plugins
                 // leaving it would grant a role whose queue stays empty. Refusing says which.
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix
-                    + "An AQS reviewer reads the AQS queue through the \"" + CaseAccessReconciler.AqsQueueAccountName
+                    + "An AQS reviewer reads the AQS queue through the \"" + ProductName.AqsQueueAccount(ProductName.Read(service))
                     + "\" account, but this person's contact already belongs to another account. "
                     + "Clear their company on the contact, then grant the role again.");
             }
@@ -141,7 +141,7 @@ namespace OutcomeTesting.Plugins
         private static Guid? FindQueueAccountOrNull(IOrganizationService service)
         {
             var query = new QueryExpression("account") { ColumnSet = new ColumnSet(false), TopCount = 2 };
-            query.Criteria.AddCondition("name", ConditionOperator.Equal, CaseAccessReconciler.AqsQueueAccountName);
+            query.Criteria.AddCondition("name", ConditionOperator.Equal, ProductName.AqsQueueAccount(ProductName.Read(service)));
             var rows = service.RetrieveMultiple(query).Entities;
             return rows.Count == 1 ? rows[0].Id : (Guid?)null;
         }

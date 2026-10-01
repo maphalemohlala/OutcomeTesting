@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Crm.Sdk;
 using Microsoft.Crm.Sdk.Messages;
@@ -18,9 +18,9 @@ namespace OutcomeTesting.Plugins
     /// </summary>
     public static class CaseAccessReconciler
     {
-        public const string TaxTeamName = "Outcome Testing - Tax Team";
-        public const string AqsTeamName = "Outcome Testing - AQS Team";
-        public const string AqsQueueAccountName = "Outcome Testing - AQS Team";
+        // The two teams and the AQS queue account are found by NAME, and the name carries the
+        // product name: "Outcome Testing - Tax Team" in DEV and TEST, "OTIS - Tax Team" in PROD.
+        // See ProductName.TaxTeam, AqsTeam and AqsQueueAccount.
 
         public const string TaxCheckerAttr = "al_taxcheckercontactid";
         public const string AqsCheckerAttr = "al_aqscheckercontactid";
@@ -42,11 +42,9 @@ namespace OutcomeTesting.Plugins
 
         public static CaseAccessChange Reconcile(IOrganizationService service, Guid caseId, DateTime now)
         {
-            var teams = new Dictionary<string, EntityReference>
-            {
-                { TaxTeamName, FindByName(service, "team", TaxTeamName) },
-                { AqsTeamName, FindByName(service, "team", AqsTeamName) },
-            };
+            var product = ProductName.Read(service);
+            var taxTeam = FindByName(service, "team", ProductName.TaxTeam(product));
+            var aqsTeam = FindByName(service, "team", ProductName.AqsTeam(product));
 
             var outcomeCase = service.Retrieve(
                 CaseEntity,
@@ -77,7 +75,7 @@ namespace OutcomeTesting.Plugins
             // costs no extra reads and needs no account to exist.
             if (CaseAccess.InAqsQueue(input))
             {
-                input.AqsQueueAccount = FindByName(service, "account", AqsQueueAccountName);
+                input.AqsQueueAccount = FindByName(service, "account", ProductName.AqsQueueAccount(product));
             }
 
             var released = CaseAccess.IsReleased(input);
@@ -116,8 +114,8 @@ namespace OutcomeTesting.Plugins
             }
 
             var target = new EntityReference(CaseEntity, caseId);
-            Share(service, target, teams[TaxTeamName], decided.ShareWithTaxTeam);
-            Share(service, target, teams[AqsTeamName], decided.ShareWithAqsTeam);
+            Share(service, target, taxTeam, decided.ShareWithTaxTeam);
+            Share(service, target, aqsTeam, decided.ShareWithAqsTeam);
 
             return new CaseAccessChange
             {
@@ -195,7 +193,7 @@ namespace OutcomeTesting.Plugins
         /// <summary>The AQS Team account whose contacts read the AQS queue. Throws if it is missing.</summary>
         public static EntityReference AqsQueueAccount(IOrganizationService service)
         {
-            return FindByName(service, "account", AqsQueueAccountName);
+            return FindByName(service, "account", ProductName.AqsQueueAccount(ProductName.Read(service)));
         }
 
         private static EntityReference FindByName(IOrganizationService service, string entity, string name)

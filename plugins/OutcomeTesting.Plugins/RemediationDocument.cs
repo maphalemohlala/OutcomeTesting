@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -26,7 +26,7 @@ namespace OutcomeTesting.Plugins
     /// </summary>
     public static class RemediationDocument
     {
-        public const string FormFooter = "Outcome Testing — Remediation and escalation | V8";
+        // The footer line carries the product name: ProductName.RemediationFooter.
 
         private const int DecisionApproved = 120910720;
         private const int DecisionRejected = 120910721;
@@ -69,7 +69,7 @@ namespace OutcomeTesting.Plugins
             var actions = Actions(service, caseRef);
             var signoffs = Signoffs(service, actions);
 
-            blocks.Add(PdfBlock.Note(FormFooter));
+            blocks.Add(PdfBlock.Note(ProductName.RemediationFooter(ProductName.Read(service))));
             blocks.Add(PdfBlock.Title("Remediation and escalation"));
 
             var head = new PdfTable(0.25, 0.25, 0.25, 0.25) { Ruled = false };

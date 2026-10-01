@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -41,8 +41,8 @@ namespace OutcomeTesting.Plugins
     /// </summary>
     public static class CompletedCheck
     {
-        /// <summary>The line the page prints above the form's title, verbatim.</summary>
-        public const string FormFooter = "Outcome Testing Checker Checklist | V5 Draft";
+        // The line above the form's title and the title itself carry the product name:
+        // ProductName.ChecklistFooter and ChecklistTitle.
 
         /// <summary>Tick-grid widths: the test point, then the tick columns share the rest.</summary>
         private const double GridLabel = 0.55;
@@ -105,8 +105,9 @@ namespace OutcomeTesting.Plugins
             blocks.AddRange(Summary(review, row, labels, isTax));
 
             blocks.Add(PdfBlock.Spacer());
-            blocks.Add(PdfBlock.Note(FormFooter));
-            blocks.Add(PdfBlock.Title(ChecklistDocument.Title));
+            var product = ProductName.Read(service);
+            blocks.Add(PdfBlock.Note(ProductName.ChecklistFooter(product)));
+            blocks.Add(PdfBlock.Title(ProductName.ChecklistTitle(product)));
 
             if (row != null)
             {

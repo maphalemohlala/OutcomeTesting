@@ -500,6 +500,14 @@ if (args.Length >= 6 && args[0].Equals("registerstep", StringComparison.OrdinalI
         args.Length > 8 ? args[8] : null);
 }
 
+// brandpackage <in.zip> <out.zip> <product>: rewrites the packaged labels that carry the
+// product name (solution, Code App, security roles, manager web role, site) for an
+// environment that calls the product something else. Offline: no environment is touched.
+if (args.Length >= 4 && args[0].Equals("brandpackage", StringComparison.OrdinalIgnoreCase))
+{
+    return OutcomeTesting.Registration.PackageBranding.Run(args[1], args[2], args[3]);
+}
+
 if (args.Length >= 4 && args[0].Equals("addcomponent", StringComparison.OrdinalIgnoreCase))
 {
     return AddComponent(args[1], int.Parse(args[2]), Guid.Parse(args[3]), args.Length > 4 ? args[4] : SolutionUniqueName);
@@ -7155,10 +7163,6 @@ int GrantAppRole(string[] a)
         return 1;
     }
 
-    const string RoleName = "Outcome Testing App User";
-    var carriesWork = new HashSet<string>(
-        new[] { "Outcome Testing App User", "Outcome Testing App Admin", "System Administrator" },
-        StringComparer.OrdinalIgnoreCase);
 
     // Explicit emails, if any were named before --confirm.
     var named = new List<string>();
@@ -7169,6 +7173,14 @@ int GrantAppRole(string[] a)
     }
 
     using var svc = Connect(orgUrl);
+
+    // The app roles carry this environment's product name (ProductName): "Outcome Testing
+    // App User" in DEV and TEST, "OTIS App User" in PROD.
+    var product = OutcomeTesting.Plugins.ProductName.Read(svc);
+    var RoleName = OutcomeTesting.Plugins.ProductName.AppUserRole(product);
+    var carriesWork = new HashSet<string>(
+        new[] { RoleName, OutcomeTesting.Plugins.ProductName.AppAdminRole(product), "System Administrator" },
+        StringComparer.OrdinalIgnoreCase);
 
     var roleId = FindId(svc, "role", ("name", RoleName));
     if (roleId == Guid.Empty)
@@ -7348,8 +7360,10 @@ int CheckAssignable(string orgUrl)
 
     // The roles that carry read on al_reviewinstance, which is what the owner check needs.
     // Same list as AssignCasePlugin.EnsureCanHoldWork, and it has to stay that way.
+    var product = OutcomeTesting.Plugins.ProductName.Read(svc);
+    var appUserRole = OutcomeTesting.Plugins.ProductName.AppUserRole(product);
     var carriesWork = new HashSet<string>(
-        new[] { "Outcome Testing App User", "Outcome Testing App Admin", "System Administrator" },
+        new[] { appUserRole, OutcomeTesting.Plugins.ProductName.AppAdminRole(product), "System Administrator" },
         StringComparer.OrdinalIgnoreCase);
 
     Console.WriteLine($"{emails.Count} people carry an application role in {orgUrl}");
@@ -7416,7 +7430,7 @@ int CheckAssignable(string orgUrl)
         if (contactId == Guid.Empty) { reasons.Add("no portal contact on this email"); }
         if (!roleNames.Any(carriesWork.Contains))
         {
-            reasons.Add("no Outcome Testing security role - assign \"Outcome Testing App User\"");
+            reasons.Add($"no {product} security role - assign \"{appUserRole}\"");
         }
 
         var roleList = roleNames.Count == 0 ? "(none)" : string.Join(", ", roleNames);
@@ -7450,7 +7464,7 @@ int CheckAssignable(string orgUrl)
     Console.WriteLine("Fix each with (Basic User stays, this is additive):");
     foreach (var email in blocked)
     {
-        Console.WriteLine($"  pac admin assign-user --environment {orgUrl} --user {email} --role \"Outcome Testing App User\"");
+        Console.WriteLine($"  pac admin assign-user --environment {orgUrl} --user {email} --role \"{appUserRole}\"");
     }
 
     return 1;
@@ -7462,7 +7476,7 @@ int GrantSecurity(string orgUrl)
     var buId = RootBusinessUnitId(svc);
 
     // App User: read the RBAC + export tables so the client resolves roles and lists exports.
-    var userRole = EnsureRole(svc, "Outcome Testing App User", buId);
+    var userRole = EnsureRole(svc, OutcomeTesting.Plugins.ProductName.AppUserRole(OutcomeTesting.Plugins.ProductName.Read(svc)), buId);
     GrantTable(svc, userRole, "al_userrolemapping", read: true);
     GrantTable(svc, userRole, "al_pagepermission", read: true);
     GrantTable(svc, userRole, "al_exportbatch", read: true);
@@ -7471,7 +7485,7 @@ int GrantSecurity(string orgUrl)
     // App Admin: manage the permission model, generate exports and succeed questions.
     // Create/write on al_userrolemapping and al_pagepermission is admin-only so a user
     // cannot self-escalate by writing a mapping directly (the escalation-safe split).
-    var adminRole = EnsureRole(svc, "Outcome Testing App Admin", buId);
+    var adminRole = EnsureRole(svc, OutcomeTesting.Plugins.ProductName.AppAdminRole(OutcomeTesting.Plugins.ProductName.Read(svc)), buId);
     GrantTable(svc, adminRole, "al_userrolemapping", read: true, create: true, write: true, delete: true, append: true, appendTo: true);
     GrantTable(svc, adminRole, "al_pagepermission", read: true, create: true, write: true, delete: true, append: true, appendTo: true);
     GrantTable(svc, adminRole, "al_exportbatch", read: true, create: true, write: true, append: true, appendTo: true);
@@ -7650,7 +7664,7 @@ int SetCascade(string[] a)
 // AD-218: the two owner teams the reconciler shares cases with, and the account AQS
 // reviewers belong to for the queue permission. Data, not solution components: each
 // environment makes its own, and the names are what the plug-in looks them up by
-// (CaseAccessReconciler.TaxTeamName, AqsTeamName, AqsQueueAccountName). Idempotent.
+// (ProductName.TaxTeam, AqsTeam and AqsQueueAccount, for this environment's product). Idempotent.
 int EnsureAccessPrincipals(string[] a)
 {
     var orgUrl = a[1];
@@ -7663,7 +7677,11 @@ int EnsureAccessPrincipals(string[] a)
     using var svc = Connect(orgUrl);
     var buId = RootBusinessUnitId(svc);
 
-    foreach (var teamName in new[] { "Outcome Testing - Tax Team", "Outcome Testing - AQS Team" })
+    // Named for this environment's product (ProductName), since the plug-in finds them by name.
+    var product = OutcomeTesting.Plugins.ProductName.Read(svc);
+    Console.WriteLine($"Product name in {orgUrl}: {product}");
+
+    foreach (var teamName in new[] { OutcomeTesting.Plugins.ProductName.TaxTeam(product), OutcomeTesting.Plugins.ProductName.AqsTeam(product) })
     {
         var found = svc.RetrieveMultiple(new QueryExpression("team")
         {
@@ -7692,7 +7710,7 @@ int EnsureAccessPrincipals(string[] a)
         Console.WriteLine($"  team created  {teamName} ({id:D})");
     }
 
-    const string accountName = "Outcome Testing - AQS Team";
+    var accountName = OutcomeTesting.Plugins.ProductName.AqsQueueAccount(product);
     var accounts = svc.RetrieveMultiple(new QueryExpression("account")
     {
         ColumnSet = new ColumnSet("name"),
@@ -7726,7 +7744,7 @@ int GrantTeamSecurity(string orgUrl)
 {
     using var svc = Connect(orgUrl);
     var buId = RootBusinessUnitId(svc);
-    var role = EnsureRole(svc, "Outcome Testing Team Manager", buId);
+    var role = EnsureRole(svc, OutcomeTesting.Plugins.ProductName.TeamManagerRole(OutcomeTesting.Plugins.ProductName.Read(svc)), buId);
 
     string[] caseTables =
     {
@@ -11468,6 +11486,7 @@ int AddMetadataToSolution(string orgUrl, string entityName, string? attributeNam
 /// </summary>
 int FixPermissions(string orgUrl)
 {
+    using var svc = Connect(orgUrl);
     const int None = 120910766, View = 120910767, Edit = 120910768, Manage = 120910769;
     var levelName = new Dictionary<int, string>
     {
@@ -11478,7 +11497,7 @@ int FixPermissions(string orgUrl)
     const string Aqs = "AL Portal - AQS Reviewer";
     const string Adviser = "AL Portal - Adviser Remediation";
     const string Tc = "AL Portal - T&C Supervisor";
-    const string Otm = "AL Portal - Outcome Testing Manager";
+    var Otm = OutcomeTesting.Plugins.ProductName.ManagerWebRole(OutcomeTesting.Plugins.ProductName.Read(svc));
     const string Planner = "AL Portal - Planner";
     const string PortalAdmin = "AL Portal - Portal Administrator";
     const string Admins = "Administrators";
@@ -11520,7 +11539,6 @@ int FixPermissions(string orgUrl)
         new[] { Adviser, "page.reviews" },
     };
 
-    using var svc = Connect(orgUrl);
 
     var query = new QueryExpression("al_pagepermission")
     {

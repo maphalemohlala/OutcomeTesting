@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xrm.Sdk;
 using Xunit;
 
@@ -27,7 +27,7 @@ namespace OutcomeTesting.Plugins.Tests
             svc.Seed(WebRoleRegistry.RoleEntity, TaxRole, WebRoleRegistry.NameAttr, WebRoleRegistry.TaxReviewerRole);
             if (withQueueAccount)
             {
-                svc.Seed("account", QueueAccount, "name", CaseAccessReconciler.AqsQueueAccountName);
+                svc.Seed("account", QueueAccount, "name", ProductName.AqsQueueAccount(ProductName.Default));
             }
 
             svc.Seed("account", OtherAccount, "name", "Some firm");
@@ -124,7 +124,7 @@ namespace OutcomeTesting.Plugins.Tests
                 AqsQueueMembershipPlugin.Apply(svc, true, WebRoleLink, ContactRef, Roles(AqsRole)));
 
             Assert.StartsWith(CommandHelpers.PreconditionPrefix, ex.Message);
-            Assert.Contains(CaseAccessReconciler.AqsQueueAccountName, ex.Message);
+            Assert.Contains(ProductName.AqsQueueAccount(ProductName.Default), ex.Message);
             Assert.Empty(svc.Updates);
         }
 

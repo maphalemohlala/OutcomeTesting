@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -52,6 +52,8 @@
     <Compile Include="..\OutcomeTesting.Plugins\RemedialActions.cs" Link="Linked\RemedialActions.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\PdfWriter.cs" Link="Linked\PdfWriter.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\ChecklistDocument.cs" Link="Linked\ChecklistDocument.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\ProductName.cs" Link="Linked\ProductName.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\EnvironmentVariable.cs" Link="Linked\EnvironmentVariable.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\OptionLabels.cs" Link="Linked\OptionLabels.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\CommandHelpers.cs" Link="Linked\CommandHelpers.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\OutcomeRules.cs" Link="Linked\OutcomeRules.cs" />
