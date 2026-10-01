@@ -341,6 +341,23 @@ if (args.Length >= 3 && args[0].Equals("setcascade", StringComparison.OrdinalIgn
     return SetCascade(args);
 }
 
+// Onboard a list of people (PeopleOnboarding): onboardpeople <orgUrl> <people.csv> [--issuer <url>] [--apply --confirm <orgUrl>]
+if (args.Length >= 3 && args[0].Equals("onboardpeople", StringComparison.OrdinalIgnoreCase))
+{
+    var orgUrl = args[1];
+    var apply = args.Any(x => x.Equals("--apply", StringComparison.OrdinalIgnoreCase));
+    if (apply && !ConfirmedFor(args, orgUrl))
+    {
+        Console.Error.WriteLine("This gives real people access. Re-run as: onboardpeople <orgUrl> <people.csv> --apply --confirm <orgUrl>");
+        return 1;
+    }
+
+    var issuerAt = Array.FindIndex(args, x => x.Equals("--issuer", StringComparison.OrdinalIgnoreCase));
+    var people = PeopleOnboarding.ReadFile(args[2]);
+    using var svc = Connect(orgUrl);
+    return PeopleOnboarding.Run(svc, orgUrl, people, apply, issuerAt > 0 && issuerAt + 1 < args.Length ? args[issuerAt + 1] : null);
+}
+
 if (args.Length >= 2 && args[0].Equals("ensureaccessprincipals", StringComparison.OrdinalIgnoreCase))
 {
     return EnsureAccessPrincipals(args);

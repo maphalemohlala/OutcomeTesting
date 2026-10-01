@@ -187,6 +187,41 @@ owner's. After each one, the agent can check the result read-only.
    | Teams | no members or roles | the same |
    | App roles, portal bindings, web-role holders | the UAT people | none |
 
-6. **People: decision needed.** Role mappings, adviser mappings, and `OTIS App User` plus
+6. **People: from the owner's `Advisers.xlsx` (2026-10-01).**
+   - **The list:** 328 people in `artifacts/2026-10-01-otis/prod-people.csv`, built from five
+     sheets:
+
+     | Sheet | People | Web role |
+     |---|---|---|
+     | Advisers (FC rows included) | 204 | Adviser Remediation |
+     | Paraplanners | 104 | Planner |
+     | Tax Team | 7 | Tax Reviewer; the manager also Tax Team Manager |
+     | T&C Managers | 8 | T&C Supervisor |
+     | AQS Team | 5 | AQS Reviewer; the manager also AQS Team Manager |
+
+     Everyone also gets **Basic User** and **OTIS App User**, by owner direction.
+   - **New verb:** `onboardpeople <org> <csv> [--issuer <url>] [--apply --confirm <org>]`. It
+     does what `grantapprole`, `grantrole`, `bindidentity`, `setsecuritystamp` and
+     `enableportallogin` do, for each person in turn. It is additive and idempotent. Without
+     `--apply` it writes nothing.
+   - **Dry run against PROD:**
+     - 328 contacts to create;
+     - 171 people who already exist as users get both Dataverse roles;
+     - **157 are not users of PROD**: all 104 paraplanners, 47 advisers, Elaine Osler, Sandeep
+       Somel, and 4 T&C managers (`david.wright2`, `jake.tree`, `dawn.wilson`,
+       `rachel.craske`).
+   - **`prod-add-users.ps1`** adds those 157 with `pac admin assign-user`. Each needs a licence.
+     Run `onboardpeople` again afterwards to bind their sign-ins.
+   - **Issuer:** PROD has no binding to copy one from. Pass
+     `--issuer https://sts.windows.net/4abde4fc-68ae-44b4-8e80-b575a8c3d5b8/`, the value every
+     TEST binding carries; it comes from the same tenant and the same built-in Entra provider.
+     Then have one non-admin person sign in before relying on it.
+   - **Not in the spreadsheet:**
+     - who holds App Admin, OTIS Manager, Portal Administrator and Administrators;
+     - the adviser → T&C manager mappings.
+   - **Gate 0:** the site's Manage access list, in the design studio. One Entra group is
+     recommended.
+
+   The original note: **People: decision needed.** Role mappings, adviser mappings, and `OTIS App User` plus
    Basic User for each person.
 7. **Email.** Approve and enable the sending mailbox.
