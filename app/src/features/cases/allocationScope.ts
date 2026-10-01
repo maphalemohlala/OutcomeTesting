@@ -1,4 +1,5 @@
 import type { Discipline } from './caseCheckers';
+import { DEFAULT_PRODUCT, managerWebRole } from '../../app/product/productName';
 
 /**
  * Who may allocate which check, mirrored from AllocationScope in the plug-in assembly
@@ -7,15 +8,16 @@ import type { Discipline } from './caseCheckers';
  */
 export const TAX_TEAM_MANAGER = 'AL Portal - Tax Team Manager';
 export const AQS_TEAM_MANAGER = 'AL Portal - AQS Team Manager';
-const BOTH = ['AL Portal - Outcome Testing Manager', 'Administrators'];
+// The manager role carries this environment's product name (PROD: "AL Portal - OTIS Manager").
+const both = (product: string) => [managerWebRole(product), 'Administrators'];
 
 function normalise(role: string): string {
   return role.trim().toLowerCase();
 }
 
-export function allocatableDisciplines(roles: readonly string[]): Discipline[] {
+export function allocatableDisciplines(roles: readonly string[], product: string = DEFAULT_PRODUCT): Discipline[] {
   const held = new Set(roles.map(normalise));
-  if (BOTH.some((role) => held.has(normalise(role)))) return ['Tax', 'AQS'];
+  if (both(product).some((role) => held.has(normalise(role)))) return ['Tax', 'AQS'];
 
   const out: Discipline[] = [];
   if (held.has(normalise(TAX_TEAM_MANAGER))) out.push('Tax');

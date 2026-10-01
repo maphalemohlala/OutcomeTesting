@@ -32,7 +32,9 @@ const ROLE = {
   administrators: 'c53b2908-1fc1-4470-89cd-6f5b95c17ffe',
 };
 const OVERSIGHT = [ROLE.manager, ROLE.administrators];
-const OVERSIGHT_NAMES = ['AL Portal - Outcome Testing Manager', 'Administrators'];
+// The manager role is derived from the environment's product name (PROD: "AL Portal - OTIS
+// Manager"), so a page checks the derived variable rather than the name written out.
+const OVERSIGHT_CHECKS = ['user.roles contains ot_manager_role', "user.roles contains 'Administrators'"];
 
 const PAGE = {
   myWork: 'a1000000-0000-4000-8000-000000000030',
@@ -125,9 +127,7 @@ describe('the header', () => {
   });
 
   it('shows the My Work link to oversight roles only', () => {
-    for (const name of OVERSIGHT_NAMES) {
-      expect(header).toContain(`user.roles contains '${name}'`);
-    }
+    for (const check of OVERSIGHT_CHECKS) expect(header).toContain(check);
     expect(header).toMatch(/link\.url == '\/' and ot_oversight == false/);
     expect(header).not.toContain("user.roles contains 'AL Portal - Portal Administrator'");
   });
@@ -139,9 +139,7 @@ describe('the header', () => {
 
 describe('the landing page', () => {
   it('sends a non-oversight user from / to Cases and renders nothing else for them', () => {
-    for (const name of OVERSIGHT_NAMES) {
-      expect(myWork).toContain(`user.roles contains '${name}'`);
-    }
+    for (const check of OVERSIGHT_CHECKS) expect(myWork).toContain(check);
     // Portal Administrator is named in the landing choice (it brings Cases), never as oversight.
     const oversightLine = myWork.split(/\r?\n/).find((l) => l.includes('assign ot_oversight = true')) ?? '';
     expect(oversightLine).not.toBe('');
@@ -175,9 +173,7 @@ describe('someone Cases does not admit lands on their one page', () => {
 describe('the Cases page scope toggle', () => {
   it('is offered to oversight only', () => {
     expect(caseList).toMatch(/\{% if user and ot_oversight %\}\s*<nav class="ot-scope"/);
-    for (const name of OVERSIGHT_NAMES) {
-      expect(caseList).toContain(`user.roles contains '${name}'`);
-    }
+    for (const check of OVERSIGHT_CHECKS) expect(caseList).toContain(check);
   });
 
   it('ignores ?mine=1 for everyone else, so an old link cannot empty their list', () => {

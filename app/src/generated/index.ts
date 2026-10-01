@@ -56,6 +56,8 @@ export * as Al_signoffsModel from './models/Al_signoffsModel';
 export * as Al_userrolemappingsModel from './models/Al_userrolemappingsModel';
 export * as CommonModels from './models/CommonModels';
 export * as ContactsModel from './models/ContactsModel';
+export * as EnvironmentvariabledefinitionsModel from './models/EnvironmentvariabledefinitionsModel';
+export * as EnvironmentvariablevaluesModel from './models/EnvironmentvariablevaluesModel';
 export * as Mspp_webrolesModel from './models/Mspp_webrolesModel';
 
 // Services
@@ -110,4 +112,6 @@ export * from './services/Al_sectionsService';
 export * from './services/Al_signoffsService';
 export * from './services/Al_userrolemappingsService';
 export * from './services/ContactsService';
+export * from './services/EnvironmentvariabledefinitionsService';
+export * from './services/EnvironmentvariablevaluesService';
 export * from './services/Mspp_webrolesService';

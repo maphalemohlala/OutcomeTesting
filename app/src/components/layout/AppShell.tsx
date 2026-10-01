@@ -7,6 +7,7 @@ import { useCurrentUser } from '../../services/auth/useCurrentUser';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import './AppShell.css';
+import { useProductName } from '../../app/product/useProductName';
 
 function isItemActive(pathname: string, to: string): boolean {
   return to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`);
@@ -131,6 +132,7 @@ function AccessNotice() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const { can } = usePermissions();
+  const product = useProductName();
   const isCompact = useMediaQuery('(max-width: 60rem)');
 
   // Only show pages the current role may view (AD-041). Empty groups drop out.
@@ -177,7 +179,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </a>
 
       <header className="shell__header">
-        <span className="shell__product">Outcome Testing</span>
+        <span className="shell__product">{product}</span>
         <SignedInUser />
       </header>
 

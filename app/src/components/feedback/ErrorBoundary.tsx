@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
+import { productName } from '../../app/product/useProductName';
 
 interface State {
   failed: boolean;
@@ -24,7 +25,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           <h1>This screen could not be displayed</h1>
           <p>
             No case data has been changed. Reload the page to try again. If it keeps happening,
-            report it to the Outcome Testing support contact.
+            report it to the {productName()} support contact.
           </p>
         </section>
       );

@@ -21,6 +21,8 @@ import { remediationClock } from '../../lib/workingDays';
 import type { CaseStatus } from '../../types/domain';
 import '../../styles/document.css';
 import './RemediationPage.css';
+import { useProductName } from '../../app/product/useProductName';
+import { remediationFooter } from '../../app/product/productName';
 
 
 
@@ -282,6 +284,7 @@ export function RemediationFormBlock({
 
 export function RemediationPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const product = useProductName();
   // Read-only: every remediation action is completed and signed off on the portal
   // (project owner, 2026-09-10), so this page reports and never writes. The reload key
   // stays at zero because nothing here changes what it reads.
@@ -327,7 +330,7 @@ export function RemediationPage() {
             second door onto columns the portal already owns.
           */}
           <section className="checklist-doc" aria-labelledby="remediation-actions">
-            <div className="doc-footer">Outcome Testing — Remediation and escalation | V8</div>
+            <div className="doc-footer">{remediationFooter(product)}</div>
             <h1 id="remediation-actions">
               Remediation and escalation
               {state.outcomeCase?.status ? (

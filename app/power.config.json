@@ -138,6 +138,16 @@
           "entitySetName": "al_listoption_al_outcomecase_productsset",
           "logicalName": "al_listoption_al_outcomecase_products",
           "isHidden": false
+        },
+        "environmentvariabledefinitions": {
+          "entitySetName": "environmentvariabledefinitions",
+          "logicalName": "environmentvariabledefinition",
+          "isHidden": false
+        },
+        "environmentvariablevalues": {
+          "entitySetName": "environmentvariablevalues",
+          "logicalName": "environmentvariablevalue",
+          "isHidden": false
         }
       },
       "environmentVariableName": ""

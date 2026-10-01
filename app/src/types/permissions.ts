@@ -1,3 +1,4 @@
+import { DEFAULT_PRODUCT, brandRules } from '../app/product/productName';
 /*
  * Application RBAC model (AD-041). This is the single client-side source of truth
  * for what a role may see and do; the server-side Custom API commands (AD-003)
@@ -284,8 +285,13 @@ export function resolvePermissions(
  * and seed the table. That is the one state in which the client is more permissive than
  * the server, and the server still gates every write.
  */
-export function rulesInForce(stored: readonly PermissionRule[]): readonly PermissionRule[] {
-  return stored.length > 0 ? stored : DEFAULT_PERMISSIONS;
+export function rulesInForce(
+  stored: readonly PermissionRule[],
+  product: string = DEFAULT_PRODUCT,
+): readonly PermissionRule[] {
+  // The coded defaults name the manager role for the default product; an environment that
+  // calls the product something else (PROD: OTIS) names it differently.
+  return stored.length > 0 ? stored : brandRules(DEFAULT_PERMISSIONS, product);
 }
 
 /** The rules to gate the UI with, and whether they are the real ones. */
@@ -317,14 +323,15 @@ export interface RuleResolution {
 export function resolveRules(
   readSucceeded: boolean,
   stored: readonly PermissionRule[],
+  product: string = DEFAULT_PRODUCT,
 ): RuleResolution {
   // A read that failed carries no authority, whatever it returned: a partial result is not a
   // rulebook, so `stored` is deliberately ignored here rather than merged.
   if (!readSucceeded) {
-    return { rules: DEFAULT_PERMISSIONS, unavailable: true };
+    return { rules: brandRules(DEFAULT_PERMISSIONS, product), unavailable: true };
   }
 
-  return { rules: rulesInForce(stored), unavailable: false };
+  return { rules: rulesInForce(stored, product), unavailable: false };
 }
 
 /** The access level a permission set grants on a resource (None when absent). */

@@ -30,6 +30,7 @@ import {
 import { useAllListOptions } from '../admin/useListOptions';
 import { useCaseReviews } from './useCaseReviews';
 import { allocatableDisciplines } from './allocationScope';
+import { useProductName } from '../../app/product/useProductName';
 import { useUserDirectory } from '../../hooks/useUserDirectory';
 import {
   Al_outcomecasesal_adviserstatus,
@@ -283,6 +284,7 @@ function TickSet({
 }
 export function CaseEditPanel({ detail, onSaved }: Props) {
   const { can, roles } = usePermissions();
+  const product = useProductName();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<CaseEditValues>(detail.edit);
   const [reason, setReason] = useState('');
@@ -303,7 +305,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
 
   // AD-218: each team manager allocates their own discipline only. al_AssignCase refuses the
   // rest; this stops the modal offering what the command will refuse.
-  const inScope = allocatableDisciplines(roles);
+  const inScope = allocatableDisciplines(roles, product);
 
   // Moving a deadline is a manager's act (item 6, 2026-09-19), and page.cases Edit is not
   // the right question: Tax and AQS reviewers hold it so they can complete the header

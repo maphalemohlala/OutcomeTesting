@@ -18,6 +18,7 @@ import {
 import { executeCommand } from '../../services/commands/commandClient';
 import { useCurrentUser } from '../../services/auth/useCurrentUser';
 import { PermissionContext, type PermissionContextValue } from './permissionContext';
+import { loadProductName } from '../product/loadProductName';
 
 interface Resolved {
   roles: string[];
@@ -41,6 +42,8 @@ interface Resolved {
  * Custom API commands.
  */
 export async function loadPermissions(email: string): Promise<Resolved> {
+  // Started first so it runs alongside the role and rule reads; only the stand-in rules need it.
+  const product = loadProductName();
   const [rolesResult, permResult, userResult] = await Promise.all([
     executeCommand<{ RoleCodes: string }>('al_GetMyRoles', {}),
     Al_pagepermissionsService.getAll({ filter: 'statecode eq 0', top: 5000 }),
@@ -119,7 +122,7 @@ export async function loadPermissions(email: string): Promise<Resolved> {
   // `permResult.success` is the distinction that matters: a read that FAILED and a read that
   // legitimately found no rules both arrive as an empty array, and treating them alike is what
   // gated a mis-provisioned user by the coded defaults while telling nobody (AD-136).
-  const { rules, unavailable } = resolveRules(permResult.success, dataRules);
+  const { rules, unavailable } = resolveRules(permResult.success, dataRules, await product);
 
   // With no roles established there is nothing to resolve rules against, and no point
   // telling somebody the RULEBOOK was a stand-in when the more basic answer is that we do

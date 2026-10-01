@@ -21,6 +21,8 @@ import { CaseHeaderTable } from './CaseHeaderTable';
 import { ChecklistSection } from './ChecklistSection';
 import '../../styles/document.css';
 import './ReviewDetailPage.css';
+import { useProductName } from '../../app/product/useProductName';
+import { checklistFooter, checklistTitle } from '../../app/product/productName';
 
 interface ReviewDetailPageProps {
   reviewType: ReviewType;
@@ -315,6 +317,7 @@ function FailPoints({ title, points }: { title: string; points: FailPoint[] }) {
 }
 
 export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
+  const product = useProductName();
   const { reviewId } = useParams<{ reviewId: string }>();
   const state = useReviewDetail(reviewId, reviewType);
 
@@ -424,8 +427,8 @@ export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
             * per case rather than per review (AD-095).
             */}
           <div className="checklist-doc">
-            <div className="doc-footer">Outcome Testing Checker Checklist | V5 Draft</div>
-            <h1>Outcome Testing - Checker Checklist</h1>
+            <div className="doc-footer">{checklistFooter(product)}</div>
+            <h1>{checklistTitle(product)}</h1>
 
             {state.detail.caseHeader === null ? (
               <p className="intro">The case header could not be read, so it is not shown here.</p>
