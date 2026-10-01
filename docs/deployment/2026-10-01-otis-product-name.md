@@ -257,3 +257,21 @@ owner's. After each one, the agent can check the result read-only.
    The original note: **People: decision needed.** Role mappings, adviser mappings, and `OTIS App User` plus
    Basic User for each person.
 7. **Email.** Approve and enable the sending mailbox.
+
+## PROD settings applied (2026-10-01, by the agent)
+
+| Setting | Value | Read back |
+|---|---|---|
+| Site setting `OT/ProductName` | `OTIS` (row `f9139578…`) | one row; 74 site settings in all, no duplicate names |
+| Environment variable `al_PortalBaseUrl` | `otis-ascotlloyd.powerappsportals.com`, a host only, in the same form as TEST's | value present |
+
+The portal serves settings from a cache. The OTIS titles, and the manager check that
+`OT/ProductName` drives, can take a while to appear, or need a site restart from Power Pages.
+
+**Still open:**
+- **Mailbox:** approve and test the svc mailbox.
+- **The OTIS app:** share it with its users.
+- **Site visibility:** make the site public, or restrict access through the group in Entra.
+- **End-to-end run:** one real case through to the email.
+- **Logging:** turn on auditing and plug-in trace logging.
+- **The 157 people,** once they have licences and PROD accounts.
