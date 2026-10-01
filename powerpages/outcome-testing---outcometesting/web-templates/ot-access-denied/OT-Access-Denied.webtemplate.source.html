@@ -1,5 +1,6 @@
 ﻿{% extends 'OT Layout' %}
 {% block content %}
+{% assign ot_product = settings['OT/ProductName'] | default: 'Outcome Testing' %}
 {% comment %}
   Access denied (PP-01, PP-16).
 
@@ -28,7 +29,7 @@
   <p>
     This may be because the page is restricted to a different role, or because the
     record is not one you work on. If you think you should have access, contact your
-    Outcome Testing manager.
+    {{ ot_product | escape }} manager.
   </p>
   <p>
     {% if user %}
@@ -64,7 +65,7 @@
       If a role you were granted is not in that list, the portal has not picked it up
       for this session yet.
       <a href="{{ website.sign_out_url_substitution }}">Sign out</a> and sign back in,
-      and if it is still missing, send this page's contents to your Outcome Testing
+      and if it is still missing, send this page's contents to your {{ ot_product | escape }}
       manager — it says which account the site is treating you as, which is the part
       nobody can check from the other side.
     </p>

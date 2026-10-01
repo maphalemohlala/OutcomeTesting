@@ -1,5 +1,6 @@
 ﻿{% extends 'OT Layout' %}
 {% block content %}
+{% assign ot_product = settings['OT/ProductName'] | default: 'Outcome Testing' %}
 {% comment %}
   Review detail: renders the questionnaire version issued to this review
   (PP-07, PP-08, PP-09).
@@ -1007,8 +1008,8 @@
           the autosave script does not have to re-parse the query string.
         {% endcomment %}
         <div class="ot-checklist" data-ot-questionnaire data-review-id="{{ rv.al_reviewinstanceid }}">
-        <div class="doc-footer">Outcome Testing Checker Checklist | V5 Draft</div>
-        <h1>Outcome Testing - Checker Checklist</h1>
+        <div class="doc-footer">{{ ot_product | escape }} Checker Checklist | V5 Draft</div>
+        <h1>{{ ot_product | escape }} - Checker Checklist</h1>
         {{ case_header }}
         {% comment %}
           The document's blocks (AD-098). The checklist model holds Section then Question

@@ -1,5 +1,6 @@
 {% extends 'OT Layout' %}
 {% block content %}
+{% assign ot_product = settings['OT/ProductName'] | default: 'Outcome Testing' %}
 {% comment %}
   Remediation worklist (PP-12, PP-13).
 
@@ -531,7 +532,7 @@
         write path to either.
       {% endcomment %}
       <div class="ot-checklist">
-      <div class="doc-footer">Outcome Testing — Remediation and escalation | V8</div>
+      <div class="doc-footer">{{ ot_product | escape }} — Remediation and escalation | V8</div>
       <h1>Remediation and escalation</h1>
 
       <dl class="ot-dl">
@@ -2058,7 +2059,7 @@
         show(markComplete
           ? 'There is nothing here for you to sign off. None of the remedial actions on this'
             + ' case are open and assigned to you. If you expected to answer one, reload the'
-            + ' page, and contact your Outcome Testing manager if it still says this.'
+            + ' page, and contact your {{ ot_product | escape }} manager if it still says this.'
           : 'There is nothing to save. None of the remedial actions on this case are open and'
             + ' assigned to you.', 'error');
         return;

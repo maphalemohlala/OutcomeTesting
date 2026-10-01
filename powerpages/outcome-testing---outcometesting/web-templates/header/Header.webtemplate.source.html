@@ -47,7 +47,7 @@
             Administrators; Portal Administrator reads no cases, so it is not one of them.
           {% endcomment %}
           {% assign ot_oversight = false %}
-          {% if user.roles contains 'AL Portal - Outcome Testing Manager' or user.roles contains 'Administrators' %}{% assign ot_oversight = true %}{% endif %}
+          {% assign ot_product = settings['OT/ProductName'] | default: 'Outcome Testing' %}{% assign ot_manager_role = 'AL Portal - ' | append: ot_product | append: ' Manager' %}{% if user.roles contains ot_manager_role or user.roles contains 'Administrators' %}{% assign ot_oversight = true %}{% endif %}
           {% assign ot_links_shown = 0 %}
           <ul class='nav navbar-nav weblinks'>
             {% for link in primary_nav.weblinks %}

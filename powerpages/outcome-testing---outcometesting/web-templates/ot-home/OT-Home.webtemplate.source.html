@@ -1,5 +1,6 @@
 ﻿{% extends 'OT Layout' %}
 {% block content %}
+{% assign ot_product = settings['OT/ProductName'] | default: 'Outcome Testing' %}
 {% comment %}
   Portal landing page.
 
@@ -227,11 +228,11 @@
 </section>
 
 <section class="ot-card" aria-labelledby="ot-home-about">
-  <h2 class="ot-card__title" id="ot-home-about">Outcome Testing</h2>
+  <h2 class="ot-card__title" id="ot-home-about">{{ ot_product | escape }}</h2>
   <p>
     Tax and AQS checks, outcomes and remediation for Ascot Lloyd. Tax runs before AQS
     when a case requires both. Case import, allocation, question administration and
-    reporting are handled by managers in the Outcome Testing app.
+    reporting are handled by managers in the {{ ot_product | escape }} app.
   </p>
 
   {% if user %}
@@ -257,7 +258,7 @@
         You hold no roles on this site yet, so most pages will be hidden.
       {% endif %}
       A role you were granted but cannot see here has not reached this session - sign out
-      and back in, then tell your Outcome Testing manager if it is still missing.
+      and back in, then tell your {{ ot_product | escape }} manager if it is still missing.
     </p>
   {% endif %}
 </section>

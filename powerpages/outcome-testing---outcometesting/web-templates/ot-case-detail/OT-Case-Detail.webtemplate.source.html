@@ -1,5 +1,6 @@
 ﻿{% extends 'OT Layout' %}
 {% block content %}
+{% assign ot_product = settings['OT/ProductName'] | default: 'Outcome Testing' %}
 {% comment %}
   Case detail (PP-05).
 
@@ -330,7 +331,7 @@
       flowing list, not a ruled block, and the sheet rules everything.
     {% endcomment %}
     <div class="ot-checklist">
-    <div class="doc-footer">Outcome Testing — Case record | V8</div>
+    <div class="doc-footer">{{ ot_product | escape }} — Case record | V8</div>
     <h1>
       {{ c.al_casereference | default: 'Case' | escape }}
       {% include 'OT Status Badge' status: c.al_casestatus.label %}
