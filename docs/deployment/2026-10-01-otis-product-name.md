@@ -133,7 +133,38 @@ owner's. After each one, the agent can check the result read-only.
    - give it its own Entra sign-in (app registration and the `Authentication/*` settings);
    - add the site setting `OT/ProductName` = OTIS, kept out of the solution.
    - add `al_PortalBaseUrl`, created per environment and never shipped.
-5. **Configuration seed: decision needed.** The seed covers routes, the checklist, fail
+5. **Configuration seed: owner chose TEST (2026-10-01). The portal address is
+   `otis.powerappsportals.com`.**
+   - **The package:** `artifacts/2026-10-01-otis/prod-config-seed/`, built from TEST's active rows
+     with the 11 tables in parent order:
+
+     | Table | Rows |
+     |---|---|
+     | Review routes | 3 |
+     | Fail reasons | 20 |
+     | Checklist | 1 |
+     | Checklist version | 1 |
+     | Sections | 16 |
+     | Questions | 48 |
+     | Question versions | 78 |
+     | List options (with their legacy values) | 77 |
+     | Notification templates | 12 |
+     | `al_role` | 10 |
+     | Page permissions | 74 |
+
+     The 4 inactive list options and 10 inactive page permissions were left out.
+   - **What was renamed (30 values):**
+     - the manager's page-permission name, code and role code, to `AL Portal - OTIS Manager`;
+     - the `al_role` entry, to "OTIS Manager" / `ROLE-OTIS-MANAGER`.
+   - **Checks:** no other value carries the product name, a TEST address, or a TEST contact.
+     No business key repeats. Rows without a key keep TEST's ids, so a re-run updates rather
+     than duplicates.
+   - **Not in the package:** role mappings and adviser mappings. Those are people.
+   - **Do not run `seedlistoptions` in PROD afterwards.** It would duplicate the 58 options that
+     have no legacy value.
+   - The agent's `importseed` into PROD was refused ("Production Deploy").
+
+   The original note: **Configuration seed: decision needed.** The seed covers routes, the checklist, fail
    reasons, list options with legacy values, notification templates, `al_role`, and page
    permissions with the manager role written as `AL Portal - OTIS Manager`. Before it can be
    built, the owner must choose which environment's checklist PROD starts from: DEV's or TEST's.
