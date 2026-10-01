@@ -99,6 +99,22 @@ or renamed by hand. The agent was refused the delete.
 The registration verbs that create or look up named things now refuse a target with no
 `al_ProductName` definition, instead of quietly using the default (`TargetProduct`).
 
+**Recovery, read back by the agent.**
+1. The owner removed 1.0.8.0 (10:31-11:12Z). Two OTIS imports started meanwhile were turned
+   away by the uninstall lock and changed nothing.
+2. OTIS 1.0.18.0 was installed fresh, 11:26-11:45Z.
+3. The old teams and account were deleted, and `ensureaccessprincipals` ran at 11:58Z.
+
+| Check | PROD |
+|---|---|
+| Solution | "OTIS" 1.0.18.0, managed; component counts by type equal TEST's |
+| Assembly | `965e689a…`, identical to DEV and TEST; 65 of 65 steps enabled, the same step names as TEST; 32 APIs, the same as TEST |
+| `al_ProductName` | value "OTIS" |
+| Names | roles OTIS App User, App Admin and Team Manager; Code App "OTIS"; site "OTIS"; web role "AL Portal - OTIS Manager" |
+| Teams and account | "OTIS - Tax Team" and "OTIS - AQS Team" in the root business unit, with no roles, as in TEST; their default queues; account "OTIS - AQS Team". No "Outcome Testing" principals remain |
+
+Steps 1 to 3 below are done. Steps 4 to 7 wait on the owner's decisions.
+
 The branded package `artifacts/2026-10-01-otis/OTIS_1_0_18_0_managed.zip` is ready. The agent's
 import was refused, and so was writing its request file, so every PROD write below is the
 owner's. After each one, the agent can check the result read-only.
