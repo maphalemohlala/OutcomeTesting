@@ -232,6 +232,27 @@ owner's. After each one, the agent can check the result read-only.
        - **Script removed:** `prod-add-users.ps1` was deleted.
    - **Gate 0:** the site's Manage access list, in the design studio. One Entra group is
      recommended.
+   - **Applied, 2026-10-01.**
+     1. **The first `--apply`.** The run granted Aaron Banasik's web role. After that,
+        `al_AssignUserRole` refused every grant with "no application role assigned":
+        - the command fails open only while no mapping exists anywhere;
+        - `svc.automate.aq` held no role in PROD.
+     2. **The fix.** The owner added svc's mapping. It was first written with role code
+        `Administrator`, which matches no rule, and then corrected to `Administrators`, as in
+        TEST.
+     3. **The rerun.** The owner's run and the agent's ran at the same time. That caused 55
+        "duplicate key" failures and 38 doubled `adx_externalidentity` rows. The agent deleted the
+        newer row of each pair, as the owner approved.
+   - **Verified read-only, per person, for all 171:**
+     - contact, Basic User and OTIS App User;
+     - every web role and its mapping;
+     - one binding, plus username, stamp and logonenabled;
+     - the adviser mapping (90);
+     - App Admin for Zoe Ramwell and Adam Strumidlo.
+
+     Bindings: 171 for 171 object ids. No duplicate contacts, mappings or adviser mappings.
+   - **`al_approle` stays empty on these rows, as in TEST.** `al_rolecode` outranks it, and its
+     picklist lacks Planner, the two Team Manager roles and Portal Administrator.
 
    The original note: **People: decision needed.** Role mappings, adviser mappings, and `OTIS App User` plus
    Basic User for each person.
