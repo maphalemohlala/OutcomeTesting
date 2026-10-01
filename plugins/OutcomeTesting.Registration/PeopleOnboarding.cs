@@ -9,7 +9,7 @@ namespace OutcomeTesting.Registration;
 /// <summary>
 /// One person to give access to, read from a people file.
 /// </summary>
-internal sealed record Person(string Email, string Name, string StaffCode, IReadOnlyList<string> WebRoles);
+internal sealed record Person(string Email, string Name, string StaffCode, IReadOnlyList<string> WebRoles, string TcManager = "", bool Admin = false);
 
 /// <summary>
 /// Gives a list of people everything a person needs here, in one pass (owner, 2026-10-01:
@@ -31,14 +31,19 @@ internal sealed record Person(string Email, string Name, string StaffCode, IRead
 /// rotates a stamp, so a second run finishes what the first could not. Without --apply it
 /// writes nothing and says what it would do.
 ///
-/// It cannot add someone to the environment. A person with no systemuser row gets their
-/// contact and web roles, and is listed for `pac admin assign-user`; run this again after.
+/// It cannot add someone to the environment. A person with no systemuser row is skipped
+/// whole, and so is any adviser mapping that names them; they are listed for
+/// `pac admin assign-user`, and a later run picks them up.
 /// </remarks>
 internal static class PeopleOnboarding
 {
     public const string BasicUser = "Basic User";
 
-    /// <summary>Reads email,name,staffcode,roles (roles separated by ';'), with a header row.</summary>
+    /// <summary>
+    /// Reads email,name,staffcode,roles[,tcmanager[,admin]] with a header row. Roles are
+    /// separated by ';'. tcmanager is the adviser's T&amp;C Manager's email; admin "yes" adds
+    /// the App Admin security role.
+    /// </summary>
     public static List<Person> ReadFile(string path)
     {
         var people = new List<Person>();
@@ -49,7 +54,9 @@ internal static class PeopleOnboarding
             var cells = SplitCsv(lines[i]);
             if (cells.Count < 4) throw new InvalidOperationException($"Line {i + 1}: expected email,name,staffcode,roles.");
             var roles = cells[3].Split(';').Select(r => r.Trim()).Where(r => r.Length > 0).ToList();
-            people.Add(new Person(cells[0].Trim(), cells[1].Trim(), cells[2].Trim(), roles));
+            var manager = cells.Count > 4 ? cells[4].Trim() : string.Empty;
+            var admin = cells.Count > 5 && cells[5].Trim().Equals("yes", StringComparison.OrdinalIgnoreCase);
+            people.Add(new Person(cells[0].Trim(), cells[1].Trim(), cells[2].Trim(), roles, manager, admin));
         }
 
         var duplicate = people.GroupBy(p => p.Email, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
@@ -68,6 +75,7 @@ internal static class PeopleOnboarding
     {
         var product = TargetProduct.Read(svc);
         var appUser = ProductName.AppUserRole(product);
+        var appAdmin = ProductName.AppAdminRole(product);
         Console.WriteLine($"Product name in {orgUrl}: {product}. {(apply ? "APPLYING" : "Dry run - nothing is written")}.");
 
         // Every web role named in the file has to exist before anything is written.
@@ -131,6 +139,7 @@ internal static class PeopleOnboarding
         void Count(string what) => tally[what] = tally.TryGetValue(what, out var n) ? n + 1 : 1;
         var notUsers = new List<Person>();
         var failures = new List<string>();
+        var skipped = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var person in people)
         {
@@ -142,15 +151,19 @@ internal static class PeopleOnboarding
                 var user = FindUser(svc, email);
                 if (user == null)
                 {
+                    // Skipped whole (owner, 2026-10-01: "do not action them"). A contact and web
+                    // roles without a user give a portal account nobody can sign in to.
                     notUsers.Add(person);
-                    did.Add("NOT A DATAVERSE USER");
-                    Count("not a Dataverse user");
+                    skipped.Add(person.Email);
+                    Console.WriteLine($"  SKIPPED  {email}: not a user of this environment");
+                    Count("skipped - not a user of this environment");
+                    continue;
                 }
-                else
+
                 {
                     var bu = user.GetAttributeValue<EntityReference>("businessunitid").Id;
                     var held = HeldRoles(svc, user.Id);
-                    foreach (var roleName in new[] { BasicUser, appUser })
+                    foreach (var roleName in person.Admin ? new[] { BasicUser, appUser, appAdmin } : new[] { BasicUser, appUser })
                     {
                         if (held.Contains(roleName)) continue;
                         var roleId = SecurityRole(bu, roleName);
@@ -282,6 +295,64 @@ internal static class PeopleOnboarding
             }
         }
 
+        // 5. Adviser -> T&C Manager mappings, after everyone's contact exists. The sheet is
+        // the source, so a mapping that points elsewhere is moved to the sheet's manager.
+        foreach (var person in people.Where(p => p.TcManager.Length > 0))
+        {
+            if (skipped.Contains(person.Email) || skipped.Contains(person.TcManager))
+            {
+                Console.WriteLine($"  SKIPPED  mapping {person.Email} -> {person.TcManager}: one of them is not a user of this environment");
+                Count("skipped - mapping with a non-user");
+                continue;
+            }
+
+            try
+            {
+                var manager = FindContact(svc, person.TcManager);
+                if (manager == Guid.Empty && apply)
+                {
+                    throw new InvalidOperationException($"no contact has the T&C Manager's email {person.TcManager}");
+                }
+
+                var existing = svc.RetrieveMultiple(new QueryExpression("al_advisermapping")
+                {
+                    ColumnSet = new ColumnSet("al_tcmanagerid"),
+                    TopCount = 1,
+                    Criteria = { Conditions = { new ConditionExpression("al_adviseremail", ConditionOperator.Equal, person.Email) } },
+                }).Entities.FirstOrDefault();
+
+                if (existing == null)
+                {
+                    if (apply)
+                    {
+                        svc.Create(new Entity("al_advisermapping")
+                        {
+                            ["al_name"] = person.Email,
+                            ["al_adviseremail"] = person.Email,
+                            ["al_tcmanagerid"] = new EntityReference("contact", manager),
+                        });
+                    }
+
+                    Count("adviser mapping created");
+                }
+                else if (manager == Guid.Empty || existing.GetAttributeValue<EntityReference>("al_tcmanagerid")?.Id != manager)
+                {
+                    if (apply)
+                    {
+                        svc.Update(new Entity("al_advisermapping", existing.Id) { ["al_tcmanagerid"] = new EntityReference("contact", manager) });
+                    }
+
+                    Count("adviser mapping moved to the sheet's manager");
+                }
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"{person.Email} mapping: {ex.Message}");
+                Console.Error.WriteLine($"  FAILED   {person.Email} mapping: {ex.Message}");
+                Count("failed");
+            }
+        }
+
         Console.WriteLine();
         Console.WriteLine($"{people.Count} people. {(apply ? "Done" : "Would do")}:");
         foreach (var (what, n) in tally) Console.WriteLine($"  {n,4}  {what}");
@@ -289,9 +360,8 @@ internal static class PeopleOnboarding
         if (notUsers.Count > 0)
         {
             Console.WriteLine();
-            Console.WriteLine($"{notUsers.Count} are not users of this environment. Their contact and web roles are " +
-                              "in place, but they need a licence and adding to the environment before they get the " +
-                              "Dataverse roles or a sign-in. Then run this again. For example:");
+            Console.WriteLine($"{notUsers.Count} are not users of this environment and were skipped entirely. Once " +
+                              "they have a licence and are added, run this again. For example:");
             foreach (var p in notUsers)
             {
                 Console.WriteLine($"  pac admin assign-user --environment {orgUrl} --user {p.Email} --role \"{BasicUser}\"");
@@ -300,6 +370,14 @@ internal static class PeopleOnboarding
         }
 
         return failures.Count > 0 ? 1 : 0;
+    }
+
+    private static Guid FindContact(IOrganizationService svc, string email)
+    {
+        var q = new QueryExpression("contact") { ColumnSet = new ColumnSet(false), TopCount = 1 };
+        q.Criteria.AddCondition("emailaddress1", ConditionOperator.Equal, email);
+        q.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+        return svc.RetrieveMultiple(q).Entities.FirstOrDefault()?.Id ?? Guid.Empty;
     }
 
     private static Entity? FindUser(IOrganizationService svc, string email)

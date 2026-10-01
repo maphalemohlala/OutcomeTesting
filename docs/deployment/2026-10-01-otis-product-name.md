@@ -216,9 +216,20 @@ owner's. After each one, the agent can check the result read-only.
      `--issuer https://sts.windows.net/4abde4fc-68ae-44b4-8e80-b575a8c3d5b8/`, the value every
      TEST binding carries; it comes from the same tenant and the same built-in Entra provider.
      Then have one non-admin person sign in before relying on it.
-   - **Not in the spreadsheet:**
-     - who holds App Admin, OTIS Manager, Portal Administrator and Administrators;
-     - the adviser → T&C manager mappings.
+   - **Owner direction, later the same day:**
+     - **Admins:** Zoe Ramwell and Adam Strumidlo get App Admin, OTIS Manager, Portal
+       Administrator and Administrators.
+     - **Mappings:** adviser → T&C manager mappings come from `adviserMapping.xlsx`, matched by
+       name, nicknames included.
+     - **"Highlight the missing ones and do not action them."**
+       - **The people file:** `prod-people.csv` now holds only the **171 PROD users**, with
+         **90 mappings**.
+       - **The command:** `onboardpeople` skips a non-user whole, and any mapping that names
+         one.
+       - **For review:** the 157 non-users and 111 unmappable rows are highlighted, with the
+         reason, in `Advisers - PROD missing highlighted.xlsx` and
+         `adviserMapping - PROD missing highlighted.xlsx`.
+       - **Script removed:** `prod-add-users.ps1` was deleted.
    - **Gate 0:** the site's Manage access list, in the design studio. One Entra group is
      recommended.
 
