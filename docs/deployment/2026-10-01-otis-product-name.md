@@ -80,6 +80,25 @@ $env:DOTNET_ROLL_FORWARD='Major'; $t='plugins\OutcomeTesting.Registration\bin\De
 tables, portal site or Code App. The Power Pages platform solutions are present and newer than
 TEST's. `svc.automate.aq` is System Administrator.
 
+**The wrong package was imported first (09:30-09:47Z).** PROD received
+`artifacts/OutcomeTesting_1_0_8_0_managed.zip`, an export from 2026-09-22 that sits at the top of
+`artifacts/`, rather than the OTIS package. Read back from PROD:
+
+| Item | PROD now |
+|---|---|
+| Solution | "Outcome Testing" 1.0.8.0, managed |
+| Assembly | sha256 `caf43fbb…` (TEST and DEV: `965e689a…`); 31 steps, all enabled; 31 APIs (TEST 32) |
+| Names | roles "Outcome Testing App User" and "App Admin" (no Team Manager); Code App "Ascot Lloyd Outcome Testing"; site "Outcome Testing - outcometesting"; web role "AL Portal - Outcome Testing Manager" |
+| `al_ProductName` | absent, so step 2 below failed |
+| Teams and account | `ensureaccessprincipals` ran at 09:49Z. With no variable it fell back to the default and created "Outcome Testing - Tax Team" (`104c6a63…`), "Outcome Testing - AQS Team" (`85046a69…`), their two default queues, and the account "Outcome Testing - AQS Team" (`89046a69…`). The teams have no members and no roles |
+
+Importing the OTIS 1.0.18.0 package over it upgrades in place and renames every packaged label.
+The teams and the account are data, so the upgrade does not touch them. They have to be deleted
+or renamed by hand. The agent was refused the delete.
+
+The registration verbs that create or look up named things now refuse a target with no
+`al_ProductName` definition, instead of quietly using the default (`TargetProduct`).
+
 The branded package `artifacts/2026-10-01-otis/OTIS_1_0_18_0_managed.zip` is ready. The agent's
 import was refused, and so was writing its request file, so every PROD write below is the
 owner's. After each one, the agent can check the result read-only.

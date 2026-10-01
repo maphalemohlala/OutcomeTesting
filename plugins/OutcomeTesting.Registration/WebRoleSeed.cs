@@ -189,7 +189,7 @@ public static class WebRoleSeed
         Console.WriteLine("2. Seeding al_pagepermission rules for the web roles…");
 
         var written = 0;
-        foreach (var (role, resource, level) in Matrix(OutcomeTesting.Plugins.ProductName.ManagerWebRole(OutcomeTesting.Plugins.ProductName.Read(svc))))
+        foreach (var (role, resource, level) in Matrix(OutcomeTesting.Plugins.ProductName.ManagerWebRole(TargetProduct.Read(svc))))
         {
             var code = "PP-" + Slug(role) + "-" + resource;
             var rule = new Entity(PermissionEntity)
