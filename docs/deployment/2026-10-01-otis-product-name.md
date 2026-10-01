@@ -168,6 +168,25 @@ owner's. After each one, the agent can check the result read-only.
    reasons, list options with legacy values, notification templates, `al_role`, and page
    permissions with the manager role written as `AL Portal - OTIS Manager`. Before it can be
    built, the owner must choose which environment's checklist PROD starts from: DEV's or TEST's.
+   **Seed loaded by the owner.** Every count in PROD matches TEST's active rows.
+
+   **The portal address is `otis-ascotlloyd.powerappsportals.com`, because `otis` belongs to
+   another tenant.** The site was provisioned by the owner, and its sign-in redirects to the Ascot
+   Lloyd tenant (`4abde4fc…`) with the site's own app registration (`2903b302…`).
+
+   **Security and sign-in compared with TEST (read-only, 2026-10-01):**
+
+   | Item | TEST | PROD |
+   |---|---|---|
+   | `Authentication/*` site settings | - | Identical. PROD additionally sets `LoginButtonAuthenticationType` to the tenant, which TEST leaves null; that only sends the sign-in button straight to Entra |
+   | Other site settings | 73 | 73, identical; `OT/ProductName` still to add |
+   | `al_PortalBaseUrl` | the TEST host | missing; `prod-portal-base-url.json` creates it |
+   | Notification step runs as | svc | svc |
+   | svc mailbox | approved, enabled | **pending approval**, not tested |
+   | Table auditing | 26 of 28 | 26 of 28; organisation auditing is off in both |
+   | Teams | no members or roles | the same |
+   | App roles, portal bindings, web-role holders | the UAT people | none |
+
 6. **People: decision needed.** Role mappings, adviser mappings, and `OTIS App User` plus
    Basic User for each person.
 7. **Email.** Approve and enable the sending mailbox.
