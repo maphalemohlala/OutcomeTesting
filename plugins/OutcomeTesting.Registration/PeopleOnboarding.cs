@@ -9,7 +9,7 @@ namespace OutcomeTesting.Registration;
 /// <summary>
 /// One person to give access to, read from a people file.
 /// </summary>
-internal sealed record Person(string Email, string Name, string StaffCode, IReadOnlyList<string> WebRoles, string TcManager = "", bool Admin = false);
+internal sealed record Person(string Email, string Name, string StaffCode, IReadOnlyList<string> WebRoles, string TcManager = "", bool Admin = false, Guid? ObjectId = null);
 
 /// <summary>
 /// Gives a list of people everything a person needs here, in one pass (owner, 2026-10-01:
@@ -34,15 +34,21 @@ internal sealed record Person(string Email, string Name, string StaffCode, IRead
 /// It cannot add someone to the environment. A person with no systemuser row is skipped
 /// whole, and so is any adviser mapping that names them; they are listed for
 /// `pac admin assign-user`, and a later run picks them up.
+///
+/// PORTAL-ONLY: a person with no systemuser row but an Entra object id in the file is set up
+/// for the portal alone - contact, web roles, sign-in - with no Dataverse roles (owner,
+/// 2026-10-02: paraplanners have no Power Apps licence and only use the portal). The object
+/// id is what a systemuser would otherwise have supplied for the binding.
 /// </remarks>
 internal static class PeopleOnboarding
 {
     public const string BasicUser = "Basic User";
 
     /// <summary>
-    /// Reads email,name,staffcode,roles[,tcmanager[,admin]] with a header row. Roles are
-    /// separated by ';'. tcmanager is the adviser's T&amp;C Manager's email; admin "yes" adds
-    /// the App Admin security role.
+    /// Reads email,name,staffcode,roles[,tcmanager[,admin[,objectid]]] with a header row.
+    /// Roles are separated by ';'. tcmanager is the adviser's T&amp;C Manager's email; admin
+    /// "yes" adds the App Admin security role; objectid is the Entra object id, used for a
+    /// portal-only person who has no user in the environment.
     /// </summary>
     public static List<Person> ReadFile(string path)
     {
@@ -56,7 +62,18 @@ internal static class PeopleOnboarding
             var roles = cells[3].Split(';').Select(r => r.Trim()).Where(r => r.Length > 0).ToList();
             var manager = cells.Count > 4 ? cells[4].Trim() : string.Empty;
             var admin = cells.Count > 5 && cells[5].Trim().Equals("yes", StringComparison.OrdinalIgnoreCase);
-            people.Add(new Person(cells[0].Trim(), cells[1].Trim(), cells[2].Trim(), roles, manager, admin));
+            Guid? objectId = null;
+            if (cells.Count > 6 && cells[6].Trim().Length > 0)
+            {
+                if (!Guid.TryParse(cells[6].Trim(), out var parsed))
+                {
+                    throw new InvalidOperationException($"Line {i + 1}: '{cells[6].Trim()}' is not an Entra object id.");
+                }
+
+                objectId = parsed;
+            }
+
+            people.Add(new Person(cells[0].Trim(), cells[1].Trim(), cells[2].Trim(), roles, manager, admin, objectId));
         }
 
         var duplicate = people.GroupBy(p => p.Email, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
@@ -149,7 +166,13 @@ internal static class PeopleOnboarding
             {
                 // 1. Dataverse user and security roles.
                 var user = FindUser(svc, email);
-                if (user == null)
+                var portalOnly = user == null && person.ObjectId.HasValue;
+                if (portalOnly)
+                {
+                    did.Add("portal only");
+                    Count("portal only - no Dataverse user, set up from the Entra object id");
+                }
+                else if (user == null)
                 {
                     // Skipped whole (owner, 2026-10-01: "do not action them"). A contact and web
                     // roles without a user give a portal account nobody can sign in to.
@@ -160,6 +183,7 @@ internal static class PeopleOnboarding
                     continue;
                 }
 
+                if (user != null)
                 {
                     var bu = user.GetAttributeValue<EntityReference>("businessunitid").Id;
                     var held = HeldRoles(svc, user.Id);
@@ -226,8 +250,9 @@ internal static class PeopleOnboarding
                     Count("web role granted: " + role);
                 }
 
-                // 4. Sign-in. Needs the person's Entra object id, which only a systemuser carries.
-                var objectId = user?.GetAttributeValue<Guid?>("azureactivedirectoryobjectid");
+                // 4. Sign-in. Needs the person's Entra object id: the systemuser's, or for a
+                // portal-only person the one in the file.
+                var objectId = user != null ? user.GetAttributeValue<Guid?>("azureactivedirectoryobjectid") : person.ObjectId;
                 if (objectId.HasValue && objectId.Value != Guid.Empty)
                 {
                     if (bound.TryGetValue(objectId.Value, out var boundTo))
