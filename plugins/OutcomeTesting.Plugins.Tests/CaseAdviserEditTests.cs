@@ -78,6 +78,54 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void The_portal_header_edit_clears_a_name_alone_and_keeps_the_email()
+        {
+            // A cleared name names nobody, so it is not a name without its email: the label
+            // goes, the email stays the identity, and nothing moves.
+            var service = Ready(out var oldAdviser, out _, out var actionId);
+
+            var provider = new FakeServiceProvider(service);
+            provider.Context.MessageName = "Update";
+            provider.Context.PrimaryEntityName = "contact";
+            provider.Context.PrimaryEntityId = Checker;
+            provider.Context.InputParameters["Target"] = new Entity("contact", Checker)
+            {
+                [CaseHeaderRequestPlugin.RequestAttr] =
+                    "{\"caseId\":\"" + CaseId.ToString("D") + "\",\"fields\":\"{\\\"al_advisername\\\":\\\"\\\"}\"}",
+            };
+
+            new CaseHeaderRequestPlugin(null, null).Execute(provider);
+
+            var row = service.Row("al_outcomecase", CaseId);
+            Assert.Null(row.GetAttributeValue<string>(CaseAdviser.NameAttr));
+            Assert.Equal("old@example.com", row.GetAttributeValue<string>(CaseAdviser.EmailAttr));
+            Assert.Equal(oldAdviser.Id, service.Row("al_remediationaction", actionId)
+                .GetAttributeValue<EntityReference>("al_assignedcontactid").Id);
+        }
+
+        [Fact]
+        public void The_shared_field_applier_clears_a_name_alone_and_keeps_the_email()
+        {
+            // The Code App's al_UpdateCaseDetails reaches the same rule through ApplyFields.
+            var service = Ready(out _, out _, out _);
+            var before = service.Row("al_outcomecase", CaseId);
+            var update = new Entity("al_outcomecase", CaseId);
+            var changes = new List<string>();
+
+            UpdateCaseDetailsPlugin.ApplyFields(
+                service,
+                new Dictionary<string, string> { { CaseAdviser.NameAttr, "" } },
+                before,
+                update,
+                changes,
+                new OptionLabels(service));
+
+            Assert.True(update.Contains(CaseAdviser.NameAttr));
+            Assert.Null(update.GetAttributeValue<string>(CaseAdviser.NameAttr));
+            Assert.False(update.Contains(CaseAdviser.EmailAttr));
+        }
+
+        [Fact]
         public void The_shared_field_applier_refuses_a_name_only_adviser_change()
         {
             // UpdateCaseDetailsPlugin.ApplyFields is what the Code App's al_UpdateCaseDetails

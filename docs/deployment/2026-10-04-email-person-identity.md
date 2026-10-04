@@ -213,12 +213,14 @@ and check that both `AdviserContactPlugin` steps arrived **enabled**:
 
 ```powershell
 & $t webapi $org GET 'solutions?$select=version,ismanaged&$filter=uniquename eq ''OutcomeTesting'''
-& $t webapi $org GET 'sdkmessageprocessingsteps?$select=name,statecode,filteringattributes&$filter=startswith(name,''AdviserContactPlugin'')'
+& $t webapi $org GET 'sdkmessageprocessingsteps?$select=name,statecode,filteringattributes&$filter=startswith(name,''AdviserContactPlugin'')&$expand=sdkmessageprocessingstepid_sdkmessageprocessingstepimage($select=name,attributes)'
 ```
 
-You should see 1.0.19.0, managed, and two steps with statecode 0. `verifysteps` in the import
-script reads `src/SdkMessageProcessingSteps`, which does not yet carry these two steps, so this
-query is the check.
+You should see 1.0.19.0, managed, and two steps with statecode 0. The Update step must carry
+one image, `PreImage`, with `attributes` `emailaddress1`. Without it the step follows only a
+contact's new email, and cases still carrying the old address keep that contact's actions.
+`verifysteps` in the import script reads `src/SdkMessageProcessingSteps`, so check that folder
+carries these two steps before trusting it; otherwise this query is the check.
 - If the steps arrived disabled:
   `& $t setstepstate $org enable "AdviserContactPlugin: Create of contact" "AdviserContactPlugin: Update of contact"`.
 - If the import did not carry them, register them as DEV did:
@@ -227,6 +229,14 @@ query is the check.
 & $t registertype $org OutcomeTesting.Plugins.AdviserContactPlugin
 & $t registerstep $org OutcomeTesting.Plugins.AdviserContactPlugin Create contact 40 "" sync
 & $t registerstep $org OutcomeTesting.Plugins.AdviserContactPlugin Update contact 40 "emailaddress1,statecode" sync
+```
+
+  then give the Update step its pre-image, with the step id the query above returns (DEV's is
+  `6efc79ea-e3bf-f111-aaad-70a8a5b3561e`, its image `37a4deea-efbf-f111-aaad-70a8a5b3561e`):
+
+```powershell
+Set-Content -Encoding utf8 $env:TEMP\preimage.json '{"name":"PreImage","entityalias":"PreImage","imagetype":0,"messagepropertyname":"Target","attributes":"emailaddress1","sdkmessageprocessingstepid@odata.bind":"/sdkmessageprocessingsteps(<updateStepId>)"}'
+& $t webapi $org POST sdkmessageprocessingstepimages "@$env:TEMP\preimage.json"
 ```
 
 **4. Templates and Code App.** Both arrive with the same import, never before the plug-ins: the
@@ -266,9 +276,11 @@ portal.
 
 ## Known limits
 
-- A contact whose email changes **away** from a case's adviser email keeps that case's open
-  actions. The step sees only the new email, and has no pre-image of the old one. Deactivating
-  the contact, or editing the case's adviser email, moves them. Deactivation is covered by the
-  code and its unit tests, but was not exercised in DEV.
+- Closed 2026-10-04 (second wave): a contact whose email changes **away** from a case's adviser
+  email now releases that case's open actions. The Update step's pre-image gives the old email,
+  and its cases are followed as well: to whoever holds that address now, or to nobody.
+- Closed 2026-10-04 (second wave): the contact step skips cases with no remediation action, and
+  reads the invariant access settings once per save rather than once per case. A closed case
+  with remediation keeps its access check, so a deactivated contact still loses it.
 - See Step 7 item 5: in the normal lifecycle, the "Re-pointed" audit line comes from the Code
   App edit, not from the portal header.

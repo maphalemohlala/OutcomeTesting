@@ -198,32 +198,7 @@ namespace OutcomeTesting.Plugins
                 [RequestAttr] = null,
             });
 
-            var columns = new List<string>
-            {
-                TaxRequiredAttr, DispositionAttr, "al_reviewrouteid", "al_casestatus", CaseAdviser.EmailAttr,
-                CasePeople.ParaplannerEmailAttr, CasePeople.AdviserNameAttr, CasePeople.ParaplannerNameAttr,
-            };
-            foreach (var field in fields.Keys)
-            {
-                // A field applied by ASSOCIATION names no column, so it must never reach the
-                // ColumnSet: Dataverse validates a ColumnSet against metadata and faults
-                // before it reads anything, which is what made every portal header edit
-                // touching Products fail on the read - "'al_OutcomeCase' entity doesn't
-                // contain attribute with Name = 'al_productids'" - and take the submit that
-                // flushes the header down with it. ApplyFields still applies the field; it
-                // reads the set from the relationship, not from the row.
-                if (ListOptionRules.AppliedByAssociation(field))
-                {
-                    continue;
-                }
-
-                if (!columns.Contains(field))
-                {
-                    columns.Add(field);
-                }
-            }
-
-            var before = service.Retrieve(CaseEntity, caseId, new ColumnSet(columns.ToArray()));
+            var before = service.Retrieve(CaseEntity, caseId, new ColumnSet(BeforeColumns(fields.Keys).ToArray()));
 
             var update = new Entity(CaseEntity, caseId);
             var changes = new List<string>();
@@ -287,6 +262,39 @@ namespace OutcomeTesting.Plugins
                 context,
                 contactId,
                 actorName);
+        }
+
+        /// <summary>
+        /// The case columns read before an edit: what the route and status rules need, every
+        /// person column (<see cref="CasePeople.Columns"/> - an edit sending only an email is
+        /// checked against the name already on the case), and each field the edit names.
+        /// </summary>
+        public static List<string> BeforeColumns(IEnumerable<string> fields)
+        {
+            var columns = new List<string> { TaxRequiredAttr, DispositionAttr, "al_reviewrouteid", "al_casestatus" };
+            columns.AddRange(CasePeople.Columns);
+
+            foreach (var field in fields ?? new string[0])
+            {
+                // A field applied by ASSOCIATION names no column, so it must never reach the
+                // ColumnSet: Dataverse validates a ColumnSet against metadata and faults
+                // before it reads anything, which is what made every portal header edit
+                // touching Products fail on the read - "'al_OutcomeCase' entity doesn't
+                // contain attribute with Name = 'al_productids'" - and take the submit that
+                // flushes the header down with it. ApplyFields still applies the field; it
+                // reads the set from the relationship, not from the row.
+                if (ListOptionRules.AppliedByAssociation(field))
+                {
+                    continue;
+                }
+
+                if (!columns.Contains(field))
+                {
+                    columns.Add(field);
+                }
+            }
+
+            return columns;
         }
 
         /// <summary>

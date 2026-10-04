@@ -958,10 +958,11 @@ namespace OutcomeTesting.Plugins
         /// <summary>
         /// Points the case's open remediation actions at the contact holding the adviser
         /// email now on the case, and tells them (PP-15 "Remediation assigned"). Returns how
-        /// many moved. An email that matches nobody unassigns the open actions.
+        /// many moved. An email that no single active contact holds - none, two, or a blank
+        /// email - unassigns the open actions (AD-228).
         ///
-        /// Two repairs, one rule. <see cref="Raise"/> leaves an action unassigned when
-        /// <c>al_advisername</c> matches no contact or two, and nothing could assign it
+        /// Two repairs, one rule. <see cref="Raise"/> leaves an action unassigned when the
+        /// adviser email matches no active contact or two, and nothing could assign it
         /// afterwards: the portal's response panel opens only for the assigned contact, so
         /// such an action sat on the worklist with nobody able to answer it. Separately, a
         /// case whose adviser changes after the actions were raised left them pinned to the
@@ -970,15 +971,15 @@ namespace OutcomeTesting.Plugins
         ///
         /// This used to fill only a null assignee, on the reading that "a header edit is not
         /// a reassignment". That reading does not survive contact with a reassigned case:
-        /// the adviser field IS how remediation is routed (see <see cref="AdviserContact"/>),
+        /// the adviser email IS how remediation is routed (see <see cref="AdviserContact"/>),
         /// so changing it and having the work stay put leaves an action nobody on the case
-        /// can answer and no supported way to move it. Changing the adviser now moves the
-        /// open actions with it.
+        /// can answer and no supported way to move it. Changing the adviser email now moves
+        /// the open actions with it; changing only the name is a label and moves nothing.
         ///
         /// Two things still never move. A <b>completed</b> action is history (BR-007), so it
-        /// keeps the name of whoever actually did the work. An action <b>already held by the
-        /// adviser now named</b> is left untouched rather than rewritten, so a header edit
-        /// that does not change the adviser cannot re-notify them.
+        /// keeps whoever actually did the work. An action <b>already held by the contact the
+        /// adviser email resolves to</b> is left untouched rather than rewritten, so an edit
+        /// that does not change who the adviser is cannot re-notify them.
         /// </summary>
         public static int AssignOpenActions(IOrganizationService service, EntityReference caseRef, Guid correlationId)
         {
@@ -1000,8 +1001,10 @@ namespace OutcomeTesting.Plugins
             {
                 var holder = action.GetAttributeValue<EntityReference>("al_assignedcontactid");
 
-                // The email matches nobody: the action leaves whoever held it, because they
-                // are not the adviser on this case. Nobody is told - there is nobody to tell.
+                // No single active contact holds the adviser email (none does, two do, or the
+                // case has none): the action leaves whoever held it, because nothing shows
+                // they are the adviser on this case, and nobody is guessed in their place
+                // (AD-228). Nobody is told - there is nobody to tell.
                 if (adviser == null)
                 {
                     if (holder == null)

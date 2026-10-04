@@ -29,13 +29,13 @@ namespace OutcomeTesting.Plugins
     /// </summary>
     public static class NotificationRecipients
     {
-        /// <summary>The adviser named on the case.</summary>
+        /// <summary>The adviser whose email is on the case (AD-228).</summary>
         public const int KindAdviser = 120910810;
 
         /// <summary>The T&amp;C Manager the adviser is mapped to (AD-162).</summary>
         public const int KindTcManager = 120910811;
 
-        /// <summary>The para-planner named on the case, matched to a contact (AD-161).</summary>
+        /// <summary>The para-planner whose email is on the case (AD-161, AD-228).</summary>
         public const int KindParaplanner = 120910812;
 
         /// <summary>The checker the case or review is allocated to.</summary>

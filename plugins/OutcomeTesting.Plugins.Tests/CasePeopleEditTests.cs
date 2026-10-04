@@ -48,6 +48,26 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Contains("paraplanner's email", error.Message);
         }
 
+        // A cleared name is not "a name without its email": nobody is named, so there is no
+        // one to identify, and the email already on the case stays the identity.
+        [Theory]
+        [InlineData("al_advisername", null)]
+        [InlineData("al_advisername", "   ")]
+        [InlineData("al_paraplanner", null)]
+        [InlineData("al_paraplanner", "")]
+        public void Clearing_a_name_alone_is_allowed(string attribute, string value)
+        {
+            CasePeople.EnsureEmails(Before(), Update(attribute, value));
+        }
+
+        [Fact]
+        public void A_name_sent_without_its_email_is_refused_on_a_case_with_no_email_either()
+        {
+            var error = Assert.Throws<InvalidPluginExecutionException>(() =>
+                CasePeople.EnsureEmails(Before(email: null), Update("al_advisername", "Sam Adviser")));
+            Assert.Contains("adviser's email", error.Message);
+        }
+
         [Fact]
         public void A_name_with_a_valid_email_is_accepted()
         {

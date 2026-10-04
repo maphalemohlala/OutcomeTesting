@@ -647,10 +647,10 @@ namespace OutcomeTesting.Plugins
             /// <summary>
             /// The matched contact's staff code, set only when <see cref="IsMatch"/>.
             ///
-            /// Null on every failure kind by construction: an ambiguous name resolved to
-            /// nobody, so there is no code to report. That is the point - a code guessed
-            /// from the first of two Sam Joneses would attribute a fail to the wrong person
-            /// on a file that leaves this system.
+            /// Null on every failure kind by construction: an email two contacts share
+            /// resolved to nobody, so there is no code to report. That is the point - a code
+            /// guessed from the first of two contacts would attribute a fail to the wrong
+            /// person on a file that leaves this system.
             /// </summary>
             public string StaffCode { get; set; }
 

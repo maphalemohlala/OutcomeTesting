@@ -40,11 +40,35 @@ namespace OutcomeTesting.Plugins
             AccessRights.ReadAccess | AccessRights.WriteAccess | AccessRights.AppendAccess
             | AccessRights.AppendToAccess | AccessRights.AssignAccess;
 
+        /// <summary>Reconciles one case, reading everything it needs afresh.</summary>
         public static CaseAccessChange Reconcile(IOrganizationService service, Guid caseId, DateTime now)
         {
-            var product = ProductName.Read(service);
-            var taxTeam = FindByName(service, "team", ProductName.TaxTeam(product));
-            var aqsTeam = FindByName(service, "team", ProductName.AqsTeam(product));
+            return Reconcile(service, caseId, now, new CaseAccessLookups(service));
+        }
+
+        /// <summary>
+        /// Reconciles one case with <paramref name="lookups"/> that may already hold what does
+        /// not depend on the case. A caller reconciling several cases in one transaction passes
+        /// the same lookups to each, so the product name, the teams, the queue account and an
+        /// adviser email's contact and supervisor are read once rather than once per case.
+        /// </summary>
+        public static CaseAccessChange Reconcile(IOrganizationService service, Guid caseId, DateTime now, CaseAccessLookups lookups)
+        {
+            if (lookups == null)
+            {
+                throw new ArgumentNullException(nameof(lookups));
+            }
+
+            // Lookups read through another service would read the teams and the adviser as
+            // another principal, so the two must be the one service.
+            if (!ReferenceEquals(lookups.Service, service))
+            {
+                throw new ArgumentException(
+                    "The lookups were read through a different service from the one reconciling.", nameof(lookups));
+            }
+
+            var taxTeam = lookups.TaxTeam;
+            var aqsTeam = lookups.AqsTeam;
 
             var outcomeCase = service.Retrieve(
                 CaseEntity,
@@ -75,18 +99,19 @@ namespace OutcomeTesting.Plugins
             // costs no extra reads and needs no account to exist.
             if (CaseAccess.InAqsQueue(input))
             {
-                input.AqsQueueAccount = FindByName(service, "account", ProductName.AqsQueueAccount(product));
+                input.AqsQueueAccount = lookups.AqsQueueAccount;
             }
 
             var released = CaseAccess.IsReleased(input);
             if (released)
             {
-                var caseRef = new EntityReference(CaseEntity, caseId);
-                input.ResolvedAdviser = Remediation.AdviserContact(service, caseRef);
-                // The same adviser email sign-off routes by (CaseAdviser), so the supervisor who
-                // can read the case is the one who can sign it off.
-                input.ResolvedSupervisor = SupervisorFor(service, CaseAdviser.EmailFor(
-                    outcomeCase.GetAttributeValue<string>("al_adviseremail")));
+                // The adviser email on the row just read: the same contact
+                // Remediation.AdviserContact resolves, without reading the email again. The
+                // same email sign-off routes by (CaseAdviser), so the supervisor who can read
+                // the case is the one who can sign it off.
+                var adviserEmail = outcomeCase.GetAttributeValue<string>("al_adviseremail");
+                input.ResolvedAdviser = lookups.AdviserFor(adviserEmail);
+                input.ResolvedSupervisor = lookups.SupervisorFor(adviserEmail);
             }
 
             var decided = CaseAccess.Decide(input);
@@ -168,7 +193,7 @@ namespace OutcomeTesting.Plugins
         /// The T&amp;C Manager mapped to this adviser (AD-162), on the same email key the
         /// portal's sign-off gate reads. None or two means nobody: never guessed.
         /// </summary>
-        private static EntityReference SupervisorFor(IOrganizationService service, string adviserEmail)
+        internal static EntityReference SupervisorFor(IOrganizationService service, string adviserEmail)
         {
             if (string.IsNullOrWhiteSpace(adviserEmail))
             {
@@ -194,7 +219,7 @@ namespace OutcomeTesting.Plugins
             return FindByName(service, "account", ProductName.AqsQueueAccount(ProductName.Read(service)));
         }
 
-        private static EntityReference FindByName(IOrganizationService service, string entity, string name)
+        internal static EntityReference FindByName(IOrganizationService service, string entity, string name)
         {
             var query = new QueryExpression(entity)
             {
@@ -249,6 +274,108 @@ namespace OutcomeTesting.Plugins
             // Revoking a principal the row was never shared with is a no-op on the platform,
             // which is what lets this be idempotent without first reading the shares.
             service.Execute(new RevokeAccessRequest { Target = target, Revokee = team });
+        }
+    }
+
+    /// <summary>
+    /// What <see cref="CaseAccessReconciler"/> reads that does not depend on the case: the
+    /// product name, the Tax and AQS teams, the AQS queue account, and the contact and T&amp;C
+    /// supervisor an adviser email resolves to. Each is read on first use and kept, so one
+    /// instance shared across the cases of a single transaction reads each once.
+    ///
+    /// Scoped to one transaction, never kept between plug-in runs: nothing here notices a
+    /// contact, mapping or team changing, and inside one save nothing it reads changes. A
+    /// missing team still refuses, on first use, exactly as a single-case reconcile does.
+    ///
+    /// Public only because the plug-in assembly is signed and carries no InternalsVisibleTo,
+    /// so the tests cannot reach an internal type. Rules for a caller: build it on the same
+    /// service you pass to <see cref="CaseAccessReconciler.Reconcile(IOrganizationService, Guid, DateTime, CaseAccessLookups)"/>
+    /// (refused otherwise), keep it a local of one plug-in execution, and do not share it
+    /// across a write to a contact's email or state, an adviser mapping, the teams or the
+    /// product name - it would go on answering from before that write.
+    /// </summary>
+    public sealed class CaseAccessLookups
+    {
+        private readonly IOrganizationService _service;
+        private readonly Dictionary<string, EntityReference> _advisers =
+            new Dictionary<string, EntityReference>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, EntityReference> _supervisors =
+            new Dictionary<string, EntityReference>(StringComparer.OrdinalIgnoreCase);
+        private string _product;
+        private EntityReference _taxTeam;
+        private EntityReference _aqsTeam;
+        private EntityReference _queueAccount;
+
+        public CaseAccessLookups(IOrganizationService service)
+        {
+            if (service == null)
+            {
+                throw new ArgumentNullException(nameof(service));
+            }
+
+            _service = service;
+        }
+
+        /// <summary>The service everything here is read through.</summary>
+        internal IOrganizationService Service
+        {
+            get { return _service; }
+        }
+
+        private string Product
+        {
+            get { return _product ?? (_product = ProductName.Read(_service)); }
+        }
+
+        public EntityReference TaxTeam
+        {
+            get { return _taxTeam ?? (_taxTeam = CaseAccessReconciler.FindByName(_service, "team", ProductName.TaxTeam(Product))); }
+        }
+
+        public EntityReference AqsTeam
+        {
+            get { return _aqsTeam ?? (_aqsTeam = CaseAccessReconciler.FindByName(_service, "team", ProductName.AqsTeam(Product))); }
+        }
+
+        public EntityReference AqsQueueAccount
+        {
+            get
+            {
+                return _queueAccount
+                    ?? (_queueAccount = CaseAccessReconciler.FindByName(_service, "account", ProductName.AqsQueueAccount(Product)));
+            }
+        }
+
+        /// <summary>
+        /// The one active contact holding this adviser email, or null for none, two or a blank
+        /// email (AD-228) - the same answer <see cref="Remediation.AdviserContact"/> gives.
+        /// </summary>
+        public EntityReference AdviserFor(string adviserEmail)
+        {
+            var key = CasePeople.Clean(adviserEmail) ?? string.Empty;
+            EntityReference contact;
+            if (!_advisers.TryGetValue(key, out contact))
+            {
+                var match = NotificationOutbox.MatchAdviser(_service, adviserEmail);
+                contact = match.IsMatch ? match.Contact : null;
+                _advisers[key] = contact;
+            }
+
+            return contact;
+        }
+
+        /// <summary>The T&amp;C Manager mapped to this adviser email, or null for none or two.</summary>
+        public EntityReference SupervisorFor(string adviserEmail)
+        {
+            var key = CasePeople.Clean(adviserEmail) ?? string.Empty;
+            EntityReference supervisor;
+            if (!_supervisors.TryGetValue(key, out supervisor))
+            {
+                supervisor = CaseAccessReconciler.SupervisorFor(_service, CaseAdviser.EmailFor(adviserEmail));
+                _supervisors[key] = supervisor;
+            }
+
+            return supervisor;
         }
     }
 

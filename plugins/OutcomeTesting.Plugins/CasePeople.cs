@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using Microsoft.Xrm.Sdk;
 
@@ -14,6 +15,17 @@ namespace OutcomeTesting.Plugins
         public const string AdviserEmailAttr = "al_adviseremail";
         public const string ParaplannerNameAttr = "al_paraplanner";
         public const string ParaplannerEmailAttr = "al_paraplanneremail";
+
+        /// <summary>
+        /// Every column that names a person on a case, each label beside its email - the
+        /// columns <see cref="EnsureEmails"/> and <see cref="AdviserEmailChanged"/> read off
+        /// the case before an edit. An edit path's before-read takes them from here, so a
+        /// person added to the rule cannot be missing from the row it is checked against.
+        /// </summary>
+        public static readonly ReadOnlyCollection<string> Columns = new ReadOnlyCollection<string>(new[]
+        {
+            AdviserNameAttr, AdviserEmailAttr, ParaplannerNameAttr, ParaplannerEmailAttr,
+        });
 
         // One address: something@something.something, no spaces, one @. Deliberately loose -
         // the import and the edits refuse a NAME typed into an email column, not every
@@ -68,6 +80,13 @@ namespace OutcomeTesting.Plugins
 
             if (update.Contains(nameAttr) && !update.Contains(emailAttr))
             {
+                // A cleared name names nobody, so it is not a name without its email: the
+                // email already on the case stays the identity, and only the label goes.
+                if (Clean(update.GetAttributeValue<string>(nameAttr)) == null)
+                {
+                    return;
+                }
+
                 throw new InvalidPluginExecutionException(CommandHelpers.ValidationPrefix
                     + "Give the " + who + "'s email as well as their name. People on a case are "
                     + "identified by email, because two people can share a name.");

@@ -242,28 +242,6 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// The para-planner's work email for this case, or null when the name on it reaches
-        /// nobody.
-        ///
-        /// <see cref="NotificationOutbox.MatchParaplanner"/> is the one place that decides,
-        /// and it decides strictly: no name, no active contact of that name, TWO active
-        /// contacts of that name, or one with no work email all come back unmatched. Two
-        /// matching contacts is the case worth stating - the query deliberately does not
-        /// prefer the one that happens to have an email, because a missing address is not
-        /// evidence about which Sam Jones the case means.
-        ///
-        /// An unmatched name leaves the column empty rather than falling back to the name or
-        /// to the code. AD-039 reads by position, so column D is "Paraplanner Email" for
-        /// every row or the file lies about the rows where it is something else - and a
-        /// wrong email in a file that goes outside this system is worse than a blank one.
-        /// The para-planner match already surfaces on the import report the day of the
-        /// upload, so a gap here is one somebody has already been told about.
-        ///
-        /// Public so the four outcomes can be asserted directly. The assembly is signed and
-        /// carries no InternalsVisibleTo (see PluginBase), so public is what makes a helper
-        /// reachable from the test project.
-        /// </summary>
-        /// <summary>
         /// The case's product / solution type for the export: the managed-list option it
         /// points at, else the choice column it was imported with (AD-187).
         /// </summary>
@@ -300,6 +278,19 @@ namespace OutcomeTesting.Plugins
             return CommandHelpers.Formatted(outcomeCase, legacyAttribute);
         }
 
+        /// <summary>
+        /// Column D, the para-planner's email for this case, or null when the case holds none.
+        ///
+        /// Read from the case's al_paraplanneremail (AD-228), never from the name in
+        /// al_paraplanner: a name describes a person, and two people can share one. Where one
+        /// active contact holds the address, its email is written; otherwise the stored address
+        /// itself, trimmed - an address the firm supplied is the para-planner's email whether or
+        /// not the directory carries it (see <see cref="ParaplannerEmailOf"/>).
+        ///
+        /// Public so the outcomes can be asserted directly. The assembly is signed and carries
+        /// no InternalsVisibleTo (see PluginBase), so public is what makes a helper reachable
+        /// from the test project.
+        /// </summary>
         public static string ParaplannerEmail(IOrganizationService service, Entity outcomeCase)
         {
             return ParaplannerEmailOf(ParaplannerMatch(service, outcomeCase), outcomeCase);
@@ -374,10 +365,10 @@ namespace OutcomeTesting.Plugins
         /// The para-planner's staff code for this case, or null where the registry does not
         /// hold one for them.
         ///
-        /// Resolved by ADDRESS first (AD-186). This is what the ParaplannerEmail import
-        /// mapping buys: two active contacts of one name resolve to nobody, so a name-only
-        /// lookup would blank the code on exactly the rows where it is ambiguous - the
-        /// problem this change exists to fix.
+        /// Resolved by the case's para-planner EMAIL only (AD-186, AD-228), never by the name
+        /// in al_paraplanner: a name describes a person, and two people can share one. A blank
+        /// email, or one that no active contact holds or that two hold, leaves the column
+        /// EMPTY, as the adviser's does.
         /// </summary>
         public static string ParaplannerCode(IOrganizationService service, Entity outcomeCase)
         {

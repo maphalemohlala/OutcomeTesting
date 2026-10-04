@@ -190,26 +190,25 @@ namespace OutcomeTesting.Plugins
             // file carried never proved a case was allocated to anyone. Importing it into a
             // column named for the paraplanner is the mistake this line now fixes.
             //
-            // A name is only useful here if it reaches somebody: ImportCasesPlugin resolves
-            // it against Contact on the way in and reports every row whose para-planner
-            // cannot be addressed, rather than letting it surface weeks later as a Failed
-            // notification nobody is watching (finding 7).
+            // The name is a LABEL (AD-228): what a person reads on the case, never what
+            // finds anyone. The para-planner is identified by ParaplannerEmail below, and it
+            // is that address ImportCasesPlugin resolves against Contact on the way in,
+            // reporting every row whose para-planner cannot be addressed rather than letting
+            // it surface weeks later as a Failed notification nobody is watching (finding 7).
             new ColumnDef("AssignedBy", "al_paraplanner", ColumnKind.Text, null),
             // The para-planner's ADDRESS (project owner, 2026-09-21: "the paraplanner email
             // field should now be used to map the paraplanner ... emails are more safe than
             // names"). The extract carries it in ParaplannerEmail, beside AssignedBy.
             //
-            // This is the same judgement AdviserEmail settled on 2026-09-20 and the reason
-            // NotificationOutbox.MatchPerson already reads email first and name second: an
-            // address identifies somebody, a display name describes them, and two people
-            // share a name far more often than they share a mailbox. Until this column
-            // existed the para-planner was the one person on a case with no address at all,
-            // so every route to them - the letter, the import's reachability check, Trail
-            // Light column D - had to resolve a name and refuse whenever two contacts
-            // answered to it.
+            // This is the same judgement AdviserEmail settled on 2026-09-20, and since AD-228
+            // the only one: NotificationOutbox.MatchPerson reads the email and nothing else.
+            // An address identifies somebody, a display name describes them, and two people
+            // share a name far more often than they share a mailbox. Every route to the
+            // para-planner - the letter, the import's reachability check, Trail Light column
+            // D - goes by this address.
             //
-            // The name is still mapped and still used. It is what a person reads on the case;
-            // a row without an address is rejected (AD-228).
+            // The name is still mapped, as a label: it is what a person reads on the case. A
+            // row without an address is rejected (AD-228).
             new ColumnDef("ParaplannerEmail", "al_paraplanneremail", ColumnKind.Text, null),
             // al_checkername is deliberately absent. The checker is set manually (project
             // owner, 2026-09-14): by allocation (AssignCasePlugin), by a claim
@@ -263,16 +262,17 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>
         /// The case column carrying the para-planner's name, from the extract's AssignedBy
-        /// (AD-160). Named here so the import's match check and the column map cannot drift
-        /// apart - they were one edit away from doing so when the mapping moved.
+        /// (AD-160) - a label, never used to find anyone (AD-228). Named here so the column
+        /// map and the code that reads the column cannot drift apart - they were one edit
+        /// away from doing so when the mapping moved.
         /// </summary>
         public const string ParaplannerAttribute = "al_paraplanner";
 
         /// <summary>
         /// The case column carrying the para-planner's work address, from the extract's
-        /// ParaplannerEmail (project owner, 2026-09-21). Named here for the reason
-        /// <see cref="ParaplannerAttribute"/> is: the import's reachability check and the
-        /// column map must not drift apart.
+        /// ParaplannerEmail (project owner, 2026-09-21) - the column that identifies them
+        /// (AD-228). Named here for the reason <see cref="ParaplannerAttribute"/> is: the
+        /// import's reachability check and the column map must not drift apart.
         /// </summary>
         public const string ParaplannerEmailAttribute = "al_paraplanneremail";
 

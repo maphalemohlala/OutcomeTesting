@@ -234,5 +234,38 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal(UpdateCaseDetailsPlugin.CommandUpdateCaseDetails, CaseHeaderRequestPlugin.CommandUpdateCaseDetails);
             Assert.Equal(120910778, CaseHeaderRequestPlugin.CommandUpdateCaseDetails);
         }
+
+        // The before-read has to carry each person's name AND email whatever the edit names:
+        // an edit sending only the email is checked against the name already on the case, and
+        // a moved adviser email is detected against the email already there (AD-228).
+        [Fact]
+        public void The_before_read_carries_every_person_column_whatever_the_edit_names()
+        {
+            var columns = CaseHeaderRequestPlugin.BeforeColumns(new[] { "al_clientname" });
+
+            foreach (var person in CasePeople.Columns)
+            {
+                Assert.Contains(person, columns);
+            }
+        }
+
+        [Fact]
+        public void The_person_columns_are_the_four_name_and_email_columns()
+        {
+            Assert.Equal(
+                new[] { "al_advisername", "al_adviseremail", "al_paraplanner", "al_paraplanneremail" },
+                CasePeople.Columns.ToArray());
+        }
+
+        [Fact]
+        public void The_before_read_names_each_column_once_and_never_the_products_association()
+        {
+            var columns = CaseHeaderRequestPlugin.BeforeColumns(
+                new[] { "al_adviseremail", "al_clientname", ListOptionRules.ProductsField });
+
+            Assert.Equal(columns.Count, columns.Distinct().Count());
+            Assert.DoesNotContain(ListOptionRules.ProductsField, columns);
+            Assert.Contains("al_clientname", columns);
+        }
     }
 }
