@@ -153,6 +153,20 @@ using System.Text.Json.Nodes;
 // Backfill access: dotnet run -- reconcileaccess <orgUrl> [--confirm <orgUrl>]
 //   Calls al_ReconcileCaseAccess on every active case and reports unmatched advisers.
 //
+// Set a case's adviser: dotnet run -- setcaseadviser <orgUrl> <referenceLike> <name> <email> [--confirm <orgUrl>]
+//   Seeds al_advisername and al_adviseremail together on every matching case.
+//
+// Set a case's people: dotnet run -- setcasepeople <orgUrl> <referenceLike> <email> [--confirm <orgUrl>]
+//   Sets adviser and para-planner name and email from the one active contact holding that
+//   email, plus al_checkername, on every matching case.
+//
+// Repoint remediation: dotnet run -- repointremediation <orgUrl> <caseReference> [--confirm <orgUrl>]
+//   Points a case's OPEN remediation actions at the contact its adviser email now resolves to.
+//
+// Backfill people email: dotnet run -- backfillpeopleemail <orgUrl> [--confirm <orgUrl>]
+//   The one-off move to email identity (AD-228): fills a blank adviser/para-planner email the
+//   case's name gives unambiguously, reports what it cannot, and re-points open remediation.
+//
 // Add to solution: dotnet run -- addtosolution <orgUrl> [<solutionUniqueName>]
 //   Adds the plug-in assembly (and its plug-in type) to the target solution for clean ALM
 //   promotion. Idempotent. The Custom API is added separately via a solution-file import
@@ -581,9 +595,9 @@ if (args.Length >= 4 && args[0].Equals("setcasepeople", StringComparison.Ordinal
     return SetCasePeople(args[1], args[2], args[3], ConfirmedFor(args, args[1]));
 }
 
-if (args.Length >= 4 && args[0].Equals("setcaseadviser", StringComparison.OrdinalIgnoreCase))
+if (args.Length >= 5 && args[0].Equals("setcaseadviser", StringComparison.OrdinalIgnoreCase))
 {
-    return SetCaseAdviser(args[1], args[2], args[3], ConfirmedFor(args, args[1]));
+    return SetCaseAdviser(args[1], args[2], args[3], args[4], ConfirmedFor(args, args[1]));
 }
 
 if (args.Length >= 3 && args[0].Equals("repointremediation", StringComparison.OrdinalIgnoreCase))
@@ -596,9 +610,9 @@ if (args.Length >= 2 && args[0].Equals("backfilltaxoutcome", StringComparison.Or
     return BackfillTaxOutcome(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
 }
 
-if (args.Length >= 2 && args[0].Equals("backfilladviseremail", StringComparison.OrdinalIgnoreCase))
+if (args.Length >= 2 && args[0].Equals("backfillpeopleemail", StringComparison.OrdinalIgnoreCase))
 {
-    return BackfillAdviserEmail(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+    return BackfillPeopleEmail(args[1], ConfirmedFor(args, args[1]));
 }
 
 if (args.Length >= 2 && args[0].Equals("backfillioreference", StringComparison.OrdinalIgnoreCase))
@@ -9908,11 +9922,31 @@ int VerifyTaxHeader(string[] a)
     return pass ? 0 : 2;
 }
 
+// The one active contact holding this email, or null with the reason. The tool's copy of
+// NotificationOutbox.MatchPerson (AD-228): by email only, two rows read so a duplicate shows.
+(Entity Contact, string Problem) ContactByEmail(ServiceClient svc, string email)
+{
+    var value = (email ?? string.Empty).Trim();
+    if (value.Length == 0)
+    {
+        return (null, "no email");
+    }
+
+    var query = new QueryExpression("contact") { ColumnSet = new ColumnSet("fullname", "emailaddress1"), TopCount = 2 };
+    query.Criteria.AddCondition("emailaddress1", ConditionOperator.Equal, value);
+    query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+    var found = svc.RetrieveMultiple(query).Entities;
+    return found.Count == 1 ? (found[0], null)
+        : found.Count == 0 ? (null, "no active contact holds " + value)
+        : (null, "two or more active contacts hold " + value);
+}
+
 // Points a seeded case's adviser, para-planner and checker name at one real person.
 //
 // Seeding exists to exercise the paths that only run when a name resolves. Both ends of the
 // BR-009 / BR-006 routing match a **name** against contact.fullname - the case carries
-// al_paraplanner and al_advisername as text and no address (AD-082) - so a case seeded with
+// al_paraplanner and al_advisername as text. Both people are identified by email (AD-228) -
+// a case seeded with
 // "Seed Adviser 01" queues its notifications with no recipient and the drain marks them
 // Failed, which exercises nothing. Naming a contact that actually exists is what makes the
 // adviser letters and the para-planner notification deliverable.
@@ -9943,7 +9977,7 @@ int VerifyTaxHeader(string[] a)
 //
 // Straight through the SDK, as setcasepeople is: no step is registered on al_outcomecase, so
 // nothing is bypassed.
-int SetCaseAdviser(string orgUrl, string referenceLike, string adviserName, bool confirm)
+int SetCaseAdviser(string orgUrl, string referenceLike, string adviserName, string adviserEmail, bool confirm)
 {
     using var svc = Connect(orgUrl);
 
@@ -9954,9 +9988,17 @@ int SetCaseAdviser(string orgUrl, string referenceLike, string adviserName, bool
         return 1;
     }
 
+    var email = adviserEmail.Trim();
+    if (!System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+    {
+        Console.Error.WriteLine($"'{email}' is not an email address. People on a case are identified by email.");
+        return 1;
+    }
+
     var cases = svc.RetrieveMultiple(new FetchExpression(
         "<fetch><entity name=\"al_outcomecase\"><attribute name=\"al_outcomecaseid\"/>" +
-        "<attribute name=\"al_casereference\"/><attribute name=\"al_advisername\"/><filter>" +
+        "<attribute name=\"al_casereference\"/><attribute name=\"al_advisername\"/>" +
+        "<attribute name=\"al_adviseremail\"/><filter>" +
         "<condition attribute=\"al_casereference\" operator=\"like\" value=\"" +
         System.Security.SecurityElement.Escape(referenceLike) + "\"/>" +
         "</filter><order attribute=\"al_casereference\"/></entity></fetch>")).Entities;
@@ -9965,9 +10007,11 @@ int SetCaseAdviser(string orgUrl, string referenceLike, string adviserName, bool
     foreach (var c in cases)
     {
         var was = c.GetAttributeValue<string>("al_advisername");
-        var unchanged = string.Equals(was, name, StringComparison.Ordinal);
+        var wasEmail = c.GetAttributeValue<string>("al_adviseremail");
+        var unchanged = string.Equals(was, name, StringComparison.Ordinal)
+            && string.Equals(wasEmail, email, StringComparison.Ordinal);
         Console.WriteLine($"   {c.GetAttributeValue<string>("al_casereference")}: "
-            + $"'{was}' -> '{name}'{(unchanged ? " (no change)" : string.Empty)}");
+            + $"'{was}' <{wasEmail}> -> '{name}' <{email}>{(unchanged ? " (no change)" : string.Empty)}");
     }
 
     if (!confirm)
@@ -9979,41 +10023,34 @@ int SetCaseAdviser(string orgUrl, string referenceLike, string adviserName, bool
     var written = 0;
     foreach (var c in cases)
     {
-        if (string.Equals(c.GetAttributeValue<string>("al_advisername"), name, StringComparison.Ordinal))
+        if (string.Equals(c.GetAttributeValue<string>("al_advisername"), name, StringComparison.Ordinal)
+            && string.Equals(c.GetAttributeValue<string>("al_adviseremail"), email, StringComparison.Ordinal))
         {
             continue;
         }
 
-        svc.Update(new Entity("al_outcomecase", c.Id) { ["al_advisername"] = name });
+        svc.Update(new Entity("al_outcomecase", c.Id) { ["al_advisername"] = name, ["al_adviseremail"] = email });
         written++;
     }
 
-    Console.WriteLine($"Set the adviser to '{name}' on {written} case(s); {cases.Count - written} already held it.");
+    Console.WriteLine($"Set the adviser to '{name}' <{email}> on {written} case(s); {cases.Count - written} already held it.");
     return 0;
 }
 
-int SetCasePeople(string orgUrl, string referenceLike, string personName, bool confirm)
+int SetCasePeople(string orgUrl, string referenceLike, string personEmail, bool confirm)
 {
     using var svc = Connect(orgUrl);
 
-    var name = personName.Trim();
-    var matches = svc.RetrieveMultiple(new FetchExpression(
-        "<fetch top=\"5\"><entity name=\"contact\"><attribute name=\"contactid\"/>" +
-        "<attribute name=\"emailaddress1\"/><filter>" +
-        "<condition attribute=\"fullname\" operator=\"eq\" value=\"" + System.Security.SecurityElement.Escape(name) + "\"/>" +
-        "<condition attribute=\"statecode\" operator=\"eq\" value=\"0\"/>" +
-        "<condition attribute=\"emailaddress1\" operator=\"not-null\"/>" +
-        "</filter></entity></fetch>")).Entities;
-
-    if (matches.Count != 1)
+    var (person, problem) = ContactByEmail(svc, personEmail);
+    if (person == null)
     {
-        Console.Error.WriteLine(
-            $"'{name}' resolves to {matches.Count} active contact(s) with a work email, not one. " +
-            "Seeding a name the notification paths cannot resolve would fail silently later (AD-082).");
+        Console.Error.WriteLine($"'{personEmail}': {problem}. Nothing written.");
         return 1;
     }
 
-    Console.WriteLine($"'{name}' resolves to {matches[0].GetAttributeValue<string>("emailaddress1")}.");
+    var name = person.GetAttributeValue<string>("fullname");
+    var email = person.GetAttributeValue<string>("emailaddress1").Trim();
+    Console.WriteLine($"'{email}' is {name}.");
 
     var cases = svc.RetrieveMultiple(new FetchExpression(
         "<fetch><entity name=\"al_outcomecase\"><attribute name=\"al_outcomecaseid\"/>" +
@@ -10038,12 +10075,14 @@ int SetCasePeople(string orgUrl, string referenceLike, string personName, bool c
         svc.Update(new Entity("al_outcomecase", c.Id)
         {
             ["al_advisername"] = name,
+            ["al_adviseremail"] = email,
             ["al_paraplanner"] = name,
+            ["al_paraplanneremail"] = email,
             ["al_checkername"] = name,
         });
     }
 
-    Console.WriteLine($"Set adviser, para-planner and checker name to '{name}' on {cases.Count} case(s).");
+    Console.WriteLine($"Set adviser, para-planner and checker name/email to '{name}' <{email}> on {cases.Count} case(s).");
     return 0;
 }
 
@@ -10070,7 +10109,8 @@ int RepointRemediation(string orgUrl, string caseReference, bool confirm)
 
     var cases = svc.RetrieveMultiple(new FetchExpression(
         "<fetch><entity name=\"al_outcomecase\"><attribute name=\"al_outcomecaseid\"/>" +
-        "<attribute name=\"al_casereference\"/><attribute name=\"al_advisername\"/><filter>" +
+        "<attribute name=\"al_casereference\"/><attribute name=\"al_advisername\"/>" +
+        "<attribute name=\"al_adviseremail\"/><filter>" +
         "<condition attribute=\"al_casereference\" operator=\"eq\" value=\"" +
         System.Security.SecurityElement.Escape(caseReference) + "\"/>" +
         "</filter></entity></fetch>")).Entities;
@@ -10083,29 +10123,15 @@ int RepointRemediation(string orgUrl, string caseReference, bool confirm)
 
     var outcomeCase = cases[0];
     var adviserName = outcomeCase.GetAttributeValue<string>("al_advisername");
-    if (string.IsNullOrWhiteSpace(adviserName))
+
+    var (adviser, problem) = ContactByEmail(svc, outcomeCase.GetAttributeValue<string>("al_adviseremail"));
+    if (adviser == null)
     {
-        Console.Error.WriteLine("The case names no adviser, so there is nobody to point the actions at.");
+        Console.Error.WriteLine($"The case's adviser email resolves to nobody: {problem}. " +
+            "Set the email on the case, or onboard the contact; the actions then follow on their own.");
         return 1;
     }
 
-    var contacts = svc.RetrieveMultiple(new FetchExpression(
-        "<fetch top=\"5\"><entity name=\"contact\"><attribute name=\"contactid\"/>" +
-        "<attribute name=\"emailaddress1\"/><filter>" +
-        "<condition attribute=\"fullname\" operator=\"eq\" value=\"" +
-        System.Security.SecurityElement.Escape(adviserName.Trim()) + "\"/>" +
-        "<condition attribute=\"statecode\" operator=\"eq\" value=\"0\"/>" +
-        "</filter></entity></fetch>")).Entities;
-
-    if (contacts.Count != 1)
-    {
-        Console.Error.WriteLine(
-            $"Adviser '{adviserName}' resolves to {contacts.Count} active contact(s), not one. " +
-            "Remediation refuses to guess between two people with the same name (AD-082).");
-        return 1;
-    }
-
-    var adviser = contacts[0];
     Console.WriteLine($"Case {outcomeCase.GetAttributeValue<string>("al_casereference")}: adviser '{adviserName}' " +
                       $"-> {adviser.GetAttributeValue<string>("emailaddress1")}.");
 
@@ -10167,92 +10193,132 @@ int RepointRemediation(string orgUrl, string caseReference, bool confirm)
 // after a later submit cannot overwrite a fresher grade with an older review's answer, and
 // the newest submitted review wins where a case somehow carries two Tax legs.
 /// <summary>
-/// Gives every case that names its adviser but carries no adviser email the email of the one
-/// active contact that name resolves to (project owner, 2026-09-30; CaseAdviser in the plug-ins).
+/// The one-off move to email identity (AD-228), run once per environment after the plug-ins
+/// that stop reading names are deployed.
 ///
-/// The email is what al_advisermapping is keyed by, so without it nobody can sign the case off,
-/// regrade it, or be its supervisor. TEST's 29 Sep import carried names and no addresses and
-/// left 24 such cases. From 2026-09-30 the import and the adviser edit fill it; this is for the
-/// cases created before. A name matching no contact, two, or one without an email is reported
-/// and left alone - never guessed. A case that already carries an email is never touched, so
-/// the verb is safe to re-run. The write fires CaseAccessPlugin (its filter names the adviser
-/// email), which re-resolves the supervisor on the same case.
+/// Reports, for every case:
+///   FILL      a blank adviser/para-planner email that the name gives unambiguously (one active
+///             contact of that exact name, with an email);
+///   NO FILL   a blank email the name cannot give (no contact, two, or no email) - fix in the app;
+///   MISMATCH  a stored email whose contact is NAMED differently from the case (an Adam
+///             Strumidlo / Strumdlio typo, or a wrong address) - check by hand, nothing written.
+/// With --confirm <org> it writes the FILL rows, then re-points every open remediation action
+/// to the contact holding the case's adviser email (unassigning where nobody does), exactly
+/// as AssignOpenActions does - without a "Remediation assigned" email, because this is a
+/// repair, not new work. Completed actions never move. Run reconcileaccess --confirm after.
+/// Safe to re-run: filled emails are no longer blank, and actions already right are skipped.
 /// </summary>
-int BackfillAdviserEmail(string orgUrl, bool confirm)
+int BackfillPeopleEmail(string orgUrl, bool confirm)
 {
     using var svc = Connect(orgUrl);
 
-    var rows = svc.RetrieveMultiple(new FetchExpression(
-        "<fetch><entity name=\"al_outcomecase\">" +
-        "<attribute name=\"al_outcomecaseid\"/>" +
-        "<attribute name=\"al_casereference\"/>" +
-        "<attribute name=\"al_advisername\"/>" +
-        "<filter><condition attribute=\"al_adviseremail\" operator=\"null\"/>" +
-        "<condition attribute=\"al_advisername\" operator=\"not-null\"/></filter>" +
-        "<order attribute=\"al_casereference\"/>" +
-        "</entity></fetch>")).Entities;
-
-    var emails = new Dictionary<string, (string Email, string Problem)>(StringComparer.OrdinalIgnoreCase);
-    var pending = new List<(Guid Id, string Reference, string Name, string Email)>();
-    var skipped = new List<string>();
-
-    foreach (var row in rows)
+    var cases = new List<Entity>();
+    var query = new QueryExpression("al_outcomecase")
     {
-        var name = (row.GetAttributeValue<string>("al_advisername") ?? string.Empty).Trim();
-        var reference = row.GetAttributeValue<string>("al_casereference") ?? row.Id.ToString("D");
-        if (name.Length == 0)
-        {
-            continue;
-        }
-
-        if (!emails.TryGetValue(name, out var found))
-        {
-            var query = new QueryExpression("contact") { ColumnSet = new ColumnSet("emailaddress1"), TopCount = 2 };
-            query.Criteria.AddCondition("fullname", ConditionOperator.Equal, name);
-            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
-            var matches = svc.RetrieveMultiple(query).Entities;
-            var email = matches.Count == 1 ? matches[0].GetAttributeValue<string>("emailaddress1") : null;
-            found = matches.Count == 0 ? (null, "no active contact of that name")
-                : matches.Count > 1 ? (null, "two or more active contacts of that name")
-                : string.IsNullOrWhiteSpace(email) ? (null, "the contact has no email")
-                : (email.Trim(), null);
-            emails[name] = found;
-        }
-
-        if (found.Email == null)
-        {
-            skipped.Add($"{reference}  {name}: {found.Problem}");
-            continue;
-        }
-
-        pending.Add((row.Id, reference, name, found.Email));
+        ColumnSet = new ColumnSet("al_casereference", "al_advisername", "al_adviseremail", "al_paraplanner", "al_paraplanneremail"),
+        PageInfo = new PagingInfo { Count = 5000, PageNumber = 1 },
+    };
+    while (true)
+    {
+        var page = svc.RetrieveMultiple(query);
+        cases.AddRange(page.Entities);
+        if (!page.MoreRecords) break;
+        query.PageInfo.PageNumber++;
+        query.PageInfo.PagingCookie = page.PagingCookie;
     }
 
-    Console.WriteLine($"{rows.Count} case(s) name an adviser with no adviser email; {pending.Count} to write; {skipped.Count} left alone.");
-    foreach (var p in pending)
+    var byName = new Dictionary<string, (string Email, string Problem)>(StringComparer.OrdinalIgnoreCase);
+    (string Email, string Problem) EmailFromName(string name)
     {
-        Console.WriteLine($"   {p.Reference}  {p.Name}  <- {p.Email}");
+        if (byName.TryGetValue(name, out var known)) return known;
+        var q = new QueryExpression("contact") { ColumnSet = new ColumnSet("emailaddress1"), TopCount = 2 };
+        q.Criteria.AddCondition("fullname", ConditionOperator.Equal, name);
+        q.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+        var m = svc.RetrieveMultiple(q).Entities;
+        var e = m.Count == 1 ? (m[0].GetAttributeValue<string>("emailaddress1") ?? string.Empty).Trim() : string.Empty;
+        // Declared, not var: a tuple literal holding null has no type of its own.
+        (string Email, string Problem) result = m.Count == 0 ? (null, "no active contact of that name")
+            : m.Count > 1 ? (null, "two or more active contacts of that name")
+            : e.Length == 0 ? (null, "the contact has no email")
+            : (e, null);
+        byName[name] = result;
+        return result;
     }
 
-    foreach (var s in skipped)
+    var fills = new List<(Guid Id, string Attr, string Email, string Line)>();
+    var lines = new List<string>();
+    foreach (var c in cases)
     {
-        Console.WriteLine($"   LEFT ALONE {s}");
+        var reference = c.GetAttributeValue<string>("al_casereference") ?? c.Id.ToString("D");
+        foreach (var (nameAttr, emailAttr, who) in new[] { ("al_advisername", "al_adviseremail", "adviser"), ("al_paraplanner", "al_paraplanneremail", "para-planner") })
+        {
+            var name = (c.GetAttributeValue<string>(nameAttr) ?? string.Empty).Trim();
+            var email = (c.GetAttributeValue<string>(emailAttr) ?? string.Empty).Trim();
+            if (email.Length == 0)
+            {
+                if (name.Length == 0) continue;
+                var (found, problem) = EmailFromName(name);
+                if (found != null)
+                {
+                    fills.Add((c.Id, emailAttr, found, $"FILL      {reference}  {who} '{name}' <- {found}"));
+                }
+                else
+                {
+                    lines.Add($"NO FILL   {reference}  {who} '{name}': {problem}");
+                }
+
+                continue;
+            }
+
+            var (contact, _) = ContactByEmail(svc, email);
+            var contactName = contact?.GetAttributeValue<string>("fullname");
+            if (contact != null && name.Length > 0 && !string.Equals(contactName?.Trim(), name, StringComparison.OrdinalIgnoreCase))
+            {
+                lines.Add($"MISMATCH  {reference}  {who} '{name}' but {email} belongs to '{contactName}'");
+            }
+        }
     }
+
+    Console.WriteLine($"{cases.Count} case(s) read. {fills.Count} email(s) to fill.");
+    foreach (var f in fills) Console.WriteLine("   " + f.Line);
+    foreach (var l in lines) Console.WriteLine("   " + l);
 
     if (!confirm)
     {
-        Console.WriteLine("Dry run. Re-run with --confirm to write.");
+        Console.WriteLine("Dry run. Re-run with --confirm <orgUrl> to fill and re-point open actions.");
         return 0;
     }
 
-    var written = 0;
-    foreach (var p in pending)
+    foreach (var f in fills)
     {
-        svc.Update(new Entity("al_outcomecase", p.Id) { ["al_adviseremail"] = p.Email });
-        written++;
+        svc.Update(new Entity("al_outcomecase", f.Id) { [f.Attr] = f.Email });
     }
 
-    Console.WriteLine($"Wrote the adviser email on {written} case(s).");
+    var moved = 0;
+    var adviserEmails = cases.ToDictionary(
+        c => c.Id,
+        c => fills.Where(f => f.Id == c.Id && f.Attr == "al_adviseremail").Select(f => f.Email).FirstOrDefault()
+             ?? c.GetAttributeValue<string>("al_adviseremail"));
+    var actions = svc.RetrieveMultiple(new FetchExpression(
+        "<fetch><entity name=\"al_remediationaction\"><attribute name=\"al_remediationactionid\"/>" +
+        "<attribute name=\"al_outcomecaseid\"/><attribute name=\"al_assignedcontactid\"/><filter>" +
+        "<condition attribute=\"al_actionstatus\" operator=\"ne\" value=\"120910602\"/>" +
+        "</filter></entity></fetch>")).Entities;
+    foreach (var action in actions)
+    {
+        var caseRef = action.GetAttributeValue<EntityReference>("al_outcomecaseid");
+        if (caseRef == null || !adviserEmails.TryGetValue(caseRef.Id, out var adviserEmail)) continue;
+        var (adviser, _) = ContactByEmail(svc, adviserEmail);
+        var holder = action.GetAttributeValue<EntityReference>("al_assignedcontactid");
+        if (adviser == null ? holder == null : holder != null && holder.Id == adviser.Id) continue;
+        svc.Update(new Entity("al_remediationaction", action.Id)
+        {
+            ["al_assignedcontactid"] = adviser?.ToEntityReference(),
+        });
+        moved++;
+    }
+
+    Console.WriteLine($"Filled {fills.Count} email(s); re-pointed {moved} open action(s). Now run: reconcileaccess {orgUrl} --confirm {orgUrl}");
     return 0;
 }
 
