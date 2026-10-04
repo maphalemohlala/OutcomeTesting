@@ -12,6 +12,8 @@ import { CASE_EXPORT_HEADERS, caseExportRow } from './caseExport';
 import { useCaseWorklist } from './useCaseWorklist';
 import type { CaseRemediation } from './caseRemediation';
 import { applyFilters, FILTER_KEYS, type FilterKey, type Filters } from './worklistFilters';
+import { useUserDirectory } from '../../hooks/useUserDirectory';
+import { adviserIdentity, contactEmailsOf } from '../people/peopleDirectory';
 import './CaseWorklistPage.css';
 
 /**
@@ -77,6 +79,7 @@ function RemediationCell({ remediation }: { remediation: CaseRemediation | null 
 
 export function CaseWorklistPage() {
   const state = useCaseWorklist();
+  const directory = useUserDirectory();
   const [params, setParams] = useSearchParams();
 
   const filters = useMemo(
@@ -87,13 +90,21 @@ export function CaseWorklistPage() {
   const allCases = useMemo(() => (state.status === 'ready' ? state.cases : []), [state]);
   const remediationKnown = state.status === 'ready' && state.remediationKnown;
 
+  const contactEmails = useMemo(
+    () => contactEmailsOf(directory.status === 'ready' ? directory.users : []),
+    [directory],
+  );
+
   const priorities = useMemo(
     () =>
       [...new Set(allCases.map((c) => c.priority).filter((p): p is string => Boolean(p)))].sort(),
     [allCases],
   );
 
-  const filtered = useMemo(() => applyFilters(allCases, filters), [allCases, filters]);
+  const filtered = useMemo(
+    () => applyFilters(allCases, filters, contactEmails),
+    [allCases, filters, contactEmails],
+  );
   const isFiltered = FILTER_KEYS.some((key) => filters[key] !== '');
 
   function set(key: FilterKey, value: string) {
@@ -245,7 +256,20 @@ export function CaseWorklistPage() {
 
           {filters.adviser || filters.checker ? (
             <p className="worklist__scope" role="status">
-              Showing cases{filters.adviser ? <> advised by <strong>{filters.adviser}</strong></> : null}
+              Showing cases
+              {filters.adviser ? (
+                <>
+                  {' '}
+                  advised by{' '}
+                  <strong>
+                    {allCases.find(
+                      (item) =>
+                        (item.adviserEmail ?? '').trim().toLowerCase() ===
+                        filters.adviser.trim().toLowerCase(),
+                    )?.adviser ?? filters.adviser}
+                  </strong>
+                </>
+              ) : null}
               {filters.adviser && filters.checker ? ' and' : null}
               {filters.checker ? <> checked by <strong>{filters.checker}</strong></> : null}.{' '}
               <button
@@ -322,7 +346,7 @@ export function CaseWorklistPage() {
                       <td>{item.client ?? '—'}</td>
                       <td>
                         {item.adviser ? (
-                          <Link to={`/people/Adviser/${encodeURIComponent(item.adviser)}`}>
+                          <Link to={`/people/Adviser/${encodeURIComponent(adviserIdentity(item))}`}>
                             {item.adviser}
                           </Link>
                         ) : (

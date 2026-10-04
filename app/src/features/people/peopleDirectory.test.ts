@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildDirectory, caseloadByName, casesForPerson, isPersonRole } from './peopleDirectory';
+import {
+  buildDirectory,
+  caseloadByIdentity,
+  casesForPerson,
+  contactEmailsOf,
+  isPersonRole,
+} from './peopleDirectory';
 import type { CaseSummary } from '../cases/caseWorklistMapping';
 
 function caseRow(overrides: Partial<CaseSummary>): CaseSummary {
@@ -21,10 +27,14 @@ function caseRow(overrides: Partial<CaseSummary>): CaseSummary {
     client: null,
     adviser: null,
     adviserCode: null,
+    adviserEmail: null,
     paraplanner: null,
     paraplannerCode: null,
+    paraplannerEmail: null,
     taxChecker: null,
     aqsChecker: null,
+    taxCheckerId: null,
+    aqsCheckerId: null,
     caseType: null,
     productSolutionType: null,
     products: null,
@@ -106,12 +116,12 @@ describe('casesForPerson', () => {
   ];
 
   it('returns only the cases where the person holds that position', () => {
-    expect(casesForPerson(cases, 'Adviser', 'Jane Adviser').map((c) => c.id)).toEqual(['a']);
-    expect(casesForPerson(cases, 'Checker', 'Jane Adviser').map((c) => c.id)).toEqual(['b']);
+    expect(casesForPerson(cases, 'Adviser', 'name:jane adviser').map((c) => c.id)).toEqual(['a']);
+    expect(casesForPerson(cases, 'Checker', 'name:jane adviser').map((c) => c.id)).toEqual(['b']);
   });
 
   it('matches case-insensitively so a link survives a differently cased name', () => {
-    expect(casesForPerson(cases, 'Adviser', 'jane adviser')).toHaveLength(1);
+    expect(casesForPerson(cases, 'Adviser', 'name:Jane Adviser')).toHaveLength(1);
   });
 });
 
@@ -123,24 +133,24 @@ describe('isPersonRole', () => {
   });
 });
 
-describe('caseloadByName', () => {
+describe('caseloadByIdentity', () => {
   it('counts a case once for someone holding two positions on it', () => {
-    const loads = caseloadByName([
+    const loads = caseloadByIdentity([
       caseRow({ id: 'a', adviser: 'Jane Adviser', aqsChecker: 'Jane Adviser' }),
     ]);
 
-    const jane = loads.get('jane adviser');
+    const jane = loads.get('name:jane adviser');
     expect(jane?.totalCases).toBe(1);
     expect(jane?.roles).toEqual(['Adviser', 'Checker']);
   });
 
   it('aggregates a person across separate cases and positions', () => {
-    const loads = caseloadByName([
+    const loads = caseloadByIdentity([
       caseRow({ id: 'a', adviser: 'Jane Adviser', status: 'Closed', latestOutcome: 'Pass' }),
       caseRow({ id: 'b', paraplanner: 'Jane Adviser', status: 'Assigned' }),
     ]);
 
-    const jane = loads.get('jane adviser');
+    const jane = loads.get('name:jane adviser');
     expect(jane?.totalCases).toBe(2);
     expect(jane?.closedCases).toBe(1);
     expect(jane?.openCases).toBe(1);
@@ -149,14 +159,53 @@ describe('caseloadByName', () => {
   });
 
   it('matches on name case-insensitively so a directory join is not defeated by casing', () => {
-    const loads = caseloadByName([caseRow({ id: 'a', adviser: 'JANE ADVISER' })]);
+    const loads = caseloadByIdentity([caseRow({ id: 'a', adviser: 'JANE ADVISER' })]);
 
-    expect(loads.get('jane adviser')?.name).toBe('JANE ADVISER');
+    expect(loads.get('name:jane adviser')?.name).toBe('JANE ADVISER');
   });
 
   it('ignores blank names rather than inventing an empty person', () => {
-    const loads = caseloadByName([caseRow({ id: 'a', adviser: '   ', aqsChecker: null })]);
+    const loads = caseloadByIdentity([caseRow({ id: 'a', adviser: '   ', aqsChecker: null })]);
 
     expect(loads.size).toBe(0);
+  });
+});
+
+describe('people are keyed by email (two people, one name)', () => {
+  const a = caseRow({ id: '1', adviser: 'Adam Smith', adviserEmail: 'adam.smith@example.com' });
+  const b = caseRow({ id: '2', adviser: 'Adam Smith', adviserEmail: 'adam.smith2@example.com' });
+
+  it('keeps two advisers of one name apart', () => {
+    const loads = caseloadByIdentity([a, b]);
+    expect(loads.get('email:adam.smith@example.com')?.totalCases).toBe(1);
+    expect(loads.get('email:adam.smith2@example.com')?.totalCases).toBe(1);
+  });
+
+  it('joins a checker to the same person through the directory email', () => {
+    const c = caseRow({
+      id: '3',
+      adviser: null,
+      adviserEmail: null,
+      taxChecker: 'Adam Smith',
+      taxCheckerId: 'C1',
+    });
+    const loads = caseloadByIdentity(
+      [a, c],
+      contactEmailsOf([{ id: 'c1', email: 'Adam.Smith@example.com' }]),
+    );
+    const load = loads.get('email:adam.smith@example.com');
+    expect(load?.totalCases).toBe(2);
+    expect(load?.roles).toEqual(['Adviser', 'Checker']);
+  });
+
+  it('falls back to the name only for a legacy case with no email', () => {
+    const legacy = caseRow({ id: '4', adviser: 'Old Adviser', adviserEmail: null });
+    expect(caseloadByIdentity([legacy]).has('name:old adviser')).toBe(true);
+  });
+
+  it("lists one adviser identity's cases", () => {
+    expect(
+      casesForPerson([a, b], 'Adviser', 'email:adam.smith2@example.com').map((c) => c.id),
+    ).toEqual(['2']);
   });
 });

@@ -56,8 +56,11 @@ export interface CaseSummary {
   client: string | null;
   adviser: string | null;
   adviserCode: string | null;
+  /** The adviser's email: who they are. `adviser` is only the label. */
+  adviserEmail: string | null;
   paraplanner: string | null;
   paraplannerCode: string | null;
+  paraplannerEmail: string | null;
   /**
    * One checker per discipline (item 2, 2026-09-19), each the checker assigned to that
    * review instance. The single `checker` these replace named whichever discipline was
@@ -67,6 +70,9 @@ export interface CaseSummary {
    */
   taxChecker: string | null;
   aqsChecker: string | null;
+  /** The checkers' contact ids, from the access lookups. */
+  taxCheckerId: string | null;
+  aqsCheckerId: string | null;
   caseType: string | null;
   productSolutionType: string | null;
   products: string | null;
@@ -168,10 +174,14 @@ export function toSummary(record: Al_outcomecases, grades?: CaseOutcomeGrades): 
     client: record.al_clientname ?? null,
     adviser: record.al_advisername ?? null,
     adviserCode: record.al_advisercode ?? null,
+    adviserEmail: record.al_adviseremail ?? null,
     paraplanner: record.al_paraplanner ?? null,
     paraplannerCode: record.al_paraplannercode ?? null,
+    paraplannerEmail: record.al_paraplanneremail ?? null,
     taxChecker: record.al_taxcheckername ?? null,
     aqsChecker: record.al_aqscheckername ?? null,
+    taxCheckerId: record._al_taxcheckercontactid_value ?? null,
+    aqsCheckerId: record._al_aqscheckercontactid_value ?? null,
     caseType:
       lookupLabelOn(record as unknown as Record<string, unknown>, MIGRATED_LISTS[2]) ??
       choiceLabel(Al_outcomecasesal_casetype, record.al_casetype, record.al_casetypename),

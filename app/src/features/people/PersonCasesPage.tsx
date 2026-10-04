@@ -7,7 +7,8 @@ import { ExportMenu } from '../../components/export/ExportMenu';
 import { OUTCOMES } from '../../types/domain';
 import { CASE_EXPORT_HEADERS, caseExportRow } from '../cases/caseExport';
 import { useCaseWorklist } from '../cases/useCaseWorklist';
-import { casesForPerson, isPersonRole } from './peopleDirectory';
+import { useUserDirectory } from '../../hooks/useUserDirectory';
+import { casesForPerson, contactEmailsOf, identityOf, isPersonRole, positions } from './peopleDirectory';
 import { checkerLabel } from '../cases/checkerNames';
 import './PeoplePage.css';
 
@@ -16,15 +17,40 @@ function day(iso: string | null): string {
 }
 
 export function PersonCasesPage() {
-  const { role, name = '' } = useParams<{ role: string; name: string }>();
+  const { role, key = '' } = useParams<{ role: string; key: string }>();
   const state = useCaseWorklist();
+  const directory = useUserDirectory();
 
   const personRole = isPersonRole(role) ? role : null;
 
+  const contactEmails = useMemo(
+    () => contactEmailsOf(directory.status === 'ready' ? directory.users : []),
+    [directory],
+  );
+
   const cases = useMemo(() => {
     if (!personRole || state.status !== 'ready') return [];
-    return casesForPerson(state.cases, personRole, name);
-  }, [state, personRole, name]);
+    return casesForPerson(state.cases, personRole, key, contactEmails);
+  }, [state, personRole, key, contactEmails]);
+
+  /**
+   * The person's display name: the name of the first matching position, since that is what
+   * the case actually recorded. Falls back to the part of the key after `email:` when no
+   * case matches (visibility can hide every one), so the page still shows something
+   * recognisable rather than the raw `email:`/`contact:`/`name:` key.
+   */
+  const name = useMemo(() => {
+    if (personRole) {
+      const target = key.toLowerCase();
+      for (const item of cases) {
+        const match = positions(item).find(
+          (position) => position.role === personRole && identityOf(position, contactEmails) === target,
+        );
+        if (match?.name) return match.name;
+      }
+    }
+    return key.startsWith('email:') ? key.slice('email:'.length) : key;
+  }, [cases, personRole, key, contactEmails]);
 
   const totals = useMemo(() => {
     const open = cases.filter(
@@ -70,7 +96,7 @@ export function PersonCasesPage() {
       <p className="people__note">
         <Link to="/admin/people">Back to people</Link>
         {' · '}
-        <Link to={`/cases?person=${encodeURIComponent(name)}`}>
+        <Link to={`/cases?person=${encodeURIComponent(key)}`}>
           Open in the case worklist with all filters
         </Link>
       </p>

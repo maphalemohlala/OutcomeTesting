@@ -45,16 +45,27 @@ describe('the worklist remediation filter', () => {
 
 describe('the adviser and checker filters a dashboard hands over', () => {
   const cases = [
-    row('tax', { adviser: 'A. Adviser', taxChecker: 'C. Checker' }),
-    row('aqs', { adviser: 'B. Adviser', aqsChecker: 'C. Checker' }),
-    row('other', { adviser: 'A. Adviser', aqsChecker: 'D. Checker' }),
+    row('tax', { adviser: 'A. Adviser', adviserEmail: 'a.adviser@example.com', taxChecker: 'C. Checker' }),
+    row('aqs', { adviser: 'B. Adviser', adviserEmail: 'b.adviser@example.com', aqsChecker: 'C. Checker' }),
+    row('other', { adviser: 'A. Adviser', adviserEmail: 'a.adviser@example.com', aqsChecker: 'D. Checker' }),
   ];
 
   it('matches the checker in either discipline', () => {
     expect(filtered(cases, { checker: 'C. Checker' })).toEqual(['tax', 'aqs']);
   });
 
-  it('matches the adviser only as adviser', () => {
-    expect(filtered(cases, { adviser: 'A. Adviser' })).toEqual(['tax', 'other']);
+  it('matches the adviser by email, not just by name', () => {
+    expect(filtered(cases, { adviser: 'a.adviser@example.com' })).toEqual(['tax', 'other']);
+  });
+});
+
+describe('the adviser filter keys on email, so two advisers of one name stay apart', () => {
+  it('filters by adviser email', () => {
+    const cases = [
+      row('1', { adviser: 'Adam Smith', adviserEmail: 'adam.smith@example.com' }),
+      row('2', { adviser: 'Adam Smith', adviserEmail: 'adam.smith2@example.com' }),
+    ];
+    expect(filtered(cases, { adviser: 'ADAM.SMITH2@example.com' })).toEqual(['2']);
+    expect(filtered(cases, { person: 'email:adam.smith@example.com' })).toEqual(['1']);
   });
 });

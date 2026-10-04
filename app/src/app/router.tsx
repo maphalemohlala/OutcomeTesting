@@ -93,7 +93,7 @@ export function AppRoutes() {
         />
         {/* The caseload drill-down stays a case view: it shows work, not access. */}
         <Route
-          path="/people/:role/:name"
+          path="/people/:role/:key"
           element={
             <RequirePermission resource="page.cases">
               <PersonCasesPage />

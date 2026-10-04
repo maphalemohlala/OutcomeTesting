@@ -1,4 +1,5 @@
 import type { CaseSummary } from './caseWorklistMapping';
+import { identityOf, positions, type ContactEmails } from '../people/peopleDirectory';
 
 /**
  * The worklist's filters, kept out of the page so they can be tested.
@@ -37,13 +38,11 @@ export function withinRange(createdOn: string | null, from: string, to: string):
   return true;
 }
 
-function matchesPerson(item: CaseSummary, person: string): boolean {
-  const name = person.toLowerCase();
-  // Both checkers, so a search for a name finds the case whichever discipline that
-  // person holds (item 2, 2026-09-19). Searching one column used to miss the other.
-  return [item.adviser, item.paraplanner, item.taxChecker, item.aqsChecker, item.owner].some(
-    (value) => (value ?? '').toLowerCase() === name,
-  );
+function matchesPerson(item: CaseSummary, person: string, contactEmails: ContactEmails): boolean {
+  const target = person.trim().toLowerCase();
+  // Every position, so a search finds the case whichever one that person holds (item 2,
+  // 2026-09-19). Searching one column used to miss the others.
+  return positions(item).some((position) => identityOf(position, contactEmails) === target);
 }
 
 export function matchesChecker(item: CaseSummary, checker: string): boolean {
@@ -55,7 +54,11 @@ function matchesRemediation(item: CaseSummary, remediation: string): boolean {
   return item.remediation?.state === remediation;
 }
 
-export function applyFilters(cases: CaseSummary[], filters: Filters): CaseSummary[] {
+export function applyFilters(
+  cases: CaseSummary[],
+  filters: Filters,
+  contactEmails: ContactEmails = new Map(),
+): CaseSummary[] {
   const search = filters.q.trim().toLowerCase();
   return cases.filter((item) => {
     if (filters.status && item.status !== filters.status) return false;
@@ -71,8 +74,13 @@ export function applyFilters(cases: CaseSummary[], filters: Filters): CaseSummar
       return false;
     }
     if (filters.remediation && !matchesRemediation(item, filters.remediation)) return false;
-    if (filters.person && !matchesPerson(item, filters.person)) return false;
-    if (filters.adviser && item.adviser !== filters.adviser) return false;
+    if (filters.person && !matchesPerson(item, filters.person, contactEmails)) return false;
+    if (
+      filters.adviser &&
+      (item.adviserEmail ?? '').trim().toLowerCase() !== filters.adviser.trim().toLowerCase()
+    ) {
+      return false;
+    }
     if (filters.checker && !matchesChecker(item, filters.checker)) return false;
     if (!withinRange(item.createdOn, filters.from, filters.to)) return false;
     if (search) {

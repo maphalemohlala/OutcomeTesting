@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CaseSummary } from '../cases/caseWorklistMapping';
 import {
   EMPTY_REPORT_FILTERS,
+  adviserOptions,
   casesInScope,
   narrowToScope,
   worklistLink,
@@ -88,5 +89,18 @@ describe('worklistLink', () => {
 
   it('leaves the link alone when nothing is filtered', () => {
     expect(worklistLink('/cases', EMPTY_REPORT_FILTERS)).toBe('/cases');
+  });
+});
+
+describe('adviserOptions', () => {
+  it('offers advisers by email, labelled with name and email', () => {
+    const cases = [
+      row('1', { adviser: 'Adam Smith', adviserEmail: 'adam.smith@example.com' }),
+      row('2', { adviser: 'Adam Smith', adviserEmail: 'adam.smith2@example.com' }),
+    ];
+    expect(adviserOptions(cases)).toEqual([
+      { value: 'adam.smith@example.com', label: 'Adam Smith (adam.smith@example.com)' },
+      { value: 'adam.smith2@example.com', label: 'Adam Smith (adam.smith2@example.com)' },
+    ]);
   });
 });

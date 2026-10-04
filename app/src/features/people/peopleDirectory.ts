@@ -4,11 +4,9 @@ import type { CaseSummary } from '../cases/caseWorklistMapping';
 
 /**
  * The four ways a person appears on a case. These are positions on the case record, not
- * security roles: `al_OutcomeCase` carries adviser, paraplanner and checker as names from
- * the Intelligent Office extract, and the owner is the Dataverse user the case is
- * allocated to (BR-003). No approved requirement joins those names to the `al_User`
- * registry — that key is work email (AD-010), which the case does not carry — so this
- * view groups by the name as recorded and does not claim to be a user directory.
+ * security roles: `al_OutcomeCase` carries adviser, paraplanner and checker, and the owner
+ * is the Dataverse user the case is allocated to (BR-003). Adviser and paraplanner are keyed
+ * by the email the case stores; checkers by their contact, through the directory's email.
  */
 export const PERSON_ROLES = ['Adviser', 'Paraplanner', 'Checker', 'Owner'] as const;
 
@@ -27,16 +25,64 @@ export interface PersonSummary {
   oldestOpenDays: number;
 }
 
-export function personKey(role: PersonRole, name: string): string {
-  return `${role}:${name.toLowerCase()}`;
+export function personKey(role: PersonRole, identity: string): string {
+  return `${role}:${identity.toLowerCase()}`;
 }
 
-function positions(item: CaseSummary): { role: PersonRole; name: string | null; code: string | null }[] {
+export type ContactEmails = ReadonlyMap<string, string>;
+
+export function contactEmailsOf(users: { id: string; email: string }[]): ContactEmails {
+  return new Map(
+    users
+      .filter((u) => u.email.trim() !== '')
+      .map((u) => [u.id.toLowerCase(), u.email.trim().toLowerCase()] as const),
+  );
+}
+
+/**
+ * Who a position is. The email wherever it is known - stored on the case for the adviser
+ * and paraplanner, through the directory for a checker - so two people of one name stay two
+ * people and one person in two positions stays one. A name only for a legacy row with nothing
+ * better, marked as such so it never merges with an email-keyed person.
+ */
+export function identityOf(
+  position: { name: string | null; email: string | null; contactId: string | null },
+  contactEmails: ContactEmails = new Map(),
+): string {
+  const email = position.email?.trim().toLowerCase();
+  if (email) return `email:${email}`;
+  const id = position.contactId?.trim().toLowerCase();
+  if (id) {
+    const viaDirectory = contactEmails.get(id);
+    return viaDirectory ? `email:${viaDirectory}` : `contact:${id}`;
+  }
+  return `name:${(position.name ?? '').trim().toLowerCase()}`;
+}
+
+export function adviserIdentity(item: CaseSummary): string {
+  return identityOf({ name: item.adviser, email: item.adviserEmail, contactId: null });
+}
+
+export interface Position {
+  role: PersonRole;
+  name: string | null;
+  code: string | null;
+  email: string | null;
+  contactId: string | null;
+}
+
+export function positions(item: CaseSummary): Position[] {
   return [
-    { role: 'Adviser', name: item.adviser, code: item.adviserCode },
-    { role: 'Paraplanner', name: item.paraplanner, code: item.paraplannerCode },
+    { role: 'Adviser', name: item.adviser, code: item.adviserCode, email: item.adviserEmail, contactId: null },
+    {
+      role: 'Paraplanner',
+      name: item.paraplanner,
+      code: item.paraplannerCode,
+      email: item.paraplannerEmail,
+      contactId: null,
+    },
     ...checkers(item),
-    { role: 'Owner', name: item.owner, code: null },
+    { role: 'Owner', name: item.owner, code: null, email: null, contactId: null },
   ];
 }
 
@@ -47,20 +93,32 @@ function positions(item: CaseSummary): { role: PersonRole; name: string | null; 
  * "what has this person got on", and someone who checks both disciplines is one person with
  * one workload, not two entries to be read side by side.
  *
- * De-duplicated by name, which is what stops a case counting twice against someone who holds
- * BOTH of its checks - the case would otherwise be added to their total once per column.
- * Two different names produce two positions, which is correct: that case really is on two
- * people's desks.
+ * De-duplicated by contact id where present - that is what stops a case counting twice
+ * against someone who holds BOTH of its checks, the case would otherwise be added to their
+ * total once per column. Falls back to name when neither carries a contact id. Two distinct
+ * people produce two positions, which is correct: that case really is on two people's desks.
  */
-function checkers(item: CaseSummary): { role: PersonRole; name: string | null; code: string | null }[] {
-  const named = [item.taxChecker, item.aqsChecker]
-    .map((name) => name?.trim())
-    .filter((name): name is string => !!name);
+function checkers(item: CaseSummary): Position[] {
+  const entries = [
+    { name: item.taxChecker, contactId: item.taxCheckerId },
+    { name: item.aqsChecker, contactId: item.aqsCheckerId },
+  ]
+    .map((entry) => ({ name: entry.name?.trim() ?? '', contactId: entry.contactId?.trim() ?? null }))
+    .filter((entry) => entry.name !== '');
 
-  const distinct = Array.from(new Set(named.map((name) => name.toLowerCase())))
-    .map((lower) => named.find((name) => name.toLowerCase() === lower) as string);
+  const distinct = new Map<string, { name: string; contactId: string | null }>();
+  for (const entry of entries) {
+    const dedupeKey = entry.contactId ? `id:${entry.contactId.toLowerCase()}` : `name:${entry.name.toLowerCase()}`;
+    if (!distinct.has(dedupeKey)) distinct.set(dedupeKey, entry);
+  }
 
-  return distinct.map((name) => ({ role: 'Checker' as PersonRole, name, code: null }));
+  return [...distinct.values()].map((entry) => ({
+    role: 'Checker' as PersonRole,
+    name: entry.name,
+    code: null,
+    email: null,
+    contactId: entry.contactId,
+  }));
 }
 
 function emptyOutcomes(): Record<Outcome, number> {
@@ -70,15 +128,19 @@ function emptyOutcomes(): Record<Outcome, number> {
 const CLOSED_STATUSES = new Set(['Closed', 'No Check Required']);
 
 /** One row per person per position, so someone who both checks and advises shows as both. */
-export function buildDirectory(cases: CaseSummary[]): PersonSummary[] {
+export function buildDirectory(
+  cases: CaseSummary[],
+  contactEmails: ContactEmails = new Map(),
+): PersonSummary[] {
   const people = new Map<string, PersonSummary>();
 
   for (const item of cases) {
     for (const position of positions(item)) {
-      const name = position.name?.trim();
-      if (!name) continue;
+      const identity = identityOf(position, contactEmails);
+      if (identity === 'name:') continue;
 
-      const key = personKey(position.role, name);
+      const name = (position.name ?? '').trim();
+      const key = personKey(position.role, identity);
       const person =
         people.get(key) ??
         ({
@@ -119,12 +181,13 @@ export function buildDirectory(cases: CaseSummary[]): PersonSummary[] {
 export function casesForPerson(
   cases: CaseSummary[],
   role: PersonRole,
-  name: string,
+  identity: string,
+  contactEmails: ContactEmails = new Map(),
 ): CaseSummary[] {
-  const target = name.trim().toLowerCase();
+  const target = identity.toLowerCase();
   return cases.filter((item) =>
     positions(item).some(
-      (position) => position.role === role && (position.name ?? '').trim().toLowerCase() === target,
+      (position) => position.role === role && identityOf(position, contactEmails) === target,
     ),
   );
 }
@@ -138,13 +201,16 @@ export function isPersonRole(value: string | undefined): value is PersonRole {
  *
  * `buildDirectory` deliberately emits a row per person *per position*, because that is
  * how a workload is read. Joining to the registry needs the opposite: one row per human,
- * keyed on something the registry also has. Name is all the case carries (AD-029 keeps
- * the person fields as text from the intake extract), so that is the key, lower-cased so
- * a difference in casing does not split one person into two.
+ * keyed on something the registry also has. The email wherever it is known is that key -
+ * stored on the case for the adviser and paraplanner, through the directory for a checker -
+ * so two people of one name stay two people and one person in two positions stays one. A
+ * name only for a legacy row with nothing better.
  */
 export interface PersonCaseload {
   /** As recorded on the case, for display. */
   name: string;
+  /** The key this caseload is filed under: `email:…`, `contact:…` or `name:…`. */
+  identity: string;
   roles: PersonRole[];
   code: string | null;
   totalCases: number;
@@ -155,7 +221,10 @@ export interface PersonCaseload {
   oldestOpenDays: number;
 }
 
-export function caseloadByName(cases: CaseSummary[]): Map<string, PersonCaseload> {
+export function caseloadByIdentity(
+  cases: CaseSummary[],
+  contactEmails: ContactEmails = new Map(),
+): Map<string, PersonCaseload> {
   const loads = new Map<string, PersonCaseload>();
   // A person can hold two positions on one case — adviser and checker, say. Counting the
   // case once per position would inflate their load, so each case is counted once per
@@ -164,14 +233,15 @@ export function caseloadByName(cases: CaseSummary[]): Map<string, PersonCaseload
 
   for (const item of cases) {
     for (const position of positions(item)) {
-      const name = position.name?.trim();
-      if (!name) continue;
+      const key = identityOf(position, contactEmails);
+      if (key === 'name:') continue;
 
-      const key = name.toLowerCase();
+      const name = (position.name ?? '').trim();
       const load =
         loads.get(key) ??
         ({
           name,
+          identity: key,
           roles: [],
           code: null,
           totalCases: 0,

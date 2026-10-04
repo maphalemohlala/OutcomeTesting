@@ -37,7 +37,12 @@ export function casesInScope(cases: CaseSummary[], filters: ReportFilters): Set<
     if (!withinRange(item.createdOn, filters.from, filters.to)) continue;
     if (filters.route === 'none' && item.route) continue;
     if (filters.route && filters.route !== 'none' && item.route !== filters.route) continue;
-    if (filters.adviser && item.adviser !== filters.adviser) continue;
+    if (
+      filters.adviser &&
+      (item.adviserEmail ?? '').trim().toLowerCase() !== filters.adviser.trim().toLowerCase()
+    ) {
+      continue;
+    }
     if (filters.checker && !matchesChecker(item, filters.checker)) continue;
     ids.add(item.id);
   }
@@ -73,4 +78,19 @@ export function distinctNames(values: (string | null | undefined)[]): string[] {
   return [...new Set(values.filter((v): v is string => Boolean(v)))].sort((a, b) =>
     a.localeCompare(b),
   );
+}
+
+/**
+ * The adviser filter's options, keyed on email so two advisers of one name stay apart. The
+ * label carries the name too, since the email alone cannot be matched back to a person by eye.
+ */
+export function adviserOptions(cases: CaseSummary[]): { value: string; label: string }[] {
+  const byEmail = new Map<string, string>();
+  for (const item of cases) {
+    const email = item.adviserEmail?.trim().toLowerCase();
+    if (email && !byEmail.has(email)) byEmail.set(email, item.adviser?.trim() || email);
+  }
+  return [...byEmail.entries()]
+    .map(([value, name]) => ({ value, label: name === value ? value : `${name} (${value})` }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 }

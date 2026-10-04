@@ -14,7 +14,12 @@ import { assignUserRole, setRoleAssignmentActive } from '../../services/commands
 import { useCaseWorklist } from '../cases/useCaseWorklist';
 import { useSecurityConfig } from '../admin/useSecurityConfig';
 import { useRoles } from '../admin/useRoles';
-import { caseloadByName, type PersonCaseload, type PersonRole } from './peopleDirectory';
+import {
+  caseloadByIdentity,
+  contactEmailsOf,
+  type PersonCaseload,
+  type PersonRole,
+} from './peopleDirectory';
 import { matchesRole } from './peopleFilters';
 import { RoleAssignment } from './RoleAssignmentCell';
 import { CreatePersonModal, EditPersonModal } from './PersonModals';
@@ -68,7 +73,7 @@ function zeroes(): Record<string, number> {
 /** Where a person's cases live: their first position, since that route is per-position. */
 function drillTo(load: PersonCaseload | null): string | null {
   const role: PersonRole | undefined = load?.roles[0];
-  return role ? `/people/${role}/${encodeURIComponent(load!.name)}` : null;
+  return role ? `/people/${role}/${encodeURIComponent(load!.identity)}` : null;
 }
 
 export function PeoplePage() {
@@ -105,9 +110,14 @@ export function PeoplePage() {
   const [roleBusy, setRoleBusy] = useState<string | null>(null);
   const intent = useIntentKeys();
 
+  const contactEmails = useMemo(
+    () => contactEmailsOf(directory.status === 'ready' ? directory.users : []),
+    [directory],
+  );
+
   const loads = useMemo(
-    () => caseloadByName(cases.status === 'ready' ? cases.cases : []),
-    [cases],
+    () => caseloadByIdentity(cases.status === 'ready' ? cases.cases : [], contactEmails),
+    [cases, contactEmails],
   );
 
   /**
@@ -139,7 +149,7 @@ export function PeoplePage() {
 
     // The directory is the spine: everyone in it appears, with or without cases.
     const registered = users.map((user) => {
-      const key = user.name.trim().toLowerCase();
+      const key = `email:${user.email.trim().toLowerCase()}`;
       claimed.add(key);
       return {
         key: `user:${user.id}`,

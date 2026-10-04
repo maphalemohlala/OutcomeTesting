@@ -3,6 +3,7 @@ import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import { REVIEW_ROUTES } from '../../types/domain';
 import type { CaseSummary } from '../cases/caseWorklistMapping';
 import {
+  adviserOptions,
   distinctNames,
   isFiltered,
   type ReportFilterKey,
@@ -20,7 +21,7 @@ interface Props {
 
 /** The worklist's filters that make sense for totals: import dates, route, adviser, checker. */
 export function ReportFilterBar({ idPrefix, cases, inScope, filters, onChange, onClear }: Props) {
-  const advisers = useMemo(() => distinctNames(cases.map((c) => c.adviser)), [cases]);
+  const advisers = useMemo(() => adviserOptions(cases), [cases]);
   const checkers = useMemo(
     () => distinctNames(cases.flatMap((c) => [c.taxChecker, c.aqsChecker])),
     [cases],
@@ -70,9 +71,9 @@ export function ReportFilterBar({ idPrefix, cases, inScope, filters, onChange, o
           onChange={(e) => onChange('adviser', e.target.value)}
         >
           <option value="">All advisers</option>
-          {advisers.map((name) => (
-            <option key={name} value={name}>
-              {name}
+          {advisers.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
