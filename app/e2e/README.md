@@ -32,6 +32,7 @@ Nothing about any environment is committed here. Set what you are pointing at:
 | `OT_REMEDIAL_CASE` | A case whose actions carry the checker's remedial action and an Action performed answer, **both a Yes and a No**. |
 | `OT_REMEDIAL_ACTION_ID` | One of that case's actions, for the write-once check. |
 | `OT_KEEP_ROOT_CAUSES` | `1` leaves the two root causes `checker-feedback.e2e.ts` saves, so they can be read back from Dataverse (answers carry no audit history). |
+| `OT_E2E_WRITE`, `OT_E2E_TARGET`, `OT_E2E_TESTER_EMAIL` | The PROD lifecycle run only - see [PROD-LIFECYCLE.md](PROD-LIFECYCLE.md). Unset, `prod-lifecycle.e2e.ts` skips. |
 
 Then:
 
@@ -71,10 +72,19 @@ a sign-off, or the spec is decoration.
 service, including the negatives. These specs only check that the page does not offer
 somebody a form they will be refused for filling in.
 
-Nothing here writes. No spec signs a case off, completes an action or records an outcome:
-they are read-only against a shared environment other people are using. The one exception is
-the allowlist spec, which deliberately attempts a write it expects to be **refused** — if
-that ever starts succeeding, the refusal is the finding.
+Nothing here writes by default. No spec signs a case off, completes an action or records an
+outcome unless it is told to: they are read-only against a shared environment other people
+are using.
+
+The one deliberate exception is `prod-lifecycle.e2e.ts`, which walks ONE marked test case
+through the whole lifecycle in PROD - upload, both checks, remediation, sign-off and regrade.
+It skips unless `OT_E2E_WRITE=PROD-LIFECYCLE` and `OT_E2E_TARGET` names the portal host it
+is pointed at, so `npm run e2e` never runs it. Its prerequisites, variables and how to read a
+failure are in [PROD-LIFECYCLE.md](PROD-LIFECYCLE.md).
+
+Among the read-only specs, the allowlist spec deliberately attempts a write it expects to be
+**refused** — if that ever starts succeeding, the refusal is the finding. A few others write
+only when `OT_ALLOW_WRITES=1` is set.
 
 ## Three vacuous passes, and the rule they leave
 
