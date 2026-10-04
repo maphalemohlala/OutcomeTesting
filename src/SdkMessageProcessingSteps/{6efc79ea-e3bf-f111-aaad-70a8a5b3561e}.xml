@@ -1,0 +1,38 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<SdkMessageProcessingStep Name="AdviserContactPlugin: Update of contact" SdkMessageProcessingStepId="{6efc79ea-e3bf-f111-aaad-70a8a5b3561e}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <SdkMessageId>20bebb1b-ea3e-db11-86a7-000a3a5473e8</SdkMessageId>
+  <PluginTypeName>OutcomeTesting.Plugins.AdviserContactPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f</PluginTypeName>
+  <PluginTypeId>2e5c3fd7-e3bf-f111-aaad-70a8a5b3561e</PluginTypeId>
+  <PrimaryEntity>contact</PrimaryEntity>
+  <AsyncAutoDelete>0</AsyncAutoDelete>
+  <Description>Follows a contact email change to the cases carrying the new and the old address (AD-228). PreImage: emailaddress1.</Description>
+  <FilteringAttributes>emailaddress1,statecode</FilteringAttributes>
+  <InvocationSource>1</InvocationSource>
+  <Mode>0</Mode>
+  <Rank>1</Rank>
+  <EventHandlerTypeCode>4602</EventHandlerTypeCode>
+  <Stage>40</Stage>
+  <IsCustomizable>1</IsCustomizable>
+  <IsHidden>0</IsHidden>
+  <SupportedDeployment>0</SupportedDeployment>
+  <IntroducedVersion>1.0</IntroducedVersion>
+  <!-- Stamped 2026-09-20, audit finding 3. Dataverse imports a step DISABLED
+       unless activation is requested, and an import that forgot the
+       activate-plugins flag switched these off once already (2026-09-02, six
+       al_response steps, unnoticed for a week). The export does not emit these
+       two elements, so round-trip-src.ps1 re-applies them after every export;
+       see Restore-StepState there. Do not remove either without reading that. -->
+  <StateCode>Enabled</StateCode>
+  <StatusCode>Enabled</StatusCode>
+  <SdkMessageProcessingStepImages>
+    <SdkMessageProcessingStepImage Name="PreImage">
+      <Description>Old email, so the cases still carrying it are followed too (AD-228).</Description>
+      <SdkMessageProcessingStepImageId>{37a4deea-efbf-f111-aaad-70a8a5b3561e}</SdkMessageProcessingStepImageId>
+      <Attributes>emailaddress1</Attributes>
+      <EntityAlias>PreImage</EntityAlias>
+      <ImageType>0</ImageType>
+      <MessagePropertyName>Target</MessagePropertyName>
+      <IsCustomizable>1</IsCustomizable>
+    </SdkMessageProcessingStepImage>
+  </SdkMessageProcessingStepImages>
+</SdkMessageProcessingStep>

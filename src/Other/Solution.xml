@@ -111,22 +111,33 @@
       <RootComponent type="91" id="{7b51d0d1-f5a1-f111-b8dd-e4fade069307}" schemaName="OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" behavior="0" />
       <RootComponent type="92" id="{01304cf3-21ac-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{08b31cc7-d4b4-f111-aaac-e4fade069307}" behavior="0" />
+      <RootComponent type="92" id="{098e9a75-7bb7-f111-aaac-e4fade069307}" behavior="0" />
+      <RootComponent type="92" id="{0d8e9a75-7bb7-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{0fd9d5b9-c0a3-f111-aaac-e4fade069307}" behavior="0" />
+      <RootComponent type="92" id="{10e553f5-7ab7-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{12d9d5b9-c0a3-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{16d9d5b9-c0a3-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{432da5a6-d0a6-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{462da5a6-d0a6-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{4ecc30ee-0ead-f111-aaac-e4fade069307}" behavior="0" />
+      <RootComponent type="92" id="{5008e5fb-7ab7-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{52cd83d4-a5b5-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{5bdd01c1-c0a3-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{5fdd01c1-c0a3-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{62dd01c1-c0a3-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{6887ed96-ceab-f111-aaac-e4fade069307}" behavior="0" />
+      <RootComponent type="92" id="{6efc79ea-e3bf-f111-aaad-70a8a5b3561e}" behavior="0" />
       <RootComponent type="92" id="{76bbe7e0-62a9-f111-aaac-e4fade069307}" behavior="0" />
+      <RootComponent type="92" id="{80999f10-7bb7-f111-aaac-e4fade069307}" behavior="0" />
+      <RootComponent type="92" id="{a52fa2e2-e3bf-f111-aaad-70a8a5b3561e}" behavior="0" />
+      <RootComponent type="92" id="{aba7fdf2-86b7-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{b22a72ef-b5a6-f111-aaac-e4fade069307}" behavior="0" />
+      <RootComponent type="92" id="{b87eb76c-7bb7-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{b8a554d4-d4b4-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{c3013097-56af-f111-aaac-e4fade069307}" behavior="0" />
+      <RootComponent type="92" id="{ce0e73a5-fabb-f111-aaad-e4fade0775c0}" behavior="0" />
       <RootComponent type="92" id="{d1786a92-1db4-f111-aaac-e4fade069307}" behavior="0" />
+      <RootComponent type="92" id="{dcab3dcc-86b7-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{e10a09ed-b8a7-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{e243f481-c1a6-f111-aaac-e4fade069307}" behavior="0" />
       <RootComponent type="92" id="{e3d62f51-e1a7-f111-aaac-e4fade069307}" behavior="0" />

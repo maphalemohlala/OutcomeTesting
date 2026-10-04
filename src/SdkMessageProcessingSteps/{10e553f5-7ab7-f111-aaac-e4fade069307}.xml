@@ -1,11 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<SdkMessageProcessingStep Name="RemediationResponseGuardPlugin: Update of al_remediationaction" SdkMessageProcessingStepId="{01304cf3-21ac-f111-aaac-e4fade069307}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<SdkMessageProcessingStep Name="CaseAccessGuardPlugin: Update of al_outcomecase" SdkMessageProcessingStepId="{10e553f5-7ab7-f111-aaac-e4fade069307}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <SdkMessageId>20bebb1b-ea3e-db11-86a7-000a3a5473e8</SdkMessageId>
-  <PluginTypeName>OutcomeTesting.Plugins.RemediationResponseGuardPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f</PluginTypeName>
-  <PluginTypeId>df7246ec-21ac-f111-aaac-e4fade069307</PluginTypeId>
-  <PrimaryEntity>al_remediationaction</PrimaryEntity>
+  <PluginTypeName>OutcomeTesting.Plugins.CaseAccessGuardPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f</PluginTypeName>
+  <PluginTypeId>41982ebd-7ab7-f111-aaac-e4fade069307</PluginTypeId>
+  <PrimaryEntity>al_outcomecase</PrimaryEntity>
   <AsyncAutoDelete>0</AsyncAutoDelete>
-  <FilteringAttributes>al_adviserresponse,al_evidencereference,al_clientcontactrequired,al_recheckrequired,al_changesadvice,al_actionperformed,al_remedialaction</FilteringAttributes>
+  <FilteringAttributes>al_taxcheckercontactid,al_aqscheckercontactid,al_aqsqueueaccountid,al_aqsqueuedon,al_advisercontactid,al_tcsupervisorcontactid</FilteringAttributes>
   <InvocationSource>1</InvocationSource>
   <Mode>0</Mode>
   <Rank>1</Rank>
