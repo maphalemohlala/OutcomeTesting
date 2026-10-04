@@ -420,6 +420,32 @@
   {% endcomment %}
   {% assign ot_is_case_tcmanager = false %}
   {% assign ot_case_adviser_email = c.al_adviseremail | default: '' %}
+
+  {% comment %}
+    How many ACTIVE portal contacts hold the adviser's email (F4, 2026-10-04 final review,
+    spec §1: "two contacts share an email" is a different problem from "no contact holds it"
+    at all - a duplicate onboarding to clean up, not a typo to fix - so the unassigned hint
+    below tells them apart). Skipped where the case carries no adviser email, the same guard
+    the mapping read just below uses: there is nothing to count. Counted with `.size` on the
+    assigned result rather than `entities[0]`, the shape this Liquid raises "Index was
+    outside the bounds of the array" for on an empty result.
+  {% endcomment %}
+  {% assign ot_adviser_holders = 0 %}
+  {% if ot_case_adviser_email != '' %}
+    {% fetchxml adviserholders %}
+    <fetch>
+      <entity name="contact">
+        <attribute name="contactid" />
+        <filter type="and">
+          <condition attribute="emailaddress1" operator="eq" value="{{ ot_case_adviser_email | xml_escape }}" />
+          <condition attribute="statecode" operator="eq" value="0" />
+        </filter>
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+    {% assign ot_adviser_holders = adviserholders.results.entities.size %}
+  {% endif %}
+
   {% if c and ot_case_adviser_email != '' and user %}
     {% fetchxml mymapping %}
     <fetch top="1">
@@ -780,7 +806,7 @@
                             <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
                             <td rowspan="{{ ot_count }}">—</td>
                           {% endif %}
-                          <td rowspan="{{ ot_count }}">{% if a.al_assignedcontactid %}{{ a.al_assignedcontactid.name | escape }}{% else %}<span class="ot-unassigned" title="The adviser email on this case is held by no single portal contact, so nobody can record a response on this action. Correct the adviser's email on the case, or add the person; the open actions then move to them.">Nobody assigned{% if c.al_adviseremail %} &mdash; {{ c.al_adviseremail | escape }} is held by no portal contact{% endif %}</span>{% endif %}</td>
+                          <td rowspan="{{ ot_count }}">{% if a.al_assignedcontactid %}{{ a.al_assignedcontactid.name | escape }}{% else %}<span class="ot-unassigned" title="The adviser email on this case is held by no single portal contact, so nobody can record a response on this action. Correct the adviser's email on the case, or add the person; the open actions then move to them.">Nobody assigned{% if c.al_adviseremail %} &mdash; {{ c.al_adviseremail | escape }} {% if ot_adviser_holders > 1 %}is shared by two portal contacts{% else %}is held by no portal contact{% endif %}{% endif %}</span>{% endif %}</td>
                           <td rowspan="{{ ot_count }}"><span class="ot-due" data-ot-due data-due="{{ a.al_duedate | date: 'yyyy-MM-dd' }}" data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</span></td>
                           <td rowspan="{{ ot_count }}" data-ot-row-status="{{ a.al_remediationactionid }}">{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
                           <td rowspan="{{ ot_count }}">

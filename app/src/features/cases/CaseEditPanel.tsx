@@ -28,7 +28,13 @@ import {
   type ManagedList,
 } from '../admin/listOptions';
 import { useAllListOptions } from '../admin/useListOptions';
-import { personRefusals, withPersonPairs, type PersonForm } from './casePeople';
+import {
+  emailDirectoryNote,
+  personRefusals,
+  staleEmailAfterRename,
+  withPersonPairs,
+  type PersonForm,
+} from './casePeople';
 import { useCaseReviews } from './useCaseReviews';
 import { allocatableDisciplines } from './allocationScope';
 import { useProductName } from '../../app/product/useProductName';
@@ -568,6 +574,13 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
     const value = form[field.attr];
     const inputId = `case-edit-${field.attr}`;
 
+    // Only once the directory has actually loaded - otherwise every email reads as "nobody
+    // active holds it" for the instant before the candidates arrive.
+    const directoryNote =
+      field.kind === 'email' && directory.status === 'ready'
+        ? emailDirectoryNote(typeof value === 'string' ? value : '', candidates.map((user) => user.email))
+        : null;
+
     // Shown and explained rather than hidden, which is how this panel treats a check it
     // cannot reallocate too: a deadline somebody cannot move is still a deadline they need
     // to see, and an empty space would read as a case with no due date.
@@ -650,7 +663,28 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
             value={typeof value === 'string' ? value : ''}
             onChange={(next) => setField(field.attr, field.kind, next)}
             onPick={(user) => {
-              if (user && field.emailAttr) setField(field.emailAttr, 'email', user.email);
+              const emailAttr = field.emailAttr;
+              if (!emailAttr) return;
+
+              if (user) {
+                setField(emailAttr, 'email', user.email);
+                return;
+              }
+
+              // The typed name resolves to nobody. If the email field still reads as it was
+              // saved, it is about to go stale under a new name (staleEmailAfterRename), so
+              // it is cleared rather than silently carried over; an email the user already
+              // typed themselves is left exactly as they left it.
+              setForm((prev) => {
+                const typedName = typeof prev[field.attr] === 'string' ? (prev[field.attr] as string) : '';
+                const savedName =
+                  typeof detail.edit[field.attr] === 'string' ? (detail.edit[field.attr] as string) : '';
+                const savedEmail =
+                  typeof detail.edit[emailAttr] === 'string' ? (detail.edit[emailAttr] as string) : '';
+                const currentEmail = typeof prev[emailAttr] === 'string' ? (prev[emailAttr] as string) : '';
+                if (!staleEmailAfterRename(savedName, savedEmail, typedName, currentEmail)) return prev;
+                return { ...prev, [emailAttr]: '' };
+              });
             }}
             placeholder="Not set"
           />
@@ -670,6 +704,11 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
           />
         )}
         {field.help ? <small className="case-edit__help">{field.help}</small> : null}
+        {directoryNote ? (
+          <small className="case-edit__help" role="status">
+            {directoryNote}
+          </small>
+        ) : null}
       </label>
     );
   }

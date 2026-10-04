@@ -243,12 +243,8 @@ namespace OutcomeTesting.Plugins
             // actions keep whoever did the work.
             if (CasePeople.AdviserEmailChanged(before, update))
             {
-                var moved = Remediation.AssignOpenActions(
-                    systemService, new EntityReference(CaseEntity, targetId), context.CorrelationId);
-                if (moved > 0)
-                {
-                    changes.Add("Re-pointed " + moved + " open remediation action(s) to the adviser email now on the case");
-                }
+                Remediation.ApplyAdviserEmailChange(
+                    systemService, new EntityReference(CaseEntity, targetId), context.CorrelationId, changes);
             }
 
             var auditId = CommandHelpers.WriteAuditEvent(

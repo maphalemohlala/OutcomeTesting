@@ -1027,6 +1027,33 @@ namespace OutcomeTesting.Plugins
             return moved;
         }
 
+        /// <summary>
+        /// Re-points the case's open remediation actions to whoever its adviser email now
+        /// resolves to, and appends the one audit line both edit paths show for it (AD-228):
+        /// "Re-pointed ... to the adviser email now on the case" when the email still resolves
+        /// to exactly one active contact, or "Unassigned ... no single active contact holds the
+        /// adviser email" when it does not - so the history reads as what actually happened,
+        /// not as a re-point that left nobody holding the action.
+        ///
+        /// Called only when the adviser email itself changed
+        /// (<see cref="CasePeople.AdviserEmailChanged"/>): a name-only change is a label and
+        /// this is never reached. Shared by <see cref="UpdateCaseDetailsPlugin"/> and
+        /// <see cref="CaseHeaderRequestPlugin"/> so the wording cannot drift between them.
+        /// </summary>
+        public static void ApplyAdviserEmailChange(
+            IOrganizationService service, EntityReference caseRef, Guid correlationId, List<string> changes)
+        {
+            var moved = AssignOpenActions(service, caseRef, correlationId);
+            if (moved == 0)
+            {
+                return;
+            }
+
+            changes.Add(AdviserContact(service, caseRef) != null
+                ? "Re-pointed " + moved + " open remediation action(s) to the adviser email now on the case"
+                : "Unassigned " + moved + " open remediation action(s): no single active contact holds the adviser email");
+        }
+
         private static Guid FindByCode(IOrganizationService service, string code)
         {
             var query = new QueryExpression(ActionEntity)

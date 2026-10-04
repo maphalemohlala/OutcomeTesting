@@ -26,4 +26,13 @@ describe('the portal case header people', () => {
     expect(remediation).toContain('is held by no portal contact');
     expect(remediation).not.toContain('is not a portal contact');
   });
+
+  it('counts ACTIVE contacts sharing the adviser email, by .size rather than entities[0]', () => {
+    expect(remediation).toContain('<condition attribute="emailaddress1" operator="eq" value="{{ ot_case_adviser_email | xml_escape }}" />');
+    expect(remediation).toContain('ot_adviser_holders = adviserholders.results.entities.size');
+  });
+
+  it('tells two contacts sharing the email apart from no contact holding it', () => {
+    expect(remediation).toContain('{% if ot_adviser_holders > 1 %}is shared by two portal contacts{% else %}is held by no portal contact{% endif %}');
+  });
 });

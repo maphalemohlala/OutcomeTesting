@@ -13,6 +13,8 @@ import { CaseOutcomeSummary } from './CaseOutcomeSummary';
 import { FailAccountabilityPanel } from './FailAccountabilityPanel';
 import { CaseHistoryPanel } from './CaseHistoryPanel';
 import { CaseEditPanel } from './CaseEditPanel';
+import { sharedEmailNote } from './casePeople';
+import { useUserDirectory } from '../../hooks/useUserDirectory';
 import './CaseDetailPage.css';
 
 /**
@@ -30,6 +32,18 @@ export function CaseDetailPage() {
   // Checks table that did not re-read said "AQS check allocated" in the banner while
   // still listing one check underneath it (F27).
   const reviews = useCaseReviews(caseId, reloadKey);
+  const directory = useUserDirectory();
+
+  // Spec §1 / F4 (2026-10-04 final review): "two contacts share <email>" is a different
+  // problem from "no contact holds <email>" - a duplicate onboarding to clean up, not a typo
+  // to correct - so it gets its own wording using the directory the page already loads.
+  const adviserDuplicateNote =
+    state.status === 'ready' && state.detail.adviserUnmatched && directory.status === 'ready'
+      ? sharedEmailNote(
+          state.detail.edit.al_adviseremail || '',
+          directory.users.filter((u) => u.active).map((u) => u.email),
+        )
+      : null;
 
   return (
     <>
@@ -196,10 +210,14 @@ export function CaseDetailPage() {
 
                     {state.detail.adviserUnmatched ? (
                       <p className="case-detail__notice" role="status">
-                        Adviser not matched: no single active person holds the email{' '}
-                        {state.detail.edit.al_adviseremail || '(none recorded)'}, so no adviser
-                        can see this case yet. Correct the adviser&apos;s email on the case, or
-                        add or correct the person on the People page.
+                        {adviserDuplicateNote ?? (
+                          <>
+                            Adviser not matched: no single active person holds the email{' '}
+                            {state.detail.edit.al_adviseremail || '(none recorded)'}, so no adviser
+                            can see this case yet. Correct the adviser&apos;s email on the case, or
+                            add or correct the person on the People page.
+                          </>
+                        )}
                       </p>
                     ) : null}
 

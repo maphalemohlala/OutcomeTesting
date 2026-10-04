@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Xunit;
@@ -147,6 +148,59 @@ namespace OutcomeTesting.Plugins.Tests
             Action(svc, Remediation.StatusOpen);
 
             Assert.Equal(0, Remediation.AssignOpenActions(svc, Ref(), Correlation));
+        }
+
+        /// <summary>
+        /// The one audit line both edit paths show for an adviser email change (AD-228, F3 of
+        /// the 2026-10-04 final review): "Re-pointed" when the new email still resolves to
+        /// exactly one active contact, "Unassigned ... no single active contact holds the
+        /// adviser email" when it does not - never "Re-pointed" for a move that actually left
+        /// the action with nobody.
+        /// </summary>
+        public class ApplyAdviserEmailChangeTests
+        {
+            [Fact]
+            public void Reports_a_repoint_when_the_new_email_resolves_to_one_contact()
+            {
+                var svc = Case("Sam Adviser");
+                Action(svc, Remediation.StatusOpen);
+                var changes = new List<string>();
+
+                Remediation.ApplyAdviserEmailChange(svc, Ref(), Correlation, changes);
+
+                Assert.Equal(
+                    new[] { "Re-pointed 1 open remediation action(s) to the adviser email now on the case" },
+                    changes);
+            }
+
+            [Fact]
+            public void Reports_an_unassign_when_the_new_email_resolves_to_nobody()
+            {
+                // The case's adviser email matches no active contact: the action held by the
+                // previous adviser is cleared, and the line must say so rather than claim a
+                // re-point that did not happen.
+                var svc = Case("Nobody Known");
+                Action(svc, Remediation.StatusOpen, assignedTo: AdviserId);
+                var changes = new List<string>();
+
+                Remediation.ApplyAdviserEmailChange(svc, Ref(), Correlation, changes);
+
+                Assert.Equal(
+                    new[] { "Unassigned 1 open remediation action(s): no single active contact holds the adviser email" },
+                    changes);
+            }
+
+            [Fact]
+            public void Adds_nothing_when_no_open_action_moves()
+            {
+                var svc = Case("Sam Adviser");
+                Action(svc, Remediation.StatusOpen, assignedTo: AdviserId);
+                var changes = new List<string>();
+
+                Remediation.ApplyAdviserEmailChange(svc, Ref(), Correlation, changes);
+
+                Assert.Empty(changes);
+            }
         }
     }
 }

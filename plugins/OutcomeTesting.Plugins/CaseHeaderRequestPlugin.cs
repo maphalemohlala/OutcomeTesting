@@ -267,12 +267,8 @@ namespace OutcomeTesting.Plugins
             // actions with it, exactly as the Code App's edit does.
             if (CasePeople.AdviserEmailChanged(before, update))
             {
-                var moved = Remediation.AssignOpenActions(
-                    service, new EntityReference(CaseEntity, caseId), context.CorrelationId);
-                if (moved > 0)
-                {
-                    changes.Add("Re-pointed " + moved + " open remediation action(s) to the adviser email now on the case");
-                }
+                Remediation.ApplyAdviserEmailChange(
+                    service, new EntityReference(CaseEntity, caseId), context.CorrelationId, changes);
             }
 
             // Named to the contact, not the caller: a portal write reaches Dataverse as the
