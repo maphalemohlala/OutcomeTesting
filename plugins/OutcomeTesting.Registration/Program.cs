@@ -10299,11 +10299,21 @@ int BackfillPeopleEmail(string orgUrl, bool confirm)
         c => c.Id,
         c => fills.Where(f => f.Id == c.Id && f.Attr == "al_adviseremail").Select(f => f.Email).FirstOrDefault()
              ?? c.GetAttributeValue<string>("al_adviseremail"));
-    var actions = svc.RetrieveMultiple(new FetchExpression(
-        "<fetch><entity name=\"al_remediationaction\"><attribute name=\"al_remediationactionid\"/>" +
-        "<attribute name=\"al_outcomecaseid\"/><attribute name=\"al_assignedcontactid\"/><filter>" +
-        "<condition attribute=\"al_actionstatus\" operator=\"ne\" value=\"120910602\"/>" +
-        "</filter></entity></fetch>")).Entities;
+    var actions = new List<Entity>();
+    var actionQuery = new QueryExpression("al_remediationaction")
+    {
+        ColumnSet = new ColumnSet("al_outcomecaseid", "al_assignedcontactid"),
+        PageInfo = new PagingInfo { Count = 5000, PageNumber = 1 },
+    };
+    actionQuery.Criteria.AddCondition("al_actionstatus", ConditionOperator.NotEqual, StatusCompleted);
+    while (true)
+    {
+        var page = svc.RetrieveMultiple(actionQuery);
+        actions.AddRange(page.Entities);
+        if (!page.MoreRecords) break;
+        actionQuery.PageInfo.PageNumber++;
+        actionQuery.PageInfo.PagingCookie = page.PagingCookie;
+    }
     foreach (var action in actions)
     {
         var caseRef = action.GetAttributeValue<EntityReference>("al_outcomecaseid");
