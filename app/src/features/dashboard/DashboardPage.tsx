@@ -12,6 +12,8 @@ import { toSummary } from '../cases/caseWorklistMapping';
 import { casesInScope, narrowToScope, worklistLink, type ReportFilters } from './reportFilters';
 import { ReportFilterBar } from './ReportFilterBar';
 import { useReportFilters } from './useReportFilters';
+import { useUserDirectory } from '../../hooks/useUserDirectory';
+import { contactEmailsOf } from '../people/peopleDirectory';
 import './DashboardPage.css';
 
 /** Matches the OutcomeIndicator silhouettes so the bar reinforces the same grade. */
@@ -135,9 +137,17 @@ type ReadyState = Extract<ReturnType<typeof useCaseDashboard>, { status: 'ready'
 
 function FilteredDashboard({ cases, outcomes, actions }: Omit<ReadyState, 'status'>) {
   const [filters, setFilter, clearFilters] = useReportFilters();
+  const directory = useUserDirectory();
 
   const summaries = useMemo(() => cases.map((record) => toSummary(record)), [cases]);
-  const scope = useMemo(() => casesInScope(summaries, filters), [summaries, filters]);
+  const contactEmails = useMemo(
+    () => contactEmailsOf(directory.status === 'ready' ? directory.users : []),
+    [directory],
+  );
+  const scope = useMemo(
+    () => casesInScope(summaries, filters, contactEmails),
+    [summaries, filters, contactEmails],
+  );
 
   const data = useMemo(
     () =>
@@ -158,6 +168,7 @@ function FilteredDashboard({ cases, outcomes, actions }: Omit<ReadyState, 'statu
         filters={filters}
         onChange={setFilter}
         onClear={clearFilters}
+        contactEmails={contactEmails}
       />
       <DashboardBody data={data} filters={filters} />
     </>

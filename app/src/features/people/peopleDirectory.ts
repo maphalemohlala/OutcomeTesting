@@ -29,6 +29,28 @@ export function personKey(role: PersonRole, identity: string): string {
   return `${role}:${identity.toLowerCase()}`;
 }
 
+const IDENTITY_PREFIXES = ['email:', 'contact:', 'name:'];
+
+/**
+ * True for a value already in the `email:`/`contact:`/`name:` scheme `identityOf` produces.
+ */
+export function isIdentityKey(value: string): boolean {
+  const lower = value.trim().toLowerCase();
+  return IDENTITY_PREFIXES.some((prefix) => lower.startsWith(prefix));
+}
+
+/**
+ * A route key as a bookmark or saved filter may still hold it, normalised to the identity
+ * scheme. Already-prefixed values pass through lower-cased and unchanged; a bare value -
+ * what every link held before identities existed - is treated as a name (item 2, 2026-10-04
+ * review): that is what the bookmark always meant, so it goes on meaning that rather than
+ * silently matching nobody.
+ */
+export function normalizeIdentityKey(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  return isIdentityKey(trimmed) ? trimmed : `name:${trimmed}`;
+}
+
 export type ContactEmails = ReadonlyMap<string, string>;
 
 export function contactEmailsOf(users: { id: string; email: string }[]): ContactEmails {
@@ -107,6 +129,38 @@ export function positions(item: CaseSummary): Position[] {
     ...checkers(item),
     { role: 'Owner', name: item.owner, code: null, email: null, contactId: null },
   ];
+}
+
+/**
+ * A human label for an identity key, for a scope note that names who a filter is narrowed
+ * to (items 1-3 of the 2026-10-04 follow-up: the worklist's "checked by" and "involving"
+ * notes must never print a raw `email:`/`contact:` key).
+ *
+ * Searches every position on `cases` for one carrying that identity and returns its name.
+ * A value with no `email:`/`contact:`/`name:` prefix is already a name - a legacy bookmark
+ * or saved filter, or the checker filter's own bare-name fallback - and is returned as is.
+ * An `email:` key nobody on `cases` carries falls back to the email itself, the one
+ * recognisable part of it; any other unmatched key falls back to the text after its prefix.
+ */
+export function labelForIdentity(
+  cases: CaseSummary[],
+  identity: string,
+  contactEmails: ContactEmails = new Map(),
+): string {
+  if (!isIdentityKey(identity)) return identity;
+
+  const target = normalizeIdentityKey(identity);
+  for (const item of cases) {
+    for (const position of positions(item)) {
+      if (identityOf(position, contactEmails) !== target) continue;
+      const name = (position.name ?? '').trim();
+      if (name) return name;
+    }
+  }
+
+  const email = emailFromIdentity(target);
+  if (email) return email;
+  return target.replace(/^(email|contact|name):/, '');
 }
 
 /**
@@ -207,7 +261,7 @@ export function casesForPerson(
   identity: string,
   contactEmails: ContactEmails = new Map(),
 ): CaseSummary[] {
-  const target = identity.toLowerCase();
+  const target = normalizeIdentityKey(identity);
   return cases.filter((item) =>
     positions(item).some(
       (position) => position.role === role && identityOf(position, contactEmails) === target,

@@ -13,7 +13,13 @@ import { useCaseWorklist } from './useCaseWorklist';
 import type { CaseRemediation } from './caseRemediation';
 import { applyFilters, FILTER_KEYS, type FilterKey, type Filters } from './worklistFilters';
 import { useUserDirectory } from '../../hooks/useUserDirectory';
-import { adviserIdentity, checkerIdentity, contactEmailsOf, type ContactEmails } from '../people/peopleDirectory';
+import {
+  adviserIdentity,
+  checkerIdentity,
+  contactEmailsOf,
+  labelForIdentity,
+  type ContactEmails,
+} from '../people/peopleDirectory';
 import './CaseWorklistPage.css';
 
 /**
@@ -276,7 +282,14 @@ export function CaseWorklistPage() {
                 </>
               ) : null}
               {filters.adviser && filters.checker ? ' and' : null}
-              {filters.checker ? <> checked by <strong>{filters.checker}</strong></> : null}.{' '}
+              {filters.checker ? (
+                <>
+                  {' '}
+                  checked by{' '}
+                  <strong>{labelForIdentity(allCases, filters.checker, contactEmails)}</strong>
+                </>
+              ) : null}
+              .{' '}
               <button
                 type="button"
                 className="worklist__scope-clear"
@@ -294,7 +307,8 @@ export function CaseWorklistPage() {
 
           {filters.person ? (
             <p className="worklist__scope" role="status">
-              Showing cases involving <strong>{filters.person}</strong>.{' '}
+              Showing cases involving{' '}
+              <strong>{labelForIdentity(allCases, filters.person, contactEmails)}</strong>.{' '}
               <button
                 type="button"
                 className="worklist__scope-clear"

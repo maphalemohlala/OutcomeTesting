@@ -1,5 +1,6 @@
 import type { CaseSummary } from '../cases/caseWorklistMapping';
-import { matchesChecker, withinRange } from '../cases/worklistFilters';
+import { matchesAdviser, matchesChecker, withinRange } from '../cases/worklistFilters';
+import { checkerIdentity, type ContactEmails } from '../people/peopleDirectory';
 
 /**
  * The filters the Dashboard and Management reporting share (2026-09-28): the worklist's
@@ -29,7 +30,11 @@ export function isFiltered(filters: ReportFilters): boolean {
  * Null rather than every id, because an unfiltered page must count exactly what it counted
  * before filters existed - including an outcome or action row that names no case.
  */
-export function casesInScope(cases: CaseSummary[], filters: ReportFilters): Set<string> | null {
+export function casesInScope(
+  cases: CaseSummary[],
+  filters: ReportFilters,
+  contactEmails: ContactEmails = new Map(),
+): Set<string> | null {
   if (!isFiltered(filters)) return null;
 
   const ids = new Set<string>();
@@ -37,13 +42,8 @@ export function casesInScope(cases: CaseSummary[], filters: ReportFilters): Set<
     if (!withinRange(item.createdOn, filters.from, filters.to)) continue;
     if (filters.route === 'none' && item.route) continue;
     if (filters.route && filters.route !== 'none' && item.route !== filters.route) continue;
-    if (
-      filters.adviser &&
-      (item.adviserEmail ?? '').trim().toLowerCase() !== filters.adviser.trim().toLowerCase()
-    ) {
-      continue;
-    }
-    if (filters.checker && !matchesChecker(item, filters.checker)) continue;
+    if (filters.adviser && !matchesAdviser(item, filters.adviser)) continue;
+    if (filters.checker && !matchesChecker(item, filters.checker, contactEmails)) continue;
     ids.add(item.id);
   }
   return ids;
@@ -73,13 +73,6 @@ export function worklistLink(to: string, filters: ReportFilters): string {
   return text ? `${path}?${text}` : path;
 }
 
-/** Distinct, sorted names for a filter's options. */
-export function distinctNames(values: (string | null | undefined)[]): string[] {
-  return [...new Set(values.filter((v): v is string => Boolean(v)))].sort((a, b) =>
-    a.localeCompare(b),
-  );
-}
-
 /**
  * The adviser filter's options, keyed on email so two advisers of one name stay apart. The
  * label carries the name too, since the email alone cannot be matched back to a person by eye.
@@ -92,5 +85,33 @@ export function adviserOptions(cases: CaseSummary[]): { value: string; label: st
   }
   return [...byEmail.entries()]
     .map(([value, name]) => ({ value, label: name === value ? value : `${name} (${value})` }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/**
+ * The checker filter's options, keyed on the same identity `matchesChecker` now matches
+ * against (item 1, 2026-10-04 review) - email where the directory has it, else contact id -
+ * so two checkers who share a name stay apart as separate options rather than one the filter
+ * cannot tell apart.
+ */
+export function checkerOptions(
+  cases: CaseSummary[],
+  contactEmails: ContactEmails = new Map(),
+): { value: string; label: string }[] {
+  const byIdentity = new Map<string, string>();
+  for (const item of cases) {
+    const entries: readonly [string | null, string | null][] = [
+      [item.taxChecker, item.taxCheckerId],
+      [item.aqsChecker, item.aqsCheckerId],
+    ];
+    for (const [name, contactId] of entries) {
+      const trimmed = name?.trim();
+      if (!trimmed) continue;
+      const identity = checkerIdentity(trimmed, contactId, contactEmails);
+      if (!byIdentity.has(identity)) byIdentity.set(identity, trimmed);
+    }
+  }
+  return [...byIdentity.entries()]
+    .map(([value, name]) => ({ value, label: name }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }

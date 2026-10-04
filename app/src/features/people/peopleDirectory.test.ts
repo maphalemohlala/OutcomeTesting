@@ -7,6 +7,8 @@ import {
   contactEmailsOf,
   emailFromIdentity,
   isPersonRole,
+  labelForIdentity,
+  positions,
 } from './peopleDirectory';
 import type { CaseSummary } from '../cases/caseWorklistMapping';
 
@@ -124,6 +126,73 @@ describe('casesForPerson', () => {
 
   it('matches case-insensitively so a link survives a differently cased name', () => {
     expect(casesForPerson(cases, 'Adviser', 'name:Jane Adviser')).toHaveLength(1);
+  });
+});
+
+describe('casesForPerson (a bookmark or saved filter with no identity prefix)', () => {
+  // Item 2, 2026-10-04 review: `/people/Adviser/<bare name>` links made before identities
+  // existed carry no `email:`/`contact:`/`name:` prefix at all. That bare key must still
+  // match by name, rather than silently matching nobody now the comparison is to an identity.
+  it('treats a raw, unprefixed key as a name match', () => {
+    const cases = [
+      caseRow({ id: 'a', adviser: 'Jane Adviser', adviserEmail: null }),
+      caseRow({ id: 'b', adviser: 'Someone Else', adviserEmail: null }),
+    ];
+    expect(casesForPerson(cases, 'Adviser', 'Jane Adviser').map((c) => c.id)).toEqual(['a']);
+  });
+});
+
+describe("positions (the People page's checker grouping, item 3 2026-10-04 review)", () => {
+  it('collapses two checker columns naming the same contact id to one position', () => {
+    const item = caseRow({
+      taxChecker: 'Carol Checker',
+      taxCheckerId: 'C1',
+      aqsChecker: 'Carol Checker',
+      aqsCheckerId: 'c1',
+    });
+    const checkers = positions(item).filter((p) => p.role === 'Checker');
+    expect(checkers).toHaveLength(1);
+  });
+
+  it('keeps two checkers of the same name but different contact ids apart', () => {
+    const item = caseRow({
+      taxChecker: 'Carol Checker',
+      taxCheckerId: 'C1',
+      aqsChecker: 'Carol Checker',
+      aqsCheckerId: 'C2',
+    });
+    const checkers = positions(item).filter((p) => p.role === 'Checker');
+    expect(checkers).toHaveLength(2);
+  });
+});
+
+describe('labelForIdentity (worklist scope notes, follow-up to the 2026-10-04 review)', () => {
+  it('shows a legacy, unprefixed value exactly as it is - it is already a name', () => {
+    expect(labelForIdentity([], 'C. Checker')).toBe('C. Checker');
+  });
+
+  it('finds the name behind an email: identity, from whichever position carries it', () => {
+    const cases = [caseRow({ id: 'a', adviser: 'Jane Adviser', adviserEmail: 'jane@example.com' })];
+    expect(labelForIdentity(cases, 'email:jane@example.com')).toBe('Jane Adviser');
+  });
+
+  it('finds the name behind a contact: identity, via a checker position', () => {
+    const cases = [caseRow({ id: 'a', taxChecker: 'Carol Checker', taxCheckerId: 'C1' })];
+    expect(labelForIdentity(cases, 'contact:c1')).toBe('Carol Checker');
+  });
+
+  it('resolves a contact id through the directory email, same as the identity it names', () => {
+    const cases = [caseRow({ id: 'a', taxChecker: 'Carol Checker', taxCheckerId: 'C1' })];
+    const contactEmails = contactEmailsOf([{ id: 'c1', email: 'carol@example.com' }]);
+    expect(labelForIdentity(cases, 'email:carol@example.com', contactEmails)).toBe('Carol Checker');
+  });
+
+  it('falls back to the email for an email: identity nobody on these cases carries', () => {
+    expect(labelForIdentity([], 'email:nobody@example.com')).toBe('nobody@example.com');
+  });
+
+  it('falls back to the id for a contact: identity nobody on these cases carries', () => {
+    expect(labelForIdentity([], 'contact:c9')).toBe('c9');
   });
 });
 

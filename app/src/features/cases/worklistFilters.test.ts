@@ -68,4 +68,34 @@ describe('the adviser filter keys on email, so two advisers of one name stay apa
     expect(filtered(cases, { adviser: 'ADAM.SMITH2@example.com' })).toEqual(['2']);
     expect(filtered(cases, { person: 'email:adam.smith@example.com' })).toEqual(['1']);
   });
+
+  // Item 2, 2026-10-04 review: a saved filter or bookmark from before advisers were keyed
+  // by email held a bare name. It must keep matching by name rather than silently matching
+  // nobody now the filter compares emails.
+  it('falls back to a name match for a legacy, non-email adviser value', () => {
+    const cases = [
+      row('1', { adviser: 'Adam Smith', adviserEmail: 'adam.smith@example.com' }),
+      row('2', { adviser: 'Someone Else', adviserEmail: 'someone@example.com' }),
+    ];
+    expect(filtered(cases, { adviser: 'Adam Smith' })).toEqual(['1']);
+  });
+});
+
+describe('the checker filter keys on identity, so two checkers of one name stay apart (item 1, 2026-10-04 review)', () => {
+  it('matches an identity-prefixed value by contact id, not name', () => {
+    const cases = [
+      row('tax', { taxChecker: 'Carol Checker', taxCheckerId: 'c1' }),
+      row('aqs', { aqsChecker: 'Carol Checker', aqsCheckerId: 'c2' }),
+    ];
+    expect(filtered(cases, { checker: 'contact:c1' })).toEqual(['tax']);
+    expect(filtered(cases, { checker: 'contact:c2' })).toEqual(['aqs']);
+  });
+
+  it('still matches a legacy, unprefixed checker name', () => {
+    const cases = [
+      row('tax', { taxChecker: 'C. Checker' }),
+      row('aqs', { aqsChecker: 'C. Checker' }),
+    ];
+    expect(filtered(cases, { checker: 'C. Checker' })).toEqual(['tax', 'aqs']);
+  });
 });

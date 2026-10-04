@@ -33,7 +33,6 @@ import {
   personRefusals,
   staleEmailAfterRename,
   withPersonPairs,
-  type PersonForm,
 } from './casePeople';
 import { useCaseReviews } from './useCaseReviews';
 import { allocatableDisciplines } from './allocationScope';
@@ -434,7 +433,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
       if (current === original) continue;
       changed[field.attr] = current == null ? '' : String(current);
     }
-    return withPersonPairs(changed, form as unknown as PersonForm);
+    return withPersonPairs(changed, form);
   }
 
   /** al_UpdateCaseDetails, or 'skipped' when the user changed no fields. */
@@ -526,7 +525,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
       // ordinary way to break this.
       adviceDateOnRecord: typeof form.al_advicedate === 'string' ? form.al_advicedate : null,
     });
-    const refusals = [...found, ...personRefusals(changed, form as unknown as PersonForm)];
+    const refusals = [...found, ...personRefusals(changed, form)];
     setErrors(refusals);
     if (refusals.length > 0) return;
 

@@ -22,6 +22,25 @@ describe('the portal case header people', () => {
     expect(reviewTemplate).toContain("var PERSON_PAIRS = [['al_advisername', 'al_adviseremail'], ['al_paraplanner', 'al_paraplanneremail']];");
   });
 
+  // Item 6, 2026-10-04 review: the Paraplanner email row sat above the Paraplanner row
+  // itself. Each email row must come directly after its own name row.
+  it('puts each email row directly after its own name row', () => {
+    const indexOf = (needle: string) => reviewTemplate.indexOf(needle);
+    const adviserName = indexOf('data-ot-hdr="al_advisername"');
+    const adviserEmail = indexOf('data-ot-hdr="al_adviseremail"');
+    const paraplannerName = indexOf('data-ot-hdr="al_paraplanner"');
+    const paraplannerEmail = indexOf('data-ot-hdr="al_paraplanneremail"');
+
+    expect(adviserName).toBeGreaterThanOrEqual(0);
+    expect(adviserEmail).toBeGreaterThanOrEqual(0);
+    expect(paraplannerName).toBeGreaterThanOrEqual(0);
+    expect(paraplannerEmail).toBeGreaterThanOrEqual(0);
+
+    expect(adviserName).toBeLessThan(adviserEmail);
+    expect(adviserEmail).toBeLessThan(paraplannerName);
+    expect(paraplannerName).toBeLessThan(paraplannerEmail);
+  });
+
   it('explains an unassigned action by the email, not the name', () => {
     expect(remediation).toContain('is held by no portal contact');
     expect(remediation).not.toContain('is not a portal contact');

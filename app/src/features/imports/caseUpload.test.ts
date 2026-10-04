@@ -426,16 +426,45 @@ describe('the supplied extract', () => {
 });
 
 describe('people on an imported row (email identity)', () => {
-  const header = 'TaskID,AdviserName,AdviserEmail,AssignedBy,ParaplannerEmail';
+  // Checklist columns are included so a row that passes the people check still has to be
+  // accepted or rejected on its own terms, rather than failing on "no checklist item" for
+  // every case here (T3, 2026-10-04 review: this covered 4 of the 6 rejection reasons, and
+  // never pinned the accepted row).
+  const header =
+    'TaskID,AdviserName,AdviserEmail,AssignedBy,ParaplannerEmail,ChecklistItem1,CompletedBy1,CompletionDate1';
+  const checklist = 'Tax Check,Miko Stewart,2026-09-04T13:54:00';
 
   it.each([
-    ['T1,Sam Adviser,,Pip Planner,pip@example.com', 'AdviserEmail'],
-    ['T1,Sam Adviser,sam@example.com,Pip Planner,', 'ParaplannerEmail'],
-    ['T1,,sam@example.com,Pip Planner,pip@example.com', 'AdviserName'],
-    ['T1,Sam Adviser,Sam Adviser,Pip Planner,pip@example.com', 'is not an email address'],
+    [`T1,Sam Adviser,,Pip Planner,pip@example.com,${checklist}`, '"AdviserEmail" is empty'],
+    [`T1,Sam Adviser,sam@example.com,Pip Planner,,${checklist}`, '"ParaplannerEmail" is empty'],
+    [`T1,,sam@example.com,Pip Planner,pip@example.com,${checklist}`, '"AdviserName" is empty'],
+    [
+      `T1,Sam Adviser,Sam Adviser,Pip Planner,pip@example.com,${checklist}`,
+      '"AdviserEmail" value "Sam Adviser" is not an email address',
+    ],
+    // The paraplanner's name column (AssignedBy) missing - the other half of item 5.
+    [`T1,Sam Adviser,sam@example.com,,pip@example.com,${checklist}`, '"AssignedBy" is empty'],
+    // The paraplanner's email malformed - distinct from the adviser's, so the two rejection
+    // paths through peopleError's second pair are each pinned.
+    [
+      `T1,Sam Adviser,sam@example.com,Pip Planner,Pip Planner,${checklist}`,
+      '"ParaplannerEmail" value "Pip Planner" is not an email address',
+    ],
   ])('rejects %s', (row, fragment) => {
     const result = parseCaseCsv(`${header}\n${row}`);
     expect(result.valid).toHaveLength(0);
     expect(result.invalid[0].reason).toContain(fragment);
+  });
+
+  it('accepts a row that names and emails both the adviser and the paraplanner', () => {
+    const result = parseCaseCsv(
+      `${header}\nT1,Sam Adviser,sam@example.com,Pip Planner,pip@example.com,${checklist}`,
+    );
+    expect(result.invalid).toHaveLength(0);
+    expect(result.valid).toHaveLength(1);
+    expect(result.valid[0].record.al_advisername).toBe('Sam Adviser');
+    expect(result.valid[0].record.al_adviseremail).toBe('sam@example.com');
+    expect(result.valid[0].record.al_paraplanner).toBe('Pip Planner');
+    expect(result.valid[0].record.al_paraplanneremail).toBe('pip@example.com');
   });
 });

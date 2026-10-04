@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { useCaseWorklist } from '../cases/useCaseWorklist';
+import { useUserDirectory } from '../../hooks/useUserDirectory';
+import { contactEmailsOf } from '../people/peopleDirectory';
 import { casesInScope, narrowToScope, worklistLink } from '../dashboard/reportFilters';
 import { ReportFilterBar } from '../dashboard/ReportFilterBar';
 import { useReportFilters } from '../dashboard/useReportFilters';
@@ -13,14 +15,19 @@ import './ReportsPage.css';
 export function ReportsPage() {
   const state = useReports();
   const worklist = useCaseWorklist();
+  const directory = useUserDirectory();
   const [filters, setFilter, clearFilters] = useReportFilters();
 
   const cases = useMemo(() => (worklist.status === 'ready' ? worklist.cases : []), [worklist]);
+  const contactEmails = useMemo(
+    () => contactEmailsOf(directory.status === 'ready' ? directory.users : []),
+    [directory],
+  );
   // Unscoped until the cases are in: filtering against an empty case list would zero every
   // figure, which reads as "nothing happened" rather than "not loaded yet".
   const scope = useMemo(
-    () => (worklist.status === 'ready' ? casesInScope(cases, filters) : null),
-    [worklist.status, cases, filters],
+    () => (worklist.status === 'ready' ? casesInScope(cases, filters, contactEmails) : null),
+    [worklist.status, cases, filters, contactEmails],
   );
 
   const data = useMemo(
@@ -66,6 +73,7 @@ export function ReportsPage() {
               filters={filters}
               onChange={setFilter}
               onClear={clearFilters}
+              contactEmails={contactEmails}
             />
           ) : null}
 

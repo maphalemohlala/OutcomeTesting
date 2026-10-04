@@ -4,6 +4,7 @@ import {
   EMPTY_REPORT_FILTERS,
   adviserOptions,
   casesInScope,
+  checkerOptions,
   narrowToScope,
   worklistLink,
   type ReportFilters,
@@ -61,6 +62,28 @@ describe('casesInScope', () => {
 
     expect([...(scope(cases, { checker: 'C. Checker' }) ?? [])]).toEqual(['tax', 'aqs']);
   });
+
+  // Item 1, 2026-10-04 review: two checkers sharing a name must stay apart once the filter
+  // value is an identity rather than a bare name.
+  it('keeps two checkers of one name apart when matched by identity', () => {
+    const cases = [
+      row('tax', { taxChecker: 'Carol Checker', taxCheckerId: 'c1' }),
+      row('aqs', { aqsChecker: 'Carol Checker', aqsCheckerId: 'c2' }),
+    ];
+
+    expect([...(scope(cases, { checker: 'contact:c1' }) ?? [])]).toEqual(['tax']);
+  });
+
+  // Item 2, 2026-10-04 review: the adviser filter's own legacy value, a bare name from
+  // before advisers were keyed by email.
+  it('falls back to a name match for a legacy, non-email adviser value', () => {
+    const cases = [
+      row('1', { adviser: 'Adam Smith', adviserEmail: 'adam.smith@example.com' }),
+      row('2', { adviser: 'Someone Else', adviserEmail: 'someone@example.com' }),
+    ];
+
+    expect([...(scope(cases, { adviser: 'Adam Smith' }) ?? [])]).toEqual(['1']);
+  });
 });
 
 describe('narrowToScope', () => {
@@ -102,5 +125,25 @@ describe('adviserOptions', () => {
       { value: 'adam.smith@example.com', label: 'Adam Smith (adam.smith@example.com)' },
       { value: 'adam.smith2@example.com', label: 'Adam Smith (adam.smith2@example.com)' },
     ]);
+  });
+});
+
+describe('checkerOptions', () => {
+  // Item 1, 2026-10-04 review: options are keyed on identity, so two checkers who share a
+  // name offer two distinct choices rather than one the filter cannot tell apart.
+  it('offers two checkers of one name as distinct options, keyed by contact id', () => {
+    const cases = [
+      row('tax', { taxChecker: 'Carol Checker', taxCheckerId: 'c1' }),
+      row('aqs', { aqsChecker: 'Carol Checker', aqsCheckerId: 'c2' }),
+    ];
+    expect(checkerOptions(cases)).toEqual([
+      { value: 'contact:c1', label: 'Carol Checker' },
+      { value: 'contact:c2', label: 'Carol Checker' },
+    ]);
+  });
+
+  it('de-duplicates a checker who appears in both disciplines', () => {
+    const cases = [row('1', { taxChecker: 'Carol Checker', taxCheckerId: 'c1', aqsChecker: 'Carol Checker', aqsCheckerId: 'c1' })];
+    expect(checkerOptions(cases)).toEqual([{ value: 'contact:c1', label: 'Carol Checker' }]);
   });
 });

@@ -2,9 +2,10 @@ import { useMemo } from 'react';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import { REVIEW_ROUTES } from '../../types/domain';
 import type { CaseSummary } from '../cases/caseWorklistMapping';
+import type { ContactEmails } from '../people/peopleDirectory';
 import {
   adviserOptions,
-  distinctNames,
+  checkerOptions,
   isFiltered,
   type ReportFilterKey,
   type ReportFilters,
@@ -17,15 +18,27 @@ interface Props {
   filters: ReportFilters;
   onChange: (key: ReportFilterKey, value: string) => void;
   onClear: () => void;
+  /**
+   * Resolves a checker's contact id to their directory email, so the checker options offered
+   * here are keyed on the same identity `casesInScope` matches against (producer and
+   * consumer must agree - item 2 of the 2026-10-04 follow-up). Defaults to none, which still
+   * keeps two checkers with different contact ids apart, by contact id.
+   */
+  contactEmails?: ContactEmails;
 }
 
 /** The worklist's filters that make sense for totals: import dates, route, adviser, checker. */
-export function ReportFilterBar({ idPrefix, cases, inScope, filters, onChange, onClear }: Props) {
+export function ReportFilterBar({
+  idPrefix,
+  cases,
+  inScope,
+  filters,
+  onChange,
+  onClear,
+  contactEmails = new Map(),
+}: Props) {
   const advisers = useMemo(() => adviserOptions(cases), [cases]);
-  const checkers = useMemo(
-    () => distinctNames(cases.flatMap((c) => [c.taxChecker, c.aqsChecker])),
-    [cases],
-  );
+  const checkers = useMemo(() => checkerOptions(cases, contactEmails), [cases, contactEmails]);
 
   return (
     <FilterBar
@@ -85,9 +98,9 @@ export function ReportFilterBar({ idPrefix, cases, inScope, filters, onChange, o
           onChange={(e) => onChange('checker', e.target.value)}
         >
           <option value="">All checkers</option>
-          {checkers.map((name) => (
-            <option key={name} value={name}>
-              {name}
+          {checkers.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>

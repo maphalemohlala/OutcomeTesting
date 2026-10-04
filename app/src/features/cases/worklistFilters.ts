@@ -1,5 +1,12 @@
 import type { CaseSummary } from './caseWorklistMapping';
-import { identityOf, positions, type ContactEmails } from '../people/peopleDirectory';
+import { isEmail } from './casePeople';
+import {
+  checkerIdentity,
+  identityOf,
+  isIdentityKey,
+  positions,
+  type ContactEmails,
+} from '../people/peopleDirectory';
 
 /**
  * The worklist's filters, kept out of the page so they can be tested.
@@ -45,8 +52,42 @@ function matchesPerson(item: CaseSummary, person: string, contactEmails: Contact
   return positions(item).some((position) => identityOf(position, contactEmails) === target);
 }
 
-export function matchesChecker(item: CaseSummary, checker: string): boolean {
+/**
+ * Keyed on the same identity the People page uses for checkers (item 1, 2026-10-04 review):
+ * `checkerIdentity`, email where the directory has it, else contact id. Two checkers who
+ * share a name stay apart once the filter value is one of those identities.
+ *
+ * A value with no `email:`/`contact:`/`name:` prefix is a legacy bookmark or saved filter
+ * from before checkers were keyed this way, and is matched by name exactly as it always was
+ * - so it keeps working rather than silently matching nobody.
+ */
+export function matchesChecker(
+  item: CaseSummary,
+  checker: string,
+  contactEmails: ContactEmails = new Map(),
+): boolean {
+  if (isIdentityKey(checker)) {
+    const target = checker.trim().toLowerCase();
+    return (
+      checkerIdentity(item.taxChecker, item.taxCheckerId, contactEmails) === target ||
+      checkerIdentity(item.aqsChecker, item.aqsCheckerId, contactEmails) === target
+    );
+  }
   return item.taxChecker === checker || item.aqsChecker === checker;
+}
+
+/**
+ * The adviser filter's own legacy fallback (item 2, 2026-10-04 review). The current scheme
+ * keys this filter on the plain adviser email (`adviserOptions`), so a value that is not
+ * shaped like an email is an old saved filter from before advisers were keyed by email at
+ * all, and is matched by name instead of silently matching nobody.
+ */
+export function matchesAdviser(item: CaseSummary, adviser: string): boolean {
+  const target = adviser.trim().toLowerCase();
+  if (isEmail(target)) {
+    return (item.adviserEmail ?? '').trim().toLowerCase() === target;
+  }
+  return (item.adviser ?? '').trim().toLowerCase() === target;
 }
 
 function matchesRemediation(item: CaseSummary, remediation: string): boolean {
@@ -75,13 +116,8 @@ export function applyFilters(
     }
     if (filters.remediation && !matchesRemediation(item, filters.remediation)) return false;
     if (filters.person && !matchesPerson(item, filters.person, contactEmails)) return false;
-    if (
-      filters.adviser &&
-      (item.adviserEmail ?? '').trim().toLowerCase() !== filters.adviser.trim().toLowerCase()
-    ) {
-      return false;
-    }
-    if (filters.checker && !matchesChecker(item, filters.checker)) return false;
+    if (filters.adviser && !matchesAdviser(item, filters.adviser)) return false;
+    if (filters.checker && !matchesChecker(item, filters.checker, contactEmails)) return false;
     if (!withinRange(item.createdOn, filters.from, filters.to)) return false;
     if (search) {
       const haystack =
