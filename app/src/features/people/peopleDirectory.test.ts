@@ -3,6 +3,7 @@ import {
   buildDirectory,
   caseloadByIdentity,
   casesForPerson,
+  checkerIdentity,
   contactEmailsOf,
   isPersonRole,
 } from './peopleDirectory';
@@ -207,5 +208,31 @@ describe('people are keyed by email (two people, one name)', () => {
     expect(
       casesForPerson([a, b], 'Adviser', 'email:adam.smith2@example.com').map((c) => c.id),
     ).toEqual(['2']);
+  });
+});
+
+describe('checkerIdentity', () => {
+  // The worklist's Tax/AQS checker cells build a link from one name and one contact id at a
+  // time, outside any CaseSummary - this pins that the identity it builds is exactly what
+  // casesForPerson matches, so that link never again regresses to a bare, unprefixed name.
+  it('matches a checker link built from their contact id, via the directory email', () => {
+    const c = caseRow({ id: '5', taxChecker: 'Carol Checker', taxCheckerId: 'C9' });
+    const contactEmails = contactEmailsOf([{ id: 'c9', email: 'carol.checker@example.com' }]);
+
+    const identity = checkerIdentity('Carol Checker', 'C9', contactEmails);
+
+    expect(identity).toBe('email:carol.checker@example.com');
+    expect(casesForPerson([c], 'Checker', identity, contactEmails).map((item) => item.id)).toEqual([
+      '5',
+    ]);
+  });
+
+  it('matches a checker link built from their contact id when the directory holds no email for them', () => {
+    const c = caseRow({ id: '6', aqsChecker: 'Dave Checker', aqsCheckerId: 'C10' });
+
+    const identity = checkerIdentity('Dave Checker', 'C10');
+
+    expect(identity).toBe('contact:c10');
+    expect(casesForPerson([c], 'Checker', identity).map((item) => item.id)).toEqual(['6']);
   });
 });

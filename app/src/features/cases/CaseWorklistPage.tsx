@@ -13,7 +13,7 @@ import { useCaseWorklist } from './useCaseWorklist';
 import type { CaseRemediation } from './caseRemediation';
 import { applyFilters, FILTER_KEYS, type FilterKey, type Filters } from './worklistFilters';
 import { useUserDirectory } from '../../hooks/useUserDirectory';
-import { adviserIdentity, contactEmailsOf } from '../people/peopleDirectory';
+import { adviserIdentity, checkerIdentity, contactEmailsOf, type ContactEmails } from '../people/peopleDirectory';
 import './CaseWorklistPage.css';
 
 /**
@@ -26,19 +26,24 @@ import './CaseWorklistPage.css';
  */
 function CheckerCell({
   name,
+  contactId,
+  contactEmails,
   route,
   type,
 }: {
   name: string | null;
+  contactId: string | null;
+  contactEmails: ContactEmails;
   route: ReviewRoute | null;
   type: ReviewType;
 }) {
   const state = checkerState(name, route, type);
 
   if (state.kind === 'named') {
+    const identity = checkerIdentity(state.name, contactId, contactEmails);
     return (
       <td>
-        <Link to={`/people/Checker/${encodeURIComponent(state.name)}`}>{state.name}</Link>
+        <Link to={`/people/Checker/${encodeURIComponent(identity)}`}>{state.name}</Link>
       </td>
     );
   }
@@ -354,8 +359,20 @@ export function CaseWorklistPage() {
                         )}
                       </td>
                       <td>{item.route ?? 'Not routed'}</td>
-                      <CheckerCell name={item.taxChecker} route={item.route} type="Tax" />
-                      <CheckerCell name={item.aqsChecker} route={item.route} type="AQS" />
+                      <CheckerCell
+                        name={item.taxChecker}
+                        contactId={item.taxCheckerId}
+                        contactEmails={contactEmails}
+                        route={item.route}
+                        type="Tax"
+                      />
+                      <CheckerCell
+                        name={item.aqsChecker}
+                        contactId={item.aqsCheckerId}
+                        contactEmails={contactEmails}
+                        route={item.route}
+                        type="AQS"
+                      />
                       <td>
                         <StageLabel status={item.status} />
                       </td>

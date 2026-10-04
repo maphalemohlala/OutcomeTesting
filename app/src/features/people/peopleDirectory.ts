@@ -63,6 +63,19 @@ export function adviserIdentity(item: CaseSummary): string {
   return identityOf({ name: item.adviser, email: item.adviserEmail, contactId: null });
 }
 
+/**
+ * A checker's identity, for the one-cell-at-a-time callers (the worklist's Tax/AQS checker
+ * columns) that do not have a whole `CaseSummary` to read `positions()` from. Delegates to
+ * `identityOf` so there remains one definition of what a checker's identity is.
+ */
+export function checkerIdentity(
+  name: string | null,
+  contactId: string | null,
+  contactEmails: ContactEmails = new Map(),
+): string {
+  return identityOf({ name, email: null, contactId }, contactEmails);
+}
+
 export interface Position {
   role: PersonRole;
   name: string | null;
