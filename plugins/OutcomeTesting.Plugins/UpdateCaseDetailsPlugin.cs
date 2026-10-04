@@ -237,18 +237,17 @@ namespace OutcomeTesting.Plugins
             // moving the case are the command's consequences rather than the caller's edit.
             RequeueAfterRouteChange(systemService, before, update, changes);
 
-            // The adviser named on the case is how remediation is routed (BR-006), so a change
-            // to that name takes the case's open actions with it — whether they were raised
-            // unassigned because the old name matched no contact, or assigned to the adviser
-            // who has just been replaced. Completed actions keep the name of whoever did the
-            // work, and an action already held by this adviser is not rewritten.
-            if (update.Contains("al_advisername"))
+            // Remediation and the adviser's access follow the adviser EMAIL (AD-228), so a new
+            // email takes the open actions with it - to the contact holding it, or to nobody
+            // when no contact does. A name-only change is a label and moves nothing. Completed
+            // actions keep whoever did the work.
+            if (CasePeople.AdviserEmailChanged(before, update))
             {
-                var assigned = Remediation.AssignOpenActions(
+                var moved = Remediation.AssignOpenActions(
                     systemService, new EntityReference(CaseEntity, targetId), context.CorrelationId);
-                if (assigned > 0)
+                if (moved > 0)
                 {
-                    changes.Add("Assigned " + assigned + " open remediation action(s) to the adviser now named");
+                    changes.Add("Re-pointed " + moved + " open remediation action(s) to the adviser email now on the case");
                 }
             }
 
@@ -532,8 +531,10 @@ namespace OutcomeTesting.Plugins
             {
                 { "al_clientname", new EditableField(EditableKind.Text, "Client name") },
                 { "al_advisername", new EditableField(EditableKind.Text, "Adviser") },
+                { "al_adviseremail", new EditableField(EditableKind.Text, "Adviser email") },
                 { "al_adviserstatus", new EditableField(EditableKind.Option, "Adviser status") },
                 { "al_paraplanner", new EditableField(EditableKind.Text, "Paraplanner") },
+                { "al_paraplanneremail", new EditableField(EditableKind.Text, "Paraplanner email") },
                 { "al_products", new EditableField(EditableKind.Text, "Products") },
                 { "al_casetype", new EditableField(EditableKind.Option, "Case type") },
                 // Display name only (item 9, 2026-09-19). The schema name is unchanged, so
@@ -999,6 +1000,10 @@ namespace OutcomeTesting.Plugins
                         }
                 }
             }
+
+            // People are identified by email (AD-228): a name travels with its email, and the
+            // email must be one. Both front ends reach here.
+            CasePeople.EnsureEmails(before, update);
         }
 
         /// <summary>

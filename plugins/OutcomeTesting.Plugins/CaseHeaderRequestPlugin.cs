@@ -201,6 +201,7 @@ namespace OutcomeTesting.Plugins
             var columns = new List<string>
             {
                 TaxRequiredAttr, DispositionAttr, "al_reviewrouteid", "al_casestatus", CaseAdviser.EmailAttr,
+                CasePeople.ParaplannerEmailAttr, CasePeople.AdviserNameAttr, CasePeople.ParaplannerNameAttr,
             };
             foreach (var field in fields.Keys)
             {
@@ -262,16 +263,15 @@ namespace OutcomeTesting.Plugins
 
             UpdateCaseDetailsPlugin.RequeueAfterRouteChange(service, before, update, changes);
 
-            // The adviser named on the case routes remediation (BR-006), so a new adviser takes
-            // the open actions with them - as the Code App's edit already did. Until 2026-09-30
-            // this path moved neither the actions nor the email (CaseAdviser).
-            if (update.Contains(CaseAdviser.NameAttr))
+            // The adviser EMAIL routes remediation (AD-228), so a new email takes the open
+            // actions with it, exactly as the Code App's edit does.
+            if (CasePeople.AdviserEmailChanged(before, update))
             {
                 var moved = Remediation.AssignOpenActions(
                     service, new EntityReference(CaseEntity, caseId), context.CorrelationId);
                 if (moved > 0)
                 {
-                    changes.Add("Assigned " + moved + " open remediation action(s) to the adviser now named");
+                    changes.Add("Re-pointed " + moved + " open remediation action(s) to the adviser email now on the case");
                 }
             }
 
@@ -376,8 +376,10 @@ namespace OutcomeTesting.Plugins
             {
                 "al_clientname",
                 "al_advisername",
+                "al_adviseremail",
                 "al_adviserstatus",
                 "al_paraplanner",
+                "al_paraplanneremail",
                 "al_products",
                 "al_casetype",
                 "al_advicedate",

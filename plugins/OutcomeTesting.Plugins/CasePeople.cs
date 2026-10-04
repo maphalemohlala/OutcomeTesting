@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Microsoft.Xrm.Sdk;
 
 namespace OutcomeTesting.Plugins
 {
@@ -32,6 +33,67 @@ namespace OutcomeTesting.Plugins
         {
             var trimmed = Clean(value);
             return trimmed != null && EmailShape.IsMatch(trimmed);
+        }
+
+        /// <summary>
+        /// Refuses an edit that names a person without their email, or gives an email that is
+        /// not one (AD-228). Only the people the update touches are checked, so an unrelated
+        /// edit to a case imported before emails were required still saves.
+        /// </summary>
+        public static void EnsureEmails(Entity before, Entity update)
+        {
+            EnsurePair(before, update, AdviserNameAttr, AdviserEmailAttr, "adviser");
+            EnsurePair(before, update, ParaplannerNameAttr, ParaplannerEmailAttr, "paraplanner");
+        }
+
+        /// <summary>True when this update moves the adviser email (case and spaces ignored).</summary>
+        public static bool AdviserEmailChanged(Entity before, Entity update)
+        {
+            if (update == null || !update.Contains(AdviserEmailAttr))
+            {
+                return false;
+            }
+
+            var was = Clean(before == null ? null : before.GetAttributeValue<string>(AdviserEmailAttr));
+            var now = Clean(update.GetAttributeValue<string>(AdviserEmailAttr));
+            return !string.Equals(was ?? string.Empty, now ?? string.Empty, System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void EnsurePair(Entity before, Entity update, string nameAttr, string emailAttr, string who)
+        {
+            if (update == null || (!update.Contains(nameAttr) && !update.Contains(emailAttr)))
+            {
+                return;
+            }
+
+            if (update.Contains(nameAttr) && !update.Contains(emailAttr))
+            {
+                throw new InvalidPluginExecutionException(CommandHelpers.ValidationPrefix
+                    + "Give the " + who + "'s email as well as their name. People on a case are "
+                    + "identified by email, because two people can share a name.");
+            }
+
+            var name = Clean(update.Contains(nameAttr)
+                ? update.GetAttributeValue<string>(nameAttr)
+                : before == null ? null : before.GetAttributeValue<string>(nameAttr));
+            var email = Clean(update.GetAttributeValue<string>(emailAttr));
+
+            if (email == null)
+            {
+                if (name != null)
+                {
+                    throw new InvalidPluginExecutionException(CommandHelpers.ValidationPrefix
+                        + "The " + who + "'s email cannot be cleared while the case still names them.");
+                }
+
+                return;
+            }
+
+            if (!IsEmail(email))
+            {
+                throw new InvalidPluginExecutionException(CommandHelpers.ValidationPrefix
+                    + "The " + who + "'s email \"" + email + "\" is not an email address.");
+            }
         }
     }
 }

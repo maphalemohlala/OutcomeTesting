@@ -6,11 +6,14 @@ using Xunit;
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// Changing a case's adviser NAME alone no longer moves the adviser email or the open
-    /// remediation actions (AD-228, 2026-10-02): email-to-name derivation (CaseAdviser.FollowName)
-    /// was removed along with every other name match, so an edit that sends only
-    /// al_advisername now leaves al_adviseremail - and therefore who holds the open actions -
-    /// untouched. Task 2 is expected to put a new, explicit rule here.
+    /// Changing a case's adviser NAME alone used to leave the adviser email - and therefore
+    /// who holds the open remediation actions - untouched: email-to-name derivation
+    /// (CaseAdviser.FollowName) was removed along with every other name match (2026-10-02),
+    /// and nothing replaced it yet. Task 2 put the explicit rule in its place
+    /// (<see cref="CasePeople.EnsureEmails"/>, called from the end of
+    /// <see cref="UpdateCaseDetailsPlugin.ApplyFields"/>, which both front ends reach):
+    /// a name travels with its email, so a name-only change is refused outright rather than
+    /// silently leaving the email behind (AD-228, "two people can share a name").
     /// </summary>
     public class CaseAdviserEditTests
     {
@@ -44,11 +47,11 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void The_portal_header_edit_renames_the_adviser_without_moving_the_email_or_the_open_actions()
+        public void The_portal_header_edit_refuses_a_name_only_adviser_change()
         {
-            // Inverted from the removed behaviour. A name-only edit changes al_advisername but
-            // leaves the stored email - and therefore who the open action is assigned to -
-            // exactly as it was, because nothing derives an email from a name any more.
+            // A name-only edit used to change al_advisername and leave the stored email -
+            // and therefore who the open action was assigned to - exactly as it was. Task 2
+            // refuses this outright instead: the email must travel with the name.
             var service = Ready(out var oldAdviser, out _, out var actionId);
 
             var provider = new FakeServiceProvider(service);
@@ -61,22 +64,48 @@ namespace OutcomeTesting.Plugins.Tests
                     "{\"caseId\":\"" + CaseId.ToString("D") + "\",\"fields\":\"{\\\"al_advisername\\\":\\\"New Adviser\\\"}\"}",
             };
 
-            new CaseHeaderRequestPlugin(null, null).Execute(provider);
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => new CaseHeaderRequestPlugin(null, null).Execute(provider));
+            Assert.Contains("adviser's email", error.Message);
 
+            // Refused before anything was written: the name, the email and the open action's
+            // assignee are all exactly as seeded.
             var row = service.Row("al_outcomecase", CaseId);
-            Assert.Equal("New Adviser", row.GetAttributeValue<string>(CaseAdviser.NameAttr));
+            Assert.Equal("Old Adviser", row.GetAttributeValue<string>(CaseAdviser.NameAttr));
             Assert.Equal("old@example.com", row.GetAttributeValue<string>(CaseAdviser.EmailAttr));
             Assert.Equal(oldAdviser.Id, service.Row("al_remediationaction", actionId)
                 .GetAttributeValue<EntityReference>("al_assignedcontactid").Id);
         }
 
         [Fact]
-        public void The_shared_field_applier_leaves_the_email_alone_on_a_name_only_edit()
+        public void The_shared_field_applier_refuses_a_name_only_adviser_change()
         {
             // UpdateCaseDetailsPlugin.ApplyFields is what the Code App's al_UpdateCaseDetails
-            // and the portal header both call. CaseAdviser.FollowName, which used to derive an
-            // email from the new name here, was removed (AD-228) - Task 2 is expected to put
-            // a new, explicit rule in its place.
+            // and the portal header both call, and it now ends with CasePeople.EnsureEmails -
+            // so a name sent without its email is refused on either front end.
+            var service = Ready(out _, out _, out _);
+            var before = service.Row("al_outcomecase", CaseId);
+            var update = new Entity("al_outcomecase", CaseId);
+            var changes = new List<string>();
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(() =>
+                UpdateCaseDetailsPlugin.ApplyFields(
+                    service,
+                    new Dictionary<string, string> { { CaseAdviser.NameAttr, "New Adviser" } },
+                    before,
+                    update,
+                    changes,
+                    new OptionLabels(service)));
+
+            Assert.Contains("adviser's email", error.Message);
+        }
+
+        [Fact]
+        public void The_shared_field_applier_accepts_a_name_sent_with_its_email()
+        {
+            // The positive case alongside the refusal above: a name sent WITH its email is
+            // accepted, and the email is applied through its own Editable (al_adviseremail)
+            // exactly as the name is.
             var service = Ready(out _, out _, out _);
             var before = service.Row("al_outcomecase", CaseId);
             var update = new Entity("al_outcomecase", CaseId);
@@ -84,14 +113,18 @@ namespace OutcomeTesting.Plugins.Tests
 
             UpdateCaseDetailsPlugin.ApplyFields(
                 service,
-                new Dictionary<string, string> { { CaseAdviser.NameAttr, "New Adviser" } },
+                new Dictionary<string, string>
+                {
+                    { CaseAdviser.NameAttr, "New Adviser" },
+                    { CaseAdviser.EmailAttr, "new@example.com" },
+                },
                 before,
                 update,
                 changes,
                 new OptionLabels(service));
 
-            Assert.False(update.Contains(CaseAdviser.EmailAttr));
-            Assert.DoesNotContain(changes, c => c.StartsWith("Adviser email"));
+            Assert.Equal("New Adviser", update.GetAttributeValue<string>(CaseAdviser.NameAttr));
+            Assert.Equal("new@example.com", update.GetAttributeValue<string>(CaseAdviser.EmailAttr));
         }
     }
 }

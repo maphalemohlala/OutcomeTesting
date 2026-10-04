@@ -151,6 +151,16 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void The_portal_may_send_the_two_person_emails()
+        {
+            CaseHeaderRequestPlugin.EnsureCheckerEditable(new System.Collections.Generic.Dictionary<string, string>
+            {
+                { "al_adviseremail", "sam@example.com" },
+                { "al_paraplanneremail", "pip@example.com" },
+            });
+        }
+
+        [Fact]
         public void Refuses_the_check_date_a_checker_used_to_be_able_to_correct()
         {
             // Project owner, 2026-09-21: "the check date has to be uneditable as it is
