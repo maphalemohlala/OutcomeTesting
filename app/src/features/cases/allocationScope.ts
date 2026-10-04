@@ -29,9 +29,9 @@ export function allocatableDisciplines(roles: readonly string[], product: string
 const RELEASE_OPEN = new Set([120910587, 120910588, 120910589, 120910590]);
 
 /**
- * A case in remediation that nobody could be released to (AD-218): the adviser name matched
- * no single contact, so no adviser can see it. Closed is excluded because a Pass case closes
- * without ever being released.
+ * A case in remediation that nobody could be released to (AD-218): the adviser email matched
+ * no single active contact, so no adviser can see it. Closed is excluded because a Pass case
+ * closes without ever being released.
  */
 export function adviserUnmatched(statusValue: number, adviserContactId: string | null): boolean {
   return RELEASE_OPEN.has(statusValue) && !adviserContactId;

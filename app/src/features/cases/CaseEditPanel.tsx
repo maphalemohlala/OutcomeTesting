@@ -28,6 +28,7 @@ import {
   type ManagedList,
 } from '../admin/listOptions';
 import { useAllListOptions } from '../admin/useListOptions';
+import { personRefusals, withPersonPairs, type PersonForm } from './casePeople';
 import { useCaseReviews } from './useCaseReviews';
 import { allocatableDisciplines } from './allocationScope';
 import { useProductName } from '../../app/product/useProductName';
@@ -57,7 +58,7 @@ import './CaseEditPanel.css';
  * choice metadata a developer deploys (project owner, 2026-09-21). Its value is a guid, not
  * an option value, which is why it cannot just be another 'choice'.
  */
-type FieldKind = 'text' | 'date' | 'choice' | 'user' | 'listoption' | 'listoptionset';
+type FieldKind = 'text' | 'date' | 'email' | 'choice' | 'user' | 'listoption' | 'listoptionset';
 
 /** MIGRATED_LISTS is the single place that says which lists have a lookup on the case. */
 function managedList(key: string): ManagedList {
@@ -75,6 +76,8 @@ interface FieldDef {
   list?: ManagedList;
   /** A line under the control for a field whose name reads as more than it does. */
   help?: string;
+  /** For a `user` field, the sibling attribute its picked person's email is written to. */
+  emailAttr?: keyof CaseEditValues;
 }
 
 interface Section {
@@ -114,9 +117,11 @@ const SECTIONS: Section[] = [
   {
     heading: 'Adviser and paraplanner',
     fields: [
-      { attr: 'al_advisername', label: 'Adviser', kind: 'user' },
+      { attr: 'al_advisername', label: 'Adviser', kind: 'user', emailAttr: 'al_adviseremail' },
+      { attr: 'al_adviseremail', label: 'Adviser email', kind: 'email' },
       { attr: 'al_adviserstatus', label: 'Adviser status', kind: 'choice', options: Al_outcomecasesal_adviserstatus },
-      { attr: 'al_paraplanner', label: 'Paraplanner', kind: 'user' },
+      { attr: 'al_paraplanner', label: 'Paraplanner', kind: 'user', emailAttr: 'al_paraplanneremail' },
+      { attr: 'al_paraplanneremail', label: 'Paraplanner email', kind: 'email' },
     ],
   },
   {
@@ -423,7 +428,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
       if (current === original) continue;
       changed[field.attr] = current == null ? '' : String(current);
     }
-    return changed;
+    return withPersonPairs(changed, form as unknown as PersonForm);
   }
 
   /** al_UpdateCaseDetails, or 'skipped' when the user changed no fields. */
@@ -515,8 +520,9 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
       // ordinary way to break this.
       adviceDateOnRecord: typeof form.al_advicedate === 'string' ? form.al_advicedate : null,
     });
-    setErrors(found);
-    if (found.length > 0) return;
+    const refusals = [...found, ...personRefusals(changed, form as unknown as PersonForm)];
+    setErrors(refusals);
+    if (refusals.length > 0) return;
 
     setSaving(true);
 
@@ -643,12 +649,15 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
             id={inputId}
             value={typeof value === 'string' ? value : ''}
             onChange={(next) => setField(field.attr, field.kind, next)}
+            onPick={(user) => {
+              if (user && field.emailAttr) setField(field.emailAttr, 'email', user.email);
+            }}
             placeholder="Not set"
           />
         ) : (
           <input
             id={inputId}
-            type={field.kind === 'date' ? 'date' : 'text'}
+            type={field.kind === 'date' ? 'date' : field.kind === 'email' ? 'email' : 'text'}
             /*
              * The date of meeting cannot be in the future (item 9, 2026-09-19), so the
              * picker will not offer one. An affordance only - the save re-checks it, and so

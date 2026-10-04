@@ -29,9 +29,11 @@ import { date, text } from '../../lib/format';
 export interface CaseEditValues {
   al_clientname: string;
   al_advisername: string;
+  al_adviseremail: string;
   al_advisercode: string;
   al_adviserstatus: number | null;
   al_paraplanner: string;
+  al_paraplanneremail: string;
   al_paraplannercode: string;
   al_products: string;
   al_casetype: number | null;
@@ -83,7 +85,7 @@ export interface CaseDetail {
   previousCase: string | null;
   /**
    * True when the case is in remediation and no adviser contact was matched to it, so no
-   * adviser can see it (AD-218). Never guessed: the fix is correcting a name.
+   * adviser can see it (AD-218). Never guessed: the fix is correcting an email.
    */
   adviserUnmatched: boolean;
   /**
@@ -166,9 +168,11 @@ export function toDetail(
     edit: {
       al_clientname: text(record.al_clientname) ?? '',
       al_advisername: text(record.al_advisername) ?? '',
+      al_adviseremail: text(record.al_adviseremail) ?? '',
       al_advisercode: text(record.al_advisercode) ?? '',
       al_adviserstatus: opt(record.al_adviserstatus),
       al_paraplanner: text(record.al_paraplanner) ?? '',
+      al_paraplanneremail: text(record.al_paraplanneremail) ?? '',
       al_paraplannercode: text(record.al_paraplannercode) ?? '',
       al_products: text(record.al_products) ?? '',
       al_casetype: opt(record.al_casetype),

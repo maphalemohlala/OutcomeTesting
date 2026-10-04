@@ -196,10 +196,10 @@ export function CaseDetailPage() {
 
                     {state.detail.adviserUnmatched ? (
                       <p className="case-detail__notice" role="status">
-                        Adviser not matched: no single person is named{' '}
-                        {state.detail.edit.al_advisername || 'as the adviser'}, so no adviser can see
-                        this case yet. Correct the adviser name, or the person&apos;s name on the
-                        People page.
+                        Adviser not matched: no single active person holds the email{' '}
+                        {state.detail.edit.al_adviseremail || '(none recorded)'}, so no adviser
+                        can see this case yet. Correct the adviser&apos;s email on the case, or
+                        add or correct the person on the People page.
                       </p>
                     ) : null}
 
