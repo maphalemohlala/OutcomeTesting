@@ -239,6 +239,19 @@ Set-Content -Encoding utf8 $env:TEMP\preimage.json '{"name":"PreImage","entityal
 & $t webapi $org POST sdkmessageprocessingstepimages "@$env:TEMP\preimage.json"
 ```
 
+  **Then touch the step**, or the image is not delivered. In DEV on 2026-10-04 the image row
+  was correct, but the running step went on without it until the step itself was written. The
+  step's trace line read "Pre-image absent". Any write to the step refreshes it, for example its
+  description:
+
+```powershell
+Set-Content -Encoding utf8 $env:TEMP\stepdesc.json '{"description":"Follows a contact email change to the cases carrying the new and the old address. PreImage: emailaddress1."}'
+& $t webapi $org PATCH 'sdkmessageprocessingsteps(<updateStepId>)' "@$env:TEMP\stepdesc.json"
+```
+
+  Check it after any contact email change: the newest `AdviserContactPlugin` row in
+  `plugintracelogs` should read "Pre-image present". It records no addresses.
+
 **4. Templates and Code App.** Both arrive with the same import, never before the plug-ins: the
 old allowlists refuse `al_adviseremail`. `pa app push` only ever reaches DEV.
 
@@ -278,7 +291,10 @@ portal.
 
 - Closed 2026-10-04 (second wave): a contact whose email changes **away** from a case's adviser
   email now releases that case's open actions. The Update step's pre-image gives the old email,
-  and its cases are followed as well: to whoever holds that address now, or to nobody.
+  and its cases are followed as well: to whoever holds that address now, or to nobody. Proved in
+  DEV: moving "Email Proof Twin" A from `email.proof.twin.a@` to `...twin.a2@` unassigned case
+  941004001's open action and cleared its adviser access. Moving it back returned both, and the
+  data is as it was.
 - Closed 2026-10-04 (second wave): the contact step skips cases with no remediation action, and
   reads the invariant access settings once per save rather than once per case. A closed case
   with remediation keeps its access check, so a deactivated contact still loses it.

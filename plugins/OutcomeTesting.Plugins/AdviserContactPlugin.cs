@@ -44,7 +44,7 @@ namespace OutcomeTesting.Plugins
 
             var context = localPluginContext.PluginExecutionContext;
             var system = localPluginContext.OrgSvcFactory.CreateOrganizationService(null);
-            Apply(context, system);
+            Apply(context, system, trace: message => localPluginContext.Trace(message));
         }
 
         /// <summary>
@@ -52,7 +52,7 @@ namespace OutcomeTesting.Plugins
         /// Returns how many actions moved. Separated from the pipeline wiring so the rule can
         /// be tested against any service.
         /// </summary>
-        public static int Apply(IPluginExecutionContext context, IOrganizationService system)
+        public static int Apply(IPluginExecutionContext context, IOrganizationService system, Action<string> trace = null)
         {
             var email = EmailOf(context, system);
 
@@ -69,10 +69,17 @@ namespace OutcomeTesting.Plugins
             // (a Create, or the step registered before the image was) leaves only the new
             // address followed.
             var previous = PreviousEmailOf(context);
-            if (previous != null && !string.Equals(previous, email, StringComparison.OrdinalIgnoreCase))
+            var followPrevious = previous != null && !string.Equals(previous, email, StringComparison.OrdinalIgnoreCase);
+            if (followPrevious)
             {
                 moved += Follow(system, previous, context.CorrelationId, lookups);
             }
+
+            // No addresses: the trace log outlives the case, and this is enough to tell a
+            // missing pre-image from a follow that found nothing to move.
+            trace?.Invoke("Pre-image " + (HasPreImage(context) ? "present" : "absent")
+                + "; old email followed: " + (followPrevious ? "yes" : "no")
+                + "; actions moved: " + moved);
 
             return moved;
         }
@@ -142,6 +149,11 @@ namespace OutcomeTesting.Plugins
         /// The email the contact held before this write, from the <see cref="PreImageName"/>
         /// pre-image, or null when there is no image or it holds no email.
         /// </summary>
+        private static bool HasPreImage(IPluginExecutionContext context)
+        {
+            return context.PreEntityImages != null && context.PreEntityImages.Contains(PreImageName);
+        }
+
         public static string PreviousEmailOf(IPluginExecutionContext context)
         {
             Entity image;

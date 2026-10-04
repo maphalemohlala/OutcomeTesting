@@ -197,6 +197,27 @@ public static class ContactsMigration
         // a real person, and is not this phase's to move.
         var held = new HashSet<string>(people.Select(p => p.Email), StringComparer.OrdinalIgnoreCase);
 
+        // Only a person whose email no other active contact shares is written onto a case: a
+        // shared address resolves to nobody, so writing it would unassign the case's actions.
+        var shared = people
+            .GroupBy(p => (p.Email ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Key.Length > 0 && g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+        foreach (var address in shared)
+        {
+            Console.WriteLine($"   SHARED   <{address}> is held by more than one active contact - not written onto any case.");
+        }
+
+        people = people
+            .Where(p => !shared.Contains((p.Email ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase))
+            .ToList();
+        if (people.Count == 0)
+        {
+            Console.WriteLine("   No registry person has an email of their own - nothing rewritten.");
+            return;
+        }
+
         var updated = 0;
         var kept = 0;
         var skipped = 0;
