@@ -99,8 +99,10 @@ describe('alreadyMappedRefusal', () => {
     {
       id: 'm1',
       adviserEmail: 'Adviser@Example.invalid',
+      adviserName: null,
       managerId: 'c1',
       managerName: 'A Manager',
+      managerEmail: null,
     },
   ];
 

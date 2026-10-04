@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
 import { PageIntro } from '../../components/layout/PageIntro';
+import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import { usePermissions } from '../../app/permissions/permissionContext';
 import {
   useAdviserMappings,
@@ -10,6 +11,7 @@ import {
   type ContactOption,
 } from './useAdviserMappings';
 import { alreadyMappedRefusal } from './adviserMappingFailure';
+import { filterMappings } from './adviserMappingRows';
 import './AdviserMappingPage.css';
 
 /**
@@ -29,6 +31,9 @@ export function AdviserMappingPage() {
   const [editing, setEditing] = useState<AdviserMappingRow | 'new' | null>(null);
   const [removing, setRemoving] = useState<AdviserMappingRow | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  const shown = state.status === 'ready' ? filterMappings(state.mappings, search) : [];
 
   return (
     <div className="advisers">
@@ -62,6 +67,28 @@ export function AdviserMappingPage() {
               sign-off itself still works — any T&amp;C Manager can perform one.
             </p>
           ) : (
+            <>
+            <FilterBar
+              summary={`${shown.length} of ${state.mappings.length} mappings`}
+              onClear={() => setSearch('')}
+              clearDisabled={search.trim() === ''}
+            >
+              <FilterField label="Search" htmlFor="advisers-search">
+                <input
+                  id="advisers-search"
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Adviser or manager, name or email"
+                />
+              </FilterField>
+            </FilterBar>
+
+            {shown.length === 0 ? (
+              <p className="advisers__note">
+                No mapping matches “{search.trim()}”. Clear the search to see every adviser.
+              </p>
+            ) : (
             <table className="advisers__table">
               <thead>
                 <tr>
@@ -73,9 +100,14 @@ export function AdviserMappingPage() {
                 </tr>
               </thead>
               <tbody>
-                {state.mappings.map((row) => (
+                {shown.map((row) => (
                   <tr key={row.id}>
-                    <td>{row.adviserEmail}</td>
+                    <td>
+                      {row.adviserName && (
+                        <span className="advisers__name">{row.adviserName}</span>
+                      )}
+                      <span className="advisers__email">{row.adviserEmail}</span>
+                    </td>
                     <td>
                       {row.managerName ?? (
                         <span className="advisers__missing">No manager chosen</span>
@@ -107,6 +139,8 @@ export function AdviserMappingPage() {
                 ))}
               </tbody>
             </table>
+            )}
+            </>
           )}
 
           {problem && <p className="advisers__problem">{problem}</p>}

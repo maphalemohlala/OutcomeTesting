@@ -1,8 +1,11 @@
 export interface AdviserMappingRow {
   id: string;
   adviserEmail: string;
+  /** The contact with the adviser's email, for display and search; null when none has it. */
+  adviserName: string | null;
   managerId: string | null;
   managerName: string | null;
+  managerEmail: string | null;
 }
 
 export interface ContactOption {
@@ -54,15 +57,54 @@ export function managerNameFor(
   return name === '' ? null : name;
 }
 
-/** The mapping rows the page renders, manager names resolved. */
+/** The mapping rows the page renders, adviser and manager resolved against the contacts. */
 export function toMappingRows(
   rows: readonly RawAdviserMapping[],
   contacts: readonly ContactOption[],
 ): AdviserMappingRow[] {
-  return rows.map((row) => ({
-    id: row.al_advisermappingid,
-    adviserEmail: (row.al_adviseremail ?? '').trim(),
-    managerId: row._al_tcmanagerid_value ?? null,
-    managerName: managerNameFor(row, contacts),
-  }));
+  return rows.map((row) => {
+    const adviserEmail = (row.al_adviseremail ?? '').trim();
+    const managerId = row._al_tcmanagerid_value ?? null;
+    return {
+      id: row.al_advisermappingid,
+      adviserEmail,
+      adviserName: nonBlank(contactByEmail(contacts, adviserEmail)?.name),
+      managerId,
+      managerName: managerNameFor(row, contacts),
+      managerEmail: nonBlank(contactById(contacts, managerId)?.email),
+    };
+  });
+}
+
+/**
+ * The rows whose adviser or manager matches the search, by name or email, ignoring case and
+ * matching part of a word. A blank search keeps every row.
+ */
+export function filterMappings(
+  rows: readonly AdviserMappingRow[],
+  search: string,
+): AdviserMappingRow[] {
+  const needle = search.trim().toLowerCase();
+  if (needle === '') return [...rows];
+
+  return rows.filter((row) =>
+    [row.adviserEmail, row.adviserName, row.managerName, row.managerEmail].some(
+      (value) => (value ?? '').toLowerCase().includes(needle),
+    ),
+  );
+}
+
+function contactByEmail(contacts: readonly ContactOption[], email: string): ContactOption | undefined {
+  const wanted = email.toLowerCase();
+  return wanted === '' ? undefined : contacts.find((c) => c.email.trim().toLowerCase() === wanted);
+}
+
+function contactById(contacts: readonly ContactOption[], id: string | null): ContactOption | undefined {
+  const wanted = (id ?? '').trim().toLowerCase();
+  return wanted === '' ? undefined : contacts.find((c) => c.id.toLowerCase() === wanted);
+}
+
+function nonBlank(value: string | null | undefined): string | null {
+  const text = (value ?? '').trim();
+  return text === '' ? null : text;
 }

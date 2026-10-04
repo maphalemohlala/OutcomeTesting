@@ -36,6 +36,19 @@
   border-bottom: none;
 }
 
+/* The adviser's name above the email the mapping is keyed by; the email alone when no
+   contact carries it. */
+.advisers__name {
+  display: block;
+  font-weight: 600;
+}
+
+.advisers__email {
+  display: block;
+  color: var(--colour-text-muted);
+  overflow-wrap: anywhere;
+}
+
 /* A mapping with no manager routes nothing, so it is marked rather than left looking
    like an ordinary empty cell. */
 .advisers__missing {

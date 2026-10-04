@@ -101,10 +101,19 @@ describe('toMappingRows', () => {
       {
         id: 'm1',
         adviserEmail: 'adviser@example.invalid',
+        adviserName: null,
         managerId: 'bea63626-cbad-f111-aaac-000000000001',
         managerName: 'A Manager',
+        managerEmail: 'a@example.invalid',
       },
-      { id: 'm2', adviserEmail: 'other@example.invalid', managerId: null, managerName: null },
+      {
+        id: 'm2',
+        adviserEmail: 'other@example.invalid',
+        adviserName: null,
+        managerId: null,
+        managerName: null,
+        managerEmail: null,
+      },
     ]);
   });
 });
