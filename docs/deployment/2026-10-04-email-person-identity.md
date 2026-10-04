@@ -219,8 +219,8 @@ and check that both `AdviserContactPlugin` steps arrived **enabled**:
 You should see 1.0.19.0, managed, and two steps with statecode 0. The Update step must carry
 one image, `PreImage`, with `attributes` `emailaddress1`. Without it the step follows only a
 contact's new email, and cases still carrying the old address keep that contact's actions.
-`verifysteps` in the import script reads `src/SdkMessageProcessingSteps`, so check that folder
-carries these two steps before trusting it; otherwise this query is the check.
+`verifysteps` in the import script reads `src/SdkMessageProcessingSteps`, which carries both
+steps since 8b18ae4. It does not check images, so this query stays the check for the pre-image.
 - If the steps arrived disabled:
   `& $t setstepstate $org enable "AdviserContactPlugin: Create of contact" "AdviserContactPlugin: Update of contact"`.
 - If the import did not carry them, register them as DEV did:
