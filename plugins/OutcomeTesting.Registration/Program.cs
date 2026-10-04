@@ -163,9 +163,12 @@ using System.Text.Json.Nodes;
 // Repoint remediation: dotnet run -- repointremediation <orgUrl> <caseReference> [--confirm <orgUrl>]
 //   Points a case's OPEN remediation actions at the contact its adviser email now resolves to.
 //
-// Backfill people email: dotnet run -- backfillpeopleemail <orgUrl> [--confirm <orgUrl>]
+// Backfill people email: dotnet run -- backfillpeopleemail <orgUrl> [--confirm <orgUrl>] [--include-mismatch]
 //   The one-off move to email identity (AD-228): fills a blank adviser/para-planner email the
 //   case's name gives unambiguously, reports what it cannot, and re-points open remediation.
+//   Previews and (with --confirm) applies one MOVE/UNASSIGN line per open action that would
+//   change. A case whose stored email resolves to a contact named differently (MISMATCH) is
+//   skipped unless --include-mismatch is also passed.
 //
 // Add to solution: dotnet run -- addtosolution <orgUrl> [<solutionUniqueName>]
 //   Adds the plug-in assembly (and its plug-in type) to the target solution for clean ALM
@@ -612,7 +615,8 @@ if (args.Length >= 2 && args[0].Equals("backfilltaxoutcome", StringComparison.Or
 
 if (args.Length >= 2 && args[0].Equals("backfillpeopleemail", StringComparison.OrdinalIgnoreCase))
 {
-    return BackfillPeopleEmail(args[1], ConfirmedFor(args, args[1]));
+    return BackfillPeopleEmail(args[1], ConfirmedFor(args, args[1]),
+        args.Any(a => a.Equals("--include-mismatch", StringComparison.OrdinalIgnoreCase)));
 }
 
 if (args.Length >= 2 && args[0].Equals("backfillioreference", StringComparison.OrdinalIgnoreCase))
@@ -4632,9 +4636,15 @@ int SeedCases(string[] a)
                 ["al_casereference"] = reference,
                 ["al_clientname"] = $"Seed Client {tag}{n:D2}",
                 ["al_advisername"] = $"Seed Adviser {n:D2}",
+                // People are identified by email (AD-228), including seeded ones: nothing
+                // here names a real contact to borrow an email from, so each label gets a
+                // deterministic placeholder of its own rather than seeding a case with a name
+                // and no email, which the rest of the system now treats as nobody.
+                ["al_adviseremail"] = $"seed.adviser{n:D2}@example.com",
                 ["al_advisercode"] = $"ADV-S{n:D2}",
                 ["al_adviserstatus"] = new OptionSetValue(120910501),
                 ["al_paraplanner"] = $"Seed Paraplanner {n:D2}",
+                ["al_paraplanneremail"] = $"seed.paraplanner{n:D2}@example.com",
                 ["al_paraplannercode"] = $"PP-S{n:D2}",
                 ["al_products"] = "Pension; ISA",
                 ["al_casetype"] = new OptionSetValue(120910510),
@@ -10201,14 +10211,25 @@ int RepointRemediation(string orgUrl, string caseReference, bool confirm)
 ///             contact of that exact name, with an email);
 ///   NO FILL   a blank email the name cannot give (no contact, two, or no email) - fix in the app;
 ///   MISMATCH  a stored email whose contact is NAMED differently from the case (an Adam
-///             Strumidlo / Strumdlio typo, or a wrong address) - check by hand, nothing written.
-/// With --confirm <org> it writes the FILL rows, then re-points every open remediation action
-/// to the contact holding the case's adviser email (unassigning where nobody does), exactly
-/// as AssignOpenActions does - without a "Remediation assigned" email, because this is a
-/// repair, not new work. Completed actions never move. Run reconcileaccess --confirm after.
+///             Strumidlo / Strumdlio typo, or a wrong address) - check by hand, nothing written;
+///   UNASSIGN  a stored, non-blank email that matches no active contact or two - the case-level
+///             counterpart to the per-action lines below.
+/// The dry run ALSO computes the open-action re-point plan and prints it, one line per action
+/// that would change:
+///   MOVE      &lt;caseRef&gt; &lt;actionId&gt;: &lt;holder name or (unassigned)&gt; -&gt; &lt;contact name&gt;
+///   UNASSIGN  &lt;caseRef&gt; &lt;actionId&gt;: &lt;holder name&gt; -&gt; nobody (&lt;reason&gt;)
+/// A MISMATCH case's actions are, by default, left alone - the stored email resolves, but to a
+/// contact named differently from the case, which is as likely to be a wrong address as a typo'd
+/// name, so it prints `SKIPPED (mismatch)` instead of moving anything. Pass --include-mismatch to
+/// re-point those too.
+/// With --confirm &lt;org&gt; it writes the FILL rows, then re-points every open remediation action
+/// to the contact holding the case's adviser email (unassigning where nobody does), echoing the
+/// same MOVE/UNASSIGN/SKIPPED lines as it writes them - without a "Remediation assigned" email,
+/// because this is a repair, not new work. Completed actions never move. Run
+/// reconcileaccess --confirm after.
 /// Safe to re-run: filled emails are no longer blank, and actions already right are skipped.
 /// </summary>
-int BackfillPeopleEmail(string orgUrl, bool confirm)
+int BackfillPeopleEmail(string orgUrl, bool confirm, bool includeMismatch)
 {
     using var svc = Connect(orgUrl);
 
@@ -10226,6 +10247,8 @@ int BackfillPeopleEmail(string orgUrl, bool confirm)
         query.PageInfo.PageNumber++;
         query.PageInfo.PagingCookie = page.PagingCookie;
     }
+
+    var referenceById = cases.ToDictionary(c => c.Id, c => c.GetAttributeValue<string>("al_casereference") ?? c.Id.ToString("D"));
 
     var byName = new Dictionary<string, (string Email, string Problem)>(StringComparer.OrdinalIgnoreCase);
     (string Email, string Problem) EmailFromName(string name)
@@ -10245,11 +10268,22 @@ int BackfillPeopleEmail(string orgUrl, bool confirm)
         return result;
     }
 
+    // A reason in the exact three shapes the per-action UNASSIGN line promises, regardless of
+    // the wording ContactByEmail uses for its own (case-level) MISMATCH/UNASSIGN check.
+    string UnassignReason(string email, string contactByEmailProblem)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return "no email";
+        return contactByEmailProblem != null && contactByEmailProblem.StartsWith("two or more", StringComparison.OrdinalIgnoreCase)
+            ? "two or more hold " + email
+            : "no active contact holds " + email;
+    }
+
     var fills = new List<(Guid Id, string Attr, string Email, string Line)>();
     var lines = new List<string>();
+    var mismatchAdviserCases = new HashSet<Guid>();
     foreach (var c in cases)
     {
-        var reference = c.GetAttributeValue<string>("al_casereference") ?? c.Id.ToString("D");
+        var reference = referenceById[c.Id];
         foreach (var (nameAttr, emailAttr, who) in new[] { ("al_advisername", "al_adviseremail", "adviser"), ("al_paraplanner", "al_paraplanneremail", "para-planner") })
         {
             var name = (c.GetAttributeValue<string>(nameAttr) ?? string.Empty).Trim();
@@ -10270,11 +10304,16 @@ int BackfillPeopleEmail(string orgUrl, bool confirm)
                 continue;
             }
 
-            var (contact, _) = ContactByEmail(svc, email);
+            var (contact, contactProblem) = ContactByEmail(svc, email);
             var contactName = contact?.GetAttributeValue<string>("fullname");
             if (contact != null && name.Length > 0 && !string.Equals(contactName?.Trim(), name, StringComparison.OrdinalIgnoreCase))
             {
                 lines.Add($"MISMATCH  {reference}  {who} '{name}' but {email} belongs to '{contactName}'");
+                if (who == "adviser") mismatchAdviserCases.Add(c.Id);
+            }
+            else if (contact == null)
+            {
+                lines.Add($"UNASSIGN  {reference}  {who} email '{email}': {UnassignReason(email, contactProblem)}");
             }
         }
     }
@@ -10283,18 +10322,17 @@ int BackfillPeopleEmail(string orgUrl, bool confirm)
     foreach (var f in fills) Console.WriteLine("   " + f.Line);
     foreach (var l in lines) Console.WriteLine("   " + l);
 
-    if (!confirm)
+    // The re-point plan is computed - and printed - in the dry run too, so the owner reviews
+    // every MOVE/UNASSIGN before anything is written, not after. --confirm re-runs the same
+    // computation and echoes the same lines as it applies them.
+    if (confirm)
     {
-        Console.WriteLine("Dry run. Re-run with --confirm <orgUrl> to fill and re-point open actions.");
-        return 0;
+        foreach (var f in fills)
+        {
+            svc.Update(new Entity("al_outcomecase", f.Id) { [f.Attr] = f.Email });
+        }
     }
 
-    foreach (var f in fills)
-    {
-        svc.Update(new Entity("al_outcomecase", f.Id) { [f.Attr] = f.Email });
-    }
-
-    var moved = 0;
     var adviserEmails = cases.ToDictionary(
         c => c.Id,
         c => fills.Where(f => f.Id == c.Id && f.Attr == "al_adviseremail").Select(f => f.Email).FirstOrDefault()
@@ -10314,18 +10352,59 @@ int BackfillPeopleEmail(string orgUrl, bool confirm)
         actionQuery.PageInfo.PageNumber++;
         actionQuery.PageInfo.PagingCookie = page.PagingCookie;
     }
+
+    var moved = 0;
     foreach (var action in actions)
     {
         var caseRef = action.GetAttributeValue<EntityReference>("al_outcomecaseid");
         if (caseRef == null || !adviserEmails.TryGetValue(caseRef.Id, out var adviserEmail)) continue;
-        var (adviser, _) = ContactByEmail(svc, adviserEmail);
+
+        var reference = referenceById.TryGetValue(caseRef.Id, out var r) ? r : caseRef.Id.ToString("D");
         var holder = action.GetAttributeValue<EntityReference>("al_assignedcontactid");
-        if (adviser == null ? holder == null : holder != null && holder.Id == adviser.Id) continue;
-        svc.Update(new Entity("al_remediationaction", action.Id)
+        var holderLabel = holder?.Name ?? "(unassigned)";
+
+        if (mismatchAdviserCases.Contains(caseRef.Id) && !includeMismatch)
         {
-            ["al_assignedcontactid"] = adviser?.ToEntityReference(),
-        });
-        moved++;
+            // Leave it: the stored email resolves, but to a contact named differently from the
+            // case. That is as likely to be a wrong address as a typo'd name - moving it without
+            // a human looking first could hand the action to the wrong person.
+            Console.WriteLine($"   SKIPPED (mismatch)  {reference} {action.Id}: {holderLabel}, use --include-mismatch to re-point");
+            continue;
+        }
+
+        var (adviser, adviserProblem) = ContactByEmail(svc, adviserEmail);
+        if (adviser == null)
+        {
+            if (holder == null) continue;
+
+            Console.WriteLine($"   UNASSIGN  {reference} {action.Id}: {holderLabel} -> nobody ({UnassignReason(adviserEmail, adviserProblem)})");
+            if (confirm)
+            {
+                svc.Update(new Entity("al_remediationaction", action.Id) { ["al_assignedcontactid"] = null });
+                moved++;
+            }
+
+            continue;
+        }
+
+        if (holder != null && holder.Id == adviser.Id) continue;
+
+        var contactName = adviser.GetAttributeValue<string>("fullname") ?? adviser.Id.ToString("D");
+        Console.WriteLine($"   MOVE      {reference} {action.Id}: {holderLabel} -> {contactName}");
+        if (confirm)
+        {
+            svc.Update(new Entity("al_remediationaction", action.Id)
+            {
+                ["al_assignedcontactid"] = adviser.ToEntityReference(),
+            });
+            moved++;
+        }
+    }
+
+    if (!confirm)
+    {
+        Console.WriteLine("Dry run. Re-run with --confirm <orgUrl> to fill and re-point open actions.");
+        return 0;
     }
 
     Console.WriteLine($"Filled {fills.Count} email(s); re-pointed {moved} open action(s). Now run: reconcileaccess {orgUrl} --confirm {orgUrl}");
