@@ -780,7 +780,7 @@
                             <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
                             <td rowspan="{{ ot_count }}">—</td>
                           {% endif %}
-                          <td rowspan="{{ ot_count }}">{% if a.al_assignedcontactid %}{{ a.al_assignedcontactid.name | escape }}{% else %}<span class="ot-unassigned" title="The adviser named on this case does not match a portal contact, so nobody can record a response on this action. Correct the adviser on the case record and the open actions move with it.">Nobody assigned{% if c.al_advisername %} &mdash; {{ c.al_advisername | escape }} is not a portal contact{% endif %}</span>{% endif %}</td>
+                          <td rowspan="{{ ot_count }}">{% if a.al_assignedcontactid %}{{ a.al_assignedcontactid.name | escape }}{% else %}<span class="ot-unassigned" title="The adviser email on this case is held by no single portal contact, so nobody can record a response on this action. Correct the adviser's email on the case, or add the person; the open actions then move to them.">Nobody assigned{% if c.al_adviseremail %} &mdash; {{ c.al_adviseremail | escape }} is held by no portal contact{% endif %}</span>{% endif %}</td>
                           <td rowspan="{{ ot_count }}"><span class="ot-due" data-ot-due data-due="{{ a.al_duedate | date: 'yyyy-MM-dd' }}" data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</span></td>
                           <td rowspan="{{ ot_count }}" data-ot-row-status="{{ a.al_remediationactionid }}">{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
                           <td rowspan="{{ ot_count }}">

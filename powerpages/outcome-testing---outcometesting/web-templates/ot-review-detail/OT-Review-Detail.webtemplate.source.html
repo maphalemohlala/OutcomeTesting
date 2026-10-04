@@ -142,9 +142,11 @@
         <attribute name="al_ioreference" />
         <attribute name="al_clientname" />
         <attribute name="al_advisername" />
+        <attribute name="al_adviseremail" />
         <attribute name="al_adviserstatus" />
         <attribute name="al_advisercode" />
         <attribute name="al_paraplanner" />
+        <attribute name="al_paraplanneremail" />
         <attribute name="al_paraplannercode" />
         <attribute name="al_products" />
         <attribute name="al_casetype" />
@@ -619,6 +621,10 @@
           <tr>
             <td class="lbl">Adviser name</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_advisername" value="{{ rv['case.al_advisername'] | escape }}" aria-label="Adviser name" /></td>
             <td class="lbl">Adviser status</td><td class="val"><select class="ot-hdr-input" data-ot-hdr="al_adviserstatus" aria-label="Adviser status"><option value="">&mdash;</option><option value="120910500" {% if h_adviserstatus.value == 120910500 %}selected{% endif %}>PreCAS</option><option value="120910501" {% if h_adviserstatus.value == 120910501 %}selected{% endif %}>CAS</option><option value="120910502" {% if h_adviserstatus.value == 120910502 %}selected{% endif %}>Enhanced</option><option value="120910503" {% if h_adviserstatus.value == 120910503 %}selected{% endif %}>Watchlist</option></select></td>
+          </tr>
+          <tr>
+            <td class="lbl">Adviser email</td><td class="val"><input type="email" class="ot-hdr-input" data-ot-hdr="al_adviseremail" value="{{ rv['case.al_adviseremail'] | escape }}" aria-label="Adviser email" /></td>
+            <td class="lbl">Paraplanner email</td><td class="val"><input type="email" class="ot-hdr-input" data-ot-hdr="al_paraplanneremail" value="{{ rv['case.al_paraplanneremail'] | escape }}" aria-label="Paraplanner email" /></td>
           </tr>
           {% comment %}
             Adviser code and Paraplanner code retired from 2026-09-22. The code is a
@@ -4641,6 +4647,18 @@
               // remove one, and the server replaces what it is given.
               fields[group.el.getAttribute('data-ot-hdr-set')] = now;
               any = true;
+            }
+
+            // People are identified by email (the server refuses a name sent alone), so a
+            // person's name and email travel together whenever either one changed.
+            var PERSON_PAIRS = [['al_advisername', 'al_adviseremail'], ['al_paraplanner', 'al_paraplanneremail']];
+            for (var p = 0; p < PERSON_PAIRS.length; p++) {
+              var pair = PERSON_PAIRS[p];
+              if (!(pair[0] in fields) && !(pair[1] in fields)) { continue; }
+              for (var q = 0; q < pair.length; q++) {
+                var input = document.querySelector('[data-ot-hdr="' + pair[q] + '"]');
+                if (input) { fields[pair[q]] = input.value; }
+              }
             }
 
             return any ? fields : null;
