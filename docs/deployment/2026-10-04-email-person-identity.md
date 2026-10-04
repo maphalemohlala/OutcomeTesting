@@ -155,6 +155,57 @@ Case 900000003 was restored to "Service Account" / `svc.automate.aq@ascotlloyd.c
 action read back held by Service Account again. Case 920929002 was restored too. Audit events
 are immutable and remain.
 
+## TEST, 2026-10-04 - imported, three owner steps left
+
+The agent did the following:
+- **Solution check in DEV:** every component type was checked against the solution, and none
+  is missing. That covers 298 portal components, 32 custom APIs with 140 parameters and 115
+  response properties, 35 steps (all enabled), the Code App, 3 roles, the assembly, every
+  `al_` table, and `al_ProductName` / `al_NotificationSenderAddress`. `al_PortalBaseUrl` stays
+  out on purpose, because it is per environment.
+- **Packages:** DEV was bumped to 1.0.19.0 and exported managed through the Web API (`pac`'s
+  sign-in was revoked). The two packages are in
+  `artifacts\2026-10-04-email-identity\` (gitignored):
+  - `OutcomeTesting_1_0_19_0_managed.zip`, sha256 starting `e2d19db6`;
+  - `OTIS_1_0_19_0_managed.zip`, sha256 starting `e70daa07`, branded with 7 labels.
+  - Both carry assembly `9db97b8d…`, the two AdviserContactPlugin steps with the PreImage, and
+    Code App bundle `index-Bhii7iBv.js`.
+- **TEST dry run (read only):** 48 cases.
+  - 25 FILL lines, all paraplanner, mostly `adam.strumidlo@`.
+  - 23 NO FILL lines: paraplanners with no contact, mainly Jessica Bell and Matheau Frith.
+  - 1 MISMATCH: test case 900000004.
+  - 20 case-level UNASSIGN notes: `matthew.hall@` and `svc.automate.aq-dev@` match no TEST
+    contact.
+  - No MOVE or UNASSIGN action lines, because TEST has no held open action. No adviser email
+    is blank.
+- **Import into TEST:** the import ran through `ImportSolutionAsync` (job
+  `d0d1ef6c-1b73-4ee9-a508-faddc5875d21`) and succeeded. Read back from TEST:
+  - solution 1.0.19.0, managed;
+  - assembly sha256 `9db97b8d…`;
+  - all our steps enabled, with the Update step carrying `PreImage` / `emailaddress1`;
+  - Code App `appversion` 2026-10-04T13:53:36Z.
+- **Templates:** every TEST web template and page equals DEV's, except **OT Review Detail**.
+  The direct push of 2026-10-01 still masks it.
+
+The agent's attempts at the backfill `--confirm` and the template push were both refused as
+shared-resource writes, so these are the owner's:
+
+```powershell
+$env:DOTNET_ROLL_FORWARD='Major'
+$t='C:\Users\rsimu\OutcomeTesting\plugins\OutcomeTesting.Registration\bin\Release\net8.0\OutcomeTesting.Registration.exe'
+$org='https://org37995f36.crm11.dynamics.com'
+# 1. Fill the 25 paraplanner emails (moves no action in TEST)
+& $t backfillpeopleemail $org --confirm $org
+# 2. Unmask the review page (Clear fix, email fields)
+& $t pushwebtemplate $org a1000000-0000-4000-8000-00000000001b C:\Users\rsimu\OutcomeTesting\powerpages\outcome-testing---outcometesting\web-templates\ot-review-detail\OT-Review-Detail.webtemplate.source.html
+# 3. Reconcile access with the new rules
+& $t reconcileaccess $org --confirm $org
+```
+
+The Update step arrived with its image in the same import, so it should not need the step
+touch that DEV needed. Prove it after the first contact email change in TEST: the newest
+`AdviserContactPlugin` row in `plugintracelogs` should read "Pre-image present".
+
 ## TEST and PROD - the owner's steps
 
 Writes there are the owner's. Run them from the repo root, in this order. TEST is
@@ -184,8 +235,9 @@ are left alone unless `--include-mismatch` is added.
 & $t backfillpeopleemail $org --confirm $org
 ```
 
-**3. Managed export from DEV, then import.** DEV is at 1.0.18.0. Bump it, and export once for
-both environments:
+**3. Managed export from DEV, then import.** Done on 2026-10-04: both packages are in
+`artifacts\2026-10-04-email-identity\`, as listed above. Use those files. The commands below
+are only for rebuilding them:
 
 ```powershell
 pac solution online-version --solution-name OutcomeTesting --solution-version 1.0.19.0 --environment https://org0b075da8.crm11.dynamics.com/
