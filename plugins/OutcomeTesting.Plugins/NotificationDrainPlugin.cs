@@ -25,10 +25,10 @@ namespace OutcomeTesting.Plugins
     /// where that has not been confirmed simply does not get the step, and the outbox goes on
     /// recording events honestly without claiming anything was sent.
     ///
-    /// The sending mailbox is the account the step is registered to run as, reached through
-    /// <c>PluginUserService</c>. Registering the step with an impersonating user therefore
-    /// sets the sender, which is how the service account is named without an address ever
-    /// appearing in code (AGENTS.md rule 7).
+    /// The sending mailbox is the shared mailbox's queue where <c>al_NotificationSenderAddress</c>
+    /// is set (<see cref="NotificationSender"/>), and otherwise the account the step is
+    /// registered to run as, reached through <c>PluginUserService</c>. Either way no address
+    /// appears in code (AGENTS.md rule 7).
     /// </summary>
     public class NotificationDrainPlugin : PluginBase
     {

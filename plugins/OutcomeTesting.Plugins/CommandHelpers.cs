@@ -274,9 +274,10 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Who a drained notification is sent from: the account the step runs as, or null
-        /// where the context names none. Both drain entry points ask the same question, so
-        /// they get the same answer from one place.
+        /// The account the drain step runs as, or null where the context names none - the
+        /// sender only where no shared mailbox address is set (<see cref="NotificationSender"/>).
+        /// Both drain entry points ask the same question, so they get the same answer from one
+        /// place.
         /// </summary>
         public static EntityReference Sender(IPluginExecutionContext context)
         {

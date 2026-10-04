@@ -77,11 +77,12 @@ namespace OutcomeTesting.Plugins
         /// <summary>
         /// Sends one notification and stamps the outcome on the row.
         ///
-        /// <paramref name="sender"/> is the mailbox the email leaves from. It is the account
-        /// the plug-in is registered to run as — the service account — never an address in
-        /// code (AGENTS.md rule 7). Server-side email requires that mailbox to be approved
-        /// and tested on the environment; where it is not, the send throws and the row lands
-        /// at <c>Failed</c> saying so, which is the visible version of that gap.
+        /// <paramref name="sender"/> is the account the plug-in is registered to run as. The
+        /// email leaves from the shared mailbox's queue where <c>al_NotificationSenderAddress</c>
+        /// is set, and from this account only where it is not (<see cref="NotificationSender"/>).
+        /// Server-side email requires the sending mailbox to be approved and tested on the
+        /// environment; where it is not, the send throws and the row lands at <c>Failed</c>
+        /// saying so, which is the visible version of that gap.
         /// </summary>
         public static Result Send(IOrganizationService service, Entity notification, EntityReference sender)
         {
@@ -111,16 +112,26 @@ namespace OutcomeTesting.Plugins
                     + "so nothing was sent.");
             }
 
-            if (sender == null)
+            EntityReference from;
+            try
             {
-                return Fail(service, notification.Id,
-                    "No sending account. The drain step must be registered to run as the "
-                    + "account whose mailbox is approved for server-side email.");
+                string problem;
+                from = NotificationSender.Resolve(service, sender, out problem);
+                if (from == null)
+                {
+                    return Fail(service, notification.Id, problem);
+                }
+            }
+            catch (Exception error)
+            {
+                // A queue the run-as account cannot read is a configuration fault like any
+                // other, and belongs on the row rather than in an async retry.
+                return Fail(service, notification.Id, Describe(error));
             }
 
             try
             {
-                var emailId = service.Create(Compose(notification, recipient, sender));
+                var emailId = service.Create(Compose(notification, recipient, from));
 
                 Attach(service, notification, emailId);
 
