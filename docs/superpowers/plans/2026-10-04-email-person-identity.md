@@ -2520,18 +2520,44 @@ Append after the last `| AD-` row, keeping the table's four columns:
 | AD-228 | **People on a case are identified by email, never by name.** `NotificationOutbox.MatchPerson` resolves by `emailaddress1` only (active, `TopCount 2`); `al_advisername` and `al_paraplanner` are labels. Remediation assignment, adviser access, the pass letter, T&C routing, paraplanner letters and export codes read the stored email. The import rejects a row without AdviserName, AdviserEmail, AssignedBy and ParaplannerEmail; both edit paths refuse a name sent without its email. Open actions follow the adviser email: on an email change, and from `AdviserContactPlugin` on contact Create and Update of emailaddress1/statecode; an email matching nobody unassigns them. `backfillpeopleemail` fills blank emails from unambiguous names once and re-points open actions. | Project owner, 2026-10-02: "This should use email instead of name for matching. The whole system needs to do that as 2 people can have the same name", after PROD case 256497798 named "Adam Strumidlo" while his contact read "Adam Strumdlio" and his remediation was raised unassigned. Owner chose: reject rows without email, one-off backfill with report, email as the only key, manual name + email entry allowed. Spec `docs/superpowers/specs/2026-10-02-email-person-identity-design.md`. Supersedes the name fallback in `CaseAdviser` (2026-09-30) and `MatchPerson` (2026-09-20). | 2026-10-04 |
 ```
 
-- [ ] **Step 2: Build and push the plug-in assembly to DEV**
+Deployment order (why): the backfill must run, and be reviewed and confirmed, while the OLD
+plug-ins are still live, before the new assembly or solution lands. The old plug-ins already
+read the email first, so running the backfill against them is safe. Legacy cases with a blank
+adviser or paraplanner email would otherwise lose remediation access, T&C routing and letters
+the moment the new email-only plug-ins and portal/Code App (which refuse a name without an
+email) land — there would be a window where those cases have neither a usable name match nor
+a filled email. Filling the emails first, under the old code, closes that window before the
+new code ever reads them.
+
+- [ ] **Step 2: Backfill DEV — dry run, before any push or import**
+
+```bash
+T=plugins/OutcomeTesting.Registration/bin/Debug/net8.0/OutcomeTesting.Registration.exe
+DOTNET_ROLL_FORWARD=Major "$T" backfillpeopleemail https://org0b075da8.crm11.dynamics.com
+```
+
+Read the report. Review every NO FILL, MISMATCH, UNASSIGN and MOVE line; fix any by hand or
+accept them knowingly before proceeding. Record the FILL, NO FILL and MISMATCH counts.
+
+- [ ] **Step 3: Backfill DEV — confirm, while the OLD plug-ins are still live**
+
+```bash
+DOTNET_ROLL_FORWARD=Major "$T" backfillpeopleemail https://org0b075da8.crm11.dynamics.com --confirm https://org0b075da8.crm11.dynamics.com
+```
+
+This is safe now because the plug-ins still live in DEV already read the email first; it
+would not be safe to defer this past Step 4. A `--confirm` command can be refused by the
+permission gate. If so, hand it to the owner in PowerShell form.
+
+- [ ] **Step 4: Build and push the plug-in assembly, and register the contact step in DEV**
 
 ```bash
 cd plugins && DOTNET_ROLL_FORWARD=Major dotnet build OutcomeTesting.Plugins -c Release
-T=plugins/OutcomeTesting.Registration/bin/Debug/net8.0/OutcomeTesting.Registration.exe
 DOTNET_ROLL_FORWARD=Major "$T" pushassembly https://org0b075da8.crm11.dynamics.com 2>&1 | grep -v "^Connecting"
 ```
 
 Verify by sha256: compare the local Release DLL with `pluginassembly.content` read back from
 DEV. Do not trust the byte count; `pushassembly` sends `bin/Release` as it stands.
-
-- [ ] **Step 3: Register the contact step in DEV and add it to the solution**
 
 ```bash
 DOTNET_ROLL_FORWARD=Major "$T" registerstep https://org0b075da8.crm11.dynamics.com OutcomeTesting.Plugins.AdviserContactPlugin Create contact 40 "" sync
@@ -2541,7 +2567,15 @@ DOTNET_ROLL_FORWARD=Major "$T" registerstep https://org0b075da8.crm11.dynamics.c
 Then run `addcomponent` (type 92) for both new step ids into `OutcomeTesting`. Confirm with
 the solution membership audit that both steps are members and are enabled.
 
-- [ ] **Step 4: Push the two portal templates and the Code App to DEV**
+For TEST and PROD this step is the owner's managed import (PROD through
+`brandpackage <zip> <out.zip> OTIS`), with `--activate-plugins` so both
+`AdviserContactPlugin` steps arrive enabled — an import that carries step XML without that
+switch disables them.
+
+- [ ] **Step 5: Push the two portal templates and the Code App to DEV**
+
+Never before Step 4: the old allowlists refuse `al_adviseremail`, so pushing the templates or
+the Code App ahead of the plug-ins would surface an edit the server cannot yet accept.
 
 - **Templates.** Before each push, diff DEV's copy against the repo (read
   `powerpagecomponents(<id>)` content). A difference other than this change means DEV holds
@@ -2557,23 +2591,21 @@ DOTNET_ROLL_FORWARD=Major "$T" pushwebtemplate https://org0b075da8.crm11.dynamic
   `al_adviseremail`. Then run `npx pa app push`. If `pa` needs an interactive sign-in, hand the
   command to the owner. Open the `/app/` URL with `sourcetime` that the push prints.
 
-- [ ] **Step 5: Backfill DEV**
+For TEST, the Code App's copy moves only with the Step 4 solution import, not with
+`pa app push` (that verb only ever reaches DEV).
 
-```bash
-DOTNET_ROLL_FORWARD=Major "$T" backfillpeopleemail https://org0b075da8.crm11.dynamics.com
-```
-
-Read the report and record the FILL, NO FILL and MISMATCH counts. Then:
+- [ ] **Step 6: Backfill DEV again, then reconcile access**
 
 ```bash
 DOTNET_ROLL_FORWARD=Major "$T" backfillpeopleemail https://org0b075da8.crm11.dynamics.com --confirm https://org0b075da8.crm11.dynamics.com
 DOTNET_ROLL_FORWARD=Major "$T" reconcileaccess https://org0b075da8.crm11.dynamics.com --confirm https://org0b075da8.crm11.dynamics.com
 ```
 
-A `--confirm` command can be refused by the permission gate. If so, hand it to the owner in
-PowerShell form.
+This second backfill confirm is idempotent and catches any case created between Step 3 and
+now. A `--confirm` command can be refused by the permission gate. If so, hand it to the owner
+in PowerShell form.
 
-- [ ] **Step 6: DEV proof**
+- [ ] **Step 7: DEV proof**
 
 Each item must be observed in DEV, not inferred:
 1. **Import.** Upload a two-row extract in the Code App: one row complete, one row with
@@ -2592,24 +2624,31 @@ Each item must be observed in DEV, not inferred:
 
 Clean up anything the proof created that is not ordinary DEV test data.
 
-- [ ] **Step 7: Deployment note, then hand TEST and PROD to the owner**
+- [ ] **Step 8: Deployment note, then hand TEST and PROD to the owner**
 
 Write `docs/deployment/2026-10-04-email-person-identity.md` in the style of the other
 deployment notes. Include:
 - what changed;
-- the DEV evidence from Step 6;
+- the DEV evidence from Step 7;
 - the backfill counts;
-- the owner's steps for TEST and PROD, as PowerShell:
-  1. the managed export from DEV (PROD through `brandpackage <zip> <out.zip> OTIS`) and the
-     import, with full paths;
-  2. read back the solution version after the import;
-  3. confirm the two `AdviserContactPlugin` steps arrived **enabled**. An import with step XML
-     and no `--activate-plugins` disables them;
-  4. `backfillpeopleemail <org>`, then `--confirm <org>`, then `reconcileaccess --confirm`;
-  5. in PROD, check that case 256497798's open action is now held by Adam Strumidlo's contact.
+- why the order matters (the paragraph above Step 2);
+- the owner's steps for TEST and PROD, as PowerShell, in this order:
+  1. `backfillpeopleemail <org>` (dry run), reviewed, BEFORE any assembly push or solution
+     import;
+  2. `backfillpeopleemail <org> --confirm <org>`, while the OLD plug-ins there are still live;
+  3. the managed export from DEV (PROD through `brandpackage <zip> <out.zip> OTIS`) and the
+     import, with full paths and `--activate-plugins`; read back the solution version after
+     the import; confirm the two `AdviserContactPlugin` steps arrived **enabled** — an import
+     with step XML and no `--activate-plugins` disables them; then register the contact step
+     if the import did not carry it;
+  4. the portal templates and the Code App arrive with the same solution import, never before
+     the plug-ins (the old allowlists refuse `al_adviseremail`);
+  5. `backfillpeopleemail <org> --confirm <org>` again (idempotent, catches cases created in
+     between), then `reconcileaccess <org> --confirm <org>`;
+  6. in PROD, check that case 256497798's open action is now held by Adam Strumidlo's contact.
      Remind the owner that he still needs the **AL Portal - Adviser Remediation** web role.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add knowledge/decision-log.md docs/deployment/2026-10-04-email-person-identity.md
