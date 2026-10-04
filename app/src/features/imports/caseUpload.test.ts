@@ -14,8 +14,8 @@ import {
  * these cases deliberately mirror that file.
  */
 const HEADER =
-  'TaskID,ServiceCaseSequentialRef,Client,AdviserName,AssignedTo,Status,Outcome,' +
-  'CompletedBy,CompletedDate,DueDate,TaskType,AssignedBy,' +
+  'TaskID,ServiceCaseSequentialRef,Client,AdviserName,AdviserEmail,AssignedTo,Status,Outcome,' +
+  'CompletedBy,CompletedDate,DueDate,TaskType,AssignedBy,ParaplannerEmail,' +
   'ChecklistItem1,CompletedBy1,CompletionDate1,ChecklistItem2,CompletedBy2,CompletionDate2';
 
 const STAMP = '2026-09-04T13:54:00';
@@ -39,6 +39,8 @@ interface RowOptions {
   completedDate?: string;
   /** Feeds DueDate, which is deliberately ignored. Only the case below passes one. */
   dueDate?: string;
+  adviserEmail?: string;
+  paraplannerEmail?: string;
 }
 
 /** A row carrying one stamped Tax item by default, so a test not about the checklist still imports. */
@@ -55,12 +57,15 @@ function row(taskId: string, options: RowOptions = {}): string {
     client = 'A. Client',
     completedDate = '',
     dueDate = '',
+    adviserEmail = 'sam@example.com',
+    paraplannerEmail = 'pip@example.com',
   } = options;
   return [
     taskId,
     'IOA07028411',
     client,
     'Jane Adviser',
+    adviserEmail,
     // AssignedTo. The extract puts the CHECKER here; calling this value "Pat Paraplanner"
     // is the assumption that got written into the column map twice.
     'Chris Checker',
@@ -72,6 +77,7 @@ function row(taskId: string, options: RowOptions = {}): string {
     'Pre-Advice Check Required',
     // AssignedBy: the para-planner who raised the task (AD-160).
     'Pat Paraplanner',
+    paraplannerEmail,
     item1,
     by1,
     date1,
@@ -416,5 +422,20 @@ describe('the supplied extract', () => {
 
     expect(shared).toHaveLength(2);
     expect(new Set(shared.map((c) => c.reference)).size).toBe(2);
+  });
+});
+
+describe('people on an imported row (email identity)', () => {
+  const header = 'TaskID,AdviserName,AdviserEmail,AssignedBy,ParaplannerEmail';
+
+  it.each([
+    ['T1,Sam Adviser,,Pip Planner,pip@example.com', 'AdviserEmail'],
+    ['T1,Sam Adviser,sam@example.com,Pip Planner,', 'ParaplannerEmail'],
+    ['T1,,sam@example.com,Pip Planner,pip@example.com', 'AdviserName'],
+    ['T1,Sam Adviser,Sam Adviser,Pip Planner,pip@example.com', 'is not an email address'],
+  ])('rejects %s', (row, fragment) => {
+    const result = parseCaseCsv(`${header}\n${row}`);
+    expect(result.valid).toHaveLength(0);
+    expect(result.invalid[0].reason).toContain(fragment);
   });
 });

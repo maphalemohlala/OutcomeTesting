@@ -152,9 +152,10 @@ namespace OutcomeTesting.Plugins
         /// without renaming anything, so this table is the single place the extract's shape
         /// is known.
         ///
-        /// TaskID is the import key and the only mandatory column; every other column is
-        /// validated only when a value is present. The extract's remaining ~60 columns are
-        /// constant, empty or personal data we do not hold (D8), and are deliberately absent.
+        /// TaskID, AdviserName, AdviserEmail, AssignedBy and ParaplannerEmail are mandatory;
+        /// every other column is validated only when a value is present. The extract's
+        /// remaining ~60 columns are constant, empty or personal data we do not hold (D8),
+        /// and are deliberately absent.
         /// </summary>
         public static readonly ColumnDef[] Columns = new[]
         {
@@ -207,8 +208,8 @@ namespace OutcomeTesting.Plugins
             // Light column D - had to resolve a name and refuse whenever two contacts
             // answered to it.
             //
-            // The name is still mapped and still used. It is what a person reads on the case,
-            // and it is the fallback when a row carries no address.
+            // The name is still mapped and still used. It is what a person reads on the case;
+            // a row without an address is rejected (AD-228).
             new ColumnDef("ParaplannerEmail", "al_paraplanneremail", ColumnKind.Text, null),
             // al_checkername is deliberately absent. The checker is set manually (project
             // owner, 2026-09-14): by allocation (AssignCasePlugin), by a claim
@@ -672,8 +673,9 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>
         /// Parses an extract into cases to create and rows to flag (BR-002). No business rule
-        /// is invented: only TaskID is mandatory, and an unrecognised choice or an
-        /// unreadable date becomes an exception carrying the reason, never a silent default.
+        /// is invented: TaskID, AdviserName, AdviserEmail, AssignedBy and ParaplannerEmail
+        /// are mandatory, and an unrecognised choice or an unreadable date becomes an
+        /// exception carrying the reason, never a silent default.
         /// </summary>
         public static ParseResult ParseCsv(string csv)
         {
@@ -819,6 +821,13 @@ namespace OutcomeTesting.Plugins
                     values["al_preorpostcheck"] = PreOrPostCheckPre;
                 }
 
+                // People are identified by email (AD-228): a row without both people's name
+                // and email is rejected rather than created routable by name.
+                if (rowError == null)
+                {
+                    rowError = PeopleError(values);
+                }
+
                 // The checklist is the route's only input now (D6), so a row whose checklist
                 // cannot be read is rejected rather than created without one. DeriveRoute
                 // returns early on a null tax answer and writes nothing, which would leave
@@ -871,6 +880,43 @@ namespace OutcomeTesting.Plugins
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Why a row cannot become a case for want of its people, or null (AD-228, owner
+        /// 2026-10-02). Both people need a name, which is what a person reads, and an email,
+        /// which is who they are. A row naming someone with no address would route remediation,
+        /// sign-off and letters by a name - the matching that misrouted PROD case 256497798.
+        /// </summary>
+        public static string PeopleError(IDictionary<string, object> values)
+        {
+            return PersonError(values, "AdviserName", CasePeople.AdviserNameAttr, "AdviserEmail", CasePeople.AdviserEmailAttr)
+                ?? PersonError(values, "AssignedBy", CasePeople.ParaplannerNameAttr, "ParaplannerEmail", CasePeople.ParaplannerEmailAttr);
+        }
+
+        private static string PersonError(
+            IDictionary<string, object> values, string nameHeader, string nameAttr, string emailHeader, string emailAttr)
+        {
+            object name;
+            object email;
+            values.TryGetValue(nameAttr, out name);
+            values.TryGetValue(emailAttr, out email);
+
+            if (CasePeople.Clean(name as string) == null)
+            {
+                return "\"" + nameHeader + "\" is empty. Every case needs this person's name.";
+            }
+
+            var address = CasePeople.Clean(email as string);
+            if (address == null)
+            {
+                return "\"" + emailHeader + "\" is empty. People are identified by email, so a case "
+                    + "cannot be created without it.";
+            }
+
+            return CasePeople.IsEmail(address)
+                ? null
+                : "\"" + emailHeader + "\" value \"" + address + "\" is not an email address.";
         }
 
         /// <summary>One cell, addressed by the extract's own header name.</summary>

@@ -15,8 +15,8 @@ namespace OutcomeTesting.Plugins.Tests
     public class ImportRulesTests
     {
         private const string Header =
-            "TaskID,ServiceCaseSequentialRef,Client,AdviserName,AssignedTo,Status,Outcome," +
-            "CompletedBy,CompletedDate,DueDate,TaskType,AssignedBy," +
+            "TaskID,ServiceCaseSequentialRef,Client,AdviserName,AdviserEmail,AssignedTo,Status,Outcome," +
+            "CompletedBy,CompletedDate,DueDate,TaskType,AssignedBy,ParaplannerEmail," +
             "ChecklistItem1,CompletedBy1,CompletionDate1,ChecklistItem2,CompletedBy2,CompletionDate2";
 
         private const string Stamp = "2026-09-04T13:54:00";
@@ -35,7 +35,9 @@ namespace OutcomeTesting.Plugins.Tests
             string date2 = "",
             string status = "Complete",
             string outcome = "",
-            string client = "A. Client")
+            string client = "A. Client",
+            string adviserEmail = "sam@example.com",
+            string paraplannerEmail = "pip@example.com")
         {
             return string.Join(
                 ",",
@@ -43,6 +45,7 @@ namespace OutcomeTesting.Plugins.Tests
                 "IOA07028411",
                 client,
                 "Jane Adviser",
+                adviserEmail,
                 // AssignedTo. The extract puts the CHECKER here, which is why this fixture
                 // no longer calls it "Pat Paraplanner" - the old name was the guess that
                 // caused the mapping to be reversed twice.
@@ -55,6 +58,7 @@ namespace OutcomeTesting.Plugins.Tests
                 "Pre-Advice Check Required",
                 // AssignedBy: the para-planner who raised the task (AD-160).
                 "Pat Paraplanner",
+                paraplannerEmail,
                 item1,
                 by1,
                 date1,
@@ -77,11 +81,13 @@ namespace OutcomeTesting.Plugins.Tests
         /// their own header rather than reusing one that would fail for an unrelated reason.
         /// </summary>
         private const string IoHeader =
-            "TaskID,ClientRef,ChecklistItem1,CompletedBy1,CompletionDate1";
+            "TaskID,ClientRef,AdviserName,AdviserEmail,AssignedBy,ParaplannerEmail," +
+            "ChecklistItem1,CompletedBy1,CompletionDate1";
 
         private static string IoRow(string taskId, string clientRef)
         {
-            return taskId + "," + clientRef + ",Tax Check,Miko Stewart," + Stamp;
+            return taskId + "," + clientRef
+                + ",Sam Adviser,sam@example.com,Pip Planner,pip@example.com,Tax Check,Miko Stewart," + Stamp;
         }
 
         private static string IoFile(params string[] rows)
@@ -808,6 +814,35 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.DoesNotContain(
                 ImportRules.Columns,
                 column => string.Equals(column.Attribute, "al_duedate", StringComparison.OrdinalIgnoreCase));
+        }
+
+        // -------------------------------------------- people are identified by email (AD-228)
+
+        private const string PeopleHeader =
+            "TaskID,AdviserName,AdviserEmail,AssignedBy,ParaplannerEmail";
+
+        [Theory]
+        [InlineData("T1,Sam Adviser,,Pip Planner,pip@example.com", "AdviserEmail")]
+        [InlineData("T1,Sam Adviser,sam@example.com,Pip Planner,", "ParaplannerEmail")]
+        [InlineData("T1,,sam@example.com,Pip Planner,pip@example.com", "AdviserName")]
+        [InlineData("T1,Sam Adviser,sam@example.com,,pip@example.com", "AssignedBy")]
+        [InlineData("T1,Sam Adviser,Sam Adviser,Pip Planner,pip@example.com", "is not an email address")]
+        public void A_row_missing_a_persons_name_or_email_is_rejected(string row, string reasonFragment)
+        {
+            var result = ImportRules.ParseCsv(PeopleHeader + "\n" + row);
+
+            Assert.Empty(result.Valid);
+            var error = Assert.Single(result.Invalid);
+            Assert.Contains(reasonFragment, error.Reason);
+        }
+
+        [Fact]
+        public void A_file_without_the_email_columns_rejects_every_row()
+        {
+            var result = ImportRules.ParseCsv("TaskID,AdviserName,AssignedBy\nT1,Sam Adviser,Pip Planner");
+
+            Assert.Empty(result.Valid);
+            Assert.Contains("AdviserEmail", Assert.Single(result.Invalid).Reason);
         }
     }
 }

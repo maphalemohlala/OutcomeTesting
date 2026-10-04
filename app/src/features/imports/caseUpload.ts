@@ -7,6 +7,8 @@
  * shows a row as importable here and then rejects it there. When one changes, change both.
  */
 
+import { isEmail } from '../cases/casePeople';
+
 /** al_casestatus for a freshly imported case (Imported, BR-001). */
 const CASE_STATUS_IMPORTED = 120910580;
 
@@ -465,6 +467,12 @@ export function parseCaseCsv(text: string): ParseResult {
       record.al_preorpostcheck = PRE_OR_POST_CHECK_PRE;
     }
 
+    // People are identified by email: a row without both people's name and email is
+    // rejected, as the server rejects it (ImportRules.PeopleError).
+    if (rowError === null) {
+      rowError = peopleError(record);
+    }
+
     // The checklist is the route's only input now, so a row whose checklist cannot be read
     // is rejected rather than created without one.
     if (rowError === null) {
@@ -491,4 +499,21 @@ export function parseCaseCsv(text: string): ParseResult {
   }
 
   return { valid, invalid, fatal: null };
+}
+
+function peopleError(record: Record<string, unknown>): string | null {
+  const people = [
+    ['AdviserName', 'al_advisername', 'AdviserEmail', 'al_adviseremail'],
+    ['AssignedBy', 'al_paraplanner', 'ParaplannerEmail', 'al_paraplanneremail'],
+  ] as const;
+  for (const [nameHeader, nameField, emailHeader, emailField] of people) {
+    const name = String(record[nameField] ?? '').trim();
+    const email = String(record[emailField] ?? '').trim();
+    if (name === '') return `"${nameHeader}" is empty. Every case needs this person's name.`;
+    if (email === '') {
+      return `"${emailHeader}" is empty. People are identified by email, so a case cannot be created without it.`;
+    }
+    if (!isEmail(email)) return `"${emailHeader}" value "${email}" is not an email address.`;
+  }
+  return null;
 }
