@@ -17,6 +17,7 @@ import { useRoles } from '../admin/useRoles';
 import {
   caseloadByIdentity,
   contactEmailsOf,
+  emailFromIdentity,
   type PersonCaseload,
   type PersonRole,
 } from './peopleDirectory';
@@ -169,7 +170,10 @@ export function PeoplePage() {
       .map(([key, load]) => ({
         key: `case:${key}`,
         name: load.name,
-        email: '',
+        // F6: an unregistered row's key IS the case's identity for them (identityOf), so an
+        // `email:`-keyed one shows the address the case identifies them by, rather than a
+        // blank the directory happens to have nothing to fill in.
+        email: emailFromIdentity(key),
         active: true,
         createdOn: null,
         user: null,

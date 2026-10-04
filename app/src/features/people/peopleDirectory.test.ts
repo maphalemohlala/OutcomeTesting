@@ -5,6 +5,7 @@ import {
   casesForPerson,
   checkerIdentity,
   contactEmailsOf,
+  emailFromIdentity,
   isPersonRole,
 } from './peopleDirectory';
 import type { CaseSummary } from '../cases/caseWorklistMapping';
@@ -234,5 +235,21 @@ describe('checkerIdentity', () => {
 
     expect(identity).toBe('contact:c10');
     expect(casesForPerson([c], 'Checker', identity).map((item) => item.id)).toEqual(['6']);
+  });
+});
+
+describe('emailFromIdentity', () => {
+  // F6 of the 2026-10-04 final review: the People page's unregistered rows are keyed on
+  // identityOf's own output, so an email:-prefixed one must show that address, not a blank.
+  it('reads the address out of an email: identity', () => {
+    expect(emailFromIdentity('email:adam.strumidlo@example.com')).toBe('adam.strumidlo@example.com');
+  });
+
+  it('is empty for a contact: identity, which names no email', () => {
+    expect(emailFromIdentity('contact:c10')).toBe('');
+  });
+
+  it('is empty for a name: identity, the legacy no-email fallback', () => {
+    expect(emailFromIdentity('name:sam adviser')).toBe('');
   });
 });

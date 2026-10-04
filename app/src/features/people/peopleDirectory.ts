@@ -59,6 +59,16 @@ export function identityOf(
   return `name:${(position.name ?? '').trim().toLowerCase()}`;
 }
 
+/**
+ * The email an `email:`-prefixed identity carries, or '' for a `contact:` or `name:` one
+ * (F6 of the 2026-10-04 final review). The People page's unregistered rows show it, so a
+ * person the directory does not hold is still shown by the email the case actually
+ * identifies them by, not a blank.
+ */
+export function emailFromIdentity(identity: string): string {
+  return identity.startsWith('email:') ? identity.slice('email:'.length) : '';
+}
+
 export function adviserIdentity(item: CaseSummary): string {
   return identityOf({ name: item.adviser, email: item.adviserEmail, contactId: null });
 }
