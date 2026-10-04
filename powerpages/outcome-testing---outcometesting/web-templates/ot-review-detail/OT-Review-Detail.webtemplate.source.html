@@ -1681,7 +1681,7 @@
                     <button type="button" class="ot-rte__btn" data-ot-rte-cmd="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list">&bull; List</button>
                     <button type="button" class="ot-rte__btn" data-ot-rte-cmd="insertOrderedList" title="Numbered list" aria-label="Numbered list">1. List</button>
                     <span class="ot-rte__sep" aria-hidden="true"></span>
-                    <button type="button" class="ot-rte__btn" data-ot-rte-cmd="removeFormat" title="Clear formatting" aria-label="Clear formatting">Clear</button>
+                    <button type="button" class="ot-rte__btn" data-ot-rte-clear title="Clear the answer" aria-label="Clear the answer">Clear</button>
                   </div>
                   <div class="ot-rte__area"
                        contenteditable="true"
@@ -2557,6 +2557,26 @@
                       document.execCommand(this.getAttribute('data-ot-rte-cmd'), false, null);
                     } catch (e) {
                       return; // A browser that refuses the command leaves the text as it was.
+                    }
+                    queue();
+                  });
+                }
+
+                // Clear empties the answer. It used to be removeFormat, which only unbolds a
+                // selection: with the caret merely in the field it did nothing, and the text a
+                // checker meant to clear stayed. selectAll + delete rather than innerHTML = '' so
+                // Ctrl+Z brings the text back after a mis-press. currentPayload() sends an editor
+                // with no words as null, and AnswerWriter stores that as cleared.
+                var clear = root.querySelector('[data-ot-rte-clear]');
+                if (clear) {
+                  clear.addEventListener('mousedown', function (event) {
+                    event.preventDefault();
+                    area.focus();
+                    try {
+                      document.execCommand('selectAll', false, null);
+                      document.execCommand('delete', false, null);
+                    } catch (e) {
+                      area.innerHTML = '';
                     }
                     queue();
                   });
