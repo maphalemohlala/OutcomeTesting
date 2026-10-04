@@ -10,7 +10,8 @@ namespace OutcomeTesting.Registration;
 ///
 /// Four phases, each reported and each idempotent enough to re-run:
 ///   1. Remove the al_user rows that no contact matches.
-///   2. Rewrite the adviser and paraplanner recorded on every case to the real people.
+///   2. Point the adviser and paraplanner on each case that names nobody real at the real
+///      people, by email - a case already naming an active contact is left alone.
 ///   3. Allocate most cases, leaving a few in the queue.
 ///   4. Take the caller's own allocations through review to Closed, so the Trail Light
 ///      export has something to snapshot.
@@ -142,18 +143,45 @@ public static class ContactsMigration
     {
         return svc.RetrieveMultiple(new QueryExpression("al_outcomecase")
         {
-            ColumnSet = new ColumnSet("al_casereference", "al_casestatus", "al_reviewrouteid"),
+            ColumnSet = new ColumnSet(
+                "al_casereference", "al_casestatus", "al_reviewrouteid",
+                "al_adviseremail", "al_paraplanneremail", "al_checkername"),
             Orders = { new OrderExpression("al_casereference", OrderType.Ascending) },
         }).Entities.ToList();
     }
 
     /// <summary>
-    /// Phase 2. Rewrites the adviser and paraplanner names to the real people.
+    /// Phase 2. Points the adviser and paraplanner on each case that names nobody real at
+    /// the real people: each person's EMAIL with their name, never a name alone.
     ///
-    /// The People view groups by the name recorded on the case (AD-029 keeps those fields
-    /// as text from the intake extract), so leaving the fictional names would keep listing
-    /// people the registry no longer holds. Adviser and paraplanner are offset so no case
-    /// has the same person in both positions.
+    /// People on a case are identified by email (AD-228) - remediation, portal access,
+    /// letters, T&amp;C routing and the People view all go by al_adviseremail and
+    /// al_paraplanneremail, and the names are labels. So a fictional address left behind
+    /// would keep routing to nobody, and a name written without its email would label one
+    /// person while the case still identifies another.
+    ///
+    /// Only an email that is blank, or that no active contact holds, is replaced. A case
+    /// whose email already belongs to an active contact is left exactly as it is, and
+    /// reported as kept: a raw write of a new email moves the case's portal access at once
+    /// (CaseAccessPlugin fires on it) while its open remediation actions stay with the
+    /// previous adviser, which is the stranded state AD-228 removed - and a re-run after the
+    /// registry grew would shift the round-robin and do exactly that to every case. So a
+    /// re-run is a true no-op. A registry person with no email is skipped and reported too,
+    /// and that case keeps whoever it had. Adviser and paraplanner are offset so no case has
+    /// the same person in both positions.
+    ///
+    /// Every case's open remediation actions then follow its ADVISER email, by the plug-ins'
+    /// rule (AdviserEmailFollow, in Program.cs): to the one active contact holding that email,
+    /// else off whoever held them - never guessed. Completed actions never move, and each move
+    /// is listed. For a case whose email was just written this is what stops the new adviser
+    /// opening the case (CaseAccessPlugin has already given them access) without being able to
+    /// answer its actions. A KEPT case is followed too, on the email it already has, which is
+    /// never rewritten: that is what lets a re-run finish a run that wrote an email and failed
+    /// before its actions moved, and it only enforces what the plug-ins enforce anyway. Being
+    /// idempotent, it moves nothing on a case that is already right.
+    ///
+    /// The retired al_advisercode / al_paraplannercode are no longer written: a staff code
+    /// is the person's, held on contact.al_staffcode (2026-09-22).
     ///
     /// The checker is taken from the case's live allocation, and cleared where there is
     /// none. ClaimCasePlugin stamps it at allocation time, but a re-run skips cases already
@@ -165,30 +193,114 @@ public static class ContactsMigration
     {
         Console.WriteLine("2. Rewriting the people recorded on every case…");
 
+        // Every address an active contact holds. A case carrying one of these already names
+        // a real person, and is not this phase's to move.
+        var held = new HashSet<string>(people.Select(p => p.Email), StringComparer.OrdinalIgnoreCase);
+
+        var updated = 0;
+        var kept = 0;
+        var skipped = 0;
+        var moved = 0;
         for (var i = 0; i < cases.Count; i++)
         {
             var adviser = people[i % people.Count];
             var paraplanner = people[(i + 1) % people.Count];
             var checker = AssigneeOf(svc, cases[i].Id, people);
+            var reference = cases[i].GetAttributeValue<string>("al_casereference") ?? cases[i].Id.ToString("D");
 
-            svc.Update(new Entity("al_outcomecase", cases[i].Id)
+            var update = new Entity("al_outcomecase", cases[i].Id);
+            if (!string.Equals(cases[i].GetAttributeValue<string>("al_checkername"), checker?.Name, StringComparison.Ordinal))
             {
-                ["al_advisername"] = adviser.Name,
-                ["al_advisercode"] = Code("ADV", adviser),
-                ["al_paraplanner"] = paraplanner.Name,
-                ["al_paraplannercode"] = Code("PP", paraplanner),
-                ["al_checkername"] = checker?.Name,
-            });
+                update["al_checkername"] = checker?.Name;
+            }
+
+            var adviserWrite = WritePerson(update, cases[i], held, adviser, "al_advisername", "al_adviseremail", "adviser", reference);
+            switch (adviserWrite)
+            {
+                case PersonWrite.Kept: kept++; break;
+                case PersonWrite.Skipped: skipped++; break;
+            }
+
+            switch (WritePerson(update, cases[i], held, paraplanner, "al_paraplanner", "al_paraplanneremail", "paraplanner", reference))
+            {
+                case PersonWrite.Kept: kept++; break;
+                case PersonWrite.Skipped: skipped++; break;
+            }
+
+            if (update.Attributes.Count > 0)
+            {
+                svc.Update(update);
+                updated++;
+            }
+
+            // The open actions follow the adviser email the case now carries: the one just
+            // written, or - for a KEPT case - the one it already had. A case whose adviser write
+            // was skipped is left as it was, actions and all.
+            var adviserEmail = adviserWrite == PersonWrite.Written
+                ? adviser.Email
+                : adviserWrite == PersonWrite.Kept
+                    ? (cases[i].GetAttributeValue<string>("al_adviseremail") ?? string.Empty).Trim()
+                    : null;
+            if (adviserEmail != null)
+            {
+                moved += AdviserEmailFollow.Follow(svc, cases[i].Id, reference, SoleHolder(people, adviserEmail), adviserEmail, write: true);
+            }
         }
 
-        Console.WriteLine($"   {cases.Count} case(s) updated.");
+        Console.WriteLine($"   {updated} of {cases.Count} case(s) updated; {kept} person(s) kept because an active contact "
+            + $"already holds their email; {skipped} person write(s) skipped for want of an email; "
+            + $"{moved} open remediation action(s) followed the adviser email.");
         Console.WriteLine();
     }
 
-    /// <summary>A stable code per person, so the export's code columns are not blank.</summary>
-    private static string Code(string prefix, Person person)
+    /// <summary>
+    /// The one active contact holding this email, as the plug-ins resolve it (AD-228), or null
+    /// when none or two do - never guessed. Read off the registry already loaded: it is every
+    /// active contact with an email.
+    /// </summary>
+    private static Entity? SoleHolder(List<Person> people, string email)
     {
-        return prefix + "-" + person.ContactId.ToString("N")[..6].ToUpperInvariant();
+        var holders = people.Where(p => string.Equals(p.Email, email, StringComparison.OrdinalIgnoreCase)).ToList();
+        return holders.Count == 1 ? new Entity("contact", holders[0].ContactId) : null;
+    }
+
+    private enum PersonWrite
+    {
+        Written,
+        Kept,
+        Skipped,
+    }
+
+    /// <summary>
+    /// Puts one person's name and email on the update, together - but only where the case's
+    /// email for that role is blank or no active contact holds it. An email an active contact
+    /// already holds is kept as it is, and a registry person with no email is never written,
+    /// because a name alone would label someone the case does not identify (AD-228). Both
+    /// are reported.
+    /// </summary>
+    private static PersonWrite WritePerson(
+        Entity update, Entity outcomeCase, HashSet<string> held, Person person,
+        string nameAttr, string emailAttr, string who, string reference)
+    {
+        var current = (outcomeCase.GetAttributeValue<string>(emailAttr) ?? string.Empty).Trim();
+        if (current.Length > 0 && held.Contains(current))
+        {
+            Console.WriteLine($"   KEPT     {reference}: {who} <{current}> is an active contact's email - left as it is.");
+            return PersonWrite.Kept;
+        }
+
+        var email = (person.Email ?? string.Empty).Trim();
+        if (email.Length == 0)
+        {
+            Console.WriteLine($"   SKIPPED  {reference}: {who} '{person.Name}' has no email - left as it was.");
+            return PersonWrite.Skipped;
+        }
+
+        Console.WriteLine($"   SET      {reference}: {who} <{(current.Length == 0 ? "blank" : current)}> -> '{person.Name}' <{email}>"
+            + (current.Length == 0 ? "." : " (no active contact held it)."));
+        update[nameAttr] = person.Name;
+        update[emailAttr] = email;
+        return PersonWrite.Written;
     }
 
     /// <summary>

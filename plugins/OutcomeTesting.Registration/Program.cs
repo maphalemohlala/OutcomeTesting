@@ -154,14 +154,19 @@ using System.Text.Json.Nodes;
 //   Calls al_ReconcileCaseAccess on every active case and reports unmatched advisers.
 //
 // Set a case's adviser: dotnet run -- setcaseadviser <orgUrl> <referenceLike> <name> <email> [--confirm <orgUrl>]
-//   Seeds al_advisername and al_adviseremail together on every matching case.
+//   Writes the adviser's email (the identity, AD-228) and name (its label) together on every
+//   matching case, and moves every matching case's open remediation actions to the contact
+//   holding the email (or off their holder when none does), so a re-run finishes an interrupted
+//   one. A case already holding exactly these - the email in any letter case - is not rewritten.
 //
 // Set a case's people: dotnet run -- setcasepeople <orgUrl> <referenceLike> <email> [--confirm <orgUrl>]
 //   Sets adviser and para-planner name and email from the one active contact holding that
-//   email, plus al_checkername, on every matching case.
+//   email, plus al_checkername, on every matching case, and moves their open remediation
+//   actions to that contact.
 //
 // Repoint remediation: dotnet run -- repointremediation <orgUrl> <caseReference> [--confirm <orgUrl>]
-//   Points a case's OPEN remediation actions at the contact its adviser email now resolves to.
+//   Points a case's OPEN remediation actions at the one active contact holding the case's
+//   adviser email (AD-228) - never by name. Writes nothing when no contact, or two, hold it.
 //
 // Backfill people email: dotnet run -- backfillpeopleemail <orgUrl> [--confirm <orgUrl>] [--include-mismatch]
 //   The one-off move to email identity (AD-228): fills a blank adviser/para-planner email the
@@ -8043,9 +8048,8 @@ static void GrantTable(
 // front of a lookup table.
 //
 // The adviser's EMAIL is the key, not their name. The extract supplies AdviserEmail on every
-// row and an email is exact; para-planner matching is by name only because nothing better
-// exists there, and AD-161 exists to make that weakness loud. There is no reason to repeat it
-// where a strong key is available.
+// row and an email is exact. Every person on a case is identified the same way since AD-228 -
+// the para-planner by ParaplannerEmail - so a name is never a key anywhere.
 // Creates the editable notification wording table (Change 1). Idempotent, like every other
 // create verb here, so it is safe to re-run against an environment that already has part of
 // it.
@@ -9951,42 +9955,40 @@ int VerifyTaxHeader(string[] a)
         : (null, "two or more active contacts hold " + value);
 }
 
-// Points a seeded case's adviser, para-planner and checker name at one real person.
+// Sets a case's adviser - al_adviseremail, the identity, and al_advisername, its label -
+// on matching cases, and NOTHING else.
 //
-// Seeding exists to exercise the paths that only run when a name resolves. Both ends of the
-// BR-009 / BR-006 routing match a **name** against contact.fullname - the case carries
-// al_paraplanner and al_advisername as text. Both people are identified by email (AD-228) -
-// a case seeded with
-// "Seed Adviser 01" queues its notifications with no recipient and the drain marks them
-// Failed, which exercises nothing. Naming a contact that actually exists is what makes the
-// adviser letters and the para-planner notification deliverable.
-//
-// Matching is deliberately strict about ambiguity for the reason AD-082 gives: two people
-// sharing a name leave ParaplannerEmail unable to choose, so this refuses a name that does
-// not resolve to exactly one active contact with a work email rather than seeding data that
-// will silently fail later.
-//
-// Written straight through the SDK rather than through al_UpdateCaseDetails. No step is
-// registered on al_outcomecase, so nothing is bypassed, and an audit trail of seed rows being
-// relabelled is noise rather than history.
-// Sets al_advisername on matching cases, and NOTHING else.
+// People on a case are identified by email (AD-228): the email decides who the adviser is
+// for remediation, portal access, letters and T&C routing, and the name is only what a person
+// reads. So both are written together, and the email must be one.
 //
 // setcasepeople below will not do: it writes the adviser, the para-planner AND the checker
-// name from one value, and it refuses a name that does not resolve to an active contact. All
-// three are right for what it is for - seeding a case whose people must be addressable - and
-// all three are wrong here.
+// from one value, and it refuses an email no single active contact holds. All three are right
+// for what it is for - seeding a case whose people must be addressable - and all three are
+// wrong here.
 //
-// An adviser name is NOT a contact. It arrives on the extract as free text, it is what the
-// adviser -> T&C Manager mapping is looked up by, and AD-029 is explicit that an imported
-// name nobody registered has to survive. Requiring a contact would refuse exactly the values
-// the extract actually carries.
+// The adviser does NOT have to be a contact. The extract carries whoever the firm named, and
+// AD-029 is explicit that an imported person nobody registered has to survive; their email
+// still routes their letters, and the open actions follow the email once a contact holds it.
 //
 // al_checkername is deliberately not touched either. It is not an assignment (AD-113): the
 // import stopped stamping it for that reason, and a verb that quietly put a name back would
 // undo that.
 //
-// Straight through the SDK, as setcasepeople is: no step is registered on al_outcomecase, so
-// nothing is bypassed.
+// Straight through the SDK, as setcasepeople is, so al_UpdateCaseDetails's audit line and its
+// re-point of the open actions do not run. What DOES run is CaseAccessPlugin, registered on
+// al_outcomecase Update filtered to al_casestatus, al_reviewrouteid, al_advisername and
+// al_adviseremail: the case's adviser portal access moves to the new email's contact the moment
+// the row is written. So the open actions are moved here too, in the same run, by the rule the
+// plug-in applies (AdviserEmailFollow at the end of this file) - otherwise the new adviser could
+// open the case but not answer its actions, and the old one would hold actions on a case they
+// can no longer open. The dry run lists the moves it would make.
+//
+// Every matching case is followed under --confirm, not only the ones rewritten. The case is
+// written before its actions move, so a run that fails part-way (a throttle, an expired token)
+// leaves cases that already hold the new email with actions still to move; following those
+// too is what lets a plain re-run finish the job. Following is idempotent - an action already
+// where the rule puts it is not touched - so a case that was right all along costs one read.
 int SetCaseAdviser(string orgUrl, string referenceLike, string adviserName, string adviserEmail, bool confirm)
 {
     using var svc = Connect(orgUrl);
@@ -10013,15 +10015,37 @@ int SetCaseAdviser(string orgUrl, string referenceLike, string adviserName, stri
         System.Security.SecurityElement.Escape(referenceLike) + "\"/>" +
         "</filter><order attribute=\"al_casereference\"/></entity></fetch>")).Entities;
 
+    // Who the email resolves to, once for every case: the contact the open actions move to,
+    // or nobody - in which case the actions leave whoever held them, as the plug-in does.
+    var (adviser, adviserProblem) = ContactByEmail(svc, email);
+    Console.WriteLine(adviser != null
+        ? $"<{email}> is {adviser.GetAttributeValue<string>("fullname")}."
+        : $"<{email}> resolves to nobody ({adviserProblem}): open actions on every matching case will be unassigned.");
+
+    // The stored email, UNTRIMMED, against the cleaned argument. Case is ignored - Dataverse
+    // compares it that way, so "Adam@" and "adam@" are one adviser and rewriting one as the
+    // other is not a change of person - but surrounding spaces are not: a padded address is
+    // one the plug-ins' Equal queries miss, so it is rewritten clean. The name is compared
+    // exactly, raw, because a corrected label or a stray space is a real edit.
+    bool EmailHeld(Entity c) =>
+        string.Equals(c.GetAttributeValue<string>("al_adviseremail"), email, StringComparison.OrdinalIgnoreCase);
+    bool Holds(Entity c) =>
+        EmailHeld(c) && string.Equals(c.GetAttributeValue<string>("al_advisername"), name, StringComparison.Ordinal);
+
     Console.WriteLine($"{cases.Count} case(s) matching '{referenceLike}':");
     foreach (var c in cases)
     {
         var was = c.GetAttributeValue<string>("al_advisername");
         var wasEmail = c.GetAttributeValue<string>("al_adviseremail");
-        var unchanged = string.Equals(was, name, StringComparison.Ordinal)
-            && string.Equals(wasEmail, email, StringComparison.Ordinal);
-        Console.WriteLine($"   {c.GetAttributeValue<string>("al_casereference")}: "
-            + $"'{was}' <{wasEmail}> -> '{name}' <{email}>{(unchanged ? " (no change)" : string.Empty)}");
+        var reference = c.GetAttributeValue<string>("al_casereference");
+        Console.WriteLine($"   {reference}: "
+            + $"'{was}' <{wasEmail}> -> '{name}' <{email}>{(Holds(c) ? " (no change)" : string.Empty)}");
+
+        // Every case ends up holding this email, so every case's open actions follow it.
+        if (!confirm)
+        {
+            AdviserEmailFollow.Follow(svc, c.Id, reference, adviser, email, write: false);
+        }
     }
 
     if (!confirm)
@@ -10031,22 +10055,41 @@ int SetCaseAdviser(string orgUrl, string referenceLike, string adviserName, stri
     }
 
     var written = 0;
+    var moved = 0;
     foreach (var c in cases)
     {
-        if (string.Equals(c.GetAttributeValue<string>("al_advisername"), name, StringComparison.Ordinal)
-            && string.Equals(c.GetAttributeValue<string>("al_adviseremail"), email, StringComparison.Ordinal))
+        if (!Holds(c))
         {
-            continue;
+            svc.Update(new Entity("al_outcomecase", c.Id) { ["al_advisername"] = name, ["al_adviseremail"] = email });
+            written++;
         }
 
-        svc.Update(new Entity("al_outcomecase", c.Id) { ["al_advisername"] = name, ["al_adviseremail"] = email });
-        written++;
+        // Including a case that already held the email: see the doc above.
+        moved += AdviserEmailFollow.Follow(svc, c.Id, c.GetAttributeValue<string>("al_casereference"), adviser, email, write: true);
     }
 
-    Console.WriteLine($"Set the adviser to '{name}' <{email}> on {written} case(s); {cases.Count - written} already held it.");
+    Console.WriteLine($"Set the adviser to '{name}' <{email}> on {written} case(s); {cases.Count - written} already held it. "
+        + $"{moved} open remediation action(s) followed the email.");
     return 0;
 }
 
+// Points a seeded case's adviser, para-planner and checker at one real person, given by email.
+//
+// Seeding exists to exercise the paths that only run when a person resolves. Every route to
+// the adviser and the para-planner goes by the email on the case (AD-228): a case seeded with
+// a made-up address queues its notifications to a mailbox nobody reads and assigns its
+// remediation to nobody, which exercises nothing. Naming a contact that actually exists is
+// what makes the adviser letters, the para-planner notification and remediation reach someone.
+//
+// Strict about ambiguity for the reason AD-082 gives: an email no active contact holds, or two
+// hold, resolves to nobody, so this refuses it rather than seeding data that will silently fail
+// later. The contact's own name and email are written, so the label matches the identity.
+//
+// Written straight through the SDK rather than through al_UpdateCaseDetails: an audit trail of
+// seed rows being relabelled is noise rather than history. CaseAccessPlugin still fires on the
+// adviser name and email, so the case's adviser access moves to this contact at once - and the
+// open remediation actions are moved with it in the same run (AdviserEmailFollow), so the two
+// never disagree about who the adviser is. The dry run lists those moves.
 int SetCasePeople(string orgUrl, string referenceLike, string personEmail, bool confirm)
 {
     using var svc = Connect(orgUrl);
@@ -10072,6 +10115,10 @@ int SetCasePeople(string orgUrl, string referenceLike, string personEmail, bool 
     foreach (var c in cases)
     {
         Console.WriteLine($"   {c.GetAttributeValue<string>("al_casereference")}");
+        if (!confirm)
+        {
+            AdviserEmailFollow.Follow(svc, c.Id, c.GetAttributeValue<string>("al_casereference"), person, email, write: false);
+        }
     }
 
     if (!confirm)
@@ -10080,6 +10127,7 @@ int SetCasePeople(string orgUrl, string referenceLike, string personEmail, bool 
         return 0;
     }
 
+    var moved = 0;
     foreach (var c in cases)
     {
         svc.Update(new Entity("al_outcomecase", c.Id)
@@ -10090,25 +10138,30 @@ int SetCasePeople(string orgUrl, string referenceLike, string personEmail, bool 
             ["al_paraplanneremail"] = email,
             ["al_checkername"] = name,
         });
+        moved += AdviserEmailFollow.Follow(svc, c.Id, c.GetAttributeValue<string>("al_casereference"), person, email, write: true);
     }
 
-    Console.WriteLine($"Set adviser, para-planner and checker name/email to '{name}' <{email}> on {cases.Count} case(s).");
+    Console.WriteLine($"Set adviser, para-planner and checker name/email to '{name}' <{email}> on {cases.Count} case(s); "
+        + $"{moved} open remediation action(s) followed the adviser email.");
     return 0;
 }
 
-// Points a case's OPEN remediation actions at the adviser now named on it, for cases whose
-// adviser changed before AssignOpenActions moved with it.
+// Points a case's OPEN remediation actions at the one active contact holding the case's
+// adviser EMAIL, for cases whose actions were stranded before the plug-ins moved them.
 //
-// Remediation is routed by matching al_outcomecase.al_advisername to contact.fullname, and
-// until 2026-09-18 a header edit only filled a NULL assignee — so a case reassigned after its
-// actions were raised left them pinned to the previous adviser, with nobody on the case able
-// to answer them and no supported way to move them. The plug-in now moves them; this moves the
-// ones stranded before it did.
+// Remediation is routed by the adviser email on the case (AD-228): Remediation.AdviserContact
+// resolves al_adviseremail to exactly one active contact, never the name. Until 2026-09-18 a
+// header edit only filled a NULL assignee, so a case reassigned after its actions were raised
+// left them pinned to the previous adviser; and a case whose email no contact held when the
+// action was raised left it with nobody. The plug-ins now move them; this moves the ones
+// stranded before they did. The case reference names the case; the email on it names the
+// person.
 //
 // The same three rules the plug-in applies, so a repair cannot diverge from the behaviour it
-// is repairing to: an ambiguous or unmatched name writes nothing (AD-082), a completed action
-// keeps whoever did the work (BR-007), and an action already held by the named adviser is left
-// untouched rather than rewritten.
+// is repairing to: an email that no active contact holds, or two hold, writes nothing (AD-082)
+// - set the email on the case or onboard the contact and the actions follow on their own -
+// a completed action keeps whoever did the work (BR-007), and an action already held by that
+// contact is left untouched rather than rewritten.
 //
 // No notification is queued. The plug-in tells an adviser when the work reaches them as it
 // happens; a repair run replaying "Remediation assigned" for rows that have been sitting there
@@ -10142,8 +10195,10 @@ int RepointRemediation(string orgUrl, string caseReference, bool confirm)
         return 1;
     }
 
+    var adviserEmail = adviser.GetAttributeValue<string>("emailaddress1");
     Console.WriteLine($"Case {outcomeCase.GetAttributeValue<string>("al_casereference")}: adviser '{adviserName}' " +
-                      $"-> {adviser.GetAttributeValue<string>("emailaddress1")}.");
+                      $"<{outcomeCase.GetAttributeValue<string>("al_adviseremail")}> -> contact " +
+                      $"'{adviser.GetAttributeValue<string>("fullname")}' <{adviserEmail}>.");
 
     var actions = svc.RetrieveMultiple(new FetchExpression(
         "<fetch><entity name=\"al_remediationaction\"><attribute name=\"al_remediationactionid\"/>" +
@@ -10159,11 +10214,11 @@ int RepointRemediation(string orgUrl, string caseReference, bool confirm)
         var holder = action.GetAttributeValue<EntityReference>("al_assignedcontactid");
         if (holder != null && holder.Id == adviser.Id)
         {
-            Console.WriteLine($"   already held by the named adviser, leaving: {action.Id:D}");
+            Console.WriteLine($"   already held by the contact holding the adviser email, leaving: {action.Id:D}");
             continue;
         }
 
-        Console.WriteLine($"   {action.Id:D} {(holder == null ? "(unassigned)" : holder.Name)} -> {adviserName}");
+        Console.WriteLine($"   {action.Id:D} {(holder == null ? "(unassigned)" : holder.Name)} -> <{adviserEmail}>");
         moving.Add(action);
     }
 
@@ -10188,7 +10243,7 @@ int RepointRemediation(string orgUrl, string caseReference, bool confirm)
         });
     }
 
-    Console.WriteLine($"Moved {moving.Count} open remediation action(s) to '{adviserName}'.");
+    Console.WriteLine($"Moved {moving.Count} open remediation action(s) to the contact holding <{adviserEmail}>.");
     return 0;
 }
 
@@ -12009,4 +12064,66 @@ static class NotificationTable
         (StatusSent, "Sent", "Handed to Dataverse server-side email successfully."),
         (StatusFailed, "Failed", "The send failed; al_failurereason says why and the row can be retried."),
     };
+}
+
+// Shared by setcaseadviser, setcasepeople and ContactsMigration, so the three move open actions
+// by one rule and a fix to it reaches all three.
+static class AdviserEmailFollow
+{
+    // Moves one case's OPEN remediation actions to follow its adviser email, by the rule
+    // Remediation.AssignOpenActions applies in the plug-ins (AD-228): to the one active contact
+    // holding the email, or - when none or two do - off whoever held them, never guessed. A
+    // completed action never moves (BR-007), and one already held by that contact is not
+    // rewritten. Prints one MOVE/UNASSIGN line per action; writes only when told to. Returns how
+    // many moved (or would). No "Remediation assigned" email: this is an operator's write, and the
+    // adviser is told out of band, as repointremediation says.
+    //
+    // ContactsMigration passes an adviser it already knows is the only active contact holding
+    // the email; the verbs pass ContactByEmail's answer.
+    public static int Follow(IOrganizationService svc, Guid caseId, string? reference, Entity? adviser, string email, bool write)
+    {
+        var actions = svc.RetrieveMultiple(new FetchExpression(
+            "<fetch><entity name=\"al_remediationaction\"><attribute name=\"al_remediationactionid\"/>" +
+            "<attribute name=\"al_assignedcontactid\"/><filter>" +
+            "<condition attribute=\"al_outcomecaseid\" operator=\"eq\" value=\"" + caseId.ToString("D") + "\"/>" +
+            "<condition attribute=\"al_actionstatus\" operator=\"ne\" value=\"120910602\"/>" +
+            "</filter></entity></fetch>")).Entities;
+
+        var moved = 0;
+        foreach (var action in actions)
+        {
+            var holder = action.GetAttributeValue<EntityReference>("al_assignedcontactid");
+            if (adviser == null)
+            {
+                if (holder == null)
+                {
+                    continue;
+                }
+
+                Console.WriteLine($"      UNASSIGN {reference} {action.Id:D}: {holder.Name ?? holder.Id.ToString("D")} -> nobody (no single active contact holds <{email}>)");
+                if (write)
+                {
+                    svc.Update(new Entity("al_remediationaction", action.Id) { ["al_assignedcontactid"] = null });
+                }
+
+                moved++;
+                continue;
+            }
+
+            if (holder != null && holder.Id == adviser.Id)
+            {
+                continue;
+            }
+
+            Console.WriteLine($"      MOVE     {reference} {action.Id:D}: {(holder == null ? "(unassigned)" : holder.Name ?? holder.Id.ToString("D"))} -> <{email}>");
+            if (write)
+            {
+                svc.Update(new Entity("al_remediationaction", action.Id) { ["al_assignedcontactid"] = adviser.ToEntityReference() });
+            }
+
+            moved++;
+        }
+
+        return moved;
+    }
 }
