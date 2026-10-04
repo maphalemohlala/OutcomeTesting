@@ -257,12 +257,7 @@ namespace OutcomeTesting.Plugins
         /// supported the case hears that its check is finished, by email, without being
         /// given a licence, a web role or any operational access to the case itself.
         ///
-        /// The case names the para-planner but carries no address for them, so
-        /// <see cref="NotificationOutbox.ParaplannerEmail"/> resolves the name to a Contact
-        /// and returns null unless the match is unambiguous. A null recipient still queues
-        /// the row — the event happened and the outbox says so — and the drain then marks it
-        /// Failed with the reason, which puts an unresolvable para-planner in front of a
-        /// person instead of sending a client's advice outcome to a guessed address.
+        /// The para-planner's stored email (AD-228).
         /// </summary>
         private static void QueueSubmittedNotification(
             IOrganizationService service,

@@ -29,10 +29,8 @@ namespace OutcomeTesting.Plugins
     /// </para>
     /// <para>
     /// Resolved through <c>al_advisermapping</c>, keyed on the adviser's work EMAIL as the
-    /// case carries it from the extract. An email is exact. The para-planner is matched by
-    /// name only because nothing better exists on that side, and <see cref="NotificationOutbox.MatchParaplanner"/>
-    /// has to fail loudly because of it; there was no reason to repeat that weakness where a
-    /// strong key was already on the row.
+    /// case carries it from the extract. Both people on a case are identified by email
+    /// (AD-228).
     /// </para>
     /// </summary>
     public static class TcManagerRouting
@@ -110,13 +108,9 @@ namespace OutcomeTesting.Plugins
                 };
             }
 
-            // The stored email, or the email of the contact the adviser's name resolves to
-            // (CaseAdviser): a case imported with a name and no address still has a manager.
-            var row = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet(CaseAdviserEmailAttr, CaseAdviser.NameAttr));
-            return ForAdviserEmail(service, CaseAdviser.EmailFor(
-                service,
-                row.GetAttributeValue<string>(CaseAdviserEmailAttr),
-                row.GetAttributeValue<string>(CaseAdviser.NameAttr)));
+            // The stored adviser email only (AD-228). The name is never used to find one.
+            var row = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet(CaseAdviserEmailAttr));
+            return ForAdviserEmail(service, CaseAdviser.EmailFor(row.GetAttributeValue<string>(CaseAdviserEmailAttr)));
         }
 
         /// <summary>The T&amp;C Manager mapped to this adviser email, or why there is none.</summary>
@@ -143,6 +137,7 @@ namespace OutcomeTesting.Plugins
                 Criteria = new FilterExpression(),
             };
             query.Criteria.AddCondition(MappingEmailAttr, ConditionOperator.Equal, trimmed);
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
 
             var found = service.RetrieveMultiple(query).Entities;
             if (found.Count == 0)

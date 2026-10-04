@@ -123,8 +123,9 @@ namespace OutcomeTesting.Plugins.Tests
                 "al_sequence", 1,
                 "statecode", new OptionSetValue(0));
             svc.Seed("al_remediationaction", Guid.NewGuid(), "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId));
-            svc.Seed("contact", Guid.NewGuid(), "fullname", "Ann Adviser", "statecode", new OptionSetValue(0));
-            svc.Seed("contact", Guid.NewGuid(), "fullname", "Ann Adviser", "statecode", new OptionSetValue(0));
+            // Two contacts sharing the case's adviser EMAIL (AD-228) - never by name.
+            svc.Seed("contact", Guid.NewGuid(), "fullname", "Ann Adviser", "emailaddress1", "ann@example.com", "statecode", new OptionSetValue(0));
+            svc.Seed("contact", Guid.NewGuid(), "fullname", "Ann A", "emailaddress1", "ann@example.com", "statecode", new OptionSetValue(0));
 
             var change = CaseAccessReconciler.Reconcile(svc, CaseId, Now);
 
@@ -147,7 +148,8 @@ namespace OutcomeTesting.Plugins.Tests
             svc.Seed("al_remediationaction", Guid.NewGuid(), "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId));
             var adviser = Guid.NewGuid();
             var supervisor = Guid.NewGuid();
-            svc.Seed("contact", adviser, "fullname", "Ann Adviser", "statecode", new OptionSetValue(0));
+            // Matched by EMAIL (AD-228): the contact must carry the same address the case does.
+            svc.Seed("contact", adviser, "fullname", "Ann Adviser", "emailaddress1", "ann@example.com", "statecode", new OptionSetValue(0));
             svc.Seed(
                 "al_advisermapping", Guid.NewGuid(),
                 "al_adviseremail", "ann@example.com",
@@ -164,10 +166,11 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void A_released_case_with_no_adviser_email_names_the_supervisor_through_the_adviser_contact()
+        public void A_released_case_with_no_adviser_email_has_no_supervisor_even_though_the_name_matches_a_mapped_contact()
         {
-            // TEST's 29 Sep import: the name, no address. The supervisor who can read the case
-            // must be the one sign-off routes to (CaseAdviser), not nobody.
+            // Inverted from the removed behaviour (AD-228). A blank adviser email resolves no
+            // supervisor at all - not even when the case's adviser NAME matches a contact that
+            // the mapping would otherwise route to. No name branch.
             var svc = Environment(CaseLifecycle.AwaitingRemediation, false, true);
             svc.Row("al_outcomecase", CaseId)["al_adviseremail"] = null;
             svc.Seed(
@@ -188,9 +191,9 @@ namespace OutcomeTesting.Plugins.Tests
 
             var change = CaseAccessReconciler.Reconcile(svc, CaseId, Now);
 
-            Assert.Equal(supervisor, svc.Row("al_outcomecase", CaseId)
-                .GetAttributeValue<EntityReference>(CaseAccessReconciler.SupervisorAttr).Id);
-            Assert.False(change.SupervisorUnmatched);
+            Assert.Null(svc.Row("al_outcomecase", CaseId)
+                .GetAttributeValue<EntityReference>(CaseAccessReconciler.SupervisorAttr));
+            Assert.True(change.SupervisorUnmatched);
         }
     }
 }

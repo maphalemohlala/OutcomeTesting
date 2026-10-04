@@ -26,6 +26,7 @@ namespace OutcomeTesting.Plugins.Tests
                 CaseId,
                 "al_casereference", "IO-TEST-100",
                 "al_advisername", adviserName,
+                "al_adviseremail", adviserName == "Sam Adviser" ? "sam@example.com" : null,
                 "al_clientname", "Mr and Mrs Smith");
             svc.Seed(
                 "contact",
@@ -192,12 +193,13 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void The_pass_letter_is_queued_unaddressed_when_the_adviser_is_not_matched()
+        public void The_pass_letter_is_queued_unaddressed_when_the_case_has_no_adviser_email()
         {
-            // AdviserContact refuses to guess. The outbox already treats a row with no
-            // address as one the drain declines to send, which is a state a person can see
-            // rather than an invented recipient. The letter still greets the adviser the
-            // case names - failing to find their mailbox is not failing to know who they are.
+            // The recipient is read straight off the stored email (AD-228), never resolved
+            // through a contact. A case with no stored email queues with no address, which is
+            // a state a person can see rather than an invented recipient. The letter still
+            // greets the adviser the case names - no address is not failing to know who they
+            // are.
             var svc = Case("Nobody By That Name");
 
             NotificationEmitterPlugin.QueueCasePassed(svc, Correlation, Ref());

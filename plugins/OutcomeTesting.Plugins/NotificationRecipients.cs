@@ -48,8 +48,6 @@ namespace OutcomeTesting.Plugins
         private const string ReviewEntity = "al_reviewinstance";
         private const string AssignmentEntity = "al_caseassignment";
         private const string CaseLookup = "al_outcomecaseid";
-        /// <summary>al_advisername, the fallback when no adviser email is stored.</summary>
-        private const string CaseAdviserNameAttr = "al_advisername";
 
         private const string AssignedContact = "al_assignedcontactid";
 
@@ -164,19 +162,7 @@ namespace OutcomeTesting.Plugins
                     : null;
         }
 
-        /// <summary>
-        /// The adviser, resolved to a contact by email and then by name (project owner,
-        /// 2026-09-20).
-        ///
-        /// <para>
-        /// <b>The stored address is still used when nothing matches.</b> Requiring a contact
-        /// would mean an environment whose advisers are not in the directory silently stopped
-        /// receiving adviser letters, and losing a letter is worse than sending one to an
-        /// address no contact record happens to carry - the same judgement AD-168 made about
-        /// a recipient override that reaches nobody. What the match buys is the person: who
-        /// the adviser IS, and a diagnostic at import when they are nobody.
-        /// </para>
-        /// </summary>
+        /// <summary>The adviser's stored email (AD-228). The name is never used to find one.</summary>
         private static string AdviserEmail(IOrganizationService service, EntityReference caseRef)
         {
             if (caseRef == null)
@@ -185,20 +171,8 @@ namespace OutcomeTesting.Plugins
             }
 
             var row = service.Retrieve(
-                CaseEntity,
-                caseRef.Id,
-                new ColumnSet(TcManagerRouting.CaseAdviserEmailAttr, CaseAdviserNameAttr));
-
-            var stored = row.GetAttributeValue<string>(TcManagerRouting.CaseAdviserEmailAttr);
-            var name = row.GetAttributeValue<string>(CaseAdviserNameAttr);
-
-            var match = NotificationOutbox.MatchAdviser(service, stored, name);
-            if (match.IsMatch)
-            {
-                return match.Email;
-            }
-
-            return string.IsNullOrWhiteSpace(stored) ? null : stored.Trim();
+                CaseEntity, caseRef.Id, new ColumnSet(TcManagerRouting.CaseAdviserEmailAttr));
+            return CaseAdviser.EmailFor(row.GetAttributeValue<string>(TcManagerRouting.CaseAdviserEmailAttr));
         }
 
         /// <summary>

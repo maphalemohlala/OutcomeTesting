@@ -5,18 +5,12 @@ using Xunit;
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// The para-planner is identified by their ADDRESS, not their name (project owner,
-    /// 2026-09-21: "the paraplanner email field should now be used to map the paraplanner ...
-    /// emails are more safe than names").
+    /// The para-planner is identified by their ADDRESS only, never their name (AD-228,
+    /// owner 2026-10-02: "two people can have the same name").
     ///
-    /// The extract carries <c>ParaplannerEmail</c> beside <c>AssignedBy</c>, and until it was
-    /// mapped the para-planner was the one person on a case with no address at all - so every
-    /// route to them resolved a display name and gave up whenever two contacts answered to it.
-    /// That is the same judgement <c>AdviserEmail</c> settled on 2026-09-20, and
-    /// <see cref="NotificationOutbox.MatchPerson"/> has read email first and name second ever
-    /// since; the para-planner simply had nothing to hand it.
-    ///
-    /// The name is still mapped, still shown, and still the fallback.
+    /// The extract carries <c>ParaplannerEmail</c> beside <c>AssignedBy</c>; the name is still
+    /// mapped and still shown, but <see cref="NotificationOutbox.MatchPerson"/> never reads it
+    /// - a display name describes a person, only the address identifies them.
     /// </summary>
     public class ParaplannerByEmailTests
     {
@@ -89,8 +83,7 @@ namespace OutcomeTesting.Plugins.Tests
             Contact(service, "Sam Jones", "sam.jones@example.com");
             Contact(service, "Sam Jones", "s.jones@example.com");
 
-            var match = NotificationOutbox.MatchParaplanner(
-                service, "s.jones@example.com", "Sam Jones");
+            var match = NotificationOutbox.MatchParaplanner(service, "s.jones@example.com");
 
             Assert.True(match.IsMatch);
             Assert.Equal("s.jones@example.com", match.Email);
@@ -99,31 +92,30 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void The_address_decides_even_when_the_name_would_have_matched_somebody_else()
         {
-            // Email first, name second. A name that has since changed - or was typed
-            // differently in the extract - must not outvote the mailbox.
+            // The name is never read. A name that has since changed - or was typed
+            // differently in the extract - has no vote on who the mailbox reaches.
             var service = new FakeOrganizationService();
             Contact(service, "Pat Paraplanner", "pat@example.com");
             Contact(service, "Sam Jones", "sam.jones@example.com");
 
-            var match = NotificationOutbox.MatchParaplanner(
-                service, "sam.jones@example.com", "Pat Paraplanner");
+            var match = NotificationOutbox.MatchParaplanner(service, "sam.jones@example.com");
 
             Assert.True(match.IsMatch);
             Assert.Equal("sam.jones@example.com", match.Email);
         }
 
         [Fact]
-        public void A_row_with_no_address_still_falls_back_to_the_name()
+        public void A_row_with_no_address_matches_nobody_even_though_the_name_would_have()
         {
-            // Every case imported before this column existed carries no address, and they
-            // must keep working exactly as they did.
+            // The inverse of the old behaviour. Every case imported before this column
+            // existed carries no address, and such a row now reaches nobody rather than
+            // falling back to a name match.
             var service = new FakeOrganizationService();
             Contact(service, "Pat Paraplanner", "pat@example.com");
 
-            var match = NotificationOutbox.MatchParaplanner(service, null, "Pat Paraplanner");
+            var match = NotificationOutbox.MatchParaplanner(service, null);
 
-            Assert.True(match.IsMatch);
-            Assert.Equal("pat@example.com", match.Email);
+            Assert.Equal(NotificationOutbox.PersonMatchKind.NoEmail, match.Kind);
         }
 
         // --- the letter ------------------------------------------------------------------
@@ -145,15 +137,9 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void An_address_that_reaches_nobody_is_not_overruled_by_a_name_that_does()
         {
-            // The safety property the change was asked for. MatchPerson searches by the
-            // address OR the name, never both: given an address it looks up that and stops,
-            // so a contact who merely shares the display name is never substituted. The
-            // letter goes to the address the firm supplied.
-            //
-            // Worth stating out loud, because the obvious reading of "email first, name
-            // second" is that the name is tried when the email misses. It is not, and that is
-            // deliberate - falling through would reintroduce exactly the name-collision risk
-            // the address was mapped to remove.
+            // ParaplannerEmail returns the stored address as-is (AD-228); it never resolves a
+            // contact at all, so a contact who merely shares the display name is never
+            // substituted. The letter goes to the address the firm supplied.
             var service = Case("new.starter@example.com", "Pat Paraplanner");
             Contact(service, "Pat Paraplanner", "someone.else@example.com");
 
@@ -164,11 +150,10 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void A_matched_address_is_resolved_through_the_contact()
+        public void A_matched_address_is_the_stored_value_itself()
         {
-            // Where the address does reach somebody, the contact is what answers - the same
-            // path the adviser's letter takes, so a future change to how a contact's address
-            // is chosen reaches both.
+            // The stored email is used directly as the letter address (AD-228); a para-planner
+            // need not be a contact at all (BR-009).
             var service = Case("pat@example.com", "Pat Paraplanner");
             Contact(service, "Pat Paraplanner", "pat@example.com");
 

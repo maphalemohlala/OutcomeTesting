@@ -6,10 +6,10 @@ using Xunit;
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// Remediation follows the adviser named on the case. That covers two repairs: an
-    /// action raised unassigned because the name matched no contact, and an action left
+    /// Remediation follows the adviser EMAIL on the case (AD-228). That covers two repairs:
+    /// an action raised unassigned because the email matched no contact, and an action left
     /// with the previous adviser when the case was reassigned. Completed actions, and
-    /// actions the named adviser already holds, stay where they are.
+    /// actions the matched adviser already holds, stay where they are.
     /// </summary>
     public class RemediationAssignmentTests
     {
@@ -20,7 +20,10 @@ namespace OutcomeTesting.Plugins.Tests
         private static FakeOrganizationService Case(string adviserName)
         {
             var svc = new FakeOrganizationService();
-            svc.Seed("al_outcomecase", CaseId, "al_casereference", "IO-TEST-009", "al_advisername", adviserName);
+            svc.Seed("al_outcomecase", CaseId,
+                "al_casereference", "IO-TEST-009",
+                "al_advisername", adviserName,
+                "al_adviseremail", adviserName == "Sam Adviser" ? "sam@example.com" : null);
             svc.Seed("contact", AdviserId, "fullname", "Sam Adviser", "emailaddress1", "sam@example.com", "statecode", new OptionSetValue(0));
             return svc;
         }
@@ -124,7 +127,7 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Does_nothing_while_the_name_still_matches_no_contact()
+        public void Does_nothing_while_the_case_carries_no_adviser_email()
         {
             var svc = Case("Nobody Known");
             Action(svc, Remediation.StatusOpen);
@@ -134,10 +137,13 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Refuses_to_guess_between_two_contacts_with_the_same_name()
+        public void Refuses_to_guess_between_two_contacts_sharing_the_adviser_email()
         {
+            // The removed name-ambiguity case, converted (AD-228): two contacts sharing the
+            // same NAME but different emails are no longer ambiguous at all - only a shared
+            // EMAIL is.
             var svc = Case("Sam Adviser");
-            svc.Seed("contact", Guid.NewGuid(), "fullname", "Sam Adviser", "emailaddress1", "sam2@example.com", "statecode", new OptionSetValue(0));
+            svc.Seed("contact", Guid.NewGuid(), "fullname", "Sam A", "emailaddress1", "sam@example.com", "statecode", new OptionSetValue(0));
             Action(svc, Remediation.StatusOpen);
 
             Assert.Equal(0, Remediation.AssignOpenActions(svc, Ref(), Correlation));

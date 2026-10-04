@@ -263,14 +263,14 @@ namespace OutcomeTesting.Plugins
             }
 
             var caseRow = service.Retrieve("al_outcomecase", caseRef.Id,
-                new ColumnSet("al_casereference", "al_advisername", "al_clientname"));
+                new ColumnSet("al_casereference", "al_advisername", "al_clientname", CaseAdviser.EmailAttr));
 
             var reference = caseRow.GetAttributeValue<string>("al_casereference");
 
-            // The adviser is named on the case as text; AdviserContact is what turns that
-            // into an address, and it declines rather than guess between two of the same
-            // name. An unmatched adviser still queues the row - see Queue.
-            var email = NotificationOutbox.ContactEmail(service, Remediation.AdviserContact(service, caseRef));
+            // The stored adviser email, as an address (AD-228). Not resolved to a contact: the
+            // letter reaches the adviser whether or not they are onboarded, and the name is
+            // never used to guess one. A blank email still queues the row - see Queue.
+            var email = CaseAdviser.EmailFor(caseRow.GetAttributeValue<string>(CaseAdviser.EmailAttr));
 
             var passed = NotificationTemplates.Render(
                 service,

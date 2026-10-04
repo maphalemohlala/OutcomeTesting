@@ -5,75 +5,13 @@ using Xunit;
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// A person field resolves to a contact: by email where the field carries one, by name
-    /// where it does not (project owner, 2026-09-20).
-    ///
-    /// <para>
-    /// The rule is one sentence and the reason is one too. An address identifies somebody; a
-    /// display name describes them. Two people share a name far more often than they share a
-    /// mailbox, so where a field carries both, the email decides.
-    /// </para>
-    /// <para>
-    /// The adviser carries both (<c>al_adviseremail</c>, <c>al_advisername</c>). The
-    /// para-planner carries only a name, because the extract gives it no address - which is
-    /// why the fallback is not a nicety here, it is the only path that field has.
-    /// </para>
+    /// A person field resolves to a contact by EMAIL only (AD-228, owner 2026-10-02). An
+    /// address identifies somebody; a display name describes them, and two people share a
+    /// name far more often than they share a mailbox, so the name is never consulted - not
+    /// even when the email is blank.
     /// </summary>
     public class PersonMatchTests
     {
-        // ------------------------------------------------------------ which key is used
-
-        [Fact]
-        public void The_email_decides_when_the_field_carries_one()
-        {
-            var service = new FakeOrganizationService();
-            Contact(service, "Sam Adviser", "sam.adviser@example.com");
-            Contact(service, "Someone Else", "someone.else@example.com");
-
-            var match = NotificationOutbox.MatchAdviser(
-                service, "someone.else@example.com", "Sam Adviser");
-
-            // The name says one person and the email says another. The email wins.
-            Assert.True(match.IsMatch);
-            Assert.Equal("someone.else@example.com", match.Email);
-        }
-
-        [Fact]
-        public void The_name_is_used_when_there_is_no_email()
-        {
-            var service = new FakeOrganizationService();
-            Contact(service, "Sam Adviser", "sam.adviser@example.com");
-
-            var match = NotificationOutbox.MatchAdviser(service, null, "Sam Adviser");
-
-            Assert.True(match.IsMatch);
-            Assert.Equal("sam.adviser@example.com", match.Email);
-        }
-
-        [Fact]
-        public void A_blank_email_falls_through_to_the_name_rather_than_matching_nothing()
-        {
-            // Whitespace is not an address. Treating it as one would search for a contact
-            // whose email is "   " and report the adviser as unmatched with a name sitting
-            // right there that would have resolved.
-            var service = new FakeOrganizationService();
-            Contact(service, "Sam Adviser", "sam.adviser@example.com");
-
-            Assert.True(NotificationOutbox.MatchAdviser(service, "   ", "Sam Adviser").IsMatch);
-        }
-
-        [Fact]
-        public void The_para_planner_is_matched_by_name_because_it_has_no_email_to_use()
-        {
-            var service = new FakeOrganizationService();
-            Contact(service, "Pat Paraplanner", "pat@example.com");
-
-            var match = NotificationOutbox.MatchParaplanner(service, null, "Pat Paraplanner");
-
-            Assert.True(match.IsMatch);
-            Assert.Equal("pat@example.com", match.Email);
-        }
-
         // ------------------------------------------------------------ the link
 
         [Fact]
@@ -85,7 +23,7 @@ namespace OutcomeTesting.Plugins.Tests
             var service = new FakeOrganizationService();
             var contact = Contact(service, "Sam Adviser", "sam.adviser@example.com");
 
-            var match = NotificationOutbox.MatchAdviser(service, "sam.adviser@example.com", null);
+            var match = NotificationOutbox.MatchAdviser(service, "sam.adviser@example.com");
 
             Assert.NotNull(match.Contact);
             Assert.Equal("contact", match.Contact.LogicalName);
@@ -97,7 +35,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var service = new FakeOrganizationService();
 
-            Assert.Null(NotificationOutbox.MatchAdviser(service, "nobody@example.com", null).Contact);
+            Assert.Null(NotificationOutbox.MatchAdviser(service, "nobody@example.com").Contact);
         }
 
         // ------------------------------------------------------------ the refusals
@@ -108,7 +46,7 @@ namespace OutcomeTesting.Plugins.Tests
             var service = new FakeOrganizationService();
             Contact(service, "Sam Adviser", "sam.adviser@example.com");
 
-            var match = NotificationOutbox.MatchAdviser(service, "nobody@example.com", null);
+            var match = NotificationOutbox.MatchAdviser(service, "nobody@example.com");
 
             Assert.False(match.IsMatch);
             // The value that failed is in the sentence, because an import report is read by a
@@ -126,7 +64,7 @@ namespace OutcomeTesting.Plugins.Tests
             Contact(service, "Sam Adviser", "shared@example.com");
             Contact(service, "Sam Adviser Junior", "shared@example.com");
 
-            var match = NotificationOutbox.MatchAdviser(service, "shared@example.com", null);
+            var match = NotificationOutbox.MatchAdviser(service, "shared@example.com");
 
             Assert.False(match.IsMatch);
             Assert.Equal(NotificationOutbox.PersonMatchKind.Ambiguous, match.Kind);
@@ -139,16 +77,31 @@ namespace OutcomeTesting.Plugins.Tests
             var contact = Contact(service, "Sam Adviser", "sam.adviser@example.com");
             contact["statecode"] = 1;
 
-            Assert.False(NotificationOutbox.MatchAdviser(service, "sam.adviser@example.com", null).IsMatch);
+            Assert.False(NotificationOutbox.MatchAdviser(service, "sam.adviser@example.com").IsMatch);
         }
 
         [Fact]
-        public void A_field_carrying_neither_names_the_role_that_was_missing()
+        public void A_field_carrying_no_email_names_the_role_that_was_missing()
         {
             var service = new FakeOrganizationService();
 
-            Assert.Contains("adviser", NotificationOutbox.MatchAdviser(service, null, null).Reason);
-            Assert.Contains("para-planner", NotificationOutbox.MatchParaplanner(service, null, null).Reason);
+            Assert.Contains("adviser", NotificationOutbox.MatchAdviser(service, null).Reason);
+            Assert.Contains("para-planner", NotificationOutbox.MatchParaplanner(service, null).Reason);
+        }
+
+        [Fact]
+        public void A_name_that_matches_a_contact_is_never_consulted_when_the_email_is_blank()
+        {
+            // The inverse of the old "name second" rule. A case naming an adviser who is a
+            // real, unambiguous contact still resolves to nobody when the case's own email
+            // is blank or whitespace - the contact's name is not evidence of anything.
+            var service = new FakeOrganizationService();
+            Contact(service, "Sam Adviser", "sam.adviser@example.com");
+
+            Assert.Equal(NotificationOutbox.PersonMatchKind.NoEmail,
+                NotificationOutbox.MatchAdviser(service, null).Kind);
+            Assert.Equal(NotificationOutbox.PersonMatchKind.NoEmail,
+                NotificationOutbox.MatchAdviser(service, "   ").Kind);
         }
 
         // ------------------------------------------------------------ what it must not break

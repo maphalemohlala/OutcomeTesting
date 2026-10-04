@@ -999,10 +999,6 @@ namespace OutcomeTesting.Plugins
                         }
                 }
             }
-
-            // A new adviser brings their own email, which is what sign-off and the T&C
-            // Manager are looked up by (CaseAdviser). Both front ends reach here.
-            CaseAdviser.FollowName(service, before, update, changes);
         }
 
         /// <summary>

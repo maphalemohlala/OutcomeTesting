@@ -146,24 +146,20 @@ namespace OutcomeTesting.Plugins.Tests
         // ------------------------------------------------------------------
         // Para-planner routing for Review submitted (BR-009, OD-030(ii)).
         //
-        // The case names the para-planner but holds no address for them, so the name is
-        // matched against Contact. Every test below is about the same question: is this
-        // match certain enough to send a client's advice outcome to?
+        // The para-planner's EMAIL is read straight off the case (AD-228); the name is
+        // never consulted. Matching a name to a Contact is NotificationOutbox.MatchParaplanner's
+        // job (see ParaplannerMatchTests, ParaplannerByEmailTests) - ParaplannerEmail itself
+        // just reads the stored value.
         // ------------------------------------------------------------------
 
         private static readonly Guid CaseId = Guid.Parse("77777777-8888-4888-8888-999999999999");
 
-        private static FakeOrganizationService WithCase(string paraplanner)
+        private static FakeOrganizationService WithCase(string paraplannerEmail, string paraplannerName = null)
         {
             var service = new FakeOrganizationService();
-            service.Seed("al_outcomecase", CaseId, "al_paraplanner", paraplanner);
+            service.Seed("al_outcomecase", CaseId,
+                "al_paraplanneremail", paraplannerEmail, "al_paraplanner", paraplannerName);
             return service;
-        }
-
-        private static void SeedContact(FakeOrganizationService service, string fullName, string email)
-        {
-            service.Seed("contact", Guid.NewGuid(),
-                "fullname", fullName, "emailaddress1", email, "statecode", new OptionSetValue(0));
         }
 
         private static EntityReference Case()
@@ -172,75 +168,32 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Resolves_the_paraplanner_named_on_the_case_to_their_email()
+        public void Resolves_to_the_stored_email()
         {
-            // BR-009 in one line: the para-planner is reached as a Contact, so they are
+            // BR-009 in one line: the para-planner need not be a contact at all, so they are
             // notified without a licence, a web role or any access to the case.
-            var service = WithCase("Sam Paraplanner");
-            SeedContact(service, "Sam Paraplanner", "sam@example.com");
+            var service = WithCase("sam@example.com");
 
             Assert.Equal("sam@example.com", NotificationOutbox.ParaplannerEmail(service, Case()));
         }
 
         [Fact]
-        public void Ignores_surrounding_whitespace_on_the_imported_name()
+        public void Ignores_surrounding_whitespace_on_the_stored_email()
         {
-            var service = WithCase("  Sam Paraplanner  ");
-            SeedContact(service, "Sam Paraplanner", "sam@example.com");
+            var service = WithCase("  sam@example.com  ");
 
             Assert.Equal("sam@example.com", NotificationOutbox.ParaplannerEmail(service, Case()));
         }
 
         [Fact]
-        public void Refuses_to_choose_between_two_people_of_the_same_name()
+        public void Returns_nothing_when_the_case_has_no_paraplanner_email()
         {
-            // The reason this is a null and not a best guess: sending a client's advice
-            // outcome to the wrong para-planner is a data-protection incident, and an
-            // unrouted row is an operational one.
-            var service = WithCase("J Smith");
-            SeedContact(service, "J Smith", "first@example.com");
-            SeedContact(service, "J Smith", "second@example.com");
-
-            Assert.Null(NotificationOutbox.ParaplannerEmail(service, Case()));
-        }
-
-        [Fact]
-        public void Returns_nothing_when_no_contact_carries_that_name()
-        {
-            var service = WithCase("Nobody Here");
-
-            Assert.Null(NotificationOutbox.ParaplannerEmail(service, Case()));
-        }
-
-        [Fact]
-        public void Returns_nothing_when_the_matched_contact_has_no_work_email()
-        {
-            var service = WithCase("Sam Paraplanner");
+            // No name branch (AD-228): even with a contact sharing the case's paraplanner
+            // NAME, a blank email resolves to nothing.
+            var service = WithCase(null, "Sam Paraplanner");
             service.Seed("contact", Guid.NewGuid(),
-                "fullname", "Sam Paraplanner", "statecode", new OptionSetValue(0));
-
-            Assert.Null(NotificationOutbox.ParaplannerEmail(service, Case()));
-        }
-
-        [Fact]
-        public void Skips_a_deactivated_contact()
-        {
-            // A para-planner who has left. Their old mailbox is not where a live case
-            // outcome should go, and an inactive row must not make the match look ambiguous
-            // either — the active namesake below still resolves.
-            var service = WithCase("Sam Paraplanner");
-            service.Seed("contact", Guid.NewGuid(), "fullname", "Sam Paraplanner",
-                "emailaddress1", "left@example.com", "statecode", new OptionSetValue(1));
-            SeedContact(service, "Sam Paraplanner", "current@example.com");
-
-            Assert.Equal("current@example.com", NotificationOutbox.ParaplannerEmail(service, Case()));
-        }
-
-        [Fact]
-        public void Returns_nothing_when_the_case_names_no_paraplanner()
-        {
-            var service = WithCase(null);
-            SeedContact(service, "Sam Paraplanner", "sam@example.com");
+                "fullname", "Sam Paraplanner", "emailaddress1", "sam@example.com",
+                "statecode", new OptionSetValue(0));
 
             Assert.Null(NotificationOutbox.ParaplannerEmail(service, Case()));
         }

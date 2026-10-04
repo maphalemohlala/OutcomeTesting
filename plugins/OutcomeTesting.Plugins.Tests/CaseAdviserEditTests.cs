@@ -6,14 +6,11 @@ using Xunit;
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// Changing a case's adviser, from either front end, keeps the adviser email and the open
-    /// remediation actions with the new adviser (project owner, 2026-09-30; see CaseAdviser).
-    ///
-    /// <para>
-    /// Before: the Code App's edit moved the open actions but left the old adviser's email, so
-    /// sign-off would have been routed to the previous adviser's T&amp;C Manager; the portal's
-    /// review-header edit moved neither.
-    /// </para>
+    /// Changing a case's adviser NAME alone no longer moves the adviser email or the open
+    /// remediation actions (AD-228, 2026-10-02): email-to-name derivation (CaseAdviser.FollowName)
+    /// was removed along with every other name match, so an edit that sends only
+    /// al_advisername now leaves al_adviseremail - and therefore who holds the open actions -
+    /// untouched. Task 2 is expected to put a new, explicit rule here.
     /// </summary>
     public class CaseAdviserEditTests
     {
@@ -47,9 +44,12 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void The_portal_header_edit_moves_the_email_and_the_open_actions_to_the_new_adviser()
+        public void The_portal_header_edit_renames_the_adviser_without_moving_the_email_or_the_open_actions()
         {
-            var service = Ready(out _, out var newAdviser, out var actionId);
+            // Inverted from the removed behaviour. A name-only edit changes al_advisername but
+            // leaves the stored email - and therefore who the open action is assigned to -
+            // exactly as it was, because nothing derives an email from a name any more.
+            var service = Ready(out var oldAdviser, out _, out var actionId);
 
             var provider = new FakeServiceProvider(service);
             provider.Context.MessageName = "Update";
@@ -65,16 +65,18 @@ namespace OutcomeTesting.Plugins.Tests
 
             var row = service.Row("al_outcomecase", CaseId);
             Assert.Equal("New Adviser", row.GetAttributeValue<string>(CaseAdviser.NameAttr));
-            Assert.Equal("new@example.com", row.GetAttributeValue<string>(CaseAdviser.EmailAttr));
-            Assert.Equal(newAdviser.Id, service.Row("al_remediationaction", actionId)
+            Assert.Equal("old@example.com", row.GetAttributeValue<string>(CaseAdviser.EmailAttr));
+            Assert.Equal(oldAdviser.Id, service.Row("al_remediationaction", actionId)
                 .GetAttributeValue<EntityReference>("al_assignedcontactid").Id);
         }
 
         [Fact]
-        public void The_shared_field_applier_puts_the_new_advisers_email_on_the_same_update()
+        public void The_shared_field_applier_leaves_the_email_alone_on_a_name_only_edit()
         {
             // UpdateCaseDetailsPlugin.ApplyFields is what the Code App's al_UpdateCaseDetails
-            // and the portal header both call, so the rule lives there once.
+            // and the portal header both call. CaseAdviser.FollowName, which used to derive an
+            // email from the new name here, was removed (AD-228) - Task 2 is expected to put
+            // a new, explicit rule in its place.
             var service = Ready(out _, out _, out _);
             var before = service.Row("al_outcomecase", CaseId);
             var update = new Entity("al_outcomecase", CaseId);
@@ -88,8 +90,8 @@ namespace OutcomeTesting.Plugins.Tests
                 changes,
                 new OptionLabels(service));
 
-            Assert.Equal("new@example.com", update.GetAttributeValue<string>(CaseAdviser.EmailAttr));
-            Assert.Contains(changes, c => c.StartsWith("Adviser email"));
+            Assert.False(update.Contains(CaseAdviser.EmailAttr));
+            Assert.DoesNotContain(changes, c => c.StartsWith("Adviser email"));
         }
     }
 }

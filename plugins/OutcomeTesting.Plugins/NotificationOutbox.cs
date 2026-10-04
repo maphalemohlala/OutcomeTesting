@@ -594,25 +594,9 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// The email of the para-planner named on a case, or null when it cannot be resolved
-        /// to exactly one person (BR-009, OD-030(ii)).
-        ///
-        /// The case carries <c>al_paraplanner</c> as a <b>name</b> and
-        /// <c>al_paraplannercode</c> as an Intelligent Office identifier — neither is an
-        /// address, and Contact is unmodified in this solution, so the code has nothing to
-        /// match on. The name is therefore matched against <c>contact.fullname</c>, which is
-        /// the only link between the two that exists in the model today.
-        ///
-        /// <b>Matching by name is weak, so it is made to fail loudly rather than
-        /// approximately.</b> Two people sharing a name, a contact with no work email, or no
-        /// contact at all all return null, and the outbox row is queued with no recipient —
-        /// the drain then marks it Failed saying so. Sending a client's advice outcome to the
-        /// wrong para-planner because two of them are called J Smith is a data-protection
-        /// incident; a Failed row is an operational one. Only an unambiguous match sends.
-        ///
-        /// BR-009 is satisfied precisely because this resolves a Contact and not a system
-        /// user: the para-planner is reachable by email without holding a Dataverse licence,
-        /// a web role or any operational access to the case.
+        /// The para-planner's email as the case stores it, or null (AD-228). Used directly as
+        /// the letter address: a para-planner need not be a contact (BR-009), and the name is
+        /// never used to guess one.
         /// </summary>
         public static string ParaplannerEmail(IOrganizationService service, EntityReference outcomeCase)
         {
@@ -622,47 +606,27 @@ namespace OutcomeTesting.Plugins
             }
 
             var row = service.Retrieve(
-                "al_outcomecase",
-                outcomeCase.Id,
-                new ColumnSet(ImportRules.ParaplannerEmailAttribute, "al_paraplanner"));
-
-            var stored = row.GetAttributeValue<string>(ImportRules.ParaplannerEmailAttribute);
-            var name = row.GetAttributeValue<string>("al_paraplanner");
-
-            var match = MatchParaplanner(service, stored, name);
-            if (match.IsMatch)
-            {
-                return match.Email;
-            }
-
-            // The address the extract carried, even when no contact answers to it. This is
-            // the AD-168 judgement the adviser's letter already makes - a lost letter is
-            // worse than one sent to an address the directory does not happen to hold - and
-            // until 2026-09-21 the para-planner could not make it, because a name that
-            // matched nobody left nothing to fall back to.
-            return string.IsNullOrWhiteSpace(stored) ? null : stored.Trim();
+                "al_outcomecase", outcomeCase.Id, new ColumnSet(CasePeople.ParaplannerEmailAttr));
+            return CasePeople.Clean(row.GetAttributeValue<string>(CasePeople.ParaplannerEmailAttr));
         }
 
-        /// <summary>Why a para-planner name did or did not reach somebody.</summary>
+        /// <summary>Why a person field did or did not reach somebody.</summary>
         public enum PersonMatchKind
         {
-            /// <summary>The row named nobody.</summary>
-            NoName,
-
-            /// <summary>No active contact carries that name.</summary>
-            NoContact,
-
-            /// <summary>Two or more do, so no one of them can be chosen.</summary>
-            Ambiguous,
-
-            /// <summary>Exactly one does, and they have no work email.</summary>
+            /// <summary>The case carries no email for this person.</summary>
             NoEmail,
 
-            /// <summary>Exactly one active contact, with an email.</summary>
+            /// <summary>No active contact holds that email.</summary>
+            NoContact,
+
+            /// <summary>Two or more active contacts hold it, so no one of them can be chosen.</summary>
+            Ambiguous,
+
+            /// <summary>Exactly one active contact holds it.</summary>
             Matched,
         }
 
-        /// <summary>The outcome of resolving a para-planner name, with words for a report.</summary>
+        /// <summary>The outcome of resolving a person by email, with words for a report.</summary>
         public sealed class PersonMatch
         {
             /// <summary>What happened.</summary>
@@ -700,91 +664,45 @@ namespace OutcomeTesting.Plugins
             }
         }
 
-        /// <summary>
-        /// Resolves a para-planner name to a reachable Contact, and says why when it cannot.
-        ///
-        /// <para>
-        /// This is the one place that decides. <see cref="ParaplannerEmail"/> is a thin
-        /// wrapper for the send path, and the import calls it directly so a name that will
-        /// never reach anyone is reported on the day of the upload rather than surfacing
-        /// weeks later as a Failed notification nobody is watching (audit finding 7).
-        /// </para>
-        /// <para>
-        /// The four failures were one null until 2026-09-20. They are separated because a
-        /// report saying "unmatched" tells an administrator nothing they can act on, while
-        /// "two active contacts are named Sam Jones" and "Sam Jones has no work email" are
-        /// different jobs for different people.
-        /// </para>
-        /// <para>
-        /// <b>Deliberately stricter than before in one case.</b> The old query filtered on
-        /// emailaddress1 being present, so two contacts of one name where only one had an
-        /// email resolved to that one and sent. It now reads Ambiguous and sends nothing.
-        /// That is the existing rule applied honestly - a missing email address is not
-        /// evidence about which Sam Jones the case means, and the whole reason this matching
-        /// fails loudly is that sending a client's advice outcome to the wrong para-planner
-        /// is a data-protection incident where an unrouted row is an operational one.
-        /// </para>
-        /// </summary>
-        public static PersonMatch MatchParaplanner(
-            IOrganizationService service, string email, string name)
+        /// <summary>The para-planner whose email the case stores (AD-228).</summary>
+        public static PersonMatch MatchParaplanner(IOrganizationService service, string email)
         {
-            // Both, from 2026-09-21. The para-planner USED to have no email column on the
-            // case - "so the name is all there is" is what this comment said - and that was
-            // the only reason they were matched by name while the adviser was matched by
-            // address. The extract carries ParaplannerEmail, ImportRules maps it, and
-            // MatchPerson has read email first and name second since 2026-09-20.
-            return MatchPerson(service, email, name, "para-planner");
+            return MatchPerson(service, email, "para-planner");
+        }
+
+        /// <summary>The adviser whose email the case stores (AD-228).</summary>
+        public static PersonMatch MatchAdviser(IOrganizationService service, string email)
+        {
+            return MatchPerson(service, email, "adviser");
         }
 
         /// <summary>
-        /// The adviser, from <c>al_adviseremail</c> where it is set and <c>al_advisername</c>
-        /// where it is not (project owner, 2026-09-20).
-        /// </summary>
-        public static PersonMatch MatchAdviser(
-            IOrganizationService service, string email, string name)
-        {
-            return MatchPerson(service, email, name, "adviser");
-        }
-
-        /// <summary>
-        /// Resolves a person field to exactly one active contact.
+        /// Resolves a person by EMAIL to exactly one active contact (AD-228).
         ///
         /// <para>
-        /// <b>Email first, name second</b> (project owner, 2026-09-20). An address identifies
-        /// somebody; a display name describes them. Two people share a name far more often
-        /// than they share a mailbox, so where a field carries both, the email decides and the
-        /// name is only consulted when there is no email to go on.
+        /// No name branch. Until 2026-10-02 a blank email fell back to matching
+        /// contact.fullname, and a misspelled contact name (PROD, "Adam Strumdlio") or two
+        /// advisers of one name left remediation with nobody. A display name describes a
+        /// person; only the address identifies them.
         /// </para>
         /// <para>
-        /// <b>Two rows are fetched, never one.</b> The second row is what proves the match was
-        /// unambiguous - <c>TopCount 1</c> would return the first of two J Smiths and look
-        /// certain. The same applies to an email, which is unique by convention rather than by
-        /// constraint: nothing in Dataverse stops two contacts carrying one address.
-        /// </para>
-        /// <para>
-        /// Every failure carries a sentence naming the value that failed, because these are
-        /// read by a person looking at an import report rather than by code.
+        /// Two rows are fetched, never one: an email is unique by convention, not by
+        /// constraint, and the second row is what proves the match was unambiguous.
         /// </para>
         /// </summary>
-        public static PersonMatch MatchPerson(
-            IOrganizationService service, string email, string name, string role)
+        public static PersonMatch MatchPerson(IOrganizationService service, string email, string role)
         {
             var label = string.IsNullOrWhiteSpace(role) ? "person" : role;
-            var byEmail = (email ?? string.Empty).Trim();
-            var byName = (name ?? string.Empty).Trim();
+            var value = CasePeople.Clean(email);
 
-            if (byEmail.Length == 0 && byName.Length == 0)
+            if (value == null)
             {
                 return new PersonMatch
                 {
-                    Kind = PersonMatchKind.NoName,
-                    Reason = "The row names no " + label
-                        + ", so nothing can be sent about this case.",
+                    Kind = PersonMatchKind.NoEmail,
+                    Reason = "The case carries no " + label + " email, so nobody can be identified.",
                 };
             }
-
-            var attribute = byEmail.Length > 0 ? "emailaddress1" : "fullname";
-            var value = byEmail.Length > 0 ? byEmail : byName;
 
             var query = new QueryExpression("contact")
             {
@@ -792,7 +710,7 @@ namespace OutcomeTesting.Plugins
                 TopCount = 2,
                 Criteria = new FilterExpression(),
             };
-            query.Criteria.AddCondition(attribute, ConditionOperator.Equal, value);
+            query.Criteria.AddCondition("emailaddress1", ConditionOperator.Equal, value);
             query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
 
             var matches = service.RetrieveMultiple(query).Entities;
@@ -802,9 +720,7 @@ namespace OutcomeTesting.Plugins
                 return new PersonMatch
                 {
                     Kind = PersonMatchKind.NoContact,
-                    Reason = byEmail.Length > 0
-                        ? "No active contact holds the " + label + " email \"" + value + "\"."
-                        : "No active contact is named \"" + value + "\".",
+                    Reason = "No active contact holds the " + label + " email \"" + value + "\".",
                 };
             }
 
@@ -813,28 +729,15 @@ namespace OutcomeTesting.Plugins
                 return new PersonMatch
                 {
                     Kind = PersonMatchKind.Ambiguous,
-                    Reason = byEmail.Length > 0
-                        ? "Two or more active contacts hold the email \"" + value
-                            + "\", so no notification can be addressed."
-                        : "Two or more active contacts are named \"" + value
-                            + "\", so no notification can be addressed.",
-                };
-            }
-
-            var found = matches[0].GetAttributeValue<string>("emailaddress1");
-            if (string.IsNullOrWhiteSpace(found))
-            {
-                return new PersonMatch
-                {
-                    Kind = PersonMatchKind.NoEmail,
-                    Reason = "The contact named \"" + value + "\" has no work email.",
+                    Reason = "Two or more active contacts hold the email \"" + value
+                        + "\", so nobody can be identified. Remove the duplicate contact.",
                 };
             }
 
             return new PersonMatch
             {
                 Kind = PersonMatchKind.Matched,
-                Email = found,
+                Email = CasePeople.Clean(matches[0].GetAttributeValue<string>("emailaddress1")) ?? value,
                 Contact = matches[0].ToEntityReference(),
                 StaffCode = matches[0].GetAttributeValue<string>(ContactRegistry.StaffCodeAttr),
             };

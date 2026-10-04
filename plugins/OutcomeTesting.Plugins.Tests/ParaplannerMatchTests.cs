@@ -51,6 +51,11 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         // ------------------------------------------------------------------ the match
+        //
+        // Converted from name-matching to email-matching (AD-228, 2026-10-02): the
+        // para-planner is identified by al_paraplanneremail only, and the generic MatchPerson
+        // behaviours below (one match, no contact, ambiguous, inactive) apply the same way
+        // whether the matched value is an email - which, since Task 1, is all it ever is.
 
         [Fact]
         public void Matches_one_active_contact_with_an_email()
@@ -58,131 +63,59 @@ namespace OutcomeTesting.Plugins.Tests
             var service = new FakeOrganizationService();
             SeedContact(service, "Sam Jones", "sam@example.com");
 
-            var match = NotificationOutbox.MatchParaplanner(service, null, "Sam Jones");
+            var match = NotificationOutbox.MatchParaplanner(service, "sam@example.com");
 
             Assert.True(match.IsMatch);
             Assert.Equal("sam@example.com", match.Email);
         }
 
         [Fact]
-        public void Says_when_the_row_named_nobody()
+        public void Says_when_the_row_carries_no_email()
         {
-            var match = NotificationOutbox.MatchParaplanner(new FakeOrganizationService(), null, "   ");
+            var match = NotificationOutbox.MatchParaplanner(new FakeOrganizationService(), "   ");
 
-            Assert.Equal(NotificationOutbox.PersonMatchKind.NoName, match.Kind);
-            Assert.Contains("names no para-planner", match.Reason);
+            Assert.Equal(NotificationOutbox.PersonMatchKind.NoEmail, match.Kind);
+            Assert.Contains("no para-planner email", match.Reason);
         }
 
         [Fact]
-        public void Says_when_no_contact_carries_the_name_and_names_the_value()
+        public void Says_when_no_contact_carries_the_email_and_names_the_value()
         {
             // The value has to appear in the reason. "Para-planner unmatched" on its own
             // tells an administrator nothing they can go and fix.
-            var match = NotificationOutbox.MatchParaplanner(new FakeOrganizationService(), null, "Nobody Here");
+            var match = NotificationOutbox.MatchParaplanner(new FakeOrganizationService(), "nobody@example.com");
 
             Assert.Equal(NotificationOutbox.PersonMatchKind.NoContact, match.Kind);
-            Assert.Contains("Nobody Here", match.Reason);
+            Assert.Contains("nobody@example.com", match.Reason);
         }
 
         [Fact]
-        public void Says_when_two_people_share_the_name()
+        public void Says_when_two_contacts_share_the_email()
         {
             var service = new FakeOrganizationService();
-            SeedContact(service, "J Smith", "first@example.com");
-            SeedContact(service, "J Smith", "second@example.com");
+            SeedContact(service, "J Smith", "shared@example.com");
+            SeedContact(service, "J Smith Two", "shared@example.com");
 
-            var match = NotificationOutbox.MatchParaplanner(service, null, "J Smith");
+            var match = NotificationOutbox.MatchParaplanner(service, "shared@example.com");
 
             Assert.Equal(NotificationOutbox.PersonMatchKind.Ambiguous, match.Kind);
-            Assert.Contains("J Smith", match.Reason);
+            Assert.Contains("shared@example.com", match.Reason);
         }
 
         [Fact]
-        public void Says_when_the_one_match_has_no_work_email()
-        {
-            var service = new FakeOrganizationService();
-            service.Seed("contact", Guid.NewGuid(),
-                "fullname", "Sam Jones", "statecode", new OptionSetValue(0));
-
-            var match = NotificationOutbox.MatchParaplanner(service, null, "Sam Jones");
-
-            Assert.Equal(NotificationOutbox.PersonMatchKind.NoEmail, match.Kind);
-            Assert.Contains("no work email", match.Reason);
-        }
-
-        [Fact]
-        public void Two_of_a_name_is_ambiguous_even_when_only_one_can_be_emailed()
-        {
-            // DELIBERATELY STRICTER than before 2026-09-20. The old query filtered on the
-            // email being present, so this resolved to the one that had one and sent. A
-            // missing email address is not evidence about which Sam Jones the case means.
-            var service = new FakeOrganizationService();
-            SeedContact(service, "Sam Jones", "sam@example.com");
-            service.Seed("contact", Guid.NewGuid(),
-                "fullname", "Sam Jones", "statecode", new OptionSetValue(0));
-
-            var match = NotificationOutbox.MatchParaplanner(service, null, "Sam Jones");
-
-            Assert.Equal(NotificationOutbox.PersonMatchKind.Ambiguous, match.Kind);
-            Assert.Null(match.Email);
-        }
-
-        [Fact]
-        public void An_inactive_namesake_does_not_make_a_live_match_ambiguous()
+        public void An_inactive_contact_sharing_the_email_does_not_make_a_live_match_ambiguous()
         {
             // A para-planner who has left. Their old mailbox is not where a live case
             // outcome should go, and their row must not block the person who replaced them.
             var service = new FakeOrganizationService();
-            service.Seed("contact", Guid.NewGuid(), "fullname", "Sam Jones",
-                "emailaddress1", "left@example.com", "statecode", new OptionSetValue(1));
-            SeedContact(service, "Sam Jones", "current@example.com");
+            service.Seed("contact", Guid.NewGuid(), "fullname", "Former Planner",
+                "emailaddress1", "pat@example.com", "statecode", new OptionSetValue(1));
+            SeedContact(service, "Pat Paraplanner", "pat@example.com");
 
-            var match = NotificationOutbox.MatchParaplanner(service, null, "Sam Jones");
+            var match = NotificationOutbox.MatchParaplanner(service, "pat@example.com");
 
             Assert.True(match.IsMatch);
-            Assert.Equal("current@example.com", match.Email);
-        }
-
-        // ------------------------------------------------- the send path did not loosen
-
-        [Theory]
-        [InlineData(NotificationOutbox.PersonMatchKind.NoName)]
-        [InlineData(NotificationOutbox.PersonMatchKind.NoContact)]
-        [InlineData(NotificationOutbox.PersonMatchKind.Ambiguous)]
-        [InlineData(NotificationOutbox.PersonMatchKind.NoEmail)]
-        public void No_email_is_returned_for_anything_that_is_not_a_match(
-            NotificationOutbox.PersonMatchKind kind)
-        {
-            // Splitting one null into four reasons must not turn any of them into a send.
-            // This is the negative: the reporting is richer, the addressing is not.
-            var service = new FakeOrganizationService();
-            var caseId = Guid.NewGuid();
-            var name = NameProducing(service, kind);
-            service.Seed("al_outcomecase", caseId, "al_paraplanner", name);
-
-            Assert.Null(NotificationOutbox.ParaplannerEmail(
-                service, new EntityReference("al_outcomecase", caseId)));
-        }
-
-        /// <summary>Seeds whatever contacts produce <paramref name="kind"/>, and returns the name.</summary>
-        private static string NameProducing(
-            FakeOrganizationService service, NotificationOutbox.PersonMatchKind kind)
-        {
-            switch (kind)
-            {
-                case NotificationOutbox.PersonMatchKind.NoName:
-                    return null;
-                case NotificationOutbox.PersonMatchKind.NoContact:
-                    return "Nobody Here";
-                case NotificationOutbox.PersonMatchKind.Ambiguous:
-                    SeedContact(service, "J Smith", "first@example.com");
-                    SeedContact(service, "J Smith", "second@example.com");
-                    return "J Smith";
-                default:
-                    service.Seed("contact", Guid.NewGuid(),
-                        "fullname", "No Mailbox", "statecode", new OptionSetValue(0));
-                    return "No Mailbox";
-            }
+            Assert.Equal("pat@example.com", match.Email);
         }
 
         private static void SeedContact(FakeOrganizationService service, string name, string email)

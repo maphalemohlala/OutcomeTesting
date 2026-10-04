@@ -176,13 +176,6 @@ namespace OutcomeTesting.Plugins
 
                 try
                 {
-                    // A row naming the adviser without an address gets the address of the
-                    // contact the name resolves to (CaseAdviser): the T&C Manager, sign-off and
-                    // the supervisor's access are all keyed on it. The 29 Sep file carried no
-                    // addresses and left 24 cases that nobody could sign off. Read as the system
-                    // user, for the reason the matches below give.
-                    CaseAdviser.FillMissingEmail(systemService, record);
-
                     var result = CreateRoutedCase(userService, findRoute, record);
                     imported++;
 
@@ -198,10 +191,8 @@ namespace OutcomeTesting.Plugins
                         report.Add(ReportRow(row.RowNumber, row.Reference, "Imported (not queued)", result.QueueError, row.Raw));
                     }
 
-                    // Audit finding 7. The para-planner is matched to a Contact by name, which
-                    // is weak, so a name that will never reach anybody is said out loud on the
-                    // day of the upload. Until 2026-09-20 the first anyone knew of it was a
-                    // Failed notification row weeks later, and nothing watches those.
+                    // Both emails are now required on the row (Task 3); this reports one that
+                    // no active contact holds, or that two hold, on the day of the upload.
                     //
                     // Reported, never fatal: the case is real and the check must still happen.
                     // Refusing the row would throw away work over a contact record that can be
@@ -212,8 +203,7 @@ namespace OutcomeTesting.Plugins
                     // read on Contact, and a diagnostic must not fail for want of a privilege.
                     var paraplanner = NotificationOutbox.MatchParaplanner(
                         systemService,
-                        record.GetAttributeValue<string>(ImportRules.ParaplannerEmailAttribute),
-                        record.GetAttributeValue<string>(ImportRules.ParaplannerAttribute));
+                        record.GetAttributeValue<string>(ImportRules.ParaplannerEmailAttribute));
                     if (!paraplanner.IsMatch)
                     {
                         report.Add(ReportRow(
@@ -229,9 +219,7 @@ namespace OutcomeTesting.Plugins
                     // this line buys is knowing on the day that the adviser on this case is
                     // nobody the system can point at.
                     var adviser = NotificationOutbox.MatchAdviser(
-                        systemService,
-                        record.GetAttributeValue<string>("al_adviseremail"),
-                        record.GetAttributeValue<string>("al_advisername"));
+                        systemService, record.GetAttributeValue<string>("al_adviseremail"));
                     if (!adviser.IsMatch)
                     {
                         report.Add(ReportRow(

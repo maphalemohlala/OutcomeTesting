@@ -87,7 +87,8 @@ namespace OutcomeTesting.Plugins.Tests
             var svc = Ready(mapManager: false);
             svc.Seed(TcManagerRouting.MappingEntity, Guid.NewGuid(),
                 TcManagerRouting.MappingEmailAttr, Adviser,
-                TcManagerRouting.ManagerAttr, new EntityReference("contact", Guid.NewGuid()));
+                TcManagerRouting.ManagerAttr, new EntityReference("contact", Guid.NewGuid()),
+                "statecode", new OptionSetValue(0));
 
             var result = Complete(svc);
 
@@ -122,7 +123,8 @@ namespace OutcomeTesting.Plugins.Tests
 
                 svc.Seed(TcManagerRouting.MappingEntity, Guid.NewGuid(),
                     TcManagerRouting.MappingEmailAttr, Adviser,
-                    TcManagerRouting.ManagerAttr, manager.ToEntityReference());
+                    TcManagerRouting.ManagerAttr, manager.ToEntityReference(),
+                    "statecode", new OptionSetValue(0));
             }
 
             return svc;

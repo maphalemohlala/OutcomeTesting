@@ -783,8 +783,8 @@ namespace OutcomeTesting.Plugins
         /// <paramref name="items"/> is the <see cref="NonPassItems"/> list and may be null
         /// or empty; the description then reads as it did before the list existed.
         ///
-        /// <paramref name="adviserContact"/> may be null: the case carries the adviser as
-        /// text (AD-029), so the name can match no contact or two.
+        /// <paramref name="adviserContact"/> may be null: the case's adviser email can match
+        /// no contact or two (AD-228).
         /// <see cref="AdviserContact"/> refuses to guess, and an unassigned action is far
         /// better than no action - the remediation is on the worklist for a manager to
         /// route, rather than lost to a directory gap.
@@ -940,14 +940,8 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// The contact behind the adviser named on the case, or null when the name matches
-        /// no active contact or more than one.
-        ///
-        /// Two rows are read rather than one for the reason
-        /// <see cref="NotificationOutbox.ParaplannerEmail"/> records: the second row is what
-        /// proves the match was unambiguous, and a TopCount of 1 would return the first of
-        /// two J Smiths and look certain. Remediation is work assigned to a named person -
-        /// assigning it to the wrong adviser is worse than leaving it unassigned.
+        /// The contact whose email the case stores as its adviser's, or null when the case
+        /// has no email, or it matches no active contact or two (AD-228). Never by name.
         /// </summary>
         public static EntityReference AdviserContact(IOrganizationService service, EntityReference caseRef)
         {
@@ -956,29 +950,15 @@ namespace OutcomeTesting.Plugins
                 return null;
             }
 
-            var row = service.Retrieve("al_outcomecase", caseRef.Id, new ColumnSet("al_advisername"));
-            var name = row.GetAttributeValue<string>("al_advisername");
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return null;
-            }
-
-            var query = new QueryExpression("contact")
-            {
-                ColumnSet = new ColumnSet(false),
-                TopCount = 2,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("fullname", ConditionOperator.Equal, name.Trim());
-            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
-
-            var matches = service.RetrieveMultiple(query).Entities;
-            return matches.Count == 1 ? matches[0].ToEntityReference() : null;
+            var row = service.Retrieve("al_outcomecase", caseRef.Id, new ColumnSet(CaseAdviser.EmailAttr));
+            var match = NotificationOutbox.MatchAdviser(service, row.GetAttributeValue<string>(CaseAdviser.EmailAttr));
+            return match.IsMatch ? match.Contact : null;
         }
 
         /// <summary>
-        /// Points the case's open remediation actions at the adviser now named on the case,
-        /// and tells them (PP-15 "Remediation assigned"). Returns how many moved.
+        /// Points the case's open remediation actions at the contact holding the adviser
+        /// email now on the case, and tells them (PP-15 "Remediation assigned"). Returns how
+        /// many moved. An email that matches nobody unassigns the open actions.
         ///
         /// Two repairs, one rule. <see cref="Raise"/> leaves an action unassigned when
         /// <c>al_advisername</c> matches no contact or two, and nothing could assign it
@@ -1003,10 +983,6 @@ namespace OutcomeTesting.Plugins
         public static int AssignOpenActions(IOrganizationService service, EntityReference caseRef, Guid correlationId)
         {
             var adviser = AdviserContact(service, caseRef);
-            if (adviser == null)
-            {
-                return 0;
-            }
 
             // The assignee is read rather than filtered on, because "not this adviser" has to
             // admit a null: a Dataverse NotEqual on a lookup excludes rows where the column is
@@ -1019,25 +995,36 @@ namespace OutcomeTesting.Plugins
             query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseRef.Id);
             query.Criteria.AddCondition("al_actionstatus", ConditionOperator.NotEqual, StatusCompleted);
 
-            var assigned = 0;
+            var moved = 0;
             foreach (var action in CommandHelpers.RetrieveAll(service, query))
             {
                 var holder = action.GetAttributeValue<EntityReference>("al_assignedcontactid");
+
+                // The email matches nobody: the action leaves whoever held it, because they
+                // are not the adviser on this case. Nobody is told - there is nobody to tell.
+                if (adviser == null)
+                {
+                    if (holder == null)
+                    {
+                        continue;
+                    }
+
+                    service.Update(new Entity(ActionEntity, action.Id) { ["al_assignedcontactid"] = null });
+                    moved++;
+                    continue;
+                }
+
                 if (holder != null && holder.Id == adviser.Id)
                 {
                     continue;
                 }
 
-                service.Update(new Entity(ActionEntity, action.Id)
-                {
-                    ["al_assignedcontactid"] = adviser,
-                });
-
+                service.Update(new Entity(ActionEntity, action.Id) { ["al_assignedcontactid"] = adviser });
                 NotificationEmitterPlugin.QueueRemediationAssigned(service, correlationId, action.Id);
-                assigned++;
+                moved++;
             }
 
-            return assigned;
+            return moved;
         }
 
         private static Guid FindByCode(IOrganizationService service, string code)

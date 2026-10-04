@@ -28,8 +28,7 @@ namespace OutcomeTesting.Plugins.Tests
             var service = new FakeOrganizationService();
             Contact(service, "Jane Adviser", "jane.adviser@example.com", "4471");
 
-            var match = NotificationOutbox.MatchPerson(
-                service, "jane.adviser@example.com", null, "adviser");
+            var match = NotificationOutbox.MatchPerson(service, "jane.adviser@example.com", "adviser");
 
             Assert.True(match.IsMatch);
             Assert.Equal("4471", match.StaffCode);
@@ -41,40 +40,37 @@ namespace OutcomeTesting.Plugins.Tests
             var service = new FakeOrganizationService();
             Contact(service, "Jane Adviser", "jane.adviser@example.com", null);
 
-            var match = NotificationOutbox.MatchPerson(
-                service, "jane.adviser@example.com", null, "adviser");
+            var match = NotificationOutbox.MatchPerson(service, "jane.adviser@example.com", "adviser");
 
             Assert.True(match.IsMatch);
             Assert.True(string.IsNullOrEmpty(match.StaffCode));
         }
 
         [Fact]
-        public void An_ambiguous_name_carries_no_code()
+        public void A_missing_email_carries_no_code_even_when_a_contact_shares_the_name()
         {
-            // Two contacts of one name resolve to nobody, so there is no code to report -
-            // the whole reason this matching fails loudly rather than approximately.
+            // No name branch (AD-228): a blank email resolves to nobody no matter what the
+            // row's name happens to match, so there is no code to report.
             var service = new FakeOrganizationService();
             Contact(service, "Sam Jones", "sam.jones@example.com", "8820");
-            Contact(service, "Sam Jones", "s.jones@example.com", "9910");
 
-            var match = NotificationOutbox.MatchPerson(service, null, "Sam Jones", "para-planner");
+            var match = NotificationOutbox.MatchPerson(service, null, "para-planner");
 
             Assert.False(match.IsMatch);
+            Assert.Equal(NotificationOutbox.PersonMatchKind.NoEmail, match.Kind);
             Assert.True(string.IsNullOrEmpty(match.StaffCode));
         }
 
         [Fact]
-        public void An_address_beats_a_shared_name_and_still_brings_the_code()
+        public void An_address_picks_out_one_of_two_same_named_contacts_and_brings_the_code()
         {
-            // This is the case that earns the ParaplannerEmail import mapping its keep: two
-            // people share the name, so a name lookup would refuse, but the address the
-            // extract carried picks out one of them and their code comes with it.
+            // Two contacts share a display name; the email identifies exactly one of them,
+            // and their code comes with it.
             var service = new FakeOrganizationService();
             Contact(service, "Sam Jones", "sam.jones@example.com", "8820");
             Contact(service, "Sam Jones", "s.jones@example.com", "9910");
 
-            var match = NotificationOutbox.MatchPerson(
-                service, "s.jones@example.com", "Sam Jones", "para-planner");
+            var match = NotificationOutbox.MatchPerson(service, "s.jones@example.com", "para-planner");
 
             Assert.True(match.IsMatch);
             Assert.Equal("9910", match.StaffCode);

@@ -175,9 +175,12 @@ namespace OutcomeTesting.Plugins.Tests
         private static void SeedMapping(
             FakeOrganizationService service, string adviserEmail, EntityReference manager)
         {
+            // Active, because ForAdviserEmail now filters statecode (an inactive mapping is
+            // no mapping - see TC_routing_ignores_an_inactive_mapping in EmailIdentityTests).
             service.Seed(TcManagerRouting.MappingEntity, Guid.NewGuid(),
                 TcManagerRouting.MappingEmailAttr, adviserEmail,
-                TcManagerRouting.ManagerAttr, manager);
+                TcManagerRouting.ManagerAttr, manager,
+                "statecode", new OptionSetValue(0));
         }
     }
 

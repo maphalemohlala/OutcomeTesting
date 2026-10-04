@@ -52,9 +52,12 @@ namespace OutcomeTesting.Plugins.Tests
                         "fullname", "Pat Manager", "emailaddress1", "pat@example.com");
                 }
 
+                // Active, because TcManagerRouting.ForAdviserEmail now filters statecode (an
+                // inactive mapping is no mapping - AD-228).
                 svc.Seed(TcManagerRouting.MappingEntity, Guid.NewGuid(),
                     TcManagerRouting.MappingEmailAttr, Adviser,
-                    TcManagerRouting.ManagerAttr, new EntityReference("contact", mappedManager));
+                    TcManagerRouting.ManagerAttr, new EntityReference("contact", mappedManager),
+                    "statecode", new OptionSetValue(0));
             }
 
             var rows = new List<Entity>();

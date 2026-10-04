@@ -86,9 +86,7 @@ namespace OutcomeTesting.Plugins
                 // The same adviser email sign-off routes by (CaseAdviser), so the supervisor who
                 // can read the case is the one who can sign it off.
                 input.ResolvedSupervisor = SupervisorFor(service, CaseAdviser.EmailFor(
-                    service,
-                    outcomeCase.GetAttributeValue<string>("al_adviseremail"),
-                    outcomeCase.GetAttributeValue<string>(CaseAdviser.NameAttr)));
+                    outcomeCase.GetAttributeValue<string>("al_adviseremail")));
             }
 
             var decided = CaseAccess.Decide(input);

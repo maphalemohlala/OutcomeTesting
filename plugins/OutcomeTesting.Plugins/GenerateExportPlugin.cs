@@ -188,10 +188,8 @@ namespace OutcomeTesting.Plugins
                     // Trail Light col D, a CODE again from 2026-09-22, resolved by address.
                     ["al_paraplannercode"] = registryCodes.Paraplanner,
                     // Trail Light col D (project owner, 2026-09-21: "replace column B & D
-                    // ... rather than codes show emails"). Resolved rather than read: unlike
-                    // the adviser, the para-planner has NO email column on the case - the
-                    // import carries their name and nothing else (AD-160) - so the only
-                    // source is the Contact that name resolves to.
+                    // ... rather than codes show emails"). Both people are identified by the
+                    // email the case stores (AD-228).
                     ["al_paraplanneremail"] = ParaplannerEmailOf(paraplannerMatch, outcomeCase),
                     ["al_casetype"] = ManagedOption(
                         outcomeCase, ListOptionRules.CaseTypeAttribute, "al_casetype"),
@@ -322,9 +320,7 @@ namespace OutcomeTesting.Plugins
             if (outcomeCase == null) { return null; }
 
             return NotificationOutbox.MatchParaplanner(
-                service,
-                outcomeCase.GetAttributeValue<string>(ImportRules.ParaplannerEmailAttribute),
-                outcomeCase.GetAttributeValue<string>("al_paraplanner"));
+                service, outcomeCase.GetAttributeValue<string>(ImportRules.ParaplannerEmailAttribute));
         }
 
         /// <summary>
@@ -369,9 +365,7 @@ namespace OutcomeTesting.Plugins
             if (outcomeCase == null) { return null; }
 
             var match = NotificationOutbox.MatchAdviser(
-                service,
-                outcomeCase.GetAttributeValue<string>("al_adviseremail"),
-                outcomeCase.GetAttributeValue<string>("al_advisername"));
+                service, outcomeCase.GetAttributeValue<string>("al_adviseremail"));
 
             return match != null && match.IsMatch ? match.StaffCode : null;
         }

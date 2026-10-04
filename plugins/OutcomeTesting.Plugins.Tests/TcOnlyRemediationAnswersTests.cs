@@ -125,7 +125,8 @@ namespace OutcomeTesting.Plugins.Tests
                 TcManagerRouting.CaseAdviserEmailAttr, "adviser@example.com");
             svc.Seed(TcManagerRouting.MappingEntity, Guid.NewGuid(),
                 TcManagerRouting.MappingEmailAttr, "adviser@example.com",
-                TcManagerRouting.ManagerAttr, new EntityReference("contact", ContactId));
+                TcManagerRouting.ManagerAttr, new EntityReference("contact", ContactId),
+                "statecode", new OptionSetValue(0));
 
             var rows = new List<Entity>();
             foreach (var name in roleNames)
