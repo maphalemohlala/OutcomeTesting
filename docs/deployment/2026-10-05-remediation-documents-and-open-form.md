@@ -226,3 +226,42 @@ Four small follow-ups from the branch review, pushed to DEV at 21:13Z:
 Plug-in tests 1796/1796, app tests (cases, remediation, reviews) green, `tsc -b` clean. Not seen in a browser yet, for the same expired-session reason as above.
 
 TEST and PROD: not deployed.
+
+## TEST (`org37995f36`), 2026-10-05 - imported; one owner step left
+
+The owner said "deploy to TEST".
+
+- **Package:** DEV bumped to **1.0.21.0** and exported managed through the Web API
+  (`ExportSolution`). `artifacts\2026-10-05-remediation-documents\OutcomeTesting_1_0_21_0_managed.zip`
+  (gitignored), sha256 `3012264549e73444064a9ef26dfdce5da9eb88439e86ce4e1e67be74a00cfacd`. It
+  carries assembly sha256 `583e8b98…` (equal to the local Release build), Code App bundle
+  `index-4cQH5Fk1.js` and the current OT Review Detail. This work added no component, so the
+  1.0.20.0 membership audit still holds.
+- **Before the import:** OT Review Detail on TEST has two layers, `Active` over `OutcomeTesting` -
+  the direct push of 2026-10-01 still masks managed imports of it.
+- **Import:** `ImportSolutionAsync`, `PublishWorkflows: true`, `OverwriteUnmanagedCustomizations:
+  false`, job `d6b84e9d-30fa-4db7-9507-3833166a2cb8`, async operation
+  `21fbeacc-02c1-f111-aaaf-6045bd0aeb46`. Succeeded (statuscode 30) at 21:23:20Z.
+- **Read back from TEST:**
+  - solution 1.0.21.0, managed;
+  - assembly sha256 `583e8b981127ced3f3f1b0ce876f4fd1dc9a5b587f9a5259bb24c27d9a18eb63`, as DEV;
+  - all 67 steps of `OutcomeTesting.Plugins` enabled;
+  - Code App `appversion` 2026-10-05T21:23:01Z;
+  - **OT Review Detail does not equal the repo** (276,546 chars, the masked copy): the import
+    landed beneath the `Active` layer, as expected.
+- The agent's `pushwebtemplate` to TEST was refused ("Production Deploy"). Until it runs, TEST's
+  review page still greys out and pre-ticks answers (the server no longer refuses them) and a
+  submitted review does not list its remedial actions. Every other change is live in TEST.
+
+### The owner's step
+
+Run from the repo root. The template reads only columns TEST already has, so it is safe after
+the import:
+
+```powershell
+$env:DOTNET_ROLL_FORWARD='Major'; $t='C:\Users\rsimu\OutcomeTesting\plugins\OutcomeTesting.Registration\bin\Release\net8.0\OutcomeTesting.Registration.exe'; & $t pushwebtemplate https://org37995f36.crm11.dynamics.com/ a1000000-0000-4000-8000-00000000001b C:\Users\rsimu\OutcomeTesting\powerpages\outcome-testing---outcometesting\web-templates\ot-review-detail\OT-Review-Detail.webtemplate.source.html
+```
+
+It should print `pushed web template 'OT Review Detail' … 276546 -> 255727 chars`.
+
+PROD: not deployed.
