@@ -80,18 +80,20 @@
 
 {% comment %}
   `locked` is an optional pipe-delimited list of values this question may not currently take,
-  e.g. '|120910300|120910303|'. It is what item 10 (2026-09-19) uses to take PASS and PASS
-  WITH ISSUES off the advice quality grade once a Suitability core check has been answered
-  Insufficient evidence.
+  e.g. '|120910300|120910303|'. Item 10 (2026-09-19) used it to take PASS and PASS WITH ISSUES
+  off the advice quality grade once a Suitability core check had been answered Insufficient
+  evidence; that per-row lock was withdrawn (project owner, 2026-10-05: "allow any answer"),
+  and OT Review Detail's own include no longer passes it. The parameter is kept for any
+  option a question version disables, or any other caller with its own narrower reason to
+  lock one in.
 
   Delimited rather than compared as a bare substring, the same way the multi-select above
   builds optkey: none of these values is a substring of another today, and a list that
   depends on that staying true is a list that breaks quietly.
 
-  Rendering only. GradingRules.SuitabilityGradeRefusal is the authority and refuses the write
-  itself, in ResponseGuardPlugin and again in the command that completes the review, so a
-  value locked here and not there would still be saveable and a value locked there and not
-  here is simply refused with a sentence.
+  Rendering only, whatever a caller's reason for locking a value: nothing here can make the
+  write honour a lock the server does not also enforce, and nothing here can refuse one the
+  server allows.
 {% endcomment %}
 {% comment %}
   `question_text` names every radio for a screen reader (F54, fixed 2026-09-21), so each one

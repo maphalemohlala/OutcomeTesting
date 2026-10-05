@@ -120,6 +120,13 @@ on the old scale. The page, the Code App and the emailed completed check all fol
 versions in force (a known grid's declared scale gives way to its questions' shared one),
 so what a checker ticks and what is sent agree whichever scale an environment holds.
 
+> **Superseded 2026-10-05 (AD-231):** the form no longer narrows answers; any answer is
+> accepted. The "gating rule" and the "Insufficient-anywhere rule" named below (`ChecklistGating`
+> and the per-row lock they drove) were withdrawn on the project owner's direction - "Remove any
+> parts of the form that are automatically greyed out or selected by default - leave them open,
+> allow any answer" - and no longer run. The history below is kept for why the fails-open shape
+> mattered at the time; it is no longer live behaviour.
+
 **Why it is worth closing.** The gating rule does not care which scale the section is on - it
 asks whether every point reads **Yes**, never which values are not a Yes - but the two scales
 offer a checker different ways to not say Yes, and they behave differently:
@@ -175,6 +182,14 @@ the two answers can be read against each other.
 | Q-FQTAX-03 | Remedial action required? | YesNo | Yes |
 
 ## Which answers the rest of the form leaves available
+
+> **Superseded 2026-10-05 (AD-231): the form no longer narrows answers; any answer is
+> accepted.** `ChecklistGating` (named below as the authority) was deleted along with every
+> rule in this section, on the project owner's direction - "Remove any parts of the form that
+> are automatically greyed out or selected by default - leave them open, allow any answer".
+> `OT Review Detail` offers every option and leaves the refusal, if any, to the submit command.
+> The four rules below are kept as a record of what used to be enforced and why; none of them
+> runs today.
 
 Four rules of one shape: an answer recorded somewhere takes an option off somewhere else,
 because the two could not both be true of one file. `ChecklistGating` in the plug-in assembly

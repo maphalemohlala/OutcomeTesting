@@ -1370,7 +1370,6 @@
                 {% if a.al_questionversionid.id == qv.al_questionversionid %}{% assign fq_existing = a %}{% endif %}
               {% endfor %}
               <h2>File Quality &ndash; Fail points</h2>
-              <p class="intro" data-ot-failpoints-note hidden></p>
               <table class="fails" data-ot-failpoints-for="{{ qv.al_questionversionid }}">
                 <thead>
                   <tr>
@@ -1661,9 +1660,8 @@
                   that are automatically greyed out or selected by default - leave them open,
                   allow any answer") withdrew the pre-pass flags and the per-row lock that used
                   to narrow the grade, the file quality outcome and the remedial action answer
-                  here. ChecklistGating is still the authority for what the server accepts; the
-                  page now offers every option and leaves the refusal, if any, to the submit
-                  command (AD-231).
+                  here. The server accepts any answer since 2026-10-05 (AD-231); the page
+                  simply offers every option.
                 {% endcomment %}
                 {% include 'OT Answer Options' response_type: rt selected: existing.al_answerchoice.value question: qv_id editable: editable is_tax: is_tax_review question_text: qv.al_questiontext %}
               {% endif %}
@@ -1923,12 +1921,15 @@
                *
                * This read querySelector('[disabled]') into a single flag and applied that
                * flag to every option it then rebuilt. That was right for as long as a lock
-               * was all or nothing: a read-only form disabled the row entire. Since
-               * 2026-09-23 the gating rules disable a SINGLE option and leave the rest live
-               * - Pass taken away by a finding, Yes taken away by a file quality Pass - so
+               * was all or nothing: a read-only form disabled the row entire. From
+               * 2026-09-23 to 2026-10-05 the grading rules (since withdrawn - project owner:
+               * "allow any answer") disabled a SINGLE option and left the rest live - Pass
+               * taken away by a finding, Yes taken away by a file quality Pass - so
                * collapsing it to one flag re-drew the row with EVERY option dead, and a
                * checker whose checklist was reissued mid-answer could no longer answer the
-               * question at all.
+               * question at all. OT Answer Options' own `locked` param can still disable one
+               * option without the rest for any other reason a caller has, so the per-option
+               * read stays the honest one.
                *
                * Read-only still holds, because it is the same rule read honestly: a row
                * where every option was locked sets allLocked, and any option the new scale
@@ -2621,9 +2622,8 @@
                * answer was cleared out from under the checker - are withdrawn (project
                * owner, 2026-10-05: "Remove any parts of the form that are automatically
                * greyed out or selected by default - leave them open, allow any answer").
-               * ChecklistGating is still the authority for what the server accepts; the
-               * page draws every option open and leaves the refusal, if any, to the
-               * submit command (AD-231).
+               * The server accepts any answer since 2026-10-05 (AD-231); the page simply
+               * draws every option open.
                */
             }
           })();
