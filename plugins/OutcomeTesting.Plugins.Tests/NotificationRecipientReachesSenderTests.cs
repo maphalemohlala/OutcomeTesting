@@ -107,8 +107,12 @@ namespace OutcomeTesting.Plugins.Tests
                     var args = call.Groups["args"].Value;
                     checked_++;
 
+                    // The para-planner's remediation copy (AD-232) is the one deliberate
+                    // exception: it is queued with templateCode: null on purpose, because it
+                    // is not in NotificationTemplates and no administrator may edit it.
                     Assert.True(
-                        args.Contains("NotificationTemplates.") || args.Contains("code"),
+                        args.Contains("NotificationTemplates.") || args.Contains("code")
+                            || args.Contains("ParaplannerRemediationLetter."),
                         Path.GetFileName(path) + " queues a letter without naming its template, "
                         + "so an administrator's choice of recipient and wording is ignored "
                         + "for it (F33).");
@@ -117,9 +121,10 @@ namespace OutcomeTesting.Plugins.Tests
 
             // Guards the test itself: a rename that broke the pattern would otherwise make
             // the loop above vacuously true.
-            // Seven today: three in the emitter, two in sign-off progress, one in
-            // complete-remediation and the para-planner's in submit-review.
-            Assert.True(checked_ >= 7, "Found only " + checked_ + " places that queue a letter.");
+            // Eight today: four in the emitter (the fourth is the para-planner's remediation
+            // copy, AD-232), two in sign-off progress, one in complete-remediation and the
+            // para-planner's in submit-review.
+            Assert.True(checked_ >= 8, "Found only " + checked_ + " places that queue a letter.");
         }
 
         // ------------------------------------------------------------ fixtures

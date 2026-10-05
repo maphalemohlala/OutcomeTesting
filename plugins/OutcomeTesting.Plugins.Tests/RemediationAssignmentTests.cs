@@ -71,7 +71,10 @@ namespace OutcomeTesting.Plugins.Tests
 
             Remediation.AssignOpenActions(svc, Ref(), Correlation);
 
-            var queued = svc.Creates.Single(c => c.Contains("al_event"));
+            // Also queues the para-planner's own copy (AD-232), its own row beside the
+            // adviser's; this picks the adviser's by its address.
+            var queued = svc.Creates.Single(c =>
+                c.Contains("al_event") && c.GetAttributeValue<string>("al_recipientemail") == "sam@example.com");
             Assert.Equal(NotificationOutbox.EventRemediationAssigned, queued.GetAttributeValue<OptionSetValue>("al_event").Value);
             Assert.Equal("sam@example.com", queued.GetAttributeValue<string>("al_recipientemail"));
         }

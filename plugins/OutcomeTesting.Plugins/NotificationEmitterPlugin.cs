@@ -241,6 +241,23 @@ namespace OutcomeTesting.Plugins
                 letter.Body,
                 code,
                 caseRef);
+
+            // The para-planner's own copy (project owner, 2026-10-05): the same documents, a
+            // fixed line of wording, its own outbox row so it neither collides with the
+            // adviser's nor goes twice.
+            var paraplannerReference = caseRow == null ? null : caseRow.GetAttributeValue<string>("al_casereference");
+            NotificationOutbox.QueueWithCompletedCheck(
+                service,
+                correlationId,
+                NotificationOutbox.EventRemediationAssigned,
+                targetTable,
+                targetId,
+                NotificationOutbox.ParaplannerEmail(service, caseRef),
+                ParaplannerRemediationLetter.Subject(paraplannerReference),
+                ParaplannerRemediationLetter.Body(paraplannerReference),
+                null,
+                caseRef,
+                ParaplannerRemediationLetter.Occurrence);
         }
 
         /// <summary>

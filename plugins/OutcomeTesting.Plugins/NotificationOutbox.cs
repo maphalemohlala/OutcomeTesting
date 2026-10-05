@@ -540,6 +540,50 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// Rebuilds the documents on every Pending remediation letter for this review that
+        /// already carries some (2026-10-05).
+        ///
+        /// <para>
+        /// The letters are queued by NotificationEmitterPlugin on the create of the FIRST
+        /// action a submit raises, so the documents drawn then list one action. Called by
+        /// <see cref="Remediation.Raise"/> once every action exists. Pending only: a sent
+        /// letter's documents are what the recipient has, and are never rewritten.
+        /// </para>
+        /// <para>Never throws: the actions are raised whether or not a document can be redrawn.</para>
+        /// </summary>
+        public static void RefreshDocuments(IOrganizationService service, EntityReference caseRef, Guid reviewId)
+        {
+            if (caseRef == null || reviewId == Guid.Empty)
+            {
+                return;
+            }
+
+            try
+            {
+                var query = new QueryExpression(NotificationEntity)
+                {
+                    ColumnSet = new ColumnSet(AttachmentNameAttr),
+                    Criteria = new FilterExpression(),
+                };
+                query.Criteria.AddCondition("al_targetid", ConditionOperator.Equal, reviewId.ToString("D"));
+                query.Criteria.AddCondition("al_event", ConditionOperator.Equal, EventRemediationAssigned);
+                query.Criteria.AddCondition("al_status", ConditionOperator.Equal, StatusPending);
+
+                foreach (var row in service.RetrieveMultiple(query).Entities)
+                {
+                    if (!string.IsNullOrWhiteSpace(row.GetAttributeValue<string>(AttachmentNameAttr)))
+                    {
+                        AttachCompletedCheck(service, row.Id, caseRef);
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // See the summary.
+            }
+        }
+
+        /// <summary>
         /// True when this event is already queued for this target.
         ///
         /// The same question <see cref="Queue"/> asks itself, offered to callers that would

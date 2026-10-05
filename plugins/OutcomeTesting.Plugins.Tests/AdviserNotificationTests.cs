@@ -66,7 +66,12 @@ namespace OutcomeTesting.Plugins.Tests
 
         private static Entity Queued(FakeOrganizationService svc)
         {
-            return svc.Creates.Single(c => c.Contains("al_event"));
+            // A remediation-assigned event also queues the para-planner's own copy (AD-232),
+            // its own row beside the adviser's; this picks the adviser's.
+            return svc.Creates.Single(c =>
+                c.Contains("al_event")
+                && !(c.GetAttributeValue<string>("al_notificationcode") ?? string.Empty)
+                    .EndsWith("-" + ParaplannerRemediationLetter.Occurrence, StringComparison.Ordinal));
         }
 
         // ---- The remediation letter follows the grading -------------------------------

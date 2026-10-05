@@ -565,15 +565,90 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // The sign-off letters are queued deep inside SignoffProgressPlugin, which no test
             // drives end to end; this pins that each adviser letter goes the one way. The
-            // para-planner's copy (a later task) will bring the emitter's count to 3; today it
-            // is the remediation letter and the case-passed letter.
+            // emitter's count is 3: the remediation letter, the case-passed letter and the
+            // para-planner's own copy of the remediation letter.
             var plugins = Path.Combine(PluginsPath(), "OutcomeTesting.Plugins");
             var emitter = File.ReadAllText(Path.Combine(plugins, "NotificationEmitterPlugin.cs"));
             var signoff = File.ReadAllText(Path.Combine(plugins, "SignoffProgressPlugin.cs"));
 
-            Assert.Equal(2, Count(emitter, "NotificationOutbox.QueueWithCompletedCheck("));
+            Assert.Equal(3, Count(emitter, "NotificationOutbox.QueueWithCompletedCheck("));
             Assert.Equal(1, Count(emitter, "NotificationOutbox.Queue("));
             Assert.Contains("NotificationOutbox.QueueWithCompletedCheck(", signoff.Substring(signoff.IndexOf("private static void QueueSignoffNotification(", StringComparison.Ordinal)));
+        }
+
+        private const string ParaplannerEmail = "pat.planner@example.com";
+
+        [Fact]
+        public void The_para_planner_gets_their_own_copy_with_the_checks()
+        {
+            var service = WithAdviser();
+            service.Row("al_outcomecase", CaseId)["al_paraplanneremail"] = ParaplannerEmail;
+            Action(service, completed: false);
+
+            Remediation.AssignOpenActions(service, Ref(), Guid.NewGuid());
+
+            var copy = LetterTo(service, ParaplannerEmail);
+            Assert.Equal("Checks and remedial points: 300000006", copy.GetAttributeValue<string>("al_subject"));
+            Assert.Equal("The checks and remedial points for case 300000006 are attached.", copy.GetAttributeValue<string>("al_body"));
+            Assert.Equal(Checks, copy.GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
+
+            // Its own outbox row: a replay collides with it, and it never collides with the adviser's.
+            Assert.Equal(
+                NotificationOutbox.CodeFor(NotificationOutbox.EventRemediationAssigned, AqsReviewId, ParaplannerRemediationLetter.Occurrence),
+                copy.GetAttributeValue<string>("al_notificationcode"));
+            Assert.NotEqual(
+                LetterTo(service, AdviserEmail).GetAttributeValue<string>("al_notificationcode"),
+                copy.GetAttributeValue<string>("al_notificationcode"));
+        }
+
+        [Fact]
+        public void A_case_with_no_para_planner_email_still_queues_the_copy_unaddressed()
+        {
+            // The drain parks it as Failed with a reason; the adviser's letter is unaffected.
+            var service = WithAdviser();
+            Action(service, completed: false);
+
+            Remediation.AssignOpenActions(service, Ref(), Guid.NewGuid());
+
+            var copy = service.Creates.Single(c =>
+                c.LogicalName == "al_notification"
+                && c.GetAttributeValue<string>("al_notificationcode")
+                    == NotificationOutbox.CodeFor(NotificationOutbox.EventRemediationAssigned, AqsReviewId, ParaplannerRemediationLetter.Occurrence));
+            Assert.Null(copy.GetAttributeValue<string>("al_recipientemail"));
+            Assert.NotNull(LetterTo(service, AdviserEmail));
+        }
+
+        [Fact]
+        public void The_para_planner_letter_is_not_an_editable_template()
+        {
+            Assert.DoesNotContain(NotificationTemplates.All, t => t.Subject.StartsWith("Checks and remedial points", StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void Raising_the_actions_refreshes_a_pending_letters_documents_and_leaves_a_sent_one_alone()
+        {
+            var service = Case();
+            var pending = service.Seed("al_notification", Guid.NewGuid(),
+                "al_event", new OptionSetValue(NotificationOutbox.EventRemediationAssigned),
+                "al_status", new OptionSetValue(NotificationOutbox.StatusPending),
+                "al_targetid", AqsReviewId.ToString("D"),
+                NotificationOutbox.AttachmentNameAttr, "stale.pdf",
+                NotificationOutbox.AttachmentBodyAttr, "AA==");
+            var sent = service.Seed("al_notification", Guid.NewGuid(),
+                "al_event", new OptionSetValue(NotificationOutbox.EventRemediationAssigned),
+                "al_status", new OptionSetValue(NotificationOutbox.StatusSent),
+                "al_targetid", AqsReviewId.ToString("D"),
+                NotificationOutbox.AttachmentNameAttr, "sent.pdf",
+                NotificationOutbox.AttachmentBodyAttr, "AA==");
+
+            Remediation.Raise(
+                service, Ref(), "300000006", AqsReviewId, 1, "Insufficient evidence", null,
+                new[] { "First point: No", "Second point: Fail" }, null,
+                new DateTime(2026, 9, 25, 10, 0, 0, DateTimeKind.Utc),
+                new[] { "Fix the first.", "Fix the second." });
+
+            Assert.Equal(Checks, service.Row("al_notification", pending.Id).GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
+            Assert.Equal("sent.pdf", service.Row("al_notification", sent.Id).GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
         }
 
         private static int Count(string text, string probe)

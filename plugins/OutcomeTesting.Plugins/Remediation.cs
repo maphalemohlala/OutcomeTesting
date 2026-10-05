@@ -808,6 +808,31 @@ namespace OutcomeTesting.Plugins
             IList<string> remedialActions = null,
             string overallRemedialAction = null)
         {
+            var raised = RaiseActions(
+                service, caseRef, caseReference, reviewId, sequence, reason, observation,
+                items, adviserContact, raisedOn, remedialActions, overallRemedialAction);
+
+            // The letters were queued on the first create and drew one action; every action
+            // exists now (2026-10-05).
+            NotificationOutbox.RefreshDocuments(service, caseRef, reviewId);
+            return raised;
+        }
+
+        /// <summary>The actions themselves; see <see cref="Raise"/>.</summary>
+        private static IList<Guid> RaiseActions(
+            IOrganizationService service,
+            EntityReference caseRef,
+            string caseReference,
+            Guid reviewId,
+            int sequence,
+            string reason,
+            string observation,
+            IList<string> items,
+            EntityReference adviserContact,
+            DateTime raisedOn,
+            IList<string> remedialActions = null,
+            string overallRemedialAction = null)
+        {
             var raised = new List<Guid>();
 
             // No item list is not a reason to raise nothing: a grade can require remediation
