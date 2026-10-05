@@ -301,6 +301,10 @@ test.describe('PROD full lifecycle, one marked test case', () => {
     const reviewId = need(run.aqsReviewId, 'the AQS review id');
     await openEditableReview(page, reviewId, ref);
 
+    // The outcome lens rows keep their text and draw no tick box (Q-E2-LENS retired 2026-10-05).
+    await expect(page.locator('tr.lens').first(), 'the outcome lens rows are drawn').toBeVisible();
+    await expect(page.locator('tr.lens input[type="checkbox"]'), 'an outcome lens row still draws a tick box').toHaveCount(0);
+
     const answered = await answerReview(page, NOTE);
     log?.note(`AQS review answered: ${answered.map((a) => `${a.code}=${a.answer}`).join(', ')}`);
     const grade = answered.find((a) => a.code === 'Q-GR-01');

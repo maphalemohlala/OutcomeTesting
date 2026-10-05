@@ -17,7 +17,8 @@ drives the real Code App and the real portal, as one signed-in tester:
    the rich-text answer (Tax Remedial), presses **Clear**, and checks the answer is empty and
    the empty answer is saved.
 6. **AQS allocation.** Allocates the AQS check to the tester.
-7. **AQS review.** Answers every test point clean and grades the advice **Pass with issues**,
+7. **AQS review.** Checks the outcome lens rows keep their text and draw no tick box. Then it
+   answers every test point clean and grades the advice **Pass with issues**,
    a failing grade. If the page has locked that grade, it takes the next failing one. It then
    writes the remedial action and submits.
 8. **Remediation assigned.** Checks the remediation action reached the tester by **email**.
@@ -86,6 +87,14 @@ connected, so read the version back:
 
 ```powershell
 & $t webapi $p GET 'solutions?$select=version,ismanaged&$filter=uniquename eq ''OutcomeTesting'''
+```
+
+**0a. The E2 outcome lens tick is retired.** Step 7 fails while the box is still drawn. In the
+Code App, open the question library, find `Q-E2-LENS` and choose Retire, or:
+
+```powershell
+Set-Content -Encoding utf8 "$Detire.json" '{"QuestionId":"44440000-0000-4c00-8000-000000000094","EffectiveTo":"2026-10-05","Reason":"Owner direction 2026-10-05: remove the tick box on the E2 outcome lens row; the lens text stays.","IdempotencyKey":"retire-Q-E2-LENS-2026-10-05"}'
+& $t webapi $p POST al_RetireQuestion "@$Detire.json"
 ```
 
 **1. Choose the tester.** Pick a PROD user whose contact has `emailaddress1` = their mailbox.

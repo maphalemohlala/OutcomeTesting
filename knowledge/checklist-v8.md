@@ -260,6 +260,13 @@ attestation box that had to be ticked before the section could be submitted woul
 judgement, it would be a toll gate. Both pages recognise it by the `-LENS` code suffix rather
 than by its section, so a second one could be seeded without a code change.
 
+**Retired 2026-10-05 (AD-229).** The owner directed that the box be removed and the lens text
+kept. `Q-E2-LENS` is retired through `al_RetireQuestion` (effective-to 2026-10-05), not deleted:
+open reviews read their questions as of today and stop drawing the box; submitted reviews read
+as of their submission day and keep any tick already recorded. The lens row itself is the
+section's help text and is unchanged. The `-LENS` handling in both pages stays, dormant, so the
+tick can be restored by adding a successor version rather than by a code change.
+
 ### S-E3 — Research & Recommendation Rationale (COBS 9.3)
 | Code | Question |
 |---|---|

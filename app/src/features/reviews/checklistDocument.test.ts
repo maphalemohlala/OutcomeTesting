@@ -56,6 +56,12 @@ import {
  * 8. Primary root cause takes several ticks. Its options are the document's, unchanged; the
  *    seed carries a second version of Q-GR-02 on the multi-select type from 2026-09-24, so the
  *    fixture reads the versions in force today rather than every version seeded.
+ *
+ * And one from the project owner's direction of 2026-10-05 (AD-229, superseding AD-102):
+ *
+ * 9. E2's outcome lens row has no tick box. The document draws one, and Q-E2-LENS was built
+ *    to match it; it is now retired in the seed (effective-to 2026-10-05), so the lens text
+ *    stays and the box goes. Asserted below as the document's one tick, removed by name.
  */
 
 // ---------------------------------------------------------------------------------------
@@ -268,11 +274,11 @@ describe('the checklist the app draws matches the reference document', () => {
     expect(documentFailReasons.length).toBe(20);
     expect(seedSections.length).toBe(12);
 
-    // 47 in force, not the 46 the document draws: Q-TAX-04 is difference (4) above. Asserted
-    // as the document's count plus exactly one, so the number carries its own reason. The
-    // seed holds one more - Q-GR-02's retired first version (difference 8).
-    expect(seedVersions.length).toBe(46 + 1);
-    expect(seedRecords('al_questionversion')).toHaveLength(46 + 1 + 1);
+    // 46 in force, the document's count plus Q-TAX-04 (difference 4) less Q-E2-LENS
+    // (difference 9), so the number carries its own reasons. The seed holds two more than
+    // that - Q-GR-02's retired first version (difference 8) and the retired Q-E2-LENS.
+    expect(seedVersions.length).toBe(46 + 1 - 1);
+    expect(seedRecords('al_questionversion')).toHaveLength(46 + 1 - 1 + 2);
     expect(seedVersions.filter((version) => version.text === 'Tax Remedial')).toHaveLength(1);
   });
 
@@ -338,6 +344,12 @@ describe('the checklist the app draws matches the reference document', () => {
     }
 
     expect(expected).toHaveLength(5);
+
+    // Difference 9: the document's one lens tick, on E2, is not drawn (AD-229).
+    expect(expected.filter((group) => group.lensTick).map((group) => group.heading)).toHaveLength(1);
+    expect(expected[1].lensTick).toBe(true);
+    expected[1].lensTick = false;
+
     expect(
       suitability.groups.map((group) => ({
         heading: group.heading,
