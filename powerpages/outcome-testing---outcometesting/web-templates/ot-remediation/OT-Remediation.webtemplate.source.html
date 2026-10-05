@@ -281,6 +281,8 @@
       {% endcomment %}
       <attribute name="al_adviseremail" />
       <attribute name="al_casestatus" />
+      {% comment %}Read for ot_signoff_due below: a Tax Fail is one the T&C Manager verifies.{% endcomment %}
+      <attribute name="al_taxoutcome" />
       {% comment %}
         The route, so the regraded-outcome cell below can say WHY it is empty on a case that
         will never carry a grade. Outer join: a case not yet routed has none, and an inner
@@ -394,6 +396,34 @@
     </entity>
   </fetch>
   {% endfetchxml %}
+
+  {% comment %}
+    Does this case's remediation go to the T&C Manager at all? BR-008: the manager verifies
+    Insufficient evidence and Potential harm (and a Tax Fail). Pass with issues on either
+    check, or a Pass the checker flagged, closes on the adviser's last completion
+    (CompleteRemediationPlugin.SignoffRequired, project owner 2026-10-05), so the page must
+    not offer a sign-off nobody is waiting for or tell the adviser one is coming.
+
+    The server is the rule; this mirrors it for wording only. A case the server HAS put at
+    Awaiting Sign-off is always due, so the page can never hide a decision the case is
+    parked on. 120910300 Pass and 120910302 Pass with issues on al_taxoutcome (AD-055
+    amended); 120910700 Pass and 120910701 Pass with issues on al_initialoutcome. No grade
+    on either check means due, as every case was before.
+  {% endcomment %}
+  {% assign ot_signoff_due = false %}
+  {% assign ot_graded = false %}
+  {% if c and c.al_taxoutcome %}
+    {% assign ot_graded = true %}
+    {% unless c.al_taxoutcome.value == 120910300 or c.al_taxoutcome.value == 120910302 %}{% assign ot_signoff_due = true %}{% endunless %}
+  {% endif %}
+  {% for o in caseoutcomes.results.entities %}
+    {% if o.al_initialoutcome %}
+      {% assign ot_graded = true %}
+      {% unless o.al_initialoutcome.value == 120910700 or o.al_initialoutcome.value == 120910701 %}{% assign ot_signoff_due = true %}{% endunless %}
+    {% endif %}
+  {% endfor %}
+  {% if ot_graded == false %}{% assign ot_signoff_due = true %}{% endif %}
+  {% if c and c.al_casestatus.value == 120910589 %}{% assign ot_signoff_due = true %}{% endif %}
 
   {% comment %}
     Is the reader the T&C Manager for THIS case's adviser? (Project owner, 2026-09-21:
@@ -817,11 +847,11 @@
                                   data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
                                   data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
                           </td>
-                          <td rowspan="{{ ot_count }}" data-ot-row-decision="{{ a.al_remediationactionid }}">
+                          <td rowspan="{{ ot_count }}" data-ot-row-decision="{{ a.al_remediationactionid }}"{% unless ot_signoff_due %} data-ot-no-signoff{% endunless %}>
                             {% if latest %}
                               {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
                             {% elsif a.al_completedon %}
-                              Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor
+                              Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}{% if ot_signoff_due %}; awaiting supervisor{% endif %}
                             {% else %}
                               —
                             {% endif %}
@@ -912,7 +942,7 @@
                       {% if latest %}
                         {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
                       {% elsif a.al_completedon %}
-                        Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor
+                        Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}{% if ot_signoff_due %}; awaiting supervisor{% endif %}
                       {% else %}
                         —
                       {% endif %}
@@ -1211,6 +1241,7 @@
         {% if user.roles contains signoff_role %}{% assign has_signoff_role = true %}{% endif %}
         {% assign can_signoff = false %}
         {% if user.roles contains signoff_role and ot_is_case_tcmanager %}{% assign can_signoff = true %}{% endif %}
+        {% unless ot_signoff_due %}{% assign signoff_ids = '' %}{% endunless %}
         {% if signoff_ids != '' and can_signoff == false %}
           <div class="ot-form-submit">
             {% if has_signoff_role %}
@@ -1657,7 +1688,9 @@
 
         var decision = cells('data-ot-row-decision', ids);
         for (var j = 0; j < decision.length; j += 1) {
-          setText(decision[j], 'Adviser completed ' + today() + '; awaiting supervisor');
+          // No "awaiting supervisor" where the page was told the case needs no sign-off.
+          setText(decision[j], 'Adviser completed ' + today()
+            + (decision[j].hasAttribute('data-ot-no-signoff') ? '' : '; awaiting supervisor'));
         }
       },
 

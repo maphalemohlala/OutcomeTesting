@@ -107,7 +107,10 @@ namespace OutcomeTesting.Plugins
             { ReviewInProgress, new[] { Submitted, Queued, Assigned, NoCheckRequired } },
             { Submitted, new[] { AwaitingRemediation, Closed } },
             { AwaitingRemediation, new[] { RemediationInProgress } },
-            { RemediationInProgress, new[] { AwaitingSignoff } },
+            // Closed: a remediation with nothing for the T&C Manager to verify (BR-008 -
+            // Pass with issues, or a flagged Pass) closes on the adviser's last completion
+            // (project owner, 2026-10-05). CaseStatusGuardPlugin holds the edge to that case.
+            { RemediationInProgress, new[] { AwaitingSignoff, Closed } },
             { AwaitingSignoff, new[] { AwaitingRecheck, AwaitingRemediation, Queued } },
             { AwaitingRecheck, new[] { Closed } },
             { Closed, new int[0] },

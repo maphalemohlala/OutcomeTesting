@@ -102,7 +102,20 @@ namespace OutcomeTesting.Plugins
                     "A case cannot be left with no status. Move it to the state it belongs in instead.");
             }
 
-            CaseTransitions.EnsureAllowed(CaseTransitions.CurrentStatus(service, target.Id), to.Value);
+            var from = CaseTransitions.CurrentStatus(service, target.Id);
+            CaseTransitions.EnsureAllowed(from, to.Value);
+
+            // The one edge whose legality depends on the case, not the states. Without this
+            // the Remediation In Progress -> Closed hop added for Pass with issues would let
+            // a single PATCH close a Potential harm case past its sign-off - F53 again.
+            if (from == CaseLifecycle.RemediationInProgress
+                && to.Value == CaseLifecycle.Closed
+                && !CompleteRemediationPlugin.MayCloseWithoutSignoff(service, target.Id))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "This case cannot close yet: a remedial action is still open, or its grade needs T&C sign-off first.");
+            }
         }
     }
 }

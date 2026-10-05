@@ -70,7 +70,10 @@ export const CASE_STATUS_TRANSITIONS: Record<CaseStatus, readonly CaseStatus[]> 
   'Review In Progress': ['Submitted', 'Queued', 'Assigned', 'No Check Required'],
   Submitted: ['Awaiting Remediation', 'Closed'],
   'Awaiting Remediation': ['Remediation In Progress'],
-  'Remediation In Progress': ['Awaiting Sign-off'],
+  // Closed: a remediation with nothing for the T&C Manager to verify (Pass with issues, or
+  // a flagged Pass) closes on the adviser's last completion. The server's status guard
+  // refuses it for any other case, so offering it here decides nothing.
+  'Remediation In Progress': ['Awaiting Sign-off', 'Closed'],
   // Queued: OD-038 — a Tax check that raised remediation holds the case until the
   // remediation is approved, and the AQS check then follows from the shared queue.
   'Awaiting Sign-off': ['Awaiting Recheck', 'Awaiting Remediation', 'Queued'],

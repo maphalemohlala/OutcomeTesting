@@ -44,6 +44,15 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void Allows_a_remediation_that_needs_no_signoff_to_close()
+        {
+            // BR-008: the T&C Manager verifies Insufficient evidence and Potential harm only.
+            // Whether THIS case may take the edge is CaseStatusGuardPlugin's question.
+            Assert.True(CaseLifecycle.IsAllowed(CaseLifecycle.RemediationInProgress, CaseLifecycle.Closed));
+            Assert.False(CaseLifecycle.IsAllowed(CaseLifecycle.AwaitingRemediation, CaseLifecycle.Closed));
+        }
+
+        [Fact]
         public void Allows_a_corrected_validation_failure_back_into_allocation()
         {
             // BR-002: an invalid case is returned with a reason; correcting it puts it back

@@ -140,6 +140,12 @@ describe('case lifecycle (BR-002, BR-008, AD-031, AD-036)', () => {
     expect(canTransition('Imported', 'Closed')).toBe(false);
   });
 
+  it('closes a remediation that needs no sign-off, and only from Remediation In Progress', () => {
+    // Pass with issues is not one the T&C Manager verifies; the server decides per case.
+    expect(canTransition('Remediation In Progress', 'Closed')).toBe(true);
+    expect(canTransition('Awaiting Remediation', 'Closed')).toBe(false);
+  });
+
   it('returns a rejected sign-off to remediation', () => {
     expect(canTransition('Awaiting Sign-off', 'Awaiting Remediation')).toBe(true);
   });

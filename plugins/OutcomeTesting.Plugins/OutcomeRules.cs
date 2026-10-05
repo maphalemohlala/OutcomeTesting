@@ -118,6 +118,47 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// Whether a remediated case goes to the T&amp;C Manager once the adviser has finished
+        /// (BR-008: the manager verifies Insufficient evidence and Potential harm).
+        ///
+        /// Pass with issues - the AQS grade or the Tax check's middle result, 120910302 on
+        /// <c>al_taxoutcome</c> (AD-055 amended) - and a Pass the checker flagged for action
+        /// close on the adviser's completion instead (project owner, 2026-10-05). Anything
+        /// else on either check sends the whole case to sign-off, because the sign-off is
+        /// made on the case, not per check.
+        ///
+        /// A case with no grade recorded on either check goes to sign-off, as every case did
+        /// before: nothing on it says it was a pass.
+        /// </summary>
+        /// <param name="taxOutcome">al_outcomecase.al_taxoutcome, or null where no Tax check ran.</param>
+        /// <param name="aqsOutcomes">al_outcome.al_initialoutcome for each AQS outcome on the case.</param>
+        public static bool SignoffRequired(int? taxOutcome, IEnumerable<int> aqsOutcomes)
+        {
+            var graded = false;
+
+            if (taxOutcome.HasValue)
+            {
+                graded = true;
+                if (taxOutcome.Value != ResponseRules.ChoicePass
+                    && taxOutcome.Value != ResponseRules.ChoiceInsufficient)
+                {
+                    return true;
+                }
+            }
+
+            foreach (var outcome in aqsOutcomes ?? new int[0])
+            {
+                graded = true;
+                if (outcome != OutcomePass && outcome != OutcomePassWithIssues)
+                {
+                    return true;
+                }
+            }
+
+            return !graded;
+        }
+
+        /// <summary>
         /// Whether the answer to "Remedial action required?" is a Yes.
         ///
         /// Null is "not answered", never a Yes. Both questions are mandatory so an

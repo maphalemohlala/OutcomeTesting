@@ -158,3 +158,46 @@ describe('the sign-off panel and the case adviser', () => {
     );
   });
 });
+
+/**
+ * BR-008: the T&C Manager verifies Insufficient evidence and Potential harm, not Pass with
+ * issues. PROD case 256497798 (Pass with issues on both checks) was offered for sign-off
+ * once every action was done; the server now closes such a case, and the page must not
+ * offer a sign-off nobody is waiting for.
+ */
+describe('the sign-off panel on a case that needs no sign-off', () => {
+  it('reads the Tax result, so a Tax Fail still counts as due', () => {
+    expect(remediation).toContain('<attribute name="al_taxoutcome" />');
+  });
+
+  it('treats only Pass and Pass with issues as not due, on both checks', () => {
+    expect(remediation).toContain(
+      '{% unless c.al_taxoutcome.value == 120910300 or c.al_taxoutcome.value == 120910302 %}{% assign ot_signoff_due = true %}{% endunless %}',
+    );
+    expect(remediation).toContain(
+      '{% unless o.al_initialoutcome.value == 120910700 or o.al_initialoutcome.value == 120910701 %}{% assign ot_signoff_due = true %}{% endunless %}',
+    );
+  });
+
+  it('never hides the panel on a case the server has parked at Awaiting Sign-off', () => {
+    expect(remediation).toContain(
+      '{% if c and c.al_casestatus.value == 120910589 %}{% assign ot_signoff_due = true %}{% endif %}',
+    );
+    expect(remediation).toContain('{% if ot_graded == false %}{% assign ot_signoff_due = true %}{% endif %}');
+  });
+
+  it('clears the actions to sign before either panel or its hint is drawn', () => {
+    const clearAt = remediation.indexOf("{% unless ot_signoff_due %}{% assign signoff_ids = '' %}{% endunless %}");
+    const hintAt = remediation.indexOf("{% if signoff_ids != '' and can_signoff == false %}");
+    const panelAt = remediation.indexOf("{% if signoff_ids != '' and can_signoff %}");
+    expect(clearAt).toBeGreaterThan(-1);
+    expect(hintAt).toBeGreaterThan(clearAt);
+    expect(panelAt).toBeGreaterThan(clearAt);
+  });
+
+  it('does not tell the adviser a supervisor is coming', () => {
+    expect(remediation).not.toContain("date: 'dd MMM yyyy' }}; awaiting supervisor");
+    expect(remediation).toContain("{% if ot_signoff_due %}; awaiting supervisor{% endif %}");
+    expect(remediation).toContain("decision[j].hasAttribute('data-ot-no-signoff') ? '' : '; awaiting supervisor'");
+  });
+});

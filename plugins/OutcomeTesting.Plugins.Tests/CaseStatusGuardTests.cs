@@ -53,6 +53,63 @@ namespace OutcomeTesting.Plugins.Tests
             CaseStatusGuardPlugin.Guard(service, Moving(CaseLifecycle.RemediationInProgress));
         }
 
+        private static void Grade(FakeOrganizationService service, int aqsOutcome)
+        {
+            service.Seed(
+                "al_outcome",
+                Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_initialoutcome", new OptionSetValue(aqsOutcome));
+        }
+
+        private static void ActionOnCase(FakeOrganizationService service, int actionStatus)
+        {
+            service.Seed(
+                "al_remediationaction",
+                Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_actionstatus", new OptionSetValue(actionStatus));
+        }
+
+        [Fact]
+        public void Lets_a_remediated_pass_with_issues_case_close_without_signoff()
+        {
+            var service = At(CaseLifecycle.RemediationInProgress);
+            Grade(service, OutcomeRules.OutcomePassWithIssues);
+            ActionOnCase(service, Remediation.StatusCompleted);
+
+            CaseStatusGuardPlugin.Guard(service, Moving(CaseLifecycle.Closed));
+        }
+
+        [Fact]
+        public void Refuses_to_close_a_case_the_manager_still_has_to_verify()
+        {
+            // The new edge is not a way round BR-008: a Potential harm case with every
+            // action done still goes to the T&C Manager.
+            var service = At(CaseLifecycle.RemediationInProgress);
+            Grade(service, OutcomeRules.OutcomePotentialHarm);
+            ActionOnCase(service, Remediation.StatusCompleted);
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => CaseStatusGuardPlugin.Guard(service, Moving(CaseLifecycle.Closed)));
+
+            Assert.StartsWith(CommandHelpers.PreconditionPrefix, error.Message);
+        }
+
+        [Fact]
+        public void Refuses_to_close_a_pass_with_issues_case_with_an_action_still_open()
+        {
+            var service = At(CaseLifecycle.RemediationInProgress);
+            Grade(service, OutcomeRules.OutcomePassWithIssues);
+            ActionOnCase(service, Remediation.StatusCompleted);
+            ActionOnCase(service, Remediation.StatusOpen);
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(
+                () => CaseStatusGuardPlugin.Guard(service, Moving(CaseLifecycle.Closed)));
+
+            Assert.StartsWith(CommandHelpers.PreconditionPrefix, error.Message);
+        }
+
         [Fact]
         public void Allows_a_write_that_leaves_the_status_where_it_is()
         {

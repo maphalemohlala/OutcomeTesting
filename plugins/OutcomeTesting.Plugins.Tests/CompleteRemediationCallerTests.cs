@@ -211,6 +211,80 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal(new[] { CaseLifecycle.RemediationInProgress, CaseLifecycle.AwaitingSignoff }, hops);
         }
 
+        private static void Graded(FakeOrganizationService svc, int? aqsOutcome, int? taxOutcome)
+        {
+            if (aqsOutcome.HasValue)
+            {
+                svc.Seed(
+                    "al_outcome",
+                    Guid.NewGuid(),
+                    "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                    "al_initialoutcome", new OptionSetValue(aqsOutcome.Value));
+            }
+
+            if (taxOutcome.HasValue)
+            {
+                svc.Row("al_outcomecase", CaseId)["al_taxoutcome"] = new OptionSetValue(taxOutcome.Value);
+            }
+        }
+
+        /// <summary>
+        /// BR-008: the T&amp;C Manager verifies Insufficient evidence and Potential harm, not
+        /// Pass with issues. PROD case 256497798 (Tax "Pass with issues", AQS Pass with
+        /// issues) sat at Awaiting Sign-off with six completed actions and nothing for the
+        /// manager to decide.
+        /// </summary>
+        [Theory]
+        [InlineData(OutcomeRules.OutcomePassWithIssues, null)]
+        [InlineData(OutcomeRules.OutcomePassWithIssues, ResponseRules.ChoiceInsufficient)]
+        [InlineData(null, ResponseRules.ChoiceInsufficient)]
+        [InlineData(OutcomeRules.OutcomePass, null)]
+        [InlineData(OutcomeRules.OutcomePass, ResponseRules.ChoicePass)]
+        public void A_case_that_needs_no_signoff_closes_on_the_last_completion(int? aqsOutcome, int? taxOutcome)
+        {
+            var svc = ActionOnCase(CaseLifecycle.AwaitingRemediation);
+            Graded(svc, aqsOutcome, taxOutcome);
+
+            Complete(svc, OwnerId, true);
+
+            var hops = svc.Updates
+                .FindAll(u => u.LogicalName == "al_outcomecase")
+                .ConvertAll(u => u.GetAttributeValue<OptionSetValue>("al_casestatus").Value);
+            Assert.Equal(new[] { CaseLifecycle.RemediationInProgress, CaseLifecycle.Closed }, hops);
+        }
+
+        [Theory]
+        [InlineData(OutcomeRules.OutcomeInsufficient, null)]
+        [InlineData(OutcomeRules.OutcomePotentialHarm, null)]
+        [InlineData(OutcomeRules.OutcomeInsufficient, ResponseRules.ChoiceInsufficient)]
+        [InlineData(OutcomeRules.OutcomePassWithIssues, ResponseRules.ChoiceFail)]
+        [InlineData(null, ResponseRules.ChoiceFail)]
+        public void A_case_carrying_a_grade_the_manager_verifies_still_goes_to_signoff(int? aqsOutcome, int? taxOutcome)
+        {
+            var svc = ActionOnCase(CaseLifecycle.AwaitingRemediation);
+            Graded(svc, aqsOutcome, taxOutcome);
+
+            Complete(svc, OwnerId, true);
+
+            Assert.Equal(CaseLifecycle.AwaitingSignoff, CaseStatus(svc));
+        }
+
+        [Fact]
+        public void A_pass_with_issues_case_stays_open_while_a_sibling_is_outstanding()
+        {
+            var svc = ActionOnCase(CaseLifecycle.AwaitingRemediation);
+            Graded(svc, OutcomeRules.OutcomePassWithIssues, null);
+            svc.Seed(
+                "al_remediationaction",
+                Guid.NewGuid(),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_actionstatus", new OptionSetValue(StatusOpen));
+
+            Complete(svc, OwnerId, true);
+
+            Assert.Equal(CaseLifecycle.RemediationInProgress, CaseStatus(svc));
+        }
+
         [Fact]
         public void A_reworked_action_moves_the_case_forward_again_after_a_rejection()
         {

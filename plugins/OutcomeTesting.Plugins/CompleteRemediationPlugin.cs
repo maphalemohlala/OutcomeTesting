@@ -275,12 +275,73 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            // BR-008: the T&C Manager verifies Insufficient evidence and Potential harm. A
+            // case carrying neither has nothing for them to decide, and closes here - PROD
+            // case 256497798, Pass with issues on both checks, sat at Awaiting Sign-off with
+            // every action done and no one asked to act on it.
+            if (!SignoffRequired(service, caseRef.Id))
+            {
+                CaseTransitions.MoveThrough(
+                    service,
+                    caseRef.Id,
+                    new[] { CaseLifecycle.RemediationInProgress, CaseLifecycle.Closed });
+                return;
+            }
+
             CaseTransitions.MoveThrough(
                 service,
                 caseRef.Id,
                 new[] { CaseLifecycle.RemediationInProgress, CaseLifecycle.AwaitingSignoff });
 
             NotifySignoffDue(service, caseRef, correlationId, trace);
+        }
+
+        /// <summary>
+        /// Whether this case's remediation goes to the T&amp;C Manager, read from the grades
+        /// on the case (<see cref="OutcomeRules.SignoffRequired"/>).
+        ///
+        /// An AQS check still owed always goes to sign-off: approval is what hands such a
+        /// case back to the queue (<see cref="SignoffProgressPlugin.MoveCase"/>), and closing
+        /// it here would end the case before its AQS check ran.
+        /// </summary>
+        public static bool SignoffRequired(IOrganizationService service, Guid caseId)
+        {
+            if (SubmitReviewPlugin.AqsStillOwed(service, caseId))
+            {
+                return true;
+            }
+
+            var outcomeCase = service.Retrieve("al_outcomecase", caseId, new ColumnSet("al_taxoutcome"));
+            var tax = outcomeCase.GetAttributeValue<OptionSetValue>("al_taxoutcome");
+
+            var query = new QueryExpression("al_outcome")
+            {
+                ColumnSet = new ColumnSet("al_initialoutcome"),
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+
+            var aqs = new List<int>();
+            foreach (var outcome in service.RetrieveMultiple(query).Entities)
+            {
+                var initial = outcome.GetAttributeValue<OptionSetValue>("al_initialoutcome");
+                if (initial != null)
+                {
+                    aqs.Add(initial.Value);
+                }
+            }
+
+            return OutcomeRules.SignoffRequired(tax == null ? (int?)null : tax.Value, aqs);
+        }
+
+        /// <summary>
+        /// Whether the case may go from Remediation In Progress straight to Closed: nothing
+        /// on it needs sign-off and no action on it, on any check, is still open. What
+        /// <see cref="CaseStatusGuardPlugin"/> holds a direct write of that edge to.
+        /// </summary>
+        public static bool MayCloseWithoutSignoff(IOrganizationService service, Guid caseId)
+        {
+            return !AnyOutstanding(service, caseId, null) && !SignoffRequired(service, caseId);
         }
 
         /// <summary>
