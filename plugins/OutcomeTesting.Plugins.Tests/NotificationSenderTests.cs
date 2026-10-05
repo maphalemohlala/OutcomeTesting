@@ -6,7 +6,7 @@ using Xunit;
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// Who the letters come from (owner direction 2026-10-02: "ot.outcometesting@ascotlloyd.co.uk
+    /// Who the letters come from (owner direction 2026-10-02: "tc.outcometesting@ascotlloyd.co.uk
     /// is a shared mailbox - we need to use it for all communications").
     ///
     /// <para>
@@ -19,7 +19,7 @@ namespace OutcomeTesting.Plugins.Tests
     /// </summary>
     public class NotificationSenderTests
     {
-        private const string Shared = "ot.outcometesting@ascotlloyd.co.uk";
+        private const string Shared = "tc.outcometesting@ascotlloyd.co.uk";
 
         private static readonly Guid NotificationId = Guid.Parse("aaaaaaaa-1111-4111-8111-222222222222");
         private static readonly Guid RunAsId = Guid.Parse("bbbbbbbb-3333-4333-8333-444444444444");

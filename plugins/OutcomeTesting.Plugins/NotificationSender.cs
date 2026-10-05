@@ -6,7 +6,7 @@ namespace OutcomeTesting.Plugins
 {
     /// <summary>
     /// Who a drained notification is sent from (owner direction 2026-10-02: the shared mailbox
-    /// <c>ot.outcometesting@</c> is used for all communications, closing OD-046's sender half).
+    /// <c>tc.outcometesting@</c> is used for all communications, closing OD-046's sender half).
     /// </summary>
     /// <remarks>
     /// <para>

@@ -50,7 +50,7 @@ addressed to the tester. That includes:
 - the sign-off request;
 - the outcome letters.
 
-All of them leave from the shared mailbox (`ot.outcometesting@ascotlloyd.co.uk`), once
+All of them leave from the shared mailbox (`tc.outcometesting@ascotlloyd.co.uk`), once
 `al_NotificationSenderAddress` is set in PROD and its queue mailbox is approved. Until then
 they wait or fail with the reason recorded. A notification marked "Sent" only means queued;
 the `email` table is the proof (see "After the run").
