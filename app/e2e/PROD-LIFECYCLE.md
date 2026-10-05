@@ -76,7 +76,7 @@ PROD write, and every one is yours to run.
 
 ```powershell
 $env:DOTNET_ROLL_FORWARD='Major'
-$t='C:\Users\rsimu\OutcomeTesting\plugins\OutcomeTesting.Registration\bin\Debug\net8.0\OutcomeTesting.Registration.exe'
+$t='C:\Users\rsimu\OutcomeTesting\plugins\OutcomeTesting.Registration\bin\Release\net8.0\OutcomeTesting.Registration.exe'
 $p='https://org3461d426.crm11.dynamics.com'
 $me='<tester email>'          # the tester's own mailbox, as on their PROD contact
 $D="$env:TEMP\ot-prod-e2e"; New-Item -ItemType Directory -Force $D | Out-Null
@@ -89,13 +89,8 @@ connected, so read the version back:
 & $t webapi $p GET 'solutions?$select=version,ismanaged&$filter=uniquename eq ''OutcomeTesting'''
 ```
 
-**0a. The E2 outcome lens tick is retired.** Step 7 fails while the box is still drawn. In the
-Code App, open the question library, find `Q-E2-LENS` and choose Retire, or:
-
-```powershell
-Set-Content -Encoding utf8 "$Detire.json" '{"QuestionId":"44440000-0000-4c00-8000-000000000094","EffectiveTo":"2026-10-05","Reason":"Owner direction 2026-10-05: remove the tick box on the E2 outcome lens row; the lens text stays.","IdempotencyKey":"retire-Q-E2-LENS-2026-10-05"}'
-& $t webapi $p POST al_RetireQuestion "@$Detire.json"
-```
+**0a. The E2 outcome lens tick is retired.** Done in PROD on 2026-10-05 (AD-229). Step 7
+fails if a lens row still draws a tick box.
 
 **1. Choose the tester.** Pick a PROD user whose contact has `emailaddress1` = their mailbox.
 - **Active.** The tester must be **active** and the **only** active contact with that email.
