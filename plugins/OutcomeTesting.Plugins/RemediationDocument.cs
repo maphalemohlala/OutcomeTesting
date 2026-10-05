@@ -392,7 +392,7 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>The issues an action lists, one per "- " line of its description.</summary>
-        private static List<string> Issues(string description)
+        internal static List<string> Issues(string description)
         {
             var issues = new List<string>();
             foreach (var raw in (description ?? string.Empty).Replace("\r\n", "\n").Split('\n'))
@@ -510,12 +510,12 @@ namespace OutcomeTesting.Plugins
             return cell;
         }
 
-        private static string Text(string value)
+        internal static string Text(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? "—" : value.Trim();
         }
 
-        private static string Day(DateTime? value)
+        internal static string Day(DateTime? value)
         {
             return value.HasValue ? CompletedCheck.Day(value) : "—";
         }

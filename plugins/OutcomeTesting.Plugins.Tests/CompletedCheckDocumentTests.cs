@@ -262,6 +262,59 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Contains("/Helvetica-BoldOblique", pdf);
         }
 
+        // ================================================================== remedial actions
+
+        [Fact]
+        public void A_check_that_raised_remediation_ends_with_its_remedial_actions()
+        {
+            var service = Case();
+            var action = Action(service, completed: false);
+            action[RemedialActions.ActionAttr] = "Re-verify ID and file the evidence.";
+
+            var blocks = CompletedCheck.Blocks(service, AqsReviewId);
+
+            Assert.Equal(CheckRemedialActions.Heading, blocks.Last(b => b.Kind == PdfBlockKind.Subheading).Text);
+
+            var table = Tables(blocks).Last();
+            Assert.Equal(
+                new[] { "No.", "Fail point", "Remedial action", "Owner", "Target date", "Status" },
+                table.Rows[0].Cells.Select(c => c.Text).ToArray());
+
+            Assert.Equal(3, table.Rows.Count);
+            Assert.Equal("1", table.Rows[1].Cells[0].Text);
+            Assert.Equal("ID verification completed and retained for all relevant clients/parties.: No", table.Rows[1].Cells[1].Text);
+            Assert.Equal("Re-verify ID and file the evidence.", table.Rows[1].Cells[2].Text);
+            Assert.Equal("Adam Strumidlo", table.Rows[1].Cells[3].Text);
+            Assert.Equal("05 Oct 2026", table.Rows[1].Cells[4].Text);
+
+            Assert.Equal("2", table.Rows[2].Cells[0].Text);
+            Assert.Equal("Client objectives clearly evidenced and specific: Fail", table.Rows[2].Cells[1].Text);
+            Assert.Equal(string.Empty, table.Rows[2].Cells[2].Text);
+        }
+
+        [Fact]
+        public void A_check_that_raised_nothing_has_no_remedial_section()
+        {
+            var service = Case();
+            Action(service, completed: false);
+
+            // The action belongs to the AQS check, so the Tax check's document carries none.
+            var blocks = CompletedCheck.Blocks(service, TaxReviewId);
+
+            Assert.DoesNotContain(blocks, b => b.Kind == PdfBlockKind.Subheading && b.Text == CheckRemedialActions.Heading);
+        }
+
+        [Fact]
+        public void A_row_raised_before_the_checkers_words_shows_the_advisers_own()
+        {
+            var service = Case();
+            Action(service, completed: true);
+
+            var table = Tables(CompletedCheck.Blocks(service, AqsReviewId)).Last();
+
+            Assert.Equal("ID re-verified and retained on file.", table.Rows[1].Cells[2].Text);
+        }
+
         // ================================================================== the files
 
         [Fact]

@@ -19,8 +19,9 @@ namespace OutcomeTesting.Plugins
     /// left unanswered questions out, and folded Tax, AQS and the remedial actions into one
     /// file. It now draws what the page draws: the review summary, the checklist items, the
     /// case header table, and every block of the form as the ruled table the page rules,
-    /// with its tick columns and its empty boxes. One check per file;
-    /// <see cref="RemediationDocument"/> is the remedial actions' own.
+    /// with its tick columns and its empty boxes. One check per file, ending with the
+    /// remedial actions that check raised (2026-10-05, <see cref="CheckRemedialActions"/>);
+    /// <see cref="RemediationDocument"/> is the case's whole remediation form.
     /// </para>
     /// <para>
     /// <b>The whole form in force, not only the answers.</b> The page renders every question
@@ -119,6 +120,9 @@ namespace OutcomeTesting.Plugins
             var reasons = FailReasons(service, reviewId);
 
             Draw(blocks, items, reasons, isTax);
+
+            // What the check raised, last, as the review page now prints it (2026-10-05).
+            blocks.AddRange(CheckRemedialActions.Blocks(service, reviewId));
             return blocks;
         }
 
