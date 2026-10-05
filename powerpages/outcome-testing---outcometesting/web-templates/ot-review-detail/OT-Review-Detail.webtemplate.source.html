@@ -3446,8 +3446,17 @@
         1, 10, 2, 3... once a check has ten actions. The fix here does not re-sort a list
         (this Liquid has no sort filter): it walks the band of possible index values
         1..(count + 1) and, on each pass, emits whichever action's own index matches that
-        pass's number. The last pass (count + 1) is a catch-all for an index that parsed
-        out of range, so a bad code still renders exactly once instead of vanishing.
+        pass's number. The last pass (count + 1) is a catch-all for an index that matched
+        none of 1..count, so a bad or missing code still renders exactly once instead of
+        vanishing.
+
+        The index is never converted to a number: this site runs DotLiquid, whose plus
+        filter concatenates when its input is a string instead of adding (the string "3"
+        run through plus: 0 is string.Concat, giving "30", not 3). rr_tail stays a string
+        straight out of the split, and the pass number is captured into a string of its own
+        (rr_n, rr_k) so the comparison is string equals string throughout; rr_size, n and k
+        themselves are genuine integers (from .size and a Liquid range), so the range and
+        the rr_last addition below are unaffected by this and stay numeric.
       {% endcomment %}
       {% fetchxml review_actions %}
       <fetch>
@@ -3495,19 +3504,20 @@
                   {% assign rr_parts = a.al_remediationactioncode | default: '' | split: '-' %}
                   {% assign rr_tail = '' %}
                   {% for s in rr_parts %}{% assign rr_tail = s %}{% endfor %}
-                  {% assign rr_idx = rr_tail | plus: 0 %}
                   {% assign rr_show = false %}
                   {% if rr_size == 1 %}
                     {% if n == 1 %}{% assign rr_show = true %}{% endif %}
                   {% else %}
                     {% if n < rr_last %}
-                      {% if rr_idx == n %}{% assign rr_show = true %}{% endif %}
+                      {% capture rr_n %}{{ n }}{% endcapture %}
+                      {% if rr_tail == rr_n %}{% assign rr_show = true %}{% endif %}
                     {% else %}
-                      {% if rr_idx < 1 %}
-                        {% assign rr_show = true %}
-                      {% else %}
-                        {% if rr_idx > rr_size %}{% assign rr_show = true %}{% endif %}
-                      {% endif %}
+                      {% assign rr_in_range = false %}
+                      {% for k in (1..rr_size) %}
+                        {% capture rr_k %}{{ k }}{% endcapture %}
+                        {% if rr_tail == rr_k %}{% assign rr_in_range = true %}{% endif %}
+                      {% endfor %}
+                      {% unless rr_in_range %}{% assign rr_show = true %}{% endunless %}
                     {% endif %}
                   {% endif %}
                   {% if rr_show %}

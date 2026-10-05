@@ -43,4 +43,14 @@ describe('the submitted review page lists its remedial actions', () => {
   it('re-sorts the fetch result into raise order rather than trusting the lexical fetch order', () => {
     expect(section).toContain('{% for n in (1..');
   });
+
+  it('compares the code tail as a string, since DotLiquid\'s plus filter concatenates a string input instead of adding', () => {
+    // "3" | plus: 0 is string.Concat in DotLiquid when the input is a string, giving "30"
+    // rather than 3 — numeric conversion would send every itemised action to the catch-all
+    // pass and silently degrade the order back to the fetch's lexical one (fix round 1,
+    // controller finding, 2026-10-05).
+    expect(section).not.toMatch(/rr_(tail|idx)\s*\|\s*plus:/);
+    expect(section).toContain('{% capture rr_n %}{{ n }}{% endcapture %}');
+    expect(section).toContain('rr_tail == rr_n');
+  });
 });
