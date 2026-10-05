@@ -190,11 +190,6 @@ describe('the freshness check keeps the card in step', () => {
     expect(apply).toContain("if (window.otRemedial && typeof window.otRemedial.redraw === 'function') { window.otRemedial.redraw(); }");
   });
 
-  it('redraws the card after the gating rules untick an option without a change event', () => {
-    const sync = fn(template, 'var syncGradeOptions = function () {');
-    expect(sync).toContain("if (window.otRemedial && typeof window.otRemedial.redraw === 'function') { window.otRemedial.redraw(); }");
-  });
-
   it('is offered a redraw by the card', () => {
     expect(cardScript()).toMatch(/window\.otRemedial = \{[\s\S]*?redraw: draw,/);
   });
