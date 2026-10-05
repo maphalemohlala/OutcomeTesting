@@ -36,6 +36,19 @@ the missing `<Compile Include="..\OutcomeTesting.Plugins\CheckRemedialActions.cs
 its neighbours. Committed separately (`ee54806`), since it is a prerequisite for deployment
 rather than part of the task brief's named file.
 
+Re-run after the fix, `dotnet build plugins/OutcomeTesting.Registration -c Release` **succeeded**:
+
+```
+    154 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:10.92
+```
+
+The 154 warnings are pre-existing nullable-reference-type warnings in `Program.cs`, unrelated to
+this fix; the build that follows (Step 2's `pushassembly`) is the one that matters, and it is 0
+errors.
+
 ## Artefacts pushed to DEV (`https://org0b075da8.crm11.dynamics.com/`)
 
 | Artefact | Command | Result |
@@ -123,7 +136,30 @@ session involved for this part):
      2. `Reasonable alternatives considered or explained: Fail` - the AQS review's own item.
      Both rows carry the text written at step 6, owner "Service Account", target date "16 Oct
      2026", status "Open".
-9. **5(c), best effort.** Both actions were completed (`al_CompleteRemediation`, after patching
+9. **Check date (fix round 1, proof for `81694b9` - `StampCheckDate` moved before the letters
+   are built).** Read `al_checkdate` back from the case via `webapi GET`:
+   `al_outcomecases(cd34f49c-...)?$select=al_checkdate` -> **`"al_checkdate":"2026-10-05"`** -
+   today, UK date, matching the system clock at submit time. Decoded the case-header "Check
+   date" cell out of **both** check PDFs attached to **all three** outbox rows for this review
+   (adviser `REMEDIATIONASSIGNED`, para-planner `REMEDIATIONASSIGNED-...-PARAPLANNER`, and
+   para-planner `REVIEWSUBMITTED`):
+
+   | Outbox row | `Tax check 920930001.pdf` | `AQS check 920930001.pdf` |
+   |---|---|---|
+   | Adviser `REMEDIATIONASSIGNED` | Check date: **05 Oct 2026** | Check date: **05 Oct 2026** |
+   | Para-planner `REMEDIATIONASSIGNED-...-PARAPLANNER` | Check date: **05 Oct 2026** | Check date: **05 Oct 2026** |
+   | Para-planner `REVIEWSUBMITTED` | Check date: **05 Oct 2026** | Check date: **05 Oct 2026** |
+
+   All six readings agree with each other and with `al_checkdate` - no stale or blank date
+   anywhere. The byte counts are identical across all three rows for the same filename
+   (`Tax check 920930001.pdf` 13,347 bytes every time; `AQS check 920930001.pdf` 38,462 bytes
+   every time), which says the three outbox rows carry the *same* generated documents rather
+   than three independently-rebuilt copies - consistent with the design's "the remediation
+   letters are queued while the first action is being created... `SubmitReviewPlugin`
+   re-attaches the documents to both remediation rows for the review after `Remediation.Raise`
+   returns", and with `REVIEWSUBMITTED` picking up `CompletedCheckPdf.Documents` the same way.
+   Nothing here suggests `StampCheckDate` ran late or the PDF renderer read a stale cached row.
+10. **5(c), best effort.** Both actions were completed (`al_CompleteRemediation`, after patching
    `al_adviserresponse`/`al_actionperformed`), then **sign-off approve** was called
    (`al_SignOffRemediation {Decision:"Approved"}`, targeting one action's id) - **succeeded**
    (`Status: "Approved"`), and signed off **both** of the case's actions in the one call (case
@@ -137,7 +173,7 @@ session involved for this part):
    carrying signed-off actions, also **succeeded** with no privilege fault. Both results are
    consistent with the new attach-PDFs-inside-the-transaction code not faulting the surrounding
    command.
-10. **5(d) and the rest of Step 5 - BLOCKED, not worked around.** Steps 5.1 (confirm nothing is
+11. **5(d) and the rest of Step 5 - BLOCKED, not worked around.** Steps 5.1 (confirm nothing is
     greyed out or pre-ticked on the open page), 5.6 (reload the submitted review and confirm the
     read-only "Remedial actions" section and Save-as-PDF) and 5.7 (open the case in the Code App
     and confirm the panel) all need a live portal/Entra browser session.
