@@ -105,7 +105,7 @@ export function toAction(record: Al_remediationactions): RemediationActionRow {
     completedOn: date(record.al_completedon),
     triggeredBy: lookupLabel(record, 'al_reviewinstanceid', record.al_reviewinstanceidname),
     owner: lookupLabel(record, 'ownerid', record.owneridname),
-    assignedTo: text(extra.al_assignedcontactidname as string | undefined),
+    assignedTo: lookupLabel(record, 'al_assignedcontactid', extra.al_assignedcontactidname as string | undefined),
     // The checker writes the remedial action from 2026-09-29 and the adviser's text becomes
     // their note. A row raised before that carries no checker's words, so its remedial action
     // is still the adviser's own, and it has no note.

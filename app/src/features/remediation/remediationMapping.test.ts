@@ -74,6 +74,16 @@ describe('toAction', () => {
     expect(row.adviserNote).toBe('Client unreachable');
   });
 
+  it('reads the assignee from the lookup annotation when the generated name field is empty', () => {
+    const row = toAction(
+      action({
+        al_assignedcontactidname: undefined,
+        '_al_assignedcontactid_value@OData.Community.Display.V1.FormattedValue': 'Sims Rad',
+      }),
+    );
+    expect(row.assignedTo).toBe('Sims Rad');
+  });
+
   it('keeps the adviser\'s words as the remedial action on a row raised before the change', () => {
     const row = toAction(action({ al_adviserresponse: 'Reissued the report', al_actionperformed: null }));
     expect(row.remedialAction).toBe('Reissued the report');
