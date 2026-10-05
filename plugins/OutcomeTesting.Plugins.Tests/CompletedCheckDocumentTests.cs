@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using Microsoft.Xrm.Sdk;
@@ -512,6 +513,89 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal("AQS check IO 300001.pdf", CompletedCheckPdf.FileName("AQS check", "IO/300001"));
             Assert.Equal("Tax check unreferenced.pdf", CompletedCheckPdf.FileName("Tax check", "  "));
             Assert.Equal("Remediation a b.pdf", CompletedCheckPdf.FileName("Remediation", "a|b"));
+        }
+
+        // ================================================================== the letters
+
+        private const string AdviserEmail = "adam.strumidlo@example.com";
+        private const string Checks = "Tax check 300000006.pdf|AQS check 300000006.pdf";
+
+        /// <summary>The case's adviser, reachable by email (AD-228).</summary>
+        private static FakeOrganizationService WithAdviser()
+        {
+            var service = Case();
+            service.Row("al_outcomecase", CaseId)["al_adviseremail"] = AdviserEmail;
+            service.Seed("contact", Guid.NewGuid(),
+                "fullname", "Adam Strumidlo",
+                "emailaddress1", AdviserEmail,
+                "statecode", new OptionSetValue(0));
+            return service;
+        }
+
+        private static Entity LetterTo(FakeOrganizationService service, string email)
+        {
+            var created = service.Creates.Single(c =>
+                c.LogicalName == "al_notification" && c.GetAttributeValue<string>("al_recipientemail") == email);
+            return service.Row("al_notification", created.Id);
+        }
+
+        [Fact]
+        public void The_case_passed_letter_carries_the_checks()
+        {
+            var service = WithAdviser();
+
+            NotificationEmitterPlugin.QueueCasePassed(service, Guid.NewGuid(), Ref());
+
+            Assert.Equal(Checks, LetterTo(service, AdviserEmail).GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
+        }
+
+        [Fact]
+        public void The_advisers_remediation_letter_carries_the_checks()
+        {
+            var service = WithAdviser();
+            Action(service, completed: false);
+
+            Remediation.AssignOpenActions(service, Ref(), Guid.NewGuid());
+
+            Assert.Equal(Checks, LetterTo(service, AdviserEmail).GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
+        }
+
+        [Fact]
+        public void Every_adviser_letter_is_queued_with_the_checks()
+        {
+            // The sign-off letters are queued deep inside SignoffProgressPlugin, which no test
+            // drives end to end; this pins that each adviser letter goes the one way. The
+            // para-planner's copy (a later task) will bring the emitter's count to 3; today it
+            // is the remediation letter and the case-passed letter.
+            var plugins = Path.Combine(PluginsPath(), "OutcomeTesting.Plugins");
+            var emitter = File.ReadAllText(Path.Combine(plugins, "NotificationEmitterPlugin.cs"));
+            var signoff = File.ReadAllText(Path.Combine(plugins, "SignoffProgressPlugin.cs"));
+
+            Assert.Equal(2, Count(emitter, "NotificationOutbox.QueueWithCompletedCheck("));
+            Assert.Equal(1, Count(emitter, "NotificationOutbox.Queue("));
+            Assert.Contains("NotificationOutbox.QueueWithCompletedCheck(", signoff.Substring(signoff.IndexOf("private static void QueueSignoffNotification(", StringComparison.Ordinal)));
+        }
+
+        private static int Count(string text, string probe)
+        {
+            var count = 0;
+            for (var at = text.IndexOf(probe, StringComparison.Ordinal); at >= 0; at = text.IndexOf(probe, at + probe.Length, StringComparison.Ordinal))
+            {
+                count++;
+            }
+
+            return count;
+        }
+
+        private static string PluginsPath()
+        {
+            var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while (directory != null && !Directory.Exists(Path.Combine(directory.FullName, "OutcomeTesting.Plugins")))
+            {
+                directory = directory.Parent;
+            }
+
+            return directory.FullName;
         }
 
         // ================================================================== the fixture

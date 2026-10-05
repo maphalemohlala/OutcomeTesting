@@ -253,6 +253,10 @@ namespace OutcomeTesting.Plugins
         /// would roll back a checker's submit because a PDF could not be drawn. The letter
         /// goes either way and the row simply carries no attachment.
         /// </para>
+        /// <para>
+        /// Every letter to an adviser goes this way (2026-10-05: "Include a pdf of the checks
+        /// whenever sending an email to advisers").
+        /// </para>
         /// </summary>
         public static Guid QueueWithCompletedCheck(
             IOrganizationService service,
@@ -264,11 +268,12 @@ namespace OutcomeTesting.Plugins
             string subject,
             string body,
             string templateCode,
-            EntityReference caseRef)
+            EntityReference caseRef,
+            string occurrence = null)
         {
             var id = Queue(
                 service, correlationId, eventValue, targetTable, targetId,
-                recipientEmail, subject, body, templateCode);
+                recipientEmail, subject, body, templateCode, occurrence);
 
             // Guid.Empty means the event was already queued, so the attachment is already on
             // the row that exists and writing it again would replace a sent document.

@@ -229,7 +229,8 @@ namespace OutcomeTesting.Plugins
                     },
                 });
 
-            NotificationOutbox.Queue(
+            // Every adviser letter carries the checks (project owner, 2026-10-05).
+            NotificationOutbox.QueueWithCompletedCheck(
                 service,
                 correlationId,
                 NotificationOutbox.EventRemediationAssigned,
@@ -238,7 +239,8 @@ namespace OutcomeTesting.Plugins
                 email,
                 letter.Subject,
                 letter.Body,
-                code);
+                code,
+                caseRef);
         }
 
         /// <summary>
@@ -293,7 +295,7 @@ namespace OutcomeTesting.Plugins
                     },
                 });
 
-            NotificationOutbox.Queue(
+            NotificationOutbox.QueueWithCompletedCheck(
                 service,
                 correlationId,
                 NotificationOutbox.EventCasePassed,
@@ -302,7 +304,8 @@ namespace OutcomeTesting.Plugins
                 email,
                 passed.Subject,
                 passed.Body,
-                NotificationTemplates.CasePassed);
+                NotificationTemplates.CasePassed,
+                caseRef);
         }
     }
 }

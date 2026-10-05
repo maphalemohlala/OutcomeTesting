@@ -445,16 +445,18 @@ namespace OutcomeTesting.Plugins
                     },
                 });
 
-            NotificationOutbox.Queue(
+            // Every adviser letter carries the checks (project owner, 2026-10-05).
+            NotificationOutbox.QueueWithCompletedCheck(
                 service,
-                context,
+                context.CorrelationId,
                 approved ? NotificationOutbox.EventSignoffApproved : NotificationOutbox.EventSignoffRejected,
                 SignoffEntity,
                 signoff.Id,
                 email,
                 letter.Subject,
                 letter.Body,
-                code);
+                code,
+                caseRef);
         }
 
         /// <summary>
