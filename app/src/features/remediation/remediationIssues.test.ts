@@ -144,6 +144,7 @@ function action(id: string, description: string): RemediationActionRow {
     createdOn: null,
     clockStartedOn: null,
     completedOnRaw: null,
+    active: true,
   };
 }
 

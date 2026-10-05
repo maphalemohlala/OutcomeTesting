@@ -20,6 +20,13 @@ function action(fields: Record<string, unknown>): Al_remediationactions {
 }
 
 describe('toAction', () => {
+  it('marks a deactivated action inactive and anything else active', () => {
+    expect(toAction(action({ statecode: 1 })).active).toBe(false);
+    expect(toAction(action({ statecode: 0 })).active).toBe(true);
+    // A record read without its state is treated as live rather than hidden.
+    expect(toAction(action({})).active).toBe(true);
+  });
+
   it('reads the remedial action text and the three answers by label', () => {
     const row = toAction(
       action({

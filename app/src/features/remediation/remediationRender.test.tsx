@@ -57,6 +57,7 @@ function action(id: string, description: string): RemediationActionRow {
     createdOn: '2026-09-08T09:00:00Z',
     clockStartedOn: null,
     completedOnRaw: null,
+    active: true,
   };
 }
 

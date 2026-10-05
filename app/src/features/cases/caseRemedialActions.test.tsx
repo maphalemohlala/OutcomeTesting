@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { RemediationActionRow } from '../remediation/remediationMapping';
+import caseDetailCss from './CaseDetailPage.css?raw';
 
 vi.mock('../remediation/useRemediation', () => ({ useRemediation: () => ({ status: 'loading' }) }));
 
@@ -29,6 +30,7 @@ function action(overrides: Partial<RemediationActionRow>): RemediationActionRow 
     createdOn: '2026-09-25T10:00:00Z',
     clockStartedOn: null,
     completedOnRaw: null,
+    active: true,
     ...overrides,
   };
 }
@@ -57,5 +59,29 @@ describe('the case page lists the remedial actions', () => {
   it('says nobody is assigned rather than leaving the owner blank', () => {
     const html = renderToStaticMarkup(<CaseRemedialActions actions={[action({ assignedTo: null })]} />);
     expect(html).toContain('Nobody assigned');
+  });
+
+  it('leaves out a deactivated action, as the emailed document does', () => {
+    const html = renderToStaticMarkup(
+      <CaseRemedialActions
+        actions={[
+          action({}),
+          action({ id: 'a2', active: false, description: 'Issues found on the check:\n- Withdrawn point: No\n' }),
+        ]}
+      />,
+    );
+
+    expect(html).toContain('ID verification: No');
+    expect(html).not.toContain('Withdrawn point');
+  });
+
+  it('draws nothing when every action is deactivated', () => {
+    expect(renderToStaticMarkup(<CaseRemedialActions actions={[action({ active: false })]} />)).toBe('');
+  });
+
+  it('styles its table as the checks table above it', () => {
+    // One rule set for both, so the two tables on the page cannot drift apart again.
+    expect(caseDetailCss).toMatch(/\.case-detail__checks-table,\s*\.case-detail__remedial-table\s*\{/);
+    expect(caseDetailCss).toMatch(/\.case-detail__checks-table thead th,\s*\.case-detail__remedial-table thead th\s*\{/);
   });
 });

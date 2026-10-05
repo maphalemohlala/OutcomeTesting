@@ -185,21 +185,27 @@
   color: var(--colour-text-muted);
 }
 
-.case-detail__checks-table {
+/* The remedial actions table below it is styled by the same rules, so the two tables on the
+   page read as one family (2026-10-05). */
+.case-detail__checks-table,
+.case-detail__remedial-table {
   width: 100%;
   font-size: var(--text-sm);
   border-collapse: collapse;
 }
 
 .case-detail__checks-table th,
-.case-detail__checks-table td {
+.case-detail__checks-table td,
+.case-detail__remedial-table th,
+.case-detail__remedial-table td {
   padding: var(--space-2) var(--space-3);
   text-align: left;
   vertical-align: top;
   border-bottom: 1px solid var(--colour-border);
 }
 
-.case-detail__checks-table thead th {
+.case-detail__checks-table thead th,
+.case-detail__remedial-table thead th {
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -208,17 +214,4 @@
 
 .case-detail__checks-table tbody th {
   font-weight: 600;
-}
-
-.case-detail__remedial-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.case-detail__remedial-table th,
-.case-detail__remedial-table td {
-  text-align: left;
-  vertical-align: top;
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--colour-border);
 }

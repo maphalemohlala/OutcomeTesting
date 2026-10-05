@@ -18,6 +18,7 @@ function action(over: Partial<RemediationActionRow> = {}): RemediationActionRow 
     dueOn: '22 Sep 2026',
     completedOn: null,
     completedOnRaw: null,
+    active: true,
     triggeredBy: null,
     owner: null,
     rowVersion: null,

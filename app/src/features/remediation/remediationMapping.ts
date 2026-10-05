@@ -42,6 +42,11 @@ export interface RemediationActionRow {
   createdOn: string | null;
   clockStartedOn: string | null;
   completedOnRaw: string | null;
+  /**
+   * False once the action has been deactivated. The case page leaves those out, as the
+   * emailed document does (CheckRemedialActions reads statecode 0 only).
+   */
+  active: boolean;
 }
 
 export interface OutcomeRow {
@@ -123,6 +128,8 @@ export function toAction(record: Al_remediationactions): RemediationActionRow {
     createdOn: (extra.createdon as string | undefined) ?? null,
     clockStartedOn: (extra.al_clockstartedon as string | undefined) ?? null,
     completedOnRaw: record.al_completedon ?? null,
+    // A record read without its state counts as live rather than being hidden.
+    active: (record.statecode as unknown) !== 1,
     rowVersion: record.versionnumber != null ? String(record.versionnumber) : null,
   };
 }

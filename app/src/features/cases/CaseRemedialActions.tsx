@@ -5,14 +5,16 @@ import type { RemediationActionRow } from '../remediation/remediationMapping';
 /**
  * The case's remedial actions on its details page (project owner, 2026-10-05: "Include the
  * remediation actions on the case details if there are any"). Read-only: answering and
- * signing off stay on the remediation page. Every action is listed, settled ones included -
- * this is the case's record, not a worklist.
+ * signing off stay on the remediation page. Every live action is listed, settled ones
+ * included - this is the case's record, not a worklist - and a deactivated one is not.
  *
  * The owner is the adviser the action is assigned to, never `ownerid`, which is the record's
  * system owner.
  */
 export function CaseRemedialActions({ actions }: { actions: RemediationActionRow[] }) {
-  if (actions.length === 0) {
+  // A deactivated action is no longer owed, and the emailed document leaves it out too.
+  const live = actions.filter((action) => action.active);
+  if (live.length === 0) {
     return null;
   }
 
@@ -32,7 +34,7 @@ export function CaseRemedialActions({ actions }: { actions: RemediationActionRow
           </tr>
         </thead>
         <tbody>
-          {groupIssues(actions).flatMap(({ action, lines }) =>
+          {groupIssues(live).flatMap(({ action, lines }) =>
             lines.map((line, index) => (
               <tr key={`${action.id}-${line.number}`}>
                 <td>{line.number}</td>
