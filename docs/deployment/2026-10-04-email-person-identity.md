@@ -206,6 +206,41 @@ The Update step arrived with its image in the same import, so it should not need
 touch that DEV needed. Prove it after the first contact email change in TEST: the newest
 `AdviserContactPlugin` row in `plugintracelogs` should read "Pre-image present".
 
+## 2026-10-05 - deployed to all three, with the owner's permission
+
+The owner said "deploy to all 3 environments. You have permissions to do so", and the agent
+ran every step.
+
+- **DEV:** `Q-E2-LENS` retired (AD-229, audit `f41f52d0-86c0-f111-aaad-70a8a5b3561e`).
+- **TEST:**
+  - Backfill `--confirm`: 25 paraplanner emails filled, 0 actions moved.
+  - OT Review Detail pushed (274,224 -> 276,546 characters), so the masked copy is gone.
+  - `Q-E2-LENS` retired.
+  - `reconcileaccess`: 5 changed, 15 released with no adviser contact (`matthew.hall@` and
+    `svc.automate.aq-dev@` match no TEST contact), 0 failed.
+- **PROD (OTIS):**
+  - **Dry run:** 19 FILL lines (12 Adam Strumidlo, 7 Zoe Ramwell, all paraplanner) and one
+    MISMATCH, case 256497798. Its adviser name reads "Adam Strumdlio", but its email belongs to
+    contact "Adam Strumidlo", and all six of its actions were already completed by Adam.
+  - **Backfill `--confirm`:** 19 filled, 0 moved.
+  - **Import:** OTIS 1.0.19.0 imported (job `54e038cd-f93d-44d8-a165-e16356543ad5`), succeeded.
+    Read back:
+    - 1.0.19.0, managed, OTIS;
+    - assembly `9db97b8d…`;
+    - all 67 steps enabled, with the Update step carrying `PreImage` / `emailaddress1`;
+    - Code App 2026-10-05T06:44:11Z;
+    - `al_ProductName` OTIS.
+  - **Portal:** all 60 web templates and pages equal DEV's, so nothing is masked.
+  - **`reconcileaccess`:** 2 changed, 0 released, 0 failed. Case 256497798 now has Adam as
+    `al_advisercontactid`, by email, and its T&C supervisor.
+  - `Q-E2-LENS` retired.
+- **Not done:** the agent did not "touch" the PROD or TEST Update step to refresh its image,
+  because writing a managed step leaves an unmanaged layer on it. The image came with the step
+  in the same import, unlike DEV. Prove it after the first contact email change: the newest
+  `AdviserContactPlugin` trace row should read "Pre-image present".
+- `al_NotificationSenderAddress` is still empty in TEST and PROD, so email leaves as before
+  until the shared-mailbox queue is set up (AD-227).
+
 ## TEST and PROD - the owner's steps
 
 Writes there are the owner's. Run them from the repo root, in this order. TEST is
