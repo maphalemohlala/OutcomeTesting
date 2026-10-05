@@ -7,9 +7,10 @@ namespace OutcomeTesting.Plugins
     /// root cause is owed and whether a recorded one must be let go (item 3, 2026-09-19).
     ///
     /// The rules about which grades the rest of the form still leaves available moved to
-    /// ChecklistGating on 2026-09-22, when they stopped being about the Suitability core
-    /// checks - and about the grade alone. Only GradeAllowedWithInsufficientEvidence stayed,
-    /// because it names the grade's own scale and nothing else.
+    /// ChecklistGating on 2026-09-22, and were withdrawn with it on 2026-10-05 (project owner:
+    /// "allow any answer") along with this class's own GradeAllowedWithInsufficientEvidence,
+    /// which had named the grade's own scale for that rule alone. Nothing here still narrows a
+    /// grade; what remains is the root-cause pair below.
     ///
     /// Deliberately free of Dataverse types, like ResponseRules and CaseHeaderRules, so the
     /// rule can be tested without a fake organisation service. Mirrored client-side in
@@ -101,22 +102,6 @@ namespace OutcomeTesting.Plugins
         public static bool RootCauseCleared(int? gradeAnswer)
         {
             return gradeAnswer.HasValue && gradeAnswer.Value == ResponseRules.ChoicePass;
-        }
-
-        /// <summary>
-        /// The two grades a review may still carry once anything on it has been answered
-        /// Insufficient evidence (item 10, 2026-09-19; widened 2026-09-22).
-        ///
-        /// Evidence the checker found insufficient on a core check cannot be reconciled with
-        /// a file that passed, with or without issues. The grade is not overridden - the
-        /// checker still chooses between Insufficient evidence and Potential harm, which is a
-        /// judgement only they can make - it is the two grades that contradict their own ticks
-        /// that stop being available.
-        /// </summary>
-        public static bool GradeAllowedWithInsufficientEvidence(int gradeAnswer)
-        {
-            return gradeAnswer == ResponseRules.ChoiceInsufficient
-                || gradeAnswer == ResponseRules.ChoicePotentialHarm;
         }
 
     }

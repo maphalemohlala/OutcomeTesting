@@ -1011,6 +1011,18 @@ namespace OutcomeTesting.Plugins
                 StampTaxOutcome(service, caseRef.Id, answer.Value);
             }
 
+            // The day the check was done (project owner, 2026-09-21). Stamped here, inside
+            // the submit transaction, so a submitted review and the date the case reports
+            // for it cannot come apart.
+            //
+            // Moved ahead of RaiseRemediation and QueueCasePassed (final-review fix wave,
+            // 2026-10-05): both raise the case's PDFs - RaiseRemediation's Remediation.Raise
+            // calls RefreshDocuments, and QueueCasePassed queues the case-passed letter - and
+            // CompletedCheck's case header draws al_checkdate off the case row at the moment
+            // the PDF is built. Stamping after either had already run meant the letter
+            // carried the previous review's date instead of this one's.
+            StampCheckDate(service, caseRef.Id);
+
             // BR-006's other half. The case status alone has always said remediation was
             // owed; the action is what an adviser can actually be given, and what the
             // response, the completion, the sign-off and the BR-010 clock all hang off.
@@ -1038,14 +1050,6 @@ namespace OutcomeTesting.Plugins
                 // reports on cannot come apart - the outbox guarantee OD-030 rests on.
                 NotificationEmitterPlugin.QueueCasePassed(service, correlationId, caseRef);
             }
-
-            // The day the check was done (project owner, 2026-09-21). Stamped here, inside
-            // the submit transaction, so a submitted review and the date the case reports
-            // for it cannot come apart.
-            // The day the check was done (project owner, 2026-09-21). Stamped here, inside
-            // the submit transaction, so a submitted review and the date the case reports
-            // for it cannot come apart.
-            StampCheckDate(service, caseRef.Id);
 
             // OutcomeRules.HopsFor is the single description of the route a submit takes:
             // open the case if it was never opened, through Submitted unless this is the Tax

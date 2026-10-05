@@ -351,11 +351,15 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void A_metadata_failure_while_drawing_the_section_returns_nothing_rather_than_throwing()
+        public void An_exception_thrown_while_drawing_the_section_is_contained_inside_Blocks()
         {
-            // OptionLabels deliberately lets a metadata-read failure propagate (its own doc
-            // comment says so); the section's "never throws" promise has to be kept here,
-            // around the whole build, not only around the query that fetches the actions.
+            // This proves only that Blocks' own try/catch contains an exception thrown while
+            // drawing - it does not prove anything about a real Dataverse fault. In production
+            // this exception's source, a metadata read, is an OrganizationService call, and a
+            // sync plug-in's transaction is aborted by the platform the moment one of those
+            // faults regardless of a catch (OptionLabels' own doc comment says so); the fake
+            // service here throws a plain exception with no such platform behind it, so the
+            // catch below absorbs it the same way it absorbs a PdfWriter or data failure.
             var service = Case();
             Action(service, completed: false);
             service.ExecuteThrows = new InvalidOperationException("Metadata is not readable to this user.");
@@ -634,6 +638,12 @@ namespace OutcomeTesting.Plugins.Tests
                 "al_targetid", AqsReviewId.ToString("D"),
                 NotificationOutbox.AttachmentNameAttr, "stale.pdf",
                 NotificationOutbox.AttachmentBodyAttr, "AA==");
+            var pendingToo = service.Seed("al_notification", Guid.NewGuid(),
+                "al_event", new OptionSetValue(NotificationOutbox.EventRemediationAssigned),
+                "al_status", new OptionSetValue(NotificationOutbox.StatusPending),
+                "al_targetid", AqsReviewId.ToString("D"),
+                NotificationOutbox.AttachmentNameAttr, "stale-too.pdf",
+                NotificationOutbox.AttachmentBodyAttr, "AA==");
             var sent = service.Seed("al_notification", Guid.NewGuid(),
                 "al_event", new OptionSetValue(NotificationOutbox.EventRemediationAssigned),
                 "al_status", new OptionSetValue(NotificationOutbox.StatusSent),
@@ -648,6 +658,7 @@ namespace OutcomeTesting.Plugins.Tests
                 new[] { "Fix the first.", "Fix the second." });
 
             Assert.Equal(Checks, service.Row("al_notification", pending.Id).GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
+            Assert.Equal(Checks, service.Row("al_notification", pendingToo.Id).GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
             Assert.Equal("sent.pdf", service.Row("al_notification", sent.Id).GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
         }
 

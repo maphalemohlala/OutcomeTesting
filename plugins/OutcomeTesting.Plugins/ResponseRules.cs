@@ -42,7 +42,9 @@ namespace OutcomeTesting.Plugins
         /// gave a checker no honest answer for one that did not. A superset of
         /// <see cref="TypePassFailInsufficient"/>, so a question moved onto it keeps every
         /// answer it already holds. N/A is never a failure (Remediation.IsNonPassAnswer) and
-        /// restricts nothing (ChecklistGating reads values, and N/A is neither of its two).
+        /// restricts nothing: the form no longer narrows answers by their classification at
+        /// all (project owner, 2026-10-05: "allow any answer"), and N/A was never one of the
+        /// two classifications that old rule read in any case.
         /// </summary>
         public const int TypePassFailInsufficientNa = 120910012;
 

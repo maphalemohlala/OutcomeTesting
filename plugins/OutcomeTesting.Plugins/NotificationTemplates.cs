@@ -602,8 +602,15 @@ namespace OutcomeTesting.Plugins
             return string.IsNullOrWhiteSpace(caseReference) ? "a case" : caseReference.Trim();
         }
 
-        /// <summary>Text as HTML, as <c>NotificationBodies</c> has always escaped it.</summary>
-        private static string Html(string text)
+        /// <summary>
+        /// Text as HTML, as <c>NotificationBodies</c> has always escaped it.
+        ///
+        /// Internal, not private: <see cref="ParaplannerRemediationLetter"/> is outside
+        /// <c>NotificationTemplates</c> on purpose (AD's "not editable" - see its own doc
+        /// comment) but its Body is still an HTML letter body, so it escapes the case
+        /// reference through this same helper rather than a second copy of it.
+        /// </summary>
+        internal static string Html(string text)
         {
             return (text ?? string.Empty)
                 .Replace("&", "&amp;")

@@ -16,7 +16,16 @@ namespace OutcomeTesting.Plugins
     /// the AQS check. The case's whole Remediation and escalation form stays its own document
     /// (<see cref="RemediationDocument"/>).
     /// </para>
-    /// <para>Never throws, for the reason every attachment gives: the letter matters more.</para>
+    /// <para>
+    /// The build is wrapped in a try/catch so a failure while drawing this section - a
+    /// malformed row, a PdfWriter error - returns an empty list rather than taking down the
+    /// whole document. That does not cover a Dataverse fault: <see cref="Actions"/>'s read and
+    /// <see cref="OptionLabels"/>'s metadata read are OrganizationService calls like any other
+    /// plug-in read, and a sync plug-in's transaction is aborted by the platform the moment one
+    /// of those faults, catch or no catch (see the comment on <c>OptionLabels</c>). The catch
+    /// here only ever sees what it can actually absorb: an exception thrown by the drawing code
+    /// itself.
+    /// </para>
     /// </summary>
     public static class CheckRemedialActions
     {
@@ -24,13 +33,16 @@ namespace OutcomeTesting.Plugins
         public const string Heading = "Remedial actions";
 
         /// <summary>
-        /// The section, or an empty list when the check raised nothing or cannot be read.
+        /// The section, or an empty list when the check raised nothing or the drawing itself
+        /// fails.
         ///
         /// The whole build - the actions, the metadata labels, the rows - sits inside one
-        /// try/catch, not only the query that fetches the actions: OptionLabels deliberately
-        /// lets a metadata-read failure propagate (its own doc comment says so), and a catch
-        /// around just the query would let that failure through as a half-built section
-        /// rather than the "never throws" promise this class makes.
+        /// try/catch, not only the query that fetches the actions, so a failure anywhere in the
+        /// drawing returns an empty section rather than a half-built one. This does not make the
+        /// read itself safe: a Dataverse fault on <see cref="Actions"/>'s query, or on
+        /// <see cref="OptionLabels"/>'s metadata read, still aborts the plug-in's transaction -
+        /// the catch below never runs for that case, because the platform does not let a sync
+        /// plug-in reach "caught the fault and carried on".
         /// </summary>
         public static List<PdfBlock> Blocks(IOrganizationService service, Guid reviewId)
         {

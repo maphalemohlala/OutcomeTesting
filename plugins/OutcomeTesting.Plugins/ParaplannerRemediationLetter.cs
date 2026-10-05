@@ -25,9 +25,14 @@ namespace OutcomeTesting.Plugins
 
         public static string Body(string reference)
         {
+            // The case reference is case data, not markup this assembly built, so it is
+            // escaped on the way in - the same rule NotificationTemplates.Substitute applies
+            // to every token value in an HTML body (AD-170), reusing its Html helper rather
+            // than a second copy of it. A reference is never expected to carry "&", "<", ">"
+            // or '"', but the letter must not break if one somehow does.
             return string.IsNullOrWhiteSpace(reference)
                 ? "The checks and remedial points for this case are attached."
-                : "The checks and remedial points for case " + reference.Trim() + " are attached.";
+                : "The checks and remedial points for case " + NotificationTemplates.Html(reference.Trim()) + " are attached.";
         }
     }
 }

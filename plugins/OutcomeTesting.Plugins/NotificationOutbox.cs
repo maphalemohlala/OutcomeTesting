@@ -498,9 +498,14 @@ namespace OutcomeTesting.Plugins
         /// Puts the completed check on a queued letter.
         ///
         /// <para>
-        /// Never throws. The letter is already queued by the time this runs, and a document
-        /// that could not be drawn must not take it back off - the same rule the para-planner's
-        /// attachment has followed since AD-164.
+        /// The catch below absorbs a failure while drawing the PDF - PdfWriter, malformed case
+        /// data - so a document that could not be built does not take the letter, already
+        /// queued by the time this runs, back off (the same rule the para-planner's attachment
+        /// has followed since AD-164). It does not absorb a Dataverse fault:
+        /// <see cref="CompletedCheckPdf.Documents"/>'s reads are OrganizationService calls like
+        /// any other plug-in read, and a sync plug-in's transaction is aborted by the platform
+        /// the moment one of those faults - catch or no catch, as for any plug-in read (see
+        /// <see cref="OptionLabels"/>'s doc comment).
         /// </para>
         /// </summary>
         private static void AttachCompletedCheck(
@@ -513,30 +518,62 @@ namespace OutcomeTesting.Plugins
 
             try
             {
-                var documents = CompletedCheckPdf.Documents(service, caseRef);
-                if (documents.Count == 0)
+                string packedNames;
+                string packedBodies;
+                if (!TryPackCompletedCheck(service, caseRef, out packedNames, out packedBodies))
                 {
                     return;
                 }
 
-                var names = new List<string>();
-                var bodies = new List<string>();
-                foreach (var document in documents)
-                {
-                    names.Add(document.Name);
-                    bodies.Add(Convert.ToBase64String(document.Content));
-                }
-
-                service.Update(new Entity(NotificationEntity, notificationId)
-                {
-                    [AttachmentNameAttr] = PackNames(names),
-                    [AttachmentBodyAttr] = string.Join(AttachmentSeparator, bodies.ToArray()),
-                });
+                WriteAttachment(service, notificationId, packedNames, packedBodies);
             }
             catch (Exception)
             {
                 // Deliberately swallowed; see the summary.
             }
+        }
+
+        /// <summary>
+        /// Draws the case's completed-check documents and packs them into the two string
+        /// columns an al_notification row carries them in, or false when the case has nothing
+        /// to attach.
+        ///
+        /// Factored out of <see cref="AttachCompletedCheck"/> so <see cref="RefreshDocuments"/>
+        /// can draw the documents once and write the same packed strings to every matching
+        /// Pending row, instead of redrawing them once per row (2026-10-05).
+        /// </summary>
+        private static bool TryPackCompletedCheck(
+            IOrganizationService service, EntityReference caseRef, out string packedNames, out string packedBodies)
+        {
+            var documents = CompletedCheckPdf.Documents(service, caseRef);
+            if (documents.Count == 0)
+            {
+                packedNames = null;
+                packedBodies = null;
+                return false;
+            }
+
+            var names = new List<string>();
+            var bodies = new List<string>();
+            foreach (var document in documents)
+            {
+                names.Add(document.Name);
+                bodies.Add(Convert.ToBase64String(document.Content));
+            }
+
+            packedNames = PackNames(names);
+            packedBodies = string.Join(AttachmentSeparator, bodies.ToArray());
+            return true;
+        }
+
+        private static void WriteAttachment(
+            IOrganizationService service, Guid notificationId, string packedNames, string packedBodies)
+        {
+            service.Update(new Entity(NotificationEntity, notificationId)
+            {
+                [AttachmentNameAttr] = packedNames,
+                [AttachmentBodyAttr] = packedBodies,
+            });
         }
 
         /// <summary>
@@ -549,7 +586,12 @@ namespace OutcomeTesting.Plugins
         /// <see cref="Remediation.Raise"/> once every action exists. Pending only: a sent
         /// letter's documents are what the recipient has, and are never rewritten.
         /// </para>
-        /// <para>Never throws: the actions are raised whether or not a document can be redrawn.</para>
+        /// <para>
+        /// The catch below absorbs a failure while redrawing the document, the same drawing
+        /// failures <see cref="AttachCompletedCheck"/> absorbs, so the actions are raised
+        /// whether or not it can be redrawn. A Dataverse fault on the query below is not one of
+        /// those: it still aborts the transaction, as for any plug-in read.
+        /// </para>
         /// </summary>
         public static void RefreshDocuments(IOrganizationService service, EntityReference caseRef, Guid reviewId)
         {
@@ -560,6 +602,13 @@ namespace OutcomeTesting.Plugins
 
             try
             {
+                string packedNames;
+                string packedBodies;
+                if (!TryPackCompletedCheck(service, caseRef, out packedNames, out packedBodies))
+                {
+                    return;
+                }
+
                 var query = new QueryExpression(NotificationEntity)
                 {
                     ColumnSet = new ColumnSet(AttachmentNameAttr),
@@ -573,7 +622,7 @@ namespace OutcomeTesting.Plugins
                 {
                     if (!string.IsNullOrWhiteSpace(row.GetAttributeValue<string>(AttachmentNameAttr)))
                     {
-                        AttachCompletedCheck(service, row.Id, caseRef);
+                        WriteAttachment(service, row.Id, packedNames, packedBodies);
                     }
                 }
             }

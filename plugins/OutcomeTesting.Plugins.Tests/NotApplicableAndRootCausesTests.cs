@@ -65,13 +65,6 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Na_neither_restricts_the_grade_nor_counts_as_a_fail()
-        {
-            Assert.False(ChecklistGating.IsInsufficient(ResponseRules.ChoiceNa));
-            Assert.False(ChecklistGating.IsNoOrFail(ResponseRules.ChoiceNa));
-        }
-
-        [Fact]
         public void Both_root_cause_types_are_recognised_as_the_root_cause()
         {
             Assert.True(GradingRules.IsRootCauseResponseType(120910003));

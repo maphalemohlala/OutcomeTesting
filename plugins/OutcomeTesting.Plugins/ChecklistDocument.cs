@@ -26,8 +26,8 @@ namespace OutcomeTesting.Plugins
     /// change all three.
     /// </para>
     /// <para>
-    /// Free of Dataverse types, like <see cref="ResponseRules"/> and
-    /// <see cref="ChecklistGating"/>, so the mapping can be tested without a fake service.
+    /// Free of Dataverse types, like <see cref="ResponseRules"/>, so the mapping can be tested
+    /// without a fake service.
     /// </para>
     /// <para>
     /// A section whose code the document does not know - one added through checklist
