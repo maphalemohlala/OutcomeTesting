@@ -68,14 +68,13 @@ namespace OutcomeTesting.Plugins
                     var owner = action.GetAttributeValue<EntityReference>("al_assignedcontactid");
                     var status = action.GetAttributeValue<OptionSetValue>("al_actionstatus");
 
-                    // The checker's words where the row has them (2026-09-29); a row raised
-                    // before that carries the adviser's own remedial action, as RemediationDocument shows.
+                    // The same cells RemediationDocument draws for the action, from the same helpers.
                     var details = new[]
                     {
-                        RemediationDocument.Text(string.IsNullOrWhiteSpace(checkerAction) ? adviserText : checkerAction),
-                        owner != null && !string.IsNullOrWhiteSpace(owner.Name) ? owner.Name : "Nobody assigned",
+                        RemediationDocument.RemedialText(checkerAction, adviserText),
+                        RemediationDocument.Owner(owner),
                         RemediationDocument.Day(action.GetAttributeValue<DateTime?>("al_duedate")),
-                        status == null ? "—" : labels.Label("al_remediationaction", "al_actionstatus", status.Value),
+                        RemediationDocument.Status(status, labels),
                     };
 
                     var issues = RemediationDocument.Issues(action.GetAttributeValue<string>("al_description"));

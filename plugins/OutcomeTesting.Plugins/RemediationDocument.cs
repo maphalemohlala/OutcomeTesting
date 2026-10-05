@@ -147,13 +147,11 @@ namespace OutcomeTesting.Plugins
 
                 var details = new[]
                 {
-                    // The checker's words where the row has them (2026-09-29); a row raised
-                    // before that carries the adviser's own remedial action, as it always did.
-                    Text(string.IsNullOrWhiteSpace(checkerAction) ? adviserText : checkerAction),
+                    RemedialText(checkerAction, adviserText),
                     Performed(action, checkerAction, adviserText),
-                    owner != null && !string.IsNullOrWhiteSpace(owner.Name) ? owner.Name : "Nobody assigned",
+                    Owner(owner),
                     Day(action.GetAttributeValue<DateTime?>("al_duedate")),
-                    status == null ? "—" : labels.Label("al_remediationaction", "al_actionstatus", status.Value),
+                    Status(status, labels),
                     opened.HasValue ? Age(opened.Value, completed ?? today) : "—",
                     SignOff(latest, completed, labels),
                 };
@@ -513,6 +511,30 @@ namespace OutcomeTesting.Plugins
         internal static string Text(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? "—" : value.Trim();
+        }
+
+        // The three cells this form and each check's document (CheckRemedialActions) both
+        // draw for an action, kept in one place so the two cannot disagree (2026-10-05).
+
+        /// <summary>
+        /// The checker's words where the row has them (2026-09-29); a row raised before that
+        /// carries the adviser's own remedial action, as it always did.
+        /// </summary>
+        internal static string RemedialText(string checkerAction, string adviserText)
+        {
+            return Text(string.IsNullOrWhiteSpace(checkerAction) ? adviserText : checkerAction);
+        }
+
+        /// <summary>The adviser the action is assigned to, or "Nobody assigned".</summary>
+        internal static string Owner(EntityReference owner)
+        {
+            return owner != null && !string.IsNullOrWhiteSpace(owner.Name) ? owner.Name : "Nobody assigned";
+        }
+
+        /// <summary>The action's status label, or a dash where it has none.</summary>
+        internal static string Status(OptionSetValue status, OptionLabels labels)
+        {
+            return status == null ? "—" : labels.Label("al_remediationaction", "al_actionstatus", status.Value);
         }
 
         internal static string Day(DateTime? value)
