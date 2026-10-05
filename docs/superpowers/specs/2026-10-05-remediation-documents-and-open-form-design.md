@@ -34,12 +34,14 @@ closes with no remediation.
 
 ### 1. A separate para-planner letter when a remediation is raised
 
-- A new built-in template, `REMEDIATION-RAISED-PARAPLANNER`. It is seeded and editable like
-  the others.
-  - Subject: `Remediation raised on case {reference}`.
-  - Body: names the adviser and the grading, and says the checks and the remedial actions
-    are attached. It has **no portal button**: the para-planner has no access to the case
-    (BR-009, AD-020).
+- **Not an editable template** (owner, 2026-10-05: "The paraplanner letter is not editable.
+  It should just be a copy of the checks and remedial points"). The wording is fixed in code
+  and kept out of the template catalogue, so it never appears in the template editor. It is
+  queued with no template code, so no stored row can redirect or reword it.
+  - Subject: `Checks and remedial points: {reference}`.
+  - Body: one sentence saying that the checks and remedial points for the case are attached.
+    It has **no portal button**: the para-planner has no access to the case (BR-009, AD-020).
+  - The content is the attachments.
 - `NotificationEmitterPlugin.QueueRemediationAssigned` queues it beside the adviser's letter.
   - Same event (`EventRemediationAssigned`) and same target (the review).
   - Occurrence `PARAPLANNER`, so it is its own outbox row. A replay still collides, and a
