@@ -3437,6 +3437,11 @@
         newline_to_br then a one-character split, and a line is a fail point when putting
         "- " back in front of it with its first "- " removed reproduces it.
 
+        Each cell's text is stripped before its fallback: default only falls back on null or
+        an empty string, and the server treats text that is only spaces as empty
+        (IsNullOrWhiteSpace), so a row of spaces would otherwise print as a blank cell here
+        and as the fallback in the emailed document.
+
         Row order: CheckRemedialActions.Actions (plugins/OutcomeTesting.Plugins/
         CheckRemedialActions.cs) sorts by createdon, then by the numeric index after
         al_remediationactioncode's last '-' (codes read "REM-<caseref>-<seq>" for a lone
@@ -3521,10 +3526,12 @@
                     {% endif %}
                   {% endif %}
                   {% if rr_show %}
-                    {% assign rr_text = a.al_remedialaction | default: a.al_adviserresponse | default: '—' %}
-                    {% assign rr_owner = a.al_assignedcontactid.name | default: 'Nobody assigned' %}
+                    {% assign rr_checker = a.al_remedialaction | strip %}
+                    {% assign rr_adviser = a.al_adviserresponse | strip %}
+                    {% assign rr_text = rr_checker | default: rr_adviser | default: '—' %}
+                    {% assign rr_owner = a.al_assignedcontactid.name | strip | default: 'Nobody assigned' %}
                     {% assign rr_due = '—' %}{% if a.al_duedate %}{% assign rr_due = a.al_duedate | date: 'dd MMM yyyy' %}{% endif %}
-                    {% assign rr_status = a.al_actionstatus.label | default: '—' %}
+                    {% assign rr_status = a.al_actionstatus.label | strip | default: '—' %}
                     {% assign rr_flat = a.al_description | default: '' | newline_to_br | replace: '<br />', '|' | replace: '<br>', '|' %}
                     {% assign rr_lines = rr_flat | split: '|' %}
                     {% assign rr_count = 0 %}

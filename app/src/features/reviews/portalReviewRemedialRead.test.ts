@@ -53,4 +53,14 @@ describe('the submitted review page lists its remedial actions', () => {
     expect(section).toContain('{% capture rr_n %}{{ n }}{% endcapture %}');
     expect(section).toContain('rr_tail == rr_n');
   });
+
+  it('treats text that is only spaces as empty, as the emailed document does', () => {
+    // `default` only falls back on null or '', so each value is stripped first - the server
+    // tests with IsNullOrWhiteSpace, and a row of spaces must not print as a blank cell.
+    expect(section).toContain('{% assign rr_checker = a.al_remedialaction | strip %}');
+    expect(section).toContain('{% assign rr_adviser = a.al_adviserresponse | strip %}');
+    expect(section).toContain("{% assign rr_text = rr_checker | default: rr_adviser | default: '—' %}");
+    expect(section).toContain("{% assign rr_owner = a.al_assignedcontactid.name | strip | default: 'Nobody assigned' %}");
+    expect(section).toContain("{% assign rr_status = a.al_actionstatus.label | strip | default: '—' %}");
+  });
 });
