@@ -1,22 +1,15 @@
-﻿using System;
-
-namespace OutcomeTesting.Plugins
+﻿namespace OutcomeTesting.Plugins
 {
     /// <summary>
-    /// The checklist's outcome questions, by code. Until 2026-10-05 this also held the rules
-    /// that took options off the grade and the file quality outcome and decided "Remedial
-    /// action required?" from the outcome; the project owner withdrew them ("allow any
-    /// answer"), so the checker's choice stands and remediation follows the grade or the flag
-    /// alone (OutcomeRules.RequiresRemediation).
+    /// The answer classifications a test point can carry - a No or a Fail, and Insufficient
+    /// evidence. Until 2026-10-05 this also held the rules that took options off the grade
+    /// and the file quality outcome and decided "Remedial action required?" from the
+    /// outcome; the project owner withdrew them ("allow any answer"), so the checker's
+    /// choice stands and remediation follows the grade or the flag alone
+    /// (OutcomeRules.RequiresRemediation).
     /// </summary>
     public static class ChecklistGating
     {
-        /// <summary>The AQS "Remedial action required?" answer, which raises remediation.</summary>
-        public const string RemedialActionQuestionCode = "Q-FQ-03";
-
-        /// <summary>The Tax "Remedial action required?" answer.</summary>
-        public const string TaxRemedialActionQuestionCode = "Q-FQTAX-03";
-
         /// <summary>
         /// Whether an answer on a test point is a finding of the kind that a checker might
         /// flag: a Fail, or a No.
