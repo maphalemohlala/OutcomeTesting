@@ -3426,6 +3426,139 @@
       </script>
     {% endif %}
 
+    {% unless editable %}
+      {% comment %}
+        The remedial actions this check raised, read-only (project owner, 2026-10-05: add the
+        remediation actions to the PDF downloaded from the portal). The editable card above is
+        not rendered once the review is submitted, so without this the page and its Save as
+        PDF lost them. CheckRemedialActions draws the same table into the emailed document.
+
+        The fail points are split out of al_description as OT Case Detail splits them:
+        newline_to_br then a one-character split, and a line is a fail point when putting
+        "- " back in front of it with its first "- " removed reproduces it.
+
+        Row order: CheckRemedialActions.Actions (plugins/OutcomeTesting.Plugins/
+        CheckRemedialActions.cs) sorts by createdon, then by the numeric index after
+        al_remediationactioncode's last '-' (codes read "REM-<caseref>-<seq>" for a lone
+        action, "REM-<caseref>-<seq>-<index>" when itemised; a case reference may itself
+        contain dashes, which is why only the LAST '-' counts). createdon commonly ties
+        across ten or more rows raised in one transaction, so the fetch's own order reads
+        1, 10, 2, 3... once a check has ten actions. The fix here does not re-sort a list
+        (this Liquid has no sort filter): it walks the band of possible index values
+        1..(count + 1) and, on each pass, emits whichever action's own index matches that
+        pass's number. The last pass (count + 1) is a catch-all for an index that parsed
+        out of range, so a bad code still renders exactly once instead of vanishing.
+      {% endcomment %}
+      {% fetchxml review_actions %}
+      <fetch>
+        <entity name="al_remediationaction">
+          <attribute name="al_remediationactionid" />
+          <attribute name="al_description" />
+          <attribute name="al_remedialaction" />
+          <attribute name="al_adviserresponse" />
+          <attribute name="al_assignedcontactid" />
+          <attribute name="al_duedate" />
+          <attribute name="al_actionstatus" />
+          <attribute name="al_remediationactioncode" />
+          <attribute name="createdon" />
+          <filter type="and">
+            <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | xml_escape }}" />
+            <condition attribute="statecode" operator="eq" value="0" />
+          </filter>
+          <order attribute="createdon" descending="false" />
+          <order attribute="al_remediationactioncode" descending="false" />
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+      {% assign review_actions_list = review_actions.results.entities %}
+      {% if review_actions_list.size > 0 %}
+      <section class="ot-card ot-remedial" data-ot-remedial-read aria-labelledby="ot-remedial-read-heading">
+        <h2 class="ot-card__title" id="ot-remedial-read-heading">Remedial actions</h2>
+        <div class="ot-table-wrap">
+          <table class="ot-table ot-remedial__table">
+            <thead>
+              <tr>
+                <th scope="col">No.</th>
+                <th scope="col">Fail point</th>
+                <th scope="col">Remedial action</th>
+                <th scope="col">Owner</th>
+                <th scope="col">Target date</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% assign rr_no = 0 %}
+              {% assign rr_size = review_actions_list.size %}
+              {% assign rr_last = rr_size | plus: 1 %}
+              {% for n in (1..rr_last) %}
+                {% for a in review_actions_list %}
+                  {% assign rr_parts = a.al_remediationactioncode | default: '' | split: '-' %}
+                  {% assign rr_tail = '' %}
+                  {% for s in rr_parts %}{% assign rr_tail = s %}{% endfor %}
+                  {% assign rr_idx = rr_tail | plus: 0 %}
+                  {% assign rr_show = false %}
+                  {% if rr_size == 1 %}
+                    {% if n == 1 %}{% assign rr_show = true %}{% endif %}
+                  {% else %}
+                    {% if n < rr_last %}
+                      {% if rr_idx == n %}{% assign rr_show = true %}{% endif %}
+                    {% else %}
+                      {% if rr_idx < 1 %}
+                        {% assign rr_show = true %}
+                      {% else %}
+                        {% if rr_idx > rr_size %}{% assign rr_show = true %}{% endif %}
+                      {% endif %}
+                    {% endif %}
+                  {% endif %}
+                  {% if rr_show %}
+                    {% assign rr_text = a.al_remedialaction | default: a.al_adviserresponse | default: '—' %}
+                    {% assign rr_owner = a.al_assignedcontactid.name | default: 'Nobody assigned' %}
+                    {% assign rr_due = '—' %}{% if a.al_duedate %}{% assign rr_due = a.al_duedate | date: 'dd MMM yyyy' %}{% endif %}
+                    {% assign rr_status = a.al_actionstatus.label | default: '—' %}
+                    {% assign rr_flat = a.al_description | default: '' | newline_to_br | replace: '<br />', '|' | replace: '<br>', '|' %}
+                    {% assign rr_lines = rr_flat | split: '|' %}
+                    {% assign rr_count = 0 %}
+                    {% for l in rr_lines %}{% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}{% if rebuilt == line %}{% assign rr_count = rr_count | plus: 1 %}{% endif %}{% endfor %}
+                    {% if rr_count == 0 %}
+                      {% assign rr_no = rr_no | plus: 1 %}
+                      <tr>
+                        <td>{{ rr_no }}</td>
+                        <td>—</td>
+                        <td>{{ rr_text | escape | newline_to_br }}</td>
+                        <td>{{ rr_owner | escape }}</td>
+                        <td>{{ rr_due }}</td>
+                        <td>{{ rr_status | escape }}</td>
+                      </tr>
+                    {% else %}
+                      {% assign rr_shown = 0 %}
+                      {% for l in rr_lines %}
+                        {% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}
+                        {% if rebuilt == line %}
+                          {% assign rr_shown = rr_shown | plus: 1 %}
+                          {% assign rr_no = rr_no | plus: 1 %}
+                          <tr>
+                            <td>{{ rr_no }}</td>
+                            <td>{{ rest | escape }}</td>
+                            {% if rr_shown == 1 %}
+                              <td rowspan="{{ rr_count }}">{{ rr_text | escape | newline_to_br }}</td>
+                              <td rowspan="{{ rr_count }}">{{ rr_owner | escape }}</td>
+                              <td rowspan="{{ rr_count }}">{{ rr_due }}</td>
+                              <td rowspan="{{ rr_count }}">{{ rr_status | escape }}</td>
+                            {% endif %}
+                          </tr>
+                        {% endif %}
+                      {% endfor %}
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {% endif %}
+    {% endunless %}
+
     {% if editable %}
       <section class="ot-card ot-submit"
                data-ot-submit
