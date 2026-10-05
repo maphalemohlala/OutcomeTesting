@@ -315,6 +315,55 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal("ID re-verified and retained on file.", table.Rows[1].Cells[2].Text);
         }
 
+        [Fact]
+        public void Ten_or_more_actions_from_one_submit_still_read_in_raise_order()
+        {
+            // Remediation.Raise writes every item's action within one transaction, so
+            // createdon commonly ties across ten or more rows, and the code's lexical order
+            // then reads 1, 10, 2, 3... Scrambled on purpose: the fixture's insertion order
+            // must not be the thing that happens to save this test.
+            var service = Case();
+            var createdOn = new DateTime(2026, 9, 25, 10, 0, 0, DateTimeKind.Utc);
+            var scrambled = new[] { 7, 2, 11, 1, 9, 4, 10, 3, 8, 5, 6 };
+
+            foreach (var index in scrambled)
+            {
+                service.Seed("al_remediationaction", Guid.NewGuid(),
+                    "al_outcomecaseid", Ref(),
+                    "al_reviewinstanceid", new EntityReference("al_reviewinstance", AqsReviewId) { Name = "AQS check" },
+                    "al_remediationactioncode", Remediation.ActionCode("300000006", 2, index),
+                    "al_description", "- item " + index,
+                    "al_actionstatus", new OptionSetValue(Remediation.StatusOpen),
+                    "al_duedate", new DateTime(2026, 10, 5, 0, 0, 0, DateTimeKind.Utc),
+                    "al_assignedcontactid", new EntityReference("contact", Guid.NewGuid()) { Name = "Adam Strumidlo" },
+                    "createdon", createdOn,
+                    "statecode", 0);
+            }
+
+            var table = Tables(CompletedCheck.Blocks(service, AqsReviewId)).Last();
+
+            for (var i = 1; i <= 11; i++)
+            {
+                Assert.Equal(i.ToString(), table.Rows[i].Cells[0].Text);
+                Assert.Equal("item " + i, table.Rows[i].Cells[1].Text);
+            }
+        }
+
+        [Fact]
+        public void A_metadata_failure_while_drawing_the_section_returns_nothing_rather_than_throwing()
+        {
+            // OptionLabels deliberately lets a metadata-read failure propagate (its own doc
+            // comment says so); the section's "never throws" promise has to be kept here,
+            // around the whole build, not only around the query that fetches the actions.
+            var service = Case();
+            Action(service, completed: false);
+            service.ExecuteThrows = new InvalidOperationException("Metadata is not readable to this user.");
+
+            var blocks = CheckRemedialActions.Blocks(service, AqsReviewId);
+
+            Assert.Empty(blocks);
+        }
+
         // ================================================================== the files
 
         [Fact]

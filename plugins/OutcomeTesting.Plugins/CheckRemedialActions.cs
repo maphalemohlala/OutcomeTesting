@@ -23,79 +23,84 @@ namespace OutcomeTesting.Plugins
         /// <summary>The section's heading, on the page and in the document.</summary>
         public const string Heading = "Remedial actions";
 
-        /// <summary>The section, or an empty list when the check raised nothing or cannot be read.</summary>
+        /// <summary>
+        /// The section, or an empty list when the check raised nothing or cannot be read.
+        ///
+        /// The whole build - the actions, the metadata labels, the rows - sits inside one
+        /// try/catch, not only the query that fetches the actions: OptionLabels deliberately
+        /// lets a metadata-read failure propagate (its own doc comment says so), and a catch
+        /// around just the query would let that failure through as a half-built section
+        /// rather than the "never throws" promise this class makes.
+        /// </summary>
         public static List<PdfBlock> Blocks(IOrganizationService service, Guid reviewId)
         {
-            var blocks = new List<PdfBlock>();
-
-            List<Entity> actions;
             try
             {
-                actions = Actions(service, reviewId);
+                var actions = Actions(service, reviewId);
+                if (actions.Count == 0)
+                {
+                    return new List<PdfBlock>();
+                }
+
+                var labels = new OptionLabels(service);
+                var table = new PdfTable(0.05, 0.3, 0.3, 0.13, 0.11, 0.11);
+                table.AddHeader(
+                    PdfCell.Head("No."), PdfCell.Head("Fail point"), PdfCell.Head("Remedial action"),
+                    PdfCell.Head("Owner"), PdfCell.Head("Target date"), PdfCell.Head("Status"));
+
+                var number = 0;
+                foreach (var action in actions)
+                {
+                    var checkerAction = action.GetAttributeValue<string>(RemedialActions.ActionAttr);
+                    var adviserText = action.GetAttributeValue<string>("al_adviserresponse");
+                    var owner = action.GetAttributeValue<EntityReference>("al_assignedcontactid");
+                    var status = action.GetAttributeValue<OptionSetValue>("al_actionstatus");
+
+                    // The checker's words where the row has them (2026-09-29); a row raised
+                    // before that carries the adviser's own remedial action, as RemediationDocument shows.
+                    var details = new[]
+                    {
+                        RemediationDocument.Text(string.IsNullOrWhiteSpace(checkerAction) ? adviserText : checkerAction),
+                        owner != null && !string.IsNullOrWhiteSpace(owner.Name) ? owner.Name : "Nobody assigned",
+                        RemediationDocument.Day(action.GetAttributeValue<DateTime?>("al_duedate")),
+                        status == null ? "—" : labels.Label("al_remediationaction", "al_actionstatus", status.Value),
+                    };
+
+                    var issues = RemediationDocument.Issues(action.GetAttributeValue<string>("al_description"));
+                    if (issues.Count == 0)
+                    {
+                        issues.Add("—");
+                    }
+
+                    for (var i = 0; i < issues.Count; i++)
+                    {
+                        number++;
+                        var cells = new List<PdfCell>
+                        {
+                            PdfCell.Of(number.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                            PdfCell.Of(issues[i]),
+                        };
+
+                        // The action's own columns sit on its first issue; the rows under it
+                        // belong to the same action, as on the remediation form.
+                        foreach (var detail in details)
+                        {
+                            cells.Add(i == 0 ? PdfCell.Of(detail) : PdfCell.Blank());
+                        }
+
+                        table.Add(cells.ToArray());
+                    }
+                }
+
+                var blocks = new List<PdfBlock>();
+                blocks.Add(PdfBlock.Subheading(Heading));
+                blocks.Add(PdfBlock.Table(table));
+                return blocks;
             }
             catch (Exception)
             {
-                return blocks;
+                return new List<PdfBlock>();
             }
-
-            if (actions.Count == 0)
-            {
-                return blocks;
-            }
-
-            var labels = new OptionLabels(service);
-            var table = new PdfTable(0.05, 0.3, 0.3, 0.13, 0.11, 0.11);
-            table.AddHeader(
-                PdfCell.Head("No."), PdfCell.Head("Fail point"), PdfCell.Head("Remedial action"),
-                PdfCell.Head("Owner"), PdfCell.Head("Target date"), PdfCell.Head("Status"));
-
-            var number = 0;
-            foreach (var action in actions)
-            {
-                var checkerAction = action.GetAttributeValue<string>(RemedialActions.ActionAttr);
-                var adviserText = action.GetAttributeValue<string>("al_adviserresponse");
-                var owner = action.GetAttributeValue<EntityReference>("al_assignedcontactid");
-                var status = action.GetAttributeValue<OptionSetValue>("al_actionstatus");
-
-                // The checker's words where the row has them (2026-09-29); a row raised before
-                // that carries the adviser's own remedial action, as RemediationDocument shows.
-                var details = new[]
-                {
-                    RemediationDocument.Text(string.IsNullOrWhiteSpace(checkerAction) ? adviserText : checkerAction),
-                    owner != null && !string.IsNullOrWhiteSpace(owner.Name) ? owner.Name : "Nobody assigned",
-                    RemediationDocument.Day(action.GetAttributeValue<DateTime?>("al_duedate")),
-                    status == null ? "—" : labels.Label("al_remediationaction", "al_actionstatus", status.Value),
-                };
-
-                var issues = RemediationDocument.Issues(action.GetAttributeValue<string>("al_description"));
-                if (issues.Count == 0)
-                {
-                    issues.Add("—");
-                }
-
-                for (var i = 0; i < issues.Count; i++)
-                {
-                    number++;
-                    var cells = new List<PdfCell>
-                    {
-                        PdfCell.Of(number.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                        PdfCell.Of(issues[i]),
-                    };
-
-                    // The action's own columns sit on its first issue; the rows under it
-                    // belong to the same action, as on the remediation form.
-                    foreach (var detail in details)
-                    {
-                        cells.Add(i == 0 ? PdfCell.Of(detail) : PdfCell.Blank());
-                    }
-
-                    table.Add(cells.ToArray());
-                }
-            }
-
-            blocks.Add(PdfBlock.Subheading(Heading));
-            blocks.Add(PdfBlock.Table(table));
-            return blocks;
         }
 
         /// <summary>The review's live actions, in the order they were raised.</summary>
@@ -114,7 +119,57 @@ namespace OutcomeTesting.Plugins
             query.AddOrder("createdon", OrderType.Ascending);
             query.AddOrder("al_remediationactioncode", OrderType.Ascending);
 
-            return new List<Entity>(CommandHelpers.RetrieveAll(service, query));
+            var actions = new List<Entity>(CommandHelpers.RetrieveAll(service, query));
+
+            // The server-side order above is best effort only. Remediation.Raise writes
+            // every item's action inside one transaction (Remediation.cs, the loop that
+            // numbers al_remediationactioncode "...-1", "...-2", ... "...-10", "...-11"), so
+            // createdon commonly ties across ten or more rows, and the code's own lexical
+            // order then reads 1, 10, 2, 3... "In raise order" is guaranteed here instead,
+            // in memory: createdon, then the code's trailing index read as a number (a code
+            // with none sorts first), then the code string as a last resort.
+            actions.Sort((left, right) =>
+            {
+                var byCreated = Nullable.Compare(
+                    left.GetAttributeValue<DateTime?>("createdon"),
+                    right.GetAttributeValue<DateTime?>("createdon"));
+                if (byCreated != 0)
+                {
+                    return byCreated;
+                }
+
+                var leftCode = left.GetAttributeValue<string>("al_remediationactioncode");
+                var rightCode = right.GetAttributeValue<string>("al_remediationactioncode");
+
+                var byIndex = Nullable.Compare(TrailingIndex(leftCode), TrailingIndex(rightCode));
+                return byIndex != 0 ? byIndex : string.CompareOrdinal(leftCode, rightCode);
+            });
+
+            return actions;
+        }
+
+        /// <summary>The integer after an action code's last '-', or null when there is none.</summary>
+        private static int? TrailingIndex(string code)
+        {
+            if (string.IsNullOrEmpty(code))
+            {
+                return null;
+            }
+
+            var dash = code.LastIndexOf('-');
+            if (dash < 0 || dash == code.Length - 1)
+            {
+                return null;
+            }
+
+            int value;
+            return int.TryParse(
+                code.Substring(dash + 1),
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out value)
+                ? value
+                : (int?)null;
         }
     }
 }
