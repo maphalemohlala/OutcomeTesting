@@ -212,3 +212,17 @@ outbox rows and their attachments, decoded above, not received mail.
 ## TEST and PROD
 
 Not deployed. Promotion is the owner's call.
+
+## Follow-up fixes, same evening (DEV only)
+
+Four small follow-ups from the branch review, pushed to DEV at 21:13Z:
+
+| Fix | Commit | Pushed |
+|---|---|---|
+| Code App case page leaves out deactivated actions, and its table now shares the checks table's styling | `30794a3` | Code App bundle `index-4cQH5Fk1.js`, play URL `…/app/5d9fc475-ee75-4386-917e-fc182307b0c2?…&sourcetime=1791234839556` |
+| Portal review page treats remedial text, owner or status of only spaces as empty, as the emailed document does | `c4458e8` | `OT Review Detail` 255,261 → 255,727 chars |
+| Both PDFs draw an action's text, owner and status from one set of helpers (no behaviour change) | `5dd313b` | Assembly 381,952 bytes, sha256 `583e8b981127ced3f3f1b0ce876f4fd1dc9a5b587f9a5259bb24c27d9a18eb63` |
+
+Plug-in tests 1796/1796, app tests (cases, remediation, reviews) green, `tsc -b` clean. Not seen in a browser yet, for the same expired-session reason as above.
+
+TEST and PROD: not deployed.
