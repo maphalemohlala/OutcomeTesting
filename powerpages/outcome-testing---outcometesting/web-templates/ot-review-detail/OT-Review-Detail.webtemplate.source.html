@@ -1064,16 +1064,6 @@
         {% assign grade_seen = false %}
         {% assign grade_value = '' %}
         {% comment %}
-          Whether any Suitability core check has been answered Insufficient evidence, which
-          takes PASS and PASS WITH ISSUES off the advice quality grade (item 10, 2026-09-19).
-
-          Accumulated as the loop passes E1 to E5, which it does before Judgement and grading
-          - S-GRADE is the last section in display order, and the grade is the only thing this
-          feeds. ChecklistGating is the authority: its rules refuse the write in
-          ResponseGuardPlugin and again in the submit command, so what this drives is which
-          options the page offers, never which ones can be saved.
-        {% endcomment %}
-        {% comment %}
           Sections outer, that section's questions inner. The rows are matched on the section
           CODE rather than the section id, because the code is a plain string on both sides
           while an aliased guid's type through Liquid is not something to bet the whole form
@@ -1380,12 +1370,6 @@
                 {% if a.al_questionversionid.id == qv.al_questionversionid %}{% assign fq_existing = a %}{% endif %}
               {% endfor %}
               <h2>File Quality &ndash; Fail points</h2>
-              {% comment %}
-                Why the ticks below are greyed, when they are (project owner, 2026-09-22).
-                Empty and hidden until the script has something to say, so a checker whose
-                fail points are open never sees it - and one whose are not is told why rather
-                than left clicking a box that does nothing.
-              {% endcomment %}
               <p class="intro" data-ot-failpoints-note hidden></p>
               <table class="fails" data-ot-failpoints-for="{{ qv.al_questionversionid }}">
                 <thead>
@@ -2583,14 +2567,11 @@
             var rootCause = document.querySelector('[data-ot-rootcause]');
 
             /*
-             * NOT guarded on the grade row.
-             *
-             * It was, while everything here was about the grade. A TAX review has no grade at
-             * all - S-GRADE is AQS-owned and AD-020 filters it out of that form - so a block
-             * opening with `if (gradeRow)` runs on AQS reviews only, and two of the rules added
-             * on 2026-09-22 are the Tax form's: its fail points lock on a Pass, and its
-             * Remedial action required? takes the same default. Each rule below guards on the
-             * row it actually needs instead.
+             * NOT guarded on the grade row, though everything inside already is: `gradeInputs`
+             * is empty where there is no grade row, and `syncRootCause` returns early without
+             * one. A TAX review has no grade at all - S-GRADE is AQS-owned and AD-020 filters
+             * it out of that form - so wrapping this in `if (gradeRow)` would cost a line to
+             * say what the guards below already say for themselves.
              */
             {
               var gradeInputs = gradeRow
