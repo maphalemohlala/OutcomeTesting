@@ -48,6 +48,7 @@
   <ItemGroup>
     <Compile Include="..\OutcomeTesting.Plugins\CompletedCheckPdf.cs" Link="Linked\CompletedCheckPdf.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\CompletedCheck.cs" Link="Linked\CompletedCheck.cs" />
+    <Compile Include="..\OutcomeTesting.Plugins\CheckRemedialActions.cs" Link="Linked\CheckRemedialActions.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\RemediationDocument.cs" Link="Linked\RemediationDocument.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\RemedialActions.cs" Link="Linked\RemedialActions.cs" />
     <Compile Include="..\OutcomeTesting.Plugins\PdfWriter.cs" Link="Linked\PdfWriter.cs" />
