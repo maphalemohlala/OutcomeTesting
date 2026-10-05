@@ -13,6 +13,7 @@ import { CaseOutcomeSummary } from './CaseOutcomeSummary';
 import { FailAccountabilityPanel } from './FailAccountabilityPanel';
 import { CaseHistoryPanel } from './CaseHistoryPanel';
 import { CaseEditPanel } from './CaseEditPanel';
+import { CaseRemedialActionsPanel } from './CaseRemedialActions';
 import { sharedEmailNote } from './casePeople';
 import { useUserDirectory } from '../../hooks/useUserDirectory';
 import './CaseDetailPage.css';
@@ -201,6 +202,11 @@ export function CaseDetailPage() {
                     />
 
                     <PermissionGate resource="page.remediation">
+                      {/*
+                        The case's remedial actions, to the same people the remediation link
+                        has always been shown to (2026-10-05).
+                      */}
+                      <CaseRemedialActionsPanel caseId={state.detail.id} reloadKey={reloadKey} />
                       <section className="case-detail__related" aria-label="Related records">
                         <Link to={`/cases/${state.detail.id}/remediation`}>
                           Remediation and sign-off →

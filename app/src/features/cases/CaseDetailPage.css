@@ -209,3 +209,16 @@
 .case-detail__checks-table tbody th {
   font-weight: 600;
 }
+
+.case-detail__remedial-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.case-detail__remedial-table th,
+.case-detail__remedial-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--colour-border);
+}
