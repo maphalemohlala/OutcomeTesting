@@ -425,22 +425,24 @@ export async function allocateCheck(
   const dialog = frame.getByRole('dialog', { name: 'Edit case details' });
   await dialog.waitFor({ timeout: 30_000 });
 
-  const select = dialog.locator(`#case-edit-checker-${discipline}`);
+  // A searchable person picker since 2026-10-06: a text box over a datalist whose options
+  // read "Name — email". Typing an option's exact text chooses that person.
+  const picker = dialog.locator(`#case-edit-checker-${discipline}`);
   try {
-    await select.waitFor({ timeout: 45_000 });
+    await picker.waitFor({ timeout: 45_000 });
   } catch {
     const checkers = dialog.locator('fieldset', { has: frame.locator('legend', { hasText: /^Checkers$/ }) });
     const said = (await checkers.count()) > 0 ? (await checkers.innerText()).replace(/\s+/g, ' ').trim() : 'no Checkers section at all - the account lacks the allocate permission';
     throw new Error(`the ${discipline} check cannot be allocated from this account: ${said}`);
   }
 
-  const values = await select.locator('option').evaluateAll((options) =>
+  const values = await dialog.locator(`#case-edit-checker-${discipline}-list option`).evaluateAll((options) =>
     options.map((option) => (option as HTMLOptionElement).value));
-  const value = values.find((candidate) => sameEmail(candidate, email));
+  const value = values.find((candidate) => sameEmail(candidate.split(' — ').pop() ?? '', email));
   if (!value) {
     throw new Error(`${email} is not offered as a ${discipline} checker - the tester must be an active person in the directory`);
   }
-  await select.selectOption({ value });
+  await picker.fill(value);
   await dialog.locator('#case-edit-reason').fill(reason);
   await dialog.getByRole('button', { name: 'Save changes' }).click();
 

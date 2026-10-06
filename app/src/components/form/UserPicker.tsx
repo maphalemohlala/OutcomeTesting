@@ -44,6 +44,25 @@ export function resolvePicker(
 }
 
 /**
+ * Whether the box holds half-typed text that the held value already accounts for, so a
+ * re-sync from the value would only wipe what the person is typing.
+ *
+ * Text matching nobody is held as typed by a name or email field, and as '' by an id field.
+ * Without this, an id field emptied its whole box the moment one character was deleted from
+ * a chosen name: the value fell to '', and the re-sync drew '' over the text.
+ */
+export function keepsTypedText(
+  users: DirectoryUser[],
+  field: 'name' | 'email' | 'id',
+  withEmail: boolean,
+  text: string,
+  value: string,
+): boolean {
+  if (text.trim() === '' || resolvePicker(users, field, withEmail, text) !== null) return false;
+  return value === (field === 'id' ? '' : text);
+}
+
+/**
  * Person selector sourced from the application user registry (contact).
  *
  * The list itself is searchable (project owner, 2026-09-19): one control, typed into
@@ -104,9 +123,12 @@ export function UserPicker({
 
   // The held value can change under the control - a save completes, a row reloads - and the
   // text has to follow it. Keyed on the value and the directory, so a value that arrives
-  // before the directory does gets its name as soon as the names are known.
+  // before the directory does gets its name as soon as the names are known. Text still being
+  // typed is left alone (keepsTypedText).
   useEffect(() => {
-    setText(textFor(value));
+    setText((current) =>
+      keepsTypedText(active, field, withEmail, current, value) ? current : textFor(value),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, active]);
 

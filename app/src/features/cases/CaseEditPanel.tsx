@@ -828,25 +828,25 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
                     return (
                       <label key={discipline} className="case-edit__field" htmlFor={inputId}>
                         <span>{discipline} Checker</span>
-                        <select
+                        {/* Searchable like the adviser field (project owner, 2026-10-06): the
+                            same picker, typed into and narrowing as you type. An id field,
+                            because a checker must be a real person: text that matches nobody
+                            allocates nobody. The state stays the email al_AssignCase takes.
+                            The empty box says who holds the check now, so the control answers
+                            "who has this check?" without a second line, and choosing a person
+                            is unambiguously a change. */}
+                        <UserPicker
                           id={inputId}
-                          value={checkerBy[discipline]}
-                          onChange={(e) =>
-                            setCheckerBy((prev) => ({ ...prev, [discipline]: e.target.value }))
+                          field="id"
+                          value={candidates.find((person) => person.email === checkerBy[discipline])?.id ?? ''}
+                          onChange={(contactId) =>
+                            setCheckerBy((prev) => ({
+                              ...prev,
+                              [discipline]: candidates.find((person) => person.id === contactId)?.email ?? '',
+                            }))
                           }
-                        >
-                          {/* The empty option carries who holds it now, so the control
-                              answers "who has this check?" without a second line, and
-                              choosing a person is unambiguously a change. */}
-                          <option value="">
-                            Leave as it is — {review ? held : 'not opened yet'}
-                          </option>
-                          {candidates.map((person) => (
-                            <option key={person.id} value={person.email}>
-                              {person.name} — {person.email}
-                            </option>
-                          ))}
-                        </select>
+                          placeholder={`Leave as it is — ${review ? held : 'not opened yet'}`}
+                        />
                         {!review ? (
                           <small className="case-edit__help">
                             Allocating opens this check.

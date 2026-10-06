@@ -28,3 +28,31 @@ describe('the case person picker', () => {
     expect(resolvePicker([adam1, adam2], 'name', true, 'Not Onboarded')).toBeNull();
   });
 });
+
+const { keepsTypedText } = await import('../../components/form/UserPicker');
+
+describe('a person picker being typed into', () => {
+  const users = [adam1, adam2];
+
+  it('keeps half-typed text in an id field, which holds nothing for it', () => {
+    // Deleting one character from a chosen "Adam Smith — adam.smith@example.com" left the
+    // value '' and the re-sync drew '' over the whole box.
+    expect(keepsTypedText(users, 'id', false, 'Adam Smith — adam.smith@example.co', '')).toBe(true);
+  });
+
+  it('keeps half-typed text in a name field, which holds it as typed', () => {
+    expect(keepsTypedText(users, 'name', true, 'Ada', 'Ada')).toBe(true);
+  });
+
+  it('re-syncs when the value moved under the text, as after a save', () => {
+    expect(keepsTypedText(users, 'id', false, 'Ada', 'c2')).toBe(false);
+  });
+
+  it('re-syncs a chosen option, so a name field shows the name it stores', () => {
+    expect(keepsTypedText(users, 'name', true, 'Adam Smith — adam.smith2@example.com', 'Adam Smith')).toBe(false);
+  });
+
+  it('re-syncs an empty box', () => {
+    expect(keepsTypedText(users, 'id', false, '', '')).toBe(false);
+  });
+});
