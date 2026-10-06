@@ -264,4 +264,34 @@ $env:DOTNET_ROLL_FORWARD='Major'; $t='C:\Users\rsimu\OutcomeTesting\plugins\Outc
 
 It should print `pushed web template 'OT Review Detail' … 276546 -> 255727 chars`.
 
-PROD: not deployed.
+## PROD (`org3461d426`, OTIS) - 2026-10-06
+
+The owner said "promote solution to prod, ensure all the components are in the solution".
+
+- **Membership audit in DEV** (`audit-dev.req.json` plus `metadatamembership`). Every component
+  in DEV is in `OutcomeTesting`:
+  - the site, all 298 portal components;
+  - 32 custom APIs, their 140 parameters and 115 response properties;
+  - the assembly and its 35 registered steps. The other 32 steps are the platform's custom-API
+    implementation steps, which travel with their APIs.
+  - the Code App, the 3 security roles, and all 28 `al_` tables.
+  - Not gaps: `powerpages_sharedwithusers_...` is Power Pages' own sharing variable, and
+    `al_PortalBaseUrl` is set per environment.
+- **Package:** the same `OutcomeTesting_1_0_21_0_managed.zip` that went to TEST (sha256
+  `30122645...`, unchanged; nothing changed in DEV after that export). It went through
+  `brandpackage ... OTIS`, which rewrote 7 labels. The result is
+  `artifacts/2026-10-06-prod-promotion/OTIS_1_0_21_0_managed.zip`, sha256 `d785d37e...`.
+- **Before the import:** PROD was at 1.0.20.0 OTIS, `al_ProductName` = OTIS, and no steps were
+  disabled. OT Review Detail had only the managed `OutcomeTesting` layer.
+- **Import:** `ImportSolutionAsync`, job `98635dbf-715f-4178-868c-883a70155e91`, async operation
+  `ea876b40-53c1-f111-aaaf-7c1e5279965e`. It succeeded (statuscode 30) at 06:59:11Z.
+- **Read back from PROD:**
+  - solution 1.0.21.0, managed, OTIS;
+  - assembly sha256 `583e8b98...9a18eb63`, the same as DEV and the local Release build;
+  - all 67 steps enabled;
+  - Code App OTIS, `appversion` 2026-10-06T06:58:43Z;
+  - roles OTIS Team Manager, App User and App Admin;
+  - OT Review Detail still has one managed layer. Its stored source is identical to DEV's
+    (255,727 chars), with the remedial actions section and without the old gating script.
+- No behaviour test was run in PROD, because raising or answering a check there would change
+  real case data.
