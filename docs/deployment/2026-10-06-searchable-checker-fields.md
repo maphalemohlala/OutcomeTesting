@@ -38,4 +38,20 @@ The owner said "push to test".
   owner's push from the 1.0.21.0 release landed. Its `Active` layer remains, so the next change
   to that template needs another direct push to TEST.
 
-PROD: not deployed. PROD is on 1.0.21.0.
+## PROD (`org3461d426`, OTIS)
+
+The owner said "promote to prod".
+- Package: the same 1.0.22.0 export that went to TEST, run through `brandpackage ... OTIS`, which
+  rewrote 7 labels. The result is `OTIS_1_0_22_0_managed.zip`, sha256 `5d245314...`.
+- Before the import: PROD was at 1.0.21.0 OTIS, with no steps disabled and OT Review Detail on
+  the managed layer only.
+- Import: `ImportSolutionAsync`, job `f79753c4-0354-42e5-904e-07ba48530554`, async operation
+  `94faa6fb-58c1-f111-aaaf-7ced8d9cd50e`. It succeeded (statuscode 30) at 07:39:51Z.
+- Read back from PROD:
+  - solution 1.0.22.0, managed, OTIS;
+  - assembly sha256 `583e8b98...`, unchanged;
+  - all 67 steps enabled;
+  - Code App OTIS, `appversion` 2026-10-06T07:39:36Z;
+  - roles carry the OTIS names;
+  - OT Review Detail has only the managed layer.
+- No allocation was made in PROD to test it, because that would change a real case.
