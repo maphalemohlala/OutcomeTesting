@@ -25,6 +25,7 @@
     <RolePrivilege name="prvAppendal_UserRoleMapping" level="Global" />
     <RolePrivilege name="prvAppendContact" level="Global" />
     <RolePrivilege name="prvAppendmspp_webrole" level="Global" />
+    <RolePrivilege name="prvAppendpowerpagecomponent" level="Global" />
     <RolePrivilege name="prvAppendToal_AuditEvent" level="Global" />
     <RolePrivilege name="prvAppendToal_CaseAssignment" level="Global" />
     <RolePrivilege name="prvAppendToal_Checklist" level="Global" />
@@ -51,6 +52,7 @@
     <RolePrivilege name="prvAppendToal_UserRoleMapping" level="Global" />
     <RolePrivilege name="prvAppendToContact" level="Global" />
     <RolePrivilege name="prvAppendTomspp_webrole" level="Global" />
+    <RolePrivilege name="prvAppendTopowerpagecomponent" level="Global" />
     <RolePrivilege name="prvAppendToUser" level="Global" />
     <RolePrivilege name="prvCreateal_AuditEvent" level="Global" />
     <RolePrivilege name="prvCreateal_CaseAssignment" level="Global" />

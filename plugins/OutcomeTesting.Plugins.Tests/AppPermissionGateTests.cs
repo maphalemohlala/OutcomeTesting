@@ -242,6 +242,31 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.StartsWith(CommandHelpers.UnauthorizedPrefix, error.Message, StringComparison.Ordinal);
         }
 
+        /// <summary>
+        /// Assigning a role links a contact to a web role over
+        /// <see cref="WebRoleRegistry.ContactRelationship"/>, as the caller, and an N:N link
+        /// needs Append and Append To on both of its tables. Those tables are <c>contact</c> and
+        /// <c>powerpagecomponent</c> — read from DEV's relationship metadata — not
+        /// <c>mspp_webrole</c>, which is a view over powerpagecomponent and is what the role
+        /// file did grant. Adam Strumidlo, holding App Admin and an Administrators mapping, was
+        /// refused every assignment in PROD on 2026-10-02 with a platform privilege fault: the
+        /// role granted Read on powerpagecomponent and nothing else.
+        /// </summary>
+        [Fact]
+        public void AnAdministratorCanLinkAPersonToAWebRole()
+        {
+            var admin = PrivilegesOf("Outcome Testing App Admin");
+
+            foreach (var privilege in new[]
+            {
+                "prvAppendContact", "prvAppendToContact",
+                "prvAppendpowerpagecomponent", "prvAppendTopowerpagecomponent",
+            })
+            {
+                Assert.True(admin.Contains(privilege), "Outcome Testing App Admin does not grant " + privilege);
+            }
+        }
+
         /// <summary>The privilege names one shipped role file grants.</summary>
         private static HashSet<string> PrivilegesOf(string roleName)
         {
