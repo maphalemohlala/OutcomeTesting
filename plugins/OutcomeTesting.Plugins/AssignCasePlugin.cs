@@ -60,6 +60,10 @@ namespace OutcomeTesting.Plugins
         private const string IsActiveAttr = "al_isactive";
         private const string AssignmentReasonAttr = "al_assignmentreason";
         private const string AssignmentCodeAttr = "al_caseassignmentcode";
+
+        // The check this assignment allocates. Read by the allocation letter to name the
+        // check; the code above carries the review too, but only as part of a key.
+        private const string ReviewLookupAttr = "al_reviewinstanceid";
         private const string CheckerNameAttr = "al_checkername";
         private const string CaseRefAttr = "al_casereference";
         private const string ReviewStatusAttr = "al_reviewstatus";
@@ -546,6 +550,7 @@ namespace OutcomeTesting.Plugins
             {
                 ["al_name"] = BuildAssignmentName(caseReference, assignee.UserName),
                 [AssignmentCodeAttr] = code,
+                [ReviewLookupAttr] = new EntityReference(ReviewEntity, reviewId),
                 ["al_outcomecaseid"] = new EntityReference(CaseEntity, caseId),
                 [AssignedUserAttr] = new EntityReference(UserEntity, assignee.UserId),
                 [AssignedContactAttr] = new EntityReference(ContactEntity, assignee.ContactId),

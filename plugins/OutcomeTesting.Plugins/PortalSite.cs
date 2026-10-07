@@ -76,6 +76,21 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// A link into one case's remediation, or null where the site is not known.
+        ///
+        /// The remedial letter asks the adviser to confirm the action taken, and that is done on
+        /// the remediation page, not the case record (project owner, 2026-10-06). The page reads
+        /// the case from <c>?case=</c>; see the OT Remediation web template.
+        /// </summary>
+        public static string RemediationLink(IOrganizationService service, Guid caseId)
+        {
+            var baseUrl = BaseUrl(service);
+            return baseUrl == null
+                ? null
+                : baseUrl + "/remediation?case=" + caseId.ToString("D");
+        }
+
+        /// <summary>
         /// The environment variable's current value, falling back to the default the
         /// definition carries. Swallowed rather than thrown: see the remarks on the class.
         /// </summary>

@@ -169,6 +169,26 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void Builds_the_remediation_link_onto_whichever_host_won()
+        {
+            // The remedial letter opens the case's remediation, not its case record (project
+            // owner, 2026-10-06). The portal's remediation page reads the case from ?case=.
+            var service = Environment("outcometesting.powerappsportals.com");
+            Variable(service, null, "outcometestingtest.powerappsportals.com");
+
+            Assert.Equal(
+                "https://outcometestingtest.powerappsportals.com/remediation?case="
+                    + CaseId.ToString("D"),
+                PortalSite.RemediationLink(service, CaseId));
+        }
+
+        [Fact]
+        public void Says_nothing_for_a_remediation_link_when_no_site_is_known()
+        {
+            Assert.Null(PortalSite.RemediationLink(Environment(null), CaseId));
+        }
+
+        [Fact]
         public void The_outbox_link_goes_through_the_same_rule()
         {
             // NotificationOutbox.CaseLink is what the bodies actually call, and it used to hold

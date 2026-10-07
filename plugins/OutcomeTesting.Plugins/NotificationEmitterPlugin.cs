@@ -83,7 +83,7 @@ namespace OutcomeTesting.Plugins
         public static void QueueAllocation(IOrganizationService service, Guid correlationId, Guid assignmentId)
         {
             var assignment = service.Retrieve(AssignmentEntity, assignmentId,
-                new ColumnSet("al_assigneduserid", "al_assignedcontactid", CaseLookup, "al_isactive", "al_assignedon"));
+                new ColumnSet("al_assigneduserid", "al_assignedcontactid", CaseLookup, "al_isactive", "al_assignedon", "al_caseassignmentcode", "al_reviewinstanceid"));
 
             // A released or inactive row is history, not an allocation to tell anyone about.
             var active = assignment.GetAttributeValue<bool?>("al_isactive");
@@ -119,6 +119,12 @@ namespace OutcomeTesting.Plugins
                 {
                     { NotificationTemplates.TokenReference, reference },
                     { NotificationTemplates.TokenCaseLink, link },
+                    {
+                        // A Tax-then-AQS case is allocated once per check; naming the check is
+                        // what stops the second letter reading as a duplicate of the first.
+                        NotificationTemplates.TokenCheck,
+                        NotificationOutbox.CheckName(NotificationOutbox.AllocatedReviewType(service, assignment))
+                    },
                 });
 
             var assignedOn = assignment.GetAttributeValue<DateTime?>("al_assignedon");
@@ -203,7 +209,9 @@ namespace OutcomeTesting.Plugins
             // records no BR-005 grade at all - and those get the plainer letter rather than
             // being told they received a grading they did not.
             var code = RemediationLetter.RemediationCodeFor(grade);
-            var remedialLink = NotificationOutbox.CaseLink(service, caseRef);
+            // The remediation page, not the case record: confirming the action is done there
+            // (project owner, 2026-10-06).
+            var remedialLink = NotificationOutbox.RemediationLink(service, caseRef);
 
             var letter = NotificationTemplates.Render(
                 service,

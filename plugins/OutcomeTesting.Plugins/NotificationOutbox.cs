@@ -907,5 +907,105 @@ namespace OutcomeTesting.Plugins
             // linked into DEV until 2026-09-22 for exactly that reason.
             return outcomeCase == null ? null : PortalSite.CaseLink(service, outcomeCase.Id);
         }
+
+        /// <summary>
+        /// A portal link to one case's remediation, or null when this environment has no site
+        /// to link into. The same host rule as <see cref="CaseLink"/>; only the page differs.
+        /// </summary>
+        public static string RemediationLink(IOrganizationService service, EntityReference outcomeCase)
+        {
+            return outcomeCase == null ? null : PortalSite.RemediationLink(service, outcomeCase.Id);
+        }
+
+        /// <summary>
+        /// The <see cref="NotificationTemplates.TokenCheck"/> value for a review type: "Tax
+        /// check", "AQS check", or "review" where the type is not known.
+        ///
+        /// "Review" rather than a guess because it is true of either check, and rather than
+        /// "check" because the audit found "(check)" read like a broken placeholder. Not
+        /// <c>CompletedCheck.CheckName</c>, which reads a missing type as AQS - right for a
+        /// document title, wrong in a letter, where naming the wrong check is worse than
+        /// naming none.
+        /// </summary>
+        public static string CheckName(int? reviewType)
+        {
+            if (reviewType == ResponseRules.ReviewTypeTax)
+            {
+                return "Tax check";
+            }
+
+            return reviewType == ResponseRules.ReviewTypeAqs ? "AQS check" : "review";
+        }
+
+        /// <summary>
+        /// The type of the review an assignment allocates, or null where it cannot be told.
+        ///
+        /// The review the row names, which both writers have set since 1.0.24.0. A row written
+        /// before that has only its alternate key, and
+        /// <see cref="AssignCasePlugin.BuildAssignmentCode"/> puts the first twelve hex digits of
+        /// the review id in it, so the case's reviews are matched on that - two sharing the
+        /// prefix answer null rather than a guess.
+        /// </summary>
+        public static int? AllocatedReviewType(IOrganizationService service, Entity assignment)
+        {
+            if (assignment == null)
+            {
+                return null;
+            }
+
+            var reviewRef = assignment.GetAttributeValue<EntityReference>("al_reviewinstanceid");
+            if (reviewRef != null)
+            {
+                // A query, not a Retrieve: a review that cannot be read must cost the letter its
+                // check name, never the allocation - and a swallowed fault would abort it.
+                var named = new QueryExpression("al_reviewinstance")
+                {
+                    ColumnSet = new ColumnSet("al_reviewtype"),
+                    TopCount = 1,
+                    Criteria = new FilterExpression(),
+                };
+                named.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewRef.Id);
+
+                var rows = service.RetrieveMultiple(named).Entities;
+                return rows.Count == 0 ? (int?)null : CommandHelpers.ReviewTypeOf(rows[0]);
+            }
+
+            var caseRef = assignment.GetAttributeValue<EntityReference>("al_outcomecaseid");
+            var assignmentCode = assignment.GetAttributeValue<string>("al_caseassignmentcode");
+            if (caseRef == null || string.IsNullOrWhiteSpace(assignmentCode))
+            {
+                return null;
+            }
+
+            var parts = assignmentCode.Split('-');
+            if (parts.Length < 4)
+            {
+                return null;
+            }
+
+            var reviewPrefix = parts[2];
+            var reviews = new QueryExpression("al_reviewinstance")
+            {
+                ColumnSet = new ColumnSet("al_reviewtype"),
+                Criteria = new FilterExpression(),
+            };
+            reviews.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseRef.Id);
+
+            Entity match = null;
+            foreach (var review in service.RetrieveMultiple(reviews).Entities)
+            {
+                if (review.Id.ToString("N").StartsWith(reviewPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (match != null)
+                    {
+                        return null;
+                    }
+
+                    match = review;
+                }
+            }
+
+            return CommandHelpers.ReviewTypeOf(match);
+        }
     }
 }

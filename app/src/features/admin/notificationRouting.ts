@@ -88,11 +88,13 @@ export const TOKEN_HELP: Record<string, string> = {
   adviser: 'The adviser’s name, or “Adviser” where the case does not name one.',
   client: 'The client’s name, or “This case” — it opens a sentence either way.',
   caseLink: 'The web address of the case in the portal, as plain text.',
-  caseButton: 'A styled button linking to the case. Comes out as nothing where there is no portal.',
+  caseButton:
+    'A styled button linking to the case — to its remediation, in the remedial letters. Comes out as nothing where there is no portal.',
   dueText: 'A sentence naming the due date, e.g. “ It is due by 3 March 2026.”, or nothing.',
   grading: 'How this letter names the grading that caused it.',
   finalOutcome: 'The final outcome recorded at sign-off.',
   notes: 'The signatory’s notes, e.g. “ Notes: …”, or nothing where they left none.',
+  check: 'Which check the letter is about: “Tax check” or “AQS check”, or “review” where it cannot be told.',
   completedCheck:
     'Attaches the completed check as a PDF. Puts nothing in the text — say what you like about it yourself.',
 };

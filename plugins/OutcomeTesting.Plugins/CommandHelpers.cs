@@ -14,6 +14,16 @@ namespace OutcomeTesting.Plugins
     /// </summary>
     public static class CommandHelpers
     {
+        /// <summary>
+        /// The discipline of a review row - <see cref="ResponseRules.ReviewTypeTax"/> or
+        /// <see cref="ResponseRules.ReviewTypeAqs"/> - or null where it carries none.
+        /// </summary>
+        public static int? ReviewTypeOf(Entity review)
+        {
+            var type = review == null ? null : review.GetAttributeValue<OptionSetValue>("al_reviewtype");
+            return type == null ? (int?)null : type.Value;
+        }
+
         // Distinct failure prefixes so the client can branch (command-concurrency skill).
         public const string ConflictPrefix = "CONFLICT: ";
         public const string UnauthorizedPrefix = "UNAUTHORIZED: ";

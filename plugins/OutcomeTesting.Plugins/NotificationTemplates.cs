@@ -87,6 +87,14 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public const string SignoffApprovedClosedNoGrade = "SIGNOFF-APPROVED-CLOSED-NOGRADE";
 
+        /// <summary>
+        /// A Tax check's remediation was approved and the case went back to the queue for its
+        /// AQS check (BR-004). It used to get the recheck letter, which promised a step that
+        /// was not coming; once the sign-off sent one letter per check that was the adviser's
+        /// only account of the decision (audit, 2026-10-06).
+        /// </summary>
+        public const string SignoffApprovedAqsNext = "SIGNOFF-APPROVED-AQS-NEXT";
+
         /// <summary>A sign-off was rejected and the work went back to the adviser.</summary>
         public const string SignoffRejected = "SIGNOFF-REJECTED";
 
@@ -130,6 +138,14 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>" Notes: …" as the signatory wrote them, or nothing.</summary>
         public const string TokenNotes = "notes";
+
+        /// <summary>
+        /// Which check the letter is about: "Tax check" or "AQS check", or "review" where it
+        /// cannot be told. A Tax-then-AQS case is allocated and submitted once per check, and
+        /// without this the two letters read word for word the same (reported 2026-10-06 as
+        /// duplicate emails).
+        /// </summary>
+        public const string TokenCheck = "check";
 
         /// <summary>
         /// Attaches the completed check to this letter. Renders as NOTHING in the text.
@@ -456,7 +472,7 @@ namespace OutcomeTesting.Plugins
         public static readonly string[] AllTokenNames =
         {
             TokenReference, TokenAdviser, TokenClient, TokenCaseLink, TokenCaseButton,
-            TokenDueText, TokenGrading, TokenFinalOutcome, TokenNotes,
+            TokenDueText, TokenGrading, TokenFinalOutcome, TokenNotes, TokenCheck,
         };
 
         /// <summary>
@@ -626,19 +642,19 @@ namespace OutcomeTesting.Plugins
             var all = new List<TemplateDefinition>
             {
                 Plain(Allocation, "Case allocated",
-                    "Case {{reference}} has been allocated to you",
-                    "Case {{reference}} is now assigned to you for checking. Open it to start the review: {{caseLink}}",
-                    TokenReference, TokenCaseLink),
+                    "Case {{reference}}: {{check}} allocated to you",
+                    "The {{check}} on case {{reference}} is now assigned to you. Open it to start the review: {{caseLink}}",
+                    TokenReference, TokenCaseLink, TokenCheck),
 
                 Plain(AllocationNoLink, "Case allocated (no portal link)",
-                    "Case {{reference}} has been allocated to you",
-                    "Case {{reference}} is now assigned to you for checking. Open it in the portal to start the review.",
-                    TokenReference),
+                    "Case {{reference}}: {{check}} allocated to you",
+                    "The {{check}} on case {{reference}} is now assigned to you. Open it in the portal to start the review.",
+                    TokenReference, TokenCheck),
 
                 Plain(ReviewSubmitted, "Review submitted",
-                    "Review submitted on case {{reference}}",
-                    "The review on case {{reference}} has been submitted and is locked to further edits.",
-                    TokenReference),
+                    "Case {{reference}}: {{check}} submitted",
+                    "The {{check}} on case {{reference}} has been submitted and is locked to further edits.",
+                    TokenReference, TokenCheck),
 
                 Html(RemediationPassWithIssues, "Remedial needed - pass with issues",
                     "Remedial needed - Pass with issues: {{reference}}",
@@ -684,6 +700,12 @@ namespace OutcomeTesting.Plugins
                     "Your remediation on case {{reference}} has been approved. You recorded that it needs no "
                         + "further checking, so the case is now closed and nothing more is needed from you."
                         + "{{notes}}",
+                    TokenReference, TokenNotes),
+
+                Plain(SignoffApprovedAqsNext, "Remediation approved - on to the AQS check",
+                    "Remediation approved on case {{reference}}",
+                    "Your Tax remediation on case {{reference}} has been approved. The case now goes on to "
+                        + "its AQS check, and nothing more is needed from you for the Tax check.{{notes}}",
                     TokenReference, TokenNotes),
 
                 Plain(SignoffRejected, "Remediation sent back",

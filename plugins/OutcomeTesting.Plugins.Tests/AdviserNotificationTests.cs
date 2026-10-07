@@ -153,6 +153,26 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal("sam@example.com", queued.GetAttributeValue<string>("al_recipientemail"));
         }
 
+        [Fact]
+        public void The_remediation_letter_opens_the_remediation_not_the_case_record()
+        {
+            // The button asks the adviser to confirm the remedial action, which is done on the
+            // remediation page; the case record only sends them on another click (project
+            // owner, 2026-10-06).
+            var svc = Case();
+            svc.Seed("powerpagesite", Guid.NewGuid(), "primarydomainname", "outcometesting.powerappsportals.com");
+            Graded(svc, OutcomeRules.OutcomePassWithIssues);
+            OpenAction(svc);
+
+            Remediation.AssignOpenActions(svc, Ref(), Correlation);
+
+            var body = Queued(svc).GetAttributeValue<string>("al_body");
+            Assert.Contains(
+                "href=\"https://outcometesting.powerappsportals.com/remediation?case=" + CaseId.ToString("D") + "\"",
+                body);
+            Assert.DoesNotContain("case-details", body);
+        }
+
         // ---- The pass letter -----------------------------------------------------------
 
         [Fact]

@@ -34,6 +34,8 @@ namespace OutcomeTesting.Plugins
         private const string ActionLookup = "al_remediationactionid";
         private const string RecheckRequiredAttr = "al_recheckrequired";
         private const string CaseLookup = "al_outcomecaseid";
+        private const string CaseEntity = "al_outcomecase";
+        private const string CaseReferenceAttr = "al_casereference";
         private const string ReviewLookup = "al_reviewinstanceid";
         private const string FinalOutcomeAttr = "al_finaloutcome";
 
@@ -136,16 +138,28 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            var reviewId = ResolveReview(service, actionRef);
+            var caseId = ResolveCase(service, signoff, actionRef);
+
+            // Before anything that reads the other sign-offs on this check (audit,
+            // 2026-10-06). Two that commit at the same moment cannot see each other's rows,
+            // so each counted the other's action as undecided: the case never moved, and the
+            // approval letter that waits for the last decision never went. The write makes
+            // the second wait for the first to commit, and read what it wrote.
+            if (caseId.HasValue)
+            {
+                LockCase(service, caseId.Value);
+            }
+
             if (decision.Value == DecisionRejectedValue)
             {
                 service.Update(ReopenedAction(actionRef.Id, DateTime.UtcNow));
             }
 
-            var reviewId = ResolveReview(service, actionRef);
-            var caseId = ResolveCase(service, signoff, actionRef);
+            var movedTheCase = false;
             if (caseId.HasValue)
             {
-                MoveCase(service, caseId.Value, decision.Value, reviewId);
+                movedTheCase = MoveCase(service, caseId.Value, decision.Value, reviewId);
                 RecordFinalOutcome(service, context, signoff, caseId.Value, reviewId);
             }
 
@@ -215,11 +229,127 @@ namespace OutcomeTesting.Plugins
             // (a remediated Tax-only case) - so a flag set in one branch would be wrong in the
             // other, which is how F40 read at first. Reading the case is right for both and
             // stays right for the next one.
-            var closedOnTheApproval = caseId.HasValue
-                && CaseTransitions.CurrentStatus(service, caseId.Value) == CaseLifecycle.Closed;
+            var statusAfter = caseId.HasValue
+                ? CaseTransitions.CurrentStatus(service, caseId.Value)
+                : null;
+            var closedOnTheApproval = statusAfter == CaseLifecycle.Closed;
 
-            QueueSignoffNotification(
-                service, context, signoff, actionRef, decision.Value, closedOnTheApproval);
+            // Only an approval can put the case back in the queue: the Tax check is finished
+            // and the route still owes its AQS check (MoveCase, OD-038).
+            var handedOnToAqs = decision.Value == DecisionApprovedValue
+                && statusAfter == CaseLifecycle.Queued;
+
+            if (EarnsSignoffLetter(
+                    service, decision.Value, caseId, reviewId, signoff.Id,
+                    signoff.GetAttributeValue<string>(NotesAttr), movedTheCase))
+            {
+                QueueSignoffNotification(
+                    service, context, signoff, actionRef, decision.Value, closedOnTheApproval, handedOnToAqs);
+            }
+        }
+
+        /// <summary>
+        /// Takes the case row's lock for the rest of this transaction by writing its reference
+        /// back unchanged. The reference is in no step's filtering attributes, so nothing else
+        /// runs; a concurrent sign-off on the same case waits here until this one commits.
+        /// </summary>
+        private static void LockCase(IOrganizationService service, Guid caseId)
+        {
+            var current = service.Retrieve(CaseEntity, caseId, new ColumnSet(CaseReferenceAttr));
+            service.Update(new Entity(CaseEntity, caseId)
+            {
+                [CaseReferenceAttr] = current.GetAttributeValue<string>(CaseReferenceAttr),
+            });
+        }
+
+        /// <summary>
+        /// Whether this decision is the one the adviser hears about: one letter per decision
+        /// on a check, not one per action (reported 2026-10-06 as duplicate emails).
+        ///
+        /// <para>
+        /// The portal signs a check's actions off one at a time, so each is its own create
+        /// and its own transaction, and nothing groups them but the check. Keyed on the
+        /// sign-off row, the letter went once per action: on TEST case 256643210 sent its
+        /// adviser twelve identical "Remediation approved" emails inside 21 seconds.
+        /// </para>
+        /// <list type="bullet">
+        /// <item>An <b>approval</b> is announced by the sign-off that moved the case - the last
+        /// one on the check. That is the only point at which there is somewhere to say it
+        /// went. A check with an unapproved rejection in it never moves, which is right: it
+        /// went back.</item>
+        /// <item>A <b>rejection</b> is announced unless another rejection on the same check,
+        /// with the same notes, was recorded in the last <see cref="SittingMinutes"/> minutes.
+        /// That is one sitting: the portal posts one set of notes for every action it sends
+        /// back. It was keyed on the case being at Awaiting Sign-off until the audit found
+        /// the panel is offered at Awaiting Remediation too, where that rule sent nothing at
+        /// all for a rejection that reopened an action.</item>
+        /// </list>
+        /// <para>
+        /// A sign-off whose case cannot be found keeps the letter it always had: with no case
+        /// there is nothing to group by, and a duplicate is better than silence.
+        /// </para>
+        /// </summary>
+        public static bool EarnsSignoffLetter(
+            IOrganizationService service,
+            int decision,
+            Guid? caseId,
+            Guid? reviewId,
+            Guid signoffId,
+            string notes,
+            bool movedTheCase)
+        {
+            if (!caseId.HasValue)
+            {
+                return true;
+            }
+
+            if (decision == DecisionRejectedValue)
+            {
+                return !EarlierRejectionInSitting(service, caseId.Value, reviewId, signoffId, notes);
+            }
+
+            return movedTheCase;
+        }
+
+        /// <summary>How close together two rejections must be to count as one sitting.</summary>
+        public const int SittingMinutes = 10;
+
+        /// <summary>
+        /// Whether another rejection on this check, with the same notes, was recorded in the
+        /// last <see cref="SittingMinutes"/> minutes. Read under the case lock, so the rows of a
+        /// sitting are all committed by the time the next one asks.
+        /// </summary>
+        private static bool EarlierRejectionInSitting(
+            IOrganizationService service, Guid caseId, Guid? reviewId, Guid signoffId, string notes)
+        {
+            var actionIds = ActionsOfCheck(service, caseId, reviewId);
+            if (actionIds.Length == 0)
+            {
+                return false;
+            }
+
+            var earlier = new QueryExpression(SignoffEntity)
+            {
+                ColumnSet = new ColumnSet(NotesAttr),
+                Criteria = new FilterExpression(),
+            };
+            earlier.Criteria.AddCondition(ActionLookup, ConditionOperator.In, actionIds);
+            earlier.Criteria.AddCondition(DecisionAttr, ConditionOperator.Equal, DecisionRejectedValue);
+            earlier.Criteria.AddCondition(
+                "createdon", ConditionOperator.GreaterEqual, DateTime.UtcNow.AddMinutes(-SittingMinutes));
+
+            // Compared here rather than in the query: notes is a multi-line column.
+            var mine = (notes ?? string.Empty).Trim();
+            foreach (var row in service.RetrieveMultiple(earlier).Entities)
+            {
+                var theirs = (row.GetAttributeValue<string>(NotesAttr) ?? string.Empty).Trim();
+                if (row.Id != signoffId && string.Equals(theirs, mine, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -383,7 +513,7 @@ namespace OutcomeTesting.Plugins
         /// Keyed on the sign-off rather than the action, because an action that goes round
         /// twice is genuinely two decisions and the adviser needs to hear about both — key
         /// it on the action and the second rejection would collide with the first and never
-        /// be sent.
+        /// be sent. Which of a check's sign-offs gets here is <see cref="EarnsSignoffLetter"/>.
         /// </summary>
         private static void QueueSignoffNotification(
             IOrganizationService service,
@@ -391,7 +521,8 @@ namespace OutcomeTesting.Plugins
             Entity signoff,
             EntityReference actionRef,
             int decision,
-            bool closedOnTheApproval)
+            bool closedOnTheApproval,
+            bool handedOnToAqs)
         {
             var approved = decision == DecisionApprovedValue;
             var action = service.Retrieve(ActionEntity, actionRef.Id,
@@ -418,8 +549,13 @@ namespace OutcomeTesting.Plugins
             // AD-138 added the fourth three days later - the adviser waives the recheck, so
             // the case closes with no grade - and nothing chose a letter for it, which left
             // it falling through to the recheck one (F40).
+            // Five, since the audit: a Tax check handed on to AQS is first, because a grade
+            // given there is not a final outcome - RecordFinalOutcome found no case at Awaiting
+            // Recheck and recorded nothing - so "closed with a final outcome" would be false.
             var code = !approved
                 ? NotificationTemplates.SignoffRejected
+                : handedOnToAqs
+                    ? NotificationTemplates.SignoffApprovedAqsNext
                 : finalOutcome != null
                     ? NotificationTemplates.SignoffApprovedClosed
                     : closedOnTheApproval
@@ -497,35 +633,18 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static bool AnyAwaitingSignoff(IOrganizationService service, Guid caseId, Guid? reviewId)
         {
-            var actions = new QueryExpression(ActionEntity)
-            {
-                ColumnSet = new ColumnSet(false),
-                Criteria = new FilterExpression(),
-            };
-            actions.Criteria.AddCondition(CaseLookup, ConditionOperator.Equal, caseId);
-            if (reviewId.HasValue)
-            {
-                actions.Criteria.AddCondition(ReviewLookup, ConditionOperator.Equal, reviewId.Value);
-            }
-
-            var undecided = new HashSet<Guid>();
-            foreach (var action in service.RetrieveMultiple(actions).Entities)
-            {
-                undecided.Add(action.Id);
-            }
-
-            if (undecided.Count == 0)
+            // Matched on the actions themselves rather than on the case, because a sign-off
+            // does not always carry the case lookup - ResolveCase above exists for that.
+            var keys = ActionsOfCheck(service, caseId, reviewId);
+            if (keys.Length == 0)
             {
                 return false;
             }
 
-            // Matched on the actions themselves rather than on the case, because a sign-off
-            // does not always carry the case lookup - ResolveCase above exists for that.
-            var keys = new object[undecided.Count];
-            var next = 0;
-            foreach (var id in undecided)
+            var undecided = new HashSet<Guid>();
+            foreach (var key in keys)
             {
-                keys[next++] = id;
+                undecided.Add((Guid)key);
             }
 
             var signoffs = new QueryExpression(SignoffEntity)
@@ -546,6 +665,36 @@ namespace OutcomeTesting.Plugins
             }
 
             return undecided.Count > 0;
+        }
+
+        /// <summary>
+        /// The ids of the actions on one check - the review's where the action carries one,
+        /// the case's otherwise - as query values.
+        ///
+        /// Scoped to the review because the two legs of a Tax-then-AQS route are separate
+        /// remediations. Rows written before that link existed carry none, and gating those on
+        /// nothing would restore what this exists to stop, so the case is the scope instead.
+        /// </summary>
+        private static object[] ActionsOfCheck(IOrganizationService service, Guid caseId, Guid? reviewId)
+        {
+            var actions = new QueryExpression(ActionEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                Criteria = new FilterExpression(),
+            };
+            actions.Criteria.AddCondition(CaseLookup, ConditionOperator.Equal, caseId);
+            if (reviewId.HasValue)
+            {
+                actions.Criteria.AddCondition(ReviewLookup, ConditionOperator.Equal, reviewId.Value);
+            }
+
+            var ids = new List<object>();
+            foreach (var action in service.RetrieveMultiple(actions).Entities)
+            {
+                ids.Add(action.Id);
+            }
+
+            return ids.ToArray();
         }
 
         /// <summary>The check the signed-off action belongs to, or null where it carries none.</summary>
@@ -587,7 +736,8 @@ namespace OutcomeTesting.Plugins
         ///
         /// Only a case AT Awaiting Sign-off is moved. The hops are checked against the
         /// lifecycle rather than assumed, so a case that is not where it expects is left
-        /// alone instead of jumping.
+        /// alone instead of jumping. Returns whether it moved the case, which is what the
+        /// approval letter waits for.
         /// </summary>
         /// <summary>
         /// Writes the final outcome the supervisor recorded as they approved, which closes
@@ -680,19 +830,19 @@ namespace OutcomeTesting.Plugins
             return rows.Count == 0 ? Guid.Empty : rows[0].Id;
         }
 
-        public static void MoveCase(IOrganizationService service, Guid caseId, int decision, Guid? reviewId = null)
+        public static bool MoveCase(IOrganizationService service, Guid caseId, int decision, Guid? reviewId = null)
         {
             var current = CaseTransitions.CurrentStatus(service, caseId);
             if (!current.HasValue || current.Value != CaseLifecycle.AwaitingSignoff)
             {
-                return;
+                return false;
             }
 
             switch (decision)
             {
                 case DecisionRejectedValue:
                     CaseTransitions.MoveThrough(service, caseId, CaseLifecycle.AwaitingRemediation);
-                    return;
+                    return true;
 
                 case DecisionApprovedValue:
                     // The check's remediation is signed off as a whole, not action by action.
@@ -706,13 +856,13 @@ namespace OutcomeTesting.Plugins
                     // remediations: a Tax action still to be decided is not this check's work.
                     if (AnyAwaitingSignoff(service, caseId, reviewId))
                     {
-                        return;
+                        return false;
                     }
 
                     if (SubmitReviewPlugin.AqsStillOwed(service, caseId))
                     {
                         CaseTransitions.MoveThrough(service, caseId, CaseLifecycle.Queued);
-                        return;
+                        return true;
                     }
 
                     CaseTransitions.MoveThrough(service, caseId, CaseLifecycle.AwaitingRecheck);
@@ -721,10 +871,10 @@ namespace OutcomeTesting.Plugins
                         CaseTransitions.MoveThrough(service, caseId, CaseLifecycle.Closed);
                     }
 
-                    return;
+                    return true;
 
                 default:
-                    return;
+                    return false;
             }
         }
 

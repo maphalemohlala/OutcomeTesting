@@ -601,6 +601,10 @@ namespace OutcomeTesting.Plugins.Tests
                     return actual != null;
                 case ConditionOperator.In:
                     return condition.Values.Any(v => Equals(actual, Scalar(v)));
+                case ConditionOperator.GreaterEqual:
+                    // A missing value never satisfies a range, as in SQL.
+                    return actual is IComparable && expected != null
+                        && ((IComparable)actual).CompareTo(expected) >= 0;
                 default:
                     throw new NotSupportedException(
                         "ConditionOperator." + condition.Operator + " is not supported by this fake. "

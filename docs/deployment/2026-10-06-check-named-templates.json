@@ -1,0 +1,6 @@
+[
+ {"verb":"PATCH","path":"al_notificationtemplates(al_templatecode='ALLOCATION')","body":{"al_subject":"Case {{reference}}: {{check}} allocated to you","al_body":"The {{check}} on case {{reference}} is now assigned to you. Open it to start the review: {{caseLink}}"}},
+ {"verb":"PATCH","path":"al_notificationtemplates(al_templatecode='ALLOCATION-NO-LINK')","body":{"al_subject":"Case {{reference}}: {{check}} allocated to you","al_body":"The {{check}} on case {{reference}} is now assigned to you. Open it in the portal to start the review."}},
+ {"verb":"PATCH","path":"al_notificationtemplates(al_templatecode='REVIEW-SUBMITTED')","body":{"al_subject":"Case {{reference}}: {{check}} submitted","al_body":"The {{check}} on case {{reference}} has been submitted and is locked to further edits."}},
+ {"verb":"GET","path":"al_notificationtemplates?$select=al_templatecode,al_subject,al_body,modifiedon&$filter=al_templatecode eq 'ALLOCATION' or al_templatecode eq 'ALLOCATION-NO-LINK' or al_templatecode eq 'REVIEW-SUBMITTED'"}
+]

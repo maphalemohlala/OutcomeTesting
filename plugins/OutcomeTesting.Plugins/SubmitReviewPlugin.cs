@@ -259,7 +259,7 @@ namespace OutcomeTesting.Plugins
         ///
         /// The para-planner's stored email (AD-228).
         /// </summary>
-        private static void QueueSubmittedNotification(
+        public static void QueueSubmittedNotification(
             IOrganizationService service,
             Guid correlationId,
             Entity review,
@@ -274,6 +274,12 @@ namespace OutcomeTesting.Plugins
                 new Dictionary<string, string>
                 {
                     { NotificationTemplates.TokenReference, reference },
+                    {
+                        // A Tax-then-AQS case is submitted once per check, to the same
+                        // para-planner; without the check named the second reads as a duplicate.
+                        NotificationTemplates.TokenCheck,
+                        NotificationOutbox.CheckName(CommandHelpers.ReviewTypeOf(review))
+                    },
                 });
 
             // The para-planner's letter is the one that carries the case summary (Change 2,

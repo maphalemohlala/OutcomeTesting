@@ -44,6 +44,10 @@ namespace OutcomeTesting.Plugins
         private const string IsActiveAttr = "al_isactive";
         private const string AssignmentReasonAttr = "al_assignmentreason";
         private const string AssignmentCodeAttr = "al_caseassignmentcode";
+
+        // The check this assignment allocates. Read by the allocation letter to name the
+        // check; the code above carries the review too, but only as part of a key.
+        private const string ReviewLookupAttr = "al_reviewinstanceid";
         private const string CaseStatusAttr = "al_casestatus";
         private const string CaseRouteAttr = "al_reviewrouteid";
         private const string RouteRequiresTaxAttr = "al_requirestaxreview";
@@ -67,13 +71,6 @@ namespace OutcomeTesting.Plugins
         public ClaimCasePlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(ClaimCasePlugin))
         {
-        }
-
-        /// <summary>The discipline of a review row, where it carries one (item 2, 2026-09-19).</summary>
-        private static int? ReviewTypeOf(Entity review)
-        {
-            var type = review == null ? null : review.GetAttributeValue<OptionSetValue>(ReviewTypeAttr);
-            return type == null ? (int?)null : type.Value;
         }
 
         protected override void ExecuteDataversePlugin(ILocalPluginContext localPluginContext)
@@ -153,6 +150,7 @@ namespace OutcomeTesting.Plugins
 
             assignment["al_name"] = AssignCasePlugin.BuildAssignmentName(caseReference, checkerName);
             assignment[AssignmentCodeAttr] = AssignCasePlugin.BuildAssignmentCode(caseRef.Id, review.Id, assignee.UserId);
+            assignment[ReviewLookupAttr] = new EntityReference(ReviewEntity, review.Id);
             assignment[AssignedUserAttr] = new EntityReference(UserEntity, assignee.UserId);
             assignment[AssignedOnAttr] = DateTime.UtcNow;
             assignment[IsActiveAttr] = true;
@@ -172,7 +170,7 @@ namespace OutcomeTesting.Plugins
             AssignCasePlugin.StampCheckerName(
                 service,
                 caseRef.Id,
-                ReviewTypeOf(review),
+                CommandHelpers.ReviewTypeOf(review),
                 checkerName);
 
             CaseTransitions.MoveThrough(service, caseRef.Id, CaseLifecycle.Assigned);

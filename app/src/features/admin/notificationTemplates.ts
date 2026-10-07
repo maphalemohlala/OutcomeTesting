@@ -30,27 +30,27 @@ export interface TemplateHint {
 const TEMPLATES: Record<string, TemplateHint> = {
   ALLOCATION: {
     name: 'Case allocated',
-    tokens: ['reference', 'caseLink'],
+    tokens: ['reference', 'caseLink', 'check'],
     isHtml: false,
-    subject: 'Case {{reference}} has been allocated to you',
+    subject: 'Case {{reference}}: {{check}} allocated to you',
     body:
-      'Case {{reference}} is now assigned to you for checking. Open it to start the review: {{caseLink}}',
+      'The {{check}} on case {{reference}} is now assigned to you. Open it to start the review: {{caseLink}}',
   },
   'ALLOCATION-NO-LINK': {
     name: 'Case allocated (no portal link)',
-    tokens: ['reference'],
+    tokens: ['reference', 'check'],
     isHtml: false,
-    subject: 'Case {{reference}} has been allocated to you',
+    subject: 'Case {{reference}}: {{check}} allocated to you',
     body:
-      'Case {{reference}} is now assigned to you for checking. Open it in the portal to start the review.',
+      'The {{check}} on case {{reference}} is now assigned to you. Open it in the portal to start the review.',
   },
   'REVIEW-SUBMITTED': {
     name: 'Review submitted',
-    tokens: ['reference'],
+    tokens: ['reference', 'check'],
     isHtml: false,
-    subject: 'Review submitted on case {{reference}}',
+    subject: 'Case {{reference}}: {{check}} submitted',
     body:
-      'The review on case {{reference}} has been submitted and is locked to further edits.',
+      'The {{check}} on case {{reference}} has been submitted and is locked to further edits.',
   },
   'REMEDIATION-PASS-WITH-ISSUES': {
     name: 'Remedial needed - pass with issues',
@@ -112,6 +112,17 @@ const TEMPLATES: Record<string, TemplateHint> = {
     body:
       'Your remediation on case {{reference}} has been approved. You recorded that it needs no '
       + 'further checking, so the case is now closed and nothing more is needed from you.{{notes}}',
+  },
+  // A Tax check whose remediation was approved while the route still owes its AQS check
+  // (audit, 2026-10-06). It used to get the recheck letter, promising a step not coming.
+  'SIGNOFF-APPROVED-AQS-NEXT': {
+    name: 'Remediation approved - on to the AQS check',
+    tokens: ['reference', 'notes'],
+    isHtml: false,
+    subject: 'Remediation approved on case {{reference}}',
+    body:
+      'Your Tax remediation on case {{reference}} has been approved. The case now goes on to '
+      + 'its AQS check, and nothing more is needed from you for the Tax check.{{notes}}',
   },
   'SIGNOFF-REJECTED': {
     name: 'Remediation sent back',
