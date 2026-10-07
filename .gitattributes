@@ -1,1 +1,5 @@
 plugins/OutcomeTesting.Plugins/RoleHolders.cs diff
+
+# Binary documents: never line-ending converted (autocrlf read the user-guide PDFs as text).
+*.pdf binary
+*.docx binary
