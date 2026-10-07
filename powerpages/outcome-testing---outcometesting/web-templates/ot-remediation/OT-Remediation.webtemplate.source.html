@@ -290,6 +290,8 @@
       {% endcomment %}
       <link-entity name="al_reviewroute" from="al_reviewrouteid" to="al_reviewrouteid" link-type="outer" alias="rt">
         <attribute name="al_name" />
+        {% comment %}For ot_signoff_due: an AQS check still owed always goes to sign-off.{% endcomment %}
+        <attribute name="al_requiresaqsreview" />
       </link-entity>
       <filter type="and">
         <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_param | xml_escape }}" />
@@ -355,6 +357,7 @@
       <entity name="al_signoff">
         <attribute name="al_remediationactionid" />
         <attribute name="al_signoffdecision" />
+        <attribute name="al_notes" />
         <attribute name="al_signedoffon" />
         <attribute name="al_signedbyname" />
         <filter type="and">
@@ -424,6 +427,13 @@
   {% endfor %}
   {% if ot_graded == false %}{% assign ot_signoff_due = true %}{% endif %}
   {% if c and c.al_casestatus.value == 120910589 %}{% assign ot_signoff_due = true %}{% endif %}
+  {% comment %}
+    CompleteRemediationPlugin.SignoffRequired: an AQS check still owed always goes to sign-off,
+    because the approval is what hands the case back to the queue. al_outcome rows are written
+    by the AQS submit only, so a route that needs AQS with none yet still owes it. Without this a
+    Tax Pass with issues on a Tax-then-AQS route told the adviser the case would close.
+  {% endcomment %}
+  {% if c['rt.al_requiresaqsreview'] and caseoutcomes.results.entities.size == 0 %}{% assign ot_signoff_due = true %}{% endif %}
 
   {% comment %}
     Is the reader the T&C Manager for THIS case's adviser? (Project owner, 2026-09-21:
@@ -849,7 +859,7 @@
                           </td>
                           <td rowspan="{{ ot_count }}" data-ot-row-decision="{{ a.al_remediationactionid }}"{% unless ot_signoff_due %} data-ot-no-signoff{% endunless %}>
                             {% if latest %}
-                              {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
+                              {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}{% assign ot_sn = latest.al_notes | default: '' | strip %}{% if ot_sn != '' %}<br /><span class="ot-remedial-form__note">{{ ot_sn | escape | newline_to_br }}</span>{% endif %}
                             {% elsif a.al_completedon %}
                               Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}{% if ot_signoff_due %}; awaiting supervisor{% endif %}
                             {% else %}
@@ -940,7 +950,7 @@
                     </td>
                     <td>
                       {% if latest %}
-                        {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
+                        {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}{% assign ot_sn = latest.al_notes | default: '' | strip %}{% if ot_sn != '' %}<br /><span class="ot-remedial-form__note">{{ ot_sn | escape | newline_to_br }}</span>{% endif %}
                       {% elsif a.al_completedon %}
                         Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}{% if ot_signoff_due %}; awaiting supervisor{% endif %}
                       {% else %}
@@ -1065,13 +1075,13 @@
                 {% endcomment %}
                 <th scope="row" colspan="2">Recheck required?</th>
                 <td colspan="2" data-ot-recheck-cell>
-                  {{ answers_source.al_recheckrequired.label | default: form_source.al_recheckrequired.label | default: 'The T&C Manager answers this at sign-off' | escape }}
+                  {% if ot_signoff_due %}{{ answers_source.al_recheckrequired.label | default: form_source.al_recheckrequired.label | default: 'The T&C Manager answers this at sign-off' | escape }}{% else %}{{ answers_source.al_recheckrequired.label | default: form_source.al_recheckrequired.label | default: 'Not asked: this grading needs no sign-off' | escape }}{% endif %}
                 </td>
               </tr>
               <tr>
                 <th scope="row" colspan="2">Do the remedial actions change the advice?</th>
                 <td colspan="2" data-ot-changesadvice-cell>
-                  {{ answers_source.al_changesadvice.label | default: form_source.al_changesadvice.label | default: 'The T&C Manager answers this at sign-off' | escape }}
+                  {% if ot_signoff_due %}{{ answers_source.al_changesadvice.label | default: form_source.al_changesadvice.label | default: 'The T&C Manager answers this at sign-off' | escape }}{% else %}{{ answers_source.al_changesadvice.label | default: form_source.al_changesadvice.label | default: 'Not asked: this grading needs no sign-off' | escape }}{% endif %}
                 </td>
                 <th scope="row" colspan="2">All remedial actions checked and approved?</th>
                 <td colspan="2" data-ot-approved-cell>{% if all_approved %}Yes{% elsif any_rejected %}No{% else %}—{% endif %}</td>
@@ -1178,7 +1188,7 @@
                 A sign-off recorded before that column existed carries none and reads as
                 decision and date alone - which is the most its row can honestly say.
               {% endcomment %}
-              <td data-ot-supervisor-cell>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}{% if latest_supervisor.al_signedbyname and latest_supervisor.al_signedbyname != '' %}, {{ latest_supervisor.al_signedbyname | escape }}{% endif %}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</td>
+              <td data-ot-supervisor-cell>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}{% if latest_supervisor.al_signedbyname and latest_supervisor.al_signedbyname != '' %}, {{ latest_supervisor.al_signedbyname | escape }}{% endif %}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% assign ot_supervisor_notes = latest_supervisor.al_notes | default: '' | strip %}{% if ot_supervisor_notes != '' %}<br /><span class="ot-remedial-form__note">{{ ot_supervisor_notes | escape | newline_to_br }}</span>{% endif %}{% else %}—{% endif %}</td>
             </tr>
             <tr>
               <th scope="row">
@@ -1465,9 +1475,11 @@
             <p class="ot-form-submit__hint">
               Save draft keeps what you have written without signing anything off. Save and
               sign off records every remedial action above, your answer to "Client contact
-              required?", and your sign-off, and sends the remediation to your supervisor.
-              "Recheck required?" and "Do the remedial actions change the advice?" are your
-              T&C Manager's to answer when they sign it off.
+              required?", and your sign-off.
+              {% if ot_signoff_due %}Once every action is complete, the remediation goes to your
+              T&C Manager for sign-off, and "Recheck required?" and "Do the remedial actions
+              change the advice?" are theirs to answer.{% else %}This grading needs no sign-off
+              from your T&C Manager: once every action is complete, the case closes.{% endif %}
             </p>
           </div>
         {% endif %}
@@ -1911,6 +1923,49 @@
 
 <script>
   /*
+   * Where the case is NOW, read from Dataverse after a write (reported 2026-10-07: "the
+   * wording sometimes suggests that a case is going to T&C or adviser even when that isn't
+   * the case").
+   *
+   * The adviser's and the supervisor's messages used to predict the destination - "sent to
+   * your supervisor" after every sign-off, "once the case reaches its recheck" after every
+   * approval - and the server's rules (CompleteRemediationPlugin.SignoffRequired, the recheck
+   * waiver, the Tax handback to the queue) do not live on this page. So the page reports what
+   * the server did instead. The values are CaseLifecycle.cs's; portalNextStepMessages.test.ts
+   * holds them to it. A read that fails answers null, and the messages then say only what is
+   * certain.
+   */
+  window.OT_CASE_STATUS = {
+    queued: 120910583,
+    awaitingRemediation: 120910587,
+    remediationInProgress: 120910588,
+    awaitingSignoff: 120910589,
+    awaitingRecheck: 120910590,
+    closed: 120910591
+  };
+
+  window.otCaseStatusNow = function (done) {
+    var marker = document.querySelector('[data-ot-case-status]');
+    var caseId = marker ? marker.getAttribute('data-ot-case-id') : null;
+    if (!caseId) { done(null); return; }
+
+    var read = new XMLHttpRequest();
+    read.open('GET', '/_api/al_outcomecases(' + caseId + ')?$select=al_casestatus', true);
+    read.setRequestHeader('Accept', 'application/json');
+    read.onreadystatechange = function () {
+      if (read.readyState !== 4) { return; }
+      var value = null;
+      if (read.status >= 200 && read.status < 300) {
+        try { value = JSON.parse(read.responseText).al_casestatus; } catch (e) { value = null; }
+      }
+      done(typeof value === 'number' ? value : null);
+    };
+    read.send();
+  };
+</script>
+
+<script>
+  /*
    * The adviser's half of the BR-008 loop, as one form (PP-12, FR-020, FR-021).
    *
    * Path: this page -> PATCH al_remediationaction -> CompleteRequestPlugin -> Dataverse.
@@ -2185,15 +2240,27 @@
               window.otRemediationRows.adviserCompleted(viewerName());
               window.otRemediationRows.caseStatusMayHaveMoved();
             }
-            show('Signed off. ' + pending.length + ' remedial action'
-              + (pending.length === 1 ? ' is' : 's are')
-              + ' recorded against your answer and sent to your supervisor.'
-              + ' The rows above now show what was saved. Reload the page when you want the'
-              + ' rest of it re-read, and if it still shows the old state the site cache has'
-              + ' not caught up - try again in a moment.', 'success');
-            if (window.otRemediationRows) {
-              window.otRemediationRows.offerReload(status);
-            }
+            window.otCaseStatusNow(function (value) {
+              var S = window.OT_CASE_STATUS;
+              var next = '';
+              if (value === S.awaitingSignoff) {
+                next = ' The remediation is now with your T&C Manager for sign-off.';
+              } else if (value === S.closed) {
+                next = " Nothing on this grading needs your T&C Manager's sign-off, so the case is now closed.";
+              } else if (value === S.awaitingRemediation || value === S.remediationInProgress) {
+                next = ' Other remedial actions on this case are still open; it moves on once every one is complete.';
+              }
+
+              show('Signed off. ' + pending.length + ' remedial action'
+                + (pending.length === 1 ? ' is' : 's are')
+                + ' recorded against your answer.' + next
+                + ' The rows above now show what was saved. Reload the page when you want the'
+                + ' rest of it re-read, and if it still shows the old state the site cache has'
+                + ' not caught up - try again in a moment.', 'success');
+              if (window.otRemediationRows) {
+                window.otRemediationRows.offerReload(status);
+              }
+            });
             return;
           }
 
@@ -2373,22 +2440,32 @@
       }
 
       /*
-       * What an approval leaves to do, without promising where the case went.
+       * Where the approval left the case, from its status read back after the write.
        *
-       * The obvious sentences - "the case moves to Awaiting Recheck", "the final outcome is
-       * recorded with it, which closes the case" - are both wrong on a Tax leg that still
-       * owes an AQS check: approving there returns the case to the QUEUE (OD-038), and no
-       * final outcome is recorded because the case never reaches its recheck. The page does
-       * not hold the route rules, so it says what is true either way and leaves the state to
-       * the badge, which is marked as possibly moved.
+       * This used to say "once the case reaches its recheck" whatever happened, which was
+       * wrong three ways: a waived recheck closes the case at once, a Tax leg that still owes
+       * AQS goes back to the QUEUE (OD-038), and an approval before the last one moves
+       * nothing. The page does not hold those rules, so it reports the status the server left
+       * (reported 2026-10-07), and says nothing about a status it cannot read.
        */
-      function gradeNote() {
-        if (grade && grade.value) {
-          return ' The final outcome you chose is recorded with it once the case reaches its'
-            + ' recheck, which closes the case.';
+      function afterApproval(value, graded) {
+        var S = window.OT_CASE_STATUS;
+        if (value === S.closed) {
+          return ' The case is now closed.' + (graded ? ' The final outcome you chose is recorded.' : '');
         }
-        return ' The final outcome is recorded separately, on this page, once the case reaches'
-          + ' its recheck.';
+        if (value === S.awaitingRecheck) {
+          return ' The case is at Awaiting Recheck: record the final outcome on this page to close it.';
+        }
+        if (value === S.queued) {
+          return ' The Tax check is finished, and the case goes back to the queue for its AQS check.';
+        }
+        if (value === S.awaitingSignoff) {
+          return ' Other remedial actions on this check are still waiting for a decision.';
+        }
+        if (value === S.awaitingRemediation || value === S.remediationInProgress) {
+          return ' Other remedial actions on this case are still with the adviser; it moves on once they are complete and signed off.';
+        }
+        return '';
       }
 
       // A decision made is not made again from here; the guard refuses a second one on an
@@ -2501,17 +2578,19 @@
                   decision.value === REJECTED);
                 window.otRemediationRows.caseStatusMayHaveMoved();
               }
-              show(decisionLabel() + ', recorded against ' + actionIds.length
-                + ' remedial action' + (actionIds.length === 1 ? '' : 's') + '.'
-                + (decision.value === REJECTED
-                    ? ' The actions go back to the adviser to put right.'
-                    : gradeNote())
-                + ' Reload the page when you want the rest of it re-read, and if it still'
-                + ' shows the old state the site cache has not caught up - try again in a'
-                + ' moment.', 'success');
-              if (window.otRemediationRows) {
-                window.otRemediationRows.offerReload(status);
-              }
+              var rejected = decision.value === REJECTED;
+              var graded = !!(grade && grade.value);
+              window.otCaseStatusNow(function (value) {
+                show(decisionLabel() + ', recorded against ' + actionIds.length
+                  + ' remedial action' + (actionIds.length === 1 ? '' : 's') + '.'
+                  + (rejected ? ' The actions go back to the adviser to put right.' : afterApproval(value, graded))
+                  + ' Reload the page when you want the rest of it re-read, and if it still'
+                  + ' shows the old state the site cache has not caught up - try again in a'
+                  + ' moment.', 'success');
+                if (window.otRemediationRows) {
+                  window.otRemediationRows.offerReload(status);
+                }
+              });
               return;
             }
 

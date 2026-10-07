@@ -327,8 +327,8 @@
     {% if rv.al_submittedon %}
       <div class="ot-notice" role="status">
         <strong>Submitted {{ rv.al_submittedon | date: 'dd MMM yyyy' }}.</strong>
-        This review is locked. Reopening or regrading is a T&amp;C Manager action and
-        requires a recorded reason.
+        This review is locked. If it needs changing, only a T&amp;C Manager can reopen or regrade it,
+        with a recorded reason.
       </div>
     {% elsif mine == false %}
       {% comment %}
@@ -3580,6 +3580,7 @@
       <section class="ot-card ot-submit"
                data-ot-submit
                data-review-id="{{ rv.al_reviewinstanceid }}"
+               data-case-id="{{ rv['case.al_outcomecaseid'] }}"
                aria-labelledby="ot-submit-heading">
         <h2 class="ot-card__title" id="ot-submit-heading">Submit this review</h2>
         <p>
@@ -3638,6 +3639,53 @@
           var button = root.querySelector('[data-ot-submit-button]');
           var status = root.querySelector('[data-ot-submit-status]');
           var reviewId = root.getAttribute('data-review-id');
+          var caseId = root.getAttribute('data-case-id');
+
+          /*
+           * Where the submit left the case, read from Dataverse rather than predicted
+           * (reported 2026-10-07: the wording suggested the case was going to the T&C
+           * Manager when it was not). SubmitReviewPlugin decides; the page only reports. The
+           * values are CaseLifecycle.cs's, and portalNextStepMessages.test.ts holds them to it.
+           */
+          var CASE_STATUS = {
+            queued: 120910583,
+            awaitingRemediation: 120910587,
+            remediationInProgress: 120910588,
+            awaitingSignoff: 120910589,
+            awaitingRecheck: 120910590,
+            closed: 120910591
+          };
+
+          function caseStatusNow(done) {
+            if (!caseId) { done(null); return; }
+            var read = new XMLHttpRequest();
+            read.open('GET', '/_api/al_outcomecases(' + caseId + ')?$select=al_casestatus', true);
+            read.setRequestHeader('Accept', 'application/json');
+            read.onreadystatechange = function () {
+              if (read.readyState !== 4) { return; }
+              var value = null;
+              if (read.status >= 200 && read.status < 300) {
+                try { value = JSON.parse(read.responseText).al_casestatus; } catch (e) { value = null; }
+              }
+              done(typeof value === 'number' ? value : null);
+            };
+            read.send();
+          }
+
+          // Nothing is said about a status the submit cannot lead to; a read that fails says
+          // only what is certain.
+          function whereItWent(value) {
+            if (value === CASE_STATUS.closed) {
+              return ' The case passed and is now closed.';
+            }
+            if (value === CASE_STATUS.queued) {
+              return ' The case goes back to the queue for its AQS check.';
+            }
+            if (value === CASE_STATUS.awaitingRemediation) {
+              return ' The case goes to the adviser to put right the points you marked down.';
+            }
+            return '';
+          }
 
           if (!button || !reviewId) { return; }
 
@@ -3985,7 +4033,10 @@
                    * makes this one right.
                    */
                   lockPage();
-                  show('Review submitted. This review is now locked; reopening or regrading is a T&C Manager action.', 'success');
+                  caseStatusNow(function (value) {
+                    show('Review submitted and locked.' + whereItWent(value)
+                      + ' If it needs changing, only a T&C Manager can reopen or regrade it.', 'success');
+                  });
                   return;
                 }
 

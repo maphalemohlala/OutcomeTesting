@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  liveActions,
   remediationForm,
   remediationFormLayout,
   settledChecks,
   signoffCell,
+  signoffNotes,
 } from './remediationForm';
 import type { OutcomeRow, RemediationActionRow, SignoffRow } from './remediationMapping';
 
@@ -69,10 +69,19 @@ describe('signoffCell', () => {
     expect(signoffCell(action(), [signoff()])).toBe('Approved, 2026-09-09');
   });
 
-  it('says the action is waiting on the supervisor when only the adviser has finished', () => {
-    expect(signoffCell(action({ completedOn: '20 Sep 2026', completedOnRaw: '2026-09-20' }), [])).toBe(
-      'Adviser completed 20 Sep 2026; awaiting supervisor',
-    );
+  it('says the action is waiting on the supervisor while the case is at Awaiting Sign-off', () => {
+    expect(
+      signoffCell(action({ completedOn: '20 Sep 2026', completedOnRaw: '2026-09-20' }), [], 'Awaiting Sign-off'),
+    ).toBe('Adviser completed 20 Sep 2026; awaiting supervisor');
+  });
+
+  it('does not promise a supervisor the case is not waiting on', () => {
+    // Reported 2026-10-07. A Pass with issues closes on the adviser's last completion with
+    // no sign-off at all, and an action finished while others are open waits on nobody yet.
+    const done = action({ completedOn: '20 Sep 2026', completedOnRaw: '2026-09-20' });
+    expect(signoffCell(done, [], 'Closed')).toBe('Adviser completed 20 Sep 2026');
+    expect(signoffCell(done, [], 'Remediation In Progress')).toBe('Adviser completed 20 Sep 2026');
+    expect(signoffCell(done, [])).toBe('Adviser completed 20 Sep 2026');
   });
 
   it('has nothing to say for an action nobody has acted on', () => {
@@ -262,25 +271,6 @@ describe('the checks a case has finished with (AD-114)', () => {
     expect(settledChecks(actions, [ok('t1'), ok('a1')])).toEqual(['Tax check']);
   });
 
-  it('drops a settled check off the table and keeps the live one', () => {
-    const actions = [tax('t1'), aqs('a1')];
-
-    expect(liveActions(actions, [ok('t1')]).map((a) => a.id)).toEqual(['a1']);
-  });
-
-  it('shows everything while nothing is settled', () => {
-    const actions = [tax('t1'), aqs('a1')];
-
-    expect(liveActions(actions, []).map((a) => a.id)).toEqual(['t1', 'a1']);
-  });
-
-  it('shows nothing once every check is settled, which is what the empty state is for', () => {
-    // IO-300005 on 2026-09-10: both legs approved, so the whole numbered list collapses.
-    const actions = [tax('t1'), aqs('a1')];
-
-    expect(liveActions(actions, [ok('t1'), ok('a1')])).toEqual([]);
-  });
-
   it('collapses nothing on a case that has only one check', () => {
     // Project owner, 2026-09-10: a remediation with no second check keeps exactly the
     // behaviour it had before collapsing existed. Hiding a single-leg case's only
@@ -288,7 +278,6 @@ describe('the checks a case has finished with (AD-114)', () => {
     const actions = [tax('t1'), tax('t2')];
 
     expect(settledChecks(actions, [ok('t1'), ok('t2')])).toEqual([]);
-    expect(liveActions(actions, [ok('t1'), ok('t2')]).map((a) => a.id)).toEqual(['t1', 't2']);
   });
 
   it('treats an action with no check of its own as its own group, never settled away', () => {
@@ -297,6 +286,19 @@ describe('the checks a case has finished with (AD-114)', () => {
     const actions = [action({ id: 'x', triggeredBy: null })];
 
     expect(settledChecks(actions, [ok('x')])).toEqual([]);
-    expect(liveActions(actions, [ok('x')]).map((a) => a.id)).toEqual(['x']);
+  });
+});
+
+describe('signoffNotes', () => {
+  // Reported 2026-10-07: the supervisor's notes went out in the email and were shown nowhere.
+  it('gives the notes of the latest decision on the action', () => {
+    const older = signoff({ id: 's1', decision: 'Rejected', notes: 'Evidence missing.', signedOffOn: '2026-09-08' });
+    const newer = signoff({ id: 's2', decision: 'Approved', notes: 'Now evidenced.', signedOffOn: '2026-09-10' });
+    expect(signoffNotes(action(), [older, newer])).toBe('Now evidenced.');
+  });
+
+  it('has nothing to say where the decision carried no notes, or there is no decision', () => {
+    expect(signoffNotes(action(), [signoff({ notes: '   ' })])).toBeNull();
+    expect(signoffNotes(action(), [])).toBeNull();
   });
 });

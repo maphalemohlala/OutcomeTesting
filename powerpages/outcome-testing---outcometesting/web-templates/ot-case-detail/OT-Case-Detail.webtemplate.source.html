@@ -190,6 +190,7 @@
       <entity name="al_signoff">
         <attribute name="al_remediationactionid" />
         <attribute name="al_signoffdecision" />
+        <attribute name="al_notes" />
         <attribute name="al_signedoffon" />
         <attribute name="al_signedbyname" />
         <filter type="and">
@@ -813,7 +814,7 @@
                           </td>
                           <td rowspan="{{ ot_count }}">
                             {% if latest %}
-                              {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
+                              {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}{% assign ot_sn = latest.al_notes | default: '' | strip %}{% if ot_sn != '' %}<br /><span class="ot-remedial-form__note">{{ ot_sn | escape | newline_to_br }}</span>{% endif %}
                             {% elsif a.al_completedon %}
                               Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor
                             {% else %}
@@ -854,7 +855,7 @@
                     </td>
                     <td>
                       {% if latest %}
-                        {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}
+                        {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}{% assign ot_sn = latest.al_notes | default: '' | strip %}{% if ot_sn != '' %}<br /><span class="ot-remedial-form__note">{{ ot_sn | escape | newline_to_br }}</span>{% endif %}
                       {% elsif a.al_completedon %}
                         Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor
                       {% else %}
@@ -961,7 +962,7 @@
                 sign-off recorded before that column existed carries none and reads as
                 decision and date alone, which is the most its row can honestly say.
               {% endcomment %}
-              <td>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}{% if latest_supervisor.al_signedbyname and latest_supervisor.al_signedbyname != '' %}, {{ latest_supervisor.al_signedbyname | escape }}{% endif %}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% else %}—{% endif %}</td>
+              <td>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}{% if latest_supervisor.al_signedbyname and latest_supervisor.al_signedbyname != '' %}, {{ latest_supervisor.al_signedbyname | escape }}{% endif %}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% assign ot_supervisor_notes = latest_supervisor.al_notes | default: '' | strip %}{% if ot_supervisor_notes != '' %}<br /><span class="ot-remedial-form__note">{{ ot_supervisor_notes | escape | newline_to_br }}</span>{% endif %}{% else %}—{% endif %}</td>
             </tr>
             <tr>
               <th scope="row">

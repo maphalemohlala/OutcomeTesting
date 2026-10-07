@@ -282,3 +282,41 @@ describe('the remediation form block', () => {
     expect(header).not.toContain('Changes advice');
   });
 });
+
+describe('approved checks and the notes on the remediation page', () => {
+  const signedOff = (actionId: string, notes: string | null) => ({
+    id: `s-${actionId}`,
+    reference: 'SO',
+    decision: 'Approved',
+    notes,
+    signedOffOn: '06 Oct 2026',
+    remediationAction: null,
+    remediationActionId: actionId,
+    signedOffBy: 'A Supervisor',
+  });
+
+  it('keeps an approved check on the table, named as approved, as the portal does', () => {
+    // Reported 2026-10-07: on a Tax-then-AQS case the approved Tax check came off the table,
+    // and the adviser's notes with it. The portal stopped collapsing on 2026-09-11.
+    const tax = { ...action('t1', DESCRIPTION), triggeredBy: 'Tax check', actionPerformed: 'Yes', adviserNote: 'CRA now on file.' };
+    const aqs = { ...action('a1', DESCRIPTION), triggeredBy: 'AQS check' };
+
+    const html = renderToStaticMarkup(
+      <ActionsTable actions={[tax, aqs]} signoffs={[signedOff('t1', 'Checked the CRA.')]} adviserName={null} />,
+    );
+
+    expect(html).toContain('Tax check (approved)');
+    expect(html).toContain('CRA now on file.');
+    expect(html).not.toContain('Settled and not shown');
+  });
+
+  it("shows the supervisor's notes beside their decision", () => {
+    const one = { ...action('t1', DESCRIPTION), completedOn: '05 Oct 2026' };
+    const html = renderToStaticMarkup(
+      <ActionsTable actions={[one]} signoffs={[signedOff('t1', 'Checked the CRA.')]} adviserName={null} />,
+    );
+
+    expect(html).toContain('Approved, 06 Oct 2026');
+    expect(html).toContain('Checked the CRA.');
+  });
+});

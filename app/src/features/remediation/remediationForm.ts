@@ -14,6 +14,10 @@
  */
 
 import type { OutcomeRow, RemediationActionRow, SignoffRow } from './remediationMapping';
+import { Al_outcomecasesal_casestatus } from '../../generated/models/Al_outcomecasesModel';
+
+/** CaseLifecycle.AwaitingSignoff's label, as the generated model names it. */
+const AWAITING_SIGNOFF = Al_outcomecasesal_casestatus[120910589];
 
 /** al_signoff.al_signoffdecision. Same values SubmitReviewPlugin and the Liquid use. */
 const APPROVED = 'Approved';
@@ -142,8 +146,12 @@ export function latestSignoff(
  * (`triggeredBy`, from al_reviewinstanceidname) and a case has at most one review per
  * discipline, so the name identifies it here.
  *
- * An action with no check of its own is never settled away. Rows written before the review
- * link existed carry none, and collapsing those would lose work rather than tidy it.
+ * An action with no check of its own is never settled. Rows written before the review link
+ * existed carry none.
+ *
+ * Used to name a settled check in its heading. It used to take the check's rows off the
+ * table, and on a Tax-then-AQS case the adviser's notes went with them (reported
+ * 2026-10-07); the portal had stopped collapsing on 2026-09-11.
  */
 export function settledChecks(actions: RemediationActionRow[], signoffs: SignoffRow[]): string[] {
   const order: string[] = [];
@@ -169,20 +177,12 @@ export function settledChecks(actions: RemediationActionRow[], signoffs: Signoff
 }
 
 /**
- * The actions still worth drawing: everything except the checks that are settled.
- *
- * Collapsing rather than showing them read-only is the project owner's call (2026-09-10) -
- * what stays on the form is the remediation in hand, and the case record keeps the rest.
- * When every check is settled this is empty, which the table renders as its own state
- * rather than as columns heading nothing.
+ * The supervisor's notes on the latest decision on an action, or null where it carried none
+ * (reported 2026-10-07: the notes went out in the email and were shown nowhere else).
  */
-export function liveActions(
-  actions: RemediationActionRow[],
-  signoffs: SignoffRow[],
-): RemediationActionRow[] {
-  const settled = settledChecks(actions, signoffs);
-  if (settled.length === 0) return actions;
-  return actions.filter((action) => !action.triggeredBy || !settled.includes(action.triggeredBy));
+export function signoffNotes(action: RemediationActionRow, signoffs: SignoffRow[]): string | null {
+  const notes = latestSignoff(action, signoffs)?.notes;
+  return notes && notes.trim() ? notes.trim() : null;
 }
 
 /**
@@ -193,14 +193,24 @@ export function liveActions(
  * just the decision label - an action sitting with the T&C Manager reads as blank
  * otherwise, and that is the state someone is most likely to be looking for.
  */
-export function signoffCell(action: RemediationActionRow, signoffs: SignoffRow[]): string {
+export function signoffCell(
+  action: RemediationActionRow,
+  signoffs: SignoffRow[],
+  caseStatus?: string | null,
+): string {
   const latest = latestSignoff(action, signoffs);
   if (latest) {
     return latest.signedOffOn ? `${latest.decision}, ${latest.signedOffOn}` : latest.decision;
   }
 
+  // "Awaiting supervisor" only where the case is actually waiting on one (reported
+  // 2026-10-07). A Pass with issues closes on the adviser's last completion with no sign-off,
+  // and an action finished while others are still open waits on nobody yet; the case status
+  // is the server's answer to both, where a grade-based guess here would drift from it.
   if (action.completedOn) {
-    return `Adviser completed ${action.completedOn}; awaiting supervisor`;
+    return caseStatus === AWAITING_SIGNOFF
+      ? `Adviser completed ${action.completedOn}; awaiting supervisor`
+      : `Adviser completed ${action.completedOn}`;
   }
 
   return '—';

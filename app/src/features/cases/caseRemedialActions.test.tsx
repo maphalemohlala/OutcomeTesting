@@ -85,3 +85,41 @@ describe('the case page lists the remedial actions', () => {
     expect(caseDetailCss).toMatch(/\.case-detail__checks-table thead th,\s*\.case-detail__remedial-table thead th\s*\{/);
   });
 });
+
+describe('the case page shows what the adviser and the supervisor wrote', () => {
+  // Reported 2026-10-07: "When an adviser signs off a case, the notes need to be shown on the
+  // remedial details and case details as well".
+  const decision = {
+    id: 's1',
+    reference: 'SO',
+    decision: 'Rejected',
+    notes: 'Client letter unsigned.',
+    signedOffOn: '06 Oct 2026',
+    remediationAction: null,
+    remediationActionId: 'a1',
+    signedOffBy: 'A Supervisor',
+  };
+
+  it("draws the adviser's answer and note", () => {
+    const html = renderToStaticMarkup(
+      <CaseRemedialActions actions={[action({ actionPerformed: 'Yes', adviserNote: 'ID re-verified on 3 Oct.' })]} />,
+    );
+    expect(html).toContain('Action performed');
+    expect(html).toContain('ID re-verified on 3 Oct.');
+  });
+
+  it("draws the supervisor's decision and notes", () => {
+    const html = renderToStaticMarkup(<CaseRemedialActions actions={[action({})]} signoffs={[decision]} />);
+    expect(html).toContain('Sign-off');
+    expect(html).toContain('Rejected, 06 Oct 2026');
+    expect(html).toContain('Client letter unsigned.');
+  });
+
+  it('says a completed action awaits the supervisor only while the case does', () => {
+    const done = action({ completedOn: '05 Oct 2026', completedOnRaw: '2026-10-05' });
+    expect(renderToStaticMarkup(<CaseRemedialActions actions={[done]} caseStatus="Awaiting Sign-off" />))
+      .toContain('awaiting supervisor');
+    expect(renderToStaticMarkup(<CaseRemedialActions actions={[done]} caseStatus="Closed" />))
+      .not.toContain('awaiting supervisor');
+  });
+});

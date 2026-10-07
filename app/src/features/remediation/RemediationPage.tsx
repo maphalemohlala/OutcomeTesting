@@ -11,11 +11,11 @@ import {
 } from './useRemediation';
 import { groupIssues, outcomeOf, type ActionGroup } from './remediationIssues';
 import {
-  liveActions,
   remediationForm,
   remediationFormLayout,
   settledChecks,
   signoffCell,
+  signoffNotes,
 } from './remediationForm';
 import { remediationClock } from '../../lib/workingDays';
 import type { CaseStatus } from '../../types/domain';
@@ -88,10 +88,13 @@ export function ActionsTable({
   actions,
   signoffs,
   adviserName,
+  caseStatus = null,
 }: {
   actions: RemediationActionRow[];
   signoffs: SignoffRow[];
   adviserName: string | null;
+  /** The case's status label, which decides whether a completed action awaits a supervisor. */
+  caseStatus?: string | null;
 }) {
   if (actions.length === 0) {
     return (
@@ -99,22 +102,11 @@ export function ActionsTable({
     );
   }
 
-  // A check whose every action is approved is settled, so its rows come off the table
-  // (AD-114, project owner 2026-09-10). A Tax-then-AQS case remediates twice; drawing both
-  // legs as one numbered list put the checker's finished work back in front of them every
-  // time the second leg opened. The case record keeps what is not drawn.
+  // A check whose every action is approved is settled, and is drawn like any other with the
+  // approval named in its heading - the portal's rule since 2026-09-11 (AD-114c). It used to
+  // come off this table, and on a Tax-then-AQS case the adviser's notes went with it
+  // (reported 2026-10-07).
   const settled = settledChecks(actions, signoffs);
-  const live = liveActions(actions, signoffs);
-
-  if (live.length === 0) {
-    return (
-      <p className="remediation__note">
-        Every issue raised on this case has been remediated and approved
-        {settled.length > 0 ? ` (${settled.join(', ')})` : ''}. The numbered rows are closed;
-        the case record keeps them in full.
-      </p>
-    );
-  }
 
   // The check is named once above its run of rows rather than on every one. A run is broken
   // only by a *different* named check: a group naming none carries the previous heading
@@ -124,9 +116,10 @@ export function ActionsTable({
   // closure outliving the render even though it does not.
   const groups: (ActionGroup & { heading: string | null })[] = [];
   let named: string | null = null;
-  for (const group of groupIssues(live)) {
+  for (const group of groupIssues(actions)) {
     const check = group.action.triggeredBy;
-    groups.push({ ...group, heading: check && check !== named ? check : null });
+    const heading = check && settled.includes(check) ? `${check} (approved)` : check;
+    groups.push({ ...group, heading: check && check !== named ? heading : null });
     if (check) named = check;
   }
 
@@ -181,7 +174,12 @@ export function ActionsTable({
                     <td rowSpan={lines.length}>{action.dueOn ?? '—'}</td>
                     <td rowSpan={lines.length}>{action.status}</td>
                     <td rowSpan={lines.length}>{ageOf(action)}</td>
-                    <td rowSpan={lines.length}>{signoffCell(action, signoffs)}</td>
+                    <td rowSpan={lines.length}>
+                      {signoffCell(action, signoffs, caseStatus)}
+                      {signoffNotes(action, signoffs) ? (
+                        <span className="remediation__form-note"> {signoffNotes(action, signoffs)}</span>
+                      ) : null}
+                    </td>
                   </>
                 ) : null}
               </tr>
@@ -190,16 +188,6 @@ export function ActionsTable({
         ))}
       </tbody>
     </table>
-    {settled.length > 0 ? (
-      // Said rather than left to be noticed: a checker who remembers approving five Tax
-      // actions needs to know they were settled, not that the page lost them.
-      <p className="remediation__note">
-        Settled and not shown: {settled.join(', ')}. Every action on
-        {settled.length > 1 ? ' those checks was' : ' that check was'} approved, so
-        {settled.length > 1 ? ' they are' : ' it is'} closed. The case record keeps them in
-        full.
-      </p>
-    ) : null}
     </>
   );
 }
@@ -342,6 +330,7 @@ export function RemediationPage() {
               actions={allActions}
               signoffs={state.signoffs}
               adviserName={state.outcomeCase?.adviserName ?? null}
+              caseStatus={state.outcomeCase?.status ?? null}
             />
             <RemediationFormBlock
               actions={allActions}

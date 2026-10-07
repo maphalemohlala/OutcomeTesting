@@ -212,6 +212,12 @@
   color: var(--colour-text-muted);
 }
 
+/* What the adviser and the supervisor wrote, beside their answer - as the remediation page. */
+.case-detail__remedial-note {
+  display: block;
+  font-style: italic;
+}
+
 .case-detail__checks-table tbody th {
   font-weight: 600;
 }

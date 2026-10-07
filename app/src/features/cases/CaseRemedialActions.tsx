@@ -1,6 +1,7 @@
 import { useRemediation } from '../remediation/useRemediation';
 import { groupIssues } from '../remediation/remediationIssues';
-import type { RemediationActionRow } from '../remediation/remediationMapping';
+import { signoffCell, signoffNotes } from '../remediation/remediationForm';
+import type { RemediationActionRow, SignoffRow } from '../remediation/remediationMapping';
 
 /**
  * The case's remedial actions on its details page (project owner, 2026-10-05: "Include the
@@ -10,8 +11,21 @@ import type { RemediationActionRow } from '../remediation/remediationMapping';
  *
  * The owner is the adviser the action is assigned to, never `ownerid`, which is the record's
  * system owner.
+ *
+ * What the adviser answered and noted, and what the supervisor decided and noted, are drawn
+ * too (reported 2026-10-07: "the notes need to be shown on the remedial details and case
+ * details as well") - the same cells the remediation page draws, from the same helpers.
  */
-export function CaseRemedialActions({ actions }: { actions: RemediationActionRow[] }) {
+export function CaseRemedialActions({
+  actions,
+  signoffs = [],
+  caseStatus = null,
+}: {
+  actions: RemediationActionRow[];
+  signoffs?: SignoffRow[];
+  /** The case's status label, which decides whether a completed action awaits a supervisor. */
+  caseStatus?: string | null;
+}) {
   // A deactivated action is no longer owed, and the emailed document leaves it out too.
   const live = actions.filter((action) => action.active);
   if (live.length === 0) {
@@ -28,9 +42,11 @@ export function CaseRemedialActions({ actions }: { actions: RemediationActionRow
             <th scope="col">Check</th>
             <th scope="col">Fail point</th>
             <th scope="col">Remedial action</th>
+            <th scope="col">Action performed</th>
             <th scope="col">Owner</th>
             <th scope="col">Target date</th>
             <th scope="col">Status</th>
+            <th scope="col">Sign-off</th>
           </tr>
         </thead>
         <tbody>
@@ -43,9 +59,21 @@ export function CaseRemedialActions({ actions }: { actions: RemediationActionRow
                     <td rowSpan={lines.length}>{action.triggeredBy ?? '—'}</td>
                     <td>{line.issue}</td>
                     <td rowSpan={lines.length}>{action.remedialAction ?? '—'}</td>
+                    <td rowSpan={lines.length}>
+                      {action.actionPerformed ?? '—'}
+                      {action.adviserNote ? (
+                        <span className="case-detail__remedial-note"> {action.adviserNote}</span>
+                      ) : null}
+                    </td>
                     <td rowSpan={lines.length}>{action.assignedTo ?? 'Nobody assigned'}</td>
                     <td rowSpan={lines.length}>{action.dueOn ?? '—'}</td>
                     <td rowSpan={lines.length}>{action.status}</td>
+                    <td rowSpan={lines.length}>
+                      {signoffCell(action, signoffs, caseStatus)}
+                      {signoffNotes(action, signoffs) ? (
+                        <span className="case-detail__remedial-note"> {signoffNotes(action, signoffs)}</span>
+                      ) : null}
+                    </td>
                   </>
                 ) : (
                   <td>{line.issue}</td>
@@ -62,5 +90,11 @@ export function CaseRemedialActions({ actions }: { actions: RemediationActionRow
 /** Loads the case's actions and draws them; draws nothing until they are read. */
 export function CaseRemedialActionsPanel({ caseId, reloadKey }: { caseId: string; reloadKey: number }) {
   const state = useRemediation(caseId, reloadKey);
-  return state.status === 'ready' ? <CaseRemedialActions actions={state.actions} /> : null;
+  return state.status === 'ready' ? (
+    <CaseRemedialActions
+      actions={state.actions}
+      signoffs={state.signoffs}
+      caseStatus={state.outcomeCase?.status ?? null}
+    />
+  ) : null;
 }
