@@ -154,6 +154,10 @@ The owner said "promote to both test and prod".
     Afterwards: solution 1.0.26.0, friendly name OTIS, all 35 steps enabled, both template rows
     updated (two 204s at 18:17:50Z).
   - The 204s also prove the new assembly is live in each: the old one refused the same rows.
+- **Rendered live in DEV** after the owner re-captured the portal session (20:26). On case
+  900000001, both OT Remediation and OT Case Detail render without a Liquid error. The
+  "Supervisor sign-off" row shows the rejection with the coach's notes. Action 1's cell shows the
+  reworked answer with "Earlier responses" (the 29 Sep answer) under it.
 - **Not read back:** the assembly hash, the portal templates as served, and the new column.
   The import's success and the guard accepting the new tokens stand in for them.
 
