@@ -114,7 +114,30 @@ Proved live on DEV case 900000001:
   carries no signatory name, because an API sign-off by Service Account stamps none; a portal
   sign-off does.
 
-## TEST and PROD
+## Packaged for TEST and PROD (1.0.26.0)
+
+The owner said "promote to both test and prod".
+
+- **DEV membership audit:** `al_remediationaction` is carried with its subcomponents, so
+  `al_responsehistory` travels. The guard step, both templates and the assembly were already
+  members.
+- **Version:** DEV bumped from 1.0.25.0 to 1.0.26.0.
+- **TEST package:** `artifacts/2026-10-08-remediation-rework/OutcomeTesting_1_0_26_0_managed.zip`
+  (1,399,612 bytes, sha256 `e168cc64...`). It carries:
+  - DLL `3eb1e066...`, the one live in DEV;
+  - the column, and the guard filter with `al_responsehistory`;
+  - bundle `index-BqTF9QPV.js`;
+  - both templates with the trail and the history.
+- **PROD package:** `OTIS_1_0_26_0_managed.zip` (sha256 `0ba9083b...`), from `brandpackage`
+  (7 labels). It carries the same DLL.
+- **Imports not run by the agent.** Writing the import request files was refused as a
+  production deploy, and a TEST read was refused as a production read. The runbook below goes
+  to the owner.
+- **Masked components:** per the 1.0.25.0 record, OT Remediation and OT Case Detail have only
+  their managed layer in TEST and PROD, so the import updates them. TEST's direct-push layer is
+  on OT Review Detail, which this release does not change.
+
+## TEST and PROD runbook
 
 In this order, for each environment:
 
