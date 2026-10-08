@@ -137,7 +137,27 @@ The owner said "promote to both test and prod".
   their managed layer in TEST and PROD, so the import updates them. TEST's direct-push layer is
   on OT Review Detail, which this release does not change.
 
-## TEST and PROD runbook
+## Promoted - TEST and PROD, 2026-10-08 (run by the owner)
+
+- **First attempt: no import.** `Import-Solution.ps1` could not connect: `pac`'s grant was
+  revoked (AADSTS50173, tokens valid from 2026-10-06T07:11:16Z). It still printed "Import
+  complete", and both version reads said 1.0.25.0. The template updates were refused by the
+  old guard (unknown `{{adviser}}`, `{{notesPanel}}` and `{{caseButton}}`), so nothing changed.
+  The same reads showed both rows unedited in both environments: TEST last modified
+  2026-09-30/09-25, PROD 2026-10-01.
+- **Second attempt:** the registration tool's `ImportSolutionAsync` route, with the async
+  operation polled to completion.
+  - **TEST:** import job `ca6fe7e1-...`, async operation `8cae8bf1-...`, statuscode 30.
+    Afterwards: solution 1.0.26.0, all 35 solution steps present and enabled, both template
+    rows updated (two 204s, then the new wording read back).
+  - **PROD (OTIS):** import job `3507e90c-...`, async operation `65b57a36-...`, statuscode 30.
+    Afterwards: solution 1.0.26.0, friendly name OTIS, all 35 steps enabled, both template rows
+    updated (two 204s at 18:17:50Z).
+  - The 204s also prove the new assembly is live in each: the old one refused the same rows.
+- **Not read back:** the assembly hash, the portal templates as served, and the new column.
+  The import's success and the guard accepting the new tokens stand in for them.
+
+## TEST and PROD runbook (as first planned)
 
 In this order, for each environment:
 
