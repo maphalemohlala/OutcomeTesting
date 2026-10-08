@@ -324,6 +324,7 @@
       <attribute name="al_duedate" />
       <attribute name="al_completedon" />
       <attribute name="al_adviserresponse" />
+      <attribute name="al_responsehistory" />
       <attribute name="al_remedialaction" />
       <attribute name="al_actionperformed" />
       <attribute name="al_assignedcontactid" />
@@ -841,10 +842,10 @@
                                   <label class="opt"><input type="radio" name="ot-performed-{{ a.al_remediationactionid }}" value="120910816" data-ot-performed-choice{% if a.al_actionperformed.value == 120910816 %} checked{% endif %} /> No</label>
                                 </fieldset>
                                 <label class="ot-remedial-form__note" for="ot-note-{{ a.al_remediationactionid }}">Note (optional)</label>
-                                <textarea id="ot-note-{{ a.al_remediationactionid }}" rows="2" class="ot-response-cell__text" data-ot-performed-note>{{ a.al_adviserresponse | escape }}</textarea>
+                                <textarea id="ot-note-{{ a.al_remediationactionid }}" rows="2" class="ot-response-cell__text" data-ot-performed-note>{{ a.al_adviserresponse | escape }}</textarea>{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}
                               </td>
                             {% else %}
-                              <td rowspan="{{ ot_count }}">{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}</td>
+                              <td rowspan="{{ ot_count }}">{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}</td>
                             {% endif %}
                           {% elsif ot_mine_open %}
                             <td rowspan="{{ ot_count }}" class="ot-response-cell" data-ot-response data-action-id="{{ a.al_remediationactionid }}" data-row-no="{{ row_no }}">
@@ -852,11 +853,11 @@
                               <textarea id="ot-response-{{ a.al_remediationactionid }}"
                                         rows="4"
                                         class="ot-response-cell__text"
-                                        data-ot-response-text>{{ a.al_adviserresponse | escape }}</textarea>
+                                        data-ot-response-text>{{ a.al_adviserresponse | escape }}</textarea>{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}
                             </td>
                             <td rowspan="{{ ot_count }}">—</td>
                           {% else %}
-                            <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                            <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}</td>
                             <td rowspan="{{ ot_count }}">—</td>
                           {% endif %}
                           <td rowspan="{{ ot_count }}">{% if a.al_assignedcontactid %}{{ a.al_assignedcontactid.name | escape }}{% else %}<span class="ot-unassigned" title="The adviser email on this case is held by no single portal contact, so nobody can record a response on this action. Correct the adviser's email on the case, or add the person; the open actions then move to them.">Nobody assigned{% if c.al_adviseremail %} &mdash; {{ c.al_adviseremail | escape }} {% if ot_adviser_holders > 1 %}is shared by two portal contacts{% else %}is held by no portal contact{% endif %}{% endif %}</span>{% endif %}</td>
@@ -932,10 +933,10 @@
                             <label class="opt"><input type="radio" name="ot-performed-{{ a.al_remediationactionid }}" value="120910816" data-ot-performed-choice{% if a.al_actionperformed.value == 120910816 %} checked{% endif %} /> No</label>
                           </fieldset>
                           <label class="ot-remedial-form__note" for="ot-note-{{ a.al_remediationactionid }}">Note (optional)</label>
-                          <textarea id="ot-note-{{ a.al_remediationactionid }}" rows="2" class="ot-response-cell__text" data-ot-performed-note>{{ a.al_adviserresponse | escape }}</textarea>
+                          <textarea id="ot-note-{{ a.al_remediationactionid }}" rows="2" class="ot-response-cell__text" data-ot-performed-note>{{ a.al_adviserresponse | escape }}</textarea>{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}
                         </td>
                       {% else %}
-                        <td>{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}</td>
+                        <td>{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}</td>
                       {% endif %}
                     {% elsif ot_mine_open %}
                       <td class="ot-response-cell" data-ot-response data-action-id="{{ a.al_remediationactionid }}" data-row-no="{{ row_no }}">
@@ -943,11 +944,11 @@
                         <textarea id="ot-response-{{ a.al_remediationactionid }}"
                                   rows="4"
                                   class="ot-response-cell__text"
-                                  data-ot-response-text>{{ a.al_adviserresponse | escape }}</textarea>
+                                  data-ot-response-text>{{ a.al_adviserresponse | escape }}</textarea>{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}
                       </td>
                       <td>—</td>
                     {% else %}
-                      <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                      <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}</td>
                       <td>—</td>
                     {% endif %}
                     <td>{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>

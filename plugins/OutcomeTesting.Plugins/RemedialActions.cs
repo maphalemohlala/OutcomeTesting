@@ -225,6 +225,44 @@ namespace OutcomeTesting.Plugins
 
             return value == ActionPerformedNo ? "No" : null;
         }
+
+        /// <summary>
+        /// <c>al_remediationaction</c>: the adviser's answers the T&amp;C Manager sent back, oldest
+        /// first (2026-10-08). A rejection reopens the action and the adviser writes over
+        /// <c>al_adviserresponse</c>, so the answer that was rejected used to be lost.
+        /// </summary>
+        public const string ResponseHistoryAttr = "al_responsehistory";
+
+        /// <summary>The length <see cref="ResponseHistoryAttr"/> is created with.</summary>
+        public const int ResponseHistoryLength = 20000;
+
+        /// <summary>
+        /// The history with one more answer on the end: its completion date and Yes / No on one
+        /// line, the words under it, a blank line between answers. The history unchanged where
+        /// the answer has nothing in it. The oldest answers give way where the column is full,
+        /// because the newest is the one the next decision is about.
+        /// </summary>
+        public static string WithEarlierResponse(string history, DateTime? completedOn, int? performed, string response)
+        {
+            var label = ActionPerformedLabel(performed);
+            var text = (response ?? string.Empty).Trim();
+            if (text.Length == 0 && label == null)
+            {
+                return history;
+            }
+
+            var heading = completedOn.HasValue
+                ? completedOn.Value.ToString("dd MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)
+                : "Earlier";
+            if (label != null)
+            {
+                heading += " - Action performed: " + label;
+            }
+
+            var entry = text.Length == 0 ? heading : heading + "\n" + text;
+            var all = string.IsNullOrWhiteSpace(history) ? entry : history.TrimEnd() + "\n\n" + entry;
+            return all.Length <= ResponseHistoryLength ? all : all.Substring(all.Length - ResponseHistoryLength);
+        }
     }
 
     /// <summary>One parked remedial action: the item it answers and the checker's words.</summary>

@@ -115,6 +115,17 @@ namespace OutcomeTesting.Plugins
                 throw new InvalidPluginExecutionException(trespass);
             }
 
+            if (update.Contains(RemedialActions.ResponseHistoryAttr))
+            {
+                var stored = service.Retrieve(ActionEntity, update.Id, new ColumnSet(
+                    ActionStatus, "al_completedon", RemedialActions.ResponseHistoryAttr));
+                var forged = HistoryRefusal(update, stored, RejectionJustRecorded(service, stored));
+                if (forged != null)
+                {
+                    throw new InvalidPluginExecutionException(forged);
+                }
+            }
+
             var rewrite = WriteOnceRefusal(update);
             if (rewrite != null)
             {
@@ -229,6 +240,79 @@ namespace OutcomeTesting.Plugins
         /// <see cref="Refusal"/>, where a restated value is a dropped-response retry and
         /// refusing it would strand the adviser.
         /// </summary>
+        /// <summary>
+        /// The refusal for a write of the adviser's earlier answers that is not the reopen a
+        /// rejection makes, or null (2026-10-08).
+        ///
+        /// <para>
+        /// Written by one thing only: <see cref="SignoffProgressPlugin"/>, as a rejection
+        /// reopens the action. The record of what the T&amp;C Manager sent back is worth nothing
+        /// if anyone with write access to the action can rewrite it.
+        /// </para>
+        /// <para>
+        /// <b>Decided from state, not provenance.</b> It first asked whether the write came
+        /// from inside a Create of <c>al_signoff</c>, and DEV refused the sign-off's own write
+        /// on the first live run - the parent chain is no more reliable here than
+        /// <see cref="IsSignoffInFlight"/> records it was before. So the write must look like the
+        /// reopen: the stored action Completed, set back In progress, the history only added
+        /// to, and the action's latest sign-off a rejection made since it was completed. Only
+        /// the T&amp;C Manager can make that rejection. The step's filtering attributes must
+        /// carry the column for this to run.
+        /// </para>
+        /// </summary>
+        public static string HistoryRefusal(Entity update, Entity stored, bool rejectionJustRecorded)
+        {
+            if (update == null || !update.Contains(RemedialActions.ResponseHistoryAttr))
+            {
+                return null;
+            }
+
+            var before = stored == null ? null : stored.GetAttributeValue<OptionSetValue>(ActionStatus);
+            var after = update.GetAttributeValue<OptionSetValue>(ActionStatus);
+            var reopening = before != null && before.Value == Remediation.StatusCompleted
+                && after != null && after.Value == Remediation.StatusInProgress;
+
+            var kept = stored == null ? null : stored.GetAttributeValue<string>(RemedialActions.ResponseHistoryAttr);
+            var written = update.GetAttributeValue<string>(RemedialActions.ResponseHistoryAttr) ?? string.Empty;
+            var onlyAdds = string.IsNullOrEmpty(kept) || written.StartsWith(kept.TrimEnd(), StringComparison.Ordinal);
+
+            if (reopening && onlyAdds && rejectionJustRecorded)
+            {
+                return null;
+            }
+
+            return CommandHelpers.PreconditionPrefix +
+                "The earlier responses are recorded by the sign-off when it sends work back, and cannot be edited.";
+        }
+
+        /// <summary>
+        /// Whether the action's latest sign-off is a rejection recorded since it was completed:
+        /// the decision a reopen with a new history entry has to follow.
+        /// </summary>
+        private static bool RejectionJustRecorded(IOrganizationService service, Entity stored)
+        {
+            var query = new QueryExpression("al_signoff")
+            {
+                ColumnSet = new ColumnSet("al_signoffdecision", "createdon"),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_remediationactionid", ConditionOperator.Equal, stored.Id);
+            query.AddOrder("createdon", OrderType.Descending);
+
+            var found = service.RetrieveMultiple(query).Entities;
+            if (found.Count == 0)
+            {
+                return false;
+            }
+
+            var decision = found[0].GetAttributeValue<OptionSetValue>("al_signoffdecision");
+            var made = found[0].GetAttributeValue<DateTime?>("createdon");
+            var completed = stored.GetAttributeValue<DateTime?>("al_completedon");
+            return decision != null && decision.Value == SignoffProgressPlugin.DecisionRejectedValue
+                && (!completed.HasValue || !made.HasValue || made.Value >= completed.Value);
+        }
+
         public static string TcOnlyRefusal(Entity update, bool fromSignoff)
         {
             if (update == null || fromSignoff)

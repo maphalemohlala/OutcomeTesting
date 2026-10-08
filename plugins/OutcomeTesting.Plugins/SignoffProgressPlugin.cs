@@ -153,7 +153,26 @@ namespace OutcomeTesting.Plugins
 
             if (decision.Value == DecisionRejectedValue)
             {
-                service.Update(ReopenedAction(actionRef.Id, DateTime.UtcNow));
+                var reopened = ReopenedAction(actionRef.Id, DateTime.UtcNow);
+
+                // The answer being sent back, kept before the adviser writes over it
+                // (2026-10-08). The replay guard above means one rejection keeps it once.
+                var judged = service.Retrieve(ActionEntity, actionRef.Id, new ColumnSet(
+                    "al_adviserresponse", "al_completedon", RemedialActions.ActionPerformedAttr,
+                    RemedialActions.ResponseHistoryAttr));
+                var performed = judged.GetAttributeValue<OptionSetValue>(RemedialActions.ActionPerformedAttr);
+                var history = judged.GetAttributeValue<string>(RemedialActions.ResponseHistoryAttr);
+                var kept = RemedialActions.WithEarlierResponse(
+                    history,
+                    judged.GetAttributeValue<DateTime?>("al_completedon"),
+                    performed == null ? (int?)null : performed.Value,
+                    judged.GetAttributeValue<string>("al_adviserresponse"));
+                if (kept != history)
+                {
+                    reopened[RemedialActions.ResponseHistoryAttr] = kept;
+                }
+
+                service.Update(reopened);
             }
 
             var movedTheCase = false;

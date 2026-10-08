@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace OutcomeTesting.Plugins
 {
@@ -20,9 +21,11 @@ namespace OutcomeTesting.Plugins
     /// the attribute Outlook reads; the style lets a phone shrink it.
     /// </para>
     /// <para>
-    /// <b>Markup letters only.</b> A body that does not open with a tag is a plain sentence
-    /// (allocation, approval) and is sent as written: a styled box around text that was never
-    /// laid out as markup would run its lines together.
+    /// <b>Plain letters too</b> (owner, same day: every email the same). A body that does not
+    /// open with a tag - allocation, approval, the para-planner's note - becomes one paragraph,
+    /// its line breaks kept and its bare web address made a link. It is not escaped: a stored
+    /// template is markup whatever its letter (AD-170), so its values arrive escaped already,
+    /// and the email has always rendered it as markup.
     /// </para>
     /// </summary>
     public static class NotificationFrame
@@ -45,10 +48,14 @@ namespace OutcomeTesting.Plugins
             }
 
             var trimmed = body.TrimStart();
-            if (!trimmed.StartsWith("<", StringComparison.Ordinal)
-                || trimmed.StartsWith(Marker, StringComparison.Ordinal))
+            if (trimmed.StartsWith(Marker, StringComparison.Ordinal))
             {
                 return body;
+            }
+
+            if (!trimmed.StartsWith("<", StringComparison.Ordinal))
+            {
+                body = "<p>" + Linked(body.Trim()).Replace("\r\n", "\n").Replace("\n", "<br />") + "</p>";
             }
 
             var name = NotificationTemplates.Html(
@@ -82,6 +89,20 @@ namespace OutcomeTesting.Plugins
 
                 .Append("</table></td></tr></table>")
                 .ToString();
+        }
+
+        /// <summary>
+        /// Plain text with each bare web address made a link. Punctuation that ends the
+        /// sentence is not part of the address: "...?id=1." links to "...?id=1".
+        /// </summary>
+        private static string Linked(string text)
+        {
+            return Regex.Replace(text, @"https?://[^\s<>""]+", match =>
+            {
+                var url = match.Value.TrimEnd('.', ',', ';', ':', ')', '!', '?');
+                return "<a href=\"" + url + "\" style=\"color:" + Brand + ";\">" + url + "</a>"
+                    + match.Value.Substring(url.Length);
+            });
         }
     }
 }

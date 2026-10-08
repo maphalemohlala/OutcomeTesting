@@ -51,13 +51,28 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void A_plain_text_letter_is_sent_as_it_was_written()
+        public void A_plain_text_letter_is_framed_too_and_its_link_is_made_clickable()
         {
-            // The allocation and approval letters are sentences, not markup; a frame around
-            // them would put a styled box around text the mail client lays out on its own.
-            const string body = "The Tax check on case C-1 is now assigned to you.";
+            // Owner, 2026-10-08: every email the same. The allocation and approval letters are
+            // sentences; the allocation's link was a bare address the reader had to copy.
+            var description = Sent(
+                "The Tax check on case C-1 is now assigned to you. Open it to start the review: "
+                + "https://outcometesting.powerappsportals.com/case-details?id=1.");
 
-            Assert.Equal(body, Sent(body));
+            Assert.Contains("Please do not reply to this email.", description);
+            Assert.Contains(
+                "<p>The Tax check on case C-1 is now assigned to you. Open it to start the review: "
+                + "<a href=\"https://outcometesting.powerappsportals.com/case-details?id=1\" style=\"color:#0b5394;\">"
+                + "https://outcometesting.powerappsportals.com/case-details?id=1</a>.</p>",
+                description);
+        }
+
+        [Fact]
+        public void A_plain_text_letter_keeps_its_line_breaks()
+        {
+            var framed = NotificationFrame.Wrap("First line.\nSecond line.", "OTIS");
+
+            Assert.Contains("<p>First line.<br />Second line.</p>", framed);
         }
 
         [Fact]

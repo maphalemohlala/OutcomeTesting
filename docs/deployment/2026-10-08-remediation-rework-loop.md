@@ -64,11 +64,63 @@ Tests: 1,828 plug-in tests and 1,364 app tests passed, and `tsc -b` was clean.
   pages. `app/e2e/.auth/trail-check.mjs <caseId>` renders both pages' "Supervisor sign-off"
   row once a session is captured again (`npm run e2e:auth`).
 
+## Second round, same day: earlier answers kept, every email framed
+
+- **The adviser's earlier answers.** A rejection reopened the action and the adviser wrote
+  over `al_adviserresponse`, so the answer the coach rejected was lost. A new memo column
+  `al_remediationaction.al_responsehistory` (20,000 characters) now keeps it. Before the action
+  reopens, `SignoffProgressPlugin` appends "<completed date> - Action performed: <Yes/No>" and
+  the answer. The PDF prints it under "Earlier responses:" in the Action performed cell. Both
+  portal pages draw it under every cell that shows the answer, the adviser's rework box
+  included.
+- **Only that reopen may write the history.** `RemediationResponseGuardPlugin.HistoryRefusal`
+  refuses every other write. The write must set a Completed action back In progress, may only
+  add to the history, and must follow a rejection recorded since the action was completed. The
+  first version asked whether the write came from inside a Create of `al_signoff`. DEV refused
+  the sign-off's own write on the first live run, so the rule now works from the record's state.
+  The guard's step filter now includes `al_responsehistory`.
+- **Plain-text emails are framed too.** The body becomes one paragraph with its line breaks kept
+  and its bare web address made a link. This covers allocation, approval, recheck and the
+  para-planner's note.
+
+DEV:
+
+- `addmemocolumn ... al_remediationaction al_ResponseHistory "Response history" 20000` created
+  the column in solution OutcomeTesting.
+- `setstepfilter` added `al_responsehistory` to "RemediationResponseGuardPlugin: Update of
+  al_remediationaction".
+- The assembly was pushed (sha256 `3eb1e066...`), and both web templates were pushed. Before
+  the push, DEV's copies matched the last commit.
+
+Proved live on DEV case 900000001:
+
+- **Rejection.** `al_SignOffRemediation` rejected action `fb9aac97-...` with notes. The action
+  went back In progress and kept the 29 Sep answer in `al_responsehistory`. The case went back
+  to Awaiting Remediation.
+- **Rejection email.** The outbox row greets the adviser and shows the notes panel and the
+  **Update remedial action** button to `/remediation?case=632409fe-...`. It carries both PDFs.
+  The drain sent it: the email activity's body is framed ("Outcome Testing" header, the footer),
+  and it renders as designed.
+- **Guard.** A direct PATCH of `al_responsehistory` was refused with the guard's message.
+- **Rework.** The answer was rewritten and `al_completerequested` was set (the portal's path).
+  The case then **closed** rather than returning to Awaiting Sign-off. That is correct: the case
+  is graded Pass with issues, which has closed on completion without T&C sign-off since
+  2026-10-05 (5c59725, AD-230). It sat at Awaiting Sign-off only because it got there before
+  that rule. So the second "sign-off due" email could not be shown on this case. That needs an
+  Insufficient evidence or Potential harm case, and none in DEV belongs to a mapped adviser. It
+  is covered by `SignoffDueNotificationTests.Rework_after_a_rejection_tells_the_manager_again`.
+- **PDF.** `renderpdf` from the DEV data shows the reworked answer with the rejected one under
+  "Earlier responses:". The "Supervisor sign-off" row shows the rejection and its notes. It
+  carries no signatory name, because an API sign-off by Service Account stamps none; a portal
+  sign-off does.
+
 ## TEST and PROD
 
 In this order, for each environment:
 
-1. Import the solution carrying this assembly, both web templates and the Code App.
+1. Import the solution carrying this assembly, both web templates, the Code App, the
+   `al_responsehistory` column and the guard step's new filter. Export it from DEV after a
+   membership audit, so the column is in it.
 2. Check that the SIGNOFF-REJECTED and SIGNOFF-DUE rows still hold the original wording.
 3. Run `2026-10-08-signoff-letter-links.json` against that environment. A row naming
    `{{notesPanel}}` or `{{recipient}}` is refused until the new assembly is there.

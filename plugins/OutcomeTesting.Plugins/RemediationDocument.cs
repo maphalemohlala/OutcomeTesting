@@ -149,7 +149,8 @@ namespace OutcomeTesting.Plugins
                 var details = new[]
                 {
                     RemedialText(checkerAction, adviserText),
-                    Performed(action, checkerAction, adviserText),
+                    Performed(action, checkerAction, adviserText)
+                        + Earlier(action.GetAttributeValue<string>(RemedialActions.ResponseHistoryAttr)),
                     Owner(owner),
                     Day(action.GetAttributeValue<DateTime?>("al_duedate")),
                     Status(status, labels),
@@ -239,7 +240,7 @@ namespace OutcomeTesting.Plugins
                         "al_adviserresponse", "al_assignedcontactid", "al_clientcontactrequired",
                         "al_recheckrequired", "al_changesadvice", "al_clockstartedon",
                         "al_reviewinstanceid", "createdon", RemedialActions.ActionAttr,
-                        RemedialActions.ActionPerformedAttr),
+                        RemedialActions.ActionPerformedAttr, RemedialActions.ResponseHistoryAttr),
                     Criteria = new FilterExpression(),
                 };
                 query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseRef.Id);
@@ -520,6 +521,15 @@ namespace OutcomeTesting.Plugins
             var answer = action.GetAttributeValue<OptionSetValue>(RemedialActions.ActionPerformedAttr);
             var label = RemedialActions.ActionPerformedLabel(answer == null ? (int?)null : answer.Value) ?? "—";
             return string.IsNullOrWhiteSpace(adviserText) ? label : label + "\n" + adviserText.Trim();
+        }
+
+        /// <summary>
+        /// The adviser's answers the T&amp;C Manager sent back, under the current one, or
+        /// nothing where none were (2026-10-08).
+        /// </summary>
+        private static string Earlier(string history)
+        {
+            return string.IsNullOrWhiteSpace(history) ? string.Empty : "\n\nEarlier responses:\n" + history.Trim();
         }
 
         /// <summary>

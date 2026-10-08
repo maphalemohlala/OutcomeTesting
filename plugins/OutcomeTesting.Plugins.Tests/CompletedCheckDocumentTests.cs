@@ -444,6 +444,24 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void The_remediation_form_shows_the_advisers_earlier_answers_under_the_current_one()
+        {
+            var service = Case();
+            var action = Action(service, completed: true);
+            action[RemedialActions.ActionAttr] = "Re-verify the client's ID.";
+            action[RemedialActions.ActionPerformedAttr] = new OptionSetValue(RemedialActions.ActionPerformedYes);
+            action["al_adviserresponse"] = "Signed declaration added.";
+            action[RemedialActions.ResponseHistoryAttr] = "06 Oct 2026 - Action performed: Yes\nID re-verified.";
+
+            var blocks = RemediationDocument.Blocks(service, Ref(), new DateTime(2026, 10, 8));
+            var first = Tables(blocks).First(t => t.Rows[0].Cells[0].Text == "No.").Rows.First(r => r.Cells[0].Text == "1");
+
+            Assert.Equal(
+                "Yes\nSigned declaration added.\n\nEarlier responses:\n06 Oct 2026 - Action performed: Yes\nID re-verified.",
+                first.Cells[3].Text);
+        }
+
+        [Fact]
         public void The_supervisor_sign_off_keeps_every_decision_and_its_notes()
         {
             // Reported 2026-10-08: once the coach approved the reworked remediation, the

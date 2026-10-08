@@ -167,6 +167,7 @@
         <attribute name="al_duedate" />
         <attribute name="al_completedon" />
         <attribute name="al_adviserresponse" />
+        <attribute name="al_responsehistory" />
         <attribute name="al_remedialaction" />
         <attribute name="al_actionperformed" />
         <attribute name="al_evidencereference" />
@@ -814,9 +815,9 @@
                         {% if ot_shown == 1 %}
                           {% if a.al_remedialaction %}
                             <td rowspan="{{ ot_count }}">{{ a.al_remedialaction | escape | newline_to_br }}</td>
-                            <td rowspan="{{ ot_count }}">{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}</td>
+                            <td rowspan="{{ ot_count }}">{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}</td>
                           {% else %}
-                            <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                            <td rowspan="{{ ot_count }}">{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}</td>
                             <td rowspan="{{ ot_count }}">—</td>
                           {% endif %}
                           <td rowspan="{{ ot_count }}">{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
@@ -855,9 +856,9 @@
                     <td>—</td>
                     {% if a.al_remedialaction %}
                       <td>{{ a.al_remedialaction | escape | newline_to_br }}</td>
-                      <td>{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}</td>
+                      <td>{{ a.al_actionperformed.label | default: '—' | escape }}{% if a.al_adviserresponse %}<br /><span class="ot-remedial-form__note">{{ a.al_adviserresponse | escape | newline_to_br }}</span>{% endif %}{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}</td>
                     {% else %}
-                      <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}</td>
+                      <td>{{ a.al_adviserresponse | default: '—' | escape | newline_to_br }}{% assign ot_hist = a.al_responsehistory | default: '' | strip %}{% if ot_hist != '' %}<div class="ot-remedial-form__note ot-response-history"><strong>Earlier responses</strong><br />{{ ot_hist | escape | newline_to_br }}</div>{% endif %}</td>
                       <td>—</td>
                     {% endif %}
                     <td>{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
