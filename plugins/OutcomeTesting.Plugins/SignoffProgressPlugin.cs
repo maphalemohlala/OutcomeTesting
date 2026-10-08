@@ -579,6 +579,24 @@ namespace OutcomeTesting.Plugins
                             ? string.Empty
                             : RegradeCasePlugin.FinalOutcomeLabel(finalOutcome.Value)
                     },
+                    // Read only by the rejection, which sends the adviser back to the work
+                    // (2026-10-08); the approval letters do not carry these tokens.
+                    {
+                        NotificationTemplates.TokenCaseButton,
+                        approved
+                            ? string.Empty
+                            : NotificationTemplates.CaseButton(
+                                NotificationOutbox.RemediationLink(service, caseRef),
+                                NotificationTemplates.Definition(code).ButtonLabel)
+                    },
+                    {
+                        NotificationTemplates.TokenAdviser,
+                        NotificationTemplates.Salutation(approved ? null : AdviserName(service, caseRef))
+                    },
+                    {
+                        NotificationTemplates.TokenNotesPanel,
+                        approved ? string.Empty : NotificationTemplates.NotesPanel("Notes from the T&C Manager", notes)
+                    },
                 });
 
             // Every adviser letter carries the checks (project owner, 2026-10-05).
@@ -593,6 +611,15 @@ namespace OutcomeTesting.Plugins
                 letter.Body,
                 code,
                 caseRef);
+        }
+
+        /// <summary>The adviser named on the case, or null where there is no case or no name.</summary>
+        private static string AdviserName(IOrganizationService service, EntityReference caseRef)
+        {
+            return caseRef == null
+                ? null
+                : service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet("al_advisername"))
+                    .GetAttributeValue<string>("al_advisername");
         }
 
         /// <summary>

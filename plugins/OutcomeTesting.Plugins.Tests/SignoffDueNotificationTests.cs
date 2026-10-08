@@ -96,6 +96,61 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Empty(Notifications(svc));
         }
 
+        [Fact]
+        public void The_letter_links_to_the_cases_remediation_page()
+        {
+            // Reported 2026-10-08: the coach had to open OTIS, go to Remediation and find the
+            // case under "Awaiting T&C sign-off". The page signs a case off from ?case=.
+            var svc = Ready(mapManager: true);
+            svc.Seed("powerpagesite", Guid.NewGuid(), "primarydomainname", "outcometesting.powerappsportals.com");
+
+            Complete(svc);
+
+            var row = Assert.Single(Notifications(svc));
+            Assert.Contains(
+                "https://outcometesting.powerappsportals.com/remediation?case=" + CaseId.ToString("D"),
+                row.GetAttributeValue<string>("al_body"));
+        }
+
+        [Fact]
+        public void The_letter_greets_the_manager_and_names_the_adviser()
+        {
+            var svc = Ready(mapManager: true);
+            svc.Update(new Entity("al_outcomecase", CaseId) { ["al_advisername"] = "Adam Strumidlo" });
+
+            Complete(svc);
+
+            var body = Assert.Single(Notifications(svc)).GetAttributeValue<string>("al_body");
+            Assert.StartsWith("<p>Dear Pat Manager,</p>", body);
+            Assert.Contains("Adam Strumidlo has completed every remediation action on case IO-1", body);
+        }
+
+        [Fact]
+        public void Rework_after_a_rejection_tells_the_manager_again()
+        {
+            // Reported 2026-10-08: once the adviser redid the work the coach sent back, nobody
+            // told the coach. The outbox row was keyed on the case alone, so the second
+            // "sign-off due" found the first and was dropped as a duplicate.
+            var svc = Ready(mapManager: true);
+            Complete(svc);
+
+            svc.Seed("al_signoff", Guid.NewGuid(),
+                "al_remediationactionid", new EntityReference("al_remediationaction", ActionId),
+                "al_outcomecaseid", new EntityReference("al_outcomecase", CaseId),
+                "al_signoffdecision", new OptionSetValue(SignoffProgressPlugin.DecisionRejectedValue),
+                "al_notes", "Add the client's signed declaration.",
+                "statecode", new OptionSetValue(0));
+            svc.Update(SignoffProgressPlugin.ReopenedAction(ActionId, DateTime.UtcNow));
+            svc.Update(new Entity("al_outcomecase", CaseId)
+            {
+                ["al_casestatus"] = new OptionSetValue(CaseLifecycle.AwaitingRemediation),
+            });
+
+            Complete(svc);
+
+            Assert.Equal(2, Notifications(svc).Count);
+        }
+
         // ------------------------------------------------------------------ fixture
 
         /// <summary>A case in remediation with one open action, about to be its last.</summary>

@@ -390,12 +390,36 @@ namespace OutcomeTesting.Plugins
 
                 var reference = NotificationOutbox.CaseReference(service, caseRef) ?? "a case";
 
+                // Who it greets and whose work it reports (2026-10-08).
+                var manager = routing.Manager == null
+                    ? null
+                    : service.Retrieve("contact", routing.Manager.Id, new ColumnSet("fullname"))
+                        .GetAttributeValue<string>("fullname");
+                var adviser = service.Retrieve("al_outcomecase", caseRef.Id, new ColumnSet("al_advisername"))
+                    .GetAttributeValue<string>("al_advisername");
+
+                // The case's own remediation page, where the sign-off is made (reported
+                // 2026-10-08: the coach had to find the case under "Awaiting T&C sign-off").
                 var letter = NotificationTemplates.Render(
                     service,
                     NotificationTemplates.SignoffDue,
                     new Dictionary<string, string>
                     {
                         { NotificationTemplates.TokenReference, reference },
+                        {
+                            NotificationTemplates.TokenRecipient,
+                            string.IsNullOrWhiteSpace(manager) ? "T&C Manager" : manager.Trim()
+                        },
+                        {
+                            NotificationTemplates.TokenAdviser,
+                            string.IsNullOrWhiteSpace(adviser) ? "The adviser" : adviser.Trim()
+                        },
+                        {
+                            NotificationTemplates.TokenCaseButton,
+                            NotificationTemplates.CaseButton(
+                                NotificationOutbox.RemediationLink(service, caseRef),
+                                NotificationTemplates.Definition(NotificationTemplates.SignoffDue).ButtonLabel)
+                        },
                     });
 
                 NotificationOutbox.Queue(
@@ -407,7 +431,8 @@ namespace OutcomeTesting.Plugins
                     routing.Email,
                     letter.Subject,
                     letter.Body,
-                    NotificationTemplates.SignoffDue);
+                    NotificationTemplates.SignoffDue,
+                    SignoffRound(service, caseRef.Id));
             }
             catch (Exception error)
             {
@@ -417,6 +442,52 @@ namespace OutcomeTesting.Plugins
                         + ": " + error.Message);
                 }
             }
+        }
+
+        /// <summary>
+        /// Which time this case has reached Awaiting Sign-off, as the outbox occurrence of its
+        /// "sign-off due" letter: the number of decisions already recorded on its actions.
+        ///
+        /// <para>
+        /// Keyed on the case alone, the letter went once per case for good (reported
+        /// 2026-10-08). Work the coach sent back and the adviser redid arrived at Awaiting
+        /// Sign-off a second time, found the first row and was dropped as a duplicate, so the
+        /// coach never heard it was done; the AQS leg of a Tax-then-AQS case did the same.
+        /// </para>
+        /// <para>
+        /// A new round needs at least one new decision, so the count differs each time, and a
+        /// replay of the same round counts the same rows and still collides. Counted through
+        /// the actions because a sign-off made on the portal need not carry the case.
+        /// </para>
+        /// </summary>
+        public static string SignoffRound(IOrganizationService service, Guid caseId)
+        {
+            var actions = new QueryExpression(ActionEntity)
+            {
+                ColumnSet = new ColumnSet(false),
+                Criteria = new FilterExpression(),
+            };
+            actions.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+
+            var ids = new List<object>();
+            foreach (var action in CommandHelpers.RetrieveAll(service, actions))
+            {
+                ids.Add(action.Id);
+            }
+
+            var decisions = 0;
+            if (ids.Count > 0)
+            {
+                var signoffs = new QueryExpression("al_signoff")
+                {
+                    ColumnSet = new ColumnSet(false),
+                    Criteria = new FilterExpression(),
+                };
+                signoffs.Criteria.AddCondition("al_remediationactionid", ConditionOperator.In, ids.ToArray());
+                decisions = CommandHelpers.RetrieveAll(service, signoffs).Count;
+            }
+
+            return "R" + decisions.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         /// <summary>

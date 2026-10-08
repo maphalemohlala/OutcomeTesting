@@ -653,16 +653,34 @@
           The form's last blocks are read off the same pass that draws the rows, so they
           cannot disagree with them: `all_approved` is every action's latest decision being
           Approved, `form_source` is the first action carrying the adviser's three answers,
-          `latest_adviser` is the most recently completed action, and `latest_supervisor`
-          is the case's most recent decision - the sign-off read is ordered by
-          al_signedoffon descending, so that is its first row.
+          and `latest_adviser` is the most recently completed action. The supervisor's
+          row is the whole trail of decisions, drawn below.
         {% endcomment %}
         {% assign all_approved = true %}
         {% assign any_rejected = false %}
         {% assign form_source = null %}
         {% assign latest_adviser = null %}
-        {% assign latest_supervisor = null %}
-        {% for s in case_signoffs.results.entities %}{% if latest_supervisor == null %}{% assign latest_supervisor = s %}{% endif %}{% endfor %}
+        {% comment %}
+          Every supervisor decision on the case, oldest first, each with the notes it was made
+          with (reported 2026-10-08: once the coach approved the reworked remediation, what they
+          had asked for when they sent it back was gone from the form). The read is newest first,
+          so each entry is put in front of the ones already drawn. A sitting signs a check's
+          actions off one row at a time with one set of notes, so a row with the same decision,
+          signatory, day and notes as the one before it is the same sitting and is drawn once.
+          The emailed document draws the same trail (RemediationDocument.SupervisorTrail).
+        {% endcomment %}
+        {% assign ot_supervisor_trail = '' %}
+        {% assign ot_trail_last = '' %}
+        {% for s in case_signoffs.results.entities %}
+          {% assign ot_tn = s.al_notes | default: '' | strip %}
+          {% assign ot_tb = s.al_signedbyname | default: '' | strip %}
+          {% capture ot_tkey %}{{ s.al_signoffdecision.value }}|{{ ot_tb }}|{{ s.al_signedoffon | date: 'yyyy-MM-dd' }}|{{ ot_tn }}{% endcapture %}
+          {% if ot_tkey != ot_trail_last %}
+            {% capture ot_entry %}<div class="ot-signoff-trail__entry" style="margin-bottom:0.35rem">{{ s.al_signoffdecision.label | escape }}{% if ot_tb != '' %}, {{ ot_tb | escape }}{% endif %}, {{ s.al_signedoffon | date: 'dd MMM yyyy' }}{% if ot_tn != '' %}<br /><span class="ot-remedial-form__note">{{ ot_tn | escape | newline_to_br }}</span>{% endif %}</div>{% endcapture %}
+            {% capture ot_supervisor_trail %}{{ ot_entry }}{% if ot_supervisor_trail != '' %}{{ ot_supervisor_trail }}{% endif %}{% endcapture %}
+            {% assign ot_trail_last = ot_tkey %}
+          {% endif %}
+        {% endfor %}
 
         {% comment %}
           Which checks are done with. A Tax-then-AQS case remediates twice, and the two are
@@ -962,7 +980,7 @@
                 sign-off recorded before that column existed carries none and reads as
                 decision and date alone, which is the most its row can honestly say.
               {% endcomment %}
-              <td>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}{% if latest_supervisor.al_signedbyname and latest_supervisor.al_signedbyname != '' %}, {{ latest_supervisor.al_signedbyname | escape }}{% endif %}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% assign ot_supervisor_notes = latest_supervisor.al_notes | default: '' | strip %}{% if ot_supervisor_notes != '' %}<br /><span class="ot-remedial-form__note">{{ ot_supervisor_notes | escape | newline_to_br }}</span>{% endif %}{% else %}—{% endif %}</td>
+              <td>{% if ot_supervisor_trail != '' %}{{ ot_supervisor_trail }}{% else %}—{% endif %}</td>
             </tr>
             <tr>
               <th scope="row">

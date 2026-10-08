@@ -122,6 +122,42 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void A_rejection_letter_links_the_adviser_to_the_cases_remediation_page()
+        {
+            // Reported 2026-10-08: the work came back with a note of what to do and no way in,
+            // unlike the letter that first raised it.
+            var svc = AwaitingSignoff();
+            svc.Seed("powerpagesite", Guid.NewGuid(), "primarydomainname", "outcometesting.powerappsportals.com");
+
+            Decide(svc, Actions[0], SignoffProgressPlugin.DecisionRejectedValue, "Add the declaration.");
+
+            var letter = Assert.Single(Letters(svc, NotificationOutbox.EventSignoffRejected));
+            var body = svc.Retrieve("al_notification", letter.Id, new ColumnSet("al_body"))
+                .GetAttributeValue<string>("al_body");
+            Assert.Contains(
+                "https://outcometesting.powerappsportals.com/remediation?case=" + CaseId.ToString("D"),
+                body);
+            Assert.Contains("Add the declaration.", body);
+        }
+
+        [Fact]
+        public void A_rejection_letter_greets_the_adviser_and_sets_the_notes_apart()
+        {
+            var svc = AwaitingSignoff();
+            svc.Update(new Entity("al_outcomecase", CaseId) { ["al_advisername"] = "Adam Strumidlo" });
+
+            Decide(svc, Actions[0], SignoffProgressPlugin.DecisionRejectedValue, "Add the <signed> declaration.");
+
+            var letter = Assert.Single(Letters(svc, NotificationOutbox.EventSignoffRejected));
+            var body = svc.Retrieve("al_notification", letter.Id, new ColumnSet("al_body"))
+                .GetAttributeValue<string>("al_body");
+            Assert.StartsWith("<p>Dear Adam Strumidlo,</p>", body);
+            Assert.Contains("Notes from the T&amp;C Manager", body);
+            Assert.Contains("Add the &lt;signed&gt; declaration.", body);
+            Assert.DoesNotContain(" Notes: ", body);
+        }
+
+        [Fact]
         public void Approving_every_action_on_a_check_sends_the_adviser_one_letter()
         {
             var svc = AwaitingSignoff();

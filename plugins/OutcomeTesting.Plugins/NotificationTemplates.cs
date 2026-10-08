@@ -148,6 +148,21 @@ namespace OutcomeTesting.Plugins
         public const string TokenCheck = "check";
 
         /// <summary>
+        /// The name of the person the letter is addressed to, where that is not the adviser:
+        /// the T&amp;C Manager a sign-off is waiting on (2026-10-08).
+        /// </summary>
+        public const string TokenRecipient = "recipient";
+
+        /// <summary>
+        /// The signatory's notes set apart in a shaded panel, or nothing when there are none.
+        ///
+        /// <b>Raw markup, not escaped</b>, for the reason <see cref="TokenCaseButton"/> is: it is
+        /// built here, with the notes escaped inside it, because the styling it needs is what
+        /// a stored template is cleaned of on save (2026-10-08).
+        /// </summary>
+        public const string TokenNotesPanel = "notesPanel";
+
+        /// <summary>
         /// Attaches the completed check to this letter. Renders as NOTHING in the text.
         ///
         /// <para>
@@ -174,7 +189,7 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>Tokens whose value is markup and must NOT be escaped.</summary>
         private static readonly HashSet<string> RawTokens =
-            new HashSet<string>(StringComparer.Ordinal) { TokenCaseButton };
+            new HashSet<string>(StringComparer.Ordinal) { TokenCaseButton, TokenNotesPanel };
 
         // ---------------------------------------------------------------- catalogue
 
@@ -473,6 +488,7 @@ namespace OutcomeTesting.Plugins
         {
             TokenReference, TokenAdviser, TokenClient, TokenCaseLink, TokenCaseButton,
             TokenDueText, TokenGrading, TokenFinalOutcome, TokenNotes, TokenCheck,
+            TokenRecipient, TokenNotesPanel,
         };
 
         /// <summary>
@@ -594,6 +610,28 @@ namespace OutcomeTesting.Plugins
                 + "\">" + Html(label) + "</a></p>";
         }
 
+        /// <summary>
+        /// The <see cref="TokenNotesPanel"/> markup: the notes under a heading, in a shaded
+        /// panel ruled in the button's colour, or nothing where there are no notes. A table
+        /// cell, because that is where Outlook draws a background and a border.
+        /// </summary>
+        public static string NotesPanel(string heading, string notes)
+        {
+            if (string.IsNullOrWhiteSpace(notes))
+            {
+                return string.Empty;
+            }
+
+            var text = Html(notes.Trim()).Replace("\r\n", "\n").Replace("\n", "<br />");
+
+            return "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" "
+                + "style=\"margin:16px 0;\"><tr><td style=\"border-left:4px solid #0b5394;"
+                + "background-color:#f3f6fa;padding:12px 16px;"
+                + "font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6;color:#1f2933;\">"
+                + "<strong>" + Html(heading) + "</strong><br />" + text
+                + "</td></tr></table>";
+        }
+
         /// <summary>The adviser's name for the salutation, or "Adviser".</summary>
         public static string Salutation(string adviserName)
         {
@@ -708,11 +746,19 @@ namespace OutcomeTesting.Plugins
                         + "its AQS check, and nothing more is needed from you for the Tax check.{{notes}}",
                     TokenReference, TokenNotes),
 
-                Plain(SignoffRejected, "Remediation sent back",
+                // A button since 2026-10-08, like the letter that first raised the work: the
+                // adviser was told what to redo and given no way back into the case.
+                Html(SignoffRejected, "Remediation sent back",
                     "Remediation sent back on case {{reference}}",
-                    "Your remediation on case {{reference}} has been sent back for further work. "
-                        + "The ten-working-day clock has restarted from today.{{notes}}",
-                    TokenReference, TokenNotes),
+                    "<p>Dear {{adviser}},</p>"
+                        + "<p>Your remediation on case {{reference}} has been reviewed and sent back for "
+                        + "further work. The ten-working-day clock has restarted from today.</p>"
+                        + "{{notesPanel}}"
+                        + "<p>Please use the button below to open the case and update the remedial action.</p>"
+                        + "{{caseButton}}"
+                        + "<p>Kind regards</p>",
+                    "Update remedial action",
+                    TokenReference, TokenAdviser, TokenNotes, TokenNotesPanel, TokenCaseButton),
 
                 Plain(RecheckDue, "Final outcome owed",
                     "Case {{reference}} is waiting for its final outcome",
@@ -722,11 +768,18 @@ namespace OutcomeTesting.Plugins
                         + "Open the case's remediation page and use Record the final outcome.",
                     TokenReference),
 
-                Plain(SignoffDue, "Sign-off due",
+                // A button since 2026-10-08, to the case's own remediation page, where the
+                // sign-off is made.
+                Html(SignoffDue, "Sign-off due",
                     "Sign-off needed on case {{reference}}",
-                    "The adviser has completed every remediation action on case {{reference}}, "
-                        + "so it is now waiting for your sign-off.",
-                    TokenReference),
+                    "<p>Dear {{recipient}},</p>"
+                        + "<p>{{adviser}} has completed every remediation action on case {{reference}}, "
+                        + "and it is now waiting for your sign-off.</p>"
+                        + "<p>Please use the button below to review the remediation and record your decision.</p>"
+                        + "{{caseButton}}"
+                        + "<p>Kind regards</p>",
+                    "Review and sign off",
+                    TokenReference, TokenRecipient, TokenAdviser, TokenCaseButton),
             };
 
             var map = new Dictionary<string, TemplateDefinition>(StringComparer.Ordinal);

@@ -73,10 +73,10 @@ namespace OutcomeTesting.Plugins.Tests
             var refusal = NotificationTemplateGuardPlugin.Refusal(
                 NotificationTemplates.SignoffDue,
                 "Sign-off needed on case {{reference}}",
-                "Dear {{adviser}}, case {{reference}} needs you.");
+                "Case {{reference}} was graded {{grading}}.");
 
             Assert.NotNull(refusal);
-            Assert.Contains("adviser", refusal);
+            Assert.Contains("grading", refusal);
         }
 
         [Fact]

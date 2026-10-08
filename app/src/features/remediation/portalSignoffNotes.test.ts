@@ -33,7 +33,19 @@ describe.each(pages)('%s', (_name, page) => {
     );
   });
 
-  it("draws the supervisor's latest notes in the form's sign-off row", () => {
-    expect(page).toContain("{% assign ot_supervisor_notes = latest_supervisor.al_notes | default: '' | strip %}");
+  /**
+   * Every decision, not the latest (reported 2026-10-08: once the coach approved the reworked
+   * remediation, what they had asked for when they sent it back was gone from the form). The
+   * emailed document draws the same trail - RemediationDocument.SupervisorTrail.
+   */
+  it("draws every supervisor decision, each with its notes, in the form's sign-off row", () => {
+    const row = page.slice(page.indexOf('Supervisor sign-off'));
+    const cell = row.slice(row.indexOf('<td'), row.indexOf('</td>'));
+
+    expect(cell).not.toContain('latest_supervisor');
+    expect(cell).toContain('{{ ot_supervisor_trail }}');
+    expect(page).toMatch(/\{% for s in \w+\.results\.entities %\}\s*\{% assign ot_tn = s\.al_notes \| default: '' \| strip %\}/);
+    // Oldest first: each entry is put in front of the ones already drawn, since the read is newest first.
+    expect(page).toContain('{{ ot_entry }}{% if ot_supervisor_trail != \'\' %}{{ ot_supervisor_trail }}{% endif %}');
   });
 });

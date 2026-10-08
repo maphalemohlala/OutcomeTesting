@@ -67,7 +67,8 @@ namespace OutcomeTesting.Plugins
 
             var labels = new OptionLabels(service);
             var actions = Actions(service, caseRef);
-            var signoffs = Signoffs(service, actions);
+            List<Entity> decisions;
+            var signoffs = Signoffs(service, actions, out decisions);
 
             blocks.Add(PdfBlock.Note(ProductName.RemediationFooter(ProductName.Read(service))));
             blocks.Add(PdfBlock.Title("Remediation and escalation"));
@@ -206,23 +207,11 @@ namespace OutcomeTesting.Plugins
                 PdfCell.Of(Regraded(service, caseRef, row, labels)));
             blocks.Add(PdfBlock.Table(regraded));
 
-            Entity latestSupervisor = null;
-            DateTime? latestOn = null;
-            foreach (var signoff in signoffs.Values)
-            {
-                var on = signoff.GetAttributeValue<DateTime?>("al_signedoffon");
-                if (latestSupervisor == null || (on.HasValue && (!latestOn.HasValue || on.Value > latestOn.Value)))
-                {
-                    latestSupervisor = signoff;
-                    latestOn = on;
-                }
-            }
-
             var signoffTable = new PdfTable(0.5, 0.5);
             signoffTable.AddHeader(PdfCell.Head(string.Empty), PdfCell.Head("Date"));
             signoffTable.Add(
                 PdfCell.Label("Supervisor sign-off (complete remedial task in IO)"),
-                PdfCell.Of(Supervisor(latestSupervisor, labels)));
+                PdfCell.Of(SupervisorTrail(decisions, labels)));
             signoffTable.Add(
                 PdfCell.Label("Adviser sign-off (complete remedial task in IO)"),
                 PdfCell.Of(Adviser(latestAdviser, row)));
@@ -267,10 +256,15 @@ namespace OutcomeTesting.Plugins
             return actions;
         }
 
-        /// <summary>Each action's latest sign-off, by action id.</summary>
-        private static Dictionary<Guid, Entity> Signoffs(IOrganizationService service, List<Entity> actions)
+        /// <summary>
+        /// Each action's latest sign-off, by action id; and in <paramref name="all"/>, every
+        /// decision on the case, for the supervisor's trail.
+        /// </summary>
+        private static Dictionary<Guid, Entity> Signoffs(
+            IOrganizationService service, List<Entity> actions, out List<Entity> all)
         {
             var latest = new Dictionary<Guid, Entity>();
+            all = new List<Entity>();
             if (actions.Count == 0)
             {
                 return latest;
@@ -287,13 +281,16 @@ namespace OutcomeTesting.Plugins
                 var query = new QueryExpression("al_signoff")
                 {
                     ColumnSet = new ColumnSet(
-                        "al_signoffdecision", "al_signedoffon", "al_signedbyname", "al_remediationactionid"),
+                        "al_signoffdecision", "al_signedoffon", "al_signedbyname", "al_remediationactionid",
+                        "al_notes"),
                     Criteria = new FilterExpression(),
                 };
                 query.Criteria.AddCondition("al_remediationactionid", ConditionOperator.In, ids.ToArray());
 
                 foreach (var signoff in CommandHelpers.RetrieveAll(service, query))
                 {
+                    all.Add(signoff);
+
                     var action = signoff.GetAttributeValue<EntityReference>("al_remediationactionid");
                     if (action == null)
                     {
@@ -312,6 +309,7 @@ namespace OutcomeTesting.Plugins
             catch (Exception)
             {
                 latest.Clear();
+                all.Clear();
             }
 
             return latest;
@@ -419,28 +417,73 @@ namespace OutcomeTesting.Plugins
                 : "—";
         }
 
-        private static string Supervisor(Entity signoff, OptionLabels labels)
+        /// <summary>
+        /// Every supervisor decision on the case, oldest first, each with the notes it was
+        /// made with (reported 2026-10-08).
+        ///
+        /// <para>
+        /// This cell used to show the latest decision only. A remediation sent back and then
+        /// approved read "Approved, Adam Strumidlo, 08 Oct 2026", and what the coach had asked
+        /// for - the reason the work went round again - was gone from the document.
+        /// </para>
+        /// <para>
+        /// The portal signs a check's actions off one at a time with one set of notes, so a
+        /// sitting writes a row per action. Rows in a run with the same decision, signatory,
+        /// day and notes are one sitting and print once.
+        /// </para>
+        /// </summary>
+        private static string SupervisorTrail(List<Entity> decisions, OptionLabels labels)
         {
-            if (signoff == null)
+            if (decisions.Count == 0)
             {
                 return "—";
             }
 
-            var decision = signoff.GetAttributeValue<OptionSetValue>("al_signoffdecision");
-            var parts = new List<string>();
-            if (decision != null)
+            var ordered = new List<Entity>(decisions);
+            ordered.Sort((a, b) => Nullable.Compare(
+                a.GetAttributeValue<DateTime?>("al_signedoffon"), b.GetAttributeValue<DateTime?>("al_signedoffon")));
+
+            var lines = new List<string>();
+            string previous = null;
+            foreach (var signoff in ordered)
             {
-                parts.Add(labels.Label("al_signoff", "al_signoffdecision", decision.Value));
+                var parts = new List<string>();
+                var decision = signoff.GetAttributeValue<OptionSetValue>("al_signoffdecision");
+                if (decision != null)
+                {
+                    parts.Add(Decision(decision.Value, labels));
+                }
+
+                var by = signoff.GetAttributeValue<string>("al_signedbyname");
+                if (!string.IsNullOrWhiteSpace(by))
+                {
+                    parts.Add(by.Trim());
+                }
+
+                parts.Add(Day(signoff.GetAttributeValue<DateTime?>("al_signedoffon")));
+
+                var sitting = string.Join(", ", parts.ToArray());
+                var notes = signoff.GetAttributeValue<string>("al_notes");
+                if (!string.IsNullOrWhiteSpace(notes))
+                {
+                    sitting += "\n" + notes.Trim();
+                }
+
+                if (sitting != previous)
+                {
+                    lines.Add(sitting);
+                    previous = sitting;
+                }
             }
 
-            var by = signoff.GetAttributeValue<string>("al_signedbyname");
-            if (!string.IsNullOrWhiteSpace(by))
-            {
-                parts.Add(by.Trim());
-            }
+            return string.Join("\n", lines.ToArray());
+        }
 
-            parts.Add(Day(signoff.GetAttributeValue<DateTime?>("al_signedoffon")));
-            return string.Join(", ", parts.ToArray());
+        private static string Decision(int value, OptionLabels labels)
+        {
+            return value == DecisionApproved ? "Approved"
+                : value == DecisionRejected ? "Rejected"
+                : labels.Label("al_signoff", "al_signoffdecision", value);
         }
 
         private static string Adviser(Entity action, Entity row)

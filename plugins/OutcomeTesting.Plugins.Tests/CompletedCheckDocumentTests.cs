@@ -444,6 +444,34 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void The_supervisor_sign_off_keeps_every_decision_and_its_notes()
+        {
+            // Reported 2026-10-08: once the coach approved the reworked remediation, the
+            // document showed only "Approved, Adam Strumidlo, 08 Oct 2026". The rejection
+            // before it, and what the coach asked for, were gone from the record.
+            var service = Case();
+            var first = Action(service, completed: true);
+            var second = Action(service, completed: true);
+
+            foreach (var action in new[] { first, second })
+            {
+                SignOff(service, action, 120910721, new DateTime(2026, 10, 7, 9, 0, 0, DateTimeKind.Utc),
+                    "Record the audit trail of the coach's comments.");
+                SignOff(service, action, 120910720, new DateTime(2026, 10, 8, 14, 0, 0, DateTimeKind.Utc), null);
+            }
+
+            var blocks = RemediationDocument.Blocks(service, Ref(), new DateTime(2026, 10, 8));
+            var supervisor = Tables(blocks)
+                .SelectMany(t => t.Rows)
+                .First(r => r.Cells[0].Text.StartsWith("Supervisor sign-off", StringComparison.Ordinal));
+
+            Assert.Equal(
+                "Rejected, Pat Coach, 07 Oct 2026\nRecord the audit trail of the coach's comments.\n"
+                + "Approved, Pat Coach, 08 Oct 2026",
+                supervisor.Cells[1].Text);
+        }
+
+        [Fact]
         public void Working_days_count_both_ends_and_skip_the_weekend()
         {
             // Thursday to the following Monday: Thu, Fri, Mon.
@@ -797,6 +825,18 @@ namespace OutcomeTesting.Plugins.Tests
                 r.GetAttributeValue<EntityReference>("al_reviewinstanceid").Id == reviewId
                 && r.GetAttributeValue<EntityReference>("al_questionversionid").Id == versionId);
             response["al_answerchoice"] = new OptionSetValue(choice);
+        }
+
+        private static void SignOff(
+            FakeOrganizationService service, Entity action, int decision, DateTime on, string notes)
+        {
+            service.Seed("al_signoff", Guid.NewGuid(),
+                "al_remediationactionid", action.ToEntityReference(),
+                "al_signoffdecision", new OptionSetValue(decision),
+                "al_signedoffon", on,
+                "al_signedbyname", "Pat Coach",
+                "al_notes", notes,
+                "statecode", 0);
         }
 
         private static IEnumerable<PdfTable> Tables(IEnumerable<PdfBlock> blocks)

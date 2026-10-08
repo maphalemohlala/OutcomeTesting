@@ -89,12 +89,15 @@ export const TOKEN_HELP: Record<string, string> = {
   client: 'The client’s name, or “This case” — it opens a sentence either way.',
   caseLink: 'The web address of the case in the portal, as plain text.',
   caseButton:
-    'A styled button linking to the case — to its remediation, in the remedial letters. Comes out as nothing where there is no portal.',
+    'A styled button linking to the case — to its remediation, in the remedial and sign-off letters. Comes out as nothing where there is no portal.',
   dueText: 'A sentence naming the due date, e.g. “ It is due by 3 March 2026.”, or nothing.',
   grading: 'How this letter names the grading that caused it.',
   finalOutcome: 'The final outcome recorded at sign-off.',
   notes: 'The signatory’s notes, e.g. “ Notes: …”, or nothing where they left none.',
   check: 'Which check the letter is about: “Tax check” or “AQS check”, or “review” where it cannot be told.',
+  recipient: 'The name of the T&C Manager the letter is addressed to, or “T&C Manager” where it cannot be found.',
+  notesPanel:
+    'The signatory’s notes in a shaded panel under a heading. Comes out as nothing where they left none.',
   completedCheck:
     'Attaches the completed check as a PDF. Puts nothing in the text — say what you like about it yourself.',
 };

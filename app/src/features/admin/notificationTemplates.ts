@@ -126,11 +126,11 @@ const TEMPLATES: Record<string, TemplateHint> = {
   },
   'SIGNOFF-REJECTED': {
     name: 'Remediation sent back',
-    tokens: ['reference', 'notes'],
-    isHtml: false,
+    tokens: ['reference', 'adviser', 'notes', 'notesPanel', 'caseButton'],
+    isHtml: true,
     subject: 'Remediation sent back on case {{reference}}',
     body:
-      'Your remediation on case {{reference}} has been sent back for further work. The ten-working-day clock has restarted from today.{{notes}}',
+      '<p>Dear {{adviser}},</p><p>Your remediation on case {{reference}} has been reviewed and sent back for further work. The ten-working-day clock has restarted from today.</p>{{notesPanel}}<p>Please use the button below to open the case and update the remedial action.</p>{{caseButton}}<p>Kind regards</p>',
   },
   'RECHECK-DUE': {
     name: 'Final outcome owed',
@@ -142,11 +142,11 @@ const TEMPLATES: Record<string, TemplateHint> = {
   },
   'SIGNOFF-DUE': {
     name: 'Sign-off due',
-    tokens: ['reference'],
-    isHtml: false,
+    tokens: ['reference', 'recipient', 'adviser', 'caseButton'],
+    isHtml: true,
     subject: 'Sign-off needed on case {{reference}}',
     body:
-      'The adviser has completed every remediation action on case {{reference}}, so it is now waiting for your sign-off.',
+      '<p>Dear {{recipient}},</p><p>{{adviser}} has completed every remediation action on case {{reference}}, and it is now waiting for your sign-off.</p><p>Please use the button below to review the remediation and record your decision.</p>{{caseButton}}<p>Kind regards</p>',
   },
 };
 

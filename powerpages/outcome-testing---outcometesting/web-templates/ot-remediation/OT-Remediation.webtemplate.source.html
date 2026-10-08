@@ -639,13 +639,26 @@
               {% assign form_source = null %}
               {% assign latest_adviser = null %}
               {% comment %}
-                The case's most recent supervisor decision. The sign-off read is ordered by
-                al_signedoffon descending, so this is its first row - taken here rather than
-                from inside the row loop, which would give whichever action came first in
-                target-date order and not the latest decision.
+                Every supervisor decision on the case, oldest first, each with the notes it was made
+                with (reported 2026-10-08: once the coach approved the reworked remediation, what they
+                had asked for when they sent it back was gone from the form). The read is newest first,
+                so each entry is put in front of the ones already drawn. A sitting signs a check's
+                actions off one row at a time with one set of notes, so a row with the same decision,
+                signatory, day and notes as the one before it is the same sitting and is drawn once.
+                The emailed document draws the same trail (RemediationDocument.SupervisorTrail).
               {% endcomment %}
-              {% assign latest_supervisor = null %}
-              {% if signoffs %}{% for s in signoffs.results.entities %}{% if latest_supervisor == null %}{% assign latest_supervisor = s %}{% endif %}{% endfor %}{% endif %}
+              {% assign ot_supervisor_trail = '' %}
+              {% assign ot_trail_last = '' %}
+              {% if signoffs %}{% for s in signoffs.results.entities %}
+                {% assign ot_tn = s.al_notes | default: '' | strip %}
+                {% assign ot_tb = s.al_signedbyname | default: '' | strip %}
+                {% capture ot_tkey %}{{ s.al_signoffdecision.value }}|{{ ot_tb }}|{{ s.al_signedoffon | date: 'yyyy-MM-dd' }}|{{ ot_tn }}{% endcapture %}
+                {% if ot_tkey != ot_trail_last %}
+                  {% capture ot_entry %}<div class="ot-signoff-trail__entry" style="margin-bottom:0.35rem">{{ s.al_signoffdecision.label | escape }}{% if ot_tb != '' %}, {{ ot_tb | escape }}{% endif %}, {{ s.al_signedoffon | date: 'dd MMM yyyy' }}{% if ot_tn != '' %}<br /><span class="ot-remedial-form__note">{{ ot_tn | escape | newline_to_br }}</span>{% endif %}</div>{% endcapture %}
+                  {% capture ot_supervisor_trail %}{{ ot_entry }}{% if ot_supervisor_trail != '' %}{{ ot_supervisor_trail }}{% endif %}{% endcapture %}
+                  {% assign ot_trail_last = ot_tkey %}
+                {% endif %}
+              {% endfor %}{% endif %}
               {% comment %}
                 A review raises one action per thing the checker marked down (2026-09-10),
                 and every one carries the same provenance in its own description. Each
@@ -1188,7 +1201,7 @@
                 A sign-off recorded before that column existed carries none and reads as
                 decision and date alone - which is the most its row can honestly say.
               {% endcomment %}
-              <td data-ot-supervisor-cell>{% if latest_supervisor %}{{ latest_supervisor.al_signoffdecision.label | escape }}{% if latest_supervisor.al_signedbyname and latest_supervisor.al_signedbyname != '' %}, {{ latest_supervisor.al_signedbyname | escape }}{% endif %}, {{ latest_supervisor.al_signedoffon | date: 'dd MMM yyyy' }}{% assign ot_supervisor_notes = latest_supervisor.al_notes | default: '' | strip %}{% if ot_supervisor_notes != '' %}<br /><span class="ot-remedial-form__note">{{ ot_supervisor_notes | escape | newline_to_br }}</span>{% endif %}{% else %}—{% endif %}</td>
+              <td data-ot-supervisor-cell>{% if ot_supervisor_trail != '' %}{{ ot_supervisor_trail }}{% else %}—{% endif %}</td>
             </tr>
             <tr>
               <th scope="row">

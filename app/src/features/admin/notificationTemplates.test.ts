@@ -147,7 +147,7 @@ describe('notificationTemplates', () => {
   });
 
   it('reports a token the letter does not supply', () => {
-    expect(unknownTokens('SIGNOFF-DUE', 'Subject', 'Dear {{adviser}}')).toEqual(['adviser']);
+    expect(unknownTokens('SIGNOFF-DUE', 'Subject', 'Graded {{grading}}')).toEqual(['grading']);
   });
 
   it('accepts the tokens a letter does supply', () => {

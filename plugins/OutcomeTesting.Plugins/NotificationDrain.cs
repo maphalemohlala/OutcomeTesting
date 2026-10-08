@@ -131,7 +131,13 @@ namespace OutcomeTesting.Plugins
 
             try
             {
-                var emailId = service.Create(Compose(notification, recipient, from));
+                var email = Compose(notification, recipient, from);
+
+                // Markup letters go out in the house frame (2026-10-08); plain ones as written.
+                email["description"] = NotificationFrame.Wrap(
+                    email.GetAttributeValue<string>("description"), ProductName.Read(service));
+
+                var emailId = service.Create(email);
 
                 Attach(service, notification, emailId);
 

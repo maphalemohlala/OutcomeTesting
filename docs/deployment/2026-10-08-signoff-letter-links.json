@@ -1,0 +1,5 @@
+[
+ {"verb": "PATCH", "path": "al_notificationtemplates(al_templatecode='SIGNOFF-REJECTED')", "body": {"al_subject": "Remediation sent back on case {{reference}}", "al_body": "<p>Dear {{adviser}},</p><p>Your remediation on case {{reference}} has been reviewed and sent back for further work. The ten-working-day clock has restarted from today.</p>{{notesPanel}}<p>Please use the button below to open the case and update the remedial action.</p>{{caseButton}}<p>Kind regards</p>"}},
+ {"verb": "PATCH", "path": "al_notificationtemplates(al_templatecode='SIGNOFF-DUE')", "body": {"al_subject": "Sign-off needed on case {{reference}}", "al_body": "<p>Dear {{recipient}},</p><p>{{adviser}} has completed every remediation action on case {{reference}}, and it is now waiting for your sign-off.</p><p>Please use the button below to review the remediation and record your decision.</p>{{caseButton}}<p>Kind regards</p>"}},
+ {"verb": "GET", "path": "al_notificationtemplates?$select=al_templatecode,al_subject,al_body,modifiedon&$filter=al_templatecode eq 'SIGNOFF-REJECTED' or al_templatecode eq 'SIGNOFF-DUE'"}
+]
