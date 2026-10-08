@@ -157,6 +157,43 @@ The owner said "promote to both test and prod".
 - **Not read back:** the assembly hash, the portal templates as served, and the new column.
   The import's success and the guard accepting the new tokens stand in for them.
 
+### The import function that worked
+
+Run it from the repo root in PowerShell. It needs no `pac`.
+
+```powershell
+$env:DOTNET_ROLL_FORWARD='Major'
+$tool='plugins\OutcomeTesting.Registration\bin\Debug\net8.0\OutcomeTesting.Registration.dll'
+$A='artifacts\2026-10-08-remediation-rework'
+
+function Import-Package($org, $zip, $name) {
+  $req = Join-Path (Get-Location) "$A\import-$name.req.json"
+  $out = Join-Path (Get-Location) "$A\import-$name.out.json"
+  $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Resolve-Path "$A\$zip").Path))
+  $body = @{ CustomizationFile = $b64; PublishWorkflows = $true; OverwriteUnmanagedCustomizations = $false; ImportJobId = [guid]::NewGuid().ToString() }
+  [IO.File]::WriteAllText($req, (ConvertTo-Json -InputObject @(@{ verb = 'POST'; path = 'ImportSolutionAsync'; body = $body }) -Depth 5 -Compress))
+  dotnet $tool webapimany $org "@$req" $out
+  $op = (Get-Content $out -Raw | ConvertFrom-Json)[0].body.AsyncOperationId
+  if (-not $op) { Write-Host "NO IMPORT STARTED - see $out"; return }
+  Write-Host "Import running: async operation $op"
+  do {
+    Start-Sleep -Seconds 20
+    $r = dotnet $tool webapi $org GET "asyncoperations($op)?`$select=statecode,statuscode,message" | Select-String '^\{' | ForEach-Object { $_.Line | ConvertFrom-Json }
+    Write-Host ("  state {0}, status {1}" -f $r.statecode, $r.statuscode)
+  } while ($r.statecode -ne 3)
+  if ($r.statuscode -ne 30) { Write-Host "IMPORT FAILED: $($r.message)"; return }
+  dotnet $tool webapi $org GET "solutions?`$select=version,friendlyname&`$filter=uniquename eq 'OutcomeTesting'"
+  dotnet $tool verifysteps $org 'src\SdkMessageProcessingSteps'
+  dotnet $tool webapimany $org '@docs\deployment\2026-10-08-signoff-letter-links.json'
+}
+
+Import-Package 'https://org37995f36.crm11.dynamics.com' 'OutcomeTesting_1_0_26_0_managed.zip' 'test'
+Import-Package 'https://org3461d426.crm11.dynamics.com' 'OTIS_1_0_26_0_managed.zip' 'prod'
+```
+
+For the next release, change `$A`, the zip names and the template-row file. Drop the last line
+inside the function when the release changes no template wording.
+
 ## TEST and PROD runbook (as first planned)
 
 In this order, for each environment:
