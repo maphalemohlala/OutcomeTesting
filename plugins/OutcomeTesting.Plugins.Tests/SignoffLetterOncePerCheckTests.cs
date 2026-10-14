@@ -103,6 +103,29 @@ namespace OutcomeTesting.Plugins.Tests
             SignoffProgressPlugin.Progress(svc, new FakePluginExecutionContext(), signoff);
         }
 
+        /// <summary>One portal sitting: the same decision and notes on every action, one at a time.</summary>
+        private static void DecideAll(FakeOrganizationService svc, int decision, string notes = null)
+        {
+            foreach (var action in Actions)
+            {
+                Decide(svc, action, decision, notes);
+            }
+        }
+
+        /// <summary>The adviser reworks every action and the check comes back for sign-off.</summary>
+        private static void Rework(FakeOrganizationService svc)
+        {
+            foreach (var action in Actions)
+            {
+                svc.Update(new Entity("al_remediationaction", action)
+                {
+                    ["al_actionstatus"] = new OptionSetValue(Remediation.StatusCompleted),
+                });
+            }
+
+            SetCaseStatus(svc, CaseLifecycle.AwaitingSignoff);
+        }
+
         private static void SetCaseStatus(FakeOrganizationService svc, int status)
         {
             svc.Update(new Entity("al_outcomecase", CaseId) { ["al_casestatus"] = new OptionSetValue(status) });
@@ -129,7 +152,7 @@ namespace OutcomeTesting.Plugins.Tests
             var svc = AwaitingSignoff();
             svc.Seed("powerpagesite", Guid.NewGuid(), "primarydomainname", "outcometesting.powerappsportals.com");
 
-            Decide(svc, Actions[0], SignoffProgressPlugin.DecisionRejectedValue, "Add the declaration.");
+            DecideAll(svc, SignoffProgressPlugin.DecisionRejectedValue, "Add the declaration.");
 
             var letter = Assert.Single(Letters(svc, NotificationOutbox.EventSignoffRejected));
             var body = svc.Retrieve("al_notification", letter.Id, new ColumnSet("al_body"))
@@ -146,7 +169,7 @@ namespace OutcomeTesting.Plugins.Tests
             var svc = AwaitingSignoff();
             svc.Update(new Entity("al_outcomecase", CaseId) { ["al_advisername"] = "Adam Strumidlo" });
 
-            Decide(svc, Actions[0], SignoffProgressPlugin.DecisionRejectedValue, "Add the <signed> declaration.");
+            DecideAll(svc, SignoffProgressPlugin.DecisionRejectedValue, "Add the <signed> declaration.");
 
             var letter = Assert.Single(Letters(svc, NotificationOutbox.EventSignoffRejected));
             var body = svc.Retrieve("al_notification", letter.Id, new ColumnSet("al_body"))
@@ -186,29 +209,27 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void Rejecting_several_actions_in_one_sitting_sends_one_letter()
         {
-            // The first rejection sends the check back; the rest add to a remediation the
-            // adviser is already being told to rework.
             var svc = AwaitingSignoff();
 
-            foreach (var action in Actions)
-            {
-                Decide(svc, action, SignoffProgressPlugin.DecisionRejectedValue);
-            }
+            DecideAll(svc, SignoffProgressPlugin.DecisionRejectedValue);
 
             Assert.Single(Letters(svc, NotificationOutbox.EventSignoffRejected));
         }
 
         [Fact]
-        public void A_check_sent_back_with_the_rest_approved_gets_only_the_rejection()
+        public void No_rejection_letter_goes_until_the_sitting_has_reached_every_action()
         {
+            // Reported 2026-10-14. The letter's documents are drawn when it is queued; queued
+            // on the first rejection, they showed one action sent back and the rest still
+            // "Adviser completed; awaiting supervisor", unlike the portal a moment later.
             var svc = AwaitingSignoff();
 
-            Decide(svc, Actions[0], SignoffProgressPlugin.DecisionRejectedValue);
-            Decide(svc, Actions[1], SignoffProgressPlugin.DecisionApprovedValue);
-            Decide(svc, Actions[2], SignoffProgressPlugin.DecisionApprovedValue);
+            Decide(svc, Actions[0], SignoffProgressPlugin.DecisionRejectedValue, "Evidence missing.");
+            Decide(svc, Actions[1], SignoffProgressPlugin.DecisionRejectedValue, "Evidence missing.");
+            Assert.Empty(Letters(svc, NotificationOutbox.EventSignoffRejected));
 
+            Decide(svc, Actions[2], SignoffProgressPlugin.DecisionRejectedValue, "Evidence missing.");
             Assert.Single(Letters(svc, NotificationOutbox.EventSignoffRejected));
-            Assert.Empty(Letters(svc, NotificationOutbox.EventSignoffApproved));
         }
 
         [Fact]
@@ -220,6 +241,13 @@ namespace OutcomeTesting.Plugins.Tests
             // the adviser has to hear about it.
             var svc = AwaitingSignoff();
             SetCaseStatus(svc, CaseLifecycle.AwaitingRemediation);
+            foreach (var stillOpen in new[] { Actions[1], Actions[2] })
+            {
+                svc.Update(new Entity("al_remediationaction", stillOpen)
+                {
+                    ["al_actionstatus"] = new OptionSetValue(Remediation.StatusInProgress),
+                });
+            }
 
             Decide(svc, Actions[0], SignoffProgressPlugin.DecisionRejectedValue, "Evidence missing.");
 
@@ -230,23 +258,10 @@ namespace OutcomeTesting.Plugins.Tests
         public void A_later_sitting_sends_its_own_rejection_letter()
         {
             var svc = AwaitingSignoff();
-            Decide(svc, Actions[0], SignoffProgressPlugin.DecisionRejectedValue, "First pass.",
-                DateTime.UtcNow.AddMinutes(-30));
+            DecideAll(svc, SignoffProgressPlugin.DecisionRejectedValue, "First pass.");
+            Rework(svc);
 
-            Decide(svc, Actions[1], SignoffProgressPlugin.DecisionRejectedValue, "First pass.");
-
-            Assert.Equal(2, Letters(svc, NotificationOutbox.EventSignoffRejected).Length);
-        }
-
-        [Fact]
-        public void A_rejection_with_different_notes_is_its_own_decision()
-        {
-            // The portal sends one sitting as one set of notes; different words are a
-            // different decision even minutes apart.
-            var svc = AwaitingSignoff();
-            Decide(svc, Actions[0], SignoffProgressPlugin.DecisionRejectedValue, "Evidence missing.");
-
-            Decide(svc, Actions[1], SignoffProgressPlugin.DecisionRejectedValue, "Client letter unsigned.");
+            DecideAll(svc, SignoffProgressPlugin.DecisionRejectedValue, "First pass.");
 
             Assert.Equal(2, Letters(svc, NotificationOutbox.EventSignoffRejected).Length);
         }
@@ -343,22 +358,10 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // A second round is a second decision, and the adviser must hear about it.
             var svc = AwaitingSignoff();
-            Decide(svc, Actions[0], SignoffProgressPlugin.DecisionRejectedValue);
+            DecideAll(svc, SignoffProgressPlugin.DecisionRejectedValue);
+            Rework(svc);
 
-            // The adviser reworks the action and the check comes back for sign-off.
-            svc.Update(new Entity("al_remediationaction", Actions[0])
-            {
-                ["al_actionstatus"] = new OptionSetValue(Remediation.StatusCompleted),
-            });
-            svc.Update(new Entity("al_outcomecase", CaseId)
-            {
-                ["al_casestatus"] = new OptionSetValue(CaseLifecycle.AwaitingSignoff),
-            });
-
-            foreach (var action in Actions)
-            {
-                Decide(svc, action, SignoffProgressPlugin.DecisionApprovedValue);
-            }
+            DecideAll(svc, SignoffProgressPlugin.DecisionApprovedValue);
 
             Assert.Single(Letters(svc, NotificationOutbox.EventSignoffRejected));
             Assert.Single(Letters(svc, NotificationOutbox.EventSignoffApproved));

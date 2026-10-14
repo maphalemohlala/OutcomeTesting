@@ -258,9 +258,7 @@ namespace OutcomeTesting.Plugins
             var handedOnToAqs = decision.Value == DecisionApprovedValue
                 && statusAfter == CaseLifecycle.Queued;
 
-            if (EarnsSignoffLetter(
-                    service, decision.Value, caseId, reviewId, signoff.Id,
-                    signoff.GetAttributeValue<string>(NotesAttr), movedTheCase))
+            if (EarnsSignoffLetter(service, decision.Value, caseId, reviewId, movedTheCase))
             {
                 QueueSignoffNotification(
                     service, context, signoff, actionRef, decision.Value, closedOnTheApproval, handedOnToAqs);
@@ -296,12 +294,13 @@ namespace OutcomeTesting.Plugins
         /// one on the check. That is the only point at which there is somewhere to say it
         /// went. A check with an unapproved rejection in it never moves, which is right: it
         /// went back.</item>
-        /// <item>A <b>rejection</b> is announced unless another rejection on the same check,
-        /// with the same notes, was recorded in the last <see cref="SittingMinutes"/> minutes.
-        /// That is one sitting: the portal posts one set of notes for every action it sends
-        /// back. It was keyed on the case being at Awaiting Sign-off until the audit found
-        /// the panel is offered at Awaiting Remediation too, where that rule sent nothing at
-        /// all for a rejection that reopened an action.</item>
+        /// <item>A <b>rejection</b> is announced by the LAST sign-off of its sitting: the one
+        /// that leaves no action on the check Completed and still to be decided. The portal's
+        /// panel puts every such action in one sitting under one decision, and this action is
+        /// already reopened by the time this asks. It used to be announced by the FIRST, and
+        /// the documents drawn then showed one action sent back and the rest still "Adviser
+        /// completed; awaiting supervisor" - not what the portal showed a moment later
+        /// (reported 2026-10-14).</item>
         /// </list>
         /// <para>
         /// A sign-off whose case cannot be found keeps the letter it always had: with no case
@@ -313,8 +312,6 @@ namespace OutcomeTesting.Plugins
             int decision,
             Guid? caseId,
             Guid? reviewId,
-            Guid signoffId,
-            string notes,
             bool movedTheCase)
         {
             if (!caseId.HasValue)
@@ -322,53 +319,9 @@ namespace OutcomeTesting.Plugins
                 return true;
             }
 
-            if (decision == DecisionRejectedValue)
-            {
-                return !EarlierRejectionInSitting(service, caseId.Value, reviewId, signoffId, notes);
-            }
-
-            return movedTheCase;
-        }
-
-        /// <summary>How close together two rejections must be to count as one sitting.</summary>
-        public const int SittingMinutes = 10;
-
-        /// <summary>
-        /// Whether another rejection on this check, with the same notes, was recorded in the
-        /// last <see cref="SittingMinutes"/> minutes. Read under the case lock, so the rows of a
-        /// sitting are all committed by the time the next one asks.
-        /// </summary>
-        private static bool EarlierRejectionInSitting(
-            IOrganizationService service, Guid caseId, Guid? reviewId, Guid signoffId, string notes)
-        {
-            var actionIds = ActionsOfCheck(service, caseId, reviewId);
-            if (actionIds.Length == 0)
-            {
-                return false;
-            }
-
-            var earlier = new QueryExpression(SignoffEntity)
-            {
-                ColumnSet = new ColumnSet(NotesAttr),
-                Criteria = new FilterExpression(),
-            };
-            earlier.Criteria.AddCondition(ActionLookup, ConditionOperator.In, actionIds);
-            earlier.Criteria.AddCondition(DecisionAttr, ConditionOperator.Equal, DecisionRejectedValue);
-            earlier.Criteria.AddCondition(
-                "createdon", ConditionOperator.GreaterEqual, DateTime.UtcNow.AddMinutes(-SittingMinutes));
-
-            // Compared here rather than in the query: notes is a multi-line column.
-            var mine = (notes ?? string.Empty).Trim();
-            foreach (var row in service.RetrieveMultiple(earlier).Entities)
-            {
-                var theirs = (row.GetAttributeValue<string>(NotesAttr) ?? string.Empty).Trim();
-                if (row.Id != signoffId && string.Equals(theirs, mine, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return decision == DecisionRejectedValue
+                ? !AnyAwaitingSignoff(service, caseId.Value, reviewId, completedOnly: true)
+                : movedTheCase;
         }
 
         /// <summary>
@@ -676,12 +629,16 @@ namespace OutcomeTesting.Plugins
         /// Scoped to the review instance when the action carries one. Rows written before
         /// that link existed carry none, and gating those on nothing would restore the
         /// behaviour this exists to stop, so the case is the scope instead.
+        ///
+        /// <paramref name="completedOnly"/> counts only actions the adviser has completed -
+        /// those the supervisor's panel is offering now, not those back with the adviser.
         /// </summary>
-        public static bool AnyAwaitingSignoff(IOrganizationService service, Guid caseId, Guid? reviewId)
+        public static bool AnyAwaitingSignoff(
+            IOrganizationService service, Guid caseId, Guid? reviewId, bool completedOnly = false)
         {
             // Matched on the actions themselves rather than on the case, because a sign-off
             // does not always carry the case lookup - ResolveCase above exists for that.
-            var keys = ActionsOfCheck(service, caseId, reviewId);
+            var keys = ActionsOfCheck(service, caseId, reviewId, completedOnly);
             if (keys.Length == 0)
             {
                 return false;
@@ -721,7 +678,8 @@ namespace OutcomeTesting.Plugins
         /// remediations. Rows written before that link existed carry none, and gating those on
         /// nothing would restore what this exists to stop, so the case is the scope instead.
         /// </summary>
-        private static object[] ActionsOfCheck(IOrganizationService service, Guid caseId, Guid? reviewId)
+        private static object[] ActionsOfCheck(
+            IOrganizationService service, Guid caseId, Guid? reviewId, bool completedOnly = false)
         {
             var actions = new QueryExpression(ActionEntity)
             {
@@ -729,6 +687,10 @@ namespace OutcomeTesting.Plugins
                 Criteria = new FilterExpression(),
             };
             actions.Criteria.AddCondition(CaseLookup, ConditionOperator.Equal, caseId);
+            if (completedOnly)
+            {
+                actions.Criteria.AddCondition(ActionStatus, ConditionOperator.Equal, Remediation.StatusCompleted);
+            }
             if (reviewId.HasValue)
             {
                 actions.Criteria.AddCondition(ReviewLookup, ConditionOperator.Equal, reviewId.Value);
