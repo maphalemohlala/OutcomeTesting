@@ -164,7 +164,6 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-border-strong);
 }
 
 .review__unavailable h2 {

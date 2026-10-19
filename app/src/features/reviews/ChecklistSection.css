@@ -3,7 +3,6 @@
   margin-bottom: var(--space-5);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-action);
 }
 
 .checklist-items__heading {

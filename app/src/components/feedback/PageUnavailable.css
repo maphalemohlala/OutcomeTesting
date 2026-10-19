@@ -3,7 +3,6 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-border-strong);
 }
 
 .page-unavailable h2 {

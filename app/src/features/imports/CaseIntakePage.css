@@ -52,15 +52,14 @@
   padding: var(--space-3) var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-action);
 }
 
 .intake__notice--success {
-  border-left-color: var(--colour-outcome-pass);
+  border-color: var(--colour-outcome-pass);
 }
 
 .intake__notice--error {
-  border-left-color: var(--colour-outcome-harm);
+  border-color: var(--colour-outcome-harm);
 }
 
 .intake__heading {
@@ -120,7 +119,6 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-border-strong);
 }
 
 .intake__unavailable h2 {

@@ -77,7 +77,6 @@
   padding: var(--space-3) var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-stage-active);
 }
 
 .people__summary-value {
@@ -97,7 +96,6 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-border-strong);
 }
 
 .people__unavailable h2 {

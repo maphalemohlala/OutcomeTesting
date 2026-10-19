@@ -1,21 +1,32 @@
 .stage {
-  display: inline-block;
-  padding-left: var(--space-3);
-  border-left: 3px solid var(--colour-stage-waiting);
+  --stage-colour: var(--colour-stage-waiting);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   white-space: nowrap;
 }
 
+/* The tone as a dot beside the words; the words carry the meaning, the dot only groups. */
+.stage::before {
+  content: '';
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--stage-colour);
+}
+
 .stage[data-tone='active'] {
-  border-left-color: var(--colour-stage-active);
+  --stage-colour: var(--colour-stage-active);
   font-weight: 600;
 }
 
 .stage[data-tone='blocked'] {
-  border-left-color: var(--colour-stage-blocked);
+  --stage-colour: var(--colour-stage-blocked);
   font-weight: 600;
 }
 
 .stage[data-tone='closed'] {
-  border-left-color: var(--colour-stage-closed);
+  --stage-colour: var(--colour-stage-closed);
   color: var(--colour-text-muted);
 }

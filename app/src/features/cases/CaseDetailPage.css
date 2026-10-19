@@ -20,7 +20,6 @@
   margin-bottom: var(--space-5);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-action);
 }
 
 .case-detail__summary-item {
@@ -158,7 +157,6 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-border-strong);
 }
 
 .case-detail__unavailable h2 {

@@ -23,19 +23,18 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-stage-active);
 }
 
 .reports__stat[data-tone='blocked'] {
-  border-left-color: var(--colour-stage-blocked);
+  border-color: var(--colour-stage-blocked);
 }
 
 .reports__stat[data-tone='waiting'] {
-  border-left-color: var(--colour-stage-waiting);
+  border-color: var(--colour-stage-waiting);
 }
 
 .reports__stat[data-tone='closed'] {
-  border-left-color: var(--colour-stage-closed);
+  border-color: var(--colour-stage-closed);
 }
 
 /* A tile that opens the worklist it counted. */
@@ -142,7 +141,6 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-border-strong);
 }
 
 .reports__unavailable h2 {

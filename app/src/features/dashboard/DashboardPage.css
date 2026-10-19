@@ -225,24 +225,34 @@ a.dashboard__row:hover {
 /* The remediation ledger's labels: the status spine, for lines that are not lifecycle stages */
 
 .dashboard__spine {
-  display: inline-block;
-  padding-left: var(--space-3);
-  border-left: 3px solid var(--colour-stage-waiting);
+  --spine-colour: var(--colour-stage-waiting);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   white-space: nowrap;
 }
 
+.dashboard__spine::before {
+  content: '';
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--spine-colour);
+}
+
 .dashboard__spine[data-tone='active'] {
-  border-left-color: var(--colour-stage-active);
+  --spine-colour: var(--colour-stage-active);
   font-weight: 600;
 }
 
 .dashboard__spine[data-tone='blocked'] {
-  border-left-color: var(--colour-stage-blocked);
+  --spine-colour: var(--colour-stage-blocked);
   font-weight: 600;
 }
 
 .dashboard__spine[data-tone='closed'] {
-  border-left-color: var(--colour-stage-closed);
+  --spine-colour: var(--colour-stage-closed);
   color: var(--colour-text-muted);
 }
 
@@ -261,7 +271,6 @@ a.dashboard__row:hover {
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-border-strong);
 }
 
 .dashboard__unavailable h2 {

@@ -114,16 +114,15 @@
   padding: var(--space-2) var(--space-3);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-action);
   font-size: var(--text-sm);
 }
 
 .security__notice--ok {
-  border-left-color: var(--colour-outcome-pass);
+  border-color: var(--colour-outcome-pass);
 }
 
 .security__notice--error {
-  border-left-color: var(--colour-outcome-harm);
+  border-color: var(--colour-outcome-harm);
 }
 
 .security__table {
@@ -179,6 +178,5 @@
   padding: var(--space-4);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-outcome-harm);
   border-radius: var(--radius);
 }

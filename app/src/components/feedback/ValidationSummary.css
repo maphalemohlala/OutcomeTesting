@@ -4,7 +4,6 @@
   font-size: var(--text-sm);
   background: var(--colour-surface-sunken);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-outcome-harm);
 }
 
 .validation-summary__title {

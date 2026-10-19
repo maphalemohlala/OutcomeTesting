@@ -19,7 +19,6 @@
   font-size: var(--text-sm);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-border-strong);
 }
 
 .review__summary {
@@ -30,7 +29,6 @@
   margin-bottom: var(--space-5);
   background: var(--colour-surface);
   border: 1px solid var(--colour-border);
-  border-left: 3px solid var(--colour-action);
 }
 
 .review__summary-item {

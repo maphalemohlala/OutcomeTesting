@@ -406,13 +406,11 @@ footer a:focus-visible, .footer a:focus-visible {
   padding: var(--space-4);
   text-decoration: none;
   color: inherit;
-  border-left: var(--edge) solid transparent;
 }
 
 .ot-tile:hover,
 .ot-tile:focus {
   background: var(--brand-teal-light);
-  border-left-color: var(--colour-action);
   text-decoration: none;
   color: inherit;
 }
@@ -435,18 +433,32 @@ footer a:focus-visible, .footer a:focus-visible {
   margin-top: var(--space-1);
 }
 
-.ot-tile--alert { border-left-color: var(--colour-outcome-issues); }
+.ot-tile--alert { --tile-colour: var(--colour-outcome-issues); }
 
-/* PP-17 outcome cards. The edge repeats the grade hue already used by .ot-badge and by the
-   Code App's dashboard, so a grade reads the same colour wherever it appears. It is the
-   only decoration on the card and it carries no meaning on its own - the grade is written
-   out as the label beside it (NFR-ACC-01), which is also what keeps the set legible in
-   forced-colours mode, where the border collapses to the system colour. */
-.ot-tile--pass { border-left-color: var(--colour-outcome-pass); }
-.ot-tile--issues { border-left-color: var(--colour-outcome-issues); }
-.ot-tile--insufficient { border-left-color: var(--colour-outcome-insufficient); }
-.ot-tile--harm { border-left-color: var(--colour-outcome-harm); }
-.ot-tile--ungraded { border-left-color: var(--colour-outcome-none); }
+/* PP-17 outcome cards. The dot repeats the grade hue already used by .ot-badge and by the
+   Code App's dashboard, so a grade reads the same colour wherever it appears. It carries no
+   meaning on its own - the grade is written out as the label beside it (NFR-ACC-01). */
+.ot-tile--pass { --tile-colour: var(--colour-outcome-pass); }
+.ot-tile--issues { --tile-colour: var(--colour-outcome-issues); }
+.ot-tile--insufficient { --tile-colour: var(--colour-outcome-insufficient); }
+.ot-tile--harm { --tile-colour: var(--colour-outcome-harm); }
+.ot-tile--ungraded { --tile-colour: var(--colour-outcome-none); }
+
+.ot-tile--alert .ot-tile__label::before,
+.ot-tile--pass .ot-tile__label::before,
+.ot-tile--issues .ot-tile__label::before,
+.ot-tile--insufficient .ot-tile__label::before,
+.ot-tile--harm .ot-tile__label::before,
+.ot-tile--ungraded .ot-tile__label::before {
+  content: '';
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: var(--space-2);
+  border-radius: 50%;
+  background: var(--tile-colour);
+  vertical-align: 0.05em;
+}
 
 /* Tiles nested in a card sit flush inside its padding rather than adding a second gap
    under the heading, and lose the standalone strip's bottom margin. */
@@ -787,8 +799,6 @@ footer a:focus-visible, .footer a:focus-visible {
 
 .ot-note--blocked {
   color: var(--colour-outcome-harm);
-  border-left: 3px solid var(--colour-outcome-harm);
-  padding-left: var(--space-3);
   font-style: normal;
 }
 
@@ -858,8 +868,7 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-empty p:last-child { margin: 0; max-width: 48ch; margin-inline: auto; }
 
 .ot-notice {
-  border: 1px solid var(--colour-border);
-  border-left: var(--edge) solid var(--colour-outcome-issues);
+  border: 1px solid var(--colour-outcome-issues);
   background: var(--colour-surface);
   border-radius: var(--radius);
   padding: var(--space-3) var(--space-4);
@@ -1070,7 +1079,6 @@ footer a:focus-visible, .footer a:focus-visible {
    than from script that would have to reimplement them (NFR-ACC-01). */
 .ot-dialog {
   border: 1px solid var(--colour-border-strong);
-  border-left: var(--edge) solid var(--colour-action);
   border-radius: var(--radius);
   padding: var(--space-5);
   max-width: 34rem;
@@ -1829,7 +1837,8 @@ footer a:focus-visible, .footer a:focus-visible {
 .ot-stale {
   margin: 0 0 1rem;
   padding: 0.75rem 1rem;
-  border-left: 4px solid #0b6ea8;
+  border: 1px solid #0b6ea8;
+  border-radius: var(--radius);
   background: #eef6fb;
   color: #16303f;
   font-size: 0.95rem;
