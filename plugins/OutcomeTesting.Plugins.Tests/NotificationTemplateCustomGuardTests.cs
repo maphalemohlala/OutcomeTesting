@@ -108,13 +108,13 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void A_token_only_one_event_could_answer_is_refused()
         {
-            // {{grading}} exists at the moment a remediation is raised and nowhere else. A
+            // {{dueText}} exists at the moment a remediation is raised and nowhere else. A
             // letter attached to an arbitrary event has no claim on it, and it would arrive as
             // a gap rather than an error.
-            var refusal = Refuse(body: "<p>The grade was {{grading}}.</p>");
+            var refusal = Refuse(body: "<p>Due:{{dueText}}</p>");
 
             Assert.NotNull(refusal);
-            Assert.Contains("{{grading}}", refusal);
+            Assert.Contains("{{dueText}}", refusal);
             Assert.Contains("{{reference}}", refusal);
         }
 

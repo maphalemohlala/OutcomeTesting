@@ -114,7 +114,7 @@ describe('who a letter can go to', () => {
 
 describe('the tokens a letter of your own may use', () => {
   it('matches the plug-in list exactly', () => {
-    // Narrower than a built-in letter's set, and deliberately so. Offering {{grading}} here
+    // Narrower than a built-in letter's set, and deliberately so. Offering {{dueText}} here
     // would produce a letter that reads correctly on the screen and arrives with a gap.
     const block = rowsSource.slice(
       rowsSource.indexOf('public static readonly string[] CustomTokens'),
@@ -131,7 +131,11 @@ describe('the tokens a letter of your own may use', () => {
 
 describe('what the editor can catch before a round trip', () => {
   it('reports a token a letter of your own cannot supply', () => {
-    expect(unknownCustomTokens('Case {{reference}}', '<p>{{grading}}</p>')).toEqual(['grading']);
+    expect(unknownCustomTokens('Case {{reference}}', '<p>{{dueText}}</p>')).toEqual(['dueText']);
+  });
+
+  it('accepts the grading, final outcome and notes, which the server reads off the case', () => {
+    expect(unknownCustomTokens('{{grading}}', '<p>{{finalOutcome}}{{notes}}</p>')).toEqual([]);
   });
 
   it('accepts every token a case can always answer', () => {
@@ -144,7 +148,7 @@ describe('what the editor can catch before a round trip', () => {
   });
 
   it('names a token once however often it appears', () => {
-    expect(unknownCustomTokens('{{grading}}', '{{grading}} {{grading}}')).toEqual(['grading']);
+    expect(unknownCustomTokens('{{dueText}}', '{{dueText}} {{dueText}}')).toEqual(['dueText']);
   });
 
   it('reads a label back for a value, and nothing for one it does not know', () => {
@@ -243,9 +247,12 @@ describe('the attachment marker', () => {
   });
 
   it('is never offered twice', () => {
-    expect(tokensFor([TOKEN_COMPLETED_CHECK, 'reference'])).toEqual([
+    expect(tokensFor([TOKEN_COMPLETED_CHECK, 'reference', 'notes'])).toEqual([
       TOKEN_COMPLETED_CHECK,
       'reference',
+      'notes',
+      'grading',
+      'finalOutcome',
     ]);
   });
 

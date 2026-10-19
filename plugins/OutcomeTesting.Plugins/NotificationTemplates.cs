@@ -179,13 +179,23 @@ namespace OutcomeTesting.Plugins
         public const string TokenCompletedCheck = "completedCheck";
 
         /// <summary>
+        /// What the case itself holds about its grading, offered in every letter (2026-10-19).
+        ///
+        /// A letter whose event does not supply one is given what the case holds when it is
+        /// sent, through <see cref="NotificationTemplateRows.OutcomeTokens"/>; each is empty
+        /// where the case has not got that far.
+        /// </summary>
+        public static readonly string[] CaseOutcomeTokens = { TokenGrading, TokenFinalOutcome, TokenNotes };
+
+        /// <summary>
         /// Tokens every letter may use, whatever its own list says.
         ///
-        /// Only the attachment marker. It is not a value any one letter supplies - it is an
-        /// instruction about the letter - so listing it twelve times in the catalogue would
-        /// invite the twelve to disagree.
+        /// The attachment marker, which is an instruction about the letter rather than a value
+        /// any one letter supplies, and <see cref="CaseOutcomeTokens"/>. Listing them in every
+        /// letter of the catalogue would invite the letters to disagree.
         /// </summary>
-        public static readonly string[] AlwaysAllowed = { TokenCompletedCheck };
+        public static readonly string[] AlwaysAllowed =
+            { TokenCompletedCheck, TokenGrading, TokenFinalOutcome, TokenNotes };
 
         /// <summary>Tokens whose value is markup and must NOT be escaped.</summary>
         private static readonly HashSet<string> RawTokens =
@@ -271,7 +281,10 @@ namespace OutcomeTesting.Plugins
         /// </para>
         /// </summary>
         public static Letter Render(
-            IOrganizationService service, string code, IDictionary<string, string> tokens)
+            IOrganizationService service,
+            string code,
+            IDictionary<string, string> tokens,
+            EntityReference caseRef = null)
         {
             var definition = Definition(code);
             if (definition == null)
@@ -318,6 +331,8 @@ namespace OutcomeTesting.Plugins
                 fromTemplate = false;
             }
 
+            tokens = WithCaseOutcome(service, caseRef, tokens, subject + " " + body);
+
             return new Letter
             {
                 // Read from the template text before the marker is stripped out of it. It
@@ -347,6 +362,54 @@ namespace OutcomeTesting.Plugins
                     escape: fromTemplate || definition.IsHtml),
                 FromTemplate = fromTemplate,
             };
+        }
+
+        /// <summary>
+        /// The caller's tokens plus any <see cref="CaseOutcomeTokens"/> the wording uses and the
+        /// caller left empty, read from the case. A value the event supplied always wins, and
+        /// the case is read only when the wording asks for something the event lacks.
+        /// </summary>
+        private static IDictionary<string, string> WithCaseOutcome(
+            IOrganizationService service,
+            EntityReference caseRef,
+            IDictionary<string, string> tokens,
+            string wording)
+        {
+            if (caseRef == null)
+            {
+                return tokens;
+            }
+
+            var lacking = false;
+            foreach (var name in CaseOutcomeTokens)
+            {
+                string value = null;
+                if (tokens != null)
+                {
+                    tokens.TryGetValue(name, out value);
+                }
+
+                lacking |= Mentions(wording, name) && string.IsNullOrEmpty(value);
+            }
+
+            if (!lacking)
+            {
+                return tokens;
+            }
+
+            var merged = NotificationTemplateRows.OutcomeTokens(service, caseRef);
+            if (tokens != null)
+            {
+                foreach (var pair in tokens)
+                {
+                    if (!string.IsNullOrEmpty(pair.Value) || !merged.ContainsKey(pair.Key))
+                    {
+                        merged[pair.Key] = pair.Value;
+                    }
+                }
+            }
+
+            return merged;
         }
 
         /// <summary>Removes every occurrence of a token, however it is spaced.</summary>

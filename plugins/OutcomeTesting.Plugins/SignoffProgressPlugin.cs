@@ -463,7 +463,8 @@ namespace OutcomeTesting.Plugins
                 new Dictionary<string, string>
                 {
                     { NotificationTemplates.TokenReference, reference },
-                });
+                },
+                caseRef);
 
             NotificationOutbox.Queue(
                 service,
@@ -569,7 +570,8 @@ namespace OutcomeTesting.Plugins
                         NotificationTemplates.TokenNotesPanel,
                         approved ? string.Empty : NotificationTemplates.NotesPanel("Notes from the T&C Manager", notes)
                     },
-                });
+                },
+                caseRef);
 
             // Every adviser letter carries the checks (project owner, 2026-10-05).
             NotificationOutbox.QueueWithCompletedCheck(

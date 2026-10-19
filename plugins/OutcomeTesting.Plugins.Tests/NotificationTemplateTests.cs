@@ -237,12 +237,12 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void A_token_that_belongs_to_a_different_letter_is_still_refused()
         {
-            // {{grading}} is real, and meaningless here: the sign-off-due letter has no
-            // grading to put in it, so it would render as a gap in something somebody reads.
+            // {{dueText}} is real, and meaningless here: the sign-off-due letter has no due
+            // date to put in it, so it would render as a gap in something somebody reads.
             var offenders = NotificationTemplates.UnknownTokens(
-                NotificationTemplates.SignoffDue, "Subject", "Body {{grading}}.");
+                NotificationTemplates.SignoffDue, "Subject", "Body {{dueText}}.");
 
-            Assert.Equal(new[] { "grading" }, offenders);
+            Assert.Equal(new[] { "dueText" }, offenders);
         }
 
         [Fact]

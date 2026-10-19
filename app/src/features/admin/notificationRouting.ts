@@ -103,13 +103,6 @@ export function recipientColumns({ kinds, contactIds }: Recipients): Record<stri
 }
 
 /**
- * The tokens a letter of your own may use: everything a case can answer whatever raised it.
- *
- * Deliberately narrower than a built-in letter's set. Things like a grade or a final outcome
- * exist only at the moment one particular event fires, so a letter attached to an arbitrary
- * event has no claim on them — it would read correctly on this screen and arrive with gaps.
- */
-/**
  * The marker that attaches the completed check, allowed in every letter (AD-171).
  *
  * Not in any letter's own token list, because it says what the letter CARRIES rather than what
@@ -117,14 +110,24 @@ export function recipientColumns({ kinds, contactIds }: Recipients): Record<stri
  */
 export const TOKEN_COMPLETED_CHECK = 'completedCheck';
 
-/** Tokens every letter may use, whatever its own list says. */
-export const ALWAYS_ALLOWED_TOKENS: readonly string[] = [TOKEN_COMPLETED_CHECK];
+/**
+ * Tokens every letter may use, whatever its own list says: the attachment marker, and what the
+ * case holds about its grading, which the server reads off the case where the event does not
+ * supply it. Mirrors `NotificationTemplates.AlwaysAllowed`.
+ */
+export const ALWAYS_ALLOWED_TOKENS: readonly string[] = [
+  TOKEN_COMPLETED_CHECK,
+  'grading',
+  'finalOutcome',
+  'notes',
+];
 
 /** A letter's own tokens plus the ones every letter may use, for the picker. */
 export function tokensFor(own: readonly string[]): string[] {
   return [...own, ...ALWAYS_ALLOWED_TOKENS.filter((t) => !own.includes(t))];
 }
 
+/** The tokens only a letter of your own adds to ALWAYS_ALLOWED_TOKENS: what any case can answer. */
 export const CUSTOM_TOKENS: readonly string[] = [
   'reference',
   'adviser',
@@ -153,9 +156,12 @@ export const TOKEN_HELP: Record<string, string> = {
   caseButton:
     'A styled button linking to the case — to its remediation, in the remedial and sign-off letters. Comes out as nothing where there is no portal.',
   dueText: 'A sentence naming the due date, e.g. “ It is due by 3 March 2026.”, or nothing.',
-  grading: 'How this letter names the grading that caused it.',
-  finalOutcome: 'The final outcome recorded at sign-off.',
-  notes: 'The signatory’s notes, e.g. “ Notes: …”, or nothing where they left none.',
+  grading:
+    'The grading the case received, e.g. “Pass with issues” — in the two remedial letters, “a pass with issues grading”. Comes out as nothing before the case is graded.',
+  finalOutcome:
+    'The final outcome recorded at sign-off, e.g. “Pass”. Comes out as nothing until one is recorded.',
+  notes:
+    'The latest sign-off notes, e.g. “ Notes: …”, or nothing where there are none.',
   check: 'Which check the letter is about: “Tax check” or “AQS check”, or “review” where it cannot be told.',
   recipient: 'The name of the T&C Manager the letter is addressed to, or “T&C Manager” where it cannot be found.',
   notesPanel:

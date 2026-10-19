@@ -10,6 +10,8 @@
  * before a round trip, which is the AD-041 pattern: the client shows and hides, the plug-in
  * decides. `notificationTemplates.test.ts` reads the C# and fails if the two drift apart.
  */
+import { ALWAYS_ALLOWED_TOKENS } from './notificationRouting';
+
 export interface TemplateHint {
   /** What an administrator sees in the list. */
   name: string;
@@ -184,13 +186,13 @@ export function templateHint(code: string): TemplateHint | null {
  * editor can say so before a round trip, and so an administrator is not left guessing at a
  * token list they cannot otherwise see.
  */
-// The attachment marker is allowed in every letter (AD-171), so the editor must not
-// report it as one this letter does not supply.
+// The always-allowed tokens are allowed in every letter, so the editor must not report one
+// as a token this letter does not supply.
 export function unknownTokens(code: string, subject: string, body: string): string[] {
   const hint = templateHint(code);
   if (!hint) return [];
 
-  const allowed = new Set([...hint.tokens, 'completedCheck']);
+  const allowed = new Set([...hint.tokens, ...ALWAYS_ALLOWED_TOKENS]);
   const offenders: string[] = [];
   const text = `${subject ?? ''} ${body ?? ''}`;
 

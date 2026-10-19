@@ -37,7 +37,7 @@ namespace OutcomeTesting.Plugins.Tests
             var allowed = NotificationTemplates.AllowedTokens(
                 new[] { "reference", NotificationTemplates.TokenCompletedCheck });
 
-            Assert.Equal(2, allowed.Length);
+            Assert.Equal(1 + NotificationTemplates.AlwaysAllowed.Length, allowed.Length);
         }
 
         [Fact]
@@ -65,11 +65,12 @@ namespace OutcomeTesting.Plugins.Tests
             var refusal = NotificationTemplateGuardPlugin.Refusal(
                 "UAT-BAD-TOKEN",
                 "Heads up on {{reference}}",
-                "Case {{reference}} graded {{grading}}.",
+                "Case {{reference}} is due.{{dueText}}",
                 NotificationOutbox.EventAllocation,
                 NotificationRecipients.KindChecker,
                 false);
 
+            Assert.Contains("{{dueText}}", refusal);
             Assert.Contains("{{grading}}", refusal);
             Assert.Contains("{{" + NotificationTemplates.TokenCompletedCheck + "}}", refusal);
         }

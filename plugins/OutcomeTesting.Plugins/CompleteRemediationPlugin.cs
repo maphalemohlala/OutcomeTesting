@@ -420,7 +420,8 @@ namespace OutcomeTesting.Plugins
                                 NotificationOutbox.RemediationLink(service, caseRef),
                                 NotificationTemplates.Definition(NotificationTemplates.SignoffDue).ButtonLabel)
                         },
-                    });
+                    },
+                    caseRef);
 
                 NotificationOutbox.Queue(
                     service,

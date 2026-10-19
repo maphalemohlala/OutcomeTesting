@@ -283,7 +283,8 @@ namespace OutcomeTesting.Plugins
                         NotificationTemplates.TokenCheck,
                         NotificationOutbox.CheckName(CommandHelpers.ReviewTypeOf(review))
                     },
-                });
+                },
+                caseRef);
 
             // The para-planner's letter is the one that carries the case summary (Change 2,
             // AD-164): they are not a checker, AD-020 keeps them out of the review page, and

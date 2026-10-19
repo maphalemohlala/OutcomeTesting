@@ -394,6 +394,87 @@ namespace OutcomeTesting.Plugins
                 return tokens;
             }
 
+            foreach (var pair in OutcomeTokens(service, caseRef))
+            {
+                tokens[pair.Key] = pair.Value;
+            }
+
+            return tokens;
+        }
+
+        /// <summary>
+        /// The case's grading, final outcome and latest sign-off notes as they stand now, each
+        /// empty where the case has not got that far.
+        ///
+        /// The newest graded outcome row wins, so a Tax-then-AQS case reads its AQS grade. The
+        /// final outcome falls back to the newest sign-off's, because a letter queued inside
+        /// the sign-off can run before the outcome row is written.
+        /// </summary>
+        public static Dictionary<string, string> OutcomeTokens(
+            IOrganizationService service, EntityReference caseRef)
+        {
+            var tokens = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                { NotificationTemplates.TokenGrading, string.Empty },
+                { NotificationTemplates.TokenFinalOutcome, string.Empty },
+                { NotificationTemplates.TokenNotes, string.Empty },
+            };
+
+            if (caseRef == null)
+            {
+                return tokens;
+            }
+
+            try
+            {
+                var outcomes = new QueryExpression("al_outcome")
+                {
+                    ColumnSet = new ColumnSet(Outcomes.InitialOutcomeAttr, Outcomes.FinalOutcomeAttr),
+                    Criteria = new FilterExpression(),
+                };
+                outcomes.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseRef.Id);
+                outcomes.AddOrder("createdon", OrderType.Descending);
+
+                OptionSetValue final = null;
+                foreach (var row in service.RetrieveMultiple(outcomes).Entities)
+                {
+                    var grading = CommandHelpers.Formatted(row, Outcomes.InitialOutcomeAttr);
+                    if (tokens[NotificationTemplates.TokenGrading].Length == 0 && grading != null)
+                    {
+                        tokens[NotificationTemplates.TokenGrading] = grading;
+                    }
+
+                    final = final ?? row.GetAttributeValue<OptionSetValue>(Outcomes.FinalOutcomeAttr);
+                }
+
+                var signoffs = new QueryExpression("al_signoff")
+                {
+                    ColumnSet = new ColumnSet("al_notes", Outcomes.FinalOutcomeAttr),
+                    TopCount = 1,
+                    Criteria = new FilterExpression(),
+                };
+                signoffs.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseRef.Id);
+                signoffs.AddOrder("createdon", OrderType.Descending);
+
+                foreach (var signoff in service.RetrieveMultiple(signoffs).Entities)
+                {
+                    var notes = signoff.GetAttributeValue<string>("al_notes");
+                    // The same leading space and label the sign-off letters give their notes.
+                    tokens[NotificationTemplates.TokenNotes] =
+                        string.IsNullOrWhiteSpace(notes) ? string.Empty : " Notes: " + notes;
+                    final = final ?? signoff.GetAttributeValue<OptionSetValue>(Outcomes.FinalOutcomeAttr);
+                }
+
+                if (final != null)
+                {
+                    tokens[NotificationTemplates.TokenFinalOutcome] = RegradeCasePlugin.FinalOutcomeLabel(final.Value);
+                }
+            }
+            catch (Exception)
+            {
+                // An extra token never costs the letter; it goes with the gap.
+            }
+
             return tokens;
         }
     }

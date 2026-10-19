@@ -147,7 +147,13 @@ describe('notificationTemplates', () => {
   });
 
   it('reports a token the letter does not supply', () => {
-    expect(unknownTokens('SIGNOFF-DUE', 'Subject', 'Graded {{grading}}')).toEqual(['grading']);
+    expect(unknownTokens('SIGNOFF-DUE', 'Subject', 'Due{{dueText}}')).toEqual(['dueText']);
+  });
+
+  it('accepts the grading, final outcome and notes on every letter', () => {
+    for (const code of TEMPLATE_CODES) {
+      expect(unknownTokens(code, '{{grading}}', '{{finalOutcome}}{{notes}}'), code).toEqual([]);
+    }
   });
 
   it('accepts the tokens a letter does supply', () => {

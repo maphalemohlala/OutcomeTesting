@@ -125,7 +125,8 @@ namespace OutcomeTesting.Plugins
                         NotificationTemplates.TokenCheck,
                         NotificationOutbox.CheckName(NotificationOutbox.AllocatedReviewType(service, assignment))
                     },
-                });
+                },
+                caseRef);
 
             var assignedOn = assignment.GetAttributeValue<DateTime?>("al_assignedon");
 
@@ -235,7 +236,8 @@ namespace OutcomeTesting.Plugins
                         NotificationTemplates.TokenCaseButton,
                         NotificationTemplates.CaseButton(remedialLink, "Confirm remedial action")
                     },
-                });
+                },
+                caseRef);
 
             // Every adviser letter carries the checks (project owner, 2026-10-05).
             NotificationOutbox.QueueWithCompletedCheck(
@@ -318,7 +320,8 @@ namespace OutcomeTesting.Plugins
                         NotificationTemplates.CaseButton(
                             NotificationOutbox.CaseLink(service, caseRef), "View the case")
                     },
-                });
+                },
+                caseRef);
 
             NotificationOutbox.QueueWithCompletedCheck(
                 service,
