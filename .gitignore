@@ -49,3 +49,5 @@ app/e2e/.runs/
 app/test-results/
 app/playwright-report/
 app/blob-report/
+graphify-out/
+test-results/
