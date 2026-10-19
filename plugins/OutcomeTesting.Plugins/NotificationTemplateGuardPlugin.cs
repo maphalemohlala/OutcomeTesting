@@ -94,13 +94,26 @@ namespace OutcomeTesting.Plugins
                     + "are kept; anything else is removed.");
             }
 
+            // The single kind and contact a row saved before multiple recipients still carries,
+            // read together with the two lists, exactly as the send path reads them.
+            var merged = new Entity(NotificationTemplates.TemplateEntity);
+            var legacyKind = MergedOption(service, row, NotificationTemplateRows.RecipientKindAttr);
+            var legacyContact = MergedLookup(service, row, NotificationTemplateRows.RecipientContactAttr);
+            if (legacyKind.HasValue) merged[NotificationTemplateRows.RecipientKindAttr] = new OptionSetValue(legacyKind.Value);
+            merged[NotificationTemplateRows.RecipientContactAttr] = legacyContact;
+            merged[NotificationTemplateRows.RecipientKindsAttr] =
+                Merged(service, row, NotificationTemplateRows.RecipientKindsAttr);
+            merged[NotificationTemplateRows.RecipientContactIdsAttr] =
+                Merged(service, row, NotificationTemplateRows.RecipientContactIdsAttr);
+            var recipients = NotificationTemplateRows.ReadRecipients(merged);
+
             var refusal = Refusal(
                 code,
                 subject,
                 body,
                 MergedOption(service, row, NotificationTemplateRows.EventAttr),
-                MergedOption(service, row, NotificationTemplateRows.RecipientKindAttr),
-                MergedLookup(service, row, NotificationTemplateRows.RecipientContactAttr) != null);
+                !recipients.IsEmpty,
+                KindProblem(legacyKind, legacyContact != null) ?? RecipientProblem(service, recipients));
             if (refusal != null)
             {
                 throw new InvalidPluginExecutionException(refusal);
@@ -137,27 +150,37 @@ namespace OutcomeTesting.Plugins
             int? recipientKind,
             bool hasContact)
         {
+            return Refusal(
+                code, subject, body, eventValue, recipientKind.HasValue, KindProblem(recipientKind, hasContact));
+        }
+
+        /// <summary>
+        /// Why this template cannot be saved, or null when it can, for a letter that may go to
+        /// several people. <paramref name="recipientProblem"/> is why one of the chosen
+        /// recipients could never be written to, or null.
+        /// </summary>
+        public static string Refusal(
+            string code,
+            string subject,
+            string body,
+            int? eventValue,
+            bool hasRecipient,
+            string recipientProblem)
+        {
             if (string.IsNullOrWhiteSpace(code))
             {
                 return "A notification template needs a template code.";
             }
 
-            if (recipientKind.HasValue && !NotificationRecipients.IsKnown(recipientKind.Value))
+            if (recipientProblem != null)
             {
-                return "That is not somebody this system can work out from a case. Choose the "
-                    + "adviser, the T&C Manager, the para-planner, the checker, or a named contact.";
-            }
-
-            if (recipientKind == NotificationRecipients.KindContact && !hasContact)
-            {
-                return "This letter is set to go to a named contact, but no contact is chosen. "
-                    + "Pick the person, or choose one of the roles instead.";
+                return recipientProblem;
             }
 
             var definition = NotificationTemplates.Definition(code.Trim());
             if (definition == null)
             {
-                return CustomRefusal(code.Trim(), subject, body, eventValue, recipientKind);
+                return CustomRefusal(code.Trim(), subject, body, eventValue, hasRecipient);
             }
 
             if (string.IsNullOrWhiteSpace(subject))
@@ -196,7 +219,7 @@ namespace OutcomeTesting.Plugins
         /// correctly on the screen where it was written and arrives with gaps in it.
         /// </summary>
         private static string CustomRefusal(
-            string code, string subject, string body, int? eventValue, int? recipientKind)
+            string code, string subject, string body, int? eventValue, bool hasRecipient)
         {
             if (!eventValue.HasValue)
             {
@@ -210,7 +233,7 @@ namespace OutcomeTesting.Plugins
                     + "\"" + code + "\".";
             }
 
-            if (!recipientKind.HasValue)
+            if (!hasRecipient)
             {
                 return "\"" + code + "\" has nobody to go to. Choose who should receive it.";
             }
@@ -238,6 +261,66 @@ namespace OutcomeTesting.Plugins
                     + "A letter of your own can use: "
                     + Join(Braced(NotificationTemplates.AllowedTokens(
                         NotificationTemplateRows.CustomTokens))) + ".";
+            }
+
+            return null;
+        }
+
+        private const string NotARecipient =
+            "That is not somebody this system can work out from a case. Choose the "
+            + "adviser, the T&C Manager, the para-planner, the checker, or a named contact.";
+
+        /// <summary>What is wrong with a single recipient kind, or null.</summary>
+        private static string KindProblem(int? recipientKind, bool hasContact)
+        {
+            if (recipientKind.HasValue && !NotificationRecipients.IsKnown(recipientKind.Value))
+            {
+                return NotARecipient;
+            }
+
+            if (recipientKind == NotificationRecipients.KindContact && !hasContact)
+            {
+                return "This letter is set to go to a named contact, but no contact is chosen. "
+                    + "Pick the person, or choose one of the roles instead.";
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Why one of the chosen recipients could never be written to, or null.
+        ///
+        /// A named contact is the same person for every case, so a missing address is known
+        /// now and refused now - otherwise the save succeeds and every letter to them fails.
+        /// The roles depend on the case and can only be judged when one is sent.
+        /// </summary>
+        private static string RecipientProblem(
+            IOrganizationService service, NotificationTemplateRows.RecipientChoice recipients)
+        {
+            if (recipients.Unreadable.Count > 0)
+            {
+                return NotARecipient;
+            }
+
+            foreach (var contact in recipients.Contacts)
+            {
+                Entity row;
+                try
+                {
+                    row = service.Retrieve("contact", contact.Id, new ColumnSet("fullname", "emailaddress1"));
+                }
+                catch (Exception)
+                {
+                    return "One of the chosen contacts no longer exists. Take them off the letter.";
+                }
+
+                if (string.IsNullOrWhiteSpace(row.GetAttributeValue<string>("emailaddress1")))
+                {
+                    var name = row.GetAttributeValue<string>("fullname");
+                    return (string.IsNullOrWhiteSpace(name) ? "One of the chosen contacts" : name.Trim())
+                        + " has no email address, so this letter could never reach them. Add one to "
+                        + "their contact record, or take them off the letter.";
+                }
             }
 
             return null;

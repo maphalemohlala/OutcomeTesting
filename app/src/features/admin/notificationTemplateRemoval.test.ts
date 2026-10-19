@@ -34,9 +34,7 @@ function row(overrides: Partial<TemplateRow> = {}): TemplateRow {
     stored: true,
     custom: true,
     eventValue: 120910800,
-    recipientKind: 120910813,
-    recipientContactId: null,
-    recipientContactName: null,
+    recipients: { kinds: [120910813], contactIds: [] },
     ...overrides,
   };
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -34,6 +34,15 @@ namespace OutcomeTesting.Plugins
         /// <summary>The contact, when the kind is <see cref="NotificationRecipients.KindContact"/>.</summary>
         public const string RecipientContactAttr = "al_recipientcontactid";
 
+        /// <summary>
+        /// Every role it goes to, as comma-separated kind values. Read together with the single
+        /// <see cref="RecipientKindAttr"/> a row saved before multiple recipients still carries.
+        /// </summary>
+        public const string RecipientKindsAttr = "al_recipientkinds";
+
+        /// <summary>Every named contact it goes to, as comma-separated contact ids.</summary>
+        public const string RecipientContactIdsAttr = "al_recipientcontactids";
+
         /// <summary>What an administrator called this letter.</summary>
         public const string NameAttr = "al_name";
 
@@ -64,11 +73,8 @@ namespace OutcomeTesting.Plugins
             /// <summary>The body, with tokens.</summary>
             public string Body { get; set; }
 
-            /// <summary>Which of the five kinds receives it.</summary>
-            public int RecipientKind { get; set; }
-
-            /// <summary>The contact, when the kind names one.</summary>
-            public EntityReference RecipientContact { get; set; }
+            /// <summary>Everybody it goes to.</summary>
+            public RecipientChoice Recipients { get; set; }
 
             /// <summary>True when the body carries the completed-check marker.</summary>
             public bool WantsCompletedCheck { get; set; }
@@ -77,14 +83,125 @@ namespace OutcomeTesting.Plugins
         /// <summary>What a stored row says about a letter, beyond its wording.</summary>
         public sealed class TemplateSettings
         {
-            /// <summary>One of the five kinds, or null where the row chooses nobody.</summary>
-            public int? Kind { get; set; }
-
-            /// <summary>The contact, when the kind names one.</summary>
-            public EntityReference Contact { get; set; }
+            /// <summary>Who the row chooses; empty where it leaves the built-in routing alone.</summary>
+            public RecipientChoice Recipients { get; set; } = new RecipientChoice();
 
             /// <summary>True when the wording carries the completed-check marker.</summary>
             public bool WantsCompletedCheck { get; set; }
+        }
+
+        /// <summary>
+        /// Who a template goes to: any of the four roles a case can answer, and any number of
+        /// named contacts.
+        /// </summary>
+        public sealed class RecipientChoice
+        {
+            /// <summary>Role kinds, in the order chosen, without repeats.</summary>
+            public List<int> Kinds { get; } = new List<int>();
+
+            /// <summary>Named contacts, in the order chosen, without repeats.</summary>
+            public List<EntityReference> Contacts { get; } = new List<EntityReference>();
+
+            /// <summary>Text in either list column that is not a role or a contact id.</summary>
+            public List<string> Unreadable { get; } = new List<string>();
+
+            /// <summary>True when the template chooses nobody.</summary>
+            public bool IsEmpty
+            {
+                get { return Kinds.Count == 0 && Contacts.Count == 0; }
+            }
+        }
+
+        /// <summary>
+        /// Who a stored row chooses: the two list columns, plus the single kind and contact a
+        /// row saved before them still carries. Read as a union so no row needs migrating.
+        /// </summary>
+        public static RecipientChoice ReadRecipients(Entity row)
+        {
+            var choice = new RecipientChoice();
+            if (row == null)
+            {
+                return choice;
+            }
+
+            var kind = row.GetAttributeValue<OptionSetValue>(RecipientKindAttr);
+            var contact = row.GetAttributeValue<EntityReference>(RecipientContactAttr);
+
+            if (kind != null && kind.Value == NotificationRecipients.KindContact)
+            {
+                if (contact != null)
+                {
+                    AddContact(choice, contact.Id.ToString());
+                }
+            }
+            else if (kind != null)
+            {
+                AddKind(choice, kind.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+
+            foreach (var part in Split(row.GetAttributeValue<string>(RecipientKindsAttr)))
+            {
+                AddKind(choice, part);
+            }
+
+            foreach (var part in Split(row.GetAttributeValue<string>(RecipientContactIdsAttr)))
+            {
+                AddContact(choice, part);
+            }
+
+            return choice;
+        }
+
+        private static IEnumerable<string> Split(string list)
+        {
+            if (string.IsNullOrWhiteSpace(list))
+            {
+                yield break;
+            }
+
+            foreach (var part in list.Split(',', ';'))
+            {
+                if (!string.IsNullOrWhiteSpace(part))
+                {
+                    yield return part.Trim();
+                }
+            }
+        }
+
+        private static void AddKind(RecipientChoice choice, string text)
+        {
+            int kind;
+
+            // A named contact is chosen by naming the contact, so that kind on its own is not
+            // somebody a letter could be sent to.
+            if (!int.TryParse(text, System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out kind)
+                || !NotificationRecipients.IsKnown(kind)
+                || kind == NotificationRecipients.KindContact)
+            {
+                choice.Unreadable.Add(text);
+                return;
+            }
+
+            if (!choice.Kinds.Contains(kind))
+            {
+                choice.Kinds.Add(kind);
+            }
+        }
+
+        private static void AddContact(RecipientChoice choice, string text)
+        {
+            Guid id;
+            if (!Guid.TryParse(text, out id) || id == Guid.Empty)
+            {
+                choice.Unreadable.Add(text);
+                return;
+            }
+
+            if (!choice.Contacts.Exists(c => c.Id == id))
+            {
+                choice.Contacts.Add(new EntityReference("contact", id));
+            }
         }
 
         /// <summary>
@@ -115,7 +232,9 @@ namespace OutcomeTesting.Plugins
                         NotificationTemplates.BodyAttr,
                         NameAttr,
                         RecipientKindAttr,
-                        RecipientContactAttr),
+                        RecipientContactAttr,
+                        RecipientKindsAttr,
+                        RecipientContactIdsAttr),
                     Criteria = new FilterExpression(),
                 };
                 query.Criteria.AddCondition(EventAttr, ConditionOperator.Equal, eventValue);
@@ -141,11 +260,11 @@ namespace OutcomeTesting.Plugins
                         continue;
                     }
 
-                    var kind = row.GetAttributeValue<OptionSetValue>(RecipientKindAttr);
-                    if (kind == null || !NotificationRecipients.IsKnown(kind.Value))
+                    // The guard refuses a letter of your own with nobody to go to, so an empty
+                    // choice here is a row written around it, with nobody to report a failure to.
+                    var recipients = ReadRecipients(row);
+                    if (recipients.IsEmpty)
                     {
-                        // Without a recipient there is nobody to send to, and queuing it
-                        // unaddressed would put a row in the outbox that can never drain.
                         continue;
                     }
 
@@ -155,8 +274,7 @@ namespace OutcomeTesting.Plugins
                         Name = row.GetAttributeValue<string>(NameAttr),
                         Subject = subject,
                         Body = body,
-                        RecipientKind = kind.Value,
-                        RecipientContact = row.GetAttributeValue<EntityReference>(RecipientContactAttr),
+                        Recipients = recipients,
                         WantsCompletedCheck = NotificationTemplates.Mentions(
                             body, NotificationTemplates.TokenCompletedCheck),
                     });
@@ -193,7 +311,11 @@ namespace OutcomeTesting.Plugins
                 var query = new QueryExpression(NotificationTemplates.TemplateEntity)
                 {
                     ColumnSet = new ColumnSet(
-                        RecipientKindAttr, RecipientContactAttr, NotificationTemplates.BodyAttr),
+                        RecipientKindAttr,
+                        RecipientContactAttr,
+                        RecipientKindsAttr,
+                        RecipientContactIdsAttr,
+                        NotificationTemplates.BodyAttr),
                     TopCount = 1,
                     Criteria = new FilterExpression(),
                 };
@@ -203,12 +325,7 @@ namespace OutcomeTesting.Plugins
                 var rows = service.RetrieveMultiple(query).Entities;
                 if (rows.Count > 0)
                 {
-                    var kind = rows[0].GetAttributeValue<OptionSetValue>(RecipientKindAttr);
-                    if (kind != null && NotificationRecipients.IsKnown(kind.Value))
-                    {
-                        settings.Kind = kind.Value;
-                        settings.Contact = rows[0].GetAttributeValue<EntityReference>(RecipientContactAttr);
-                    }
+                    settings.Recipients = ReadRecipients(rows[0]);
 
                     var stored = rows[0].GetAttributeValue<string>(NotificationTemplates.BodyAttr);
                     if (!string.IsNullOrWhiteSpace(stored))

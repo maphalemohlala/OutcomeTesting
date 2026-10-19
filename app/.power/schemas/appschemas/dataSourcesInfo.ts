@@ -676,6 +676,13 @@ export const dataSourcesInfo = {
       }
     }
   },
+  "al_notifications": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "al_notificationid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "al_notificationtemplates": {
     "tableId": "",
     "version": "",

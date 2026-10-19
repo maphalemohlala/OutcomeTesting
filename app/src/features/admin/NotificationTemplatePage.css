@@ -222,3 +222,54 @@
 .tokens__help {
   color: var(--colour-text-muted);
 }
+
+/* One line per recipient in the list, so several read as a list and not a sentence. */
+.templates__recipient {
+  display: block;
+}
+
+.templates__recipients {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--colour-border);
+}
+
+.templates__recipients legend {
+  font-weight: 600;
+  padding: 0 var(--space-1);
+}
+
+.templates__form .templates__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: normal;
+}
+
+.templates__chosen {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.templates__chosen li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.templates__failed {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.templates__failed-heading {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-lg);
+}

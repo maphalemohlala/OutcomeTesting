@@ -116,7 +116,11 @@ namespace OutcomeTesting.Plugins.Tests
                 "al_outcomecase", CaseId, "original@example.com", "Subject", "Body",
                 occurrence: null, templateCode: NotificationTemplates.CasePassed);
 
-            Assert.Equal("original@example.com", Sent(service).Single().Recipient);
+            Assert.Equal("original@example.com", Sent(service).Single(n => n.Pending).Recipient);
+
+            // And the choice that could not be honoured is said out loud, not dropped.
+            var unreached = Sent(service).Single(n => !n.Pending);
+            Assert.Contains("Not sent to Adviser", unreached.Reason);
         }
 
         [Fact]
@@ -192,10 +196,11 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void A_letter_with_nobody_to_send_to_is_not_queued_at_all()
+        public void A_letter_with_nobody_to_send_to_is_recorded_as_failed_with_the_reason()
         {
-            // An unaddressed row can never drain and nothing watches the outbox, so it would
-            // sit there unnoticed. Not queuing it is the loud option.
+            // This used to be skipped in silence (PROD, 2026-10-15): the letter never went and
+            // nothing anywhere said so. A Failed row is never drained, and the Email Templates
+            // page lists it with the reason.
             var service = Case();
             Template(service, "TELL-THE-MANAGER", NotificationOutbox.EventCasePassed,
                 NotificationRecipients.KindTcManager, "A case passed", "<p>It passed.</p>");
@@ -205,7 +210,12 @@ namespace OutcomeTesting.Plugins.Tests
                 "al_outcomecase", CaseId, "original@example.com", "Subject", "Body",
                 NotificationTemplates.CasePassed);
 
-            Assert.Single(Sent(service));
+            Assert.Single(Sent(service), n => n.Pending);
+            var failed = Sent(service).Single(n => !n.Pending);
+            Assert.Null(failed.Recipient);
+            Assert.Equal("A case passed", failed.Subject);
+            Assert.Contains("Not sent to T&C Manager", failed.Reason);
+            Assert.Contains("No T&C Manager", failed.Reason);
         }
 
         [Fact]
@@ -327,6 +337,8 @@ namespace OutcomeTesting.Plugins.Tests
             public string Subject { get; set; }
             public string Body { get; set; }
             public string Code { get; set; }
+            public bool Pending { get; set; }
+            public string Reason { get; set; }
         }
 
         private static List<Queued> Sent(FakeOrganizationService service)
@@ -334,7 +346,8 @@ namespace OutcomeTesting.Plugins.Tests
             var query = new QueryExpression(NotificationOutbox.NotificationEntity)
             {
                 ColumnSet = new ColumnSet(
-                    "al_recipientemail", "al_subject", "al_body", "al_notificationcode"),
+                    "al_recipientemail", "al_subject", "al_body", "al_notificationcode",
+                    "al_status", "al_failurereason"),
             };
 
             return service.RetrieveMultiple(query).Entities
@@ -344,6 +357,9 @@ namespace OutcomeTesting.Plugins.Tests
                     Subject = e.GetAttributeValue<string>("al_subject"),
                     Body = e.GetAttributeValue<string>("al_body"),
                     Code = e.GetAttributeValue<string>("al_notificationcode"),
+                    Pending = e.GetAttributeValue<OptionSetValue>("al_status").Value
+                        == NotificationOutbox.StatusPending,
+                    Reason = e.GetAttributeValue<string>("al_failurereason"),
                 })
                 .ToList();
         }

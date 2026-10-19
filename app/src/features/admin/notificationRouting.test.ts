@@ -21,6 +21,9 @@ import {
   normaliseCode,
   recipientLabel,
   unknownCustomTokens,
+  ROLE_KINDS,
+  readRecipients,
+  recipientColumns,
 } from './notificationRouting';
 
 describe('the events a letter can be attached to', () => {
@@ -48,6 +51,45 @@ describe('the events a letter can be attached to', () => {
     for (const event of TRIGGER_EVENTS) {
       expect(outboxSource).toContain(`return "${event.label}";`);
     }
+  });
+});
+
+describe('a letter that goes to several people', () => {
+  it('writes the same list columns the plug-in reads', () => {
+    for (const column of Object.keys(recipientColumns({ kinds: [], contactIds: [] }))) {
+      if (column.startsWith('al_RecipientContactId')) continue;
+      expect(rowsSource.toLowerCase()).toContain(`"${column}"`);
+    }
+  });
+
+  it('reads a row saved before the lists alongside the lists, without repeats', () => {
+    expect(
+      readRecipients({
+        al_recipientkind: 120910811,
+        al_recipientkinds: '120910810,120910811',
+        al_recipientcontactids: 'ABC;abc',
+      }),
+    ).toEqual({ kinds: [120910811, 120910810], contactIds: ['abc'] });
+  });
+
+  it('reads the old single named contact as one of the contacts', () => {
+    expect(
+      readRecipients({ al_recipientkind: KIND_CONTACT, _al_recipientcontactid_value: 'C-1' }),
+    ).toEqual({ kinds: [], contactIds: ['c-1'] });
+  });
+
+  it('clears the old single columns on every write, so a row holds its recipients once', () => {
+    expect(recipientColumns({ kinds: [120910810, 120910811], contactIds: ['c-1', 'c-2'] })).toEqual({
+      al_recipientkinds: '120910810,120910811',
+      al_recipientcontactids: 'c-1,c-2',
+      al_recipientkind: null,
+      'al_RecipientContactId@odata.bind': null,
+    });
+  });
+
+  it('offers every role except the named contact, which is chosen by name', () => {
+    expect(ROLE_KINDS.map((r) => r.value)).not.toContain(KIND_CONTACT);
+    expect(ROLE_KINDS).toHaveLength(RECIPIENT_KINDS.length - 1);
   });
 });
 

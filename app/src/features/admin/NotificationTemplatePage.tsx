@@ -9,16 +9,18 @@ import { usePermissions } from '../../app/permissions/permissionContext';
 import { builtInWording, unknownTokens } from './notificationTemplates';
 import {
   CUSTOM_TOKENS,
-  KIND_CONTACT,
-  RECIPIENT_KINDS,
+  ROLE_KINDS,
   TRIGGER_EVENTS,
   eventLabel,
   tokensFor,
   normaliseCode,
   recipientLabel,
   unknownCustomTokens,
+  type Recipients,
 } from './notificationRouting';
 import {
+  FAILED_LETTER_DAYS,
+  useFailedLetters,
   useNotificationTemplates,
   saveTemplate,
   createTemplate,
@@ -45,6 +47,7 @@ import './NotificationTemplatePage.css';
 export function NotificationTemplatePage() {
   const [reloadKey, setReloadKey] = useState(0);
   const state = useNotificationTemplates(reloadKey);
+  const failed = useFailedLetters(reloadKey);
   const { can } = usePermissions();
   const canEdit = can('page.admin.templates', 'Manage');
 
@@ -62,7 +65,7 @@ export function NotificationTemplatePage() {
   return (
     <div className="templates">
       <PageIntro
-        title="Notification wording"
+        title="Email Templates"
         purpose={
           'The subject and body of every email this system sends, and who receives it. A ' +
           'letter you have not edited uses the built-in wording, and changing one takes ' +
@@ -116,13 +119,12 @@ export function NotificationTemplatePage() {
                     )}
                   </td>
                   <td>
-                    {recipientLabel(row.recipientKind) ? (
-                      <>
-                        {recipientLabel(row.recipientKind)}
-                        {row.recipientKind === KIND_CONTACT && row.recipientContactName && (
-                          <span className="templates__code">{row.recipientContactName}</span>
-                        )}
-                      </>
+                    {recipientNames(row.recipients, state.contacts).length > 0 ? (
+                      recipientNames(row.recipients, state.contacts).map((name) => (
+                        <span key={name} className="templates__recipient">
+                          {name}
+                        </span>
+                      ))
                     ) : (
                       <span className="templates__builtin">Whoever the letter is about</span>
                     )}
@@ -184,6 +186,8 @@ export function NotificationTemplatePage() {
 
           {problem && <p className="templates__problem">{problem}</p>}
 
+          <NotSent state={failed} />
+
           {removing && (
             <RemoveTemplate
               row={removing}
@@ -198,6 +202,82 @@ export function NotificationTemplatePage() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Who a row goes to, in words: the roles ticked, then the contacts by name. A contact the page
+ * cannot name is no longer listed as reachable (inactive, or no work email), and says so.
+ */
+function recipientNames(recipients: Recipients, contacts: ContactOption[]): string[] {
+  return [
+    ...recipients.kinds.map((k) => recipientLabel(k) ?? String(k)),
+    ...recipients.contactIds.map(
+      (id) => contacts.find((c) => c.id === id)?.name ?? 'A contact with no work email',
+    ),
+  ];
+}
+
+/**
+ * Letters that could not be sent, and why.
+ *
+ * Without this a letter could fail with nothing anywhere a person would look - the PROD fault
+ * of 2026-10-15 was three letters that never went and a save that had said nothing was wrong.
+ * "Sent" in the outbox means handed to the mail server, so this lists only what the system
+ * itself knows went wrong.
+ */
+function NotSent({ state }: { state: ReturnType<typeof useFailedLetters> }) {
+  return (
+    <section className="templates__failed" aria-labelledby="templates-failed-heading">
+      <h2 id="templates-failed-heading" className="templates__failed-heading">
+        Not sent
+      </h2>
+
+      {state.status === 'loading' && <p className="templates__note">Loading…</p>}
+
+      {state.status === 'unavailable' && (
+        <p className="templates__problem">
+          The letters that could not be sent cannot be listed right now, so this page cannot
+          say whether any have failed.
+        </p>
+      )}
+
+      {state.status === 'ready' && state.letters.length === 0 && (
+        <p className="templates__note">
+          No letter has failed in the last {FAILED_LETTER_DAYS} days.
+        </p>
+      )}
+
+      {state.status === 'ready' && state.letters.length > 0 && (
+        <>
+          <p className="templates__hint">
+            {state.letters.length === 1 ? 'One letter' : `${state.letters.length} letters`} in
+            the last {FAILED_LETTER_DAYS} days could not be sent. Nothing is retried on its own:
+            fix the cause below, and the next letter will go.
+          </p>
+          <table className="templates__table">
+            <thead>
+              <tr>
+                <th scope="col">When</th>
+                <th scope="col">Letter</th>
+                <th scope="col">To</th>
+                <th scope="col">Why it was not sent</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.letters.map((letter) => (
+                <tr key={letter.id}>
+                  <td>{letter.queuedOn ? new Date(letter.queuedOn).toLocaleString() : '—'}</td>
+                  <td>{letter.subject}</td>
+                  <td>{letter.recipient ?? <span className="templates__builtin">Nobody</span>}</td>
+                  <td>{letter.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -289,73 +369,109 @@ function spliceAtCaret(el: HTMLInputElement | HTMLTextAreaElement, text: string)
 }
 
 /**
- * Who a letter goes to, shared by both forms.
+ * Who a letter goes to, shared by both forms: any of the roles, and any number of named
+ * contacts. Each person gets their own copy.
  *
- * Leaving it unset on a built-in letter is a real choice and the default one: the code that
+ * Choosing nobody on a built-in letter is a real choice and the default one: the code that
  * raises it already works out who it is about, and that is right far more often than a
  * blanket rule would be.
  */
 function RecipientFields({
-  kind,
-  setKind,
-  contactId,
-  setContactId,
+  recipients,
+  setRecipients,
   contacts,
   allowDefault,
 }: {
-  kind: number | null;
-  setKind: (value: number | null) => void;
-  contactId: string | null;
-  setContactId: (value: string | null) => void;
+  recipients: Recipients;
+  setRecipients: (value: Recipients) => void;
   contacts: ContactOption[];
   allowDefault: boolean;
 }) {
+  const { kinds, contactIds } = recipients;
+  const available = contacts.filter((c) => !contactIds.includes(c.id));
+
+  function toggleKind(value: number, on: boolean) {
+    setRecipients({
+      kinds: on ? [...kinds, value] : kinds.filter((k) => k !== value),
+      contactIds,
+    });
+  }
+
   return (
-    <>
-      <label htmlFor="template-recipient">Goes to</label>
+    <fieldset className="templates__recipients">
+      <legend>Goes to</legend>
+
+      {ROLE_KINDS.map((r) => (
+        <label key={r.value} className="templates__check">
+          <input
+            type="checkbox"
+            checked={kinds.includes(r.value)}
+            onChange={(e) => toggleKind(r.value, e.target.checked)}
+          />
+          {r.label}
+        </label>
+      ))}
+
+      {contactIds.length > 0 && (
+        <ul className="templates__chosen" aria-label="Named contacts">
+          {contactIds.map((id) => {
+            const contact = contacts.find((c) => c.id === id);
+            return (
+              <li key={id}>
+                {contact ? `${contact.name} (${contact.email})` : (
+                  <span className="templates__problem-cell">A contact with no work email</span>
+                )}
+                <button
+                  type="button"
+                  className="templates__btn templates__btn--ghost"
+                  onClick={() =>
+                    setRecipients({ kinds, contactIds: contactIds.filter((c) => c !== id) })
+                  }
+                >
+                  Remove
+                  <span className="templates__sr"> {contact?.name ?? 'this contact'}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <label htmlFor="template-contact">Add a named contact</label>
       <select
-        id="template-recipient"
-        value={kind === null ? '' : String(kind)}
-        onChange={(e) => setKind(e.target.value === '' ? null : Number(e.target.value))}
+        id="template-contact"
+        value=""
+        onChange={(e) => {
+          if (e.target.value !== '') {
+            setRecipients({ kinds, contactIds: [...contactIds, e.target.value] });
+          }
+        }}
       >
-        {allowDefault && <option value="">Whoever the letter is about (recommended)</option>}
-        {!allowDefault && <option value="">Choose…</option>}
-        {RECIPIENT_KINDS.map((r) => (
-          <option key={r.value} value={r.value}>
-            {r.label}
+        <option value="">{available.length > 0 ? 'Choose…' : 'No other contacts to add'}</option>
+        {available.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name} ({c.email})
           </option>
         ))}
       </select>
-      {allowDefault && kind === null && (
+      <p className="templates__hint">
+        The same person for every case. Only contacts with a work email are listed — somebody
+        without one would be chosen here but never written to.
+      </p>
+
+      {allowDefault && kinds.length === 0 && contactIds.length === 0 && (
         <p className="templates__hint">
-          The code that raises this letter works out who it is about — the adviser on the case,
-          the checker who submitted it, and so on. Choose somebody here only to override that.
+          Nobody chosen, so this letter goes to whoever it is about — the adviser on the case,
+          the checker who submitted it, and so on. Choose people here only to replace that.
         </p>
       )}
-
-      {kind === KIND_CONTACT && (
-        <>
-          <label htmlFor="template-contact">Which contact</label>
-          <select
-            id="template-contact"
-            value={contactId ?? ''}
-            onChange={(e) => setContactId(e.target.value === '' ? null : e.target.value)}
-          >
-            <option value="">Choose…</option>
-            {contacts.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} ({c.email})
-              </option>
-            ))}
-          </select>
-          <p className="templates__hint">
-            The same person for every case. Only contacts with a work email are listed —
-            somebody without one would be chosen here but never written to.
-          </p>
-        </>
-      )}
-    </>
+    </fieldset>
   );
+}
+
+/** True when a chosen contact can no longer be written to; the plug-in refuses the save. */
+function hasUnreachableContact(recipients: Recipients, contacts: ContactOption[]): boolean {
+  return recipients.contactIds.some((id) => !contacts.some((c) => c.id === id));
 }
 
 function TemplateForm({
@@ -383,14 +499,13 @@ function TemplateForm({
   const builtIn = row.custom ? null : builtInWording(row.code);
   const [subject, setSubject] = useState(row.stored ? row.subject : (builtIn?.subject ?? ''));
   const [body, setBody] = useState(row.stored ? row.body : (builtIn?.body ?? ''));
-  const [kind, setKind] = useState<number | null>(row.recipientKind);
+  const [recipients, setRecipients] = useState<Recipients>(row.recipients);
   // Which field a token goes into. Tracked rather than assumed, and named on the picker:
   // dropping one into the body when the person had just clicked into the subject is the kind
   // of mistake that is only noticed after the letter has gone.
   const [focused, setFocused] = useState<'subject' | 'body'>('body');
   const subjectRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<RichTextEditorHandle>(null);
-  const [contactId, setContactId] = useState<string | null>(row.recipientContactId);
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -398,7 +513,8 @@ function TemplateForm({
     ? unknownCustomTokens(subject, body)
     : unknownTokens(row.code, subject, body);
   const empty = subject.trim() === '' || body.trim() === '';
-  const contactMissing = kind === KIND_CONTACT && !contactId;
+  const unreachable = hasUnreachableContact(recipients, contacts);
+  const nobody = row.custom && recipients.kinds.length === 0 && recipients.contactIds.length === 0;
 
   function insertToken(token: string) {
     const text = `{{${token}}}`;
@@ -417,7 +533,7 @@ function TemplateForm({
     setSaving(true);
     setProblem(null);
 
-    const result = await saveTemplate(row, subject, body, kind, contactId);
+    const result = await saveTemplate(row, subject, body, recipients);
     setSaving(false);
 
     if (result.ok) {
@@ -488,10 +604,8 @@ function TemplateForm({
         </p>
 
         <RecipientFields
-          kind={kind}
-          setKind={setKind}
-          contactId={contactId}
-          setContactId={setContactId}
+          recipients={recipients}
+          setRecipients={setRecipients}
           contacts={contacts}
           allowDefault={!row.custom}
         />
@@ -520,11 +634,14 @@ function TemplateForm({
           </p>
         )}
 
-        {contactMissing && (
+        {unreachable && (
           <p className="templates__problem">
-            This letter is set to go to a named contact, but no contact is chosen.
+            A chosen contact has no work email, so this letter could never reach them. Remove
+            them, or add an email to their contact record.
           </p>
         )}
+
+        {nobody && <p className="templates__problem">Choose who should receive this letter.</p>}
 
         {problem && <p className="templates__problem">{problem}</p>}
 
@@ -536,7 +653,7 @@ function TemplateForm({
           <button
             type="submit"
             className="templates__btn"
-            disabled={saving || offenders.length > 0 || empty || contactMissing}
+            disabled={saving || offenders.length > 0 || empty || unreachable || nobody}
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
@@ -576,8 +693,7 @@ function NewTemplateForm({
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [eventValue, setEventValue] = useState<number | null>(null);
-  const [kind, setKind] = useState<number | null>(null);
-  const [contactId, setContactId] = useState<string | null>(null);
+  const [recipients, setRecipients] = useState<Recipients>({ kinds: [], contactIds: [] });
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
@@ -604,12 +720,12 @@ function NewTemplateForm({
   const clashes = taken.includes(normalised);
 
   const offenders = unknownCustomTokens(subject, body);
-  const contactMissing = kind === KIND_CONTACT && !contactId;
+  const unreachable = hasUnreachableContact(recipients, contacts);
   const incomplete =
     name.trim() === '' ||
     normalised === '' ||
     eventValue === null ||
-    kind === null ||
+    (recipients.kinds.length === 0 && recipients.contactIds.length === 0) ||
     subject.trim() === '' ||
     body.trim() === '';
 
@@ -624,8 +740,7 @@ function NewTemplateForm({
       subject,
       body,
       eventValue,
-      recipientKind: kind,
-      recipientContactId: contactId,
+      recipients,
     });
     setSaving(false);
 
@@ -681,10 +796,8 @@ function NewTemplateForm({
         </select>
 
         <RecipientFields
-          kind={kind}
-          setKind={setKind}
-          contactId={contactId}
-          setContactId={setContactId}
+          recipients={recipients}
+          setRecipients={setRecipients}
           contacts={contacts}
           allowDefault={false}
         />
@@ -739,9 +852,9 @@ function NewTemplateForm({
           </p>
         )}
 
-        {contactMissing && (
+        {unreachable && (
           <p className="templates__problem">
-            This letter is set to go to a named contact, but no contact is chosen.
+            A chosen contact has no work email, so this letter could never reach them.
           </p>
         )}
 
@@ -751,7 +864,7 @@ function NewTemplateForm({
           <button
             type="submit"
             className="templates__btn"
-            disabled={saving || incomplete || clashes || offenders.length > 0 || contactMissing}
+            disabled={saving || incomplete || clashes || offenders.length > 0 || unreachable}
           >
             {saving ? 'Saving…' : 'Add the letter'}
           </button>

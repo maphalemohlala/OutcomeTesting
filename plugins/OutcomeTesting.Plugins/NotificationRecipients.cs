@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -122,6 +123,89 @@ namespace OutcomeTesting.Plugins
                 // This runs inside the transaction that caused the notification. A recipient
                 // that cannot be worked out costs the letter, never the save.
                 return null;
+            }
+        }
+
+        /// <summary>One chosen recipient, and either their address or why there is none.</summary>
+        public sealed class Resolved
+        {
+            /// <summary>Who was chosen, in words: "T&amp;C Manager", or a contact's name.</summary>
+            public string Who { get; set; }
+
+            /// <summary>The address, or null.</summary>
+            public string Email { get; set; }
+
+            /// <summary>Why there is no address, for a person reading the outbox.</summary>
+            public string Problem { get; set; }
+        }
+
+        /// <summary>
+        /// Every recipient a template chooses, resolved against the case. Never throws, and
+        /// never drops one silently: a recipient with no address comes back with the reason, so
+        /// the caller can record it where a person will see it.
+        /// </summary>
+        public static List<Resolved> Resolve(
+            IOrganizationService service,
+            NotificationTemplateRows.RecipientChoice choice,
+            EntityReference caseRef,
+            EntityReference reviewRef)
+        {
+            var resolved = new List<Resolved>();
+            if (choice == null)
+            {
+                return resolved;
+            }
+
+            foreach (var kind in choice.Kinds)
+            {
+                var email = EmailFor(service, kind, caseRef, reviewRef, null);
+                resolved.Add(new Resolved
+                {
+                    Who = Name(kind),
+                    Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
+                    Problem = string.IsNullOrWhiteSpace(email) ? MissingReason(kind) : null,
+                });
+            }
+
+            foreach (var contact in choice.Contacts)
+            {
+                string name = null;
+                string email = null;
+                try
+                {
+                    var row = service.Retrieve("contact", contact.Id, new ColumnSet("fullname", "emailaddress1"));
+                    name = row.GetAttributeValue<string>("fullname");
+                    email = row.GetAttributeValue<string>("emailaddress1");
+                }
+                catch (Exception)
+                {
+                    // A contact that has been deleted since it was chosen: reported below.
+                }
+
+                var who = string.IsNullOrWhiteSpace(name) ? "A named contact" : name.Trim();
+                resolved.Add(new Resolved
+                {
+                    Who = who,
+                    Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
+                    Problem = !string.IsNullOrWhiteSpace(email) ? null
+                        : name == null ? "The chosen contact no longer exists."
+                        : who + " has no email address on their contact record.",
+                });
+            }
+
+            return resolved;
+        }
+
+        /// <summary>Why a role resolved to nobody, in the words of the person who chose it.</summary>
+        private static string MissingReason(int kind)
+        {
+            switch (kind)
+            {
+                case KindAdviser: return "The case has no adviser email address.";
+                case KindTcManager: return "No T&C Manager with an email address is mapped to the case's adviser.";
+                case KindParaplanner: return "The case has no para-planner email address.";
+                case KindChecker: return "The case is not allocated to a checker with an email address.";
+                default: return "Nobody could be found to send it to.";
             }
         }
 

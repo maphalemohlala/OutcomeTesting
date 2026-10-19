@@ -271,19 +271,11 @@ namespace OutcomeTesting.Plugins
             EntityReference caseRef,
             string occurrence = null)
         {
-            var id = Queue(
+            // Guid.Empty back means the event was already queued, so the attachment is already
+            // on the row that exists and writing it again would replace a sent document.
+            return QueueLetter(
                 service, correlationId, eventValue, targetTable, targetId,
-                recipientEmail, subject, body, templateCode, occurrence);
-
-            // Guid.Empty means the event was already queued, so the attachment is already on
-            // the row that exists and writing it again would replace a sent document.
-            if (id == Guid.Empty || caseRef == null)
-            {
-                return id;
-            }
-
-            AttachCompletedCheck(service, id, caseRef);
-            return id;
+                recipientEmail, subject, body, templateCode, occurrence, caseRef, true);
         }
 
         public static Guid Queue(
@@ -310,35 +302,38 @@ namespace OutcomeTesting.Plugins
             string templateCode,
             string occurrence = null)
         {
+            return QueueLetter(
+                service, correlationId, eventValue, targetTable, targetId,
+                recipientEmail, subject, body, templateCode, occurrence, null, false);
+        }
+
+        /// <summary>
+        /// The one place a built-in letter is queued, with or without the completed check.
+        ///
+        /// <para>
+        /// Who it goes to may have been chosen as data (AD-168), and may be several people. The
+        /// code's own routing is the default and stays the answer unless somebody has actually
+        /// picked somebody; a choice that resolved to nobody falls back to it rather than
+        /// emptying a recipient the caller had worked out correctly. Each extra recipient gets
+        /// a row of its own, and each chosen recipient who could not be reached gets a Failed
+        /// row saying why - never a silent skip.
+        /// </para>
+        /// </summary>
+        private static Guid QueueLetter(
+            IOrganizationService service,
+            Guid correlationId,
+            int eventValue,
+            string targetTable,
+            Guid targetId,
+            string recipientEmail,
+            string subject,
+            string body,
+            string templateCode,
+            string occurrence,
+            EntityReference caseRef,
+            bool withCompletedCheck)
+        {
             var code = CodeFor(eventValue, targetId, occurrence);
-
-            // Who this goes to may have been chosen as data (AD-168). The code's own routing
-            // is the default and stays the answer unless somebody has actually picked
-            // somebody else; an override that resolved to nobody is ignored rather than
-            // allowed to empty a recipient the caller had worked out correctly.
-            var settings = NotificationTemplateRows.SettingsFor(service, templateCode);
-            recipientEmail = Chosen(service, settings, targetTable, targetId) ?? recipientEmail;
-            var row = new Entity(NotificationEntity)
-            {
-                ["al_name"] = CommandHelpers.Truncate(EventName(eventValue) + ": " + subject, 200),
-                ["al_notificationcode"] = code,
-                ["al_event"] = new OptionSetValue(eventValue),
-                ["al_status"] = new OptionSetValue(StatusPending),
-                ["al_targettable"] = targetTable,
-                ["al_targetid"] = targetId.ToString("D"),
-                ["al_subject"] = CommandHelpers.Truncate(subject, 400),
-                ["al_body"] = CommandHelpers.Truncate(body, 4000),
-                ["al_queuedon"] = DateTime.UtcNow,
-                ["al_correlationid"] = correlationId.ToString("D"),
-            };
-
-            // Left empty when the record does not name one. Recipient routing per event is
-            // not settled for every event (OD-030), and an invented address is worse than a
-            // row a person has to look at: the drain refuses to send without one.
-            if (!string.IsNullOrWhiteSpace(recipientEmail))
-            {
-                row["al_recipientemail"] = CommandHelpers.Truncate(recipientEmail, 200);
-            }
 
             // Read before writing, because a duplicate must never reach the platform as a
             // fault. This used to let the create fail on the alternate key and swallow the
@@ -361,50 +356,176 @@ namespace OutcomeTesting.Plugins
                 return Guid.Empty;
             }
 
-            var created = service.Create(row);
-
-            // The wording asked for the completed check (AD-171). The para-planner's letter
-            // attaches one by its own call regardless; this is what lets any other letter.
-            if (settings.WantsCompletedCheck)
+            var settings = NotificationTemplateRows.SettingsFor(service, templateCode);
+            var wantsCheck = withCompletedCheck || settings.WantsCompletedCheck;
+            if (caseRef == null && (wantsCheck || !settings.Recipients.IsEmpty))
             {
-                AttachCompletedCheck(
-                    service, created, NotificationRecipients.CaseOf(service, targetTable, targetId));
+                caseRef = NotificationRecipients.CaseOf(service, targetTable, targetId);
+            }
+
+            var resolved = settings.Recipients.IsEmpty
+                ? new List<NotificationRecipients.Resolved>()
+                : NotificationRecipients.Resolve(
+                    service, settings.Recipients, caseRef, NotificationRecipients.ReviewOf(targetTable, targetId));
+
+            var addresses = Addresses(resolved);
+            if (addresses.Count == 0)
+            {
+                // Left empty when the record does not name one. Recipient routing per event is
+                // not settled for every event (OD-030), and an invented address is worse than a
+                // row a person has to look at: the drain refuses to send without one.
+                addresses.Add(string.IsNullOrWhiteSpace(recipientEmail) ? null : recipientEmail);
+            }
+
+            var created = new List<Guid>();
+            for (var i = 0; i < addresses.Count; i++)
+            {
+                var rowCode = i == 0 ? code : code + "-" + ShortHash(addresses[i]);
+                if (i > 0 && Exists(service, rowCode))
+                {
+                    continue;
+                }
+
+                created.Add(service.Create(
+                    Letter(rowCode, eventValue, targetTable, targetId, addresses[i], subject, body, correlationId)));
+            }
+
+            RecordUnreached(service, code, resolved, eventValue, targetTable, targetId, subject, body, correlationId);
+
+            // The wording asked for the completed check (AD-171), or the caller always sends
+            // it (every adviser letter, AD-164). Every copy carries the same documents.
+            if (wantsCheck)
+            {
+                AttachCompletedCheck(service, created, caseRef);
             }
 
             // The letters an administrator attached to this event, sent in addition to this
             // one. Deliberately AFTER the built-in is created: an extra letter is worth
             // having and is never worth losing the real one over, and a failure here would
             // otherwise take the notification that the system itself depends on with it.
-            QueueCustom(service, correlationId, eventValue, targetTable, targetId);
+            // Only alongside a template letter: the para-planner's fixed copy is a second letter
+            // at the same event, not a second occurrence of it, and would send them all twice.
+            if (!string.IsNullOrWhiteSpace(templateCode))
+            {
+                QueueCustom(service, correlationId, eventValue, targetTable, targetId, occurrence);
+            }
 
-            return created;
+            return created[0];
+        }
+
+        /// <summary>The distinct addresses among the resolved recipients, in the order chosen.</summary>
+        private static List<string> Addresses(List<NotificationRecipients.Resolved> resolved)
+        {
+            var addresses = new List<string>();
+            foreach (var recipient in resolved)
+            {
+                if (recipient.Email != null
+                    && !addresses.Exists(a => string.Equals(a, recipient.Email, StringComparison.OrdinalIgnoreCase)))
+                {
+                    addresses.Add(recipient.Email);
+                }
+            }
+
+            return addresses;
+        }
+
+        /// <summary>A pending outbox row for one recipient.</summary>
+        private static Entity Letter(
+            string code,
+            int eventValue,
+            string targetTable,
+            Guid targetId,
+            string recipientEmail,
+            string subject,
+            string body,
+            Guid correlationId)
+        {
+            var row = new Entity(NotificationEntity)
+            {
+                ["al_name"] = CommandHelpers.Truncate(EventName(eventValue) + ": " + subject, 200),
+                ["al_notificationcode"] = code,
+                ["al_event"] = new OptionSetValue(eventValue),
+                ["al_status"] = new OptionSetValue(StatusPending),
+                ["al_targettable"] = targetTable,
+                ["al_targetid"] = targetId.ToString("D"),
+                ["al_subject"] = CommandHelpers.Truncate(subject, 400),
+                ["al_body"] = CommandHelpers.Truncate(body, 4000),
+                ["al_queuedon"] = DateTime.UtcNow,
+                ["al_correlationid"] = correlationId.ToString("D"),
+            };
+
+            if (!string.IsNullOrWhiteSpace(recipientEmail))
+            {
+                row["al_recipientemail"] = CommandHelpers.Truncate(recipientEmail, 200);
+            }
+
+            return row;
         }
 
         /// <summary>
-        /// The address a stored template chooses for this letter, or null where none is
-        /// chosen and the caller's own routing stands.
+        /// A Failed row for each chosen recipient who could not be reached, carrying the reason.
+        ///
+        /// This used to be a silent skip, so a letter set to go to a T&amp;C Manager the case
+        /// could not name simply never went and nothing anywhere said so. The row is never
+        /// drained (it is not Pending); it is there for the Email Templates page to show.
         /// </summary>
-        private static string Chosen(
+        private static void RecordUnreached(
             IOrganizationService service,
-            NotificationTemplateRows.TemplateSettings settings,
+            string code,
+            List<NotificationRecipients.Resolved> resolved,
+            int eventValue,
             string targetTable,
-            Guid targetId)
+            Guid targetId,
+            string subject,
+            string body,
+            Guid correlationId)
         {
-            if (settings == null || !settings.Kind.HasValue)
+            foreach (var recipient in resolved)
             {
-                return null;
+                if (recipient.Email != null)
+                {
+                    continue;
+                }
+
+                var failedCode = code + "-" + ShortHash("unreached|" + recipient.Who);
+                if (Exists(service, failedCode))
+                {
+                    continue;
+                }
+
+                var row = Letter(failedCode, eventValue, targetTable, targetId, null, subject, body, correlationId);
+                row["al_status"] = new OptionSetValue(StatusFailed);
+                row["al_failurereason"] = CommandHelpers.Truncate(
+                    "Not sent to " + recipient.Who + ". " + recipient.Problem, FailureReasonLength);
+                service.Create(row);
             }
+        }
 
-            var choice = settings;
-            var caseRef = NotificationRecipients.CaseOf(service, targetTable, targetId);
-            var email = NotificationRecipients.EmailFor(
-                service,
-                choice.Kind.Value,
-                caseRef,
-                NotificationRecipients.ReviewOf(targetTable, targetId),
-                choice.Contact);
+        /// <summary>The longest failure reason al_failurereason holds.</summary>
+        public const int FailureReasonLength = 2000;
 
-            return string.IsNullOrWhiteSpace(email) ? null : email;
+        /// <summary>
+        /// Sixteen hex characters standing for a longer value, so a code stays inside the 100
+        /// characters al_notificationcode holds however long the template code or address is.
+        ///
+        /// The template code used to go into the outbox code whole. Any code over 46
+        /// characters made the create fail, the catch around the custom letters swallowed it,
+        /// and the letter was simply never sent (PROD, 2026-10-15).
+        /// </summary>
+        public static string ShortHash(string value)
+        {
+            using (var sha = System.Security.Cryptography.SHA1.Create())
+            {
+                var bytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(
+                    (value ?? string.Empty).Trim().ToUpperInvariant()));
+                var hex = new System.Text.StringBuilder(16);
+                for (var i = 0; i < 8; i++)
+                {
+                    hex.Append(bytes[i].ToString("X2", System.Globalization.CultureInfo.InvariantCulture));
+                }
+
+                return hex.ToString();
+            }
         }
 
         /// <summary>
@@ -426,7 +547,8 @@ namespace OutcomeTesting.Plugins
             Guid correlationId,
             int eventValue,
             string targetTable,
-            Guid targetId)
+            Guid targetId,
+            string occurrence)
         {
             try
             {
@@ -442,49 +564,37 @@ namespace OutcomeTesting.Plugins
 
                 foreach (var template in templates)
                 {
-                    var email = NotificationRecipients.EmailFor(
-                        service, template.RecipientKind, caseRef, reviewRef, template.RecipientContact);
-
-                    if (string.IsNullOrWhiteSpace(email))
-                    {
-                        // Nobody to send to. Queuing it unaddressed would put a row in the
-                        // outbox that can never drain and that nothing is watching.
-                        continue;
-                    }
-
-                    var customCode = CodeFor(eventValue, targetId, template.Code);
-                    if (Exists(service, customCode))
-                    {
-                        continue;
-                    }
-
-
                     var customSubject = NotificationTemplates.Substitute(
                         template.Subject, tokens, escape: false);
                     var customBody = NotificationTemplates.Substitute(
                         template.Body, tokens, escape: true);
 
-                    var customRow = new Entity(NotificationEntity)
-                    {
-                        ["al_name"] = CommandHelpers.Truncate(
-                            EventName(eventValue) + ": " + customSubject, 200),
-                        ["al_notificationcode"] = customCode,
-                        ["al_event"] = new OptionSetValue(eventValue),
-                        ["al_status"] = new OptionSetValue(StatusPending),
-                        ["al_targettable"] = targetTable,
-                        ["al_targetid"] = targetId.ToString("D"),
-                        ["al_recipientemail"] = CommandHelpers.Truncate(email, 200),
-                        ["al_subject"] = CommandHelpers.Truncate(customSubject, 400),
-                        ["al_body"] = CommandHelpers.Truncate(customBody, 4000),
-                        ["al_queuedon"] = DateTime.UtcNow,
-                        ["al_correlationid"] = correlationId.ToString("D"),
-                    };
+                    // Keyed on the occurrence too, so a letter attached to Allocation goes
+                    // again on a reallocation, as the built-in does.
+                    var key = CodeFor(eventValue, targetId, null)
+                        + "-" + ShortHash((occurrence ?? string.Empty) + "|" + template.Code);
 
-                    var customId = service.Create(customRow);
+                    var resolved = NotificationRecipients.Resolve(service, template.Recipients, caseRef, reviewRef);
+                    var created = new List<Guid>();
+                    foreach (var email in Addresses(resolved))
+                    {
+                        var customCode = key + "-" + ShortHash(email);
+                        if (Exists(service, customCode))
+                        {
+                            continue;
+                        }
+
+                        created.Add(service.Create(Letter(
+                            customCode, eventValue, targetTable, targetId, email,
+                            customSubject, customBody, correlationId)));
+                    }
+
+                    RecordUnreached(service, key, resolved, eventValue, targetTable, targetId,
+                        customSubject, customBody, correlationId);
 
                     if (template.WantsCompletedCheck)
                     {
-                        AttachCompletedCheck(service, customId, caseRef);
+                        AttachCompletedCheck(service, created, caseRef);
                     }
                 }
             }
@@ -509,9 +619,9 @@ namespace OutcomeTesting.Plugins
         /// </para>
         /// </summary>
         private static void AttachCompletedCheck(
-            IOrganizationService service, Guid notificationId, EntityReference caseRef)
+            IOrganizationService service, List<Guid> notificationIds, EntityReference caseRef)
         {
-            if (notificationId == Guid.Empty || caseRef == null)
+            if (notificationIds.Count == 0 || caseRef == null)
             {
                 return;
             }
@@ -525,7 +635,11 @@ namespace OutcomeTesting.Plugins
                     return;
                 }
 
-                WriteAttachment(service, notificationId, packedNames, packedBodies);
+                // Drawn once, written to every copy.
+                foreach (var id in notificationIds)
+                {
+                    WriteAttachment(service, id, packedNames, packedBodies);
+                }
             }
             catch (Exception)
             {

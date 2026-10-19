@@ -37,7 +37,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/admin/questions', label: 'Question library', resource: 'page.admin.questions' },
       { to: '/admin/advisers', label: 'Adviser mapping', resource: 'page.admin.advisers' },
-      { to: '/admin/templates', label: 'Notification wording', resource: 'page.admin.templates' },
+      { to: '/admin/templates', label: 'Email Templates', resource: 'page.admin.templates' },
       { to: '/admin/lists', label: 'Dropdown options', resource: 'page.admin.lists' },
       { to: '/admin/security', label: 'Security configuration', resource: 'page.admin.security' },
       // Moved from "My work" (Task 9, 2026-09-22): the Role column writes

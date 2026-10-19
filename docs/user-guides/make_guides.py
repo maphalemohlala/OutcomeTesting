@@ -590,7 +590,7 @@ GUIDES.append(dict(
             ["<b>Question library</b>", "Maintain checklist sections and questions. Questions are retired by "
                                         "date, never deleted, so past checks always read as they did."],
             ["<b>Adviser mapping</b>", "Link each adviser to their T&amp;C Manager. Sign-off depends on it."],
-            ["<b>Notification wording</b>", "Edit the wording of the emails OTIS sends."],
+            ["<b>Email Templates</b>", "Edit the emails OTIS sends, who receives each one, and see any that could not be sent."],
             ["<b>Dropdown options</b>", "Maintain the choices offered in lists across OTIS."],
             ["<b>Security configuration</b>", "Control which roles can reach which pages and actions."],
             ["<b>People</b>", "Grant and withdraw roles. One person can hold more than one role."],

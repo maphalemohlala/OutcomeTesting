@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Al_notificationtemplatesService, ContactsService } from '../../generated';
+import {
+  Al_notificationsService,
+  Al_notificationtemplatesService,
+  ContactsService,
+} from '../../generated';
 // The generated index re-exports each model as a NAMESPACE, so option-set types come from
 // the model module itself - the same import useQuestionLibrary.ts makes.
-import type {
-  Al_notificationtemplatesal_event,
-  Al_notificationtemplatesal_recipientkind,
-} from '../../generated/models/Al_notificationtemplatesModel';
+import type { Al_notificationtemplatesal_event } from '../../generated/models/Al_notificationtemplatesModel';
 import { logTechnical } from '../../services/errors';
 import { plainMessage } from '../../services/commands/failures';
 import { TEMPLATE_CODES, templateHint } from './notificationTemplates';
-import { CUSTOM_TOKENS } from './notificationRouting';
+import {
+  CUSTOM_TOKENS,
+  readRecipients,
+  recipientColumns,
+  type Recipients,
+} from './notificationRouting';
 import { describeRemoveFailure } from './notificationTemplateRemoval';
 
 export interface TemplateRow {
@@ -30,10 +36,8 @@ export interface TemplateRow {
   custom: boolean;
   /** The event that sends it. Only a custom letter carries one; the twelve are raised in code. */
   eventValue: number | null;
-  /** Who receives it, where somebody has chosen. Null leaves the built-in routing alone. */
-  recipientKind: number | null;
-  recipientContactId: string | null;
-  recipientContactName: string | null;
+  /** Who receives it, where somebody has chosen. None leaves the built-in routing alone. */
+  recipients: Recipients;
 }
 
 export interface ContactOption {
@@ -53,8 +57,7 @@ export interface TemplateDraft {
   subject: string;
   body: string;
   eventValue: number | null;
-  recipientKind: number | null;
-  recipientContactId: string | null;
+  recipients: Recipients;
 }
 
 /**
@@ -88,7 +91,7 @@ export function useNotificationTemplates(reloadKey = 0): TemplatesState {
           logTechnical('notification templates load', result.error);
           setState({
             status: 'unavailable',
-            reason: 'The notification wording could not be loaded right now.',
+            reason: 'The email templates could not be loaded right now.',
           });
           return;
         }
@@ -110,9 +113,7 @@ export function useNotificationTemplates(reloadKey = 0): TemplatesState {
             stored: row !== undefined,
             custom: false,
             eventValue: row?.al_event != null ? Number(row.al_event) : null,
-            recipientKind: row?.al_recipientkind != null ? Number(row.al_recipientkind) : null,
-            recipientContactId: row?._al_recipientcontactid_value ?? null,
-            recipientContactName: row?.al_recipientcontactidname ?? null,
+            recipients: readRecipients(row ?? {}),
           };
         });
 
@@ -131,9 +132,7 @@ export function useNotificationTemplates(reloadKey = 0): TemplatesState {
             stored: true,
             custom: true,
             eventValue: r.al_event != null ? Number(r.al_event) : null,
-            recipientKind: r.al_recipientkind != null ? Number(r.al_recipientkind) : null,
-            recipientContactId: r._al_recipientcontactid_value ?? null,
-            recipientContactName: r.al_recipientcontactidname ?? null,
+            recipients: readRecipients(r),
           }));
 
         // Contacts are for the "a named contact" recipient. A failure here is not fatal: the
@@ -143,7 +142,7 @@ export function useNotificationTemplates(reloadKey = 0): TemplatesState {
             ? contactResult.data
                 .filter((c) => Number(c.statecode) === 0 && (c.emailaddress1 ?? '').trim() !== '')
                 .map((c) => ({
-                  id: c.contactid,
+                  id: c.contactid.toLowerCase(),
                   name: (c.fullname ?? '').trim(),
                   email: (c.emailaddress1 ?? '').trim(),
                 }))
@@ -161,7 +160,7 @@ export function useNotificationTemplates(reloadKey = 0): TemplatesState {
         logTechnical('notification templates load', error);
         setState({
           status: 'unavailable',
-          reason: 'The notification wording could not be loaded right now.',
+          reason: 'The email templates could not be loaded right now.',
         });
       });
 
@@ -186,14 +185,13 @@ export async function saveTemplate(
   row: TemplateRow,
   subject: string,
   body: string,
-  recipientKind: number | null = row.recipientKind,
-  recipientContactId: string | null = row.recipientContactId,
+  recipients: Recipients = row.recipients,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   try {
     const fields = {
       al_subject: subject,
       al_body: body,
-      ...routingFields(recipientKind, recipientContactId),
+      ...recipientColumns(recipients),
     };
 
     const result = row.id
@@ -263,7 +261,7 @@ export async function createTemplate(
       ...(draft.eventValue === null
         ? {}
         : { al_event: draft.eventValue as Al_notificationtemplatesal_event }),
-      ...routingFields(draft.recipientKind, draft.recipientContactId),
+      ...recipientColumns(draft.recipients),
     });
 
     if (!result.success) {
@@ -276,30 +274,6 @@ export async function createTemplate(
     logTechnical('notification template create', error);
     return { ok: false, reason: refusalFrom(error) };
   }
-}
-
-/**
- * The recipient columns for a write.
- *
- * Clearing the contact when the kind is not "a named contact" is deliberate: a stale contact
- * left behind on a letter that now goes to the adviser is a row that reads as though somebody
- * chose that person, and the next reader has no way to tell it was a leftover.
- */
-function routingFields(
-  recipientKind: number | null,
-  recipientContactId: string | null,
-): Record<string, unknown> {
-  if (recipientKind === null) {
-    return { al_recipientkind: null, 'al_RecipientContactId@odata.bind': null };
-  }
-
-  const usesContact = recipientKind === 120910814;
-
-  return {
-    al_recipientkind: recipientKind as Al_notificationtemplatesal_recipientkind,
-    'al_RecipientContactId@odata.bind':
-      usesContact && recipientContactId ? `/contacts(${recipientContactId})` : null,
-  };
 }
 
 /**
@@ -319,4 +293,77 @@ function routingFields(
 function refusalFrom(error: unknown): string {
   const message = plainMessage(error);
   return message !== '' ? message : 'That wording could not be saved.';
+}
+
+/** A letter the outbox could not send, as the page lists it. */
+export interface FailedLetter {
+  id: string;
+  queuedOn: string | null;
+  subject: string;
+  recipient: string | null;
+  reason: string;
+}
+
+export type FailedLettersState =
+  | { status: 'loading' }
+  | { status: 'unavailable' }
+  | { status: 'ready'; letters: FailedLetter[] };
+
+/** How far back the page looks for letters that were not sent. */
+export const FAILED_LETTER_DAYS = 30;
+
+/**
+ * The letters that could not be sent in the last {@link FAILED_LETTER_DAYS} days, newest first.
+ *
+ * <p>
+ * A letter used to fail with nothing anywhere a person would look: the outbox records why, but
+ * nobody opens the outbox. A load failure is reported as such rather than as an empty list,
+ * which would read as "nothing failed".
+ * </p>
+ */
+export function useFailedLetters(reloadKey = 0): FailedLettersState {
+  const [state, setState] = useState<FailedLettersState>({ status: 'loading' });
+
+  useEffect(() => {
+    let cancelled = false;
+    const since = new Date(Date.now() - FAILED_LETTER_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+    Al_notificationsService.getAll({
+      select: ['al_notificationid', 'al_queuedon', 'al_subject', 'al_recipientemail', 'al_failurereason'],
+      filter: `al_status eq 120910812 and al_queuedon ge ${since}`,
+      orderBy: ['al_queuedon desc'],
+      top: 100,
+    })
+      .then((result) => {
+        if (cancelled) return;
+
+        if (!result.success || !result.data) {
+          logTechnical('failed letters load', result.error);
+          setState({ status: 'unavailable' });
+          return;
+        }
+
+        setState({
+          status: 'ready',
+          letters: result.data.map((n) => ({
+            id: n.al_notificationid,
+            queuedOn: n.al_queuedon ?? null,
+            subject: (n.al_subject ?? '').trim() || '(no subject)',
+            recipient: (n.al_recipientemail ?? '').trim() || null,
+            reason: (n.al_failurereason ?? '').trim() || 'No reason was recorded.',
+          })),
+        });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        logTechnical('failed letters load', error);
+        setState({ status: 'unavailable' });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  return state;
 }

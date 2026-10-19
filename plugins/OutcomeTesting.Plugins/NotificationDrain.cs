@@ -41,7 +41,7 @@ namespace OutcomeTesting.Plugins
         private const int PartySender = 1;
         private const int PartyToRecipient = 2;
 
-        private const int FailureReasonLength = 2000;
+        private const int FailureReasonLength = NotificationOutbox.FailureReasonLength;
 
         /// <summary>What the drain did to one row, so callers can report rather than guess.</summary>
         public enum Result

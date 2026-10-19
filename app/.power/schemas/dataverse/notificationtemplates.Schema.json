@@ -104,6 +104,14 @@
           "x-ms-read-only": true,
           "maxLength": 160
         },
+        "al_recipientcontactids": {
+          "type": "string",
+          "title": "Recipient contacts",
+          "x-ms-dataverse-attribute": "al_recipientcontactids",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_RecipientContactIds",
+          "maxLength": 4000
+        },
         "al_recipientcontactidyominame": {
           "type": "string",
           "title": "al_recipientcontactidyominame",
@@ -152,6 +160,14 @@
           "x-ms-dataverse-type": "VirtualType",
           "x-ms-schema-name": "al_recipientkindName",
           "x-ms-read-only": true
+        },
+        "al_recipientkinds": {
+          "type": "string",
+          "title": "Recipient roles",
+          "x-ms-dataverse-attribute": "al_recipientkinds",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_RecipientKinds",
+          "maxLength": 200
         },
         "al_subject": {
           "type": "string",

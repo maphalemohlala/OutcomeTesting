@@ -40,6 +40,68 @@ export const RECIPIENT_KINDS: readonly Choice[] = [
 /** The kind that needs a contact naming alongside it. */
 export const KIND_CONTACT = 120910814;
 
+/** The roles a letter can tick; named contacts are chosen by name instead. */
+export const ROLE_KINDS: readonly Choice[] = RECIPIENT_KINDS.filter((r) => r.value !== KIND_CONTACT);
+
+/** Everybody a template goes to. */
+export interface Recipients {
+  kinds: number[];
+  contactIds: string[];
+}
+
+/**
+ * Who a stored row chooses: the two list columns plus the single kind and contact a row saved
+ * before them still carries. Mirrors `NotificationTemplateRows.ReadRecipients`.
+ */
+export function readRecipients(row: {
+  al_recipientkinds?: string | null;
+  al_recipientcontactids?: string | null;
+  al_recipientkind?: unknown;
+  _al_recipientcontactid_value?: string | null;
+}): Recipients {
+  const kinds: number[] = [];
+  const contactIds: string[] = [];
+  const legacyKind = row.al_recipientkind != null ? Number(row.al_recipientkind) : null;
+
+  if (legacyKind === KIND_CONTACT && row._al_recipientcontactid_value) {
+    contactIds.push(row._al_recipientcontactid_value.toLowerCase());
+  } else if (legacyKind !== null && ROLE_KINDS.some((r) => r.value === legacyKind)) {
+    kinds.push(legacyKind);
+  }
+
+  for (const part of split(row.al_recipientkinds)) {
+    const kind = Number(part);
+    if (ROLE_KINDS.some((r) => r.value === kind) && !kinds.includes(kind)) kinds.push(kind);
+  }
+
+  for (const part of split(row.al_recipientcontactids)) {
+    const id = part.toLowerCase();
+    if (!contactIds.includes(id)) contactIds.push(id);
+  }
+
+  return { kinds, contactIds };
+}
+
+function split(list: string | null | undefined): string[] {
+  return (list ?? '')
+    .split(/[,;]/)
+    .map((p) => p.trim())
+    .filter((p) => p !== '');
+}
+
+/**
+ * The recipient columns for a write. The single legacy columns are cleared, so a row once
+ * saved here holds its recipients in one place only.
+ */
+export function recipientColumns({ kinds, contactIds }: Recipients): Record<string, unknown> {
+  return {
+    al_recipientkinds: kinds.length > 0 ? kinds.join(',') : null,
+    al_recipientcontactids: contactIds.length > 0 ? contactIds.join(',') : null,
+    al_recipientkind: null,
+    'al_RecipientContactId@odata.bind': null,
+  };
+}
+
 /**
  * The tokens a letter of your own may use: everything a case can answer whatever raised it.
  *
