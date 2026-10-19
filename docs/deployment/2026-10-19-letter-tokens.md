@@ -28,7 +28,15 @@ Tests: 1,854 plug-in tests and 1,384 app tests passed.
 - **Not checked on screen:** the saved session's Entra cookies have expired. The player sends the
   browser to Microsoft sign-in.
 
-## TEST
+## TEST (`org37995f36`)
 
-Not promoted. The DEV version bump and managed export were refused to the agent ("Production
-Deploy"). The steps are those of `2026-10-19-fail-points.md` with version **1.0.30.0**.
+The DEV version bump and managed export were refused to the agent ("Production Deploy"), so the
+owner ran the promotion: DEV bumped to **1.0.30.0**, exported managed, and imported into TEST
+with `artifacts\2026-10-19-fail-points\import.ps1`.
+
+- Import succeeded (async operation `1042c214-…`, status 30). Solution **1.0.30.0**, all 35
+  steps present and enabled.
+- Read back by the agent: plug-in sha256 `12EF9ED5509BCE41...`, the same as DEV. Code App
+  republished 10:03:01Z, and the package carries `index-DoTkHlAu.js`.
+
+PROD not promoted.
