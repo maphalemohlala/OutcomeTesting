@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -150,6 +151,8 @@ namespace OutcomeTesting.Plugins
                 }
             }
 
+            RefuseRetired(service, toAdd);
+
             var toRemove = new EntityReferenceCollection();
             foreach (var id in current)
             {
@@ -170,6 +173,84 @@ namespace OutcomeTesting.Plugins
             if (toRemove.Count > 0)
             {
                 service.Disassociate(target.LogicalName, target.Id, relationship, toRemove);
+            }
+        }
+
+        /// <summary>
+        /// Unticks every fail point retired in the question library from a review's answers.
+        /// Called by the submit while the review is still open: a retired point is not drawn on
+        /// a check in progress, so a tick made before it was retired would otherwise reach the
+        /// submitted review unseen by the checker. Once submitted, a review's ticks are kept
+        /// whatever is retired later.
+        /// </summary>
+        public static void DropRetiredFailReasons(IOrganizationService service, Guid reviewId)
+        {
+            var responses = new QueryExpression(ResponseEntity) { ColumnSet = new ColumnSet(false) };
+            responses.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
+            var responseIds = service.RetrieveMultiple(responses).Entities.Select(r => (object)r.Id).ToArray();
+            if (responseIds.Length == 0)
+            {
+                return;
+            }
+
+            var linkQuery = new QueryExpression(FailReasonIntersect)
+            {
+                ColumnSet = new ColumnSet("al_responseid", "al_failreasonid"),
+            };
+            linkQuery.Criteria.AddCondition("al_responseid", ConditionOperator.In, responseIds);
+            var links = service.RetrieveMultiple(linkQuery).Entities
+                .Select(l => new System.Collections.Generic.KeyValuePair<Guid, Guid>(
+                    l.GetAttributeValue<Guid>("al_responseid"), l.GetAttributeValue<Guid>("al_failreasonid")))
+                .ToList();
+            if (links.Count == 0)
+            {
+                return;
+            }
+
+            var retiredQuery = new QueryExpression(FailReasonEntity) { ColumnSet = new ColumnSet(false) };
+            retiredQuery.Criteria.AddCondition(
+                "al_failreasonid", ConditionOperator.In, links.Select(l => (object)l.Value).Distinct().ToArray());
+            retiredQuery.Criteria.AddCondition("statecode", ConditionOperator.Equal, 1);
+            var retired = new System.Collections.Generic.HashSet<Guid>(
+                service.RetrieveMultiple(retiredQuery).Entities.Select(r => r.Id));
+
+            foreach (var perResponse in links.Where(l => retired.Contains(l.Value)).GroupBy(l => l.Key))
+            {
+                service.Disassociate(
+                    ResponseEntity,
+                    perResponse.Key,
+                    new Relationship(FailReasonRelationship),
+                    new EntityReferenceCollection(
+                        perResponse.Select(l => new EntityReference(FailReasonEntity, l.Value)).ToList()));
+            }
+        }
+
+        /// <summary>
+        /// A fail point retired in the question library is not drawn on a check in progress, so
+        /// a NEW tick on one comes from a page loaded before it was retired or from a hand-made
+        /// request. Either way it is refused rather than silently dropped, so the checker is not
+        /// left believing it was recorded. A tick already linked is untouched here: only ids not
+        /// yet on the response reach this, and the submit clears the rest.
+        /// </summary>
+        private static void RefuseRetired(IOrganizationService service, EntityReferenceCollection toAdd)
+        {
+            if (toAdd.Count == 0)
+            {
+                return;
+            }
+
+            var query = new QueryExpression(FailReasonEntity) { ColumnSet = new ColumnSet("al_name") };
+            query.Criteria.AddCondition(
+                "al_failreasonid", ConditionOperator.In, toAdd.Select(r => (object)r.Id).ToArray());
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 1);
+
+            var retired = service.RetrieveMultiple(query).Entities.FirstOrDefault();
+            if (retired != null)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + "The fail point \""
+                    + retired.GetAttributeValue<string>("al_name")
+                    + "\" has been retired and can no longer be ticked. Reload the page to see the current list.");
             }
         }
 

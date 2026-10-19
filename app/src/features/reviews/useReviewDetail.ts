@@ -193,6 +193,7 @@ function toFailReason(record: Al_failreasons) {
     category: choiceLabel(Al_failreasonsal_category, record.al_category, record.al_categoryname),
     categoryValue: record.al_category ?? null,
     order: record.al_displayorder ?? 0,
+    retired: record.statecode === 1,
   };
 }
 
@@ -373,6 +374,7 @@ export function useReviewDetail(
             failPoints: failPoints(
               reasons.success ? reasons.data.map(toFailReason) : [],
               linked,
+              header.submittedOn !== null,
             ),
           },
         });

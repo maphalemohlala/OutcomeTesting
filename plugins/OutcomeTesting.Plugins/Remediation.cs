@@ -540,13 +540,20 @@ namespace OutcomeTesting.Plugins
             // (project owner) so the adviser reads the issue itself rather than a category
             // word in front of every other row.
             var reasons = ByIdIn(
-                service, "al_failreason", new ColumnSet("al_name", "al_displayorder"), ticked);
+                service, "al_failreason", new ColumnSet("al_name", "al_displayorder", "statecode"), ticked);
 
             var points = new List<RankedItem>();
             foreach (var reasonId in ticked)
             {
                 Entity reason;
                 if (!reasons.TryGetValue(reasonId, out reason))
+                {
+                    continue;
+                }
+
+                // Retired in the question library: the check page no longer draws it, so it
+                // is owed no remedial action, and the submit unticks it (DropRetiredFailReasons).
+                if (reason.GetAttributeValue<OptionSetValue>("statecode")?.Value == 1)
                 {
                     continue;
                 }

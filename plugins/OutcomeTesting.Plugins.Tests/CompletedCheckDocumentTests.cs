@@ -207,6 +207,22 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void Leaves_out_a_retired_fail_point_unless_the_review_ticked_it()
+        {
+            var service = Case();
+            var reasons = service.All("al_failreason").ToList();
+            var ticked = reasons.First(r => (string)r["al_name"] == "AML - ID verification issue");
+            var unticked = reasons.First(r => (string)r["al_name"] == "Breach - Any other process breach has been identified");
+            ticked["statecode"] = new OptionSetValue(1);
+            unticked["statecode"] = new OptionSetValue(1);
+
+            var fails = Grid(CompletedCheck.Blocks(service, AqsReviewId), "File Quality fail reason");
+
+            Assert.Equal("[x]", Row(fails, "AML - ID verification issue").Cells[1].Text);
+            Assert.DoesNotContain(fails.Rows, r => r.Cells[0].Text == "Breach - Any other process breach has been identified");
+        }
+
+        [Fact]
         public void Outcome_questions_draw_their_options_inline_with_the_answer_ticked()
         {
             var blocks = CompletedCheck.Blocks(Case(), AqsReviewId);

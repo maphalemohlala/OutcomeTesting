@@ -278,6 +278,18 @@ describe('failPoints', () => {
     ]);
   });
 
+  it('drops a retired reason from a check in progress, even one it ticked', () => {
+    const withRetired = [...reasons, { id: 'old', name: 'Retired point', category: 'AML', categoryValue: 120910400, order: 2, retired: true }];
+    expect(failPoints(withRetired, new Set()).map((p) => p.id)).not.toContain('old');
+    expect(failPoints(withRetired, new Set(['old'])).map((p) => p.id)).not.toContain('old');
+  });
+
+  it('keeps a retired reason on a submitted review that ticked it, and only there', () => {
+    const withRetired = [...reasons, { id: 'old', name: 'Retired point', category: 'AML', categoryValue: 120910400, order: 2, retired: true }];
+    expect(failPoints(withRetired, new Set(['old']), true).find((p) => p.id === 'old')?.ticked).toBe(true);
+    expect(failPoints(withRetired, new Set(), true).map((p) => p.id)).not.toContain('old');
+  });
+
   it('offers the Tax check reasons to whoever is looking, not only the Tax team', () => {
     expect(failPoints(reasons, new Set()).map((p) => p.id)).toContain('tax-1');
   });

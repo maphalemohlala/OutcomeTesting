@@ -162,6 +162,55 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.DoesNotContain(svc.Disassociations, d => d.RelatedId == linked);
         }
 
+        [Fact]
+        public void Refuses_a_new_tick_on_a_retired_fail_point_but_keeps_an_existing_one()
+        {
+            var svc = new FakeOrganizationService();
+            var retired = svc.Create(new Entity("al_failreason")
+            {
+                ["al_name"] = "Record Keeping - Old point",
+                ["statecode"] = new OptionSetValue(1),
+            });
+            var live = svc.Create(new Entity("al_failreason") { ["statecode"] = new OptionSetValue(0) });
+
+            var payload = Choice(ResponseRules.ChoiceNo);
+            payload.FailReasons = new[] { live.ToString("D"), retired.ToString("D") };
+            payload.RenderedReasons = payload.FailReasons;
+            var refusal = Assert.Throws<InvalidPluginExecutionException>(() => AnswerWriter.Save(svc, ReviewId, payload));
+            Assert.Contains("Record Keeping - Old point", refusal.Message);
+            Assert.Empty(svc.Associations);
+
+            // Ticked before it was retired: saving the answer again must not be refused.
+            var responseId = AnswerWriter.FindExisting(svc, ReviewId, VersionId).Value;
+            svc.Associate("al_response", responseId, new Relationship("al_failreason_response"),
+                new EntityReferenceCollection { new EntityReference("al_failreason", retired) });
+            var again = Choice(ResponseRules.ChoiceNo);
+            again.FailReasons = new[] { retired.ToString("D") };
+            again.RenderedReasons = again.FailReasons;
+            AnswerWriter.Save(svc, ReviewId, again);
+        }
+
+        [Fact]
+        public void The_submit_unticks_retired_fail_points_and_keeps_live_ones()
+        {
+            var svc = new FakeOrganizationService();
+            var retired = svc.Create(new Entity("al_failreason") { ["statecode"] = new OptionSetValue(1) });
+            var live = svc.Create(new Entity("al_failreason") { ["statecode"] = new OptionSetValue(0) });
+            var responseId = AnswerWriter.Save(svc, ReviewId, Choice(ResponseRules.ChoiceNo));
+            svc.Associate("al_response", responseId, new Relationship("al_failreason_response"),
+                new EntityReferenceCollection
+                {
+                    new EntityReference("al_failreason", retired),
+                    new EntityReference("al_failreason", live),
+                });
+
+            AnswerWriter.DropRetiredFailReasons(svc, ReviewId);
+
+            var removed = Assert.Single(svc.Disassociations);
+            Assert.Equal(retired, removed.RelatedId);
+            Assert.Equal(responseId, removed.TargetId);
+        }
+
         private static AnswerRequestPayload RichText(string markup)
         {
             return new AnswerRequestPayload

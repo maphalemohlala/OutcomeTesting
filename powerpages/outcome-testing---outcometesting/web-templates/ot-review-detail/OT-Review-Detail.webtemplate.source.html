@@ -963,6 +963,7 @@
           <attribute name="al_name" />
           <attribute name="al_category" />
           <attribute name="al_displayorder" />
+          <attribute name="statecode" />
           <order attribute="al_displayorder" />
         </entity>
       </fetch>
@@ -1378,11 +1379,22 @@
                   </tr>
                 </thead>
                 <tbody>
+                  {% comment %}A point retired in the question library is not part of a check in progress, ticked or not (the submit unticks it). A submitted review keeps showing the points it was submitted with.{% endcomment %}
                   {% for fr in failreasons.results.entities %}
+                    {% capture pairkey %}|{{ fq_existing.al_responseid }}~{{ fr.al_failreasonid }}{% endcapture %}
+                    {% assign fr_ticked = false %}
+                    {% if fq_existing.al_responseid and selected_reason_pairs contains pairkey %}{% assign fr_ticked = true %}{% endif %}
+                    {% assign fr_show = true %}
+                    {% if fr.statecode.value == 1 %}
+                      {% assign fr_show = false %}
+                      {% if locked and fr_ticked %}{% assign fr_show = true %}{% endif %}
+                    {% endif %}
+                    {% if fr_show %}
                     <tr>
                       <td class="label"><label for="fr-{{ fr.al_failreasonid }}">{{ fr.al_name | escape }}</label></td>
-                      <td class="tick">{% capture pairkey %}|{{ fq_existing.al_responseid }}~{{ fr.al_failreasonid }}{% endcapture %}<input type="checkbox" class="cc-box" id="fr-{{ fr.al_failreasonid }}" data-ot-reason value="{{ fr.al_failreasonid }}"{% unless editable %} disabled{% endunless %}{% if fq_existing.al_responseid and selected_reason_pairs contains pairkey %} checked{% endif %} /></td>
+                      <td class="tick"><input type="checkbox" class="cc-box" id="fr-{{ fr.al_failreasonid }}" data-ot-reason value="{{ fr.al_failreasonid }}"{% unless editable %} disabled{% endunless %}{% if fr_ticked %} checked{% endif %} /></td>
                     </tr>
+                    {% endif %}
                   {% endfor %}
                 </tbody>
               </table>

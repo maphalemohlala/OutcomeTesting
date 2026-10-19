@@ -570,7 +570,7 @@ namespace OutcomeTesting.Plugins
             var reasons = new List<FailReasonItem>();
             try
             {
-                var all = new QueryExpression("al_failreason") { ColumnSet = new ColumnSet("al_name", "al_displayorder") };
+                var all = new QueryExpression("al_failreason") { ColumnSet = new ColumnSet("al_name", "al_displayorder", "statecode") };
                 all.AddOrder("al_displayorder", OrderType.Ascending);
                 var rows = new List<Entity>(CommandHelpers.RetrieveAll(service, all));
                 if (rows.Count == 0)
@@ -591,6 +591,13 @@ namespace OutcomeTesting.Plugins
 
                 foreach (var row in rows)
                 {
+                    // A point retired in the question library is printed only where this
+                    // review ticked it, as the app and the portal show it.
+                    if (row.GetAttributeValue<OptionSetValue>("statecode")?.Value == 1 && !ticked.Contains(row.Id))
+                    {
+                        continue;
+                    }
+
                     var name = row.GetAttributeValue<string>("al_name");
                     reasons.Add(new FailReasonItem
                     {

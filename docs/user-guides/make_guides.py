@@ -587,8 +587,9 @@ GUIDES.append(dict(
             ["<b>Management reporting</b>", "Report on outcomes, open and overdue remediation, ageing and "
                                             "sign-off. Filter the results and export them."],
             ["<b>Exports</b>", "Produce the Trail Light file of closed cases, when you need it."],
-            ["<b>Question library</b>", "Maintain checklist sections and questions. Questions are retired by "
-                                        "date, never deleted, so past checks always read as they did."],
+            ["<b>Question library</b>", "Maintain checklist sections and questions, and the <b>File Quality - Fail "
+                                        "points</b> checkers tick. Questions and fail points are retired, never "
+                                        "deleted, so past checks always read as they did."],
             ["<b>Adviser mapping</b>", "Link each adviser to their T&amp;C Manager. Sign-off depends on it."],
             ["<b>Email Templates</b>", "Edit the emails OTIS sends, who receives each one, and see any that could not be sent."],
             ["<b>Dropdown options</b>", "Maintain the choices offered in lists across OTIS."],
@@ -602,7 +603,11 @@ GUIDES.append(dict(
             ["When people join, move or leave", "Update their roles on the <b>People</b> page and keep the "
                                                  "<b>Adviser mapping</b> current."],
             ["As needed", "Reallocate cases, correct case details, produce reports and the Trail Light export."],
-            ["When the checklist changes", "Date questions or sections in and out in the <b>Question library</b>."],
+            ["When the checklist changes", "Date questions or sections in and out in the <b>Question library</b>. "
+                                           "Add, reword, reorder or retire fail points in its <b>File Quality - "
+                                           "Fail points</b> block, below the sections. A retired fail point "
+                                           "leaves every check in progress at once, even one that ticked it. "
+                                           "Checks already submitted keep it."],
         ], [0.28, 0.72]),
         h2("The roles you manage"),
         grid(["Role", "What they do", "Where"], [

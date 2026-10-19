@@ -240,6 +240,12 @@ namespace OutcomeTesting.Plugins.Tests
             service.Seed("al_al_failreason_al_response", Guid.NewGuid(), "al_responseid", amlNo, "al_failreasonid", tob);
             service.Seed("al_al_failreason_al_response", Guid.NewGuid(), "al_responseid", amlNo, "al_failreasonid", idIssue);
             service.Seed("al_al_failreason_al_response", Guid.NewGuid(), "al_responseid", Guid.NewGuid(), "al_failreasonid", idIssue);
+            // Ticked before it was retired in the question library: the check page no longer
+            // draws it, so it owes no remedial action.
+            var retiredPoint = Guid.NewGuid();
+            service.Seed("al_failreason", retiredPoint, "al_name", "Breach - Retired point",
+                "al_category", new OptionSetValue(120910401), "al_displayorder", 6, "statecode", new OptionSetValue(1));
+            service.Seed("al_al_failreason_al_response", Guid.NewGuid(), "al_responseid", amlNo, "al_failreasonid", retiredPoint);
 
             var items = Remediation.NonPassItems(service, reviewId, new DateTime(2026, 9, 9, 12, 0, 0, DateTimeKind.Utc));
 

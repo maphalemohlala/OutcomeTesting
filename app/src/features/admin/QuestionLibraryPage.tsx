@@ -6,6 +6,7 @@ import { protectedReason } from './protectedQuestions';
 import { QuestionHistoryModal, SectionHistoryModal } from './HistoryModal';
 import { QuestionModal } from './QuestionModal';
 import { RetireModal } from './RetireModal';
+import { FailPointsPanel } from './FailPointsPanel';
 import { SectionModal } from './SectionModal';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { retireQuestion } from '../../services/commands/questions';
@@ -251,6 +252,8 @@ export function QuestionLibraryPage() {
             ) : null}
 
             {live.map(renderSection)}
+
+            <FailPointsPanel canEdit={canEdit} />
 
             {retired.length > 0 ? (
               <details className="library__retired library__retired--sections">

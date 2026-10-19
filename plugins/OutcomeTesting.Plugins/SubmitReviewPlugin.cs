@@ -198,6 +198,9 @@ namespace OutcomeTesting.Plugins
             EnsureMandatoryQuestionsAnswered(service, targetId, review);
             EnsureTaxPrecedesAqs(service, review);
 
+            // Before the status moves: the tick guard refuses changes to a submitted review.
+            AnswerWriter.DropRetiredFailReasons(service, targetId);
+
             var update = new Entity(ReviewEntity, targetId)
             {
                 [ReviewStatus] = new OptionSetValue(StatusSubmitted),

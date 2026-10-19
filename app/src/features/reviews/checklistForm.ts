@@ -430,6 +430,8 @@ export interface FailReasonRef {
   category: string | null;
   categoryValue: number | null;
   order: number;
+  /** Retired in the question library: shown only on a review that already ticked it. */
+  retired?: boolean;
 }
 
 export interface FailPoint {
@@ -459,9 +461,15 @@ export interface FailPoint {
  * own ticks: they hang off that team's File quality outcome answer (Q-FQ-01 for AQS,
  * Q-FQTAX-01 for Tax) through the response-keyed intersect, so the two sets never collide.
  */
-export function failPoints(reasons: FailReasonRef[], ticked: ReadonlySet<string>): FailPoint[] {
+export function failPoints(
+  reasons: FailReasonRef[],
+  ticked: ReadonlySet<string>,
+  submitted = false,
+): FailPoint[] {
+  // A retired point is not part of a check in progress, ticked or not (the submit unticks it);
+  // a submitted review keeps the points it was submitted with.
   return reasons
-    .slice()
+    .filter((reason) => !reason.retired || (submitted && ticked.has(reason.id)))
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))
     .map((reason) => ({
       id: reason.id,
