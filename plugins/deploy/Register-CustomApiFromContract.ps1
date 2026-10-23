@@ -9,7 +9,7 @@
     a new command needs a contract file rather than a new script.
 
     It deliberately does NOT push the plug-in assembly. `pac plugin push` is a separate,
-    ordered step (see docs/deployment/), and folding it in here would let a caller
+    ordered step, and folding it in here would let a caller
     register a command whose assembly is older than the contract it was built from.
 
     Run it AFTER `pac plugin push` has landed the assembly containing the plug-in type.

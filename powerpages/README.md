@@ -9,11 +9,10 @@ Source-controlled metadata for the Outcome Testing portal. This directory is **t
 | `powerpages/` | Portal site metadata (this folder) | `pac pages upload` |
 | `app/` | Power Apps Code App | `pa app push` |
 | `src/` | Dataverse solution root, **packaged in full** | solution import |
-| `brand/` | Authoritative colours, fonts, logos | consumed, never copied |
 
 Portal metadata must never be placed under `src/` — that directory ships wholesale inside the managed solution. It must never be placed under `app/`, and Code App source must never be placed here; the two have separate build and release paths and mixing them breaks both (AD-048).
 
-The front ends share the schema in `src/`, the server-side commands in `plugins/`, and the brand tokens in `brand/`. Sharing those prevents divergent business logic. Sharing UI directories would only cause deployment collisions.
+The front ends share the schema in `src/` and the server-side commands in `plugins/`. Sharing those prevents divergent business logic. Sharing UI directories would only cause deployment collisions.
 
 ## Site
 
@@ -138,13 +137,7 @@ through this script.
 
 After uploading: refresh the site configuration cache, sync design studio if open, then test in an InPrivate session against each representative role.
 
-## Current state
-
-Shell and data wiring built 2026-08-29; the security model closed 2026-08-31 (sub-project B
-of the portal security closure, PP-01, PP-02, NFR-SEC-01, NFR-SEC-02) and verified locally
-against both gates below. The DEV upload of this branch's changes, the round-trip check and
-the deletion verification are not yet run — see `docs/deployment/2026-08-31-portal-security-closure-deployment.md`,
-which is a runbook to be executed, not a record of a completed deployment.
+## Site structure
 
 **Pages** — `/my-work`, `/cases`, `/case-details?id=`, `/tax-reviews`, `/aqs-reviews`, `/remediation`, all children of Home and in the primary navigation. The starter pages (`contact-us`, `search`, `pages`, `subpage-1`, `subpage-2`), the basic form and nine sample media web files have been removed; `Search/Enabled` is `false` and the `Search` site marker is gone with it, because deleting the search page otherwise left a dead search box in the header of every page.
 
@@ -177,4 +170,3 @@ which is a runbook to be executed, not a record of a completed deployment.
 - Never commit secrets, tokens, connection strings or environment-specific identifiers here — including in deployment profiles, Liquid, JavaScript or web files.
 - The downloaded metadata **is** version controlled. Do not add it to `.gitignore`.
 
-Design and permission model: [`docs/superpowers/specs/2026-08-29-power-pages-portal-design.md`](../docs/superpowers/specs/2026-08-29-power-pages-portal-design.md)

@@ -5,8 +5,7 @@ using Microsoft.Xrm.Sdk.Query;
 namespace OutcomeTesting.Registration;
 
 /// <summary>
-/// One-off DEV migration onto the contact registry (spec
-/// docs/superpowers/specs/2026-09-06-contacts-registry-design.md).
+/// One-off DEV migration onto the contact registry.
 ///
 /// Four phases, each reported and each idempotent enough to re-run:
 ///   1. Remove the al_user rows that no contact matches.

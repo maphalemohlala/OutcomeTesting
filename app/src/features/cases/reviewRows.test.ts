@@ -39,8 +39,8 @@ describe('who holds a check', () => {
   it('still reads owneridname where a read supplies one', () => {
     // FetchXML and the SDK do populate it. Dropping that fallback would trade one blank
     // column for another.
-    expect(toReview(record({ owneridname: 'Simunye Radingwana' })).owner).toBe(
-      'Simunye Radingwana',
+    expect(toReview(record({ owneridname: 'Alex Owner' })).owner).toBe(
+      'Alex Owner',
     );
   });
 

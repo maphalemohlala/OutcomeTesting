@@ -24,8 +24,7 @@ internal sealed record Person(string Email, string Name, string StaffCode, IRead
 /// <item>Web roles, through al_AssignUserRole as grantrole does, so the association and the
 ///   al_userrolemapping mirror are written together.</item>
 /// <item>Portal sign-in: the binding, the identity username, a security stamp and
-///   logonenabled (bindidentity, setsecuritystamp, enableportallogin;
-///   docs/reference/portal-access-runbook.md).</item>
+///   logonenabled (bindidentity, setsecuritystamp, enableportallogin).</item>
 /// </list>
 /// Additive and idempotent: it never removes a role, never repoints a binding and never
 /// rotates a stamp, so a second run finishes what the first could not. Without --apply it

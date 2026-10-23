@@ -4,7 +4,7 @@ using Xunit;
 namespace OutcomeTesting.Plugins.Tests
 {
     /// <summary>
-    /// The canonical lifecycle in knowledge/project-context.md, encoded as tests. Every
+    /// The canonical case lifecycle, encoded as tests. Every
     /// case here names the step it comes from; a transition nothing in the requirements
     /// describes is refused rather than guessed at.
     /// </summary>

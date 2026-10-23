@@ -4,8 +4,7 @@ using Microsoft.Xrm.Sdk.Query;
 namespace OutcomeTesting.Registration;
 
 /// <summary>
-/// Puts the web role model into effect (spec
-/// docs/superpowers/specs/2026-09-06-web-roles-as-the-role-model-design.md).
+/// Puts the web role model into effect.
 ///
 /// Two phases:
 ///   1. Mirror every contact-to-web-role association into al_UserRoleMapping, so the

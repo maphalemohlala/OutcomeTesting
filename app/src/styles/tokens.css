@@ -1,10 +1,9 @@
 /*
- * Brand tokens. Colour and typography values trace to brand/.
- * Status hues are recorded in knowledge/decision-log.md (AD-008).
+ * Brand tokens. Colour and typography values trace to the Ascot Lloyd brand palette.
  */
 
 :root {
-  /* Brand palette — verified from brand/ */
+  /* Brand palette — verified from the Ascot Lloyd palette sheet */
   --brand-teal: #2b5257;
   --brand-teal-dark: #0a3535;
   --brand-teal-light: #ccfdf3; /* mint, confirmed by the brand owner over the sheet's CCDFF3 (OD-013) */

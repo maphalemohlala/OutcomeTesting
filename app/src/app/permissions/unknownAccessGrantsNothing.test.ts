@@ -9,7 +9,7 @@ vi.mock('../../generated', () => ({
 }));
 vi.mock('../../services/auth/useCurrentUser', () => ({ useCurrentUser: vi.fn() }));
 
-import { loadPermissions } from './PermissionProvider';
+import { loadPermissions } from './loadPermissions';
 import { executeCommand } from '../../services/commands/commandClient';
 import { Al_pagepermissionsService, ContactsService } from '../../generated';
 import { RESOURCE_KEYS, can } from '../../types/permissions';

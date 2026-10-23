@@ -56,7 +56,7 @@ namespace OutcomeTesting.Plugins
         /// <summary>
         /// What each state may become. Sources, state by state:
         ///
-        /// The spine is the canonical lifecycle in knowledge/project-context.md:
+        /// The spine is the canonical case lifecycle:
         /// Imported -> Validation Failed | Ready for Allocation -> Queued -> Assigned ->
         /// Review In Progress -> Submitted -> Awaiting Remediation | Closed ->
         /// Remediation In Progress -> Awaiting Sign-off -> Awaiting Recheck -> Closed.

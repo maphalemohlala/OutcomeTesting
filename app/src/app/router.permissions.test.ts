@@ -39,7 +39,7 @@ describe('every route is permission-gated', () => {
       .filter((route: string) => !route.includes('<Navigate'))
       .filter((route: string) => !/path="\*"/.test(route))
       .filter((route: string) => !route.includes('RequirePermission'))
-      .map((route: string) => (route.match(/path="([^"]*)"/) ?? [, '(unknown)'])[1]);
+      .map((route: string) => (route.match(/path="([^"]*)"/) ?? ['', '(unknown)'])[1]);
 
     expect(
       ungated,

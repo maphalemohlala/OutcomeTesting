@@ -6,8 +6,7 @@
     The companion to Check-ComponentIds.ps1. That script asks whether the site
     will deploy intact; this one asks whether it is safe to deploy at all.
 
-    Ten assertions, each traceable to the design at
-    docs/superpowers/specs/2026-08-31-portal-security-closure-design.md:
+    Ten assertions, each traceable to the portal security design:
 
       1. No table permission grants an anonymous role anything.
       2. No PROVISIONAL permission survives into a release artefact.

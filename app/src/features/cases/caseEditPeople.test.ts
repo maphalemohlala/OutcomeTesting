@@ -9,7 +9,7 @@ vi.mock('../../hooks/useUserDirectory', () => ({
   useUserDirectory: () => ({ status: 'loading' }),
 }));
 
-const { pickerOptionText, resolvePicker } = await import('../../components/form/UserPicker');
+const { pickerOptionText, resolvePicker } = await import('../../components/form/userPickerText');
 
 const adam1 = { id: 'c1', name: 'Adam Smith', email: 'adam.smith@example.com', active: true } as DirectoryUser;
 const adam2 = { id: 'c2', name: 'Adam Smith', email: 'adam.smith2@example.com', active: true } as DirectoryUser;
@@ -29,7 +29,7 @@ describe('the case person picker', () => {
   });
 });
 
-const { keepsTypedText } = await import('../../components/form/UserPicker');
+const { keepsTypedText } = await import('../../components/form/userPickerText');
 
 describe('a person picker being typed into', () => {
   const users = [adam1, adam2];

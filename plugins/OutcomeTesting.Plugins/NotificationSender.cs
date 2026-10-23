@@ -16,7 +16,7 @@ namespace OutcomeTesting.Plugins
     /// server-side email. The email's <c>from</c> party is then the queue.
     /// </para>
     /// <para>
-    /// <b>The address is an environment variable</b>, never a literal (AGENTS.md rule 7), and
+    /// <b>The address is an environment variable</b>, never a literal, and
     /// for a reason beyond the rule: one Exchange mailbox can be enabled for server-side sync
     /// in only one environment at a time, so the environments cannot all share it.
     /// </para>

@@ -14,7 +14,7 @@ plugins/**/obj/
 # MSBuild Binary and Structured Log
 *.binlog
 
-# secrets and local environment files (never commit — see build guide 7.4)
+# secrets and local environment files (never commit)
 .env
 .env.*
 *.secrets.json
@@ -23,31 +23,13 @@ plugins/**/obj/
 .auth/
 .temp/
 
-# Playwright MCP session artefacts (console logs, page snapshots) — scratch, not source
-.playwright-mcp/
-
 # NOTE: powerpages/ metadata IS version controlled. Do not ignore it.
 
-# Claude Code personal settings (machine-specific paths)
-.claude/settings.local.json
-
-# vendored obra/superpowers skills - installed locally, not committed
-/.github/skills/
-
-# Plug-in signing key (OD-025). Untracked 2026-09-08: it is a private key blob and it
-# reproduces the PublicKeyToken the registration tool expects. The file must still exist
-# here for the build - SignAssembly is on and the csproj names it - so a fresh clone
-# cannot build until the key is supplied out of band. That is the gap Key Vault injection
-# at build time is meant to close.
+# Plug-in signing key. It is a private key blob and it reproduces the PublicKeyToken the
+# registration tool expects. The file must still exist here for the build - SignAssembly is
+# on and the csproj names it - so a fresh clone cannot build until the key is supplied out
+# of band.
 plugins/OutcomeTesting.Plugins/OutcomeTesting.Plugins.snk
 
-# Playwright: a live portal session and run artefacts. The session file is a real
-# signed-in cookie jar - it is never committed, and it expires.
-app/e2e/.auth/
-# The PROD lifecycle run log (case reference, record ids, step results): environment detail.
-app/e2e/.runs/
 app/test-results/
-app/playwright-report/
-app/blob-report/
-graphify-out/
 test-results/

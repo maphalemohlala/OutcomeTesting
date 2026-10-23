@@ -5,8 +5,7 @@ namespace OutcomeTesting.Registration;
 
 /// <summary>
 /// Rewrites the product name in the labels a solution PACKAGE carries, for an environment
-/// that calls the product something else (PROD calls it OTIS; owner, 2026-10-01). Spec:
-/// docs/superpowers/specs/2026-10-01-otis-product-name-design.md.
+/// that calls the product something else (PROD calls it OTIS; owner, 2026-10-01).
 /// </summary>
 /// <remarks>
 /// <para>

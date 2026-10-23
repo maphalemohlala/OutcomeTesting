@@ -1,7 +1,6 @@
 /**
  * What this environment calls the product: OTIS in PROD, "Outcome Testing" everywhere else
- * (owner, 2026-10-01). Mirrors ProductName in the plug-in assembly; spec
- * docs/superpowers/specs/2026-10-01-otis-product-name-design.md.
+ * (owner, 2026-10-01). Mirrors ProductName in the plug-in assembly.
  *
  * The name is a label in some places and a KEY in others - the manager web role is matched by
  * name - so the derived names live here and nowhere else. An environment that sets nothing

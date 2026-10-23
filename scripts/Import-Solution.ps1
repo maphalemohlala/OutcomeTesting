@@ -12,8 +12,7 @@
 
     That is not a hypothetical. On 2026-09-02 an import without the flag switched off the
     six al_response steps in DEV, and nobody noticed for a week: the code was present, the
-    tests passed, and only the step state was wrong
-    (docs/deployment/2026-09-09-response-steps-reenabled.md). Those steps are where the
+    tests passed, and only the step state was wrong. Those steps are where the
     server-side enforcement lives - the conditional root cause, the suitability grade rule,
     the answer guards - so a silent deactivation turns every rule into a suggestion while
     every screen still looks right.

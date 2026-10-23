@@ -380,6 +380,11 @@ namespace OutcomeTesting.Plugins
                 return tokens;
             }
 
+#if REGISTRATION_TOOL
+            // The registration tool links this file only to seed template rows and never renders
+            // a letter; the case read below lives in plug-in-only code it cannot compile.
+            return tokens;
+#else
             var lacking = false;
             foreach (var name in CaseOutcomeTokens)
             {
@@ -410,6 +415,7 @@ namespace OutcomeTesting.Plugins
             }
 
             return merged;
+#endif
         }
 
         /// <summary>Removes every occurrence of a token, however it is spaced.</summary>

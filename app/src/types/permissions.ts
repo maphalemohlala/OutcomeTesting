@@ -3,7 +3,7 @@ import { DEFAULT_PRODUCT, brandRules } from '../app/product/productName';
  * Application RBAC model (AD-041). This is the single client-side source of truth
  * for what a role may see and do; the server-side Custom API commands (AD-003)
  * enforce the same rules against Dataverse privileges, so the app layer is
- * advisory only and never the security boundary (AGENTS.md invariant).
+ * advisory only and never the security boundary.
  *
  * Roles trace to AD-020/AD-031. Resource keys and access levels are the AD-041
  * vocabulary. Do not add a role or capability here without a requirement/AD ID.

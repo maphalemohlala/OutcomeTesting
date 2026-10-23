@@ -17,8 +17,7 @@ import contactsSchemaSource from '../../.power/schemas/dataverse/contacts.Schema
  * correctly with the declaration removed from `contacts.Schema.json`. If that works, the
  * declaration is not load-bearing and this tripwire guards nothing.
  *
- * What will SETTLE it: the deployment verification step in
- * `docs/superpowers/plans/2026-09-22-staff-codes-registry.md`, Task 11 - set an employee
+ * What will SETTLE it: the deployment verification step - set an employee
  * code on a contact in DEV, save, reload, and confirm it persisted. That is the step that
  * exercises the read end to end. Until it has been run, treat the premise as reasoning.
  *

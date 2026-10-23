@@ -28,7 +28,7 @@ namespace OutcomeTesting.Plugins
     /// The sending mailbox is the shared mailbox's queue where <c>al_NotificationSenderAddress</c>
     /// is set (<see cref="NotificationSender"/>), and otherwise the account the step is
     /// registered to run as, reached through <c>PluginUserService</c>. Either way no address
-    /// appears in code (AGENTS.md rule 7).
+    /// appears in code.
     /// </summary>
     public class NotificationDrainPlugin : PluginBase
     {

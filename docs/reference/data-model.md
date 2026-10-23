@@ -283,11 +283,3 @@ Two more kinds of text column are not drawn:
 - The `contact` request columns (`al_signoffrequest`, `al_claimrequest`, `al_regraderequest`,
   `al_caseheaderrequest`, `al_accountabilityrequest`) carry a JSON command naming the row to act
   on. A plug-in reads the command and clears the column.
-
-## Updating this file
-
-Regenerate the PNG after editing the diagram:
-
-```powershell
-cd app; node ..\docs\reference\render-data-model.mjs
-```

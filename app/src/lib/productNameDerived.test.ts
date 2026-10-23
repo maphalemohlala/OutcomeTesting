@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * The product name is never written out (owner, 2026-10-01: PROD is called OTIS, DEV and TEST
- * keep "Outcome Testing"; spec docs/superpowers/specs/2026-10-01-otis-product-name-design.md).
+ * keep "Outcome Testing").
  *
  * Every label and every key that carries it is derived from the one per-environment value:
  * ProductName in the plug-ins, app/product/productName.ts in the Code App, and the

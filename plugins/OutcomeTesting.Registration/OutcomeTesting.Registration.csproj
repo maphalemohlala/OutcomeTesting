@@ -15,6 +15,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>OutcomeTesting.Registration</RootNamespace>
+    <DefineConstants>$(DefineConstants);REGISTRATION_TOOL</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
