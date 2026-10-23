@@ -14,17 +14,17 @@ namespace OutcomeTesting.Plugins
     /// and if it commits, the notification is committed with it — there is no window where
     /// one exists without the other.
     ///
-    /// The event vocabulary is the FIVE events AD-035 names. PP-15 says nine; the other four
-    /// are not enumerated in any requirement, knowledge file or design document (OD-030 gap
-    /// (a)), so they are not invented here. Adding option values later is additive.
+    /// The event vocabulary is the eight Event* values below. Adding option values later is
+    /// additive.
     ///
-    /// Delivery is Dataverse server-side email with no Power Automate (OD-030, 2026-09-03).
-    /// The drain is <see cref="NotificationDrain"/>, reached from the asynchronous
+    /// Delivery is Dataverse server-side email with no Power Automate. The drain is
+    /// <see cref="NotificationDrain"/>, reached from the asynchronous
     /// <see cref="NotificationDrainPlugin"/> step and from the al_DrainNotifications command.
-    /// It sends from the account the step is registered to run as, so server-side email still
-    /// needs an approved, tested mailbox on the environment — where there is none, the step
-    /// is simply not registered, rows rest at Pending, and nothing claims an email was sent
-    /// that was not.
+    /// It sends from the shared-mailbox queue <see cref="NotificationSender"/> resolves from
+    /// al_NotificationSenderAddress, falling back to the step's run-as account only when that
+    /// variable is empty, so server-side email still needs an approved, tested mailbox on the
+    /// environment — where there is none, rows rest at Pending, and nothing claims an email
+    /// was sent that was not.
     /// </summary>
     public static class NotificationOutbox
     {
