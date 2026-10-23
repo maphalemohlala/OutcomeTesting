@@ -22,9 +22,9 @@ export type AdviserMappingsState =
  * (Fixes 5, AD-162).
  *
  * <p>
- * Routing only. The mapping decides who is told a sign-off is waiting on a case; it grants
- * no access and restricts none, because every T&C Manager reads every case. Nothing on this
- * screen should ever be described to a user as controlling what anyone can see.
+ * The mapping decides who is told a sign-off is waiting on a case, and it is also the gate
+ * on acting: in the portal only the mapped T&C Manager can sign the case off or record its
+ * final outcome (SupervisorMapping.EnsureManagesCase). It controls acting, not seeing.
  * </p>
  * <p>
  * The manager list is contacts with a work email, because a mapping to somebody unreachable

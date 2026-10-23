@@ -40,8 +40,9 @@ export function AdviserMappingPage() {
       <PageIntro
         title="Adviser mapping"
         purpose={
-          'Who is told when one of an adviser’s cases is waiting for sign-off. ' +
-          'This routes notifications only — it does not change what anyone can see or do.'
+          'The T&C Manager who supervises each adviser. They are told when one of the ' +
+          'adviser’s cases is waiting for sign-off, and only they can sign it off or record ' +
+          'its final outcome in the portal.'
         }
       />
 
@@ -63,8 +64,9 @@ export function AdviserMappingPage() {
 
           {state.mappings.length === 0 ? (
             <p className="advisers__note">
-              No adviser is mapped yet, so nobody is told when a sign-off falls due. The
-              sign-off itself still works — any T&amp;C Manager can perform one.
+              No adviser is mapped yet. Until an adviser is mapped, nobody is told when their
+              cases fall due for sign-off, and nobody can sign those cases off or record their
+              final outcome in the portal.
             </p>
           ) : (
             <>

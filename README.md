@@ -6,7 +6,8 @@ Source for the Ascot Lloyd Outcome Testing solution (OTIS in production) on Micr
 
 | Folder | Contents | Deploys with |
 |---|---|---|
-| `src/` | Unpacked Dataverse solution `OutcomeTesting`: tables, security roles, plug-in steps, the Code App package and portal components | `scripts/Import-Solution.ps1` |
+| `release/` | The installable managed solution, version 1.0.30.0: `OutcomeTesting_1_0_30_0_managed.zip` for environments named Outcome Testing, `OTIS_1_0_30_0_managed.zip` for production (OTIS) | `scripts/Import-Solution.ps1` |
+| `src/` | Unpacked Dataverse solution `OutcomeTesting`: tables, security roles, plug-in steps, the Code App package and portal components. Behind the release - see below | - |
 | `app/` | Power Apps Code App (React, TypeScript, Vite) | `npm run build`, then `pa app push` |
 | `powerpages/` | Power Pages portal metadata and its check scripts (see `powerpages/README.md`) | `powerpages/Deploy-Portal.ps1` |
 | `plugins/OutcomeTesting.Plugins` | Dataverse plug-ins and Custom API handlers (.NET Framework 4.6.2) | the registration tool |
@@ -23,6 +24,10 @@ Source for the Ascot Lloyd Outcome Testing solution (OTIS in production) on Micr
 - Code App: `cd app`, `npm ci`, `npm run build`. Unit tests: `npm test`.
 - Plug-ins: `dotnet build plugins/OutcomeTesting.Plugins -c Release`. Unit tests: `dotnet test plugins/OutcomeTesting.Plugins.Tests`.
 - The plug-in assembly is strong-name signed. The signing key `plugins/OutcomeTesting.Plugins/OutcomeTesting.Plugins.snk` is not in this repository and is supplied separately; the build fails without it.
+
+## `src/` is behind the release
+
+`src/` was last refreshed from DEV before version 1.0.30.0. It is missing some columns the live tables carry, and its plug-in assembly is older than the one in the release. Install from `release/`, never from a package packed out of `src/`. To bring `src/` up to date, export the `OutcomeTesting` solution from DEV as unmanaged and mirror it into `src/` with `scripts/round-trip-src.ps1`.
 
 ## Configuration
 
