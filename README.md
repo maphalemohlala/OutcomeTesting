@@ -26,4 +26,4 @@ Source for the Ascot Lloyd Outcome Testing solution (OTIS in production) on Micr
 
 ## Configuration
 
-Environment-specific values are Dataverse environment variables, never literals in code: `al_NotificationSenderAddress` (sender mailbox), `al_PortalBaseUrl` (portal link in letters) and `al_ProductName` (OTIS in production). They are not shipped in the solution, so create and set them in each environment.
+Environment-specific values are Dataverse environment variables, never literals in code: `al_NotificationSenderAddress` (sender mailbox), `al_PortalBaseUrl` (portal link in letters) and `al_ProductName` (OTIS in production). The solution carries the first and last; `al_PortalBaseUrl` is left out on purpose, so create it in each environment. Set all three values per environment after import.
