@@ -84,7 +84,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     isHtml: true,
     subject: 'Case check - Pass: {{reference}}',
     body:
-      '<p>Dear {{adviser}},</p><p>{{client}} has been checked and graded a Pass.</p><p>No further action is required.</p>{{caseButton}}<p>Kind regards</p>',
+      '<p>Dear {{adviser}},</p><p>{{client}} has been checked and graded a Pass.</p><p>No further action is required.</p><p>Kind regards</p>',
   },
   'SIGNOFF-APPROVED-RECHECK': {
     name: 'Remediation approved - moving to recheck',

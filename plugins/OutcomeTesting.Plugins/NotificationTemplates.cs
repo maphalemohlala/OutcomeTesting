@@ -786,7 +786,6 @@ namespace OutcomeTesting.Plugins
                     "<p>Dear {{adviser}},</p>"
                         + "<p>{{client}} has been checked and graded a Pass.</p>"
                         + "<p>No further action is required.</p>"
-                        + "{{caseButton}}"
                         + "<p>Kind regards</p>",
                     "View the case",
                     TokenReference, TokenAdviser, TokenClient, TokenCaseButton),

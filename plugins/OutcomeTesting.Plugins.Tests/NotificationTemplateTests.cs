@@ -33,7 +33,7 @@ namespace OutcomeTesting.Plugins.Tests
             // NotificationBodies is what this replaced. With no template row, the two must
             // agree character for character, or this change quietly rewrote every Pass
             // letter the moment it deployed.
-            var expected = NotificationBodies.Pass("Jane Adviser", "A. Client", Link);
+            var expected = NotificationBodies.Pass("Jane Adviser", "A. Client");
 
             var actual = NotificationTemplates.Render(
                 new FakeOrganizationService(),
@@ -121,10 +121,10 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var letter = NotificationTemplates.Render(
                 new FakeOrganizationService(),
-                NotificationTemplates.CasePassed,
+                NotificationTemplates.SignoffDue,
                 Tokens(
                     NotificationTemplates.TokenCaseButton,
-                        NotificationTemplates.CaseButton(Link, "View the case")));
+                        NotificationTemplates.CaseButton(Link, "Review and sign off")));
 
             Assert.Contains("<a href=", letter.Body);
             // The link's own ampersand is still escaped inside the attribute.

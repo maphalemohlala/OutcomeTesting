@@ -20,7 +20,7 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void Pass_confirms_the_grade_and_asks_for_nothing()
         {
-            var body = NotificationBodies.Pass("Jane Adviser", "Mr and Mrs Smith", Link);
+            var body = NotificationBodies.Pass("Jane Adviser", "Mr and Mrs Smith");
 
             Assert.StartsWith("<p>Dear Jane Adviser,</p>", body);
             Assert.Contains("Mr and Mrs Smith has been checked and graded a Pass", body);
@@ -29,19 +29,11 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Pass_carries_the_case_link()
+        public void Pass_offers_no_link_to_a_case_the_adviser_cannot_open()
         {
-            var body = NotificationBodies.Pass("Jane Adviser", "Mr and Mrs Smith", Link);
-
-            Assert.Contains(Link, body);
-        }
-
-        [Fact]
-        public void Pass_drops_the_link_sentence_when_there_is_no_site()
-        {
-            // CaseLink returns null where the environment has no portal. A sentence that
-            // offers a link and then shows nothing is worse than no sentence at all.
-            var body = NotificationBodies.Pass("Jane Adviser", "Mr and Mrs Smith", null);
+            // The portal never releases a passed case to its adviser, so a "View the case"
+            // button would open a page they are refused.
+            var body = NotificationBodies.Pass("Jane Adviser", "Mr and Mrs Smith");
 
             Assert.DoesNotContain("<a href", body);
             Assert.Contains("No further action is required.", body);
@@ -125,7 +117,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // AdviserContact refuses to guess between two people of the same name, and the
             // case may name nobody at all. The letter still has to read as a letter.
-            var body = NotificationBodies.Pass(null, "Mr and Mrs Smith", Link);
+            var body = NotificationBodies.Pass(null, "Mr and Mrs Smith");
 
             Assert.StartsWith("<p>Dear Adviser,</p>", body);
         }
@@ -133,7 +125,7 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void A_case_with_no_client_named_still_reads_as_a_sentence()
         {
-            var body = NotificationBodies.Pass("Jane Adviser", "  ", Link);
+            var body = NotificationBodies.Pass("Jane Adviser", "  ");
 
             Assert.Contains("This case has been checked and graded a Pass", body);
         }
@@ -156,15 +148,6 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Null(NotificationBodies.RemediationSubject(OutcomeRules.OutcomePass, "OT-1001"));
         }
         [Fact]
-        public void Pass_renders_the_link_as_an_anchor()
-        {
-            var body = NotificationBodies.Pass("Jane Adviser", "Mr and Mrs Smith", Link);
-
-            Assert.Contains("<a href=\"" + Link + "\"", body);
-            Assert.Contains("</a>", body);
-        }
-
-        [Fact]
         public void Remediation_renders_the_confirmation_link_as_an_anchor()
         {
             var body = NotificationBodies.Remediation(
@@ -178,7 +161,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // The body is HTML now, and the client name is copied off the case. Anything
             // that is not escaped here is markup in somebody else's mailbox.
-            var body = NotificationBodies.Pass("Jane Adviser", "<b>Smith & Co</b>", Link);
+            var body = NotificationBodies.Pass("Jane Adviser", "<b>Smith & Co</b>");
 
             Assert.DoesNotContain("<b>", body);
             Assert.Contains("&lt;b&gt;", body);
@@ -188,7 +171,7 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void An_adviser_name_carrying_markup_is_escaped_too()
         {
-            var body = NotificationBodies.Pass("Jane <script>alert(1)</script>", "Mr and Mrs Smith", Link);
+            var body = NotificationBodies.Pass("Jane <script>alert(1)</script>", "Mr and Mrs Smith");
 
             Assert.DoesNotContain("<script>", body);
             Assert.Contains("&lt;script&gt;", body);
@@ -209,8 +192,9 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // A real portal link joins its parameters with &, which is an entity start
             // inside an href.
-            var body = NotificationBodies.Pass(
-                "Jane Adviser", "Mr and Mrs Smith", "https://p.example.com/c?id=abc&mode=view");
+            var body = NotificationBodies.Remediation(
+                OutcomeRules.OutcomePassWithIssues, "Jane Adviser", "Mr and Mrs Smith",
+                "https://p.example.com/c?id=abc&mode=view", null);
 
             Assert.Contains("id=abc&amp;mode=view", body);
             Assert.DoesNotContain("id=abc&mode=view", body);
@@ -221,7 +205,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // A newline is whitespace in HTML. Without paragraphs the whole letter arrives
             // as one run-on line.
-            var body = NotificationBodies.Pass("Jane Adviser", "Mr and Mrs Smith", Link);
+            var body = NotificationBodies.Pass("Jane Adviser", "Mr and Mrs Smith");
 
             Assert.Contains("<p>", body);
         }

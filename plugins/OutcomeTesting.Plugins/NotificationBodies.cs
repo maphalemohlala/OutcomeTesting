@@ -33,14 +33,14 @@ namespace OutcomeTesting.Plugins
         /// <summary>
         /// "Case check - Pass". Sent when a submit closes the case having raised no
         /// remediation, which is the only moment "no further action is required" is true.
+        /// No case link: an adviser is never given read access to a passed case.
         /// </summary>
-        public static string Pass(string adviserName, string clientName, string caseLink)
+        public static string Pass(string adviserName, string clientName)
         {
             var body = new StringBuilder();
             Paragraph(body, "Dear " + Salutation(adviserName) + ",");
             Paragraph(body, Subject(clientName, "has been checked and graded a Pass."));
             Paragraph(body, "No further action is required.");
-            AppendButton(body, "View the case", caseLink);
             Paragraph(body, "Kind regards");
             return body.ToString();
         }

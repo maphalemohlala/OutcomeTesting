@@ -30,22 +30,25 @@ public static class WebRoleSeed
     private const string AqsReviewer = "AL Portal - AQS Reviewer";
     private const string AdviserRemediation = "AL Portal - Adviser Remediation";
     private const string TcSupervisor = "AL Portal - T&C Supervisor";
-    private const string Planner = "AL Portal - Planner";
+    private const string TaxTeamManager = "AL Portal - Tax Team Manager";
+    private const string AqsTeamManager = "AL Portal - AQS Team Manager";
     private const string PortalAdministrator = "AL Portal - Portal Administrator";
     private const string Administrators = "Administrators";
 
+    // Every role but the Planner, which has no access to the system and only receives email.
     // The manager role carries the environment's product name (ProductName.ManagerWebRole).
     private static string[] AllRoles(string outcomeTestingManager) => new[]
     {
         TaxReviewer, AqsReviewer, AdviserRemediation, TcSupervisor,
-        outcomeTestingManager, Planner, PortalAdministrator, Administrators,
+        outcomeTestingManager, PortalAdministrator, Administrators,
+        TaxTeamManager, AqsTeamManager,
     };
 
     /// <summary>
     /// The same matrix as DEFAULT_PERMISSIONS in app/src/types/permissions.ts. Duplicated
     /// rather than shared because that file is TypeScript in the Code App; the two are the
     /// client mirror and the server seed of one decision, and they have to be edited
-    /// together.
+    /// together. app/src/types/webRoleSeedMatchesDefaults.test.ts fails when they drift.
     /// </summary>
     private static IEnumerable<(string Role, string Resource, int Level)> Matrix(string OutcomeTestingManager)
     {
@@ -73,7 +76,6 @@ public static class WebRoleSeed
         yield return (TcSupervisor, "page.reports", AccessView);
         yield return (TcSupervisor, "command.regrade", AccessEdit);
         yield return (TcSupervisor, "command.signoff", AccessEdit);
-        yield return (TcSupervisor, "command.assign", AccessEdit);
         yield return (TcSupervisor, "case.duedate", AccessEdit);
 
         yield return (OutcomeTestingManager, "page.cases", AccessEdit);
@@ -81,16 +83,19 @@ public static class WebRoleSeed
         yield return (OutcomeTestingManager, "page.remediation", AccessView);
         yield return (OutcomeTestingManager, "page.reports", AccessView);
         yield return (OutcomeTestingManager, "page.exports", AccessManage);
+        yield return (OutcomeTestingManager, "page.admin.advisers", AccessManage);
+        yield return (OutcomeTestingManager, "page.admin.templates", AccessManage);
+        yield return (OutcomeTestingManager, "page.admin.lists", AccessManage);
         yield return (OutcomeTestingManager, "command.assign", AccessEdit);
         yield return (OutcomeTestingManager, "export.generate", AccessEdit);
         yield return (OutcomeTestingManager, "case.duedate", AccessEdit);
 
-        // Planner and Adviser Remediation share remediation routing (OD-019, implemented
-        // 2026-08-31): the portal binds both to the same Contact-scoped remediation
-        // permission and page rule, so they carry the same authority here.
-        yield return (Planner, "page.cases", AccessView);
-        yield return (Planner, "page.remediation", AccessEdit);
-        yield return (Planner, "remediation.complete", AccessEdit);
+        // Each team manager sees their team's cases and allocates their own discipline.
+        foreach (var teamManager in new[] { TaxTeamManager, AqsTeamManager })
+        {
+            yield return (teamManager, "page.cases", AccessEdit);
+            yield return (teamManager, "command.assign", AccessEdit);
+        }
 
         foreach (var admin in new[] { PortalAdministrator, Administrators })
         {
@@ -100,6 +105,9 @@ public static class WebRoleSeed
             yield return (admin, "page.reports", AccessView);
             yield return (admin, "page.exports", AccessManage);
             yield return (admin, "page.admin.questions", AccessManage);
+            yield return (admin, "page.admin.advisers", AccessManage);
+            yield return (admin, "page.admin.templates", AccessManage);
+            yield return (admin, "page.admin.lists", AccessManage);
             yield return (admin, "page.admin.security", AccessManage);
             yield return (admin, "page.admin.users", AccessManage);
             yield return (admin, "question.retire", AccessEdit);
