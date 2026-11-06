@@ -76,52 +76,6 @@ export function workingDaysBetween(start: Date, end: Date): number {
   return count;
 }
 
-/**
- * The working-day age of an ISO timestamp as at `now`, or 0 when the value is missing or
- * unparseable. This is the remediation clock: it replaces the provisional calendar-day
- * count OD-018 required be labelled as such.
- */
-export function workingDayAge(value: string | undefined, now: Date = new Date()): number {
-  if (!value) return 0;
-  const then = new Date(value);
-  if (Number.isNaN(then.getTime())) return 0;
-  return workingDaysBetween(then, now);
-}
-
-/**
- * `start` advanced by `count` working days, counting the start day as day 1 to match
- * workingDaysBetween. Ten working days from a Monday is therefore the Friday of the
- * following week, which is the date the BR-010 threshold falls due.
- */
-export function addWorkingDays(start: Date, count: number): Date {
-  const cursor = ukMidday(start);
-  if (count <= 0) return cursor;
-
-  let remaining = count;
-  if (isWorkingDay(cursor)) remaining -= 1;
-
-  while (remaining > 0) {
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-    if (isWorkingDay(cursor)) remaining -= 1;
-  }
-
-  // Land on a working day even when the start was a weekend and count consumed nothing.
-  while (!isWorkingDay(cursor)) {
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-
-  return cursor;
-}
-
-/** Whether a remediation raised at `value` has passed the BR-010 ten-working-day threshold. */
-export function hasBreachedRemediationThreshold(
-  value: string | undefined,
-  now: Date = new Date(),
-): boolean {
-  if (!value) return false;
-  return workingDayAge(value, now) > REMEDIATION_THRESHOLD_WORKING_DAYS;
-}
-
 /** The clock as it stands on one remediation action (OD-018). */
 export interface RemediationClock {
   /** Working days in the period now running. The BR-010 threshold measures this one. */
@@ -168,10 +122,14 @@ export function remediationClock(
 ): RemediationClock {
   const started = action.al_clockstartedon;
   const created = action.createdon;
-  const stop = action.al_completedon ? new Date(action.al_completedon) : now;
-  const stopAt = Number.isNaN(stop.getTime()) ? now : stop;
-
   const currentStart = started ?? created;
+
+  // A rejection reopens the action and leaves the completion it rejected on the row. That
+  // date ended the previous period, so it cannot stop the one now running.
+  const stop = action.al_completedon ? new Date(action.al_completedon) : now;
+  const stoppedEarlier = Boolean(started) && stop.getTime() < new Date(started as string).getTime();
+  const stopAt = Number.isNaN(stop.getTime()) || stoppedEarlier ? now : stop;
+
   const current = currentStart ? workingDaysBetween(new Date(currentStart), stopAt) : 0;
 
   let previous: number | null = null;

@@ -111,6 +111,17 @@ export function withinCheckDates(record: ExportRecord, from: string, to: string)
   return true;
 }
 
+/**
+ * Whether the row shows a pass and no fail: every grade it carries is Pass. The daily file
+ * leaves these out because Comply looks for failed outcomes, and the quarterly 12-month file
+ * keeps them (client, 2026-11-06). A Tax-only case has no advice grade, so its file grade
+ * decides. A row with no grade at all is not shown to be a pass, so it stays.
+ */
+export function isPassWithNoFails(record: ExportRecord): boolean {
+  const grades = [text(record.al_advicequalitygrade), text(record.al_filequalitygrade)].filter(Boolean);
+  return grades.length > 0 && grades.every((grade) => grade.toLowerCase() === 'pass');
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** `2026-09-28` as `28 Sep 2026`, read from the digits so no time zone can move the day. */
@@ -131,8 +142,22 @@ export function describeCheckRange(from: string, to: string): string {
 }
 
 /** One sentence saying which of a batch's cases the file will hold. */
-export function fileContentsSummary(inRange: number, total: number, from: string, to: string): string {
+export function fileContentsSummary(
+  inRange: number,
+  total: number,
+  from: string,
+  to: string,
+  passesLeftOut = 0,
+): string {
   const range = describeCheckRange(from, to);
+  if (passesLeftOut > 0) {
+    const held = inRange - passesLeftOut;
+    if (held === 0) {
+      return `Every case in this batch${range ? ` ${range}` : ''} is a pass with no fails, so the daily file has nothing to download.`;
+    }
+    const left = passesLeftOut === 1 ? '1 pass with no fails' : `${passesLeftOut} passes with no fails`;
+    return `The file will contain ${held} of the ${total} cases in this batch${range ? `: those ${range}` : ''}, leaving out ${left}.`;
+  }
   if (!range) {
     return total === 1
       ? 'The file will contain the 1 case in this batch.'

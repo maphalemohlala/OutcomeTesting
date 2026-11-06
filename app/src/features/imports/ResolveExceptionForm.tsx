@@ -14,6 +14,8 @@ import type { ExceptionSummary } from './useCaseIntake';
 interface Props {
   exception: ExceptionSummary;
   onResolved: () => void;
+  /** Re-reads the list when the server says this row has moved on. */
+  onStale: () => void;
   onCancel: () => void;
 }
 
@@ -26,7 +28,7 @@ interface Props {
  * why up front rather than discovering it from a rejection. The screen is an affordance,
  * not a boundary: the command re-checks the caller server-side (NFR-SEC-01).
  */
-export function ResolveExceptionForm({ exception, onResolved, onCancel }: Props) {
+export function ResolveExceptionForm({ exception, onResolved, onStale, onCancel }: Props) {
   const [resolution, setResolution] = useState<ImportResolution | ''>('');
   const [note, setNote] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
@@ -61,6 +63,8 @@ export function ResolveExceptionForm({ exception, onResolved, onCancel }: Props)
         setSaving(false);
         if (!result.ok) {
           setFailure(messageForFailure(result));
+          // Refused because the row moved on: re-read it, or it keeps offering this form.
+          if (result.kind === 'conflict' || result.kind === 'precondition') onStale();
           return;
         }
         intent.release(token);

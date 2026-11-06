@@ -6,7 +6,7 @@ import {
 } from '../../components/form/RichTextEditor';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { usePermissions } from '../../app/permissions/permissionContext';
-import { builtInWording, unknownTokens } from './notificationTemplates';
+import { builtInWording, hasText, unknownTokens } from './notificationTemplates';
 import {
   CUSTOM_TOKENS,
   ROLE_KINDS,
@@ -119,8 +119,8 @@ export function NotificationTemplatePage() {
                     )}
                   </td>
                   <td>
-                    {recipientNames(row.recipients, state.contacts).length > 0 ? (
-                      recipientNames(row.recipients, state.contacts).map((name) => (
+                    {recipientNames(row.recipients, state.contacts, state.contactsKnown).length > 0 ? (
+                      recipientNames(row.recipients, state.contacts, state.contactsKnown).map((name) => (
                         <span key={name} className="templates__recipient">
                           {name}
                         </span>
@@ -169,6 +169,7 @@ export function NotificationTemplatePage() {
           {editing === 'new' && (
             <NewTemplateForm
               contacts={state.contacts}
+              contactsKnown={state.contactsKnown}
               taken={state.templates.map((t) => t.code)}
               onClose={() => setEditing(null)}
               onSaved={reload}
@@ -179,6 +180,7 @@ export function NotificationTemplatePage() {
             <TemplateForm
               row={editing}
               contacts={state.contacts}
+              contactsKnown={state.contactsKnown}
               onClose={() => setEditing(null)}
               onSaved={reload}
             />
@@ -205,15 +207,17 @@ export function NotificationTemplatePage() {
   );
 }
 
+const UNREACHABLE = 'A contact who cannot be reached';
+
 /**
  * Who a row goes to, in words: the roles ticked, then the contacts by name. A contact the page
  * cannot name is no longer listed as reachable (inactive, or no work email), and says so.
  */
-function recipientNames(recipients: Recipients, contacts: ContactOption[]): string[] {
+function recipientNames(recipients: Recipients, contacts: ContactOption[], contactsKnown: boolean): string[] {
   return [
     ...recipients.kinds.map((k) => recipientLabel(k) ?? String(k)),
     ...recipients.contactIds.map(
-      (id) => contacts.find((c) => c.id === id)?.name ?? 'A contact with no work email',
+      (id) => contacts.find((c) => c.id === id)?.name ?? (contactsKnown ? UNREACHABLE : 'A named contact'),
     ),
   ];
 }
@@ -380,15 +384,18 @@ function RecipientFields({
   recipients,
   setRecipients,
   contacts,
+  contactsKnown,
   allowDefault,
 }: {
   recipients: Recipients;
   setRecipients: (value: Recipients) => void;
   contacts: ContactOption[];
+  contactsKnown: boolean;
   allowDefault: boolean;
 }) {
   const { kinds, contactIds } = recipients;
   const available = contacts.filter((c) => !contactIds.includes(c.id));
+  const noContacts = contactsKnown ? 'No other contacts to add' : 'The contact list could not be loaded';
 
   function toggleKind(value: number, on: boolean) {
     setRecipients({
@@ -419,7 +426,7 @@ function RecipientFields({
             return (
               <li key={id}>
                 {contact ? `${contact.name} (${contact.email})` : (
-                  <span className="templates__problem-cell">A contact with no work email</span>
+                  <span className="templates__problem-cell">{contactsKnown ? UNREACHABLE : 'A named contact'}</span>
                 )}
                 <button
                   type="button"
@@ -447,7 +454,7 @@ function RecipientFields({
           }
         }}
       >
-        <option value="">{available.length > 0 ? 'Choose…' : 'No other contacts to add'}</option>
+        <option value="">{available.length > 0 ? 'Choose…' : noContacts}</option>
         {available.map((c) => (
           <option key={c.id} value={c.id}>
             {c.name} ({c.email})
@@ -470,18 +477,20 @@ function RecipientFields({
 }
 
 /** True when a chosen contact can no longer be written to; the plug-in refuses the save. */
-function hasUnreachableContact(recipients: Recipients, contacts: ContactOption[]): boolean {
-  return recipients.contactIds.some((id) => !contacts.some((c) => c.id === id));
+function hasUnreachableContact(recipients: Recipients, contacts: ContactOption[], contactsKnown: boolean): boolean {
+  return contactsKnown && recipients.contactIds.some((id) => !contacts.some((c) => c.id === id));
 }
 
 function TemplateForm({
   row,
   contacts,
+  contactsKnown,
   onClose,
   onSaved,
 }: {
   row: TemplateRow;
   contacts: ContactOption[];
+  contactsKnown: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -512,8 +521,8 @@ function TemplateForm({
   const offenders = row.custom
     ? unknownCustomTokens(subject, body)
     : unknownTokens(row.code, subject, body);
-  const empty = subject.trim() === '' || body.trim() === '';
-  const unreachable = hasUnreachableContact(recipients, contacts);
+  const empty = subject.trim() === '' || !hasText(body);
+  const unreachable = hasUnreachableContact(recipients, contacts, contactsKnown);
   const nobody = row.custom && recipients.kinds.length === 0 && recipients.contactIds.length === 0;
 
   function insertToken(token: string) {
@@ -607,6 +616,7 @@ function TemplateForm({
           recipients={recipients}
           setRecipients={setRecipients}
           contacts={contacts}
+          contactsKnown={contactsKnown}
           allowDefault={!row.custom}
         />
 
@@ -636,8 +646,8 @@ function TemplateForm({
 
         {unreachable && (
           <p className="templates__problem">
-            A chosen contact has no work email, so this letter could never reach them. Remove
-            them, or add an email to their contact record.
+            A chosen contact is inactive or has no work email, so this letter could never reach
+            them. Remove them, or fix their contact record.
           </p>
         )}
 
@@ -681,11 +691,13 @@ function TemplateForm({
  */
 function NewTemplateForm({
   contacts,
+  contactsKnown,
   taken,
   onClose,
   onSaved,
 }: {
   contacts: ContactOption[];
+  contactsKnown: boolean;
   taken: string[];
   onClose: () => void;
   onSaved: () => void;
@@ -720,7 +732,7 @@ function NewTemplateForm({
   const clashes = taken.includes(normalised);
 
   const offenders = unknownCustomTokens(subject, body);
-  const unreachable = hasUnreachableContact(recipients, contacts);
+  const unreachable = hasUnreachableContact(recipients, contacts, contactsKnown);
   const incomplete =
     name.trim() === '' ||
     normalised === '' ||
@@ -799,6 +811,7 @@ function NewTemplateForm({
           recipients={recipients}
           setRecipients={setRecipients}
           contacts={contacts}
+          contactsKnown={contactsKnown}
           allowDefault={false}
         />
 

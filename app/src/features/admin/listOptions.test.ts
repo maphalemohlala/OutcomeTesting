@@ -32,6 +32,7 @@ import {
   toggleValue,
   toOptionRows,
   validateDraft,
+  optionCanBeDeleted,
 } from './listOptions';
 
 /**
@@ -569,6 +570,7 @@ describe('filtering a long tick list', () => {
     effectiveFrom: null,
     effectiveTo: null,
     retired: false,
+    startsOn: null,
   });
 
   const products = [
@@ -621,6 +623,7 @@ describe('what a folded tick list says when it is shut', () => {
     effectiveFrom: null,
     effectiveTo: null,
     retired: false,
+    startsOn: null,
   });
 
   const five = [
@@ -670,5 +673,16 @@ describe('what a folded tick list says when it is shut', () => {
     // A held id with no row cannot be named, and inventing a placeholder for it would put
     // a word in the summary that matches nothing in the panel below.
     expect(describeTickSelection(five, ['a', 'gone'], 'Select products')).toBe('AIM ISA');
+  });
+});
+
+describe('removing and reinstating', () => {
+  const list = (over: object) => ({ caseAttribute: null, caseRelationship: null, ...over }) as never;
+  const option = (legacyValue: number | null) => ({ legacyValue }) as never;
+
+  it('offers delete only where a lookup can refuse it', () => {
+    expect(optionCanBeDeleted(list({ caseAttribute: 'al_casetypeid' }), option(null))).toBe(true);
+    expect(optionCanBeDeleted(list({ caseRelationship: 'products' }), option(null))).toBe(false);
+    expect(optionCanBeDeleted(list({ caseAttribute: 'al_casetypeid' }), option(120))).toBe(false);
   });
 });

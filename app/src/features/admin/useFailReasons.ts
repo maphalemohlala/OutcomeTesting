@@ -9,6 +9,7 @@ import {
   type FailReasonDraft,
   type FailReasonRow,
 } from './failReasons';
+import { readAll } from '../../services/readAll';
 
 export type FailReasonsState =
   | { status: 'loading' }
@@ -25,7 +26,7 @@ export function useFailReasons(reloadKey = 0): FailReasonsState {
 
   useEffect(() => {
     let cancelled = false;
-    Al_failreasonsService.getAll({ top: 500 })
+    readAll((o) => Al_failreasonsService.getAll(o), { orderBy: ['al_failreasonid asc'] })
       .then((result) => {
         if (cancelled) return;
         if (!result.success || !result.data) {

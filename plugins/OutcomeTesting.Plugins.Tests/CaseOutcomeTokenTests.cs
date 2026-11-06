@@ -38,7 +38,11 @@ namespace OutcomeTesting.Plugins.Tests
             var letter = NotificationTemplates.Render(
                 service,
                 NotificationTemplates.CasePassed,
-                new Dictionary<string, string> { { NotificationTemplates.TokenReference, "OT-1" } },
+                new Dictionary<string, string>
+                {
+                    { NotificationTemplates.TokenReference, "OT-1" },
+                    { NotificationTemplates.TokenClient, "Mr Smith" },
+                },
                 CaseRef);
 
             Assert.Equal("Graded Pass with issues, final Pass. Notes: All fixed", letter.Body);
@@ -82,7 +86,11 @@ namespace OutcomeTesting.Plugins.Tests
             NotificationTemplates.Render(
                 service,
                 NotificationTemplates.RecheckDue,
-                new Dictionary<string, string> { { NotificationTemplates.TokenReference, "OT-1" } },
+                new Dictionary<string, string>
+                {
+                    { NotificationTemplates.TokenReference, "OT-1" },
+                    { NotificationTemplates.TokenClient, "Mr Smith" },
+                },
                 CaseRef);
 
             Assert.DoesNotContain("al_outcome", service.ReadEntities);

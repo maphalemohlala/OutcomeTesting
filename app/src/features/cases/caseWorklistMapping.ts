@@ -14,7 +14,7 @@ import {
   Al_outcomesal_initialoutcome,
   type Al_outcomes,
 } from '../../generated/models/Al_outcomesModel';
-import { MIGRATED_LISTS, lookupLabelOn } from '../admin/listOptions';
+import { MIGRATED_LISTS, heldOptionLabels, listByKey, lookupLabelOn } from '../admin/listOptions';
 import { choiceLabel } from '../../lib/choiceLabel';
 import { lookupLabel } from './lookupLabel';
 import type { CaseRemediation } from './caseRemediation';
@@ -108,7 +108,7 @@ function toRoute(name: string | null): ReviewRoute | null {
   return REVIEW_ROUTES.find((route) => route === name) ?? null;
 }
 
-function ageInDays(createdOn: string | undefined): number {
+export function ageInDays(createdOn: string | undefined): number {
   if (!createdOn) return 0;
   const created = new Date(createdOn).getTime();
   if (Number.isNaN(created)) return 0;
@@ -153,6 +153,45 @@ export function gradesByCase(outcomes: Al_outcomes[]): Map<string, CaseOutcomeGr
 
   return new Map([...latest].map(([caseId, entry]) => [caseId, entry.grades]));
 }
+
+/**
+ * Each case's product names, from the many-to-many the case form writes. al_products is only
+ * the value an old import left behind, so it is the fallback and never the answer.
+ */
+export function productNamesByCase(
+  links: readonly { al_outcomecaseid: string; al_listoptionid: string }[],
+  catalogue: Parameters<typeof heldOptionLabels>[0],
+  asOf: Date,
+): Map<string, string> {
+  const list = listByKey('products');
+  const idsByCase = new Map<string, string[]>();
+  for (const link of links) {
+    idsByCase.set(link.al_outcomecaseid, [...(idsByCase.get(link.al_outcomecaseid) ?? []), link.al_listoptionid]);
+  }
+
+  const names = new Map<string, string>();
+  if (!list) return names;
+  for (const [caseId, ids] of idsByCase) {
+    names.set(caseId, heldOptionLabels(catalogue, list, ids, asOf).join(', '));
+  }
+  return names;
+}
+
+/** Every column toSummary and the dashboard read, so a page does not pull the whole row. */
+export const CASE_SUMMARY_COLUMNS = [
+  'al_outcomecaseid', 'al_casereference', '_al_reviewrouteid_value', 'al_casestatus', '_ownerid_value',
+  'al_priority', 'createdon', 'al_taxoutcome', 'al_clientname', 'al_advisername', 'al_advisercode',
+  'al_adviseremail', 'al_paraplanner', 'al_paraplannercode', 'al_paraplanneremail', 'al_taxcheckername',
+  'al_aqscheckername', '_al_taxcheckercontactid_value', '_al_aqscheckercontactid_value', 'al_casetype',
+  '_al_casetypeid_value', 'al_productsolutiontype', '_al_producttypeid_value', 'al_products',
+  'al_advicedate', 'al_checkdate', 'al_preorpostcheck', '_al_preorpostcheckid_value', 'al_duedate',
+];
+
+/** Every column gradesByCase and the reports read from an outcome. */
+export const OUTCOME_GRADE_COLUMNS = [
+  'al_outcomeid', '_al_outcomecaseid_value', 'createdon', 'al_initialoutcome', 'al_finaloutcome',
+  'al_finalisedon', 'al_regradedon',
+];
 
 export function toSummary(record: Al_outcomecases, grades?: CaseOutcomeGrades): CaseSummary {
   const status = Al_outcomecasesal_casestatus[record.al_casestatus] as CaseStatus;

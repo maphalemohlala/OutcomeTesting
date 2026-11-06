@@ -60,12 +60,12 @@ function zip(files: { name: string; content: string }[]): ArrayBuffer {
 }
 
 /** A workbook whose single sheet carries the given `<row>` XML. */
-function workbook(sheetRows: string, options: { shared?: string[]; dateStyle?: boolean } = {}): ArrayBuffer {
+function workbook(sheetRows: string, options: { shared?: string[]; dateStyle?: boolean; workbookPr?: string } = {}): ArrayBuffer {
   const shared = options.shared ?? [];
   return zip([
     {
       name: 'xl/workbook.xml',
-      content: '<workbook><sheets><sheet name="Tasks (12)" sheetId="1" r:id="rId1"/></sheets></workbook>',
+      content: `<workbook>${options.workbookPr ?? ''}<sheets><sheet name="Tasks (12)" sheetId="1" r:id="rId1"/></sheets></workbook>`,
     },
     {
       name: 'xl/_rels/workbook.xml.rels',
@@ -207,5 +207,43 @@ describe('rowsToCsv', () => {
     );
 
     expect(csv).toBe('TaskID,DueDate\r\n253925362,2026-08-06\r\n');
+  });
+});
+
+describe('cells other writers produce', () => {
+  it('reads an empty value as a blank cell, not as string 0 or day 0', async () => {
+    const rows = await readWorkbook(
+      workbook('<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"/><c r="C1" s="1"><v></v></c></row>', {
+        shared: ['TaskID'],
+        dateStyle: true,
+      }),
+    );
+
+    expect(rows).toEqual([['TaskID', '', '']]);
+  });
+
+  it('keeps a task number that sits in a date-styled cell, rather than failing the file', async () => {
+    const rows = await readWorkbook(
+      workbook('<row r="1"><c r="A1" s="1"><v>256497798</v></c></row>', { dateStyle: true }),
+    );
+
+    expect(rows).toEqual([['256497798']]);
+  });
+
+  it("decodes Excel's escape for a character XML cannot hold", async () => {
+    const rows = await readWorkbook(
+      workbook('<row r="1"><c r="A1" t="s"><v>0</v></c></row>', { shared: ['Ann_x000D_ Brown'] }),
+    );
+
+    expect(rows).toEqual([['Ann\r Brown']]);
+  });
+
+  it('reads dates from a workbook on the 1904 calendar', async () => {
+    const book = workbook('<row r="1"><c r="A1" s="1"><v>44790</v></c></row>', {
+      dateStyle: true,
+      workbookPr: '<workbookPr date1904="1"/>',
+    });
+
+    expect(await readWorkbook(book)).toEqual([['2026-08-18']]);
   });
 });

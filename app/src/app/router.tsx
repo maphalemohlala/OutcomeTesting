@@ -131,8 +131,8 @@ export function AppRoutes() {
           path="/admin/questions"
           element={<RequirePermission resource="page.admin.questions"><QuestionLibraryPage /></RequirePermission>}
         />
-        {/* Adviser -> T&C Manager mapping (Fixes 5, AD-162). Routing only: it decides who is
-            told a sign-off is waiting, never who may perform one. */}
+        {/* Adviser -> T&C Manager mapping (Fixes 5, AD-162): who is told a sign-off is waiting,
+            and who alone may perform it. */}
         <Route
           path="/admin/advisers"
           element={<RequirePermission resource="page.admin.advisers"><AdviserMappingPage /></RequirePermission>}

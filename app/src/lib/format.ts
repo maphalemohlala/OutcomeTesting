@@ -13,11 +13,15 @@
  * Intl.DateTimeFormat every time, and these run once per date per row: on a worklist of a
  * few thousand cases that was the hottest line in the render path.
  */
-const DATE_FORMAT = new Intl.DateTimeFormat('en-GB', {
-  day: '2-digit',
-  month: 'short',
+const UK_DAY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/London',
   year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
 });
+
+// Spelled out because en-GB writes "Sept" in current browsers, and the portal writes "Sep".
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** A trimmed string, or null when there is nothing left after trimming. */
 export function text(value: string | null | undefined): string | null {
@@ -33,5 +37,6 @@ export function date(value: string | null | undefined): string | null {
   if (!value) return null;
   const time = new Date(value).getTime();
   if (Number.isNaN(time)) return null;
-  return DATE_FORMAT.format(time);
+  const [year, month, day] = UK_DAY.format(time).split('-');
+  return `${day} ${MONTHS[Number(month) - 1]} ${year}`;
 }

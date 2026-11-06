@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
-import { useIntentKeys } from '../../hooks/useIntentKey';
+import type { IntentKeys } from '../../hooks/useIntentKey';
 import { addQuestion, moveQuestion, retireAndSucceedQuestion } from '../../services/commands/questions';
 import { today } from './effectiveDay';
 import { intentFor, refusalFor, type QuestionDraft } from './questionModalIntent';
@@ -22,11 +22,12 @@ interface Props {
   sectionId: string;
   /** The question being edited. Absent in add mode. */
   question?: LibraryQuestion;
+  intent: IntentKeys;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export function QuestionModal({ mode, sections, sectionId, question, onClose, onSaved }: Props) {
+export function QuestionModal({ mode, sections, sectionId, question, intent, onClose, onSaved }: Props) {
   const original: QuestionDraft = {
     wording: question?.wording ?? '',
     sectionId,
@@ -46,11 +47,11 @@ export function QuestionModal({ mode, sections, sectionId, question, onClose, on
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const intent = useIntentKeys();
 
   const editIntent = mode === 'add' ? 'version' : intentFor(draft, original);
   const isMove = editIntent === 'move';
-  const token = question?.id ?? `add:${sectionId}`;
+  // The values are in the token: a retry of the SAME save replays, an edited one must not.
+  const token = `${question?.id ?? `add:${sectionId}`}:${JSON.stringify([draft, effectiveFrom, reason])}`;
 
   // A move carries the wording, response type, mandatory flag and display order forward from
   // the version it retires, so those four controls show the values that will actually be

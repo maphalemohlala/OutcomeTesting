@@ -19,6 +19,20 @@ export function dayOf(value: string | Date | null | undefined): number | null {
   return Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate());
 }
 
+/** Dated out on or before `asOf`. Only this is retired: a date yet to come is not. */
+export function hasEnded(effectiveTo: string | Date | null | undefined, asOf: Date): boolean {
+  const to = dayOf(effectiveTo);
+  const day = dayOf(asOf);
+  return to !== null && day !== null && to <= day;
+}
+
+/** Dated to start after `asOf`: not offered yet, which is not the same as retired. */
+export function notStarted(effectiveFrom: string | Date | null | undefined, asOf: Date): boolean {
+  const from = dayOf(effectiveFrom);
+  const day = dayOf(asOf);
+  return from !== null && day !== null && from > day;
+}
+
 /**
  * In force from the start of the effective-from day until the start of the effective-to
  * day. RetireAndSucceedQuestion stamps both with the same date, so on the changeover day

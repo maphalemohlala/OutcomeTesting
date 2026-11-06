@@ -5,8 +5,10 @@ import { Al_sectionsal_ownerrole } from '../../generated/models/Al_sectionsModel
 import type { Al_questions } from '../../generated/models/Al_questionsModel';
 import type { Al_questionversions } from '../../generated/models/Al_questionversionsModel';
 import { Al_questionversionsal_responsetype } from '../../generated/models/Al_questionversionsModel';
-import { inForceOn } from '../../lib/effectiveWindow';
+import { hasEnded } from '../../lib/effectiveWindow';
+import { versionsAsOf } from './questionSchedule';
 import { OWNER_ROLE_LABEL } from '../../lib/ownerRole';
+import { readAll } from '../../services/readAll';
 
 /**
  * The al_section columns AD-123 added. The generated Al_sections model predates them, and
@@ -31,6 +33,8 @@ export interface LibraryQuestion {
   versionNumber: number;
   /** Its current version is dated out, so it is no longer asked (AD-122). */
   retired: boolean;
+  /** A dated change still to come, in words, or null. No edit is offered until it lands. */
+  scheduled: string | null;
 }
 
 /** Response-type options (value + label) for the question editor, from the generated choice map. */
@@ -84,35 +88,20 @@ function responseType(record: Al_questionversions): string {
   );
 }
 
-/** The version a reviewer would answer today: the highest version number per question. */
-function currentVersionByQuestion(
-  versions: Al_questionversions[],
-): Map<string, Al_questionversions> {
-  const current = new Map<string, Al_questionversions>();
-  for (const version of versions) {
-    const questionId = version._al_questionid_value;
-    if (!questionId) continue;
-    const held = current.get(questionId);
-    if (!held || version.al_versionnumber > held.al_versionnumber) {
-      current.set(questionId, version);
-    }
-  }
-  return current;
-}
-
 function build(
   sections: Al_sections[],
   questions: Al_questions[],
   versions: Al_questionversions[],
 ): LibrarySection[] {
-  const currentVersion = currentVersionByQuestion(versions);
   const asOf = new Date();
+  const currentVersion = versionsAsOf(versions, asOf);
 
   const questionsBySection = new Map<string, LibraryQuestion[]>();
   for (const question of questions) {
     const sectionId = question._al_sectionid_value;
-    const version = currentVersion.get(question.al_questionid);
-    if (!sectionId || !version) continue;
+    const shown = currentVersion.get(question.al_questionid);
+    if (!sectionId || !shown) continue;
+    const { version, scheduled } = shown;
 
     const row: LibraryQuestion = {
       id: question.al_questionid,
@@ -126,7 +115,8 @@ function build(
       // The current version is still the current one whether or not it is in force; a
       // retired question is shown as retired rather than hidden, because the library is
       // where an administrator sees what was taken out.
-      retired: !inForceOn(version.al_effectivefrom, version.al_effectiveto, asOf),
+      retired: hasEnded(version.al_effectiveto, asOf),
+      scheduled,
     };
     const list = questionsBySection.get(sectionId) ?? [];
     list.push(row);
@@ -147,7 +137,7 @@ function build(
         // Absent reads as required: al_isoptional is null on every section that predates
         // AD-123, because Dataverse applies a boolean default to new rows only.
         isOptional: schedule.al_isoptional === true,
-        retired: !inForceOn(schedule.al_effectivefrom, schedule.al_effectiveto, asOf),
+        retired: hasEnded(schedule.al_effectiveto, asOf),
         order: section.al_displayorder ?? 0,
         questions: (questionsBySection.get(section.al_sectionid) ?? []).sort(
           (a, b) => a.order - b.order,
@@ -169,12 +159,12 @@ export function useQuestionLibrary(reloadKey = 0): QuestionLibraryState {
     let cancelled = false;
 
     Promise.all([
-      Al_sectionsService.getAll({ top: 5000 }),
-      Al_questionsService.getAll({ top: 5000 }),
+      readAll((o) => Al_sectionsService.getAll(o), { orderBy: ['al_sectionid asc'] }),
+      readAll((o) => Al_questionsService.getAll(o), { orderBy: ['al_questionid asc'] }),
       // al_questionversion gains a row per edit and is never pruned, so the cap has to clear
       // the whole table. A truncated read here is silent and wrong in both directions: a
       // question shows an older version's wording, or drops out of the library entirely.
-      Al_questionversionsService.getAll({ top: 5000 }),
+      readAll((o) => Al_questionversionsService.getAll(o), { orderBy: ['al_questionversionid asc'] }),
     ])
       .then(([sections, questions, versions]) => {
         if (cancelled) return;

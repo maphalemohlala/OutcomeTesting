@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { importCases, type ImportReportRow } from '../../services/commands/importCases';
 import { useIntentKeys } from '../../hooks/useIntentKey';
-import { parseCaseCsv, type ValidationReportRow } from './caseUpload';
+import { checkExtract, decodeCsv, type ValidationReportRow } from './caseUpload';
 import { workbookToCsv } from './xlsx';
 
 export interface UploadResult {
@@ -54,7 +54,7 @@ export function useCaseUpload(onUploaded: () => void) {
       // place that information exists — by the time the server sees the row, a date is ISO.
       text = /\.xlsx$/i.test(file.name)
         ? await workbookToCsv(await file.arrayBuffer())
-        : await file.text();
+        : decodeCsv(await file.arrayBuffer());
     } catch (error) {
       setState({
         phase: 'error',
@@ -63,22 +63,17 @@ export function useCaseUpload(onUploaded: () => void) {
       return;
     }
 
-    // A local pre-check, not the rule. The server re-parses and re-validates; this only
-    // saves a round trip on a file that is obviously not an extract, and it is the same
-    // parser, so a file it accepts is a file the command accepts.
-    const parsed = parseCaseCsv(text);
-    if (parsed.fatal) {
-      setState({ phase: 'error', message: parsed.fatal });
-      return;
-    }
-    if (parsed.valid.length === 0 && parsed.invalid.length === 0) {
-      setState({ phase: 'error', message: 'The file has no case rows to import.' });
+    // A local pre-check, not the rule. It only saves a round trip on a file that is obviously
+    // not an extract; the server re-parses and re-validates every row.
+    const refusal = checkExtract(text);
+    if (refusal) {
+      setState({ phase: 'error', message: refusal });
       return;
     }
 
     setState({
       phase: 'processing',
-      message: `Importing ${parsed.valid.length + parsed.invalid.length} rows…`,
+      message: 'Importing…',
     });
 
     // One key per file, held until the import is confirmed (NFR-REL-01). Retrying the same

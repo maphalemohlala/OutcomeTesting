@@ -66,6 +66,8 @@ export interface SignoffRow {
   decision: string;
   notes: string | null;
   signedOffOn: string | null;
+  /** The timestamp itself: the display date cannot be ordered. */
+  signedOffOnRaw: string | null;
   remediationAction: string | null;
   /**
    * The action this sign-off is against.
@@ -164,6 +166,7 @@ export function toSignoff(record: Al_signoffs): SignoffRow {
       '—',
     notes: text(record.al_notes),
     signedOffOn: date(record.al_signedoffon),
+    signedOffOnRaw: record.al_signedoffon ?? null,
     remediationAction: lookupLabel(record, 'al_remediationactionid', record.al_remediationactionidname),
     remediationActionId:
       ((record as unknown as Record<string, unknown>)._al_remediationactionid_value as

@@ -34,7 +34,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Case allocated',
     tokens: ['reference', 'caseLink', 'check'],
     isHtml: false,
-    subject: 'Case {{reference}}: {{check}} allocated to you',
+    subject: 'Case {{reference}}: {{check}} allocated to you - {{client}}',
     body:
       'The {{check}} on case {{reference}} is now assigned to you. Open it to start the review: {{caseLink}}',
   },
@@ -42,7 +42,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Case allocated (no portal link)',
     tokens: ['reference', 'check'],
     isHtml: false,
-    subject: 'Case {{reference}}: {{check}} allocated to you',
+    subject: 'Case {{reference}}: {{check}} allocated to you - {{client}}',
     body:
       'The {{check}} on case {{reference}} is now assigned to you. Open it in the portal to start the review.',
   },
@@ -50,7 +50,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Review submitted',
     tokens: ['reference', 'check'],
     isHtml: false,
-    subject: 'Case {{reference}}: {{check}} submitted',
+    subject: 'Case {{reference}}: {{check}} submitted - {{client}}',
     body:
       'The {{check}} on case {{reference}} has been submitted and is locked to further edits.',
   },
@@ -58,7 +58,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Remedial needed - pass with issues',
     tokens: ['reference', 'adviser', 'client', 'grading', 'dueText', 'caseButton'],
     isHtml: true,
-    subject: 'Remedial needed - Pass with issues: {{reference}}',
+    subject: 'Remedial needed - Pass with issues: {{reference}} - {{client}}',
     body:
       '<p>Dear {{adviser}},</p><p>{{client}} has been subject to an AQS file check and a need for remedial work has been identified due to the case receiving {{grading}}.{{dueText}}</p><p>The case summary in the portal details the remedial actions.</p><p>Please follow the link to confirm that the remedial action has been taken.</p>{{caseButton}}<p>Many thanks</p>',
   },
@@ -66,7 +66,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Remedial needed - insufficient evidence or potential harm',
     tokens: ['reference', 'adviser', 'client', 'grading', 'dueText', 'caseButton'],
     isHtml: true,
-    subject: 'Remedial needed - insufficient evidence/ potential harm: {{reference}}',
+    subject: 'Remedial needed - insufficient evidence/ potential harm: {{reference}} - {{client}}',
     body:
       '<p>Dear {{adviser}},</p><p>{{client}} has been subject to an AQS file check and a need for remedial work has been identified due to the case receiving {{grading}}.{{dueText}}</p><p>The case summary in the portal details the remedial actions. Please liaise with your T&amp;C Manager to move this case forward.</p><p>Please follow the link to confirm that the required remedial action has been taken.</p>{{caseButton}}<p>Many thanks</p>',
   },
@@ -74,7 +74,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Remediation raised (other grading)',
     tokens: ['reference', 'dueText'],
     isHtml: false,
-    subject: 'Remediation required on case {{reference}}',
+    subject: 'Remediation required on case {{reference}} - {{client}}',
     body:
       'Remediation has been raised against case {{reference}} and assigned to you.{{dueText}} Record your response against each item in the portal.',
   },
@@ -82,7 +82,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Case check - Pass',
     tokens: ['reference', 'adviser', 'client', 'caseButton'],
     isHtml: true,
-    subject: 'Case check - Pass: {{reference}}',
+    subject: 'Case check - Pass: {{reference}} - {{client}}',
     body:
       '<p>Dear {{adviser}},</p><p>{{client}} has been checked and graded a Pass.</p><p>No further action is required.</p><p>Kind regards</p>',
   },
@@ -90,7 +90,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Remediation approved - moving to recheck',
     tokens: ['reference', 'notes'],
     isHtml: false,
-    subject: 'Remediation approved on case {{reference}}',
+    subject: 'Remediation approved on case {{reference}} - {{client}}',
     body:
       'Your remediation on case {{reference}} has been approved and the case has moved on to recheck.{{notes}}',
   },
@@ -98,7 +98,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Remediation approved - case closed',
     tokens: ['reference', 'finalOutcome', 'notes'],
     isHtml: false,
-    subject: 'Remediation approved on case {{reference}}',
+    subject: 'Remediation approved on case {{reference}} - {{client}}',
     body:
       'Your remediation on case {{reference}} has been approved, and the case is now closed with a final outcome of {{finalOutcome}}.{{notes}}',
   },
@@ -110,7 +110,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Remediation approved - case closed, no recheck',
     tokens: ['reference', 'notes'],
     isHtml: false,
-    subject: 'Remediation approved on case {{reference}}',
+    subject: 'Remediation approved on case {{reference}} - {{client}}',
     body:
       'Your remediation on case {{reference}} has been approved. You recorded that it needs no '
       + 'further checking, so the case is now closed and nothing more is needed from you.{{notes}}',
@@ -121,7 +121,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Remediation approved - on to the AQS check',
     tokens: ['reference', 'notes'],
     isHtml: false,
-    subject: 'Remediation approved on case {{reference}}',
+    subject: 'Remediation approved on case {{reference}} - {{client}}',
     body:
       'Your Tax remediation on case {{reference}} has been approved. The case now goes on to '
       + 'its AQS check, and nothing more is needed from you for the Tax check.{{notes}}',
@@ -130,7 +130,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Remediation sent back',
     tokens: ['reference', 'adviser', 'notes', 'notesPanel', 'caseButton'],
     isHtml: true,
-    subject: 'Remediation sent back on case {{reference}}',
+    subject: 'Remediation sent back on case {{reference}} - {{client}}',
     body:
       '<p>Dear {{adviser}},</p><p>Your remediation on case {{reference}} has been reviewed and sent back for further work. The ten-working-day clock has restarted from today.</p>{{notesPanel}}<p>Please use the button below to open the case and update the remedial action.</p>{{caseButton}}<p>Kind regards</p>',
   },
@@ -138,7 +138,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Final outcome owed',
     tokens: ['reference'],
     isHtml: false,
-    subject: 'Case {{reference}} is waiting for its final outcome',
+    subject: 'Case {{reference}} is waiting for its final outcome - {{client}}',
     body:
       'The remediation on case {{reference}} is approved and the case is now at Awaiting Recheck. It is waiting for you to record the final outcome, which is what closes it - until then it stays open and does not reach the export. Open the case\'s remediation page and use Record the final outcome.',
   },
@@ -146,7 +146,7 @@ const TEMPLATES: Record<string, TemplateHint> = {
     name: 'Sign-off due',
     tokens: ['reference', 'recipient', 'adviser', 'caseButton'],
     isHtml: true,
-    subject: 'Sign-off needed on case {{reference}}',
+    subject: 'Sign-off needed on case {{reference}} - {{client}}',
     body:
       '<p>Dear {{recipient}},</p><p>{{adviser}} has completed every remediation action on case {{reference}}, and it is now waiting for your sign-off.</p><p>Please use the button below to review the remediation and record your decision.</p>{{caseButton}}<p>Kind regards</p>',
   },
@@ -204,4 +204,9 @@ export function unknownTokens(code: string, subject: string, body: string): stri
   }
 
   return offenders;
+}
+
+/** Whether an editor's markup holds any words. A cleared editor still leaves <p><br></p> behind. */
+export function hasText(html: string): boolean {
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() !== '';
 }

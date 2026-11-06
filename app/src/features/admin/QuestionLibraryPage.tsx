@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { useQuestionLibrary, type LibraryQuestion, type LibrarySection } from './useQuestionLibrary';
 import { usePermissions } from '../../app/permissions/permissionContext';
@@ -54,6 +54,7 @@ function QuestionRow({
         {/* Stated, not only styled. The line-through and the dimming are invisible to a
             screen reader, and "is this still asked" is the whole point of the row. */}
         {question.retired ? <span className="library__flag">Retired</span> : null}
+        {question.scheduled ? <span className="library__flag">{question.scheduled}</span> : null}
 
         {guarded ? (
           <span className="library__flag" title={guarded}>
@@ -62,8 +63,9 @@ function QuestionRow({
         ) : null}
 
         {/* A retired question offers no action: there is nothing to do to it, and offering
-            something that would be refused is worse than offering nothing. */}
-        {canEdit && !question.retired ? (
+            something that would be refused is worse than offering nothing. Nor does one with
+            a dated change to come: the server edits the newest version, not the one shown. */}
+        {canEdit && !question.retired && !question.scheduled ? (
           <button type="button" className="library__btn library__btn--ghost" onClick={onEdit}>
             Edit question
           </button>
@@ -71,7 +73,7 @@ function QuestionRow({
 
         {/* Retire is hidden for a protected code because the server refuses it (AD-122).
             The chip above already says which question it is and why. */}
-        {canEdit && !question.retired && !guarded ? (
+        {canEdit && !question.retired && !question.scheduled && !guarded ? (
           <button type="button" className="library__btn library__btn--ghost" onClick={onRetire}>
             Retire
           </button>
@@ -212,7 +214,15 @@ export function QuestionLibraryPage() {
   const live = sections.filter((section) => !section.retired);
   const retired = sections.filter((section) => section.retired);
   const reload = () => setReloadKey((key) => key + 1);
+  // Here rather than in each dialog, so a key outlives Cancel: a save whose answer was lost
+  // and is sent again from a reopened dialog then replays instead of writing twice.
   const intent = useIntentKeys();
+  const lastRetire = useRef('');
+
+  function retireToken(target: string, reason: string, effectiveTo: unknown): string {
+    lastRetire.current = `retire:${target}:${reason}:${String(effectiveTo)}`;
+    return lastRetire.current;
+  }
   const close = () => setEditing({ kind: 'none' });
 
   return (
@@ -267,6 +277,7 @@ export function QuestionLibraryPage() {
 
       {editing.kind === 'add-section' || editing.kind === 'edit-section' ? (
         <SectionModal
+          intent={intent}
           mode={editing.kind === 'add-section' ? 'add' : 'edit'}
           section={editing.kind === 'edit-section' ? editing.section : undefined}
           onClose={close}
@@ -284,12 +295,12 @@ export function QuestionLibraryPage() {
               sectionId: editing.section.id,
               reason,
               effectiveTo,
-              idempotencyKey: intent.keyFor(`retire-section:${editing.section.id}`),
+              idempotencyKey: intent.keyFor(retireToken(`section:${editing.section.id}`, reason, effectiveTo)),
             })
           }
           onClose={close}
           onRetired={() => {
-            intent.release(`retire-section:${editing.section.id}`);
+            intent.release(lastRetire.current);
             reload();
           }}
         />
@@ -304,12 +315,12 @@ export function QuestionLibraryPage() {
               questionId: editing.question.id,
               reason,
               effectiveTo,
-              idempotencyKey: intent.keyFor(`retire:${editing.question.id}`),
+              idempotencyKey: intent.keyFor(retireToken(`question:${editing.question.id}`, reason, effectiveTo)),
             })
           }
           onClose={close}
           onRetired={() => {
-            intent.release(`retire:${editing.question.id}`);
+            intent.release(lastRetire.current);
             reload();
           }}
         />
@@ -325,6 +336,7 @@ export function QuestionLibraryPage() {
 
       {editing.kind === 'add-question' || editing.kind === 'edit-question' ? (
         <QuestionModal
+          intent={intent}
           mode={editing.kind === 'add-question' ? 'add' : 'edit'}
           sections={live}
           sectionId={editing.sectionId}

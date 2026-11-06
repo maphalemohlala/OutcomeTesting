@@ -71,6 +71,8 @@ export interface CaseEditValues {
 }
 
 export interface CaseDetail {
+  /** False when the product read failed: saving the empty set would strip the case's products. */
+  productsKnown: boolean;
   id: string;
   title: string;
   caseReference: string;
@@ -138,6 +140,7 @@ export function toDetail(
   record: Al_outcomecases,
   productIds: readonly string[] = [],
   productNames: readonly string[] = [],
+  productsKnown = true,
 ): CaseDetail {
   const extra = record as Al_outcomecases & {
     al_priority?: number;
@@ -148,6 +151,7 @@ export function toDetail(
     _al_advisercontactid_value?: string;
   };
   return {
+    productsKnown,
     id: record.al_outcomecaseid,
     title: text(record.al_name) ?? record.al_casereference,
     caseReference: record.al_casereference,

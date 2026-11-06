@@ -1,3 +1,5 @@
+import { quoteCsv } from '../../lib/tabular';
+
 /**
  * A minimal `.xlsx` reader, written here rather than taken as a dependency.
  *
@@ -165,7 +167,9 @@ function decodeXml(value: string): string {
 function textOf(xml: string): string {
   return elements(xml, 't')
     .map((t) => decodeXml(t.inner))
-    .join('');
+    .join('')
+    // Excel's own escape for a character XML cannot carry, such as _x000D_ for a carriage return.
+    .replace(/_x([0-9A-Fa-f]{4})_/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
 }
 
 // ---- dates ---------------------------------------------------------------------------
@@ -185,6 +189,12 @@ function isDateFormatCode(code: string): boolean {
  * which is what the checklist completion stamps are. Seconds are rounded, so
  * 46252.57916666667 reads as 13:54:00 rather than 13:53:59.
  */
+/** The largest serial Excel holds: 31 December 9999. Anything above is not a date. */
+const LAST_SERIAL = 2958465;
+
+/** Days between the 1900 and 1904 date systems. */
+const DATE_1904_OFFSET = 1462;
+
 export function serialToIso(serial: number): string {
   const seconds = Math.round(serial * 86400);
   const date = new Date(Date.UTC(1899, 11, 30) + seconds * 1000);
@@ -269,6 +279,7 @@ export async function readWorkbook(buffer: ArrayBuffer): Promise<string[][]> {
   const shared = sharedXml ? elements(sharedXml, 'si').map((si) => textOf(si.inner)) : [];
   const styles = readStyles(stylesXml);
 
+  const dateOffset = /<workbookPr[^>]*\bdate1904="(1|true)"/.test(workbookXml ?? '') ? DATE_1904_OFFSET : 0;
   const sheetXml = await readEntry(buffer, entries, firstSheetPath(workbookXml, relsXml));
   if (sheetXml === null) throw new Error('The workbook has no readable sheet.');
 
@@ -295,22 +306,24 @@ export async function readWorkbook(buffer: ArrayBuffer): Promise<string[][]> {
       let text = '';
 
       if (type === 's') {
-        const stringIndex = Number(value ? decodeXml(value.inner) : '');
-        text = shared[stringIndex] ?? '';
+        // An empty value is a blank cell, not string 0.
+        text = value && value.inner !== '' ? (shared[Number(decodeXml(value.inner))] ?? '') : '';
       } else if (type === 'inlineStr') {
         text = textOf(cell.inner);
       } else if (type === 'b') {
         text = value && decodeXml(value.inner) === '1' ? 'TRUE' : 'FALSE';
-      } else if (value) {
+      } else if (value && value.inner !== '') {
         text = decodeXml(value.inner);
         const numeric = Number(text);
         if (
           type !== 'str' &&
           type !== 'e' &&
           Number.isFinite(numeric) &&
+          numeric >= 0 &&
+          numeric <= LAST_SERIAL &&
           isDateStyle(styles, attribute(cell.attributes, 's'))
         ) {
-          text = serialToIso(numeric);
+          text = serialToIso(numeric + dateOffset);
         }
       }
 
@@ -323,13 +336,9 @@ export async function readWorkbook(buffer: ArrayBuffer): Promise<string[][]> {
   return rows;
 }
 
-/** Quotes a cell that carries a delimiter, quote or newline. */
-function csvCell(value: string): string {
-  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
-
+/** The server parses this text, so cells are quoted and never altered. */
 export function rowsToCsv(rows: string[][]): string {
-  return `${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
+  return `${rows.map((row) => row.map(quoteCsv).join(',')).join('\r\n')}\r\n`;
 }
 
 /** Reads a workbook straight to the CSV the `al_ImportCases` command expects. */

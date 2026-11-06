@@ -79,6 +79,8 @@
     <filter type="and">
       <condition attribute="al_reviewtype" operator="eq" value="{{ reviewtype }}" />
       <condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" />
+      {% comment %}A removed case is out of checking, so its review is nobody's work.{% endcomment %}
+      <condition entityname="case" attribute="al_casestatus" operator="ne" value="120910592" />
       {% if f_ref != '' %}<condition entityname="case" attribute="al_casereference" operator="like" value="%{{ f_ref | xml_escape }}%" />{% endif %}
       {% if f_route != '' %}<condition entityname="case" attribute="al_reviewrouteid" operator="eq" value="{{ f_route | xml_escape }}" />{% endif %}
     </filter>

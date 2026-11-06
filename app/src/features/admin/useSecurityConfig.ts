@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Al_pagepermissionsService, Al_userrolemappingsService } from '../../generated';
 import { APP_ROLE_BY_VALUE, ACCESS_LEVEL_BY_VALUE } from '../../types/permissions';
 import { choiceLabel } from '../../lib/choiceLabel';
+import { readAll } from '../../services/readAll';
 
 /**
  * What to show for an option value no map recognises.
@@ -61,8 +62,8 @@ export function useSecurityConfig(reloadKey: number): SecurityConfigState {
 
     // Withdrawn rows are kept and shown as inactive, so an administrator can restore them.
     Promise.all([
-      Al_userrolemappingsService.getAll({ top: 5000 }),
-      Al_pagepermissionsService.getAll({ top: 5000 }),
+      readAll((o) => Al_userrolemappingsService.getAll(o), { orderBy: ['al_userrolemappingid asc'] }),
+      readAll((o) => Al_pagepermissionsService.getAll(o), { orderBy: ['al_pagepermissionid asc'] }),
     ])
       .then(([mapResult, permResult]) => {
         if (cancelled) return;

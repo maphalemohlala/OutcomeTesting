@@ -201,6 +201,17 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// The end date a successor starting on <paramref name="startsOn"/> must keep: a
+        /// retirement scheduled for later would otherwise end with the version it was set on,
+        /// and the question would stay asked for good.
+        /// </summary>
+        public static DateTime? CarriedEnd(Entity current, DateTime startsOn)
+        {
+            var end = current.GetAttributeValue<DateTime?>("al_effectiveto");
+            return end.HasValue && end.Value.Date > startsOn.Date ? end : null;
+        }
+
+        /// <summary>
         /// The checklist version in force today (BR-013, AD-004), or the refusal the caller
         /// supplies when none is.
         ///

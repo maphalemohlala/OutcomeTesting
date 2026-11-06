@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<SdkMessageProcessingStep Name="AdviserMappingPlugin: Delete of al_advisermapping" SdkMessageProcessingStepId="{ffe27764-d0d9-f111-84e8-70a8a5b3561e}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <SdkMessageId>a1bdbb1b-ea3e-db11-86a7-000a3a5473e8</SdkMessageId>
+  <PluginTypeName>OutcomeTesting.Plugins.AdviserMappingPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f</PluginTypeName>
+  <PluginTypeId>fc05e542-d0d9-f111-84e8-70a8a5b3561e</PluginTypeId>
+  <PrimaryEntity>al_advisermapping</PrimaryEntity>
+  <AsyncAutoDelete>0</AsyncAutoDelete>
+  <Description>Takes an adviser's cases off the coach when the mapping is removed. PreImage: al_adviseremail.</Description>
+  <InvocationSource>1</InvocationSource>
+  <Mode>0</Mode>
+  <Rank>1</Rank>
+  <EventHandlerTypeCode>4602</EventHandlerTypeCode>
+  <Stage>40</Stage>
+  <IsCustomizable>1</IsCustomizable>
+  <IsHidden>0</IsHidden>
+  <SupportedDeployment>0</SupportedDeployment>
+  <IntroducedVersion>1.0</IntroducedVersion>
+  <!-- Stamped 2026-09-20, audit finding 3. Dataverse imports a step DISABLED
+       unless activation is requested, and an import that forgot the
+       activate-plugins flag switched these off once already (2026-09-02, six
+       al_response steps, unnoticed for a week). The export does not emit these
+       two elements, so round-trip-src.ps1 re-applies them after every export;
+       see Restore-StepState there. Do not remove either without reading that. -->
+  <StateCode>Enabled</StateCode>
+  <StatusCode>Enabled</StatusCode>
+  <SdkMessageProcessingStepImages>
+    <SdkMessageProcessingStepImage Name="PreImage">
+      <Description>The removed mapping's email, which the row no longer holds.</Description>
+      <SdkMessageProcessingStepImageId>{2a61e783-d0d9-f111-84e8-70a8a5b3561e}</SdkMessageProcessingStepImageId>
+      <Attributes>al_adviseremail</Attributes>
+      <EntityAlias>PreImage</EntityAlias>
+      <ImageType>0</ImageType>
+      <MessagePropertyName>Target</MessagePropertyName>
+      <IsCustomizable>1</IsCustomizable>
+    </SdkMessageProcessingStepImage>
+  </SdkMessageProcessingStepImages>
+</SdkMessageProcessingStep>

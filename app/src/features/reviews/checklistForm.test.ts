@@ -9,7 +9,6 @@ import {
   isTicked,
   optionGridColumns,
   optionsFor,
-  remediationSummary,
   sectionLayout,
   type FailReasonRef,
   type TickedAnswer,
@@ -318,102 +317,6 @@ describe('failPoints', () => {
       new Set(),
     );
     expect(points).toEqual([{ id: 'x', label: 'New reason', ticked: false }]);
-  });
-});
-
-describe('remediationSummary', () => {
-  const action = (over: Partial<Parameters<typeof remediationSummary>[0][number]>) => ({
-    id: 'a1',
-    reference: 'RA-1',
-    description: 'Missing TOB',
-    remedialAction: null,
-    assignedTo: null,
-    owner: 'Owner',
-    dueOn: '30 Sep 2026',
-    completedOn: null,
-    clientContactRequired: null,
-    recheckRequired: null,
-    changesAdvice: null,
-    ...over,
-  });
-
-  it('numbers one line per action with issue, action, owner, target date and sign-off', () => {
-    const summary = remediationSummary(
-      [
-        action({
-          remedialAction: 'TOB reissued',
-          assignedTo: 'A. Adviser',
-          completedOn: '25 Sep 2026',
-        }),
-      ],
-      [{ decision: 'Approved', signedOffOn: '26 Sep 2026', remediationAction: 'RA-1', signedOffBy: 'T. Manager' }],
-      [],
-    );
-    expect(summary.lines).toEqual([
-      {
-        id: 'a1',
-        issue: 'Missing TOB',
-        remedialAction: 'TOB reissued',
-        owner: 'A. Adviser',
-        targetDate: '30 Sep 2026',
-        signOff: 'Approved 26 Sep 2026',
-      },
-    ]);
-  });
-
-  it('shows the completion as the sign-off when no decision has been recorded yet', () => {
-    const summary = remediationSummary([action({ completedOn: '25 Sep 2026' })], [], []);
-    expect(summary.lines[0].signOff).toBe('Completed 25 Sep 2026');
-    expect(summary.lines[0].owner).toBe('Owner');
-  });
-
-  it('derives "all approved" from every action’s latest decision', () => {
-    const two = [action({}), action({ id: 'a2', reference: 'RA-2' })];
-    const approvedOne = [
-      { decision: 'Approved', signedOffOn: null, remediationAction: 'RA-1', signedOffBy: null },
-    ];
-    expect(remediationSummary(two, approvedOne, []).allApproved).toBe('No');
-    expect(
-      remediationSummary(
-        two,
-        [
-          ...approvedOne,
-          { decision: 'Approved', signedOffOn: null, remediationAction: 'RA-2', signedOffBy: null },
-        ],
-        [],
-      ).allApproved,
-    ).toBe('Yes');
-    expect(remediationSummary([], [], []).allApproved).toBeNull();
-  });
-
-  it('reads the three form answers off the actions, joining distinct values', () => {
-    const summary = remediationSummary(
-      [
-        action({ clientContactRequired: 'Yes', recheckRequired: 'No', changesAdvice: 'No' }),
-        action({ id: 'a2', reference: 'RA-2', clientContactRequired: 'Potentially', recheckRequired: 'No' }),
-      ],
-      [],
-      [],
-    );
-    expect(summary.clientContactRequired).toBe('Yes, Potentially');
-    expect(summary.recheckRequired).toBe('No');
-    expect(summary.changesAdvice).toBe('No');
-  });
-
-  it('shows the regraded outcome and the sign-offs when recorded, and nothing otherwise', () => {
-    const empty = remediationSummary([], [], []);
-    expect(empty.regradedOutcome).toBeNull();
-    expect(empty.supervisorSignOff).toBeNull();
-    expect(empty.adviserSignOff).toBeNull();
-
-    const summary = remediationSummary(
-      [action({ assignedTo: 'A. Adviser', completedOn: '25 Sep 2026' })],
-      [{ decision: 'Approved', signedOffOn: '26 Sep 2026', remediationAction: 'RA-1', signedOffBy: 'T. Manager' }],
-      [{ finalOutcome: 'Pass', regradedOn: '27 Sep 2026' }],
-    );
-    expect(summary.regradedOutcome).toBe('Pass - 27 Sep 2026');
-    expect(summary.supervisorSignOff).toBe('T. Manager, 26 Sep 2026');
-    expect(summary.adviserSignOff).toBe('A. Adviser, 25 Sep 2026');
   });
 });
 

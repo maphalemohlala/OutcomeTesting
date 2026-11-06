@@ -157,6 +157,12 @@ namespace OutcomeTesting.Plugins
                 ["statuscode"] = new OptionSetValue(1),
             };
 
+            var carriedEnd = ChecklistQueries.CarriedEnd(current, effectiveFrom);
+            if (carriedEnd.HasValue)
+            {
+                newVersion["al_effectiveto"] = carriedEnd.Value;
+            }
+
             var responseType = current.GetAttributeValue<OptionSetValue>("al_responsetype");
             if (responseType != null)
             {

@@ -136,6 +136,7 @@
           <condition attribute="al_outcomecaseid" operator="in">
             {% for c in case_rows %}<value>{{ c.al_outcomecaseid }}</value>{% endfor %}
           </condition>
+          <condition attribute="statecode" operator="eq" value="0" />
         </filter>
         <order attribute="al_duedate" descending="false" />
       </entity>
@@ -236,7 +237,7 @@
                     All {{ c_total }} complete
                   {% endif %}
                 </td>
-                <td><span class="ot-due" data-ot-due data-due="{{ c_first.al_duedate | date: 'yyyy-MM-dd' }}" data-completed="{{ c_first.al_completedon | date: 'yyyy-MM-dd' }}">{{ c_first.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</span></td>
+                <td><span class="ot-due" data-ot-due data-due="{{ c_first.al_duedate | date: 'yyyy-MM-dd' }}" data-completed="{% if c_first.al_actionstatus.value == 120910602 %}{{ c_first.al_completedon | date: 'yyyy-MM-dd' }}{% endif %}">{{ c_first.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</span></td>
                 <td>{% include 'OT Status Badge' status: c.al_casestatus.label %}</td>
                 <td>
                   {% assign clock_start = c_first.al_clockstartedon | default: c_first.createdon %}
@@ -336,6 +337,7 @@
       <attribute name="createdon" />
       <filter type="and">
         <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_param | xml_escape }}" />
+        <condition attribute="statecode" operator="eq" value="0" />
       </filter>
       <order attribute="al_duedate" descending="false" />
     </entity>
@@ -796,13 +798,13 @@
                 {% assign ot_flat = a.al_description | newline_to_br | replace: '<br />', '|' | replace: '<br>', '|' %}
                 {% assign ot_lines = ot_flat | split: '|' %}
                 {% assign ot_count = 0 %}
-                {% capture ot_note %}{% for l in ot_lines %}{% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}{% if rebuilt == line %}{% assign ot_count = ot_count | plus: 1 %}{% elsif line != '' and line != 'Issues found on the check:' %}{% unless line contains 'Raised automatically when the review was submitted' %}{% unless line contains 'Review the file and record what you have put right' %}{{ line }} {% endunless %}{% endunless %}{% endif %}{% endfor %}{% endcapture %}
+                {% assign ot_stop = false %}{% capture ot_note %}{% for l in ot_lines %}{% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}{% if line contains 'The checker recorded:' %}{% assign ot_stop = true %}{% endif %}{% if line contains 'Raised automatically' %}{% assign ot_stop = true %}{% endif %}{% if rebuilt == line and ot_stop == false %}{% assign ot_count = ot_count | plus: 1 %}{% elsif line != '' and line != 'Issues found on the check:' %}{% unless line contains 'Raised automatically when the review was submitted' %}{% unless line contains 'Review the file and record what you have put right' %}{{ line }} {% endunless %}{% endunless %}{% endif %}{% endfor %}{% endcapture %}
                 {% assign ot_note = ot_note | strip %}
                 {% if ot_count > 0 %}
-                  {% assign ot_shown = 0 %}
+                  {% assign ot_shown = 0 %}{% assign ot_stop = false %}
                   {% for l in ot_lines %}
                     {% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}
-                    {% if rebuilt == line %}
+                    {% if line contains 'The checker recorded:' %}{% assign ot_stop = true %}{% endif %}{% if line contains 'Raised automatically' %}{% assign ot_stop = true %}{% endif %}{% if rebuilt == line and ot_stop == false %}
                       {% assign ot_shown = ot_shown | plus: 1 %}
                       {% assign row_no = row_no | plus: 1 %}
                       <tr>
@@ -861,7 +863,7 @@
                             <td rowspan="{{ ot_count }}">—</td>
                           {% endif %}
                           <td rowspan="{{ ot_count }}">{% if a.al_assignedcontactid %}{{ a.al_assignedcontactid.name | escape }}{% else %}<span class="ot-unassigned" title="The adviser email on this case is held by no single portal contact, so nobody can record a response on this action. Correct the adviser's email on the case, or add the person; the open actions then move to them.">Nobody assigned{% if c.al_adviseremail %} &mdash; {{ c.al_adviseremail | escape }} {% if ot_adviser_holders > 1 %}is shared by two portal contacts{% else %}is held by no portal contact{% endif %}{% endif %}</span>{% endif %}</td>
-                          <td rowspan="{{ ot_count }}"><span class="ot-due" data-ot-due data-due="{{ a.al_duedate | date: 'yyyy-MM-dd' }}" data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</span></td>
+                          <td rowspan="{{ ot_count }}"><span class="ot-due" data-ot-due data-due="{{ a.al_duedate | date: 'yyyy-MM-dd' }}" data-completed="{% if a.al_actionstatus.value == 120910602 %}{{ a.al_completedon | date: 'yyyy-MM-dd' }}{% endif %}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</span></td>
                           <td rowspan="{{ ot_count }}" data-ot-row-status="{{ a.al_remediationactionid }}">{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
                           <td rowspan="{{ ot_count }}">
                             {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
@@ -869,10 +871,10 @@
                                   data-ot-age
                                   data-opened="{{ clock_start | date: 'yyyy-MM-dd' }}"
                                   data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
-                                  data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
+                                  data-completed="{% if a.al_actionstatus.value == 120910602 %}{{ a.al_completedon | date: 'yyyy-MM-dd' }}{% endif %}">—</span>
                           </td>
                           <td rowspan="{{ ot_count }}" data-ot-row-decision="{{ a.al_remediationactionid }}"{% unless ot_signoff_due %} data-ot-no-signoff{% endunless %}>
-                            {% if latest %}
+                            {% assign ot_redone = false %}{% if latest and latest.al_signedoffon and a.al_completedon and a.al_completedon > latest.al_signedoffon %}{% assign ot_redone = true %}{% endif %}{% if latest and ot_redone == false %}
                               {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}{% assign ot_sn = latest.al_notes | default: '' | strip %}{% if ot_sn != '' %}<br /><span class="ot-remedial-form__note">{{ ot_sn | escape | newline_to_br }}</span>{% endif %}
                             {% elsif a.al_completedon %}
                               Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}{% if ot_signoff_due %}; awaiting supervisor{% endif %}
@@ -952,7 +954,7 @@
                       <td>—</td>
                     {% endif %}
                     <td>{{ a.al_assignedcontactid.name | default: c.al_advisername | default: 'Unassigned' | escape }}</td>
-                    <td><span class="ot-due" data-ot-due data-due="{{ a.al_duedate | date: 'yyyy-MM-dd' }}" data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</span></td>
+                    <td><span class="ot-due" data-ot-due data-due="{{ a.al_duedate | date: 'yyyy-MM-dd' }}" data-completed="{% if a.al_actionstatus.value == 120910602 %}{{ a.al_completedon | date: 'yyyy-MM-dd' }}{% endif %}">{{ a.al_duedate | date: 'dd MMM yyyy' | default: '—' }}</span></td>
                     <td>{% include 'OT Status Badge' status: a.al_actionstatus.label %}</td>
                     <td>
                       {% assign clock_start = a.al_clockstartedon | default: a.createdon %}
@@ -960,10 +962,10 @@
                             data-ot-age
                             data-opened="{{ clock_start | date: 'yyyy-MM-dd' }}"
                             data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
-                            data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
+                            data-completed="{% if a.al_actionstatus.value == 120910602 %}{{ a.al_completedon | date: 'yyyy-MM-dd' }}{% endif %}">—</span>
                     </td>
                     <td>
-                      {% if latest %}
+                      {% assign ot_redone = false %}{% if latest and latest.al_signedoffon and a.al_completedon and a.al_completedon > latest.al_signedoffon %}{% assign ot_redone = true %}{% endif %}{% if latest and ot_redone == false %}
                         {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}{% assign ot_sn = latest.al_notes | default: '' | strip %}{% if ot_sn != '' %}<br /><span class="ot-remedial-form__note">{{ ot_sn | escape | newline_to_br }}</span>{% endif %}
                       {% elsif a.al_completedon %}
                         Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}{% if ot_signoff_due %}; awaiting supervisor{% endif %}

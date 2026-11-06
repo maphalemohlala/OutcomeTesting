@@ -12,6 +12,7 @@ import {
   type RawListOption,
 } from './listOptions';
 import { describeDeleteFailure, describeSaveFailure } from './listOptionFailure';
+import { readAll } from '../../services/readAll';
 
 // The shaping lives in listOptions so it can be tested; this module cannot be imported under
 // the test runner because ../../generated pulls in the Power Apps client.
@@ -46,7 +47,7 @@ export function useAllListOptions(reloadKey = 0): AllListOptionsState {
   useEffect(() => {
     let cancelled = false;
 
-    Al_listoptionsService.getAll({ orderBy: ['al_sortorder asc', 'al_name asc'] })
+    readAll((o) => Al_listoptionsService.getAll(o), { orderBy: ['al_sortorder asc', 'al_name asc', 'al_listoptionid asc'] })
       .then((result) => {
         if (cancelled) return;
 
@@ -179,10 +180,10 @@ export async function reinstateListOption(
  * Deletes an option outright.
  *
  * Offered, rather than hidden behind retire, because an option added by mistake and never
- * used should be removable without leaving a tombstone an administrator has to explain. It
- * is safe to offer precisely because this page is not what decides it: the lookup carries
- * CascadeType.Restrict, so Dataverse refuses the delete the moment any case holds the
- * option, and `describeDeleteFailure` turns that refusal into the suggestion to retire.
+ * used should be removable without leaving a tombstone an administrator has to explain. The
+ * page offers it only where the lookup's CascadeType.Restrict guards it (optionCanBeDeleted):
+ * Dataverse refuses the delete the moment any case holds the option, and
+ * `describeDeleteFailure` turns that refusal into the suggestion to retire.
  */
 export async function deleteListOption(
   id: string,

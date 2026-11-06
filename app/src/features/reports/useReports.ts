@@ -7,6 +7,9 @@ import {
   Al_remediationactionsService,
   Al_signoffsService,
 } from '../../generated';
+import { readAll } from '../../services/readAll';
+import { ACTION_COUNT_COLUMNS } from '../cases/caseRemediation';
+import { OUTCOME_GRADE_COLUMNS } from '../cases/caseWorklistMapping';
 
 export type { OutcomeVolume, AgeingBucket, ReportData } from './reportAggregate';
 
@@ -37,9 +40,9 @@ export function useReports(): ReportState {
     let cancelled = false;
 
     Promise.all([
-      Al_outcomesService.getAll({ top: 5000 }),
-      Al_remediationactionsService.getAll({ top: 5000 }),
-      Al_signoffsService.getAll({ top: 5000 }),
+      readAll((o) => Al_outcomesService.getAll(o), { orderBy: ['al_outcomeid asc'], select: OUTCOME_GRADE_COLUMNS }),
+      readAll((o) => Al_remediationactionsService.getAll(o), { orderBy: ['al_remediationactionid asc'], select: ACTION_COUNT_COLUMNS }),
+      readAll((o) => Al_signoffsService.getAll(o), { orderBy: ['al_signoffid asc'], select: ['al_signoffid', '_al_outcomecaseid_value', 'al_signoffdecision'] }),
     ])
       .then(([outcomes, actions, signoffs]) => {
         if (cancelled) return;

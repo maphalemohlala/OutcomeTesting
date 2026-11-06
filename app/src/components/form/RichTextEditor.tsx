@@ -59,6 +59,12 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     },
   }));
 
+  // Enter makes a <div> by default, and the server's allow-list drops that tag and runs the
+  // two lines together. The setting is per document, so this only has to happen once.
+  useEffect(() => {
+    document.execCommand('defaultParagraphSeparator', false, 'p');
+  }, []);
+
   // Written only when the incoming value is not already what the element holds. Assigning
   // innerHTML on every render puts the caret back to the start on each keystroke, which is
   // the classic way a contenteditable becomes unusable for anything longer than a word.

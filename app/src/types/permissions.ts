@@ -362,3 +362,11 @@ export function pageResourceForPath(path: string): ResourceKey | null {
   if (path.startsWith('/admin/people')) return 'page.admin.users';
   return null;
 }
+
+/**
+ * Whether the person behind an email has left: every contact holding it is inactive. One
+ * active row is enough to stay, or a rehire's old record would lock the new one out.
+ */
+export function isDeactivated(contacts: readonly { statecode?: unknown }[]): boolean {
+  return contacts.length > 0 && contacts.every((contact) => Number(contact.statecode) !== 0);
+}

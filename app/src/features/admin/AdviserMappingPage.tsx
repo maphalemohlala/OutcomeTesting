@@ -17,10 +17,9 @@ import './AdviserMappingPage.css';
 /**
  * Who each adviser's T&C Manager is (Fixes 5, AD-162).
  *
- * The page says plainly, in its own intro, that this is routing and not access. Every T&C
- * Manager can already read every case and sign off any case; what this decides is who is
- * TOLD a sign-off is waiting. An administrator who believed otherwise would use this screen
- * expecting it to restrict something, and it never will.
+ * This decides who is told a sign-off is waiting and who alone may sign it off or record its
+ * final outcome. Changing a row moves that adviser's cases to the new T&C Manager, including
+ * any already waiting for sign-off (AdviserMappingPlugin).
  */
 export function AdviserMappingPage() {
   const [reloadKey, setReloadKey] = useState(0);
@@ -348,8 +347,8 @@ function RemoveMapping({
         </p>
         <p className="advisers__hint">
           Removing it stops {row.managerName ?? 'anyone'} being told when a sign-off falls due
-          for this adviser. Nothing else changes: the sign-off still works, any T&amp;C Manager
-          can perform one, and nobody gains or loses access to any case.
+          for this adviser. Until the adviser is mapped again, nobody can sign off their cases
+          or record a final outcome, and those cases come off this manager's list.
         </p>
 
         <div className="advisers__actions">

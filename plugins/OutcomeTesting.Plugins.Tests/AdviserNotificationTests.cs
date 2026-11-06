@@ -86,7 +86,7 @@ namespace OutcomeTesting.Plugins.Tests
             Remediation.AssignOpenActions(svc, Ref(), Correlation);
 
             var queued = Queued(svc);
-            Assert.Equal("Remedial needed - Pass with issues: IO-TEST-100",
+            Assert.Equal("Remedial needed - Pass with issues: IO-TEST-100 - Mr and Mrs Smith",
                 queued.GetAttributeValue<string>("al_subject"));
             Assert.Contains("pass with issues grading", queued.GetAttributeValue<string>("al_body"));
             Assert.Contains("Mr and Mrs Smith", queued.GetAttributeValue<string>("al_body"));
@@ -102,7 +102,7 @@ namespace OutcomeTesting.Plugins.Tests
             Remediation.AssignOpenActions(svc, Ref(), Correlation);
 
             var queued = Queued(svc);
-            Assert.Equal("Remedial needed - insufficient evidence/ potential harm: IO-TEST-100",
+            Assert.Equal("Remedial needed - insufficient evidence/ potential harm: IO-TEST-100 - Mr and Mrs Smith",
                 queued.GetAttributeValue<string>("al_subject"));
             Assert.Contains("liaise with your T&amp;C Manager", queued.GetAttributeValue<string>("al_body"));
         }
@@ -119,7 +119,7 @@ namespace OutcomeTesting.Plugins.Tests
             Remediation.AssignOpenActions(svc, Ref(), Correlation);
 
             var queued = Queued(svc);
-            Assert.Equal("Remediation required on case IO-TEST-100",
+            Assert.Equal("Remediation required on case IO-TEST-100 - Mr and Mrs Smith",
                 queued.GetAttributeValue<string>("al_subject"));
             Assert.DoesNotContain("grading", queued.GetAttributeValue<string>("al_body"));
         }
@@ -133,7 +133,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             Remediation.AssignOpenActions(svc, Ref(), Correlation);
 
-            Assert.Equal("Remediation required on case IO-TEST-100",
+            Assert.Equal("Remediation required on case IO-TEST-100 - Mr and Mrs Smith",
                 Queued(svc).GetAttributeValue<string>("al_subject"));
         }
 
@@ -208,7 +208,7 @@ namespace OutcomeTesting.Plugins.Tests
             var queued = Queued(svc);
             Assert.Equal(NotificationOutbox.EventCasePassed,
                 queued.GetAttributeValue<OptionSetValue>("al_event").Value);
-            Assert.Equal("Case check - Pass: IO-TEST-100", queued.GetAttributeValue<string>("al_subject"));
+            Assert.Equal("Case check - Pass: IO-TEST-100 - Mr and Mrs Smith", queued.GetAttributeValue<string>("al_subject"));
             Assert.Equal("sam@example.com", queued.GetAttributeValue<string>("al_recipientemail"));
 
             var body = queued.GetAttributeValue<string>("al_body");

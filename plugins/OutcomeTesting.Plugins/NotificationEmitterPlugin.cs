@@ -263,7 +263,9 @@ namespace OutcomeTesting.Plugins
                 targetTable,
                 targetId,
                 NotificationOutbox.ParaplannerEmail(service, caseRef),
-                ParaplannerRemediationLetter.Subject(paraplannerReference),
+                ParaplannerRemediationLetter.Subject(
+                    paraplannerReference,
+                    caseRow == null ? null : caseRow.GetAttributeValue<string>("al_clientname")),
                 ParaplannerRemediationLetter.Body(paraplannerReference),
                 null,
                 caseRef,

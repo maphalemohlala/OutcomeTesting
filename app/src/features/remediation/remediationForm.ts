@@ -121,7 +121,12 @@ function signoffsFor(action: RemediationActionRow, signoffs: SignoffRow[]): Sign
   return signoffs
     .filter((signoff) => signoff.remediationActionId === action.id)
     .slice()
-    .sort((a, b) => (b.signedOffOn ?? '').localeCompare(a.signedOffOn ?? ''));
+    .sort(newestFirst);
+}
+
+/** By the timestamp: the display date sorts "22 Sep" above "03 Oct" and cannot see a same-day pair. */
+function newestFirst(a: SignoffRow, b: SignoffRow): number {
+  return (b.signedOffOnRaw ?? '').localeCompare(a.signedOffOnRaw ?? '');
 }
 
 /** The most recent supervisor decision on an action, or null when it has none. */
@@ -199,7 +204,10 @@ export function signoffCell(
   caseStatus?: string | null,
 ): string {
   const latest = latestSignoff(action, signoffs);
-  if (latest) {
+  // Completed again since that decision: the rejection is history, and it now awaits a new one.
+  const redone =
+    latest?.signedOffOnRaw && action.completedOnRaw && action.completedOnRaw > latest.signedOffOnRaw;
+  if (latest && !redone) {
     return latest.signedOffOn ? `${latest.decision}, ${latest.signedOffOn}` : latest.decision;
   }
 
@@ -271,7 +279,7 @@ export function remediationForm(
 
   const supervisor = signoffs
     .slice()
-    .sort((a, b) => (b.signedOffOn ?? '').localeCompare(a.signedOffOn ?? ''))[0];
+    .sort(newestFirst)[0];
 
   return {
     clientContactRequired: source?.clientContactRequired ?? null,

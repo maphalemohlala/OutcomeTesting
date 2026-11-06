@@ -11,6 +11,12 @@ import { Al_remediationactionsal_actionstatus } from '../../generated/models/Al_
  * rule SignoffProgressPlugin applies before a case may leave Awaiting Sign-off.
  */
 
+/** Every column the worklist, dashboard and report counts read from an action. */
+export const ACTION_COUNT_COLUMNS = [
+  'al_remediationactionid', '_al_outcomecaseid_value', '_al_reviewinstanceid_value', 'al_actionstatus',
+  'al_duedate', 'createdon', 'al_clockstartedon', 'al_completedon',
+];
+
 /** Only what the rule reads, so a test needs no generated model. */
 export interface CaseRemediationSource {
   al_remediationactionid: string;

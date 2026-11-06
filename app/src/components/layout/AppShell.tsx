@@ -8,6 +8,8 @@ import { usePermissions } from '../../app/permissions/permissionContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import './AppShell.css';
 import { useProductName } from '../../app/product/useProductName';
+// The portal header's logo, as markup so the player's content policy cannot block it.
+import logo from '../../assets/ascot-lloyd-logo.svg?raw';
 
 function isItemActive(pathname: string, to: string): boolean {
   return to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`);
@@ -179,7 +181,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </a>
 
       <header className="shell__header">
-        <span className="shell__product">{product}</span>
+        <span className="shell__brand">
+          <span
+            className="shell__logo"
+            role="img"
+            aria-label="Ascot Lloyd"
+            dangerouslySetInnerHTML={{ __html: logo }}
+          />
+          <span className="shell__product">{product}</span>
+        </span>
         <SignedInUser />
       </header>
 

@@ -109,6 +109,7 @@ export function CaseDetailPage() {
 
           <CaseEditPanel
             detail={state.detail}
+            reloadKey={reloadKey}
             onSaved={() => setReloadKey((key) => key + 1)}
           />
 
@@ -239,7 +240,7 @@ export function CaseDetailPage() {
               {
                 id: 'history',
                 label: 'History',
-                render: () => <CaseHistoryPanel caseId={state.detail.id} />,
+                render: () => <CaseHistoryPanel caseId={state.detail.id} reloadKey={reloadKey} />,
               },
             ]}
           />

@@ -45,6 +45,7 @@ import {
   type Al_failreasons,
 } from '../../generated/models/Al_failreasonsModel';
 import { choiceLabel } from '../../lib/choiceLabel';
+import { readAll } from '../../services/readAll';
 
 export interface ReviewResponse extends TickedAnswer {
   answer: string | null;
@@ -125,7 +126,7 @@ async function linkedFailReasons(responseIds: string[]): Promise<Set<string>> {
   );
 
   for (const result of linkResults) {
-    if (!result.success) continue;
+    if (!result.success) throw new Error('The fail reason links could not be read.');
     for (const link of result.data) {
       linked.add(link.al_failreasonid);
     }
@@ -233,9 +234,9 @@ export function useReviewDetail(
       // filter - so the cap has to clear the whole table rather than the current checklist.
       // Truncation here is silent and asymmetric: a question drops off the form while the
       // submit gate, which pages server-side, still demands its answer (AD-122).
-      Al_questionversionsService.getAll({ top: 5000 }),
-      Al_questionsService.getAll({ top: 5000 }),
-      Al_failreasonsService.getAll({ top: 500 }),
+      readAll((o) => Al_questionversionsService.getAll(o), { orderBy: ['al_questionversionid asc'] }),
+      readAll((o) => Al_questionsService.getAll(o), { orderBy: ['al_questionid asc'] }),
+      readAll((o) => Al_failreasonsService.getAll(o), { orderBy: ['al_failreasonid asc'] }),
     ])
       .then(async ([review, responses, versions, questions, reasons]) => {
         if (cancelled) return;
@@ -278,17 +279,24 @@ export function useReviewDetail(
           header.caseId
             ? Al_outcomecasesService.get(header.caseId).catch(() => null)
             : Promise.resolve(null),
-          linkedFailReasons(responseIds).catch(() => new Set<string>()),
+          linkedFailReasons(responseIds),
           header.caseId
             ? Al_listoption_al_outcomecase_productssetService.getAll({
                 filter: `al_outcomecaseid eq ${header.caseId}`,
                 top: 200,
               }).catch(() => null)
             : Promise.resolve(null),
-          Al_listoptionsService.getAll({ top: 500 }).catch(() => null),
+          readAll((o) => Al_listoptionsService.getAll(o), { orderBy: ['al_listoptionid asc'] }).catch(() => null),
         ]);
 
         if (cancelled) return;
+
+        // This page is a compliance record with a Save as PDF button: a blank form or a box
+        // left unticked by a failed read would pass for what the checker recorded.
+        if (!responses.success || !sections.success || !reasons.success) {
+          setState({ status: 'unavailable', reason: 'This review could not be loaded from Dataverse.' });
+          return;
+        }
 
         // Answers are read against the versions in force on the review's reference day: its
         // submission day once submitted, otherwise today (AD-015, BR-013). A retired version

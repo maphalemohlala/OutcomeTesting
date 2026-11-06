@@ -35,7 +35,7 @@ describe('casesInScope', () => {
 
   it('keeps the cases imported inside the date range, inclusive at both ends', () => {
     const cases = [
-      row('before', { createdOn: '2026-09-01T23:00:00Z' }),
+      row('before', { createdOn: '2026-09-01T22:30:00Z' }),
       row('first', { createdOn: '2026-09-02T08:00:00Z' }),
       row('last', { createdOn: '2026-09-30T18:00:00Z' }),
       row('after', { createdOn: '2026-10-01T08:00:00Z' }),

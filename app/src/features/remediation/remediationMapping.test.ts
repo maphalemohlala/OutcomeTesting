@@ -65,7 +65,7 @@ describe('toAction', () => {
     const row = toAction(action({ al_duedate: '2026-09-20T00:00:00Z' }));
     expect(row.description).toBe('Suitability report missing');
     expect(row.status).toBe('In progress');
-    expect(row.dueOn).toBe('20 Sept 2026');
+    expect(row.dueOn).toBe('20 Sep 2026');
   });
 
   it('reads the checker\'s remedial action, the adviser\'s answer and their note', () => {

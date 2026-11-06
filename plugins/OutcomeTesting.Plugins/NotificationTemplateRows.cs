@@ -418,11 +418,24 @@ namespace OutcomeTesting.Plugins
                 { NotificationTemplates.TokenGrading, string.Empty },
                 { NotificationTemplates.TokenFinalOutcome, string.Empty },
                 { NotificationTemplates.TokenNotes, string.Empty },
+                { NotificationTemplates.TokenClient, string.Empty },
             };
 
             if (caseRef == null)
             {
                 return tokens;
+            }
+
+            // Its own try: a case that cannot be read must not cost the grading below.
+            try
+            {
+                tokens[NotificationTemplates.TokenClient] = service
+                    .Retrieve("al_outcomecase", caseRef.Id, new ColumnSet("al_clientname"))
+                    .GetAttributeValue<string>("al_clientname") ?? string.Empty;
+            }
+            catch (Exception)
+            {
+                // An extra token never costs the letter; it goes with the gap.
             }
 
             try

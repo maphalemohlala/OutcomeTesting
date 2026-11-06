@@ -2,13 +2,12 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
-import { ExportMenu } from '../../components/export/ExportMenu';
-import { useExports, type ExportRecordRow } from './useExports';
+import { useExportBatches } from './useExports';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { createExportBatch, generateExport } from '../../services/commands/exports';
 import { messageForFailure } from '../../services/errors';
-import { TRAIL_LIGHT_HEADERS, trailLightFilename, trailLightRow } from './trailLight';
-import { buildFullExtract, EXTRACT_ROW_LIMIT } from './fullExtract';
+import { ukDayOf } from '../cases/caseHeaderDates';
+import { buildFullExtract } from './fullExtract';
 import { downloadWorkbook, stampedFilename } from '../../lib/tabular';
 import './ExportsPage.css';
 
@@ -23,7 +22,8 @@ function formatDate(iso: string | null): string {
 function inRange(iso: string | null, from: string, to: string): boolean {
   if (!from && !to) return true;
   if (!iso) return false;
-  const day = iso.slice(0, 10);
+  const day = ukDayOf(iso);
+  if (!day) return false;
   if (from && day < from) return false;
   if (to && day > to) return false;
   return true;
@@ -31,7 +31,7 @@ function inRange(iso: string | null, from: string, to: string): boolean {
 
 export function ExportsPage() {
   const [reloadKey, setReloadKey] = useState(0);
-  const state = useExports(reloadKey);
+  const state = useExportBatches(reloadKey);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const intent = useIntentKeys();
@@ -40,7 +40,6 @@ export function ExportsPage() {
   const [batchFrom, setBatchFrom] = useState('');
   const [batchTo, setBatchTo] = useState('');
   const batches = useMemo(() => (state.status === 'ready' ? state.batches : []), [state]);
-  const records = useMemo(() => (state.status === 'ready' ? state.records : []), [state]);
 
   const batchStatuses = useMemo(
     () => [...new Set(batches.map((b) => b.status).filter(Boolean))].sort(),
@@ -57,15 +56,6 @@ export function ExportsPage() {
   );
 
   const batchesFiltered = batchStatus !== '' || batchFrom !== '' || batchTo !== '';
-  const recordsByBatch = useMemo(() => {
-    const grouped = new Map<string, ExportRecordRow[]>();
-    for (const record of records) {
-      if (!record.batchId) continue;
-      grouped.set(record.batchId, [...(grouped.get(record.batchId) ?? []), record]);
-    }
-    return grouped;
-  }, [records]);
-
   async function onFullExtract() {
     setBusy(true);
     setNotice(null);
@@ -77,20 +67,10 @@ export function ExportsPage() {
       }
       downloadWorkbook(stampedFilename('outcome-testing-full-extract', 'xlsx'), extract.sheets);
 
-      const caveats = [
-        extract.unavailable.length > 0
-          ? `not readable by you: ${extract.unavailable.join(', ')}`
-          : '',
-        extract.truncated.length > 0
-          ? `capped at ${EXTRACT_ROW_LIMIT} rows: ${extract.truncated.join(', ')}`
-          : '',
-      ].filter(Boolean);
-
+      const missing = extract.unavailable.join(', ');
       setNotice({
-        tone: caveats.length > 0 ? 'error' : 'ok',
-        message:
-          `Downloaded ${extract.sheets.length} sheet(s).` +
-          (caveats.length > 0 ? ` Left out or shortened — ${caveats.join('; ')}.` : ''),
+        tone: missing ? 'error' : 'ok',
+        message: `Downloaded ${extract.sheets.length} sheet(s).` + (missing ? ` Left out, not readable by you: ${missing}.` : ''),
       });
     } catch {
       setNotice({ tone: 'error', message: 'The full data extract could not be produced.' });
@@ -241,7 +221,6 @@ export function ExportsPage() {
                       </tr>
                     ) : (
                       filteredBatches.map((b) => {
-                        const batchRecords = recordsByBatch.get(b.id) ?? [];
                         // AD-042: only a Draft batch may be generated. Leaving the button
                         // live made the plug-in's refusal the way users discovered that.
                         const isDraft = b.status === 'Draft';
@@ -267,21 +246,6 @@ export function ExportsPage() {
                               >
                                 Generate
                               </button>
-                              <ExportMenu
-                                label="Download"
-                                stem={`trail-light-${b.code || b.name || 'batch'}`}
-                                filenameFor={(format) => trailLightFilename(format)}
-                                sheetName="Trail Light"
-                                headers={TRAIL_LIGHT_HEADERS}
-                                rows={batchRecords.map((record) => trailLightRow(record.record))}
-                                caption={`All ${batchRecords.length} row(s) in the batch. Open the batch to choose a check-date range.`}
-                                disabled={busy}
-                                emptyHint={
-                                  isDraft
-                                    ? 'This batch has not been generated yet.'
-                                    : 'This batch generated 0 rows, because no cases are at status Closed.'
-                                }
-                              />
                             </td>
                           </tr>
                         );

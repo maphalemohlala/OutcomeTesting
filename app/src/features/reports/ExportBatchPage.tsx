@@ -3,11 +3,12 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { FilterBar, FilterField } from '../../components/form/FilterBar';
 import { ExportMenu } from '../../components/export/ExportMenu';
-import { useExports } from './useExports';
+import { useExportBatches, useExportRecords } from './useExports';
 import {
   TRAIL_LIGHT_HEADERS,
   describeCheckRange,
   fileContentsSummary,
+  isPassWithNoFails,
   trailLightFilename,
   trailLightRow,
   ukDay,
@@ -27,33 +28,51 @@ function formatDate(iso: string | null): string {
  * the page, and users could not tell what it did. Here it sits next to the rows it
  * decides, the table shows only the cases the file will hold, and one sentence says so.
  *
- * The range is kept in the URL (`?from=&to=`) so a cut batch can be reopened or shared.
+ * The range and the file choice are kept in the URL (`?from=&to=&file=`) so a cut batch can
+ * be reopened or shared. The daily file is the default; the quarterly file keeps every case.
  */
 export function ExportBatchPage() {
   const { batchId = '' } = useParams();
   const [params, setParams] = useSearchParams();
   const from = params.get('from') ?? '';
   const to = params.get('to') ?? '';
-  const state = useExports(0);
+  const quarterly = params.get('file') === 'quarterly';
+  const batchState = useExportBatches(0);
+  const recordState = useExportRecords(batchId);
+  const state = batchState.status !== 'ready' ? batchState : recordState;
 
-  function setRange(key: 'from' | 'to', value: string) {
+  function setRange(key: 'from' | 'to' | 'file', value: string) {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
     else next.delete(key);
     setParams(next, { replace: true });
   }
 
-  const batch = state.status === 'ready' ? state.batches.find((b) => b.id === batchId) : undefined;
+  const batch = batchState.status === 'ready' ? batchState.batches.find((b) => b.id === batchId) : undefined;
   const allRecords = useMemo(
-    () => (state.status === 'ready' ? state.records.filter((r) => r.batchId === batchId) : []),
-    [state, batchId],
+    () => (recordState.status === 'ready' ? recordState.records : []),
+    [recordState],
   );
-  const records = useMemo(
+  const inRange = useMemo(
     () => allRecords.filter((r) => withinCheckDates(r.record, from, to)),
     [allRecords, from, to],
   );
+  const records = useMemo(
+    () => (quarterly ? inRange : inRange.filter((r) => !isPassWithNoFails(r.record))),
+    [inRange, quarterly],
+  );
+  const passesLeftOut = inRange.length - records.length;
+  const nothingInFile =
+    allRecords.length === 0
+      ? 'This batch holds no cases.'
+      : inRange.length === 0
+        ? 'No cases in this batch fall in the chosen range.'
+        : 'Every case in range is a pass with no fails. Choose the quarterly file to include them.';
   const range = describeCheckRange(from, to);
   const isDraft = batch?.status === 'Draft';
+  // The batch recorded how many rows it wrote. Anything else here means the file would be short.
+  const incomplete =
+    state.status === 'ready' && batch !== undefined && !isDraft && allRecords.length !== batch.rowCount;
 
   return (
     <>
@@ -77,7 +96,7 @@ export function ExportBatchPage() {
         </section>
       ) : null}
 
-      {batch ? (
+      {batch && state.status === 'ready' ? (
         <>
           <PageIntro
             title={batch.name || 'Export batch'}
@@ -91,20 +110,39 @@ export function ExportBatchPage() {
             </p>
           ) : (
             <>
+              {incomplete ? (
+                <p className="exports__notice exports__notice--error" role="alert">
+                  This batch recorded {batch.rowCount} case(s) but {allRecords.length} could be read,
+                  so the file would be incomplete and cannot be downloaded. Reload the page, and
+                  report it if this stays.
+                </p>
+              ) : null}
+
               <section aria-labelledby="range-heading">
                 <h2 id="range-heading" className="exports__heading">
                   Which cases go in the file
                 </h2>
                 <p className="exports__note">
-                  Choose the check dates to include - the day each case's review was submitted
-                  (column G). Both dates are included. Leave both empty to download every case
-                  in this batch.
+                  The daily file leaves out passes with no fails. The quarterly file keeps every
+                  case. Choose the check dates to include - the day each case's review was
+                  submitted (column G). Both dates are included. Leave both empty to use every
+                  case in this batch.
                 </p>
                 <FilterBar
                   summary={range ? `Cases ${range}` : 'Every case in this batch'}
                   onClear={() => setParams(new URLSearchParams(), { replace: true })}
-                  clearDisabled={!from && !to}
+                  clearDisabled={!from && !to && !quarterly}
                 >
+                  <FilterField label="File" htmlFor="file-kind">
+                    <select
+                      id="file-kind"
+                      value={quarterly ? 'quarterly' : ''}
+                      onChange={(e) => setRange('file', e.target.value)}
+                    >
+                      <option value="">Daily file</option>
+                      <option value="quarterly">Quarterly 12-month file</option>
+                    </select>
+                  </FilterField>
                   <FilterField label="Checked from" htmlFor="check-from">
                     <input
                       id="check-from"
@@ -138,16 +176,17 @@ export function ExportBatchPage() {
                     sheetName="Trail Light"
                     headers={TRAIL_LIGHT_HEADERS}
                     rows={records.map((r) => trailLightRow(r.record))}
+                    disabled={incomplete}
                     caption={`${records.length} row(s)${range ? `, ${range},` : ''} in the Trail Light column order`}
                     emptyHint={
                       allRecords.length === 0
                         ? 'This batch generated 0 rows, because no cases were at status Closed.'
-                        : `None of this batch's cases were ${range}.`
+                        : nothingInFile
                     }
                   />
                 </div>
                 <p className="exports__summary" role="status">
-                  {fileContentsSummary(records.length, allRecords.length, from, to)}
+                  {fileContentsSummary(inRange.length, allRecords.length, from, to, passesLeftOut)}
                 </p>
                 <table className="exports__table">
                   <thead>
@@ -164,9 +203,7 @@ export function ExportBatchPage() {
                     {records.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="exports__empty">
-                          {allRecords.length === 0
-                            ? 'This batch holds no cases.'
-                            : 'No cases in this batch fall in the chosen range.'}
+                          {nothingInFile}
                         </td>
                       </tr>
                     ) : (

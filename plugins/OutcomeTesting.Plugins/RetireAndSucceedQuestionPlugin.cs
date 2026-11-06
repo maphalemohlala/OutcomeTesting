@@ -64,7 +64,7 @@ namespace OutcomeTesting.Plugins
             }
 
             var current = ChecklistQueries.CurrentVersionOf(
-                userService, questionId, "al_versionnumber", "al_responsetype", "al_ismandatory", "al_displayorder");
+                userService, questionId, "al_versionnumber", "al_effectiveto", "al_responsetype", "al_ismandatory", "al_displayorder");
             if (current == null)
             {
                 throw new InvalidPluginExecutionException(
@@ -109,6 +109,12 @@ namespace OutcomeTesting.Plugins
                 ["statecode"] = new OptionSetValue(0),
                 ["statuscode"] = new OptionSetValue(1),
             };
+
+            var carriedEnd = ChecklistQueries.CarriedEnd(current, today);
+            if (carriedEnd.HasValue)
+            {
+                successor["al_effectiveto"] = carriedEnd.Value;
+            }
 
             // Carry forward the frozen answer shape and ordering (AD-015, AD-019),
             // unless the editor supplied an override for this new version.

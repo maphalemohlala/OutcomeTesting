@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ContactsService } from '../generated';
 import type { Contacts } from '../generated/models/ContactsModel';
 import { logTechnical } from '../services/errors';
+import { readAll } from '../services/readAll';
 
 export interface DirectoryUser {
   id: string;
@@ -83,7 +84,7 @@ export function useUserDirectory(reloadKey = 0): UserDirectoryState {
   useEffect(() => {
     let cancelled = false;
 
-    ContactsService.getAll({ orderBy: ['fullname asc'], top: 5000 })
+    readAll((o) => ContactsService.getAll(o), { orderBy: ['fullname asc', 'contactid asc'] })
       .then((result) => {
         if (cancelled) return;
         if (!result.success) {

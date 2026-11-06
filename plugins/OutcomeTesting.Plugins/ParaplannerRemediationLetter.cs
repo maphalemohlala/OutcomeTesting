@@ -18,9 +18,11 @@ namespace OutcomeTesting.Plugins
         /// <summary>The outbox occurrence that makes it a row of its own beside the adviser's.</summary>
         public const string Occurrence = "PARAPLANNER";
 
-        public static string Subject(string reference)
+        public static string Subject(string reference, string clientName = null)
         {
-            return "Checks and remedial points: " + NotificationTemplates.ReferenceOr(reference);
+            return NotificationTemplates.WithoutEmptyClient(
+                "Checks and remedial points: " + NotificationTemplates.ReferenceOr(reference)
+                + " - " + (clientName ?? string.Empty).Trim());
         }
 
         public static string Body(string reference)

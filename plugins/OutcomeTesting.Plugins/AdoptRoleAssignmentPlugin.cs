@@ -154,6 +154,13 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.NotFoundPrefix + "No web role is named " + trimmedRole + ".");
             }
 
+            // Revoke stays allowed, so what is left on a retired role can still be cleared.
+            if (adopt && !WebRoleRegistry.IsActive(webRole))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + trimmedRole + " is retired, so it cannot be adopted.");
+            }
+
             var contact = WebRoleRegistry.FindContactByEmail(systemService, trimmedEmail);
             if (contact == null)
             {

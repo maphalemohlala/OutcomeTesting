@@ -5,6 +5,7 @@ import {
   trailLightRow,
   describeCheckRange,
   fileContentsSummary,
+  isPassWithNoFails,
   withinCheckDates,
   type ExportRecord,
 } from './trailLight';
@@ -222,6 +223,48 @@ describe('how the range is put into words on a batch page', () => {
   it('says plainly when the range leaves nothing', () => {
     expect(fileContentsSummary(0, 8, '2026-10-01', '')).toBe(
       'None of the 8 cases in this batch were checked on or after 1 Oct 2026, so there is nothing to download.',
+    );
+  });
+});
+
+describe('the daily file leaving out passes with no fails', () => {
+  const row = (advice?: string, file?: string) =>
+    ({ al_advicequalitygrade: advice, al_filequalitygrade: file }) as ExportRecord;
+
+  it('treats a pass on both grades as a pass with no fails', () => {
+    expect(isPassWithNoFails(row('Pass', 'Pass'))).toBe(true);
+  });
+
+  it('treats a Tax-only pass, with no advice grade, the same way', () => {
+    expect(isPassWithNoFails(row(undefined, 'Pass'))).toBe(true);
+  });
+
+  it('keeps a failed file quality even where the advice passed', () => {
+    expect(isPassWithNoFails(row('Pass', 'Fail'))).toBe(false);
+  });
+
+  it('keeps every other advice grade', () => {
+    for (const grade of ['Pass with issues', 'Insufficient Evidence', 'Potential Harm']) {
+      expect(isPassWithNoFails(row(grade, 'Pass'))).toBe(false);
+    }
+  });
+
+  it('keeps a row with no grade at all', () => {
+    expect(isPassWithNoFails(row())).toBe(false);
+  });
+
+  it('says how many passes were left out', () => {
+    expect(fileContentsSummary(24, 24, '', '', 19)).toBe(
+      'The file will contain 5 of the 24 cases in this batch, leaving out 19 passes with no fails.',
+    );
+    expect(fileContentsSummary(2, 24, '2026-11-02', '2026-11-02', 1)).toBe(
+      'The file will contain 1 of the 24 cases in this batch: those checked on 2 Nov 2026, leaving out 1 pass with no fails.',
+    );
+  });
+
+  it('says plainly when only passes were in range', () => {
+    expect(fileContentsSummary(3, 24, '2026-11-02', '', 3)).toBe(
+      'Every case in this batch checked on or after 2 Nov 2026 is a pass with no fails, so the daily file has nothing to download.',
     );
   });
 });

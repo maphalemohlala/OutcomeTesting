@@ -99,3 +99,21 @@ describe('the checker filter keys on identity, so two checkers of one name stay 
     expect(filtered(cases, { checker: 'C. Checker' })).toEqual(['tax', 'aqs']);
   });
 });
+
+describe('a bookmark from before people were keyed by identity', () => {
+  it('still finds the person by name', () => {
+    expect(applyFilters([row('c1', { adviser: 'Ann Adviser' })], { ...EMPTY_FILTERS, person: 'Ann Adviser' })).toHaveLength(1);
+  });
+});
+
+describe('removed cases on the worklist', () => {
+  const cases = [row('live'), row('removed', { status: 'No Check Required' })];
+
+  it('leaves them out by default', () => {
+    expect(filtered(cases, {})).toEqual(['live']);
+  });
+
+  it('shows them when someone filters to their status', () => {
+    expect(filtered(cases, { status: 'No Check Required' })).toEqual(['removed']);
+  });
+});

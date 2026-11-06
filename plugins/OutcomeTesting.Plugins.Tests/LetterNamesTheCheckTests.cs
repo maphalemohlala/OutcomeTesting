@@ -199,5 +199,44 @@ namespace OutcomeTesting.Plugins.Tests
                 "The AQS check on case OT-1 has been submitted and is locked to further edits.",
                 letter.GetAttributeValue<string>("al_body"));
         }
+
+        private static Entity TaxReview()
+        {
+            return new Entity("al_reviewinstance", TaxReviewId)
+            {
+                ["al_outcomecaseid"] = new EntityReference("al_outcomecase", CaseId),
+                ["al_reviewtype"] = new OptionSetValue(ResponseRules.ReviewTypeTax),
+            };
+        }
+
+        private static void RouteCase(FakeOrganizationService svc, bool requiresAqs)
+        {
+            var route = svc.Seed("al_reviewroute", Guid.NewGuid(), "al_requiresaqsreview", requiresAqs);
+            svc.Row("al_outcomecase", CaseId)["al_reviewrouteid"] = route.ToEntityReference();
+        }
+
+        [Fact]
+        public void A_tax_submit_issues_nothing_while_the_aqs_check_is_still_owed()
+        {
+            var svc = Case();
+            RouteCase(svc, requiresAqs: true);
+
+            SubmitReviewPlugin.QueueSubmittedNotification(svc, Correlation, TaxReview(), TaxReviewId);
+
+            Assert.DoesNotContain(svc.Creates, c => c.LogicalName == "al_notification");
+        }
+
+        [Fact]
+        public void A_tax_only_case_still_gets_its_letter_at_the_tax_submit()
+        {
+            var svc = Case();
+            RouteCase(svc, requiresAqs: false);
+
+            SubmitReviewPlugin.QueueSubmittedNotification(svc, Correlation, TaxReview(), TaxReviewId);
+
+            Assert.Equal(
+                "Case OT-1: Tax check submitted",
+                LetterFor(svc, TaxReviewId).GetAttributeValue<string>("al_subject"));
+        }
     }
 }

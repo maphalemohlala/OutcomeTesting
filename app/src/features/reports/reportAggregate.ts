@@ -4,10 +4,7 @@ import {
   Al_outcomesal_initialoutcome,
   type Al_outcomes,
 } from '../../generated/models/Al_outcomesModel';
-import {
-  Al_remediationactionsal_actionstatus,
-  type Al_remediationactions,
-} from '../../generated/models/Al_remediationactionsModel';
+import type { Al_remediationactions } from '../../generated/models/Al_remediationactionsModel';
 import {
   REMEDIATION_THRESHOLD_WORKING_DAYS,
   remediationClock,
@@ -16,7 +13,8 @@ import {
   Al_signoffsal_signoffdecision,
   type Al_signoffs,
 } from '../../generated/models/Al_signoffsModel';
-import { remediationByCase } from '../cases/caseRemediation';
+import { isPastDue } from '../cases/caseHeaderDates';
+import { isActionCompleted, remediationByCase } from '../cases/caseRemediation';
 
 /**
  * The BR-010 aggregation, kept apart from the hook that fetches for it.
@@ -76,13 +74,6 @@ const AGEING_BANDS: { label: string; min: number; max: number }[] = [
   { label: 'Over 20 working days', min: 21, max: Infinity },
 ];
 
-function isOverdue(dueDate: string | undefined): boolean {
-  if (!dueDate) return false;
-  const due = new Date(dueDate).getTime();
-  if (Number.isNaN(due)) return false;
-  return due < Date.now();
-}
-
 /**
  * Whether this case has actually been regraded.
  *
@@ -127,12 +118,10 @@ export function aggregate(
   let overdueRemediation = 0;
 
   for (const record of actions) {
-    const status =
-      record.al_actionstatusname ?? Al_remediationactionsal_actionstatus[record.al_actionstatus];
-    if (status === 'Completed') continue;
+    if (isActionCompleted(record)) continue;
 
     openRemediation += 1;
-    if (isOverdue(record.al_duedate)) overdueRemediation += 1;
+    if (isPastDue(record.al_duedate)) overdueRemediation += 1;
 
     // The BR-010 clock is working days (OD-018). Calendar days were provisional and are
     // no longer used for remediation. The band is the period now running, because a

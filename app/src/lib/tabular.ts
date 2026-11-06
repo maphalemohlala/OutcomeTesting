@@ -4,14 +4,23 @@
  * only export what they can read (BR-012).
  */
 
+import { ukToday } from '../features/cases/caseHeaderDates';
 import { buildWorkbook, type CellValue, type Sheet } from './xlsx';
 
 export type { CellValue, Sheet } from './xlsx';
 
+/** Quotes a cell that carries a delimiter, quote or newline, and changes nothing else. */
+export function quoteCsv(text: string): string {
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/** Excel runs a text cell starting with these as a formula when it opens a CSV. */
+const FORMULA_START = /^[=+\-@\t\r]/;
+
 function csvCell(value: CellValue): string {
   if (value === null || value === undefined) return '';
-  const text = String(value);
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  if (typeof value !== 'string') return quoteCsv(String(value));
+  return quoteCsv(FORMULA_START.test(value) ? `'${value}` : value);
 }
 
 export function buildCsv(headers: string[], rows: CellValue[][]): string {
@@ -45,5 +54,5 @@ export function downloadWorkbook(filename: string, sheets: Sheet[]): void {
 
 /** `outcome-cases-2026-09-03.xlsx` — dated so successive extracts do not overwrite. */
 export function stampedFilename(stem: string, extension: string): string {
-  return `${stem}-${new Date().toISOString().slice(0, 10)}.${extension}`;
+  return `${stem}-${ukToday()}.${extension}`;
 }

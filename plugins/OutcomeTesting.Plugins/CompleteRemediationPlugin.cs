@@ -368,11 +368,14 @@ namespace OutcomeTesting.Plugins
         /// they were not told.
         /// </para>
         /// </summary>
-        private static void NotifySignoffDue(
+        public static void NotifySignoffDue(
             IOrganizationService service,
             EntityReference caseRef,
             Guid correlationId,
-            Action<string> trace)
+            Action<string> trace,
+            // A coach taking over a waiting case is told in the same round the old coach was,
+            // so their letter needs an outbox row of its own.
+            string handover = null)
         {
             try
             {
@@ -433,7 +436,9 @@ namespace OutcomeTesting.Plugins
                     letter.Subject,
                     letter.Body,
                     NotificationTemplates.SignoffDue,
-                    SignoffRound(service, caseRef.Id));
+                    handover == null
+                        ? SignoffRound(service, caseRef.Id)
+                        : SignoffRound(service, caseRef.Id) + "-" + handover);
             }
             catch (Exception error)
             {

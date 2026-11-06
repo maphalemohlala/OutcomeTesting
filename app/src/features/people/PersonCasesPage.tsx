@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
-import { OutcomeIndicator } from '../../components/status/OutcomeIndicator';
+import { OutcomeIndicator, TaxOutcomeIndicator } from '../../components/status/OutcomeIndicator';
 import { StageLabel } from '../../components/status/StageLabel';
 import { ExportMenu } from '../../components/export/ExportMenu';
 import { OUTCOMES } from '../../types/domain';
@@ -173,6 +173,8 @@ export function PersonCasesPage() {
                       <td>
                         {item.latestOutcome ? (
                           <OutcomeIndicator outcome={item.latestOutcome} />
+                        ) : item.taxOutcome ? (
+                          <TaxOutcomeIndicator outcome={item.taxOutcome} />
                         ) : (
                           'Not yet graded'
                         )}

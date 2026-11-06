@@ -21,7 +21,7 @@ import { adviceDateRefusal, dueDateRefusal } from './caseHeaderDates';
 export type CommandOutcome =
   | { kind: 'skipped' }
   | { kind: 'ok'; alreadyDone?: boolean }
-  | { kind: 'failed'; message: string };
+  | { kind: 'failed'; message: string; conflict?: boolean };
 
 /** One check's allocation attempt, named so a refusal can say which check it was. */
 export interface AllocationOutcome {
@@ -45,10 +45,10 @@ export function describeSubmit(
   fields: CommandOutcome,
   allocations: AllocationOutcome[] = [],
 ): SubmitOutcome {
-  // A refused field save stops the sequence before any allocation runs, so nothing
-  // committed and there is nothing to re-read.
+  // A refused field save stops the sequence before any allocation runs, so nothing committed.
+  // A conflict still re-reads: the save carried a stale row version, and every retry would too.
   if (fields.kind === 'failed') {
-    return { notice: null, error: fields.message, close: false, reload: false };
+    return { notice: null, error: fields.message, close: false, reload: fields.conflict === true };
   }
 
   const attempted = allocations.filter((a) => a.outcome.kind !== 'skipped');

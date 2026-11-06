@@ -232,3 +232,23 @@ describe('outcomeOf', () => {
     ).toBeNull();
   });
 });
+
+describe('an observation written as a list', () => {
+  it('is not read as issues, wherever its lines start', () => {
+    const description = [
+      'Issues found on the check:',
+      '- Q1: Fail',
+      '',
+      'The checker recorded: two gaps',
+      '- no risk profile',
+      '- no illustration',
+      '',
+      'Raised automatically when the review was submitted (Tax check: Pass with issues). Review the file.',
+    ].join('\n');
+
+    const { issues, outcome } = splitIssues(description);
+
+    expect(issues).toEqual(['Q1: Fail']);
+    expect(outcome).toBe('Tax check: Pass with issues');
+  });
+});

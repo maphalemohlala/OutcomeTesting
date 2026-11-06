@@ -1,0 +1,86 @@
+[
+ {
+  "verb": "PATCH",
+  "path": "al_notificationtemplates(al_templatecode='ALLOCATION')",
+  "body": {
+   "al_subject": "Case {{reference}}: {{check}} allocated to you - {{client}}"
+  }
+ },
+ {
+  "verb": "PATCH",
+  "path": "al_notificationtemplates(al_templatecode='REVIEW-SUBMITTED')",
+  "body": {
+   "al_subject": "Case {{reference}}: {{check}} submitted - {{client}}"
+  }
+ },
+ {
+  "verb": "PATCH",
+  "path": "al_notificationtemplates(al_templatecode='REMEDIATION-PASS-WITH-ISSUES')",
+  "body": {
+   "al_subject": "Remedial needed - Pass with issues: {{reference}} - {{client}}"
+  }
+ },
+ {
+  "verb": "PATCH",
+  "path": "al_notificationtemplates(al_templatecode='REMEDIATION-HARM')",
+  "body": {
+   "al_subject": "Remedial needed - insufficient evidence/ potential harm: {{reference}} - {{client}}"
+  }
+ },
+ {
+  "verb": "PATCH",
+  "path": "al_notificationtemplates(al_templatecode='REMEDIATION-OTHER')",
+  "body": {
+   "al_subject": "Remediation required on case {{reference}} - {{client}}"
+  }
+ },
+ {
+  "verb": "PATCH",
+  "path": "al_notificationtemplates(al_templatecode='CASE-PASSED')",
+  "body": {
+   "al_subject": "Case check - Pass: {{reference}} - {{client}}"
+  }
+ },
+ {
+  "verb": "PATCH",
+  "path": "al_notificationtemplates(al_templatecode='SIGNOFF-APPROVED-RECHECK')",
+  "body": {
+   "al_subject": "Remediation approved on case {{reference}} - {{client}}"
+  }
+ },
+ {
+  "verb": "PATCH",
+  "path": "al_notificationtemplates(al_templatecode='SIGNOFF-APPROVED-CLOSED')",
+  "body": {
+   "al_subject": "Remediation approved on case {{reference}} - {{client}}"
+  }
+ },
+ {
+  "verb": "PATCH",
+  "path": "al_notificationtemplates(al_templatecode='SIGNOFF-REJECTED')",
+  "body": {
+   "al_subject": "Remediation sent back on case {{reference}} - {{client}}"
+  }
+ },
+ {
+  "verb": "PATCH",
+  "path": "al_notificationtemplates(al_templatecode='RECHECK-DUE')",
+  "body": {
+   "al_subject": "Case {{reference}} is waiting for its final outcome - {{client}}"
+  }
+ },
+ {
+  "verb": "PATCH",
+  "path": "al_notificationtemplates(al_templatecode='SIGNOFF-DUE')",
+  "body": {
+   "al_subject": "Sign-off needed on case {{reference}} - {{client}}"
+  }
+ },
+ {
+  "verb": "PATCH",
+  "path": "al_notificationtemplates(al_templatecode='ALLOCATION-NO-LINK')",
+  "body": {
+   "al_subject": "Case {{reference}}: {{check}} allocated to you - {{client}}"
+  }
+ }
+]

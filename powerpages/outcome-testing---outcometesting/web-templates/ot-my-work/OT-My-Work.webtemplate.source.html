@@ -164,6 +164,8 @@
     <attribute name="al_submittedon" />
     <filter type="and">
       <condition attribute="al_assignedcontactid" operator="eq" value="{{ me | xml_escape }}" />
+      {% comment %}A removed case is out of checking, so its review is nobody's work.{% endcomment %}
+      <condition entityname="case" attribute="al_casestatus" operator="ne" value="120910592" />
       {% if f_check == 'tax' %}<condition attribute="al_reviewtype" operator="eq" value="120910200" />{% endif %}
       {% if f_check == 'aqs' %}<condition attribute="al_reviewtype" operator="eq" value="120910201" />{% endif %}
       {% if f_state == 'open' %}<condition attribute="al_submittedon" operator="null" />{% endif %}

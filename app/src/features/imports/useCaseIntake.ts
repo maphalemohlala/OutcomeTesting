@@ -1,3 +1,4 @@
+import { date } from '../../lib/format';
 import { useEffect, useState } from 'react';
 import { Al_importbatchesService, Al_importexceptionsService } from '../../generated';
 import { lookupLabel } from '../cases/lookupLabel';
@@ -9,6 +10,7 @@ import {
   Al_importexceptionsal_exceptionstatus,
   type Al_importexceptions,
 } from '../../generated/models/Al_importexceptionsModel';
+import { readAll } from '../../services/readAll';
 
 export interface BatchSummary {
   id: string;
@@ -47,12 +49,6 @@ export interface IntakeView {
   reload: () => void;
 }
 
-function formatDate(value: string | undefined): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString();
-}
-
 function toBatch(record: Al_importbatches): BatchSummary {
   return {
     id: record.al_importbatchid,
@@ -60,7 +56,7 @@ function toBatch(record: Al_importbatches): BatchSummary {
     name: record.al_name,
     source: record.al_source,
     status: Al_importbatchesal_batchstatus[record.al_batchstatus] ?? 'Unknown',
-    importedOn: formatDate(record.al_importedon),
+    importedOn: date(record.al_importedon),
     totalRows: record.al_totalrows ?? null,
     importedCount: record.al_importedcount ?? null,
     exceptionCount: record.al_exceptioncount ?? null,
@@ -77,7 +73,7 @@ function toException(record: Al_importexceptions): ExceptionSummary {
     caseReference: record.al_casereference ?? null,
     reason: record.al_reason,
     status,
-    resolvedOn: formatDate(record.al_resolvedon),
+    resolvedOn: date(record.al_resolvedon),
     resolutionNote: record.al_resolutionnote ?? null,
     // Read from the label rather than the raw option value, so an unrecognised status
     // reads as not-open and the screen offers no action it cannot complete.
@@ -97,8 +93,8 @@ export function useCaseIntake(): IntakeView {
     let cancelled = false;
 
     Promise.all([
-      Al_importbatchesService.getAll({ orderBy: ['createdon desc'], top: 200 }),
-      Al_importexceptionsService.getAll({ orderBy: ['al_rownumber asc'], top: 500 }),
+      readAll((o) => Al_importbatchesService.getAll(o), { orderBy: ['createdon desc', 'al_importbatchid asc'] }),
+      readAll((o) => Al_importexceptionsService.getAll(o), { orderBy: ['al_rownumber asc', 'al_importexceptionid asc'] }),
     ])
       .then(([batchResult, exceptionResult]) => {
         if (cancelled) return;
