@@ -182,7 +182,7 @@ function DashboardBody({ data, filters }: { data: DashboardData; filters: Report
 
   // Every case the caller can see, open or closed: the whole the outcome and stage bars
   // are drawn against, so a stage's bar and an outcome's bar are on the same scale.
-  const totalCases = data.completedTotal + data.ungraded;
+  const totalCases = data.totalCases;
   const closed = data.byStatus.find((entry) => entry.status === 'Closed')?.count ?? 0;
 
   return (
@@ -272,11 +272,11 @@ function DashboardBody({ data, filters }: { data: DashboardData; filters: Report
                   className="dashboard__spine"
                   data-tone={data.remediationOpen > 0 ? 'active' : undefined}
                 >
-                  Open actions
+                  Open remediations
                 </span>
               }
               count={data.remediationOpen}
-              to={cases('/cases?status=Awaiting+Remediation')}
+              to={cases('/cases?remediation=open')}
             />
             <LedgerRow
               label={

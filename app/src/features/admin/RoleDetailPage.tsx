@@ -261,7 +261,8 @@ export function RoleDetailPage() {
     setRoleBusy(true);
     setRoleNotice(null);
 
-    const token = `role:${role.id}`;
+    // The values are in the token: a retry of the SAME save replays, an edited one must not.
+    const token = `role:${role.id}:${roleName.trim()}:${roleDesc.trim()}`;
     const result = await updateRole({
       roleId: role.id,
       roleName: roleName.trim(),
@@ -367,7 +368,7 @@ export function RoleDetailPage() {
         <section className="security__panel" aria-labelledby="grants-heading">
           <div className="security__panel-bar">
             <h2 id="grants-heading">What this role grants</h2>
-            {canManage ? (
+            {canManage && role.active ? (
               <button
                 type="button"
                 className="security__btn"
@@ -391,7 +392,7 @@ export function RoleDetailPage() {
 
           {loading ? (
             <p role="status">Loading permissions…</p>
-          ) : grants.length === 0 ? (
+          ) : config.status === 'unavailable' ? null : grants.length === 0 ? (
             <p>
               This role grants nothing. No permission rule is stored for it, and the built-in
               defaults do not apply once any rule exists.
@@ -417,14 +418,16 @@ export function RoleDetailPage() {
                     <td>{grant.source}</td>
                     {canManage ? (
                       <td className="security__row-actions">
-                        <button
-                          type="button"
-                          className="security__link-btn"
-                          onClick={() => openPermission(grant)}
-                          disabled={rowBusy !== null}
-                        >
-                          Change level
-                        </button>
+                        {role.active ? (
+                          <button
+                            type="button"
+                            className="security__link-btn"
+                            onClick={() => openPermission(grant)}
+                            disabled={rowBusy !== null}
+                          >
+                            Change level
+                          </button>
+                        ) : null}
                         {grant.overrideId ? (
                           <button
                             type="button"
@@ -447,7 +450,7 @@ export function RoleDetailPage() {
         <section className="security__panel" aria-labelledby="holders-heading">
           <div className="security__panel-bar">
             <h2 id="holders-heading">Who holds this role</h2>
-            {canManage ? (
+            {canManage && role.active ? (
               <button
                 type="button"
                 className="security__btn"
@@ -498,7 +501,7 @@ export function RoleDetailPage() {
                   const state = classifyHolder(holder);
                   return (
                     <tr
-                      key={holder.email}
+                      key={holder.email || holder.mappingId || holder.name}
                       data-inactive={state.state === 'consistent' && !holder.mappingActive ? 'true' : undefined}
                     >
                       <td>{holder.name ?? '—'}</td>
@@ -506,7 +509,7 @@ export function RoleDetailPage() {
                       <td>{state.label}</td>
                       {canManage ? (
                         <td className="security__row-actions">
-                          {state.canAdopt ? (
+                          {state.canAdopt && role.active ? (
                             <button
                               type="button"
                               className="security__link-btn"

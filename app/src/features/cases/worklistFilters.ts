@@ -1,3 +1,4 @@
+import { ukDayOf } from './caseHeaderDates';
 import type { CaseSummary } from './caseWorklistMapping';
 import { isEmail } from './casePeople';
 import {
@@ -39,7 +40,8 @@ export const EMPTY_FILTERS = Object.fromEntries(FILTER_KEYS.map((key) => [key, '
 export function withinRange(createdOn: string | null, from: string, to: string): boolean {
   if (!from && !to) return true;
   if (!createdOn) return false;
-  const created = createdOn.slice(0, 10);
+  const created = ukDayOf(createdOn);
+  if (!created) return false;
   if (from && created < from) return false;
   if (to && created > to) return false;
   return true;
@@ -47,6 +49,10 @@ export function withinRange(createdOn: string | null, from: string, to: string):
 
 function matchesPerson(item: CaseSummary, person: string, contactEmails: ContactEmails): boolean {
   const target = person.trim().toLowerCase();
+  // A bookmark from before people were keyed by identity holds a bare name.
+  if (!isIdentityKey(person)) {
+    return positions(item).some((position) => (position.name ?? '').trim().toLowerCase() === target);
+  }
   // Every position, so a search finds the case whichever one that person holds (item 2,
   // 2026-09-19). Searching one column used to miss the others.
   return positions(item).some((position) => identityOf(position, contactEmails) === target);
@@ -102,7 +108,10 @@ export function applyFilters(
 ): CaseSummary[] {
   const search = filters.q.trim().toLowerCase();
   return cases.filter((item) => {
-    if (filters.status && item.status !== filters.status) return false;
+    // A removed case stays out of the list until someone filters to its status.
+    if (filters.status ? item.status !== filters.status : item.status === 'No Check Required') {
+      return false;
+    }
     if (filters.route === 'none' && item.route) return false;
     if (filters.route && filters.route !== 'none' && item.route !== filters.route) {
       return false;

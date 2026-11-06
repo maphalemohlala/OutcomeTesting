@@ -201,7 +201,7 @@ export function questionHistory(
     // is dated out as well, but that is the edit above, not a retirement.
     const retirement = retiredBy.get(key(version.al_questionversionid));
     const isLast = index === ordered.length - 1;
-    if (retirement || (isLast && version.al_effectiveto)) {
+    if (isLast && (retirement || version.al_effectiveto)) {
       const until = day(retirement?.al_details) || day(version.al_effectiveto);
       entries.push({
         id: `${version.al_questionversionid}:retired`,

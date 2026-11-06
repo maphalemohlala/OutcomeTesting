@@ -138,6 +138,7 @@ namespace OutcomeTesting.Plugins
                     "<attribute name='" + AuthenticatedAttr + "'/>" +
                     "<attribute name='" + AnonymousAttr + "'/>" +
                     "<attribute name='" + WebsiteAttr + "'/>" +
+                    "<attribute name='statecode'/>" +
                     "<filter><condition attribute='" + NameAttr + "' operator='eq' value='" +
                       System.Security.SecurityElement.Escape(roleName) + "'/></filter>" +
                   "</entity>" +
@@ -250,6 +251,16 @@ namespace OutcomeTesting.Plugins
 
             var found = service.RetrieveMultiple(new FetchExpression(fetch)).Entities;
             return found.Count == 0 ? null : found[0];
+        }
+
+        /// <summary>
+        /// Whether a role found by <see cref="FindByName"/> can still be granted. FindByName
+        /// keeps returning retired roles, because disassociating one still has to find it.
+        /// </summary>
+        public static bool IsActive(Entity role)
+        {
+            var state = role.GetAttributeValue<OptionSetValue>("statecode");
+            return state == null || state.Value == 0;
         }
 
         /// <summary>The website every web role belongs to, taken from any existing role.</summary>

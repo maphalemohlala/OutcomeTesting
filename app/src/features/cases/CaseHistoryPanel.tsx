@@ -5,8 +5,8 @@ import './CaseHistoryPanel.css';
  * Read-only audit trail for one case (FR-033). Audit Events are immutable (BR-012), so this
  * screen never offers an edit or delete affordance.
  */
-export function CaseHistoryPanel({ caseId }: { caseId: string }) {
-  const state = useCaseHistory(caseId);
+export function CaseHistoryPanel({ caseId, reloadKey }: { caseId: string; reloadKey: number }) {
+  const state = useCaseHistory(caseId, reloadKey);
 
   if (state.status === 'loading') {
     return <p role="status">Loading history…</p>;

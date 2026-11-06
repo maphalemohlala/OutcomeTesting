@@ -85,17 +85,16 @@ export function RecheckPage() {
       .then((result) => {
         setSaving(false);
         if (!result.ok) {
+          if (result.kind === 'conflict') {
+            // The row moved under us. Reload rather than retry: the grade on screen is no
+            // longer the grade being corrected, so a resubmit would act on a stale reading.
+            setFailure(
+              'Someone else changed this outcome while you were working. Nothing has been changed — the current grade is shown below.',
+            );
+            setReloadKey((key) => key + 1);
+            return;
+          }
           setFailure(messageForFailure(result));
-          return;
-        }
-
-        if (result.data.Conflict) {
-          // The row moved under us. Reload rather than retry: the grade on screen is no
-          // longer the grade being corrected, so a resubmit would act on a stale reading.
-          setFailure(
-            'Someone else changed this outcome while you were working. Nothing has been changed — the current grade is shown below.',
-          );
-          setReloadKey((key) => key + 1);
           return;
         }
 

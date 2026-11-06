@@ -1,4 +1,4 @@
-import { inForceOn } from '../../lib/effectiveWindow';
+import { inForceOn, notStarted } from '../../lib/effectiveWindow';
 
 /**
  * The case-header lists whose options are stored as ROWS rather than as picklist metadata,
@@ -207,6 +207,8 @@ export interface ListOptionRow {
   effectiveTo: string | null;
   /** Out of force on the day asked about: shown in the management table, never offered. */
   retired: boolean;
+  /** The day a not-yet-started option begins, or null. It reads as retired to a picker. */
+  startsOn: string | null;
 }
 
 /**
@@ -246,8 +248,14 @@ export function toOptionRows(
       effectiveFrom: row.al_effectivefrom ?? null,
       effectiveTo: row.al_effectiveto ?? null,
       retired: !inForceOn(row.al_effectivefrom, row.al_effectiveto, asOf),
+      startsOn: notStarted(row.al_effectivefrom, asOf) ? (row.al_effectivefrom ?? null) : null,
     }))
     .sort(byOrderThenLabel);
+}
+
+/** Whether deleting can be left to Dataverse: a Restrict lookup is the only thing that refuses. */
+export function optionCanBeDeleted(list: ManagedList, row: ListOptionRow): boolean {
+  return list.caseAttribute !== null && row.legacyValue === null;
 }
 
 /** The options a picker offers: in force, in order. */

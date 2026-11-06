@@ -19,6 +19,26 @@
   color: var(--colour-text-inverse);
 }
 
+.shell__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The logo is dark teal for the portal's white header, so it needs a white plate here. */
+.shell__logo {
+  display: flex;
+  padding: 3px var(--space-2);
+  background: var(--brand-white);
+  border-radius: var(--radius);
+}
+
+.shell__logo svg {
+  display: block;
+  width: auto;
+  height: 32px;
+}
+
 .shell__product {
   font-family: var(--font-heading);
   font-size: var(--text-lg);

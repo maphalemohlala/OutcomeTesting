@@ -253,6 +253,7 @@ describe('the attachment marker', () => {
       'notes',
       'grading',
       'finalOutcome',
+      'client',
     ]);
   });
 

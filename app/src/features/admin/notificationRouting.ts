@@ -120,6 +120,7 @@ export const ALWAYS_ALLOWED_TOKENS: readonly string[] = [
   'grading',
   'finalOutcome',
   'notes',
+  'client',
 ];
 
 /** A letter's own tokens plus the ones every letter may use, for the picker. */

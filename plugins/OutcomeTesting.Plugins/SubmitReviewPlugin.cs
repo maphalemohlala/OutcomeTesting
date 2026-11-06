@@ -261,6 +261,12 @@ namespace OutcomeTesting.Plugins
         /// given a licence, a web role or any operational access to the case itself.
         ///
         /// The para-planner's stored email (AD-228).
+        ///
+        /// Held on a Tax submit while AQS is still owed (client, 2026-11-06): the letter
+        /// carries the checks, and a para-planner who had them early could amend the report
+        /// before or during the AQS review. The AQS submit's letter attaches every submitted
+        /// check on the case, so the Tax check goes out with it. A Tax-only case owes no AQS
+        /// and is told here.
         /// </summary>
         public static void QueueSubmittedNotification(
             IOrganizationService service,
@@ -269,6 +275,13 @@ namespace OutcomeTesting.Plugins
             Guid reviewId)
         {
             var caseRef = review.GetAttributeValue<EntityReference>("al_outcomecaseid");
+            if (CommandHelpers.ReviewTypeOf(review) == ResponseRules.ReviewTypeTax
+                && caseRef != null
+                && AqsStillOwed(service, caseRef.Id))
+            {
+                return;
+            }
+
             var reference = NotificationOutbox.CaseReference(service, caseRef) ?? "a case";
 
             var submitted = NotificationTemplates.Render(
@@ -278,8 +291,8 @@ namespace OutcomeTesting.Plugins
                 {
                     { NotificationTemplates.TokenReference, reference },
                     {
-                        // A Tax-then-AQS case is submitted once per check, to the same
-                        // para-planner; without the check named the second reads as a duplicate.
+                        // Which check this letter closes: a Tax-only case's, or the AQS one
+                        // that releases a Tax-then-AQS case.
                         NotificationTemplates.TokenCheck,
                         NotificationOutbox.CheckName(CommandHelpers.ReviewTypeOf(review))
                     },

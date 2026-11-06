@@ -8,6 +8,7 @@ import { heldOptionLabels, listByKey } from '../admin/listOptions';
 import { logTechnical } from '../../services/errors';
 import { toDetail } from './caseDetailMapping';
 import type { CaseDetail } from './caseDetailMapping';
+import { readAll } from '../../services/readAll';
 
 export type { CaseDetail, CaseEditValues } from './caseDetailMapping';
 
@@ -58,7 +59,7 @@ export function useCaseDetail(caseId: string | undefined, reloadKey = 0): CaseDe
       // The catalogue, to turn those ids into the names the header shows. A handful of rows
       // shared by all five lists, and read alongside rather than after so a case opens in
       // one round trip rather than two.
-      Al_listoptionsService.getAll({ top: 500 }).catch((error) => {
+      readAll((o) => Al_listoptionsService.getAll(o), { orderBy: ['al_listoptionid asc'] }).catch((error) => {
         logTechnical('case product names load', error);
         return { success: false as const, data: undefined };
       }),
@@ -87,7 +88,10 @@ export function useCaseDetail(caseId: string | undefined, reloadKey = 0): CaseDe
             ? heldOptionLabels(catalogue.data, products, productIds, new Date())
             : [];
 
-        setState({ status: 'ready', detail: toDetail(result.data, productIds, productNames) });
+        setState({
+          status: 'ready',
+          detail: toDetail(result.data, productIds, productNames, productResult.success),
+        });
       })
       .catch((error) => {
         if (cancelled) return;

@@ -141,18 +141,14 @@ namespace OutcomeTesting.Plugins
 
         public static string Describe(string reason, string observation, IList<string> items)
         {
-            var text = "Raised automatically when the review was submitted"
+            var sentence = "Raised automatically when the review was submitted"
                 + (string.IsNullOrWhiteSpace(reason) ? string.Empty : " (" + reason.Trim() + ")")
                 + ". Review the file and record what you have put right.";
 
-            if (!string.IsNullOrWhiteSpace(observation))
-            {
-                text = "The checker recorded: " + observation.Trim() + Environment.NewLine + Environment.NewLine + text;
-            }
-
+            var issues = string.Empty;
             if (items != null && items.Count > 0)
             {
-                var issues = IssuesHeading;
+                issues = IssuesHeading;
                 foreach (var item in items)
                 {
                     if (!string.IsNullOrWhiteSpace(item))
@@ -161,9 +157,25 @@ namespace OutcomeTesting.Plugins
                     }
                 }
 
-                text = issues + Environment.NewLine + Environment.NewLine + text;
+                issues += Environment.NewLine + Environment.NewLine;
             }
 
+            // The observation is what gives way to the length limit. The sentence carries the
+            // outcome the renderers read back, so cutting from the end would lose it.
+            var note = string.Empty;
+            if (!string.IsNullOrWhiteSpace(observation))
+            {
+                const string lead = "The checker recorded: ";
+                var gap = Environment.NewLine + Environment.NewLine;
+                var room = DescriptionMaxLength - issues.Length - sentence.Length - lead.Length - gap.Length;
+                var words = observation.Trim();
+                if (room > 0)
+                {
+                    note = lead + (words.Length <= room ? words : words.Substring(0, room)) + gap;
+                }
+            }
+
+            var text = issues + note + sentence;
             return text.Length <= DescriptionMaxLength ? text : text.Substring(0, DescriptionMaxLength);
         }
 

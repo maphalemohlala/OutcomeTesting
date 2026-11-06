@@ -8,6 +8,7 @@ import { classify } from '../../services/commands/failures';
 import { UserPicker } from '../../components/form/UserPicker';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { updateCaseDetails } from '../../services/commands/updateCaseDetails';
+import { CaseRemoveAction } from './CaseRemoveAction';
 import { assignCase } from '../../services/commands/assignCase';
 import {
   describeSubmit,
@@ -195,6 +196,8 @@ function toOptions(map: Record<number, string>): { value: number; label: string 
 
 interface Props {
   detail: CaseDetail;
+  /** Moves after any save, so the checks shown here follow an allocation. */
+  reloadKey: number;
   onSaved: () => void;
 }
 
@@ -292,7 +295,7 @@ function TickSet({
     </div>
   );
 }
-export function CaseEditPanel({ detail, onSaved }: Props) {
+export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
   const { can, roles } = usePermissions();
   const product = useProductName();
   const [open, setOpen] = useState(false);
@@ -322,7 +325,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
   // fields the extract does not carry. An affordance, not a boundary - al_UpdateCaseDetails
   // re-checks case.duedate and refuses the write (AD-041).
   const mayMoveDueDate = can('case.duedate', 'Edit');
-  const reviews = useCaseReviews(detail.id);
+  const reviews = useCaseReviews(detail.id, reloadKey);
   const directory = useUserDirectory();
 
   const allReviews = reviews.status === 'ready' ? reviews.reviews : [];
@@ -366,7 +369,13 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
   const nextOwed = nextOwedDiscipline(owed, stateOf);
 
   const chosen = (Object.entries(checkerBy) as [Discipline, string][]).filter(
-    ([discipline, email]) => email && owed.includes(discipline),
+    // Only a choice the form still offers. One left behind when the route changed would go out
+    // with no review named, and the server would put it on whichever check is open.
+    ([discipline, email]) =>
+      email &&
+      owed.includes(discipline) &&
+      inScope.includes(discipline) &&
+      isAllocatable(discipline, stateOf(discipline), nextOwed),
   );
 
   const candidates = directory.status === 'ready' ? directory.users.filter((u) => u.active) : [];
@@ -399,7 +408,9 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
     lists.set(
       'al_casestatus',
       toOptions(Al_outcomecasesal_casestatus).filter((option) =>
-        reachable.includes(option.label as CaseStatus),
+        // Removing a case needs a reason, so it has its own action rather than this list.
+        reachable.includes(option.label as CaseStatus) &&
+        (option.label !== 'No Check Required' || detail.status === 'No Check Required'),
       ),
     );
 
@@ -440,17 +451,25 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
   async function saveFields(changed: Record<string, string>): Promise<CommandOutcome> {
     if (Object.keys(changed).length === 0) return { kind: 'skipped' };
 
+    // The values are in the token: a retry of the SAME save replays, an edited one must not.
+    const token = `${detail.id}:${reason.trim()}:${JSON.stringify(changed)}`;
     const result = await updateCaseDetails({
       caseId: detail.id,
       fields: changed,
       reason: reason.trim(),
       expectedRowVersion: detail.rowVersion,
-      idempotencyKey: intent.keyFor(detail.id),
+      idempotencyKey: intent.keyFor(token),
     });
 
-    if (!result.ok) return { kind: 'failed', message: messageForFailure(result) };
+    if (!result.ok) {
+      return {
+        kind: 'failed',
+        message: messageForFailure(result),
+        conflict: result.kind === 'conflict',
+      };
+    }
 
-    intent.release(detail.id);
+    intent.release(token);
     return { kind: 'ok' };
   }
 
@@ -607,6 +626,11 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
       >
         <span id={`${inputId}-label`}>{field.label}</span>
         {field.kind === 'listoptionset' ? (
+          !detail.productsKnown && field.attr === 'al_productids' ? (
+            <p className="case-edit__help">
+              This case&apos;s products could not be read, so they cannot be changed right now.
+            </p>
+          ) : (
           <TickSet
             labelledBy={`${inputId}-label`}
             label={field.label}
@@ -619,6 +643,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
               setField(field.attr, field.kind, toggleValue(chosen, id, on))
             }
           />
+          )
         ) : field.kind === 'listoption' ? (
           <select
             id={inputId}
@@ -716,14 +741,17 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
     <section className="case-edit" aria-labelledby="case-edit-heading">
       <div className="case-edit__bar">
         <h2 id="case-edit-heading">Case management</h2>
-        <button type="button" className="case-edit__save" onClick={openForm}>
-          Edit case details
-        </button>
+        <div className="case-edit__bar-actions">
+          <CaseRemoveAction detail={detail} onRemoved={onSaved} />
+          <button type="button" className="case-edit__save" onClick={openForm}>
+            Edit case details
+          </button>
+        </div>
       </div>
       {panelNotice ? <Notice tone="success">{panelNotice}</Notice> : null}
 
       {open ? (
-        <Modal title="Edit case details" onClose={() => setOpen(false)}>
+        <Modal title="Edit case details" onClose={() => { if (!saving) setOpen(false); }}>
           <p className="case-edit__intro">
             Amend any case field, and allocate a check to a named checker. Only the fields
             you change are saved, each recorded in the audit history with the change itself
@@ -760,7 +788,14 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
                   </p>
                 ) : null}
 
-                {owed.length === 0 ? (
+                {reviews.status === 'unavailable' ? (
+                  <p className="case-edit__help" role="status">
+                    This case&apos;s checks could not be read, so nothing can be allocated right
+                    now. Your other changes can still be saved.
+                  </p>
+                ) : null}
+
+                {reviews.status === 'ready' && owed.length === 0 ? (
                   <p className="case-edit__help">
                     This case has no review route yet, so it owes no checks. Answer
                     <strong> Tax check required</strong> above and the checks it owes appear
@@ -769,7 +804,7 @@ export function CaseEditPanel({ detail, onSaved }: Props) {
                 ) : null}
 
                 <div className="case-edit__grid">
-                  {owed.map((discipline) => {
+                  {(reviews.status === 'ready' ? owed : []).map((discipline) => {
                     const review = reviewFor(discipline);
                     const inputId = `case-edit-checker-${discipline}`;
                     const held = review?.owner ?? 'Unassigned';

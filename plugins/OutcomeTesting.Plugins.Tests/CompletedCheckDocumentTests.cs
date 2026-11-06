@@ -654,7 +654,7 @@ namespace OutcomeTesting.Plugins.Tests
             Remediation.AssignOpenActions(service, Ref(), Guid.NewGuid());
 
             var copy = LetterTo(service, ParaplannerEmail);
-            Assert.Equal("Checks and remedial points: 300000006", copy.GetAttributeValue<string>("al_subject"));
+            Assert.Equal("Checks and remedial points: 300000006 - Test Client 6", copy.GetAttributeValue<string>("al_subject"));
             Assert.Equal("The checks and remedial points for case 300000006 are attached.", copy.GetAttributeValue<string>("al_body"));
             Assert.Equal(Checks, copy.GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
 

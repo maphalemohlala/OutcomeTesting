@@ -244,7 +244,7 @@ export function buildDirectory(
       }
 
       if (item.latestOutcome) person.outcomes[item.latestOutcome] += 1;
-      else person.notGraded += 1;
+      else if (!item.taxOutcome) person.notGraded += 1;
 
       people.set(key, person);
     }
@@ -310,6 +310,10 @@ export function caseloadByIdentity(
 
   for (const item of cases) {
     for (const position of positions(item)) {
+      // Whoever uploaded the case. The record holds only a name, which cannot be joined to
+      // the directory, and uploading is not caseload.
+      if (position.role === 'Owner') continue;
+
       const key = identityOf(position, contactEmails);
       if (key === 'name:') continue;
 
@@ -346,7 +350,7 @@ export function caseloadByIdentity(
         }
 
         if (item.latestOutcome) load.outcomes[item.latestOutcome] += 1;
-        else load.notGraded += 1;
+        else if (!item.taxOutcome) load.notGraded += 1;
       }
 
       loads.set(key, load);

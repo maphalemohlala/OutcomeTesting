@@ -1,3 +1,4 @@
+import { ukDayOf } from './caseHeaderDates';
 import type { CellValue } from '../../lib/tabular';
 import { ADVICE_DATE_LABEL } from './caseHeaderDates';
 import { UPLOADED_BY_LABEL } from '../../types/domain';
@@ -40,6 +41,11 @@ function day(iso: string | null): string {
   return iso ? iso.slice(0, 10) : '';
 }
 
+/** A timestamp's UK day, so an export agrees with the date filter that chose the row. */
+function ukDate(iso: string | null): string {
+  return iso ? (ukDayOf(iso) ?? '') : '';
+}
+
 export function caseExportRow(item: CaseSummary): CellValue[] {
   return [
     item.caseReference,
@@ -60,12 +66,12 @@ export function caseExportRow(item: CaseSummary): CellValue[] {
     day(item.adviceDate),
     day(item.checkDate),
     item.preOrPostCheck ?? '',
-    day(item.createdOn),
+    ukDate(item.createdOn),
     day(item.dueDate),
     item.ageInDays,
     item.initialOutcome ?? '',
     item.finalOutcome ?? '',
-    day(item.finalisedOn),
+    ukDate(item.finalisedOn),
   ];
 }
 
@@ -108,8 +114,8 @@ export function completedCaseRow(item: CaseSummary): CellValue[] {
     item.preOrPostCheck ?? '',
     item.initialOutcome ?? '',
     item.finalOutcome ?? '',
-    item.latestOutcome ?? '',
-    day(item.finalisedOn),
+    item.latestOutcome ?? item.taxOutcome ?? '',
+    ukDate(item.finalisedOn),
     item.status,
   ];
 }

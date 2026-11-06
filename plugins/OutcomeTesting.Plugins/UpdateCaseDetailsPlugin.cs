@@ -90,7 +90,8 @@ namespace OutcomeTesting.Plugins
             // the event says so plainly instead of holding an empty string that reads as though
             // the column failed to save.
             var reason = CommandHelpers.GetOptionalString(context, InReason);
-            if (string.IsNullOrWhiteSpace(reason))
+            var reasonGiven = !string.IsNullOrWhiteSpace(reason);
+            if (!reasonGiven)
             {
                 reason = "(no reason given)";
             }
@@ -185,6 +186,8 @@ namespace OutcomeTesting.Plugins
             // have been applied is what stops either route writing an impossible status.
             EnsureLifecycleTransition(before, update);
 
+            EnsureRemovalReason(update, reasonGiven);
+
             if (changes.Count == 0)
             {
                 throw new InvalidPluginExecutionException(
@@ -236,6 +239,8 @@ namespace OutcomeTesting.Plugins
             // satisfies both. The system service, because releasing the prior assignment and
             // moving the case are the command's consequences rather than the caller's edit.
             RequeueAfterRouteChange(systemService, before, update, changes);
+
+            ReleaseIfRemoved(systemService, targetId, update, changes);
 
             // Remediation and the adviser's access follow the adviser EMAIL (AD-228), so a new
             // email takes the open actions with it - to the contact holding it, or to nobody
@@ -687,6 +692,40 @@ namespace OutcomeTesting.Plugins
             throw new InvalidPluginExecutionException(
                 CommandHelpers.ValidationPrefix + label + " is not one of the values this field accepts"
                 + (accepted == null ? "." : ": " + accepted + "."));
+        }
+
+        /// <summary>
+        /// Whether this save takes the case out of checking. Hard deletion is not permitted
+        /// (AD-037), so "delete a case added in error" is this move, and it must say why.
+        /// </summary>
+        public static bool RemovesCase(Entity update)
+        {
+            var status = update.GetAttributeValue<OptionSetValue>(StatusAttr);
+            return status != null && status.Value == CaseLifecycle.NoCheckRequired;
+        }
+
+        /// <summary>Refuses a removal that does not say why.</summary>
+        public static void EnsureRemovalReason(Entity update, bool reasonGiven)
+        {
+            if (RemovesCase(update) && !reasonGiven)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.ValidationPrefix + "Give a reason for removing this case.");
+            }
+        }
+
+        /// <summary>
+        /// A removed case is out of checking, so nobody may go on holding it. The assignment
+        /// row is kept, as every released one is (AD-037).
+        /// </summary>
+        public static void ReleaseIfRemoved(
+            IOrganizationService service, Guid caseId, Entity update, List<string> changes)
+        {
+            if (RemovesCase(update))
+            {
+                AssignCasePlugin.ReleasePriorAssignments(service, caseId);
+                changes.Add("Allocation released: the case was removed from checking");
+            }
         }
 
         private static void EnsureLifecycleTransition(Entity before, Entity update)

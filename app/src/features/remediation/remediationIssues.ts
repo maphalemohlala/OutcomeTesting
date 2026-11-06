@@ -70,6 +70,10 @@ export function splitIssues(description: string | null | undefined): Remediation
   for (const raw of (description ?? '').split(/\r?\n/)) {
     const line = raw.trim();
 
+    // The items come first. The observation below them is free text, so a line of it that
+    // happens to start "- " is not an issue.
+    if (line.startsWith('The checker recorded:') || line.startsWith('Raised automatically')) break;
+
     if (line.startsWith('- ')) {
       const item = line.slice(2).trim();
       if (item) {

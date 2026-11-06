@@ -261,7 +261,7 @@ export function RemediationFormBlock({
                 {signoff.label}
                 <span className="remediation__form-note"> ({signoff.note})</span>
               </th>
-              <td>{signoff.on ?? signoff.by ?? '—'}</td>
+              <td>{signoff.by ?? signoff.on ?? '—'}</td>
             </tr>
           ))}
         </tbody>
@@ -278,7 +278,12 @@ export function RemediationPage() {
   // stays at zero because nothing here changes what it reads.
   const state = useRemediation(caseId, 0);
 
-  const allActions = useMemo(() => (state.status === 'ready' ? state.actions : []), [state]);
+  // Active only, as the case page and the emailed form read them: a deactivated action with
+  // no sign-off would otherwise keep "all approved" from ever being Yes.
+  const allActions = useMemo(
+    () => (state.status === 'ready' ? state.actions.filter((action) => action.active) : []),
+    [state],
+  );
   // The outcome the remediation was raised for. Read across every action rather than the
   // filtered set: it is the case's, so narrowing the table by status must not change it.
   const outcome = useMemo(() => outcomeOf(allActions), [allActions]);

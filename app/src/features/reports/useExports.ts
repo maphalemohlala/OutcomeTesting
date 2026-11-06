@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Al_exportbatchesService, Al_exportrecordsService } from '../../generated';
 import { Al_exportbatchesal_batchstatus } from '../../generated/models/Al_exportbatchesModel';
 import { choiceLabel } from '../../lib/choiceLabel';
+import { isRecordId } from '../../services/odata';
+import { readAll } from '../../services/readAll';
 import { toExportRecordRow, type ExportRecordRow } from './exportRecordRow';
 
 export type { ExportRecordRow } from './exportRecordRow';
@@ -15,49 +17,48 @@ export interface ExportBatchRow {
   rowCount: number;
 }
 
-export type ExportsState =
+type Loaded<T> =
   | { status: 'loading' }
   | { status: 'unavailable'; reason: string }
-  | { status: 'ready'; batches: ExportBatchRow[]; records: ExportRecordRow[] };
+  | ({ status: 'ready' } & T);
 
-export function useExports(reloadKey: number): ExportsState {
-  const [state, setState] = useState<ExportsState>({ status: 'loading' });
+export type ExportBatchesState = Loaded<{ batches: ExportBatchRow[] }>;
+export type ExportRecordsState = Loaded<{ records: ExportRecordRow[] }>;
+
+const UNAVAILABLE = 'Exports could not be loaded from Dataverse.';
+
+export function useExportBatches(reloadKey: number): ExportBatchesState {
+  const [state, setState] = useState<ExportBatchesState>({ status: 'loading' });
 
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([
-      Al_exportbatchesService.getAll({ orderBy: ['createdon desc'], top: 200 }),
-      Al_exportrecordsService.getAll({ orderBy: ['createdon desc'], top: 5000 }),
-    ])
-      .then(([batchResult, recordResult]) => {
+    readAll((o) => Al_exportbatchesService.getAll(o), { orderBy: ['createdon desc', 'al_exportbatchid asc'] })
+      .then((result) => {
         if (cancelled) return;
-        if (!batchResult.success || !recordResult.success) {
-          setState({ status: 'unavailable', reason: 'Exports could not be loaded from Dataverse.' });
+        if (!result.success) {
+          setState({ status: 'unavailable', reason: UNAVAILABLE });
           return;
         }
 
-        const batches: ExportBatchRow[] = batchResult.data.map((b) => ({
-          id: b.al_exportbatchid,
-          name: b.al_name ?? '',
-          code: b.al_exportbatchcode ?? '',
-          // getAll does not return the *name formatted value, so this read fell through to
-          // String(al_batchstatus) and put the raw option number on the screen — both in the
-          // status column and, worse, in the status filter, whose options are built from
-          // these values. The generated map is what the numbers mean.
-          status: choiceLabel(Al_exportbatchesal_batchstatus, b.al_batchstatus, b.al_batchstatusname) ?? 'Unknown',
-          generatedOn: b.al_generatedon ?? null,
-          rowCount: Number(b.al_rowcount ?? 0),
-        }));
-
-        const batchNames = new Map(batches.map((b) => [b.id, b.name]));
-        const records: ExportRecordRow[] = recordResult.data.map((r) => toExportRecordRow(r, batchNames));
-
-        setState({ status: 'ready', batches, records });
+        setState({
+          status: 'ready',
+          batches: result.data.map((b) => ({
+            id: b.al_exportbatchid,
+            name: b.al_name ?? '',
+            code: b.al_exportbatchcode ?? '',
+            // getAll does not return the *name formatted value, so this read fell through to
+            // String(al_batchstatus) and put the raw option number on the screen — both in the
+            // status column and, worse, in the status filter, whose options are built from
+            // these values. The generated map is what the numbers mean.
+            status: choiceLabel(Al_exportbatchesal_batchstatus, b.al_batchstatus, b.al_batchstatusname) ?? 'Unknown',
+            generatedOn: b.al_generatedon ?? null,
+            rowCount: Number(b.al_rowcount ?? 0),
+          })),
+        });
       })
       .catch(() => {
-        if (cancelled) return;
-        setState({ status: 'unavailable', reason: 'Exports could not be loaded from Dataverse.' });
+        if (!cancelled) setState({ status: 'unavailable', reason: UNAVAILABLE });
       });
 
     return () => {
@@ -66,4 +67,40 @@ export function useExports(reloadKey: number): ExportsState {
   }, [reloadKey]);
 
   return state;
+}
+
+/**
+ * One batch's rows. Read per batch because every batch snapshots every closed case, so the
+ * table grows by the whole closed caseload each time and cannot be read in one go.
+ */
+export function useExportRecords(batchId: string): ExportRecordsState {
+  const [state, setState] = useState<ExportRecordsState>({ status: 'loading' });
+
+  useEffect(() => {
+    // The id comes from the route, so it is untrusted until it parses as a record id.
+    if (!isRecordId(batchId)) return;
+    let cancelled = false;
+
+    readAll((o) => Al_exportrecordsService.getAll(o), {
+      filter: `_al_exportbatchid_value eq ${batchId}`,
+      orderBy: ['createdon desc', 'al_exportrecordid asc'],
+    })
+      .then((result) => {
+        if (cancelled) return;
+        setState(
+          result.success
+            ? { status: 'ready', records: result.data.map((row) => toExportRecordRow(row)) }
+            : { status: 'unavailable', reason: UNAVAILABLE },
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: 'unavailable', reason: UNAVAILABLE });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [batchId]);
+
+  return isRecordId(batchId) ? state : { status: 'unavailable', reason: UNAVAILABLE };
 }

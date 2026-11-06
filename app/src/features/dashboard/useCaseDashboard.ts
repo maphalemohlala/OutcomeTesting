@@ -12,8 +12,15 @@ import {
 } from '../../generated/models/Al_outcomecasesModel';
 import type { Al_remediationactions } from '../../generated/models/Al_remediationactionsModel';
 import type { Al_outcomes } from '../../generated/models/Al_outcomesModel';
-import { gradesByCase } from '../cases/caseWorklistMapping';
+import { ACTION_COUNT_COLUMNS } from '../cases/caseRemediation';
+import {
+  CASE_SUMMARY_COLUMNS,
+  OUTCOME_GRADE_COLUMNS,
+  ageInDays,
+  gradesByCase,
+} from '../cases/caseWorklistMapping';
 import { remediationTotals } from './remediationTotals';
+import { readAll } from '../../services/readAll';
 
 export interface StatusCount {
   status: CaseStatus;
@@ -42,6 +49,8 @@ export interface DashboardData {
   /** BR-005 grades on cases that have reached an outcome, for the PP-17 drill-down. */
   completedOutcomes: OutcomeCount[];
   completedTotal: number;
+  /** Every case in view, open or closed. */
+  totalCases: number;
   ungraded: number;
   /** BR-006 remediation: what is open, and what has passed the BR-010 threshold. */
   remediationOpen: number;
@@ -63,13 +72,6 @@ export type DashboardState =
       outcomes: Al_outcomes[];
       actions: Al_remediationactions[];
     };
-
-function ageInDays(createdOn: string | undefined): number {
-  if (!createdOn) return 0;
-  const created = new Date(createdOn).getTime();
-  if (Number.isNaN(created)) return 0;
-  return Math.max(0, Math.floor((Date.now() - created) / 86_400_000));
-}
 
 const AGEING_BANDS: { label: string; min: number; max: number }[] = [
   { label: '0–7 days', min: 0, max: 7 },
@@ -96,7 +98,7 @@ export function aggregate(
     counts.set(status, (counts.get(status) ?? 0) + 1);
 
     if (status === 'Validation Failed') validationFailed += 1;
-    if (status === 'Closed') continue;
+    if (status === 'Closed' || status === 'No Check Required') continue;
 
     totalOpen += 1;
     if (!record._al_reviewrouteid_value) unrouted += 1;
@@ -145,7 +147,14 @@ export function aggregate(
       count: outcomeCounts.get(outcome) ?? 0,
     })),
     completedTotal,
-    ungraded: records.length - completedTotal,
+    totalCases: records.length,
+    // A Tax-only case has no outcome row but has been graded, on the Tax scale.
+    ungraded: records.filter(
+      (record) =>
+        !grades.get(record.al_outcomecaseid)?.final &&
+        !grades.get(record.al_outcomecaseid)?.initial &&
+        record.al_taxoutcome == null,
+    ).length,
     remediationOpen: remediation.open,
     remediationOverdue: remediation.overdue,
     remediationBreached: remediation.breached,
@@ -166,9 +175,9 @@ export function useCaseDashboard(): DashboardState {
     let cancelled = false;
 
     Promise.all([
-      Al_outcomecasesService.getAll({ top: 5000 }),
-      Al_outcomesService.getAll({ top: 5000 }),
-      Al_remediationactionsService.getAll({ top: 5000 }),
+      readAll((o) => Al_outcomecasesService.getAll(o), { orderBy: ['al_outcomecaseid asc'], select: CASE_SUMMARY_COLUMNS }),
+      readAll((o) => Al_outcomesService.getAll(o), { orderBy: ['al_outcomeid asc'], select: OUTCOME_GRADE_COLUMNS }),
+      readAll((o) => Al_remediationactionsService.getAll(o), { orderBy: ['al_remediationactionid asc'], select: ACTION_COUNT_COLUMNS }),
     ])
       .then(([cases, outcomes, actions]) => {
         if (cancelled) return;

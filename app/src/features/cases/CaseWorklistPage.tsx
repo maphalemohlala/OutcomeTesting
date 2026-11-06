@@ -151,8 +151,7 @@ export function CaseWorklistPage() {
           <h2 id="worklist-unavailable">No cases can be listed</h2>
           <p>{state.reason}</p>
           <p>
-            Nothing has been lost. Once the case tables are deployed this list will populate
-            automatically.
+            Nothing has been lost. Please try again shortly.
           </p>
         </section>
       ) : null}

@@ -71,7 +71,7 @@ namespace OutcomeTesting.Plugins
                 // Same rule as RoleCodeExists, kept inline because the web role entity is
                 // needed below and re-reading it to share one boolean would cost a query.
                 webRole = WebRoleRegistry.FindByName(systemService, normalizedCode);
-                if (webRole == null)
+                if (webRole == null || !WebRoleRegistry.IsActive(webRole))
                 {
                     throw new InvalidPluginExecutionException(
                         CommandHelpers.ValidationPrefix + "The role code does not match an active role.");
@@ -247,7 +247,8 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static bool RoleCodeExists(IOrganizationService service, string roleCode)
         {
-            return WebRoleRegistry.FindByName(service, roleCode) != null;
+            var role = WebRoleRegistry.FindByName(service, roleCode);
+            return role != null && WebRoleRegistry.IsActive(role);
         }
 
         internal static Guid Upsert(IOrganizationService service, string entity, string codeAttr, string code, Entity values)

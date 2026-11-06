@@ -17,6 +17,7 @@ import {
   type Recipients,
 } from './notificationRouting';
 import { describeRemoveFailure } from './notificationTemplateRemoval';
+import { readAll } from '../../services/readAll';
 
 export interface TemplateRow {
   /** Null for a letter that has no stored row and is running on the built-in wording. */
@@ -49,7 +50,7 @@ export interface ContactOption {
 export type TemplatesState =
   | { status: 'loading' }
   | { status: 'unavailable'; reason: string }
-  | { status: 'ready'; templates: TemplateRow[]; contacts: ContactOption[] };
+  | { status: 'ready'; templates: TemplateRow[]; contacts: ContactOption[]; contactsKnown: boolean };
 
 export interface TemplateDraft {
   code: string;
@@ -81,8 +82,8 @@ export function useNotificationTemplates(reloadKey = 0): TemplatesState {
     let cancelled = false;
 
     Promise.all([
-      Al_notificationtemplatesService.getAll({ orderBy: ['al_templatecode asc'] }),
-      ContactsService.getAll({ orderBy: ['fullname asc'] }),
+      readAll((o) => Al_notificationtemplatesService.getAll(o), { orderBy: ['al_templatecode asc', 'al_notificationtemplateid asc'] }),
+      readAll((o) => ContactsService.getAll(o), { orderBy: ['fullname asc', 'contactid asc'] }),
     ])
       .then(([result, contactResult]) => {
         if (cancelled) return;
@@ -136,24 +137,29 @@ export function useNotificationTemplates(reloadKey = 0): TemplatesState {
           }));
 
         // Contacts are for the "a named contact" recipient. A failure here is not fatal: the
-        // four role recipients still work, and the picker says why it is empty.
+        // four role recipients still work. `contactsKnown` stops the page reading the empty
+        // list as every chosen contact having no email.
         const contacts: ContactOption[] =
           contactResult.success && contactResult.data
             ? contactResult.data
                 .filter((c) => Number(c.statecode) === 0 && (c.emailaddress1 ?? '').trim() !== '')
                 .map((c) => ({
                   id: c.contactid.toLowerCase(),
-                  name: (c.fullname ?? '').trim(),
+                  name: (c.fullname ?? '').trim() || (c.emailaddress1 ?? '').trim(),
                   email: (c.emailaddress1 ?? '').trim(),
                 }))
-                .filter((c) => c.name.length > 0)
             : [];
 
         if (!contactResult.success) {
           logTechnical('notification templates contacts load', contactResult.error);
         }
 
-        setState({ status: 'ready', templates: [...builtIn, ...custom], contacts });
+        setState({
+          status: 'ready',
+          templates: [...builtIn, ...custom],
+          contacts,
+          contactsKnown: contactResult.success,
+        });
       })
       .catch((error) => {
         if (cancelled) return;

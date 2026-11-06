@@ -20,11 +20,14 @@ export function CaseRemedialActions({
   actions,
   signoffs = [],
   caseStatus = null,
+  adviserName = null,
 }: {
   actions: RemediationActionRow[];
   signoffs?: SignoffRow[];
   /** The case's status label, which decides whether a completed action awaits a supervisor. */
   caseStatus?: string | null;
+  /** The case's adviser, who still answers for an action nobody has been given. */
+  adviserName?: string | null;
 }) {
   // A deactivated action is no longer owed, and the emailed document leaves it out too.
   const live = actions.filter((action) => action.active);
@@ -65,7 +68,7 @@ export function CaseRemedialActions({
                         <span className="case-detail__remedial-note"> {action.adviserNote}</span>
                       ) : null}
                     </td>
-                    <td rowSpan={lines.length}>{action.assignedTo ?? 'Nobody assigned'}</td>
+                    <td rowSpan={lines.length}>{action.assignedTo ?? adviserName ?? 'Nobody assigned'}</td>
                     <td rowSpan={lines.length}>{action.dueOn ?? '—'}</td>
                     <td rowSpan={lines.length}>{action.status}</td>
                     <td rowSpan={lines.length}>
@@ -95,6 +98,7 @@ export function CaseRemedialActionsPanel({ caseId, reloadKey }: { caseId: string
       actions={state.actions}
       signoffs={state.signoffs}
       caseStatus={state.outcomeCase?.status ?? null}
+      adviserName={state.outcomeCase?.adviserName ?? null}
     />
   ) : null;
 }

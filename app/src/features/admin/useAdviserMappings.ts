@@ -7,6 +7,7 @@ import {
   type ContactOption,
 } from './adviserMappingRows';
 import { describeRemoveFailure, describeSaveFailure } from './adviserMappingFailure';
+import { readAll } from '../../services/readAll';
 
 // Held in adviserMappingRows so the shaping can be tested; this module cannot be imported
 // under the test runner because ../../generated pulls in the Power Apps client.
@@ -40,8 +41,8 @@ export function useAdviserMappings(reloadKey = 0): AdviserMappingsState {
     let cancelled = false;
 
     Promise.all([
-      Al_advisermappingsService.getAll({ orderBy: ['al_adviseremail asc'] }),
-      ContactsService.getAll({ orderBy: ['fullname asc'] }),
+      readAll((o) => Al_advisermappingsService.getAll(o), { orderBy: ['al_adviseremail asc', 'al_advisermappingid asc'] }),
+      readAll((o) => ContactsService.getAll(o), { orderBy: ['fullname asc', 'contactid asc'] }),
     ])
       .then(([mappingResult, contactResult]) => {
         if (cancelled) return;
@@ -147,15 +148,16 @@ export async function saveAdviserMapping(
 }
 
 /**
- * Removes one mapping, so that adviser's sign-offs stop being routed.
+ * Removes one mapping. Nobody can then sign off that adviser's cases until they are mapped
+ * again, and AdviserMappingPlugin takes the cases off the old manager's list.
  *
  * Deleted rather than deactivated. `al_adviseremail` is an alternate key, and an alternate
  * key holds against inactive rows too, so a deactivated mapping would make that adviser
  * impossible to map again - "remove, then map them to someone else" would come back as a
  * duplicate with no row on the page to explain it.
  *
- * Nothing is lost by deleting: the mapping carries no history, it grants no access, and the
- * audit trail for a sign-off records who was told at the time it happened (F18).
+ * No history is lost by deleting: the mapping carries none, and the audit trail for a
+ * sign-off records who was told at the time it happened (F18).
  */
 export async function removeAdviserMapping(
   id: string,

@@ -290,6 +290,7 @@ describe('approved checks and the notes on the remediation page', () => {
     decision: 'Approved',
     notes,
     signedOffOn: '06 Oct 2026',
+    signedOffOnRaw: '2026-10-06T10:00:00Z',
     remediationAction: null,
     remediationActionId: actionId,
     signedOffBy: 'A Supervisor',

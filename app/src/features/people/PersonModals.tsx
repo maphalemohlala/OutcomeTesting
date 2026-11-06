@@ -40,14 +40,16 @@ export function CreatePersonModal({
     }
     setBusy(true);
     setError(null);
+    // The values are in the token: a retry of the SAME save replays, an edited one must not.
+    const token = `create:${name.trim()}:${email.trim()}`;
     const result = await createUser({
       fullName: name.trim(),
       workEmail: email.trim(),
-      idempotencyKey: intent.keyFor('create'),
+      idempotencyKey: intent.keyFor(token),
     });
     setBusy(false);
     if (result.ok) {
-      intent.release('create');
+      intent.release(token);
       onDone(`${name.trim()} added to the people directory.`);
     } else {
       setError(messageForFailure(result));
@@ -94,10 +96,12 @@ export function EditPersonModal({
   user,
   onClose,
   onDone,
+  onConflict,
 }: {
   user: DirectoryUser;
   onClose: () => void;
   onDone: (message: string) => void;
+  onConflict: (message: string) => void;
 }) {
   const [name, setName] = useState(user.name);
   const [staffCode, setStaffCode] = useState(user.staffCode ?? '');
@@ -113,18 +117,23 @@ export function EditPersonModal({
     }
     setBusy(true);
     setError(null);
+    // The values are in the token: a retry of the SAME save replays, an edited one must not.
+    const token = `${user.id}:${name.trim()}:${staffCode}`;
     const result = await updateUser({
       userId: user.id,
       fullName: name.trim(),
       // Only when it moved - see staffCodeToSend, which holds the reasoning and the tests.
       staffCode: staffCodeToSend(staffCode, user.staffCode),
       expectedRowVersion: user.rowVersion,
-      idempotencyKey: intent.keyFor(user.id),
+      idempotencyKey: intent.keyFor(token),
     });
     setBusy(false);
     if (result.ok) {
-      intent.release(user.id);
+      intent.release(token);
       onDone(`${name.trim()} updated.`);
+    } else if (result.kind === 'conflict') {
+      // The row this form was opened on has moved, so no retry from here can succeed.
+      onConflict(messageForFailure(result));
     } else {
       setError(messageForFailure(result));
     }

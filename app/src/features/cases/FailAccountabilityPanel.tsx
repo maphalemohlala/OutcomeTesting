@@ -8,6 +8,7 @@ import {
   adviceQualityFailedFrom,
   effectiveAccountability,
   type AccountabilityFlags,
+  NOBODY,
 } from './failAccountability';
 import './FailAccountabilityPanel.css';
 
@@ -111,26 +112,35 @@ function OutcomeAccountability({
     setBusy(true);
     setMessage(null);
 
+    /*
+     * Naming a person on an untouched row must not record the pre-ticked default as a
+     * judgement: that stops the server deriving, and a File Quality fail this page cannot see
+     * would drop out of the extract. Four falses is "nobody has said yet", so it still derives.
+     */
+    const ticksMoved = LABELS.some(({ key }) => draft[key] !== effective[key]);
+    const flags = source === 'derived' && !ticksMoved ? NOBODY : draft;
+
+    /*
+     * One key per intent, not per attempt. The token names the outcome AND what is being
+     * recorded, so a retry after a timeout replays rather than writing twice, while
+     * changing a tick and saving again is a different intent with its own key.
+     */
+    const token =
+      'accountability-' +
+      outcome.id +
+      '-' +
+      [flags.fqAdviser, flags.fqParaplanner, flags.aqAdviser, flags.aqParaplanner].join('-') +
+      '-' + fqPerson + '-' + aqPerson;
+
     const result = await setFailAccountability({
       outcomeId: outcome.id,
-      fqAdviser: draft.fqAdviser,
-      fqParaplanner: draft.fqParaplanner,
-      aqAdviser: draft.aqAdviser,
-      aqParaplanner: draft.aqParaplanner,
+      fqAdviser: flags.fqAdviser,
+      fqParaplanner: flags.fqParaplanner,
+      aqAdviser: flags.aqAdviser,
+      aqParaplanner: flags.aqParaplanner,
       fqContactId: fqPerson,
       aqContactId: aqPerson,
-      /*
-       * One key per intent, not per attempt. The token names the outcome AND what is being
-       * recorded, so a retry after a timeout replays rather than writing twice, while
-       * changing a tick and saving again is a different intent with its own key.
-       */
-      idempotencyKey: intent.keyFor(
-        'accountability-' +
-          outcome.id +
-          '-' +
-          [draft.fqAdviser, draft.fqParaplanner, draft.aqAdviser, draft.aqParaplanner].join('-') +
-          '-' + fqPerson + '-' + aqPerson,
-      ),
+      idempotencyKey: intent.keyFor(token),
     });
 
     setBusy(false);
@@ -140,6 +150,7 @@ function OutcomeAccountability({
       return;
     }
 
+    intent.release(token);
     setMessage({ text: 'Accountability recorded.', kind: 'success' });
     onSaved();
   }
@@ -196,7 +207,7 @@ function OutcomeAccountability({
             field="id"
             value={fqPerson}
             onChange={setFqPerson}
-            placeholder="The case's own adviser or paraplanner"
+            placeholder={outcome.fqAccountable?.name ?? "The case's own adviser or paraplanner"}
           />
         </label>
         <label className="accountability__person">
@@ -205,7 +216,7 @@ function OutcomeAccountability({
             field="id"
             value={aqPerson}
             onChange={setAqPerson}
-            placeholder="The case's own adviser or paraplanner"
+            placeholder={outcome.aqAccountable?.name ?? "The case's own adviser or paraplanner"}
           />
         </label>
       </div>

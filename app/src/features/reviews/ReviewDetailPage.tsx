@@ -213,7 +213,9 @@ function GridGroup({ group, block }: { group: FormGroup<ReviewResponse>; block: 
  * it - which is what the document does, and what the portal template does in Liquid.
  */
 function InlineBlock({ block }: { block: SectionBlock }) {
-  const rows = block.groups.flatMap((group) => group.rows);
+  // The lens tick is taken out of its group for the grid, which is the only layout that draws
+  // it apart. Here it goes back with the rest, or the recorded answer would vanish.
+  const rows = block.groups.flatMap((group) => (group.lensTick ? [...group.rows, group.lensTick] : group.rows));
   const chunks: { kind: 'meta' | 'rootcause'; rows: FormRow<ReviewResponse>[] }[] = [];
 
   for (const row of rows) {
@@ -448,13 +450,12 @@ export function ReviewDetailPage({ reviewType }: ReviewDetailPageProps) {
             {/*
               The discipline decides how a grid heads 120910302: "Pass with issues" on a Tax
               review, "Insufficient evidence" everywhere else (AD-055 amended). Passed from
-              the page's own prop rather than read from the header, because the prop is what
-              decided which review this page is for in the first place.
+              the review's own type, so a mismatched URL cannot relabel a form.
             */}
             {formBlocks(
               state.detail.sections,
               state.detail.failPoints,
-              reviewType === 'Tax',
+              state.detail.header.type === 'Tax',
             ).map((block) =>
               block.kind === 'failpoints' ? (
                 <FailPoints key={block.id} title={block.title} points={block.points} />

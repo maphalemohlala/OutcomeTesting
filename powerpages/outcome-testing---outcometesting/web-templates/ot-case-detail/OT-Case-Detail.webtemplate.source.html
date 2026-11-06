@@ -180,6 +180,7 @@
         <attribute name="createdon" />
         <filter type="and">
           <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
+          <condition attribute="statecode" operator="eq" value="0" />
         </filter>
         <order attribute="al_duedate" descending="false" />
       </entity>
@@ -800,13 +801,13 @@
                 {% assign ot_flat = a.al_description | newline_to_br | replace: '<br />', '|' | replace: '<br>', '|' %}
                 {% assign ot_lines = ot_flat | split: '|' %}
                 {% assign ot_count = 0 %}
-                {% capture ot_note %}{% for l in ot_lines %}{% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}{% if rebuilt == line %}{% assign ot_count = ot_count | plus: 1 %}{% elsif line != '' and line != 'Issues found on the check:' %}{% unless line contains 'Raised automatically when the review was submitted' %}{% unless line contains 'Review the file and record what you have put right' %}{{ line }} {% endunless %}{% endunless %}{% endif %}{% endfor %}{% endcapture %}
+                {% assign ot_stop = false %}{% capture ot_note %}{% for l in ot_lines %}{% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}{% if line contains 'The checker recorded:' %}{% assign ot_stop = true %}{% endif %}{% if line contains 'Raised automatically' %}{% assign ot_stop = true %}{% endif %}{% if rebuilt == line and ot_stop == false %}{% assign ot_count = ot_count | plus: 1 %}{% elsif line != '' and line != 'Issues found on the check:' %}{% unless line contains 'Raised automatically when the review was submitted' %}{% unless line contains 'Review the file and record what you have put right' %}{{ line }} {% endunless %}{% endunless %}{% endif %}{% endfor %}{% endcapture %}
                 {% assign ot_note = ot_note | strip %}
                 {% if ot_count > 0 %}
-                  {% assign ot_shown = 0 %}
+                  {% assign ot_shown = 0 %}{% assign ot_stop = false %}
                   {% for l in ot_lines %}
                     {% assign line = l | strip %}{% assign rest = line | remove_first: '- ' %}{% assign rebuilt = '- ' | append: rest %}
-                    {% if rebuilt == line %}
+                    {% if line contains 'The checker recorded:' %}{% assign ot_stop = true %}{% endif %}{% if line contains 'Raised automatically' %}{% assign ot_stop = true %}{% endif %}{% if rebuilt == line and ot_stop == false %}
                       {% assign ot_shown = ot_shown | plus: 1 %}
                       {% assign row_no = row_no | plus: 1 %}
                       <tr>
@@ -829,10 +830,10 @@
                                   data-ot-age
                                   data-opened="{{ clock_start | date: 'yyyy-MM-dd' }}"
                                   data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
-                                  data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
+                                  data-completed="{% if a.al_actionstatus.value == 120910602 %}{{ a.al_completedon | date: 'yyyy-MM-dd' }}{% endif %}">—</span>
                           </td>
                           <td rowspan="{{ ot_count }}">
-                            {% if latest %}
+                            {% assign ot_redone = false %}{% if latest and latest.al_signedoffon and a.al_completedon and a.al_completedon > latest.al_signedoffon %}{% assign ot_redone = true %}{% endif %}{% if latest and ot_redone == false %}
                               {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}{% assign ot_sn = latest.al_notes | default: '' | strip %}{% if ot_sn != '' %}<br /><span class="ot-remedial-form__note">{{ ot_sn | escape | newline_to_br }}</span>{% endif %}
                             {% elsif a.al_completedon %}
                               Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor
@@ -870,10 +871,10 @@
                             data-ot-age
                             data-opened="{{ clock_start | date: 'yyyy-MM-dd' }}"
                             data-created="{{ a.createdon | date: 'yyyy-MM-dd' }}"
-                            data-completed="{{ a.al_completedon | date: 'yyyy-MM-dd' }}">—</span>
+                            data-completed="{% if a.al_actionstatus.value == 120910602 %}{{ a.al_completedon | date: 'yyyy-MM-dd' }}{% endif %}">—</span>
                     </td>
                     <td>
-                      {% if latest %}
+                      {% assign ot_redone = false %}{% if latest and latest.al_signedoffon and a.al_completedon and a.al_completedon > latest.al_signedoffon %}{% assign ot_redone = true %}{% endif %}{% if latest and ot_redone == false %}
                         {{ latest.al_signoffdecision.label | escape }} {{ latest.al_signedoffon | date: 'dd MMM yyyy' }}{% assign ot_sn = latest.al_notes | default: '' | strip %}{% if ot_sn != '' %}<br /><span class="ot-remedial-form__note">{{ ot_sn | escape | newline_to_br }}</span>{% endif %}
                       {% elsif a.al_completedon %}
                         Adviser completed {{ a.al_completedon | date: 'dd MMM yyyy' }}; awaiting supervisor

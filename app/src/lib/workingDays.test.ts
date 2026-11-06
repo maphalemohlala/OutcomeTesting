@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   REMEDIATION_THRESHOLD_WORKING_DAYS,
-  addWorkingDays,
-  hasBreachedRemediationThreshold,
   isWorkingDay,
   remediationClock,
-  workingDayAge,
   workingDaysBetween,
 } from './workingDays';
 
@@ -77,49 +74,6 @@ describe('UK time zone handling', () => {
   });
 });
 
-describe('workingDayAge', () => {
-  it('is 0 for a missing or unparseable value', () => {
-    expect(workingDayAge(undefined)).toBe(0);
-    expect(workingDayAge('not a date')).toBe(0);
-  });
-
-  it('ages from the raised date to now', () => {
-    expect(workingDayAge('2026-08-24T09:00:00Z', at('2026-08-28'))).toBe(5);
-  });
-});
-
-describe('addWorkingDays', () => {
-  it('puts ten working days from a Monday on the Friday of the following week', () => {
-    const due = addWorkingDays(at('2026-08-24'), REMEDIATION_THRESHOLD_WORKING_DAYS);
-    expect(due.toISOString().slice(0, 10)).toBe('2026-09-04');
-  });
-
-  it('skips the weekend', () => {
-    const due = addWorkingDays(at('2026-08-28'), 2);
-    expect(due.toISOString().slice(0, 10)).toBe('2026-08-31');
-  });
-
-  it('lands on a working day when started on a weekend', () => {
-    const due = addWorkingDays(at('2026-08-29'), 1);
-    expect(isWorkingDay(due)).toBe(true);
-    expect(due.toISOString().slice(0, 10)).toBe('2026-08-31');
-  });
-});
-
-describe('hasBreachedRemediationThreshold', () => {
-  it('does not breach on the tenth working day', () => {
-    expect(hasBreachedRemediationThreshold('2026-08-24T09:00:00Z', at('2026-09-04'))).toBe(false);
-  });
-
-  it('breaches on the eleventh', () => {
-    expect(hasBreachedRemediationThreshold('2026-08-24T09:00:00Z', at('2026-09-07'))).toBe(true);
-  });
-
-  it('does not breach on a missing date', () => {
-    expect(hasBreachedRemediationThreshold(undefined)).toBe(false);
-  });
-});
-
 describe('remediationClock', () => {
   // OD-018: a rejected sign-off resets the clock and the previous period is preserved,
   // so a case that goes round twice shows both periods rather than one merged age.
@@ -184,6 +138,35 @@ describe('remediationClock', () => {
 
     expect(clock.current).toBe(5);
     expect(clock.breached).toBe(false);
+  });
+
+  it('keeps ageing an action in rework, whose old completion predates the restart', () => {
+    // A rejection leaves al_completedon on the row. Reading it as the stop made every
+    // reworked action show 0 working days and never breach.
+    const clock = remediationClock(
+      {
+        createdon: '2026-08-03T09:00:00Z',
+        al_completedon: '2026-08-07T17:00:00Z',
+        al_clockstartedon: '2026-08-10T09:00:00Z',
+      },
+      at('2026-08-28'),
+    );
+
+    expect(clock.current).toBe(15);
+    expect(clock.breached).toBe(true);
+  });
+
+  it('stops a reworked action at its second completion', () => {
+    const clock = remediationClock(
+      {
+        createdon: '2026-08-03T09:00:00Z',
+        al_clockstartedon: '2026-08-10T09:00:00Z',
+        al_completedon: '2026-08-12T17:00:00Z',
+      },
+      at('2026-09-30'),
+    );
+
+    expect(clock.current).toBe(3);
   });
 
   it('ignores a reset stamped before creation rather than reporting a negative period', () => {

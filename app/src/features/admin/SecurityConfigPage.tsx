@@ -90,7 +90,7 @@ export function SecurityConfigPage() {
     return () => {
       cancelled = true;
     };
-  }, [roles]);
+  }, [roles, reloadKey]);
 
   const [roleName, setRoleName] = useState('');
   const [roleDesc, setRoleDesc] = useState('');
@@ -173,6 +173,7 @@ export function SecurityConfigPage() {
     // Grant first, then withdraw: a failure here leaves the person with both roles rather
     // than none. The mapping's business code embeds the role, so a change is two writes.
     let message = `${label} assigned to ${email.trim()}.`;
+    let tone: 'ok' | 'error' = 'ok';
     if (replacing && replacing.id !== result.data.MappingId) {
       const withdrawToken = `withdraw:${replacing.id}`;
       const withdrawn = await setRoleAssignmentActive({
@@ -185,11 +186,12 @@ export function SecurityConfigPage() {
         message = `${email.trim()} changed from ${replacing.role} to ${label}.`;
       } else {
         message = `${label} assigned, but the previous ${replacing.role} assignment could not be withdrawn: ${withdrawn.message}`;
+        tone = 'error';
       }
     }
 
     setAssignBusy(false);
-    setAssignNotice({ tone: 'ok', message });
+    setAssignNotice({ tone, message });
     setEmail('');
     setReplacing(null);
     setAssignOpen(false);
@@ -205,6 +207,8 @@ export function SecurityConfigPage() {
       setPermRole(`custom:${existing.role}`);
       setResource(existing.resource);
       setLevel(existing.level);
+    } else {
+      setPermRole('');
     }
     setPermNotice(null);
     setPermOpen(true);
@@ -253,7 +257,8 @@ export function SecurityConfigPage() {
     setRoleNotice(null);
 
     const editing = editingRole;
-    const token = editing ? `role:${editing.id}` : `role:new:${roleName.trim()}`;
+    // The values are in the token: a retry of the SAME save replays, an edited one must not.
+    const token = `role:${editing?.id ?? 'new'}:${roleName.trim()}:${roleDesc.trim()}`;
     const result = editing
       ? await updateRole({
           roleId: editing.id,
@@ -381,13 +386,13 @@ export function SecurityConfigPage() {
           <p className="security__hint">
             Give a registered person an application role. The assignment is keyed on their work
             email, and only people on the{' '}
-            <Link to="/admin/users">Users</Link> page can be chosen.
+            <Link to="/admin/people">People</Link> page can be chosen.
           </p>
           {unreconciled.length > 0 ? (
             <p className="security__notice security__notice--error" role="status">
               {unreconciled.length === 1
-                ? '1 role has an assignment made outside this app: '
-                : `${unreconciled.length} roles have assignments made outside this app: `}
+                ? '1 role has an assignment that does not match Power Pages: '
+                : `${unreconciled.length} roles have assignments that do not match Power Pages: `}
               {unreconciled.map((entry, index) => (
                 <span key={entry.code}>
                   {index > 0 ? ', ' : ''}
@@ -430,7 +435,7 @@ export function SecurityConfigPage() {
             ) : null}
           </div>
           <p className="security__hint">
-            The roles that can be assigned. Administrators can add, rename and retire them.
+            The roles that can be assigned. Administrators can add, describe and retire them.
             Select a role to see everything it grants and everyone who holds it.
           </p>
           {roleNotice && !roleOpen ? (

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
-import { useIntentKeys } from '../../hooks/useIntentKey';
+import type { IntentKeys } from '../../hooks/useIntentKey';
 import {
   addSection,
   updateSection,
@@ -20,7 +20,8 @@ import { RESPONSE_TYPE_OPTIONS, type LibrarySection } from './useQuestionLibrary
 interface Props {
   mode: 'add' | 'edit';
   section?: LibrarySection;
-  onClose: () => void;
+    intent: IntentKeys;
+onClose: () => void;
   onSaved: () => void;
 }
 
@@ -48,7 +49,7 @@ function isComplete(row: DraftQuestion): row is CompleteQuestion {
   return row.code.trim() !== '' && row.wording.trim() !== '' && row.responseType !== null;
 }
 
-export function SectionModal({ mode, section, onClose, onSaved }: Props) {
+export function SectionModal({ mode, section, intent, onClose, onSaved }: Props) {
   const [sectionCode, setSectionCode] = useState(section?.code ?? '');
   const [name, setName] = useState(section?.name ?? '');
   const [helpText, setHelpText] = useState(section?.helpText ?? '');
@@ -59,9 +60,9 @@ export function SectionModal({ mode, section, onClose, onSaved }: Props) {
   const [questions, setQuestions] = useState<DraftQuestion[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const intent = useIntentKeys();
 
-  const token = section?.id ?? 'add-section';
+  // The values are in the token: a retry of the SAME save replays, an edited one must not.
+  const token = `${section?.id ?? 'add-section'}:${JSON.stringify([sectionCode, name, helpText, ownerRole, displayOrder, isOptional, reason, questions])}`;
   const teamChanged = mode === 'edit' && ownerRole !== section?.ownerRoleValue;
   const becomingOptional = mode === 'edit' && isOptional && !section?.isOptional;
 

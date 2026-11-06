@@ -47,7 +47,7 @@ describe('answerOf', () => {
   });
 
   it('reads a date answer when everything else is null', () => {
-    expect(answerOf(response({ al_answerdate: '2026-09-08T00:00:00Z' }))).toBe('08 Sept 2026');
+    expect(answerOf(response({ al_answerdate: '2026-09-08T00:00:00Z' }))).toBe('08 Sep 2026');
   });
 
   it('reports nothing when every answer column is null', () => {

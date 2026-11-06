@@ -2,6 +2,7 @@ import { odataEscape } from '../../services/odata';
 import {
   APP_ROLE_BY_VALUE,
   ACCESS_LEVEL_BY_VALUE,
+  isDeactivated,
   resolvePermissions,
   resolveRules,
   type PermissionRule,
@@ -14,6 +15,7 @@ import {
 } from '../../generated';
 import { executeCommand } from '../../services/commands/commandClient';
 import { loadProductName } from '../product/loadProductName';
+import { readAll } from '../../services/readAll';
 
 export interface Resolved {
   roles: string[];
@@ -32,19 +34,18 @@ export interface Resolved {
  * `al_GetMyRoles` (AD-089, AD-090), which asks the server what the caller holds rather than
  * having the client re-derive it. Rules come from al_pagepermission alone once any are
  * stored, exactly as the server gate reads them; the code defaults apply only to an
- * environment with no stored rule (`rulesInForce`). Fail-open for view (permissive when the
- * API call fails outright) is safe because every write is enforced server-side by the
- * Custom API commands.
+ * environment with no stored rule (`rulesInForce`). If the roles cannot be established,
+ * nothing is granted.
  */
 export async function loadPermissions(email: string): Promise<Resolved> {
   // Started first so it runs alongside the role and rule reads; only the stand-in rules need it.
   const product = loadProductName();
   const [rolesResult, permResult, userResult] = await Promise.all([
     executeCommand<{ RoleCodes: string }>('al_GetMyRoles', {}),
-    Al_pagepermissionsService.getAll({ filter: 'statecode eq 0', top: 5000 }),
+    readAll((o) => Al_pagepermissionsService.getAll(o), { filter: 'statecode eq 0', orderBy: ['al_pagepermissionid asc'] }),
     ContactsService.getAll({
       filter: `emailaddress1 eq '${odataEscape(email.trim().toLowerCase())}'`,
-      top: 1,
+      select: ['statecode'],
     }),
   ]);
 
@@ -53,9 +54,7 @@ export async function loadPermissions(email: string): Promise<Resolved> {
   // Deactivation (OD-010) withdraws access, so a deactivated registry row resolves to no
   // roles here as well as server-side. Mirrored rather than relied on: the server is the
   // gate, and this only stops the UI offering a leaver work it would then refuse.
-  const registered = userResult.success ? userResult.data : [];
-  const deactivated = registered.length > 0 && Number(registered[0].statecode) !== 0;
-  if (deactivated) {
+  if (isDeactivated(userResult.success ? userResult.data : [])) {
     return {
       roles: [],
       permissions: resolvePermissions([]),
@@ -64,14 +63,6 @@ export async function loadPermissions(email: string): Promise<Resolved> {
     };
   }
 
-  // Bootstrap / fail-open: the trigger is no longer "the mapping table is unreadable or has
-  // zero rows" (the client no longer reads that table at all) — it is "al_GetMyRoles could
-  // not answer", whether the call itself failed or its response will not parse. Either way
-  // the permissive set stands in so the first administrator can still configure access, and
-  // server commands still gate every write, so this only affects what the UI offers. A call
-  // that SUCCEEDS and answers an empty array is not the bootstrap case: al_GetMyRoles unions
-  // al_userrolemapping with the caller's web role associations and applies the AD-090
-  // exclusion server-side, so an empty result means the caller genuinely holds nothing.
   // If we cannot establish what this person holds, they get NOTHING, and a banner saying so
   // (project owner, 2026-09-21).
   //

@@ -1,5 +1,6 @@
-import { Al_remediationactionsal_actionstatus } from '../../generated/models/Al_remediationactionsModel';
 import { remediationClock } from '../../lib/workingDays';
+import { isPastDue } from '../cases/caseHeaderDates';
+import { isActionCompleted } from '../cases/caseRemediation';
 
 /**
  * The dashboard's remediation counts, per remediation rather than per action.
@@ -26,12 +27,6 @@ export interface RemediationTotals {
   overdue: number;
   breached: number;
   completed: number;
-}
-
-function isOverdue(due: string | undefined): boolean {
-  if (!due) return false;
-  const at = new Date(due).getTime();
-  return !Number.isNaN(at) && at < Date.now();
 }
 
 /**
@@ -67,18 +62,10 @@ export function remediationTotals(actions: RemediationCountSource[]): Remediatio
       groups.set(key, group);
     }
 
-    // The formatted name when Dataverse returned one, else the option-set map. Reading the
-    // name alone would treat a completed action as open whenever the formatted value is
-    // absent, which would silently inflate the open count.
-    const status =
-      action.al_actionstatusname ??
-      Al_remediationactionsal_actionstatus[
-        action.al_actionstatus as keyof typeof Al_remediationactionsal_actionstatus
-      ];
-    if (status === 'Completed') continue;
+    if (isActionCompleted(action)) continue;
 
     group.open = true;
-    if (isOverdue(action.al_duedate)) group.overdue = true;
+    if (isPastDue(action.al_duedate)) group.overdue = true;
     // The current period, not the whole time in remediation: a rejected sign-off restarts
     // the clock (OD-018), and counting from the original start would report a reworked
     // action as breached before the adviser had had a day on it.

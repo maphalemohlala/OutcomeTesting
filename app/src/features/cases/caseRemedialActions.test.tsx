@@ -95,6 +95,7 @@ describe('the case page shows what the adviser and the supervisor wrote', () => 
     decision: 'Rejected',
     notes: 'Client letter unsigned.',
     signedOffOn: '06 Oct 2026',
+    signedOffOnRaw: '2026-10-06T10:00:00Z',
     remediationAction: null,
     remediationActionId: 'a1',
     signedOffBy: 'A Supervisor',

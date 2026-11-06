@@ -42,7 +42,8 @@ export function CaseIntakePage() {
             <button
               type="button"
               className="intake__btn"
-              disabled={busy}
+              disabled={busy || !mayResolve}
+              title={mayResolve ? undefined : 'Your role can view uploads but not add them.'}
               onClick={() => fileInputRef.current?.click()}
             >
               {busy ? 'Uploading…' : 'Upload cases'}
@@ -238,7 +239,7 @@ export function CaseIntakePage() {
                           <td>{exception.caseReference ?? 'Missing'}</td>
                           <td className="intake__reason">{exception.reason}</td>
                           <td>{exception.status}</td>
-                          <td>{exception.resolvedOn ?? 'Open'}</td>
+                          <td>{exception.resolvedOn ?? (exception.isOpen ? 'Open' : '—')}</td>
                           <td>
                             {exception.resolutionNote ? (
                               <span className="intake__reason">{exception.resolutionNote}</span>
@@ -266,6 +267,7 @@ export function CaseIntakePage() {
                             <td colSpan={7}>
                               <ResolveExceptionForm
                                 exception={exception}
+                                onStale={reload}
                                 onResolved={() => {
                                   setResolvingId(null);
                                   setResolvedNotice(

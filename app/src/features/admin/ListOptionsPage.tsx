@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { usePermissions } from '../../app/permissions/permissionContext';
-import { MIGRATED_LISTS, validateDraft, type ListOptionRow, type ManagedList } from './listOptions';
+import { MIGRATED_LISTS, optionCanBeDeleted, validateDraft, type ListOptionRow, type ManagedList } from './listOptions';
 import {
   deleteListOption,
   reinstateListOption,
@@ -25,8 +25,9 @@ import './ListOptionsPage.css';
  *
  * "Remove" is two different things and the page says which is which. Retiring takes the
  * option out of every dropdown and leaves every case that already holds it reading exactly
- * as it did; deleting is only possible for an option no case has ever used, and it is
- * Dataverse that decides that, not this screen.
+ * as it did. Deleting is offered only where Dataverse can refuse it: an option held through a
+ * lookup that no case currently holds. Products sit on a many-to-many, which has no such
+ * guard, and a migrated option can be held by a case's old value alone.
  */
 export function ListOptionsPage() {
   const [list, setList] = useState<ManagedList>(MIGRATED_LISTS[0]);
@@ -43,6 +44,16 @@ export function ListOptionsPage() {
     setEditing(null);
     setRemoving(null);
     setReloadKey((k) => k + 1);
+  }
+
+  /** A new option may have taken the name since this one was retired. */
+  function reinstate(row: ListOptionRow, siblings: readonly ListOptionRow[]) {
+    const clash = validateDraft(
+      { id: row.id, label: row.label, sortOrder: '', effectiveFrom: null, effectiveTo: null },
+      siblings,
+    );
+    if (clash) setProblem(clash);
+    else void act(reinstateListOption, row);
   }
 
   async function act(
@@ -132,7 +143,9 @@ export function ListOptionsPage() {
                     <td>{row.label}</td>
                     <td>{row.sortOrder ?? <span className="lists__missing">—</span>}</td>
                     <td>
-                      {row.retired ? (
+                      {row.startsOn ? (
+                        <span className="lists__retired">Starts on {row.startsOn}</span>
+                      ) : row.retired ? (
                         <span className="lists__retired">
                           Retired{row.effectiveTo ? ` on ${row.effectiveTo}` : ''}
                         </span>
@@ -149,11 +162,11 @@ export function ListOptionsPage() {
                         >
                           Change
                         </button>
-                        {row.retired ? (
+                        {row.retired && !row.startsOn ? (
                           <button
                             type="button"
                             className="lists__btn lists__btn--ghost"
-                            onClick={() => act(reinstateListOption, row)}
+                            onClick={() => reinstate(row, state.options)}
                           >
                             Reinstate
                           </button>
@@ -193,6 +206,7 @@ export function ListOptionsPage() {
           {removing && (
             <RemoveOption
               row={removing}
+              deletable={optionCanBeDeleted(list, removing)}
               onClose={() => setRemoving(null)}
               onRetire={() => act(retireListOption, removing)}
               onDelete={() => act(deleteListOption, removing)}
@@ -328,11 +342,13 @@ function OptionForm({
  */
 function RemoveOption({
   row,
+  deletable,
   onClose,
   onRetire,
   onDelete,
 }: {
   row: ListOptionRow;
+  deletable: boolean;
   onClose: () => void;
   onRetire: () => void;
   onDelete: () => void;
@@ -343,18 +359,24 @@ function RemoveOption({
         <strong>Retire it</strong> to stop offering it on new cases. Cases that already have
         it keep reading exactly as they do now, and you can put it back at any time.
       </p>
-      <p>
-        <strong>Delete it</strong> only if it was added by mistake. This works only when no
-        case has ever used the option — if any case has, Dataverse refuses the delete and
-        nothing is changed.
-      </p>
+      {deletable ? (
+        <p>
+          <strong>Delete it</strong> only if it was added by mistake. This works only when no
+          case currently holds the option — if any case does, Dataverse refuses the delete and
+          nothing is changed.
+        </p>
+      ) : (
+        <p>This option cannot be deleted, because nothing would stop that removing it from cases.</p>
+      )}
       <div className="lists__buttons">
         <button type="button" className="lists__btn lists__btn--ghost" onClick={onClose}>
           Cancel
         </button>
-        <button type="button" className="lists__btn lists__btn--danger" onClick={onDelete}>
-          Delete permanently
-        </button>
+        {deletable ? (
+          <button type="button" className="lists__btn lists__btn--danger" onClick={onDelete}>
+            Delete permanently
+          </button>
+        ) : null}
         <button type="button" className="lists__btn" onClick={onRetire}>
           Retire
         </button>

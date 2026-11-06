@@ -179,13 +179,15 @@ namespace OutcomeTesting.Plugins
         public const string TokenCompletedCheck = "completedCheck";
 
         /// <summary>
-        /// What the case itself holds about its grading, offered in every letter (2026-10-19).
+        /// What the case itself holds about its grading and client, offered in every letter
+        /// (2026-10-19; the client since 2026-11-06, for the subject line).
         ///
         /// A letter whose event does not supply one is given what the case holds when it is
         /// sent, through <see cref="NotificationTemplateRows.OutcomeTokens"/>; each is empty
         /// where the case has not got that far.
         /// </summary>
-        public static readonly string[] CaseOutcomeTokens = { TokenGrading, TokenFinalOutcome, TokenNotes };
+        public static readonly string[] CaseOutcomeTokens =
+            { TokenGrading, TokenFinalOutcome, TokenNotes, TokenClient };
 
         /// <summary>
         /// Tokens every letter may use, whatever its own list says.
@@ -195,7 +197,7 @@ namespace OutcomeTesting.Plugins
         /// letter of the catalogue would invite the letters to disagree.
         /// </summary>
         public static readonly string[] AlwaysAllowed =
-            { TokenCompletedCheck, TokenGrading, TokenFinalOutcome, TokenNotes };
+            { TokenCompletedCheck, TokenGrading, TokenFinalOutcome, TokenNotes, TokenClient };
 
         /// <summary>Tokens whose value is markup and must NOT be escaped.</summary>
         private static readonly HashSet<string> RawTokens =
@@ -341,7 +343,7 @@ namespace OutcomeTesting.Plugins
 
                 // The subject is plain text in every mail client, so its tokens are never
                 // escaped whatever the body is.
-                Subject = Substitute(subject, tokens, escape: false),
+                Subject = WithoutEmptyClient(Substitute(subject, tokens, escape: false)),
 
                 // A STORED body is markup whatever the catalogue calls the letter, so its
                 // token values are escaped (AD-170). Every letter is edited in a rich-text
@@ -701,6 +703,8 @@ namespace OutcomeTesting.Plugins
                 + "</td></tr></table>";
         }
 
+        private const string NoClientOpener = "This case";
+
         /// <summary>The adviser's name for the salutation, or "Adviser".</summary>
         public static string Salutation(string adviserName)
         {
@@ -716,7 +720,26 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string ClientOpener(string clientName)
         {
-            return string.IsNullOrWhiteSpace(clientName) ? "This case" : clientName.Trim();
+            return string.IsNullOrWhiteSpace(clientName) ? NoClientOpener : clientName.Trim();
+        }
+
+        /// <summary>
+        /// A subject ending " - {{client}}" on a case with no client name, minus the dangling
+        /// separator. The remedial and Pass letters pass <see cref="NoClientOpener"/> as the
+        /// client, because their body needs a sentence opener; a subject does not.
+        /// </summary>
+        public static string WithoutEmptyClient(string subject)
+        {
+            var text = (subject ?? string.Empty).TrimEnd();
+            foreach (var gap in new[] { " -", " - " + NoClientOpener })
+            {
+                if (text.EndsWith(gap, StringComparison.Ordinal))
+                {
+                    return text.Substring(0, text.Length - gap.Length);
+                }
+            }
+
+            return text;
         }
 
         /// <summary>The case reference, or "a case".</summary>
@@ -749,40 +772,40 @@ namespace OutcomeTesting.Plugins
             var all = new List<TemplateDefinition>
             {
                 Plain(Allocation, "Case allocated",
-                    "Case {{reference}}: {{check}} allocated to you",
+                    "Case {{reference}}: {{check}} allocated to you - {{client}}",
                     "The {{check}} on case {{reference}} is now assigned to you. Open it to start the review: {{caseLink}}",
                     TokenReference, TokenCaseLink, TokenCheck),
 
                 Plain(AllocationNoLink, "Case allocated (no portal link)",
-                    "Case {{reference}}: {{check}} allocated to you",
+                    "Case {{reference}}: {{check}} allocated to you - {{client}}",
                     "The {{check}} on case {{reference}} is now assigned to you. Open it in the portal to start the review.",
                     TokenReference, TokenCheck),
 
                 Plain(ReviewSubmitted, "Review submitted",
-                    "Case {{reference}}: {{check}} submitted",
+                    "Case {{reference}}: {{check}} submitted - {{client}}",
                     "The {{check}} on case {{reference}} has been submitted and is locked to further edits.",
                     TokenReference, TokenCheck),
 
                 Html(RemediationPassWithIssues, "Remedial needed - pass with issues",
-                    "Remedial needed - Pass with issues: {{reference}}",
+                    "Remedial needed - Pass with issues: {{reference}} - {{client}}",
                     RemediationBody(harm: false),
                     "Confirm remedial action",
                     TokenReference, TokenAdviser, TokenClient, TokenGrading, TokenDueText, TokenCaseButton),
 
                 Html(RemediationHarm, "Remedial needed - insufficient evidence or potential harm",
-                    "Remedial needed - insufficient evidence/ potential harm: {{reference}}",
+                    "Remedial needed - insufficient evidence/ potential harm: {{reference}} - {{client}}",
                     RemediationBody(harm: true),
                     "Confirm remedial action",
                     TokenReference, TokenAdviser, TokenClient, TokenGrading, TokenDueText, TokenCaseButton),
 
                 Plain(RemediationOther, "Remediation raised (other grading)",
-                    "Remediation required on case {{reference}}",
+                    "Remediation required on case {{reference}} - {{client}}",
                     "Remediation has been raised against case {{reference}} and assigned to you.{{dueText}}"
                         + " Record your response against each item in the portal.",
                     TokenReference, TokenDueText),
 
                 Html(CasePassed, "Case check - Pass",
-                    "Case check - Pass: {{reference}}",
+                    "Case check - Pass: {{reference}} - {{client}}",
                     "<p>Dear {{adviser}},</p>"
                         + "<p>{{client}} has been checked and graded a Pass.</p>"
                         + "<p>No further action is required.</p>"
@@ -791,25 +814,25 @@ namespace OutcomeTesting.Plugins
                     TokenReference, TokenAdviser, TokenClient, TokenCaseButton),
 
                 Plain(SignoffApprovedRecheck, "Remediation approved - moving to recheck",
-                    "Remediation approved on case {{reference}}",
+                    "Remediation approved on case {{reference}} - {{client}}",
                     "Your remediation on case {{reference}} has been approved and the case has moved on to recheck.{{notes}}",
                     TokenReference, TokenNotes),
 
                 Plain(SignoffApprovedClosed, "Remediation approved - case closed",
-                    "Remediation approved on case {{reference}}",
+                    "Remediation approved on case {{reference}} - {{client}}",
                     "Your remediation on case {{reference}} has been approved, and the case is now closed with a "
                         + "final outcome of {{finalOutcome}}.{{notes}}",
                     TokenReference, TokenFinalOutcome, TokenNotes),
 
                 Plain(SignoffApprovedClosedNoGrade, "Remediation approved - case closed, no recheck",
-                    "Remediation approved on case {{reference}}",
+                    "Remediation approved on case {{reference}} - {{client}}",
                     "Your remediation on case {{reference}} has been approved. You recorded that it needs no "
                         + "further checking, so the case is now closed and nothing more is needed from you."
                         + "{{notes}}",
                     TokenReference, TokenNotes),
 
                 Plain(SignoffApprovedAqsNext, "Remediation approved - on to the AQS check",
-                    "Remediation approved on case {{reference}}",
+                    "Remediation approved on case {{reference}} - {{client}}",
                     "Your Tax remediation on case {{reference}} has been approved. The case now goes on to "
                         + "its AQS check, and nothing more is needed from you for the Tax check.{{notes}}",
                     TokenReference, TokenNotes),
@@ -817,7 +840,7 @@ namespace OutcomeTesting.Plugins
                 // A button since 2026-10-08, like the letter that first raised the work: the
                 // adviser was told what to redo and given no way back into the case.
                 Html(SignoffRejected, "Remediation sent back",
-                    "Remediation sent back on case {{reference}}",
+                    "Remediation sent back on case {{reference}} - {{client}}",
                     "<p>Dear {{adviser}},</p>"
                         + "<p>Your remediation on case {{reference}} has been reviewed and sent back for "
                         + "further work. The ten-working-day clock has restarted from today.</p>"
@@ -829,7 +852,7 @@ namespace OutcomeTesting.Plugins
                     TokenReference, TokenAdviser, TokenNotes, TokenNotesPanel, TokenCaseButton),
 
                 Plain(RecheckDue, "Final outcome owed",
-                    "Case {{reference}} is waiting for its final outcome",
+                    "Case {{reference}} is waiting for its final outcome - {{client}}",
                     "The remediation on case {{reference}} is approved and the case is now at "
                         + "Awaiting Recheck. It is waiting for you to record the final outcome, which is "
                         + "what closes it - until then it stays open and does not reach the export. "
@@ -839,7 +862,7 @@ namespace OutcomeTesting.Plugins
                 // A button since 2026-10-08, to the case's own remediation page, where the
                 // sign-off is made.
                 Html(SignoffDue, "Sign-off due",
-                    "Sign-off needed on case {{reference}}",
+                    "Sign-off needed on case {{reference}} - {{client}}",
                     "<p>Dear {{recipient}},</p>"
                         + "<p>{{adviser}} has completed every remediation action on case {{reference}}, "
                         + "and it is now waiting for your sign-off.</p>"

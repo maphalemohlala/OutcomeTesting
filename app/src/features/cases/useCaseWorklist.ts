@@ -1,13 +1,22 @@
 import { useEffect, useState } from 'react';
 import {
+  Al_listoption_al_outcomecase_productssetService,
+  Al_listoptionsService,
   Al_outcomecasesService,
   Al_outcomesService,
   Al_remediationactionsService,
 } from '../../generated';
 import { logTechnical } from '../../services/errors';
-import { gradesByCase, toSummary } from './caseWorklistMapping';
-import { remediationByCase, type CaseRemediation } from './caseRemediation';
+import {
+  CASE_SUMMARY_COLUMNS,
+  OUTCOME_GRADE_COLUMNS,
+  gradesByCase,
+  productNamesByCase,
+  toSummary,
+} from './caseWorklistMapping';
+import { ACTION_COUNT_COLUMNS, remediationByCase, type CaseRemediation } from './caseRemediation';
 import type { CaseOutcomeGrades, CaseSummary } from './caseWorklistMapping';
+import { readAll } from '../../services/readAll';
 
 export type { CaseSummary } from './caseWorklistMapping';
 
@@ -39,11 +48,16 @@ export function useCaseWorklist(): WorklistState {
     let cancelled = false;
 
     Promise.all([
-      Al_outcomecasesService.getAll({ orderBy: ['createdon asc'], top: 5000 }),
-      Al_outcomesService.getAll({ top: 5000 }),
-      Al_remediationactionsService.getAll({ top: 5000 }),
+      readAll((o) => Al_outcomecasesService.getAll(o), { orderBy: ['createdon asc', 'al_outcomecaseid asc'], select: CASE_SUMMARY_COLUMNS }),
+      readAll((o) => Al_outcomesService.getAll(o), { orderBy: ['al_outcomeid asc'], select: OUTCOME_GRADE_COLUMNS }),
+      readAll((o) => Al_remediationactionsService.getAll(o), { orderBy: ['al_remediationactionid asc'], select: ACTION_COUNT_COLUMNS }),
+      // Products degrade to the old column: a failed read costs a report column, not the list.
+      readAll((o) => Al_listoption_al_outcomecase_productssetService.getAll(o), {
+        orderBy: ['al_listoption_al_outcomecase_productsid asc'],
+      }).catch(() => null),
+      readAll((o) => Al_listoptionsService.getAll(o), { orderBy: ['al_listoptionid asc'] }).catch(() => null),
     ])
-      .then(([cases, outcomes, actions]) => {
+      .then(([cases, outcomes, actions, productLinks, catalogue]) => {
         if (cancelled) return;
         if (!cases.success) {
           logTechnical('worklist load', cases.error);
@@ -62,10 +76,16 @@ export function useCaseWorklist(): WorklistState {
           ? remediationByCase(actions.data)
           : new Map();
 
+        const products =
+          productLinks?.success && catalogue?.success
+            ? productNamesByCase(productLinks.data, catalogue.data, new Date())
+            : new Map<string, string>();
+
         setState({
           status: 'ready',
           cases: cases.data.map((record) => ({
             ...toSummary(record, grades.get(record.al_outcomecaseid)),
+            products: products.get(record.al_outcomecaseid) || (record.al_products ?? null),
             remediation: actions.success ? (remediation.get(record.al_outcomecaseid) ?? null) : undefined,
           })),
           remediationKnown: actions.success,

@@ -36,6 +36,16 @@ export function FailPointsPanel({ canEdit }: { canEdit: boolean }) {
 
   const rows = state.status === 'ready' ? state.rows : [];
   const live = rows.filter((row) => !row.retired);
+
+  /** A new fail point may have taken the name since this one was retired. */
+  function reinstate(row: FailReasonRow) {
+    const clash = live.some(
+      (other) => other.name.localeCompare(row.name, 'en', { sensitivity: 'base' }) === 0,
+    );
+    if (clash) setProblem(`"${row.name}" is already on the list.`);
+    else void act(reinstateFailReason, row);
+  }
+
   const retired = rows.filter((row) => row.retired);
 
   const renderRow = (row: FailReasonRow) => (
@@ -57,7 +67,7 @@ export function FailPointsPanel({ canEdit }: { canEdit: boolean }) {
           </>
         ) : null}
         {canEdit && row.retired ? (
-          <button type="button" className="library__btn library__btn--ghost" onClick={() => act(reinstateFailReason, row)}>
+          <button type="button" className="library__btn library__btn--ghost" onClick={() => reinstate(row)}>
             Reinstate
           </button>
         ) : null}

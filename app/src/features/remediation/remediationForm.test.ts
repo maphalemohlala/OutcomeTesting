@@ -42,7 +42,8 @@ function signoff(over: Partial<SignoffRow> = {}): SignoffRow {
     reference: 'SO-1',
     decision: 'Approved',
     notes: null,
-    signedOffOn: '2026-09-09',
+    signedOffOn: '09 Sep 2026',
+    signedOffOnRaw: '2026-09-09T10:00:00Z',
     remediationAction: null,
     remediationActionId: 'a',
     signedOffBy: 'Seed Supervisor',
@@ -66,7 +67,7 @@ function outcome(over: Partial<OutcomeRow> = {}): OutcomeRow {
 
 describe('signoffCell', () => {
   it('gives the supervisor decision once there is one', () => {
-    expect(signoffCell(action(), [signoff()])).toBe('Approved, 2026-09-09');
+    expect(signoffCell(action(), [signoff()])).toBe('Approved, 09 Sep 2026');
   });
 
   it('says the action is waiting on the supervisor while the case is at Awaiting Sign-off', () => {
@@ -89,9 +90,9 @@ describe('signoffCell', () => {
   });
 
   it('takes the latest decision, not the first recorded', () => {
-    const older = signoff({ id: 's1', decision: 'Rejected', signedOffOn: '2026-09-08' });
-    const newer = signoff({ id: 's2', decision: 'Approved', signedOffOn: '2026-09-10' });
-    expect(signoffCell(action(), [older, newer])).toBe('Approved, 2026-09-10');
+    const older = signoff({ id: 's1', decision: 'Rejected', signedOffOn: '22 Sep 2026', signedOffOnRaw: '2026-09-22T10:00:00Z' });
+    const newer = signoff({ id: 's2', decision: 'Approved', signedOffOn: '03 Oct 2026', signedOffOnRaw: '2026-10-03T10:00:00Z' });
+    expect(signoffCell(action(), [older, newer])).toBe('Approved, 03 Oct 2026');
   });
 
   it('ignores a sign-off against a different action', () => {
@@ -166,7 +167,7 @@ describe('remediationForm', () => {
 
   it('names the supervisor, their decision and the date', () => {
     const block = remediationForm([action()], [], [signoff()]);
-    expect(block.supervisorSignoff).toBe('Approved, Seed Supervisor, 2026-09-09');
+    expect(block.supervisorSignoff).toBe('Approved, Seed Supervisor, 09 Sep 2026');
   });
 
   it('takes the adviser sign-off from the most recently completed action', () => {
@@ -292,13 +293,29 @@ describe('the checks a case has finished with (AD-114)', () => {
 describe('signoffNotes', () => {
   // Reported 2026-10-07: the supervisor's notes went out in the email and were shown nowhere.
   it('gives the notes of the latest decision on the action', () => {
-    const older = signoff({ id: 's1', decision: 'Rejected', notes: 'Evidence missing.', signedOffOn: '2026-09-08' });
-    const newer = signoff({ id: 's2', decision: 'Approved', notes: 'Now evidenced.', signedOffOn: '2026-09-10' });
+    const older = signoff({ id: 's1', decision: 'Rejected', notes: 'Evidence missing.', signedOffOnRaw: '2026-09-08T10:00:00Z' });
+    const newer = signoff({ id: 's2', decision: 'Approved', notes: 'Now evidenced.', signedOffOnRaw: '2026-09-10T10:00:00Z' });
     expect(signoffNotes(action(), [older, newer])).toBe('Now evidenced.');
   });
 
   it('has nothing to say where the decision carried no notes, or there is no decision', () => {
     expect(signoffNotes(action(), [signoff({ notes: '   ' })])).toBeNull();
     expect(signoffNotes(action(), [])).toBeNull();
+  });
+});
+
+describe('a sign-off decided and then redone', () => {
+  it('orders a same-day rejection and approval by the time they were made', () => {
+    const first = signoff({ id: 's1', decision: 'Rejected', signedOffOn: '03 Oct 2026', signedOffOnRaw: '2026-10-03T09:00:00Z' });
+    const second = signoff({ id: 's2', decision: 'Approved', signedOffOn: '03 Oct 2026', signedOffOnRaw: '2026-10-03T15:00:00Z' });
+    expect(signoffCell(action(), [first, second])).toBe('Approved, 03 Oct 2026');
+  });
+
+  it('reads as awaiting a supervisor once the adviser completes it again', () => {
+    const rejected = signoff({ decision: 'Rejected', signedOffOn: '22 Sep 2026', signedOffOnRaw: '2026-09-22T10:00:00Z' });
+    const redone = action({ completedOn: '25 Sep 2026', completedOnRaw: '2026-09-25T10:00:00Z' });
+    expect(signoffCell(redone, [rejected], 'Awaiting Sign-off')).toBe(
+      'Adviser completed 25 Sep 2026; awaiting supervisor',
+    );
   });
 });

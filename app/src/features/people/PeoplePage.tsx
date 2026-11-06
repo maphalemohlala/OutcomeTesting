@@ -209,7 +209,7 @@ export function PeoplePage() {
 
   async function onToggleActive(user: DirectoryUser) {
     setBanner(null);
-    const token = `active:${user.id}`;
+    const token = `active:${user.id}:${!user.active}`;
     const result = await setUserActive({
       userId: user.id,
       active: !user.active,
@@ -332,9 +332,9 @@ export function PeoplePage() {
       {directory.status === 'ready' ? (
         <>
           <p className="people__note">
-            The directory is the Contacts in this environment. Caseload is joined by the name
-            recorded on the case — adviser, paraplanner and checker come from the intake extract,
-            owner is the person the case is allocated to.
+            The directory is the Contacts in this environment. Caseload is joined by the email
+            recorded on the case, or the name where it holds none: adviser and paraplanner come
+            from the upload, and checkers from allocation.
             {canManage ? (
               <>
                 {' '}
@@ -426,7 +426,7 @@ export function PeoplePage() {
                             roles={row.roles}
                             mappings={security.status === 'ready' ? security.mappings : []}
                             grantable={grantable}
-                            canManage={canManage}
+                            canManage={canManage && row.user !== null}
                             busy={roleBusy === row.email}
                             onGrant={onGrantRole}
                             onWithdraw={onWithdrawRole}
@@ -485,6 +485,11 @@ export function PeoplePage() {
         <EditPersonModal
           user={editing}
           onClose={() => setEditing(null)}
+          onConflict={(message) => {
+            setBanner({ tone: 'error', message });
+            setEditing(null);
+            reload();
+          }}
           onDone={(message) => {
             setBanner({ tone: 'success', message });
             setEditing(null);

@@ -104,7 +104,10 @@ export function UserPicker({
         type={field === 'email' ? 'email' : 'text'}
         className="user-picker__fallback"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          onPick?.(null);
+        }}
         placeholder={directory.status === 'loading' ? 'Loading people…' : placeholder}
       />
     );

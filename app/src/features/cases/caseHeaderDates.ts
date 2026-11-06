@@ -34,6 +34,21 @@ export function ukToday(now: Date = new Date()): string {
   }).format(now);
 }
 
+/** The UK calendar day of a Dataverse timestamp, or null when it cannot be read. */
+export function ukDayOf(iso: string): string | null {
+  const at = new Date(iso);
+  return Number.isNaN(at.getTime()) ? null : ukToday(at);
+}
+
+/**
+ * Whether a due date has passed: from the day after it, as the portal marks it. Compared as
+ * UK days, because the column holds a date with no time and reading it as an instant makes it
+ * overdue from the first minute of the day it is due.
+ */
+export function isPastDue(dueDate: string | null | undefined, today: string = ukToday()): boolean {
+  return Boolean(dueDate) && (dueDate as string).slice(0, 10) < today;
+}
+
 /**
  * Why this date of meeting cannot be saved, or null when it can.
  *
