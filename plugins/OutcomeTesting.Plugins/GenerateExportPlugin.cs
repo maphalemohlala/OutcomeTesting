@@ -131,15 +131,18 @@ namespace OutcomeTesting.Plugins
             {
                 var caseRef = outcomeCase.GetAttributeValue<string>("al_casereference") ?? outcomeCase.Id.ToString("D");
                 var outcomeRow = ResolveOutcome(userService, outcomeCase.Id);
-                var adviceGrade = outcomeRow == null
-                    ? null
-                    : Outcomes.EffectiveOutcomeLabel(outcomeRow);
+                var aqsExpected = AqsExpected(userService, outcomeCase);
+
+                // A Tax-only case reports File Quality and nothing else (client, 2026-11-06),
+                // so an outcome left behind by a route change does not reach the advice columns.
+                var adviceRow = aqsExpected ? outcomeRow : null;
+                var adviceGrade = Outcomes.EffectiveOutcomeLabel(adviceRow);
                 // One resolution, both values. Asking twice ran the same query twice per
                 // case for no gain.
                 var fileQualityAnswer = FileQuality.Resolve(userService, outcomeCase.Id);
                 var fileQualityGrade = FileQuality.Label(fileQualityAnswer);
                 var fileQualityChoice = FileQuality.Choice(fileQualityAnswer);
-                var effectiveOutcome = Outcomes.EffectiveOutcome(outcomeRow);
+                var effectiveOutcome = Outcomes.EffectiveOutcome(adviceRow);
 
                 // Someone named in place of the case's own adviser or paraplanner (project
                 // owner, 2026-09-19). Read once per case; FlaggedText decides per column
@@ -161,7 +164,7 @@ namespace OutcomeTesting.Plugins
                 };
                 var code = "EXR-" + batchCode + "-" + caseRef;
 
-                var incomplete = DescribeIncompleteRow(outcomeRow, fileQualityGrade, AqsExpected(userService, outcomeCase));
+                var incomplete = DescribeIncompleteRow(outcomeRow, fileQualityGrade, aqsExpected);
                 if (incomplete != null)
                 {
                     throw new InvalidPluginExecutionException(
@@ -547,17 +550,20 @@ namespace OutcomeTesting.Plugins
             return service.RetrieveMultiple(query).Entities.Count > 0;
         }
 
-        private static bool AnyAccountability(Entity outcomeRow)
+        private static bool Flagged(Entity outcomeRow, string flag)
         {
-            if (outcomeRow == null)
-            {
-                return false;
-            }
+            return outcomeRow != null && (outcomeRow.GetAttributeValue<bool?>(flag) ?? false);
+        }
 
-            return (outcomeRow.GetAttributeValue<bool?>(FqAdviserFlag) ?? false)
-                || (outcomeRow.GetAttributeValue<bool?>(FqParaplannerFlag) ?? false)
-                || (outcomeRow.GetAttributeValue<bool?>(AqAdviserFlag) ?? false)
-                || (outcomeRow.GetAttributeValue<bool?>(AqParaplannerFlag) ?? false);
+        /// <summary>
+        /// Whether the advice grade names someone in the feed: Insufficient evidence or
+        /// Potential harm. A Pass with issues needs remediation, but it is not a fail here
+        /// (client, 2026-11-06).
+        /// </summary>
+        private static bool AdviceQualityFailed(int? effectiveOutcome)
+        {
+            return effectiveOutcome == OutcomeRules.OutcomeInsufficient
+                || effectiveOutcome == OutcomeRules.OutcomePotentialHarm;
         }
 
         /// <summary>
@@ -772,41 +778,43 @@ namespace OutcomeTesting.Plugins
         /// <summary>
         /// Whether the person that <paramref name="flag"/> names carries this fail.
         ///
-        /// A recorded judgement wins outright. Where nothing has been recorded the pair is
-        /// derived from the people the case already names (project owner, 2026-09-16): the
-        /// paraplanner compiles the file, so a File Quality fail is theirs; the adviser
-        /// gives the advice, so an Advice Quality fail is theirs.
+        /// Nobody is named unless that discipline failed (client, 2026-11-06): File Quality
+        /// on a Fail, Advice Quality on Insufficient evidence or Potential harm. So a judgement
+        /// left behind by a regrade drops out with the fail it described.
+        ///
+        /// A recorded judgement then wins for its own discipline. Where that discipline has
+        /// none, its person is derived from the people the case already names (project owner,
+        /// 2026-09-16): the paraplanner compiles the file, so a File Quality fail is theirs;
+        /// the adviser gives the advice, so an Advice Quality fail is theirs. Per discipline,
+        /// because a fail must always name someone: ticking only the file used to leave a
+        /// Potential harm with nobody against it.
         ///
         /// Deriving is what makes a Tax case attributable at all. The four flags live on
         /// al_outcome and a Tax review creates no such row, so before this there was
         /// nowhere to record who was accountable for a Tax fail - 254397454 exported a
         /// file quality Fail with nobody named and nothing able to object.
         ///
-        /// A row whose four flags are all false is "nobody has said yet", not "nobody is
+        /// A discipline whose two flags are false is "nobody has said yet", not "nobody is
         /// responsible", so it derives. Recording a deliberate nobody is therefore not
         /// expressible - it was not expressible before either, the OD-024 gate having
         /// refused a row that named no one.
         /// </summary>
         public static bool IsAccountable(Entity outcomeRow, string flag, int? fileQualityChoice, int? effectiveOutcome)
         {
-            if (AnyAccountability(outcomeRow))
+            var fileFlag = flag == FqAdviserFlag || flag == FqParaplannerFlag;
+
+            if (!(fileFlag ? FileQuality.Failed(fileQualityChoice) : AdviceQualityFailed(effectiveOutcome)))
             {
-                return outcomeRow.GetAttributeValue<bool?>(flag) ?? false;
+                return false;
             }
 
-            if (flag == FqParaplannerFlag)
-            {
-                return FileQuality.Failed(fileQualityChoice);
-            }
-
-            if (flag == AqAdviserFlag)
-            {
-                return effectiveOutcome.HasValue && OutcomeRules.RequiresRemediation(effectiveOutcome.Value);
-            }
+            var recorded = fileFlag
+                ? Flagged(outcomeRow, FqAdviserFlag) || Flagged(outcomeRow, FqParaplannerFlag)
+                : Flagged(outcomeRow, AqAdviserFlag) || Flagged(outcomeRow, AqParaplannerFlag);
 
             // The adviser does not carry the file and the paraplanner does not carry the
             // advice, so neither is derived; a judgement can still name them.
-            return false;
+            return recorded ? Flagged(outcomeRow, flag) : flag == FqParaplannerFlag || flag == AqAdviserFlag;
         }
 
         private static void SetResponse(IPluginExecutionContext context, string batchId, string rowCount, string status, Guid auditId, bool conflict)

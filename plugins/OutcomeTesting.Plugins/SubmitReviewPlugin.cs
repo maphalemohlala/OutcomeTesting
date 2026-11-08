@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -197,6 +198,12 @@ namespace OutcomeTesting.Plugins
 
             EnsureMandatoryQuestionsAnswered(service, targetId, review);
             EnsureTaxPrecedesAqs(service, review);
+
+            var submittedType = review.GetAttributeValue<OptionSetValue>("al_reviewtype");
+            if (submittedType != null && submittedType.Value == ResponseRules.ReviewTypeAqs)
+            {
+                EnsureConsistentGrading(service, targetId);
+            }
 
             // Before the status moves: the tick guard refuses changes to a submitted review.
             AnswerWriter.DropRetiredFailReasons(service, targetId);
@@ -404,6 +411,7 @@ namespace OutcomeTesting.Plugins
             // scoped by discipline, so a Tax submit pays nothing for a rule that cannot apply
             // to it.
             RemoveRootCauseWhenPassing(service, targetId, required);
+            RemoveTaxFileQualityUnlessTaxOnly(service, review, required);
 
             if (required.Count == 0)
             {
@@ -504,6 +512,30 @@ namespace OutcomeTesting.Plugins
             {
                 required.Remove(rootCause);
             }
+        }
+
+        /// <summary>
+        /// The Tax team's File Quality outcome and remedial answer are owed on a Tax only check
+        /// alone; on any other route AQS grades File Quality (client decision, 2026-11-06). The
+        /// page still records them, so the fail point ticks have an answer to hang off.
+        /// </summary>
+        private static void RemoveTaxFileQualityUnlessTaxOnly(
+            IOrganizationService service, Entity review, List<Entity> required)
+        {
+            var caseRef = review.GetAttributeValue<EntityReference>("al_outcomecaseid");
+            var type = review.GetAttributeValue<OptionSetValue>("al_reviewtype");
+            if (caseRef == null || type == null || type.Value != ResponseRules.ReviewTypeTax
+                || !AqsStillToCome(service, caseRef.Id))
+            {
+                return;
+            }
+
+            required.RemoveAll(version =>
+            {
+                var code = version.GetAttributeValue<AliasedValue>("q.al_questioncode");
+                return code != null
+                    && ((string)code.Value == "Q-FQTAX-01" || (string)code.Value == TaxRemedialQuestionCode);
+            });
         }
 
         /// <summary>
@@ -955,6 +987,7 @@ namespace OutcomeTesting.Plugins
                 if (OutcomeRules.RequiresRemediation(outcomeValue, remedialFlagged))
                 {
                     RemedialActions.EnsureWritten(service, targetId, DateTime.UtcNow);
+                    RemedialActions.EnsureClientContact(service, targetId);
                 }
 
                 CreateOutcome(service, targetId, caseRef, caseReference, sequence, outcomeValue);
@@ -998,6 +1031,8 @@ namespace OutcomeTesting.Plugins
                     throw new InvalidPluginExecutionException(
                         PreconditionPrefix + "The tax check outcome holds a value this solution does not recognise (" + answer.Value + ").");
                 }
+
+                remedialFlagged |= ParkTaxCategories(service, targetId);
 
                 // Checked whether or not the raising is deferred to the AQS submit (AD-184): the
                 // Tax checker is the one who can write these, and after this submit they cannot.
@@ -1280,7 +1315,8 @@ namespace OutcomeTesting.Plugins
             // review's own response because there is no column on the case carrying it - the
             // Tax submit consumed it and stamped only the outcome.
             if (!OutcomeRules.RemedialActionFlagged(
-                    AnswerChoiceFor(service, taxReview.Value, TaxRemedialQuestionCode)))
+                    AnswerChoiceFor(service, taxReview.Value, TaxRemedialQuestionCode))
+                && TaxCategories.Parked(RemedialActions.Pending(service, taxReview.Value)).Count == 0)
             {
                 return null;
             }
@@ -1429,7 +1465,8 @@ namespace OutcomeTesting.Plugins
                 Remediation.AdviserContact(service, caseRef),
                 DateTime.UtcNow,
                 texts,
-                overall.Count == 0 ? null : string.Join(Environment.NewLine + Environment.NewLine, overall));
+                overall.Count == 0 ? null : string.Join(Environment.NewLine + Environment.NewLine, overall),
+                legs[legs.Count - 1].ClientContact);
 
             // Cleared once raised, on every review the words came from - the deferred Tax leg's
             // included, and a leg whose words were not owed - so a later regrade cannot raise
@@ -1456,6 +1493,139 @@ namespace OutcomeTesting.Plugins
             public List<string> Texts;
             public string Overall;
             public bool HadWords;
+            public int? ClientContact;
+        }
+
+        /// <summary>
+        /// Parks each Tax category answered Yes under its name, its comments as its words, so
+        /// the adviser's action carries them without the checker writing them twice. Refreshed
+        /// from the answers on every submit: a category changed to No takes its words with it.
+        /// True when any category owes a remedial action.
+        /// </summary>
+        private static bool ParkTaxCategories(IOrganizationService service, Guid reviewId)
+        {
+            var raised = TaxCategories.Raised(
+                code => AnswerChoiceFor(service, reviewId, code),
+                code => AnswerTextFor(service, reviewId, code));
+
+            var refusal = TaxCategories.Refusal(raised);
+            if (refusal != null)
+            {
+                throw new InvalidPluginExecutionException(PreconditionPrefix + refusal);
+            }
+
+            var map = RemedialActions.Pending(service, reviewId);
+            if (raised.Count == 0 && TaxCategories.Parked(map).Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var category in TaxCategories.All)
+            {
+                map.Remove(category.Name);
+            }
+
+            foreach (var pair in raised)
+            {
+                map[pair.Key] = pair.Value;
+            }
+
+            service.Update(new Entity(ReviewEntity, reviewId) { [RemedialActions.PendingAttr] = RemedialActions.Serialise(map) });
+            return raised.Count > 0;
+        }
+
+        /// <summary>
+        /// Refuses an AQS check whose outcome answers disagree with its checking points and
+        /// Suitability core checks (<see cref="GradingRules.For"/>).
+        /// </summary>
+        private static void EnsureConsistentGrading(IOrganizationService service, Guid reviewId)
+        {
+            var query = new QueryExpression(ResponseEntity)
+            {
+                ColumnSet = new ColumnSet("al_answerchoice", "al_questionversionid"),
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
+            var responses = CommandHelpers.RetrieveAll(service, query);
+
+            var versionIds = new List<Guid>();
+            var responseIds = new List<object>();
+            foreach (var response in responses)
+            {
+                responseIds.Add(response.Id);
+                var version = response.GetAttributeValue<EntityReference>("al_questionversionid");
+                if (version != null)
+                {
+                    versionIds.Add(version.Id);
+                }
+            }
+
+            var versions = Remediation.ByIdIn(
+                service, "al_questionversion", new ColumnSet("al_responsetype", "al_questionid"), versionIds);
+            var questionIds = new List<Guid>();
+            foreach (var version in versions.Values)
+            {
+                var question = version.GetAttributeValue<EntityReference>("al_questionid");
+                if (question != null)
+                {
+                    questionIds.Add(question.Id);
+                }
+            }
+
+            var questions = Remediation.ByIdIn(service, "al_question", new ColumnSet("al_questioncode"), questionIds);
+
+            var suitability = new List<int>();
+            var checkingPoints = new List<int>();
+            foreach (var response in responses)
+            {
+                var choice = response.GetAttributeValue<OptionSetValue>("al_answerchoice");
+                var versionRef = response.GetAttributeValue<EntityReference>("al_questionversionid");
+                Entity version;
+                if (choice == null || versionRef == null || !versions.TryGetValue(versionRef.Id, out version))
+                {
+                    continue;
+                }
+
+                var type = version.GetAttributeValue<OptionSetValue>("al_responsetype");
+                var questionRef = version.GetAttributeValue<EntityReference>("al_questionid");
+                Entity question = null;
+                if (questionRef != null)
+                {
+                    questions.TryGetValue(questionRef.Id, out question);
+                }
+
+                var code = question == null ? string.Empty : question.GetAttributeValue<string>("al_questioncode") ?? string.Empty;
+                if (code.StartsWith("Q-AML", StringComparison.OrdinalIgnoreCase))
+                {
+                    checkingPoints.Add(choice.Value);
+                }
+                else if (type != null && type.Value == ResponseRules.TypePassFailInsufficientNa)
+                {
+                    suitability.Add(choice.Value);
+                }
+            }
+
+            var ticked = false;
+            if (responseIds.Count > 0)
+            {
+                var links = new QueryExpression("al_al_failreason_al_response")
+                {
+                    ColumnSet = new ColumnSet("al_responseid"),
+                    Criteria = new FilterExpression(),
+                };
+                links.Criteria.AddCondition("al_responseid", ConditionOperator.In, responseIds.ToArray());
+                ticked = service.RetrieveMultiple(links).Entities.Count > 0;
+            }
+
+            var refusal = GradingRules.Refusal(
+                GradingRules.For(suitability, checkingPoints, ticked),
+                AnswerChoiceFor(service, reviewId, "Q-FQ-01"),
+                AnswerChoiceFor(service, reviewId, AqsRemedialQuestionCode),
+                AnswerChoiceFor(service, reviewId, GradeQuestionCode));
+            if (refusal != null)
+            {
+                throw new InvalidPluginExecutionException(PreconditionPrefix + refusal);
+            }
         }
 
         /// <summary>
@@ -1474,15 +1644,48 @@ namespace OutcomeTesting.Plugins
         {
             var reviewItems = Remediation.NonPassItems(service, reviewId, DateTime.UtcNow);
             var map = RemedialActions.Pending(service, reviewId);
+            if (owes)
+            {
+                reviewItems.AddRange(TaxCategories.Parked(map));
+            }
 
+            var words = owes ? map : null;
+            var overall = RemedialActions.TextFor(words, RemedialActions.OverallKey);
+
+            // Several overall actions must stay several, so they become rows of their own.
+            var overallExtras = RemedialActions.Extras(words, RemedialActions.OverallKey);
+            if (reviewItems.Count == 0 && overallExtras.Count > 0)
+            {
+                var label = string.IsNullOrWhiteSpace(reason) ? "Overall" : reason;
+                var rows = new List<string> { label };
+                var texts = new List<string> { overall };
+                foreach (var extra in overallExtras)
+                {
+                    rows.Add(label);
+                    texts.Add(extra);
+                }
+
+                return new RemediationLeg
+                {
+                    ReviewId = reviewId,
+                    Reason = reason,
+                    Items = rows,
+                    Texts = texts,
+                    HadWords = true,
+                    ClientContact = RemedialActions.ClientContact(words),
+                };
+            }
+
+            var expanded = RemedialActions.Expand(reviewItems, words);
             return new RemediationLeg
             {
                 ReviewId = reviewId,
                 Reason = reason,
-                Items = reviewItems,
-                Texts = RemedialActions.Align(reviewItems, owes ? map : null),
-                Overall = owes ? RemedialActions.TextFor(map, RemedialActions.OverallKey) : null,
+                Items = expanded.Select(pair => pair.Key).ToList(),
+                Texts = expanded.Select(pair => pair.Value).ToList(),
+                Overall = overall,
                 HadWords = map.Count > 0,
+                ClientContact = RemedialActions.ClientContact(words),
             };
         }
 

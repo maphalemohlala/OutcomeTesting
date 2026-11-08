@@ -40,6 +40,18 @@ namespace OutcomeTesting.Plugins
         /// <summary>al_preorpostcheck; every task in a Pre-Advice extract is a pre-check.</summary>
         public const int PreOrPostCheckPre = 120910540;
 
+        /// <summary>al_preorpostcheck, for a task retitled as a Post-Sale review.</summary>
+        public const int PreOrPostCheckPost = 120910541;
+
+        /// <summary>
+        /// The title the business gives a Post-Sale review before importing it (UAT, 2026-11-06).
+        /// IO has no task of its own for these, so the extract is amended by hand.
+        /// </summary>
+        public const string PostSaleName = "Post sale advice check required";
+
+        private const string NoChecklistItems =
+            "No checklist items are selected, so the review route cannot be determined.";
+
         /// <summary>
         /// al_iooutcome, the outcome the extract already carried. Deliberately its own
         /// option set and its own column: it is what IO recorded, not the BR-005 grade a
@@ -325,7 +337,10 @@ namespace OutcomeTesting.Plugins
                 { "High Risk Item 2", false },
                 { "Enhanced Supervision", false },
                 { "Pre-CAS Adviser", false },
+                { "Pre-CAS", false },
+                { "Pre-Check Adviser", false },
                 { "Leaver", false },
+                { PostSaleName, false },
             };
 
         /// <summary>
@@ -337,6 +352,8 @@ namespace OutcomeTesting.Plugins
             {
                 { "Tax", "Tax Check" },
                 { "Trust documentation", "Trust Documentation Check" },
+                { "Pre-CAS", "Pre-CAS Adviser" },
+                { "Pre-Check Adviser", "Pre-CAS Adviser" },
             };
 
         /// <summary>What one row's checklist columns said (design §5).</summary>
@@ -424,11 +441,16 @@ namespace OutcomeTesting.Plugins
 
             if (selection.Items.Count == 0)
             {
-                selection.Error =
-                    "No checklist items are selected, so the review route cannot be determined.";
+                selection.Error = NoChecklistItems;
             }
 
             return selection;
+        }
+
+        /// <summary>Whether a task's title marks it as a Post-Sale review.</summary>
+        public static bool IsPostSale(string title)
+        {
+            return string.Equals((title ?? string.Empty).Trim(), PostSaleName, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>Tokenises CSV text into rows of fields, honouring quotes and embedded newlines.</summary>
@@ -815,7 +837,13 @@ namespace OutcomeTesting.Plugins
 
                 // Every task in a Pre-Advice extract is a pre-check; the extract has no
                 // column of its own for it.
-                if (HeaderCell(fields, headerIndex, "TaskType")
+                var postSale = IsPostSale(HeaderCell(fields, headerIndex, "TaskType"))
+                    || IsPostSale(HeaderCell(fields, headerIndex, "Subject"));
+                if (postSale)
+                {
+                    values["al_preorpostcheck"] = PreOrPostCheckPost;
+                }
+                else if (HeaderCell(fields, headerIndex, "TaskType")
                     .StartsWith("Pre-Advice", StringComparison.OrdinalIgnoreCase))
                 {
                     values["al_preorpostcheck"] = PreOrPostCheckPre;
@@ -835,6 +863,19 @@ namespace OutcomeTesting.Plugins
                 if (rowError == null)
                 {
                     var checklist = ReadChecklist(fields, headerIndex);
+
+                    // A Post-Sale task has no IO checklist behind it, so it may stamp nothing.
+                    // It is an AQS review; a Tax item on the row still routes it through Tax.
+                    if (postSale && checklist.Error == NoChecklistItems)
+                    {
+                        checklist.Error = null;
+                    }
+
+                    if (postSale && !checklist.Items.Contains(PostSaleName))
+                    {
+                        checklist.Items.Add(PostSaleName);
+                    }
+
                     if (checklist.Error != null)
                     {
                         rowError = checklist.Error;

@@ -5,7 +5,7 @@ import {
   trailLightRow,
   describeCheckRange,
   fileContentsSummary,
-  isPassWithNoFails,
+  belongsInDailyFile,
   withinCheckDates,
   type ExportRecord,
 } from './trailLight';
@@ -231,40 +231,47 @@ describe('the daily file leaving out passes with no fails', () => {
   const row = (advice?: string, file?: string) =>
     ({ al_advicequalitygrade: advice, al_filequalitygrade: file }) as ExportRecord;
 
-  it('treats a pass on both grades as a pass with no fails', () => {
-    expect(isPassWithNoFails(row('Pass', 'Pass'))).toBe(true);
+  it('leaves out a pass on both grades', () => {
+    expect(belongsInDailyFile(row('Pass', 'Pass'))).toBe(false);
   });
 
-  it('treats a Tax-only pass, with no advice grade, the same way', () => {
-    expect(isPassWithNoFails(row(undefined, 'Pass'))).toBe(true);
+  it('leaves out a Pass with issues when the file passed', () => {
+    expect(belongsInDailyFile(row('Pass with issues', 'Pass'))).toBe(false);
   });
 
-  it('keeps a failed file quality even where the advice passed', () => {
-    expect(isPassWithNoFails(row('Pass', 'Fail'))).toBe(false);
-  });
-
-  it('keeps every other advice grade', () => {
-    for (const grade of ['Pass with issues', 'Insufficient Evidence', 'Potential Harm']) {
-      expect(isPassWithNoFails(row(grade, 'Pass'))).toBe(false);
+  it('keeps a File Quality fail whatever the advice grade', () => {
+    for (const grade of ['Pass', 'Pass with issues', 'Insufficient evidence', 'Potential harm']) {
+      expect(belongsInDailyFile(row(grade, 'Fail'))).toBe(true);
     }
   });
 
-  it('keeps a row with no grade at all', () => {
-    expect(isPassWithNoFails(row())).toBe(false);
+  it('keeps Insufficient evidence and Potential harm when the file passed', () => {
+    for (const grade of ['Insufficient evidence', 'Potential Harm']) {
+      expect(belongsInDailyFile(row(grade, 'Pass'))).toBe(true);
+    }
   });
 
-  it('says how many passes were left out', () => {
+  it('decides a Tax-only case, with no advice grade, on its file grade', () => {
+    expect(belongsInDailyFile(row(undefined, 'Fail'))).toBe(true);
+    expect(belongsInDailyFile(row(undefined, 'Pass'))).toBe(false);
+  });
+
+  it('leaves out a row with no grade at all', () => {
+    expect(belongsInDailyFile(row())).toBe(false);
+  });
+
+  it('says how many cases were left out', () => {
     expect(fileContentsSummary(24, 24, '', '', 19)).toBe(
-      'The file will contain 5 of the 24 cases in this batch, leaving out 19 passes with no fails.',
+      'The file will contain 5 of the 24 cases in this batch, leaving out 19 cases that do not belong in it.',
     );
     expect(fileContentsSummary(2, 24, '2026-11-02', '2026-11-02', 1)).toBe(
-      'The file will contain 1 of the 24 cases in this batch: those checked on 2 Nov 2026, leaving out 1 pass with no fails.',
+      'The file will contain 1 of the 24 cases in this batch: those checked on 2 Nov 2026, leaving out 1 case that does not belong in it.',
     );
   });
 
-  it('says plainly when only passes were in range', () => {
+  it('says plainly when nothing in range belongs in the file', () => {
     expect(fileContentsSummary(3, 24, '2026-11-02', '', 3)).toBe(
-      'Every case in this batch checked on or after 2 Nov 2026 is a pass with no fails, so the daily file has nothing to download.',
+      'No case in this batch checked on or after 2 Nov 2026 belongs in the daily file, so it has nothing to download.',
     );
   });
 });

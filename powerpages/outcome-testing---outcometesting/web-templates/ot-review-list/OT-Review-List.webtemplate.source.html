@@ -161,6 +161,8 @@
       <attribute name="al_duedate" />
       <attribute name="al_aqsqueuedon" />
       <attribute name="createdon" />
+      <attribute name="al_preorpostcheck" />
+      <attribute name="al_preorpostcheckid" />
       <filter type="and">
         <condition attribute="statecode" operator="eq" value="0" />
         <condition attribute="al_aqsqueueaccountid" operator="not-null" />
@@ -234,6 +236,7 @@
                         {{ c.al_casereference | default: 'Untitled case' | escape }}
                       </a>
                       {% if c_tax %}<span class="ot-badge">Tax reviewed</span>{% endif %}
+                      {% if c.al_preorpostcheck.value == 120910541 or c.al_preorpostcheckid.name == 'Post' %}<span class="ot-badge">Post-sale</span>{% endif %}
                     </td>
                     <td>{{ c.al_clientname | escape }}</td>
                     <td>{{ c.al_advisername | escape }}</td>

@@ -139,6 +139,9 @@ namespace OutcomeTesting.Plugins.Tests
 
             var custom = Queued(service).Single(n => n.Recipient == "manager@example.com");
             Assert.False(string.IsNullOrWhiteSpace(custom.AttachmentBody));
+
+            // The T&C Coach's letter printed the marker itself (UAT, 2026-11-06).
+            Assert.DoesNotContain("completedCheck", custom.Body);
         }
 
         [Fact]
@@ -197,6 +200,8 @@ namespace OutcomeTesting.Plugins.Tests
             public string Recipient { get; set; }
             public string AttachmentName { get; set; }
             public string AttachmentBody { get; set; }
+
+            public string Body { get; set; }
         }
 
         private static List<Row> Queued(FakeOrganizationService service)
@@ -206,7 +211,8 @@ namespace OutcomeTesting.Plugins.Tests
                 ColumnSet = new ColumnSet(
                     "al_recipientemail",
                     NotificationOutbox.AttachmentNameAttr,
-                    NotificationOutbox.AttachmentBodyAttr),
+                    NotificationOutbox.AttachmentBodyAttr,
+                    "al_body"),
             };
 
             return service.RetrieveMultiple(query).Entities
@@ -215,6 +221,7 @@ namespace OutcomeTesting.Plugins.Tests
                     Recipient = e.GetAttributeValue<string>("al_recipientemail"),
                     AttachmentName = e.GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr),
                     AttachmentBody = e.GetAttributeValue<string>(NotificationOutbox.AttachmentBodyAttr),
+                    Body = e.GetAttributeValue<string>("al_body"),
                 })
                 .ToList();
         }

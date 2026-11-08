@@ -798,11 +798,12 @@ namespace OutcomeTesting.Plugins
                     "Confirm remedial action",
                     TokenReference, TokenAdviser, TokenClient, TokenGrading, TokenDueText, TokenCaseButton),
 
-                Plain(RemediationOther, "Remediation raised (other grading)",
+                Html(RemediationOther, "Remediation raised (other grading)",
                     "Remediation required on case {{reference}} - {{client}}",
-                    "Remediation has been raised against case {{reference}} and assigned to you.{{dueText}}"
-                        + " Record your response against each item in the portal.",
-                    TokenReference, TokenDueText),
+                    "<p>Remediation has been raised against case {{reference}} and assigned to you.{{dueText}}"
+                        + " Record your response against each item in the portal.</p>{{caseButton}}",
+                    "Confirm remedial action",
+                    TokenReference, TokenDueText, TokenCaseButton),
 
                 Html(CasePassed, "Case check - Pass",
                     "Case check - Pass: {{reference}} - {{client}}",

@@ -13,6 +13,15 @@ import reviewTemplate from '../../../../powerpages/outcome-testing---outcometest
 const start = reviewTemplate.indexOf('{% fetchxml review_actions %}');
 const section = reviewTemplate.slice(start, reviewTemplate.indexOf('</section>', start));
 
+describe('a Tax check waiting on AQS', () => {
+  it('shows the words parked on it while nothing has been raised', () => {
+    expect(reviewTemplate).toContain(
+      '{% if review_actions_list.size == 0 and rv.al_pendingremedialactions %}',
+    );
+    expect(reviewTemplate).toContain('data-ot-remedial-parked="{{ rv.al_pendingremedialactions | escape }}"');
+  });
+});
+
 describe('the submitted review page lists its remedial actions', () => {
   it('reads this review\'s live actions', () => {
     expect(start).toBeGreaterThan(-1);

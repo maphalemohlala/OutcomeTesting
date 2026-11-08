@@ -112,7 +112,8 @@ namespace OutcomeTesting.Plugins.Tests
                     // is not in NotificationTemplates and no administrator may edit it.
                     Assert.True(
                         args.Contains("NotificationTemplates.") || args.Contains("code")
-                            || args.Contains("ParaplannerRemediationLetter."),
+                            || args.Contains("ParaplannerRemediationLetter.")
+                            || args.Contains("TcManagerCopyOccurrence"),
                         Path.GetFileName(path) + " queues a letter without naming its template, "
                         + "so an administrator's choice of recipient and wording is ignored "
                         + "for it (F33).");

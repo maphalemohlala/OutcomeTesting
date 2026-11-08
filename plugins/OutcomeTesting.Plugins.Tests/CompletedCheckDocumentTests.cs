@@ -123,14 +123,14 @@ namespace OutcomeTesting.Plugins.Tests
             var suitability = Grid(CompletedCheck.Blocks(Case(), AqsReviewId), "Suitability test point");
 
             Assert.Equal(
-                new[] { "Suitability test point", "Pass", "Fail", "Insufficient evidence", "N/A" },
+                new[] { "Suitability test point", "Pass", "Pass with issues", "Potential harm", "Insufficient evidence", "N/A" },
                 suitability.Rows[0].Cells.Select(c => c.Text).ToArray());
 
             var concessions = Row(suitability, "Any concessions / off-tariff pricing approved and recorded");
-            Assert.Equal("[x]", concessions.Cells[4].Text);
+            Assert.Equal("[x]", concessions.Cells[5].Text);
 
             var charges = Row(suitability, "Adviser charges clearly disclosed and evidenced");
-            Assert.Equal(new[] { "[x]", "[ ]", "[ ]", "[ ]" }, charges.Cells.Skip(1).Select(c => c.Text).ToArray());
+            Assert.Equal(new[] { "[x]", "[ ]", "[ ]", "[ ]", "[ ]" }, charges.Cells.Skip(1).Select(c => c.Text).ToArray());
         }
 
         [Fact]
@@ -148,9 +148,9 @@ namespace OutcomeTesting.Plugins.Tests
 
             var suitability = Grid(CompletedCheck.Blocks(service, AqsReviewId), "Suitability test point");
 
-            Assert.Equal("N/A", suitability.Rows[0].Cells[4].Text);
+            Assert.Equal("N/A", suitability.Rows[0].Cells[5].Text);
             var charges = Row(suitability, "Adviser charges clearly disclosed and evidenced");
-            Assert.Equal(string.Empty, charges.Cells[4].Text);
+            Assert.Equal(string.Empty, charges.Cells[5].Text);
             Assert.Equal("[x]", charges.Cells[1].Text);
         }
 
@@ -159,9 +159,9 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var crp = Grid(CompletedCheck.Blocks(Case(), AqsReviewId), "Centralised Retirement Proposition test point");
 
-            Assert.Equal("N/A", crp.Rows[0].Cells[4].Text);
-            Assert.Equal("[x]", Row(crp, "Cashflow model stress tests on file").Cells[4].Text);
-            Assert.All(crp.Rows.Skip(1), r => Assert.StartsWith("[", r.Cells[4].Text));
+            Assert.Equal("N/A", crp.Rows[0].Cells[5].Text);
+            Assert.Equal("[x]", Row(crp, "Cashflow model stress tests on file").Cells[5].Text);
+            Assert.All(crp.Rows.Skip(1), r => Assert.StartsWith("[", r.Cells[5].Text));
         }
 
         [Fact]
@@ -171,7 +171,7 @@ namespace OutcomeTesting.Plugins.Tests
             var suitability = Grid(CompletedCheck.Blocks(Case(), AqsReviewId), "Suitability test point");
 
             var unanswered = Row(suitability, "Language is clear, fair and not misleading");
-            Assert.Equal(new[] { "[ ]", "[ ]", "[ ]", "[ ]" }, unanswered.Cells.Skip(1).Select(c => c.Text).ToArray());
+            Assert.Equal(new[] { "[ ]", "[ ]", "[ ]", "[ ]", "[ ]" }, unanswered.Cells.Skip(1).Select(c => c.Text).ToArray());
         }
 
         [Fact]
@@ -631,13 +631,13 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // The sign-off letters are queued deep inside SignoffProgressPlugin, which no test
             // drives end to end; this pins that each adviser letter goes the one way. The
-            // emitter's count is 3: the remediation letter, the case-passed letter and the
+            // emitter's count is 4: the remediation letter, the case-passed letter, the T&C Manager's copy and the
             // para-planner's own copy of the remediation letter.
             var plugins = Path.Combine(PluginsPath(), "OutcomeTesting.Plugins");
             var emitter = File.ReadAllText(Path.Combine(plugins, "NotificationEmitterPlugin.cs"));
             var signoff = File.ReadAllText(Path.Combine(plugins, "SignoffProgressPlugin.cs"));
 
-            Assert.Equal(3, Count(emitter, "NotificationOutbox.QueueWithCompletedCheck("));
+            Assert.Equal(4, Count(emitter, "NotificationOutbox.QueueWithCompletedCheck("));
             Assert.Equal(1, Count(emitter, "NotificationOutbox.Queue("));
             Assert.Contains("NotificationOutbox.QueueWithCompletedCheck(", signoff.Substring(signoff.IndexOf("private static void QueueSignoffNotification(", StringComparison.Ordinal)));
         }

@@ -23,10 +23,30 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static void EnsureWritten(IOrganizationService service, Guid reviewId, DateTime asOf)
         {
-            var refusal = Refusal(Remediation.NonPassItems(service, reviewId, asOf), Pending(service, reviewId));
+            var map = Pending(service, reviewId);
+            var items = Remediation.NonPassItems(service, reviewId, asOf);
+
+            // A category's comments are its words, so it needs none on the card.
+            items.AddRange(TaxCategories.Parked(map));
+
+            var refusal = Refusal(items, map);
             if (refusal != null)
             {
                 throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + refusal);
+            }
+        }
+
+        /// <summary>
+        /// The AQS checker answers "Client contact required?" whenever the check owes a
+        /// remediation (client decision, 2026-11-06). It was the adviser's until then.
+        /// </summary>
+        public static void EnsureClientContact(IOrganizationService service, Guid reviewId)
+        {
+            if (ClientContact(Pending(service, reviewId)) == null)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + "Answer 'Client contact required?' under 'Fail points "
+                    + "and remedial actions' before submitting.");
             }
         }
     }

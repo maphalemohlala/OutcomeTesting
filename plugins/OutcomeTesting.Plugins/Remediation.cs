@@ -299,6 +299,13 @@ namespace OutcomeTesting.Plugins
                 return choice == ResponseRules.ChoiceNo;
             }
 
+            // A point marked Pass with issues routes to a remedial action (client, 2026-11-06).
+            if (responseType == ResponseRules.TypePassFailInsufficientNa
+                && choice == ResponseRules.ChoicePassWithIssues)
+            {
+                return true;
+            }
+
             if (responseType == ResponseRules.TypeYesNoInsufficient)
             {
                 return choice == ResponseRules.ChoiceNo
@@ -306,6 +313,18 @@ namespace OutcomeTesting.Plugins
             }
 
             return ResponseRules.IsNonPass(choice);
+        }
+
+        /// <summary>
+        /// An answer's wording on an item. Fail reads Potential harm on the Suitability core
+        /// checks (client decision, 2026-11-06): the value is unchanged, so stored answers and
+        /// MI keep their meaning. otRemedialItems must produce the same words.
+        /// </summary>
+        private static string AnswerLabel(int responseType, int choice, OptionLabels labels)
+        {
+            return responseType == ResponseRules.TypePassFailInsufficientNa && choice == ResponseRules.ChoiceFail
+                ? "Potential harm"
+                : labels.Label("al_response", "al_answerchoice", choice);
         }
 
         /// <summary>
@@ -497,7 +516,7 @@ namespace OutcomeTesting.Plugins
                 {
                     Section = section == null ? 0 : section.GetAttributeValue<int?>("al_displayorder") ?? 0,
                     Order = version.GetAttributeValue<int?>("al_displayorder") ?? 0,
-                    Text = text.Trim() + ": " + labels.Label("al_response", "al_answerchoice", choice.Value),
+                    Text = text.Trim() + ": " + AnswerLabel(responseType.Value, choice.Value, labels),
                 });
             }
 
@@ -668,7 +687,7 @@ namespace OutcomeTesting.Plugins
         /// Empty in, empty out - an <c>In</c> with no values is a query Dataverse rejects,
         /// and a review with nothing marked down is the ordinary case rather than an error.
         /// </summary>
-        private static Dictionary<Guid, Entity> ByIdIn(
+        internal static Dictionary<Guid, Entity> ByIdIn(
             IOrganizationService service, string entity, ColumnSet columns, List<Guid> ids)
         {
             var byId = new Dictionary<Guid, Entity>();
@@ -825,11 +844,12 @@ namespace OutcomeTesting.Plugins
             EntityReference adviserContact,
             DateTime raisedOn,
             IList<string> remedialActions = null,
-            string overallRemedialAction = null)
+            string overallRemedialAction = null,
+            int? clientContact = null)
         {
             var raised = RaiseActions(
                 service, caseRef, caseReference, reviewId, sequence, reason, observation,
-                items, adviserContact, raisedOn, remedialActions, overallRemedialAction);
+                items, adviserContact, raisedOn, remedialActions, overallRemedialAction, clientContact);
 
             // The letters were queued on the first create and drew one action; every action
             // exists now (2026-10-05).
@@ -850,7 +870,8 @@ namespace OutcomeTesting.Plugins
             EntityReference adviserContact,
             DateTime raisedOn,
             IList<string> remedialActions = null,
-            string overallRemedialAction = null)
+            string overallRemedialAction = null,
+            int? clientContact = null)
         {
             var raised = new List<Guid>();
 
@@ -868,7 +889,8 @@ namespace OutcomeTesting.Plugins
                     Describe(reason, observation, null),
                     adviserContact,
                     raisedOn,
-                    overallRemedialAction));
+                    overallRemedialAction,
+                    clientContact));
                 return raised;
             }
 
@@ -894,7 +916,8 @@ namespace OutcomeTesting.Plugins
                     DescribeItem(reason, observation, item),
                     adviserContact,
                     raisedOn,
-                    remedialActions != null && position < remedialActions.Count ? remedialActions[position] : null));
+                    remedialActions != null && position < remedialActions.Count ? remedialActions[position] : null,
+                    clientContact));
             }
 
             // Every item was blank, which the list should never carry - fall back to the one
@@ -910,7 +933,8 @@ namespace OutcomeTesting.Plugins
                     Describe(reason, observation, null),
                     adviserContact,
                     raisedOn,
-                    overallRemedialAction));
+                    overallRemedialAction,
+                    clientContact));
             }
 
             return raised;
@@ -933,7 +957,8 @@ namespace OutcomeTesting.Plugins
             string description,
             EntityReference adviserContact,
             DateTime raisedOn,
-            string remedialAction)
+            string remedialAction,
+            int? clientContact = null)
         {
             var existing = FindByCode(service, code);
             if (existing != Guid.Empty)
@@ -960,6 +985,11 @@ namespace OutcomeTesting.Plugins
 
             // The checker's words, written once, here. RemediationResponseGuardPlugin refuses
             // every later write to the column, so this is the only moment it can be set.
+            if (clientContact.HasValue)
+            {
+                action["al_clientcontactrequired"] = new OptionSetValue(clientContact.Value);
+            }
+
             var remedial = (remedialAction ?? string.Empty).Trim();
             if (remedial.Length > 0)
             {

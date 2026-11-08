@@ -34,6 +34,16 @@ namespace OutcomeTesting.Plugins
         /// <summary>The single action a check with no itemised fail point owes.</summary>
         public const string OverallKey = "__overall__";
 
+        /// <summary>
+        /// Marks a further action on one item: "item ##2", "item ##3". Each raises an action of
+        /// its own, so a checker can put several independent queries against one question
+        /// (client decision, 2026-11-06) without the map changing shape.
+        /// </summary>
+        public const string ExtraMark = " ##";
+
+        /// <summary>The AQS checker's answer to "Client contact required?", as its option value.</summary>
+        public const string ClientContactKey = "__clientcontact__";
+
         /// <summary><c>al_reviewinstance</c>: the parked map, cleared once its actions are raised.</summary>
         public const string PendingAttr = "al_pendingremedialactions";
 
@@ -163,6 +173,55 @@ namespace OutcomeTesting.Plugins
             }
 
             return texts;
+        }
+
+        /// <summary>
+        /// Each item with its words, each followed by any further actions written against it,
+        /// numbered order. The item repeats, which is what gives every query its own action.
+        /// </summary>
+        public static List<KeyValuePair<string, string>> Expand(
+            IList<string> items, IDictionary<string, string> map)
+        {
+            var expanded = new List<KeyValuePair<string, string>>();
+            foreach (var item in items ?? new List<string>())
+            {
+                expanded.Add(new KeyValuePair<string, string>(item, TextFor(map, item)));
+                foreach (var extra in Extras(map, item))
+                {
+                    expanded.Add(new KeyValuePair<string, string>(item, extra));
+                }
+            }
+
+            return expanded;
+        }
+
+        /// <summary>The further actions written against one item, in the order they were added.</summary>
+        public static List<string> Extras(IDictionary<string, string> map, string item)
+        {
+            var found = new SortedDictionary<int, string>();
+            if (map != null && item != null)
+            {
+                var stem = item.Trim() + ExtraMark;
+                foreach (var pair in map)
+                {
+                    int number;
+                    if (pair.Key.StartsWith(stem, StringComparison.Ordinal)
+                        && int.TryParse(pair.Key.Substring(stem.Length), out number)
+                        && !string.IsNullOrWhiteSpace(pair.Value))
+                    {
+                        found[number] = pair.Value.Trim();
+                    }
+                }
+            }
+
+            return new List<string>(found.Values);
+        }
+
+        /// <summary>The client contact answer parked on a review, or null when there is none.</summary>
+        public static int? ClientContact(IDictionary<string, string> map)
+        {
+            int value;
+            return int.TryParse(TextFor(map, ClientContactKey), out value) ? value : (int?)null;
         }
 
         /// <summary>

@@ -72,11 +72,11 @@ const TEMPLATES: Record<string, TemplateHint> = {
   },
   'REMEDIATION-OTHER': {
     name: 'Remediation raised (other grading)',
-    tokens: ['reference', 'dueText'],
-    isHtml: false,
+    tokens: ['reference', 'dueText', 'caseButton'],
+    isHtml: true,
     subject: 'Remediation required on case {{reference}} - {{client}}',
     body:
-      'Remediation has been raised against case {{reference}} and assigned to you.{{dueText}} Record your response against each item in the portal.',
+      '<p>Remediation has been raised against case {{reference}} and assigned to you.{{dueText}} Record your response against each item in the portal.</p>{{caseButton}}',
   },
   'CASE-PASSED': {
     name: 'Case check - Pass',

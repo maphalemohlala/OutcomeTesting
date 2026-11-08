@@ -7,13 +7,13 @@ import type { Al_outcomes } from '../../generated/models/Al_outcomesModel';
  * Light columns 11-14 and 17-20 (AD-039), so this page and the export must agree about what
  * a row means - the same reason ImportRules and caseUpload are kept in step.
  *
- * The rule, from the project owner on 2026-09-16: a recorded judgement wins outright, and
- * an untouched row derives from the people the case already names. The paraplanner compiles
- * the file, so a File Quality fail is theirs; the adviser gives the advice, so an Advice
- * Quality fail is theirs.
+ * The rule, from the project owner on 2026-09-16: a recorded judgement wins for its own
+ * discipline, and a discipline nobody has judged derives from the people the case already
+ * names. The paraplanner compiles the file, so a File Quality fail is theirs; the adviser
+ * gives the advice, so an Advice Quality fail is theirs.
  *
- * "Untouched" is all four false. That is "nobody has said yet", not "nobody is
- * responsible", which is why a deliberate nobody cannot be expressed - and could not be
+ * "Nobody has judged" is both that discipline's flags false. That is "nobody has said yet",
+ * not "nobody is responsible", which is why a deliberate nobody cannot be expressed - and could not be
  * before either, the retired OD-024 gate having refused a row that named no one.
  */
 
@@ -79,25 +79,30 @@ export function effectiveAccountability(
   fileQualityFailed: boolean,
   adviceQualityFailed: boolean,
 ): { flags: AccountabilityFlags; source: AccountabilitySource } {
-  if (isRecorded(recorded)) {
-    return { flags: recorded, source: 'recorded' };
-  }
+  const derived = derivedFlags(fileQualityFailed, adviceQualityFailed);
+  if (!isRecorded(recorded)) return { flags: derived, source: 'derived' };
 
-  return { flags: derivedFlags(fileQualityFailed, adviceQualityFailed), source: 'derived' };
+  const fileJudged = recorded.fqAdviser || recorded.fqParaplanner;
+  const adviceJudged = recorded.aqAdviser || recorded.aqParaplanner;
+  return {
+    flags: {
+      fqAdviser: recorded.fqAdviser,
+      fqParaplanner: fileJudged ? recorded.fqParaplanner : derived.fqParaplanner,
+      aqAdviser: adviceJudged ? recorded.aqAdviser : derived.aqAdviser,
+      aqParaplanner: recorded.aqParaplanner,
+    },
+    source: 'recorded',
+  };
 }
 
 /**
- * Whether the outcome is one that demands remediation, which is what makes an Advice
- * Quality fail (OutcomeRules.RequiresRemediation: anything but a Pass).
+ * Whether the outcome names someone in the extract: Insufficient evidence or Potential harm
+ * (client, 2026-11-06). A Pass with issues needs remediation but is not a fail there.
  *
  * Read from the label rather than the option value because that is what the outcome hook
- * already resolved; the values live in the generated map and both spellings of "Pass" the
- * scale carries - Pass, and Pass with issues - are distinguished here, since only the bare
- * Pass is clean.
+ * already resolved.
  */
 export function adviceQualityFailedFrom(outcomeLabel: string | null): boolean {
-  if (outcomeLabel === null) return false;
-  const normalised = outcomeLabel.trim().toLowerCase();
-  if (normalised === '' || normalised === '—') return false;
-  return normalised !== 'pass';
+  const normalised = outcomeLabel?.trim().toLowerCase();
+  return normalised === 'insufficient evidence' || normalised === 'potential harm';
 }

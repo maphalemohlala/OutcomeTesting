@@ -96,6 +96,7 @@ namespace OutcomeTesting.Plugins.Tests
                 entries.Add("{\"item\":\"" + pairs[i] + "\",\"text\":\"" + pairs[i + 1] + "\"}");
             }
 
+            entries.Add(ClientContactEntry);
             svc.Row("al_reviewinstance", reviewId)[RemedialActions.PendingAttr] = "[" + string.Join(",", entries) + "]";
         }
 
@@ -107,10 +108,12 @@ namespace OutcomeTesting.Plugins.Tests
                 .ToArray();
         }
 
+        private const string ClientContactEntry = "{\"item\":\"__clientcontact__\",\"text\":\"120910794\"}";
+
         private static void Park(FakeOrganizationService svc, Guid reviewId, string overall)
         {
             svc.Row("al_reviewinstance", reviewId)[RemedialActions.PendingAttr] =
-                "[{\"item\":\"" + RemedialActions.OverallKey + "\",\"text\":\"" + overall + "\"}]";
+                "[{\"item\":\"" + RemedialActions.OverallKey + "\",\"text\":\"" + overall + "\"}," + ClientContactEntry + "]";
         }
 
         private static void Submit(FakeOrganizationService svc, Guid reviewId)

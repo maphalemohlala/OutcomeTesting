@@ -11,6 +11,7 @@ export const FAIL_REASON_CATEGORIES = [
   { value: 120910401, label: 'Breach', prefix: 'BRE' },
   { value: 120910402, label: 'Record Keeping', prefix: 'REC' },
   { value: 120910403, label: 'Tax check', prefix: 'TAX' },
+  { value: 120910404, label: 'Tax file quality', prefix: 'TFQ' },
 ] as const;
 
 export interface RawFailReason {

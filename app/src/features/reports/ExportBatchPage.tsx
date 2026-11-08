@@ -8,7 +8,7 @@ import {
   TRAIL_LIGHT_HEADERS,
   describeCheckRange,
   fileContentsSummary,
-  isPassWithNoFails,
+  belongsInDailyFile,
   trailLightFilename,
   trailLightRow,
   ukDay,
@@ -58,16 +58,16 @@ export function ExportBatchPage() {
     [allRecords, from, to],
   );
   const records = useMemo(
-    () => (quarterly ? inRange : inRange.filter((r) => !isPassWithNoFails(r.record))),
+    () => (quarterly ? inRange : inRange.filter((r) => belongsInDailyFile(r.record))),
     [inRange, quarterly],
   );
-  const passesLeftOut = inRange.length - records.length;
+  const leftOut = inRange.length - records.length;
   const nothingInFile =
     allRecords.length === 0
       ? 'This batch holds no cases.'
       : inRange.length === 0
         ? 'No cases in this batch fall in the chosen range.'
-        : 'Every case in range is a pass with no fails. Choose the quarterly file to include them.';
+        : 'No case in range belongs in the daily file. Choose the quarterly file to include them.';
   const range = describeCheckRange(from, to);
   const isDraft = batch?.status === 'Draft';
   // The batch recorded how many rows it wrote. Anything else here means the file would be short.
@@ -123,8 +123,9 @@ export function ExportBatchPage() {
                   Which cases go in the file
                 </h2>
                 <p className="exports__note">
-                  The daily file leaves out passes with no fails. The quarterly file keeps every
-                  case. Choose the check dates to include - the day each case's review was
+                  The daily file holds only cases with a File Quality Fail, or an Advice Quality
+                  outcome of Insufficient evidence or Potential harm. The quarterly file keeps
+                  every case. Choose the check dates to include - the day each case's review was
                   submitted (column G). Both dates are included. Leave both empty to use every
                   case in this batch.
                 </p>
@@ -186,7 +187,7 @@ export function ExportBatchPage() {
                   />
                 </div>
                 <p className="exports__summary" role="status">
-                  {fileContentsSummary(inRange.length, allRecords.length, from, to, passesLeftOut)}
+                  {fileContentsSummary(inRange.length, allRecords.length, from, to, leftOut)}
                 </p>
                 <table className="exports__table">
                   <thead>

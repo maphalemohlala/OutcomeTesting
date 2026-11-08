@@ -217,6 +217,51 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Contains("No further action is required.", body);
         }
 
+        [Theory]
+        [InlineData(true, 2)]
+        [InlineData(false, 1)]
+        public void A_new_entrants_pass_also_reaches_their_tc_manager(bool newEntrant, int letters)
+        {
+            var svc = Case();
+            var coach = svc.Seed("contact", Guid.NewGuid(), "emailaddress1", "coach@example.com", "statecode", 0);
+            svc.Seed("al_advisermapping", Guid.NewGuid(),
+                "al_adviseremail", "sam@example.com",
+                "al_tcmanagerid", new EntityReference("contact", coach.Id),
+                "statecode", new OptionSetValue(0));
+            svc.Row("al_outcomecase", CaseId)["al_checklistitems"] =
+                newEntrant ? "High Risk Item 1\nPre-CAS Adviser" : "High Risk Item 1";
+
+            NotificationEmitterPlugin.QueueCasePassed(svc, Correlation, Ref());
+
+            var sent = svc.All("al_notification").ToList();
+            Assert.Equal(letters, sent.Count);
+            Assert.Equal(newEntrant, sent.Any(e => e.GetAttributeValue<string>("al_recipientemail") == "coach@example.com"));
+        }
+
+        [Theory]
+        [InlineData("Tax only", 120910701, "", true)]
+        [InlineData("Tax then AQS", 120910701, "", false)]
+        [InlineData("AQS only", 120910701, "Pre-CAS Adviser", true)]
+        [InlineData("AQS only", 120910702, "Pre-CAS Adviser", false)]
+        public void The_tc_manager_is_copied_on_tax_only_and_new_entrant_pass_with_issues(
+            string route, int outcome, string items, bool copied)
+        {
+            var svc = Case();
+            var coach = svc.Seed("contact", Guid.NewGuid(), "emailaddress1", "coach@example.com", "statecode", 0);
+            svc.Seed("al_advisermapping", Guid.NewGuid(),
+                "al_adviseremail", "sam@example.com",
+                "al_tcmanagerid", new EntityReference("contact", coach.Id),
+                "statecode", new OptionSetValue(0));
+            svc.Row("al_outcomecase", CaseId)["al_reviewrouteid"] = new EntityReference("al_reviewroute", Guid.NewGuid()) { Name = route };
+            svc.Row("al_outcomecase", CaseId)["al_checklistitems"] = items;
+            Graded(svc, outcome);
+            OpenAction(svc);
+
+            Remediation.AssignOpenActions(svc, Ref(), Correlation);
+
+            Assert.Equal(copied, svc.Creates.Any(c => c.GetAttributeValue<string>("al_recipientemail") == "coach@example.com"));
+        }
+
         [Fact]
         public void The_pass_letter_is_queued_unaddressed_when_the_case_has_no_adviser_email()
         {

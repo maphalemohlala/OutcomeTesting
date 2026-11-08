@@ -5,13 +5,18 @@ import {
   Al_outcomecasesService,
   Al_outcomesService,
   Al_remediationactionsService,
+  Al_reviewinstancesService,
+  ContactsService,
 } from '../../generated';
 import { logTechnical } from '../../services/errors';
 import {
   CASE_SUMMARY_COLUMNS,
   OUTCOME_GRADE_COLUMNS,
+  REVIEW_SUBMISSION_COLUMNS,
   gradesByCase,
   productNamesByCase,
+  staffCodesByEmail,
+  submissionsByCase,
   toSummary,
 } from './caseWorklistMapping';
 import { ACTION_COUNT_COLUMNS, remediationByCase, type CaseRemediation } from './caseRemediation';
@@ -56,8 +61,17 @@ export function useCaseWorklist(): WorklistState {
         orderBy: ['al_listoption_al_outcomecase_productsid asc'],
       }).catch(() => null),
       readAll((o) => Al_listoptionsService.getAll(o), { orderBy: ['al_listoptionid asc'] }).catch(() => null),
+      // Both degrade the same way: blank codes and timings, never a lost list.
+      readAll((o) => ContactsService.getAll(o), {
+        orderBy: ['contactid asc'],
+        select: ['contactid', 'emailaddress1', 'al_staffcode', 'statecode'],
+      }).catch(() => null),
+      readAll((o) => Al_reviewinstancesService.getAll(o), {
+        orderBy: ['al_reviewinstanceid asc'],
+        select: REVIEW_SUBMISSION_COLUMNS,
+      }).catch(() => null),
     ])
-      .then(([cases, outcomes, actions, productLinks, catalogue]) => {
+      .then(([cases, outcomes, actions, productLinks, catalogue, contacts, reviews]) => {
         if (cancelled) return;
         if (!cases.success) {
           logTechnical('worklist load', cases.error);
@@ -81,11 +95,21 @@ export function useCaseWorklist(): WorklistState {
             ? productNamesByCase(productLinks.data, catalogue.data, new Date())
             : new Map<string, string>();
 
+        const codes = contacts?.success
+          ? staffCodesByEmail(contacts.data as Parameters<typeof staffCodesByEmail>[0])
+          : new Map<string, string>();
+        const codeOf = (email: string | undefined) => codes.get(email?.trim().toLowerCase() ?? '') ?? null;
+        const submissions = reviews?.success ? submissionsByCase(reviews.data) : null;
+
         setState({
           status: 'ready',
           cases: cases.data.map((record) => ({
             ...toSummary(record, grades.get(record.al_outcomecaseid)),
             products: products.get(record.al_outcomecaseid) || (record.al_products ?? null),
+            adviserCode: codeOf(record.al_adviseremail),
+            paraplannerCode: codeOf(record.al_paraplanneremail),
+            taxSubmittedOn: submissions ? (submissions.get(record.al_outcomecaseid)?.tax ?? null) : undefined,
+            aqsSubmittedOn: submissions ? (submissions.get(record.al_outcomecaseid)?.aqs ?? null) : undefined,
             remediation: actions.success ? (remediation.get(record.al_outcomecaseid) ?? null) : undefined,
           })),
           remediationKnown: actions.success,

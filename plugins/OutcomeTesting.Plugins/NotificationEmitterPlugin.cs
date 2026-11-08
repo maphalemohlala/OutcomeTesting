@@ -28,6 +28,12 @@ namespace OutcomeTesting.Plugins
         private const string ActionEntity = "al_remediationaction";
         private const string CaseLookup = "al_outcomecaseid";
 
+        /// <summary>The outbox occurrence that keeps the T&amp;C Manager's copy a row of its own.</summary>
+        private const string TcManagerCopyOccurrence = "TC-MANAGER-COPY";
+
+        /// <summary>al_adviserstatus: PreCAS, the status of an adviser still in pre-clearance.</summary>
+        private const int AdviserStatusPreCas = 120910500;
+
         public NotificationEmitterPlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(NotificationEmitterPlugin))
         {
@@ -188,7 +194,8 @@ namespace OutcomeTesting.Plugins
             var caseRow = caseRef == null
                 ? null
                 : service.Retrieve("al_outcomecase", caseRef.Id,
-                    new ColumnSet("al_casereference", "al_advisername", "al_clientname"));
+                    new ColumnSet("al_casereference", "al_advisername", "al_clientname", "al_reviewrouteid",
+                        "al_adviserstatus", "al_checklistitems"));
 
             var reference = (caseRow == null ? null : caseRow.GetAttributeValue<string>("al_casereference"))
                 ?? "a case";
@@ -270,6 +277,58 @@ namespace OutcomeTesting.Plugins
                 null,
                 caseRef,
                 ParaplannerRemediationLetter.Occurrence);
+
+            // Tax only: the T&C Manager hears as the adviser does. New entrants: on a Pass with
+            // issues, so sign-off needs no OTIS step (UAT decisions, 2026-11-06).
+            if (IsTaxOnly(caseRow) || (IsNewEntrant(caseRow) && grade == OutcomeRules.OutcomePassWithIssues))
+            {
+                QueueTcManagerCopy(service, correlationId, NotificationOutbox.EventRemediationAssigned,
+                    targetTable, targetId, caseRef, letter.Subject, letter.Body);
+            }
+        }
+
+        /// <summary>The T&amp;C Manager's own copy of an adviser's letter, on its own outbox row.</summary>
+        private static void QueueTcManagerCopy(
+            IOrganizationService service,
+            Guid correlationId,
+            int eventValue,
+            string targetTable,
+            Guid targetId,
+            EntityReference caseRef,
+            string subject,
+            string body)
+        {
+            // No mapping is a configuration gap, never a reason to lose the adviser's letter.
+            var routing = TcManagerRouting.ForCase(service, caseRef);
+            if (!routing.IsRouted)
+            {
+                return;
+            }
+
+            NotificationOutbox.QueueWithCompletedCheck(
+                service, correlationId, eventValue, targetTable, targetId, routing.Email,
+                subject, "<p>For your information, the adviser has been sent this letter.</p>" + body,
+                null, caseRef, TcManagerCopyOccurrence);
+        }
+
+        internal static bool IsTaxOnly(Entity caseRow)
+        {
+            var route = caseRow == null ? null : caseRow.GetAttributeValue<EntityReference>("al_reviewrouteid");
+            return route != null && route.Name == "Tax only";
+        }
+
+        /// <summary>A new entrant is an adviser still in pre-clearance, however the case says so.</summary>
+        internal static bool IsNewEntrant(Entity caseRow)
+        {
+            if (caseRow == null)
+            {
+                return false;
+            }
+
+            var status = caseRow.GetAttributeValue<OptionSetValue>("al_adviserstatus");
+            return (status != null && status.Value == AdviserStatusPreCas)
+                || (caseRow.GetAttributeValue<string>("al_checklistitems") ?? string.Empty)
+                    .IndexOf("Pre-CAS Adviser", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         /// <summary>
@@ -294,7 +353,8 @@ namespace OutcomeTesting.Plugins
             }
 
             var caseRow = service.Retrieve("al_outcomecase", caseRef.Id,
-                new ColumnSet("al_casereference", "al_advisername", "al_clientname", CaseAdviser.EmailAttr));
+                new ColumnSet("al_casereference", "al_advisername", "al_clientname", CaseAdviser.EmailAttr,
+                    "al_adviserstatus", "al_checklistitems"));
 
             var reference = caseRow.GetAttributeValue<string>("al_casereference");
 
@@ -336,6 +396,12 @@ namespace OutcomeTesting.Plugins
                 passed.Body,
                 NotificationTemplates.CasePassed,
                 caseRef);
+
+            if (IsNewEntrant(caseRow))
+            {
+                QueueTcManagerCopy(service, correlationId, NotificationOutbox.EventCasePassed,
+                    "al_outcomecase", caseRef.Id, caseRef, passed.Subject, passed.Body);
+            }
         }
     }
 }

@@ -997,9 +997,9 @@
                 overall remediation... the rows only need to record the remedial action for
                 each issue").
 
-                Of the three, only "Client contact required?" is still the adviser's. The
-                other two are the T&C Manager's from 2026-09-21 and are answered on the
-                sign-off panel; they are drawn here read-only so the form still reads as one
+                None of the three is the adviser's. "Client contact required?" is the AQS
+                checker's from 2026-11-06 and the other two are the T&C Manager's from
+                2026-09-21; they are drawn here read-only so the form still reads as one
                 document.
 
                 AD-107 raises one action per fail item, and these five columns live on the
@@ -1064,16 +1064,8 @@
               <tr class="ot-form-rows__lead">
                 <th scope="row" colspan="2">Client contact required?</th>
                 <td colspan="2">
-                  {% if answer_ids != '' %}
-                    <span class="ot-opts" data-ot-form-answers data-action-ids="{{ answer_ids }}"
-                          data-user-name="{{ user.fullname | escape }}">
-                      <label><input type="radio" name="ot-form-cc" value="120910793" data-ot-fq="clientcontact"{% if answers_source.al_clientcontactrequired.value == 120910793 %} checked{% endif %} /> Yes</label>
-                      <label><input type="radio" name="ot-form-cc" value="120910794" data-ot-fq="clientcontact"{% if answers_source.al_clientcontactrequired.value == 120910794 %} checked{% endif %} /> No</label>
-                      <label><input type="radio" name="ot-form-cc" value="120910795" data-ot-fq="clientcontact"{% if answers_source.al_clientcontactrequired.value == 120910795 %} checked{% endif %} /> Potentially</label>
-                    </span>
-                  {% else %}
-                    {{ form_source.al_clientcontactrequired.label | default: '—' | escape }}
-                  {% endif %}
+                  {% comment %}Answered by the AQS checker on the review (client decision, 2026-11-06); the adviser reads it here.{% endcomment %}
+                  <span{% if answer_ids != '' %} data-ot-form-answers data-action-ids="{{ answer_ids }}" data-user-name="{{ user.fullname | escape }}"{% endif %}>{{ form_source.al_clientcontactrequired.label | default: '—' | escape }}</span>
                 </td>
                 {% comment %}
                   Read-only for everyone here from 2026-09-21 (project owner: "The Recheck
@@ -1311,6 +1303,9 @@
               Offered only where there is a graded outcome to override, the same condition the
               regrade panel uses: a remediated Tax-only case has no al_outcome row at all
               (AD-055) and MoveCase closes it without one.
+
+              Pass and Potential harm only (UAT, 2026-11-06): anything still outstanding is
+              rejected back to the adviser, so an approval cannot end on the other two.
             {% endcomment %}
             {% if outcome and outcome.al_initialoutcome %}
               <div class="ot-field" data-ot-signoff-grade-field>
@@ -1318,8 +1313,6 @@
                 <select id="ot-signoff-outcome" data-ot-signoff-outcome>
                   <option value="">Leave for a separate regrade</option>
                   <option value="120910710">Pass</option>
-                  <option value="120910711">Pass with issues</option>
-                  <option value="120910712">Insufficient evidence</option>
                   <option value="120910713">Potential harm</option>
                 </select>
               </div>
@@ -1490,8 +1483,7 @@
             <p class="ot-response__status" data-ot-form-status aria-live="polite"></p>
             <p class="ot-form-submit__hint">
               Save draft keeps what you have written without signing anything off. Save and
-              sign off records every remedial action above, your answer to "Client contact
-              required?", and your sign-off.
+              sign off records every remedial action above and your sign-off.
               {% if ot_signoff_due %}Once every action is complete, the remediation goes to your
               T&C Manager for sign-off, and "Recheck required?" and "Do the remedial actions
               change the advice?" are theirs to answer.{% else %}This grading needs no sign-off
@@ -2211,16 +2203,11 @@
         }
 
         /*
-         * One question, not three, from 2026-09-21. "Recheck required?" and "Do the remedial
-         * actions change the advice?" are the T&C Manager's and are answered on the sign-off
-         * panel; holding the adviser to them here would block a completion they are not
-         * allowed to record, and the PATCH carrying them is refused server-side anyway
-         * (RemediationResponseGuardPlugin.TcOnlyRefusal).
+         * No question of the adviser's here. "Recheck required?" and "Do the remedial actions
+         * change the advice?" are the T&C Manager's, on the sign-off panel, and the PATCH
+         * carrying them is refused server-side (RemediationResponseGuardPlugin.TcOnlyRefusal).
+         * "Client contact required?" is the AQS checker's from 2026-11-06.
          */
-        if (answer('clientcontact') === null) {
-          show('Answer "Client contact required?" for this remediation before signing off.', 'error');
-          return;
-        }
       }
 
       busy(true);
@@ -2307,8 +2294,6 @@
            */
           var payload = { al_adviserresponse: row.text };
           if (row.performed && row.choice !== null) { payload.al_actionperformed = row.choice; }
-          var cc = answer('clientcontact');
-          if (cc !== null) { payload.al_clientcontactrequired = cc; }
           if (markComplete) { payload.al_completerequested = true; }
 
           request.send(JSON.stringify(payload));

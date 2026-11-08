@@ -13,7 +13,7 @@ namespace OutcomeTesting.Plugins.Tests
         public void The_na_scale_is_pass_fail_insufficient_then_na()
         {
             Assert.Equal(
-                new[] { 120910300, 120910301, 120910302, 120910307 },
+                new[] { 120910300, 120910303, 120910301, 120910302, 120910307 },
                 ResponseRules.PermittedChoices(ResponseRules.TypePassFailInsufficientNa).ToArray());
             Assert.Equal(
                 ResponseRules.AnswerColumn.Choice,
