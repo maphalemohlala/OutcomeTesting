@@ -6,7 +6,8 @@ export const Al_failreasonsal_category = {
   120910400: 'AML',
   120910401: 'Breach',
   120910402: 'Record Keeping',
-  120910403: 'Tax check'
+  120910403: 'Tax check',
+  120910404: 'Tax file quality'
 } as const;
 export type Al_failreasonsal_category = keyof typeof Al_failreasonsal_category;
 export const Al_failreasonsstatecode = {

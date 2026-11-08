@@ -73,7 +73,8 @@ export const SCALE_OPTIONS: Record<number, ChoiceOption[]> = {
   120910008: [YES, NO, NA],
   120910009: [YES, NO, INSUFFICIENT],
   120910010: [PASS, PASS_WITH_ISSUES, INSUFFICIENT, POTENTIAL_HARM],
-  120910012: [PASS, FAIL, INSUFFICIENT, NA],
+  // Pass with issues offered, and Fail read as Potential harm (client decisions, 2026-11-06).
+  120910012: [PASS, PASS_WITH_ISSUES, { value: 120910301, label: 'Potential harm' }, INSUFFICIENT, NA],
   120910003: ROOT_CAUSES,
   // Several root causes at once from 2026-09-24: Q-GR-02's successor version.
   120910013: ROOT_CAUSES,

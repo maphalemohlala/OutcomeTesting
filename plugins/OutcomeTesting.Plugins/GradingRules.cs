@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace OutcomeTesting.Plugins
 {
@@ -24,6 +26,88 @@ namespace OutcomeTesting.Plugins
     /// </summary>
     public static class GradingRules
     {
+        /// <summary>What the answers on a check allow its three outcome questions to say.</summary>
+        public sealed class Expected
+        {
+            /// <summary>The File Quality outcome, or null while no checking point is answered.</summary>
+            public int? FileQuality { get; set; }
+
+            /// <summary>The grades allowed, or null while no Suitability core check is answered.</summary>
+            public IList<int> Grades { get; set; }
+        }
+
+        /// <summary>
+        /// The consistent answers for an AQS check (client decisions, 2026-11-06), which reverse
+        /// the 2026-10-05 "allow any answer". Mirrored by otGrading in OT Review Detail.
+        ///
+        /// File Quality is Fail on any point not answered Yes or N/A, or any ticked fail point.
+        /// The grade follows the Suitability core checks: any Potential harm or Insufficient
+        /// evidence allows only those two, any Pass with issues allows only that, and all Pass
+        /// or N/A allows Pass, or Pass with issues where File Quality failed.
+        /// </summary>
+        public static Expected For(IList<int> suitability, IList<int> checkingPoints, bool failPointTicked)
+        {
+            var fileQualityFailed = failPointTicked;
+            foreach (var answer in checkingPoints)
+            {
+                fileQualityFailed |= answer != ResponseRules.ChoiceYes && answer != ResponseRules.ChoiceNa;
+            }
+
+            var harm = false;
+            var issues = false;
+            foreach (var answer in suitability)
+            {
+                harm |= answer == ResponseRules.ChoiceFail
+                    || answer == ResponseRules.ChoiceInsufficient
+                    || answer == ResponseRules.ChoicePotentialHarm;
+                issues |= answer == ResponseRules.ChoicePassWithIssues;
+            }
+
+            return new Expected
+            {
+                FileQuality = checkingPoints.Count == 0 && !failPointTicked
+                    ? (int?)null
+                    : (fileQualityFailed ? ResponseRules.ChoiceFail : ResponseRules.ChoicePass),
+                Grades = suitability.Count == 0
+                    ? null
+                    : harm
+                    ? new[] { ResponseRules.ChoiceInsufficient, ResponseRules.ChoicePotentialHarm }
+                    : issues
+                        ? new[] { ResponseRules.ChoicePassWithIssues }
+                        : fileQualityFailed
+                            ? new[] { ResponseRules.ChoicePass, ResponseRules.ChoicePassWithIssues }
+                            : new[] { ResponseRules.ChoicePass },
+            };
+        }
+
+        /// <summary>Why these answers disagree with the check, or null when they agree.</summary>
+        public static string Refusal(Expected expected, int? fileQuality, int? remedial, int? grade)
+        {
+            if (expected.FileQuality.HasValue && fileQuality.HasValue && fileQuality != expected.FileQuality)
+            {
+                return expected.FileQuality == ResponseRules.ChoicePass
+                    ? "The File Quality outcome must be Pass: every checking point is clear and no fail point is ticked."
+                    : "The File Quality outcome must be Fail: a checking point or a fail point records a failure.";
+            }
+
+            if (grade.HasValue && expected.Grades != null && !expected.Grades.Contains(grade.Value))
+            {
+                return "The Advice Quality Grade does not match the Suitability core checks. Change the grade or "
+                    + "the answers that disagree with it.";
+            }
+
+            var owed = fileQuality == ResponseRules.ChoiceFail
+                || (grade.HasValue && grade != ResponseRules.ChoicePass);
+            if (remedial.HasValue && remedial != (owed ? ResponseRules.ChoiceYes : ResponseRules.ChoiceNo))
+            {
+                return owed
+                    ? "Remedial action required must be Yes for this outcome."
+                    : "Remedial action required must be No: this check is a clean Pass.";
+            }
+
+            return null;
+        }
+
         /// <summary>
         /// Advice Quality Grade. Load-bearing by name in OutcomeRules, which maps its answer
         /// to the case outcome, and in ChecklistGuards, which refuses to retire it.

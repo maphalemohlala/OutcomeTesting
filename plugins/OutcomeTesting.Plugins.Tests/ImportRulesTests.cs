@@ -243,6 +243,8 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData("High Risk Item 2")]
         [InlineData("Enhanced Supervision")]
         [InlineData("Pre-CAS Adviser")]
+        [InlineData("Pre-CAS")]
+        [InlineData("Pre-Check Adviser")]
         [InlineData("Leaver")]
         public void Recognises_every_item_wording_the_real_extract_uses(string item)
         {
@@ -834,6 +836,21 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Empty(result.Valid);
             var error = Assert.Single(result.Invalid);
             Assert.Contains(reasonFragment, error.Reason);
+        }
+
+        [Theory]
+        [InlineData("TaskType")]
+        [InlineData("Subject")]
+        public void A_task_retitled_post_sale_imports_as_a_post_check_with_no_checklist_stamp(string column)
+        {
+            var csv = "TaskID,AdviserName,AdviserEmail,AssignedBy,ParaplannerEmail," + column
+                + "\nT1,Sam Adviser,sam@example.com,Pip Planner,pip@example.com,post sale advice check required";
+
+            var row = Assert.Single(ImportRules.ParseCsv(csv).Valid);
+
+            Assert.Equal(ImportRules.PreOrPostCheckPost, row.Values["al_preorpostcheck"]);
+            Assert.Equal(ImportRules.PostSaleName, row.Values["al_checklistitems"]);
+            Assert.Equal(ImportRules.TaxCheckRequiredNo, row.Values["al_taxcheckrequired"]);
         }
 
         [Fact]

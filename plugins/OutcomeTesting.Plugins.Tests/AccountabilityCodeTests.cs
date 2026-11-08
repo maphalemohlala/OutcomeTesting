@@ -182,7 +182,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             var columns = GenerateExportPlugin.AccountabilityColumns(
                 outcomeRow, Case(), FqPerson, AqPerson, Registry(),
-                fileQualityChoice: null, effectiveOutcome: null);
+                fileQualityChoice: ResponseRules.ChoiceFail, effectiveOutcome: OutcomeRules.OutcomePotentialHarm);
 
             Assert.Equal("Fiona Quinn", columns["al_fqfailadvisername"]);
             Assert.Equal("FQ-1", columns["al_fqfailadvisercode"]);
@@ -201,7 +201,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             var columns = GenerateExportPlugin.AccountabilityColumns(
                 outcomeRow, Case(), FqPerson, AqPerson, Registry(),
-                fileQualityChoice: null, effectiveOutcome: null);
+                fileQualityChoice: ResponseRules.ChoiceFail, effectiveOutcome: OutcomeRules.OutcomePotentialHarm);
 
             Assert.Equal("Fiona Quinn", columns["al_fqfailparaplannername"]);
             Assert.Equal("FQ-1", columns["al_fqfailparaplannercode"]);
@@ -232,7 +232,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             var columns = GenerateExportPlugin.AccountabilityColumns(
                 outcomeRow, Case(), null, null, Registry(),
-                fileQualityChoice: null, effectiveOutcome: null);
+                fileQualityChoice: ResponseRules.ChoiceFail, effectiveOutcome: OutcomeRules.OutcomePotentialHarm);
 
             Assert.Equal("REG-ADV", columns["al_fqfailadvisercode"]);
             Assert.Equal("REG-PP", columns["al_fqfailparaplannercode"]);
@@ -262,7 +262,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             var columns = GenerateExportPlugin.AccountabilityColumns(
                 outcomeRow, Case(), null, null, new GenerateExportPlugin.RegistryCodes(),
-                fileQualityChoice: null, effectiveOutcome: null);
+                fileQualityChoice: ResponseRules.ChoiceFail, effectiveOutcome: OutcomeRules.OutcomePotentialHarm);
 
             Assert.Equal(string.Empty, columns["al_fqfailadvisercode"]);
             Assert.Equal(string.Empty, columns["al_fqfailparaplannercode"]);

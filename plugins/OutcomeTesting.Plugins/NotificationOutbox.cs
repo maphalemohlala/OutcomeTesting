@@ -566,8 +566,11 @@ namespace OutcomeTesting.Plugins
                 {
                     var customSubject = NotificationTemplates.Substitute(
                         template.Subject, tokens, escape: false);
+                    // The marker has no value, so Substitute would print it (see Render).
                     var customBody = NotificationTemplates.Substitute(
-                        template.Body, tokens, escape: true);
+                        NotificationTemplates.Strip(template.Body, NotificationTemplates.TokenCompletedCheck),
+                        tokens,
+                        escape: true);
 
                     // Keyed on the occurrence too, so a letter attached to Allocation goes
                     // again on a reallocation, as the built-in does.

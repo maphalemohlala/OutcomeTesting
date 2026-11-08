@@ -181,6 +181,29 @@ the two answers can be read against each other.
 | Q-FQTAX-02 | Fail observation | MultilineText | No |
 | Q-FQTAX-03 | Remedial action required? | YesNo | Yes |
 
+## Client decisions of 2026-11-06
+
+These override anything below that disagrees, including AD-231's "allow any answer".
+
+- **Suitability core checks** (every question on `120910012`) offer Pass, Pass with issues,
+  Potential harm, Insufficient evidence, N/A. Potential harm is a rewording of `120910301`, not
+  a new value, so stored answers and MI keep their meaning; earlier reviews read the new wording
+  too.
+- **`S-AMLCRA`** moved to `YesNoNA` by retire-and-succeed, removing Insufficient evidence. N/A
+  was kept because Q-AML-05 only applies to High Risk CRA cases.
+- **Outcome answers follow the check.** `GradingRules.For` and `otGrading` in OT Review Detail
+  hold the rule, and the submit refuses a disagreement. A File Quality fail with clean
+  Suitability answers leaves Pass or Pass with issues open: the client's rules did not cover it.
+- **Several remedial actions per item**, parked as `item ##2`, `item ##3`.
+- **Tax**: Q-TAX-04 is retired for Q-TAX-05 to Q-TAX-12, four Yes/No categories each with a
+  comments question, and a Yes raises an action carrying its comments (`TaxCategories`). Q-FQTAX-01
+  and -03 are owed on a Tax only check alone; on other routes the page records them unseen because
+  the fail point ticks hang off Q-FQTAX-01. The Tax form lists only the new Tax file quality
+  category of fail point, which AQS does not see.
+- **Client contact required?** is answered by the AQS checker on the remedial card, parked as
+  `__clientcontact__` and written to each action raised. A Tax only case has no AQS checker, so
+  it stays blank there.
+
 ## Which answers the rest of the form leaves available
 
 > **Superseded 2026-10-05 (AD-231): the form no longer narrows answers; any answer is

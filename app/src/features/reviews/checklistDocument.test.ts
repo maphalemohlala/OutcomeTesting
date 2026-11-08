@@ -306,10 +306,15 @@ describe('the checklist the app draws matches the reference document', () => {
         : [],
     );
 
-    // Difference 7: Suitability and CRP take an N/A column after the document's three.
-    const withNa = new Set(['Suitability test point', 'Centralised Retirement Proposition test point']);
+    // Differences 7 and 8: Suitability and CRP take an N/A column, and from 2026-11-06 read
+    // Pass, Pass with issues, Potential harm, Insufficient evidence (client decisions).
+    const suitability = new Set(['Suitability test point', 'Centralised Retirement Proposition test point']);
     expect(grids).toEqual(
-      documentGridHeadings.map((heading) => (withNa.has(heading[0]) ? [...heading, 'N/A'] : heading)),
+      documentGridHeadings.map((heading) =>
+        suitability.has(heading[0])
+          ? [heading[0], 'Pass', 'Pass with issues', 'Potential harm', 'Insufficient evidence', 'N/A']
+          : heading,
+      ),
     );
   });
 

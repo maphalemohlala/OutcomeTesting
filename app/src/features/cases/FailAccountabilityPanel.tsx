@@ -167,12 +167,17 @@ function OutcomeAccountability({
       {source === 'derived' ? (
         <p className="accountability__note">
           Nobody has been named on this check, so the extract uses the default: the
-          paraplanner carries a File Quality fail, and the adviser carries an Advice Quality
-          fail. The File Quality half is not shown ticked here because this page does not
+          paraplanner carries a File Quality fail, and the adviser carries Insufficient
+          evidence or Potential harm. The File Quality half is not shown ticked here because this page does not
           read the file quality answer &mdash; the extract does. Ticking anything below
           records a judgement instead, and the default stops applying to this check.
         </p>
       ) : null}
+
+      <p className="accountability__note">
+        The extract names someone only for a File Quality Fail, Insufficient evidence or
+        Potential harm. Ticks against any other grade are kept here but not exported.
+      </p>
 
       <ul className="accountability__flags">
         {LABELS.map(({ key, discipline, who }) => (

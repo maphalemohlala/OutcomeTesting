@@ -76,9 +76,8 @@ export function caseExportRow(item: CaseSummary): CellValue[] {
 }
 
 /**
- * The completed-case report: closed cases with the product and the outcome they closed
- * on. Narrower than the full extract on purpose — it answers "what did we grade, and on
- * what", so allocation and ageing columns are left out (BR-010).
+ * The completed-case report: graded cases with who checked them, what each check found and
+ * how long each stage took (BR-010).
  */
 export const COMPLETED_CASE_HEADERS = [
   'Case reference',
@@ -87,17 +86,30 @@ export const COMPLETED_CASE_HEADERS = [
   'Adviser code',
   'Paraplanner name',
   'Paraplanner code',
+  'Tax Checker',
+  'AQS Checker',
   'Case type',
   'Product / solution type',
   'Products',
+  'Received on',
   'Check date',
   'Pre or post check',
+  'Tax outcome',
   'Initial outcome',
   'Final outcome',
   'Outcome',
   'Finalised on',
+  'Days in Tax',
+  'Days in AQS',
+  'Overall age (days)',
   'Status',
 ];
+
+/** Whole days between two timestamps, blank where either is missing. */
+function daysBetween(from: string | null | undefined, to: string | null | undefined): number | '' {
+  if (!from || !to) return '';
+  return Math.max(0, Math.floor((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000));
+}
 
 export function completedCaseRow(item: CaseSummary): CellValue[] {
   return [
@@ -107,15 +119,24 @@ export function completedCaseRow(item: CaseSummary): CellValue[] {
     item.adviserCode ?? '',
     item.paraplanner ?? '',
     item.paraplannerCode ?? '',
+    item.taxChecker ?? '',
+    item.aqsChecker ?? '',
     item.caseType ?? '',
     item.productSolutionType ?? '',
     item.products ?? '',
+    ukDate(item.createdOn),
     day(item.checkDate),
     item.preOrPostCheck ?? '',
+    item.taxOutcome ?? '',
     item.initialOutcome ?? '',
     item.finalOutcome ?? '',
     item.latestOutcome ?? item.taxOutcome ?? '',
     ukDate(item.finalisedOn),
+    // Tax runs from receipt; AQS from the hand-over, or from receipt on an AQS-only route.
+    daysBetween(item.createdOn, item.taxSubmittedOn),
+    daysBetween(item.taxSubmittedOn ?? item.createdOn, item.aqsSubmittedOn),
+    // To the case's end, not today: the worklist's age keeps counting after a case finishes.
+    daysBetween(item.createdOn, item.finalisedOn ?? item.aqsSubmittedOn ?? item.taxSubmittedOn),
     item.status,
   ];
 }

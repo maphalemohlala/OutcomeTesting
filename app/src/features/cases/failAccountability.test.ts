@@ -89,10 +89,16 @@ describe('effectiveAccountability', () => {
     // exactly the override this screen exists to make.
     const recorded = { ...NOBODY, fqAdviser: true };
 
-    const result = effectiveAccountability(recorded, true, true);
+    const result = effectiveAccountability(recorded, true, false);
 
     expect(result.source).toBe('recorded');
     expect(result.flags).toEqual(recorded);
+  });
+
+  it('still names the adviser for an advice fail when only the file was judged', () => {
+    const result = effectiveAccountability({ ...NOBODY, fqParaplanner: true }, true, true);
+
+    expect(result.flags).toEqual({ ...NOBODY, fqParaplanner: true, aqAdviser: true });
   });
 
   it('derives only an untouched row', () => {
@@ -119,7 +125,7 @@ describe('adviceQualityFailedFrom', () => {
   it('reads every other grade on the scale as a fail', () => {
     // OutcomeRules.RequiresRemediation: anything but a Pass. "Pass with issues" is one of
     // them, which is the case a substring test would get wrong.
-    expect(adviceQualityFailedFrom('Pass with issues')).toBe(true);
+    expect(adviceQualityFailedFrom('Pass with issues')).toBe(false);
     expect(adviceQualityFailedFrom('Insufficient evidence')).toBe(true);
     expect(adviceQualityFailedFrom('Potential harm')).toBe(true);
   });

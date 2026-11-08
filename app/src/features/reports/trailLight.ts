@@ -112,14 +112,18 @@ export function withinCheckDates(record: ExportRecord, from: string, to: string)
 }
 
 /**
- * Whether the row shows a pass and no fail: every grade it carries is Pass. The daily file
- * leaves these out because Comply looks for failed outcomes, and the quarterly 12-month file
- * keeps them (client, 2026-11-06). A Tax-only case has no advice grade, so its file grade
- * decides. A row with no grade at all is not shown to be a pass, so it stays.
+ * Whether the row belongs in the daily file (client, 2026-11-06): File Quality is Fail, and/or
+ * Advice Quality is Insufficient evidence or Potential harm. A Pass with issues alone does not
+ * qualify. The quarterly 12-month file keeps every row. A Tax-only case has no advice grade, so
+ * its file grade decides.
  */
-export function isPassWithNoFails(record: ExportRecord): boolean {
-  const grades = [text(record.al_advicequalitygrade), text(record.al_filequalitygrade)].filter(Boolean);
-  return grades.length > 0 && grades.every((grade) => grade.toLowerCase() === 'pass');
+export function belongsInDailyFile(record: ExportRecord): boolean {
+  const advice = text(record.al_advicequalitygrade).toLowerCase();
+  return (
+    text(record.al_filequalitygrade).toLowerCase() === 'fail' ||
+    advice === 'insufficient evidence' ||
+    advice === 'potential harm'
+  );
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -147,15 +151,15 @@ export function fileContentsSummary(
   total: number,
   from: string,
   to: string,
-  passesLeftOut = 0,
+  leftOut = 0,
 ): string {
   const range = describeCheckRange(from, to);
-  if (passesLeftOut > 0) {
-    const held = inRange - passesLeftOut;
+  if (leftOut > 0) {
+    const held = inRange - leftOut;
     if (held === 0) {
-      return `Every case in this batch${range ? ` ${range}` : ''} is a pass with no fails, so the daily file has nothing to download.`;
+      return `No case in this batch${range ? ` ${range}` : ''} belongs in the daily file, so it has nothing to download.`;
     }
-    const left = passesLeftOut === 1 ? '1 pass with no fails' : `${passesLeftOut} passes with no fails`;
+    const left = leftOut === 1 ? '1 case that does not belong in it' : `${leftOut} cases that do not belong in it`;
     return `The file will contain ${held} of the ${total} cases in this batch${range ? `: those ${range}` : ''}, leaving out ${left}.`;
   }
   if (!range) {

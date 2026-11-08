@@ -80,7 +80,8 @@ describe('formBlocks', () => {
     expect(suitability?.kind === 'section' && suitability.layout).toBe('grid');
     expect(suitability?.kind === 'section' && suitability.options.map((o) => o.label)).toEqual([
       'Pass',
-      'Fail',
+      'Pass with issues',
+      'Potential harm',
       'Insufficient evidence',
       'N/A',
     ]);

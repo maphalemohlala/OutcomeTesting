@@ -17,8 +17,9 @@ function reportDate(item: { checkDate: string | null; createdOn: string | null }
 /**
  * The completed-case report (BR-010, FR-032): every case that has reached a grade, with the
  * product it was advised on and the outcome it stands on. A case is "completed" here when
- * an Outcome exists for it — closure is a separate lifecycle step, so filtering on Closed
- * alone would leave graded cases still in remediation out of the count.
+ * an Outcome exists for it, or a Tax outcome: a Tax-only case never gets an Outcome row
+ * (AD-055). Closure is a separate lifecycle step, so filtering on Closed alone would leave
+ * graded cases still in remediation out of the count.
  */
 export function CompletedCaseReport({
   cases,
@@ -36,7 +37,7 @@ export function CompletedCaseReport({
   const [closedOnly, setClosedOnly] = useState(false);
 
   const completed = useMemo(
-    () => cases.filter((item) => item.latestOutcome && (!scope || scope.has(item.id))),
+    () => cases.filter((item) => (item.latestOutcome || item.taxOutcome) && (!scope || scope.has(item.id))),
     [cases, scope],
   );
 
@@ -49,7 +50,7 @@ export function CompletedCaseReport({
   const filtered = useMemo(
     () =>
       completed.filter((item) => {
-        if (outcome && item.latestOutcome !== outcome) return false;
+        if (outcome && (item.latestOutcome ?? item.taxOutcome) !== outcome) return false;
         if (product && item.productSolutionType !== product) return false;
         if (closedOnly && item.status !== 'Closed') return false;
         const day = reportDate(item);
@@ -79,9 +80,9 @@ export function CompletedCaseReport({
       </div>
 
       <p className="completed__note">
-        Cases that have reached a grade, with the product advised on and the outcome recorded
-. Filter by check date, product or outcome before exporting. Restrict to
-        Closed if you need only cases whose lifecycle has finished.
+        Cases that have reached a grade, with the product advised on and the outcome recorded.
+        Filter by check date, product or outcome before exporting. Restrict to Closed if you
+        need only cases whose lifecycle has finished.
       </p>
 
       <FilterBar
@@ -148,6 +149,7 @@ export function CompletedCaseReport({
               <th scope="col">AQS checker</th>
               <th scope="col">Product / solution type</th>
               <th scope="col">Check date</th>
+              <th scope="col">Tax outcome</th>
               <th scope="col">Initial outcome</th>
               <th scope="col">Outcome</th>
             </tr>
@@ -155,7 +157,7 @@ export function CompletedCaseReport({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="completed__empty">
+                <td colSpan={10} className="completed__empty">
                   No completed cases match your current filters.
                 </td>
               </tr>
@@ -171,6 +173,7 @@ export function CompletedCaseReport({
                   <td>{checkerLabel(item.aqsChecker, item.route, 'AQS')}</td>
                   <td>{item.productSolutionType ?? '—'}</td>
                   <td>{reportDate(item) || '—'}</td>
+                  <td>{item.taxOutcome ?? '—'}</td>
                   <td>
                     {item.initialOutcome ? <OutcomeIndicator outcome={item.initialOutcome} /> : '—'}
                   </td>

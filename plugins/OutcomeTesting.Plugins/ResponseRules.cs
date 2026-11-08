@@ -134,7 +134,9 @@ namespace OutcomeTesting.Plugins
                 case TypePassFailInsufficient:
                     return new[] { ChoicePass, ChoiceFail, ChoiceInsufficient };
                 case TypePassFailInsufficientNa:
-                    return new[] { ChoicePass, ChoiceFail, ChoiceInsufficient, ChoiceNa };
+                    // Pass with issues since 2026-11-06 (client decision). The Suitability core
+                    // checks alone answer on this scale, and read Fail as Potential harm.
+                    return new[] { ChoicePass, ChoicePassWithIssues, ChoiceFail, ChoiceInsufficient, ChoiceNa };
                 case TypeYesNo:
                     return new[] { ChoiceYes, ChoiceNo };
                 case TypeYesNoNa:

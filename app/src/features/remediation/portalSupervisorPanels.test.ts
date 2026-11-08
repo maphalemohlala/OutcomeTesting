@@ -165,6 +165,17 @@ describe('the sign-off panel and the case adviser', () => {
  * once every action was done; the server now closes such a case, and the page must not
  * offer a sign-off nobody is waiting for.
  */
+describe('the final outcome on an approval', () => {
+  it('offers Pass and Potential harm only', () => {
+    const start = remediation.indexOf('<select id="ot-signoff-outcome"');
+    const select = remediation.slice(start, remediation.indexOf('</select>', start));
+    expect(select).toContain('>Pass</option>');
+    expect(select).toContain('>Potential harm</option>');
+    expect(select).not.toContain('Pass with issues');
+    expect(select).not.toContain('Insufficient evidence');
+  });
+});
+
 describe('the sign-off panel on a case that needs no sign-off', () => {
   it('reads the Tax result, so a Tax Fail still counts as due', () => {
     expect(remediation).toContain('<attribute name="al_taxoutcome" />');

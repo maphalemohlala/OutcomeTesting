@@ -91,6 +91,43 @@ describe('the fail points the page lists', () => {
   });
 });
 
+describe('the outcome rules on the page', () => {
+  const start = template.indexOf('/* ot-remedial-items:start */');
+  const end = template.indexOf('/* ot-remedial-items:end */');
+  const grading = new Function(`${template.slice(start, end)}; return otGrading;`)() as (
+    answers: { code: string; type: string; text: string; value: string }[],
+    failPoints: string[],
+  ) => { fileQuality: string | null; grades: string[] | null; remedial: boolean };
+  const point = (value: string) => ({ code: 'Q-E1-01', type: '120910012', text: 'A point', value });
+  const aml = (value: string) => ({ code: 'Q-AML-01', type: '120910008', text: 'ID', value });
+  const grade = (value: string) => ({ code: 'Q-GR-01', type: '120910010', text: 'Grade', value });
+
+  it('reads all Pass or N/A as a Pass with nothing to put right', () => {
+    expect(grading([aml('120910305'), point('120910300'), point('120910307')], [])).toEqual({
+      fileQuality: '120910300',
+      grades: ['120910300'],
+      remedial: false,
+    });
+  });
+
+  it('reads Pass with issues as that grade with a remedial action', () => {
+    const rules = grading([aml('120910305'), point('120910303')], []);
+    expect(rules.grades).toEqual(['120910303']);
+    expect(rules.remedial).toBe(true);
+  });
+
+  it('allows only Insufficient evidence or Potential harm once either is recorded', () => {
+    const rules = grading([point('120910303'), point('120910301'), grade('120910304')], []);
+    expect(rules.grades).toEqual(['120910302', '120910304']);
+    expect(rules.remedial).toBe(true);
+  });
+
+  it('fails File Quality on a No or a ticked fail point', () => {
+    expect(grading([aml('120910306')], []).fileQuality).toBe('120910301');
+    expect(grading([aml('120910305')], ['No OEL on file']).fileQuality).toBe('120910301');
+  });
+});
+
 describe('the card on the page', () => {
   it('sits after "Who carries this fail" and before the submit, hidden until remediation is owed', () => {
     const accountability = template.indexOf('data-ot-accountability\n');

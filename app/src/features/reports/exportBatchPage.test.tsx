@@ -50,7 +50,7 @@ describe('the daily and quarterly files on a batch', () => {
     expect(html).not.toContain('CASE-PASS');
     expect(html).toContain('CASE-HARM');
     expect(html).toContain('CASE-FQFAIL');
-    expect(html).toContain('The file will contain 2 of the 3 cases in this batch, leaving out 1 pass with no fails.');
+    expect(html).toContain('The file will contain 2 of the 3 cases in this batch, leaving out 1 case that does not belong in it.');
   });
 
   it('says so and blocks the download when fewer rows came back than the batch recorded', () => {

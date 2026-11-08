@@ -291,11 +291,18 @@ namespace OutcomeTesting.Plugins
                         ResponseRules.ChoiceFail, "Fail",
                         ResponseRules.ChoiceInsufficient, insufficient);
                 case ResponseRules.TypePassFailInsufficientNa:
-                    return Options(
-                        ResponseRules.ChoicePass, "Pass",
-                        ResponseRules.ChoiceFail, "Fail",
-                        ResponseRules.ChoiceInsufficient, insufficient,
-                        ResponseRules.ChoiceNa, "N/A");
+                    return isTaxReview
+                        ? Options(
+                            ResponseRules.ChoicePass, "Pass",
+                            ResponseRules.ChoiceFail, "Fail",
+                            ResponseRules.ChoiceInsufficient, insufficient,
+                            ResponseRules.ChoiceNa, "N/A")
+                        : Options(
+                            ResponseRules.ChoicePass, "Pass",
+                            ResponseRules.ChoicePassWithIssues, "Pass with issues",
+                            ResponseRules.ChoiceFail, "Potential harm",
+                            ResponseRules.ChoiceInsufficient, insufficient,
+                            ResponseRules.ChoiceNa, "N/A");
                 case ResponseRules.TypeYesNoNa:
                     return Options(
                         ResponseRules.ChoiceYes, "Yes",
@@ -335,7 +342,8 @@ namespace OutcomeTesting.Plugins
                 case ResponseRules.TypePassFailInsufficientNa:
                     return Options(
                         ResponseRules.ChoicePass, "PASS",
-                        ResponseRules.ChoiceFail, "FAIL",
+                        ResponseRules.ChoicePassWithIssues, "PASS WITH ISSUES",
+                        ResponseRules.ChoiceFail, "POTENTIAL HARM",
                         ResponseRules.ChoiceInsufficient, "INSUFFICIENT EVIDENCE",
                         ResponseRules.ChoiceNa, "N/A");
                 case ResponseRules.TypeYesNo:

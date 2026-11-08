@@ -80,6 +80,9 @@ export interface CaseSummary {
   checkDate: string | null;
   preOrPostCheck: string | null;
   dueDate: string | null;
+  /** When each check was last submitted; absent where the reviews could not be read. */
+  taxSubmittedOn?: string | null;
+  aqsSubmittedOn?: string | null;
   /**
    * Where the case's remediation stands, per case (caseRemediation). Null when it has raised
    * none; absent where the caller did not load remediation actions.
@@ -113,6 +116,51 @@ export function ageInDays(createdOn: string | undefined): number {
   const created = new Date(createdOn).getTime();
   if (Number.isNaN(created)) return 0;
   return Math.max(0, Math.floor((Date.now() - created) / 86_400_000));
+}
+
+/**
+ * Each person's staff code by lower-cased email. The case's own al_advisercode and
+ * al_paraplannercode were retired and stay empty: the code is held on the contact, matched by
+ * email (AD-228). An address two active contacts share proves nobody, so it gets no code, as
+ * the Trail Light export's match does.
+ */
+export function staffCodesByEmail(
+  contacts: { emailaddress1?: string; al_staffcode?: string; statecode?: unknown }[],
+): Map<string, string> {
+  const seen = new Map<string, number>();
+  const codes = new Map<string, string>();
+  for (const contact of contacts) {
+    const email = contact.emailaddress1?.trim().toLowerCase();
+    if (!email || Number(contact.statecode) !== 0) continue;
+    seen.set(email, (seen.get(email) ?? 0) + 1);
+    const code = contact.al_staffcode?.trim();
+    if (code) codes.set(email, code);
+  }
+  for (const [email, count] of seen) if (count > 1) codes.delete(email);
+  return codes;
+}
+
+/** The columns `submissionsByCase` reads. */
+export const REVIEW_SUBMISSION_COLUMNS = [
+  'al_reviewinstanceid', '_al_outcomecaseid_value', 'al_reviewtype', 'al_submittedon',
+];
+
+/** When each case's Tax and AQS checks were submitted; a recheck's later date wins. */
+export function submissionsByCase(
+  reviews: { _al_outcomecaseid_value?: string; al_reviewtype?: unknown; al_submittedon?: string }[],
+): Map<string, { tax: string | null; aqs: string | null }> {
+  const byCase = new Map<string, { tax: string | null; aqs: string | null }>();
+  for (const review of reviews) {
+    const caseId = review._al_outcomecaseid_value;
+    const submitted = review.al_submittedon;
+    if (!caseId || !submitted) continue;
+    const entry = byCase.get(caseId) ?? { tax: null, aqs: null };
+    const leg = Number(review.al_reviewtype) === 120910200 ? 'tax' : 'aqs';
+    const held = entry[leg];
+    if (!held || submitted > held) entry[leg] = submitted;
+    byCase.set(caseId, entry);
+  }
+  return byCase;
 }
 
 function toOutcome(label: string | undefined): Outcome | null {

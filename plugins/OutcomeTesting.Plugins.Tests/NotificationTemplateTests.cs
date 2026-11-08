@@ -157,6 +157,26 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.DoesNotContain("{{", letter.Body);
         }
 
+        [Fact]
+        public void The_letter_a_tax_check_raises_links_to_the_remediation_page()
+        {
+            // Case 258688995: a Tax Pass with issues told the adviser to use the portal and
+            // gave no way there (UAT, 2026-11-06).
+            var letter = NotificationTemplates.Render(
+                new FakeOrganizationService(),
+                NotificationTemplates.RemediationOther,
+                new Dictionary<string, string>
+                {
+                    { NotificationTemplates.TokenReference, "258688995" },
+                    {
+                        NotificationTemplates.TokenCaseButton,
+                        NotificationTemplates.CaseButton("https://portal/remediation?case=1", "Confirm remedial action")
+                    },
+                });
+
+            Assert.Contains("https://portal/remediation?case=1", letter.Body);
+        }
+
         // ------------------------------------------------------- the stored template
 
         [Fact]

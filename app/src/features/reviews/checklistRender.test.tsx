@@ -211,8 +211,8 @@ describe('the Code App review page draws the document’s headings', () => {
     expect(heads).toEqual([
       ['Check', 'Yes', 'No', 'N/A'],
       // The N/A column (2026-09-24): Q-E4-03 in Suitability, every row of CRP.
-      ['Suitability test point', 'Pass', 'Fail', 'Insufficient evidence', 'N/A'],
-      ['Centralised Retirement Proposition test point', 'Pass', 'Fail', 'Insufficient evidence', 'N/A'],
+      ['Suitability test point', 'Pass', 'Pass with issues', 'Potential harm', 'Insufficient evidence', 'N/A'],
+      ['Centralised Retirement Proposition test point', 'Pass', 'Pass with issues', 'Potential harm', 'Insufficient evidence', 'N/A'],
       ['Outcome', 'Yes', 'No', 'Insufficient evidence'],
     ]);
   });

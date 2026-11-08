@@ -1316,6 +1316,7 @@ footer a:focus-visible, .footer a:focus-visible {
    115%, and the browser left the last column, N/A, at its minimum width. */
 .ot-checklist .grid:has(thead th:nth-of-type(5)) th.opt,
 .ot-checklist .grid:has(thead th:nth-of-type(5)) td.optcell { width: 11.25%; }
+.ot-checklist .grid:has(thead th:nth-of-type(6)) td.optcell { width: 9%; }
 .ot-checklist .grid tr.section td { background: var(--band); font-weight: 700; }
 .ot-checklist .grid tr.lens td { background: var(--subband); font-size: 10pt; }
 .ot-checklist .grid tr.lens em { font-style: italic; font-weight: 700; }
@@ -1426,6 +1427,19 @@ footer a:focus-visible, .footer a:focus-visible {
 
   .ot-checklist h2 { break-after: avoid; }
   .ot-checklist tr { break-inside: avoid; }
+
+  /* A textarea keeps its screen height on paper and clips the rest, at either orientation.
+     shortcut: field-sizing is Chromium only (Edge, Chrome); Firefox and Safari still clip. */
+  textarea,
+  .ot-checklist textarea,
+  .ot-response-cell__text {
+    field-sizing: content;
+    height: auto;
+    min-height: 0;
+    min-width: 0;
+    overflow: visible;
+    resize: none;
+  }
 }
 
 /* ------------------------------------------------------------------

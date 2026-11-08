@@ -25,10 +25,10 @@ describe('the review page after the 2026-09-24 feedback', () => {
   });
 
   it('draws the N/A scale as a four-column grid, leaving N/A empty on a plain suitability row', () => {
-    expect(reviewTemplate).toContain("{% assign gvalues = '120910300,120910301,120910302,120910307' | split: ',' %}");
-    expect(reviewTemplate).toContain("{% assign glabels = 'Pass,Fail,Insufficient evidence,N/A' | split: ',' %}");
+    expect(reviewTemplate).toContain("{% assign gvalues = '120910300,120910303,120910301,120910302,120910307' | split: ',' %}");
+    expect(reviewTemplate).toContain("{% assign glabels = 'Pass,Pass with issues,Potential harm,Insufficient evidence,N/A' | split: ',' %}");
     expect(reviewTemplate).toContain("{% if blk_rt == 120910012 and rt == 120910006 %}{% assign on_scale = true %}{% endif %}");
-    expect(reviewTemplate).toContain("{% if v == '120910307' and rt == 120910006 %}");
+    expect(reviewTemplate).toContain("{% if rt == 120910006 %}{% if v == '120910307' or v == '120910303' %}{% assign cell_off = true %}{% endif %}{% endif %}");
     expect(reviewTemplate).toContain('{% if suit_na %}{% assign grid_rt = 120910012 %}{% endif %}');
     expect(answerOptions).toContain('{% when 120910012 %}');
   });
