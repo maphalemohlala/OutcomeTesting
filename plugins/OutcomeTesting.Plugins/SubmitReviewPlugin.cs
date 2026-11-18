@@ -1548,6 +1548,8 @@ namespace OutcomeTesting.Plugins
 
             var items = new List<string>();
             var texts = new List<string>();
+            // The check each item came from, parallel to items (requirements log row 18).
+            var sources = new List<Guid>();
             var overall = new List<string>();
             foreach (var leg in legs)
             {
@@ -1555,6 +1557,10 @@ namespace OutcomeTesting.Plugins
                 {
                     items.AddRange(leg.Items);
                     texts.AddRange(leg.Texts);
+                    foreach (var unused in leg.Items)
+                    {
+                        sources.Add(leg.ReviewId);
+                    }
                 }
                 else if (leg.Overall != null && itemised)
                 {
@@ -1562,6 +1568,7 @@ namespace OutcomeTesting.Plugins
                     // would reach no action.
                     items.Add(string.IsNullOrWhiteSpace(leg.Reason) ? "Overall" : leg.Reason);
                     texts.Add(leg.Overall);
+                    sources.Add(leg.ReviewId);
                 }
                 else if (leg.Overall != null)
                 {
@@ -1582,7 +1589,11 @@ namespace OutcomeTesting.Plugins
                 DateTime.UtcNow,
                 texts,
                 overall.Count == 0 ? null : string.Join(Environment.NewLine + Environment.NewLine, overall),
-                legs[legs.Count - 1].ClientContact);
+                legs[legs.Count - 1].ClientContact,
+                sources,
+                // A single un-indexed action speaks for the first leg too: the Tax check, when one
+                // was deferred, so its own document shows it as well.
+                legs[0].ReviewId);
 
             // Cleared once raised, on every review the words came from - the deferred Tax leg's
             // included, and a leg whose words were not owed - so a later regrade cannot raise

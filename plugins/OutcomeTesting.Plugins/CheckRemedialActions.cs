@@ -11,10 +11,11 @@ namespace OutcomeTesting.Plugins
     /// portal and to the one that goes out to advisers and para-planners).
     ///
     /// <para>
-    /// Only this check's actions: those whose <c>al_reviewinstanceid</c> is the review. A Tax
-    /// fail deferred to the AQS submit is raised against the AQS review, so it is drawn under
-    /// the AQS check. The case's whole Remediation and escalation form stays its own document
-    /// (<see cref="RemediationDocument"/>).
+    /// Only this check's actions: those whose <c>al_reviewinstanceid</c> is the review, or which
+    /// it raised (<see cref="Remediation.RaisedByAttr"/>). A Tax fail deferred to the AQS submit
+    /// is raised against the AQS review, so it is drawn under the AQS check and, since
+    /// requirements log row 18 (2026-11-18), under the Tax check as well. The case's whole
+    /// Remediation and escalation form stays its own document (<see cref="RemediationDocument"/>).
     /// </para>
     /// <para>
     /// The build is wrapped in a try/catch so a failure while drawing this section - a
@@ -115,7 +116,7 @@ namespace OutcomeTesting.Plugins
             }
         }
 
-        /// <summary>The review's live actions, in the order they were raised.</summary>
+        /// <summary>The review's live actions, and those it raised on another check, in raise order.</summary>
         private static List<Entity> Actions(IOrganizationService service, Guid reviewId)
         {
             var query = new QueryExpression("al_remediationaction")
@@ -126,7 +127,12 @@ namespace OutcomeTesting.Plugins
                     RemedialActions.ActionAttr),
                 Criteria = new FilterExpression(),
             };
-            query.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
+            // Its own actions, and those it raised against another check: a Tax-then-AQS case's Tax
+            // items sit on the AQS review (requirements log row 18).
+            var whose = new FilterExpression(LogicalOperator.Or);
+            whose.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
+            whose.AddCondition(Remediation.RaisedByAttr, ConditionOperator.Equal, reviewId);
+            query.Criteria.AddFilter(whose);
             query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
             query.AddOrder("createdon", OrderType.Ascending);
             query.AddOrder("al_remediationactioncode", OrderType.Ascending);

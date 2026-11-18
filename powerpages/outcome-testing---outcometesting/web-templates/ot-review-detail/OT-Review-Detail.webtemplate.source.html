@@ -161,6 +161,7 @@
         <attribute name="al_preorpostcheck" />
         <attribute name="al_vulnerableclient" />
         <attribute name="al_vulnerableclientid" />
+        <attribute name="al_businessunit" />
         <attribute name="al_taxcheckrequired" />
         <attribute name="al_taxteamdisposition" />
         <attribute name="al_checklistitems" />
@@ -741,7 +742,7 @@
           {% endcomment %}
           <tr>
             <td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' | default: 'Stamped when this check is submitted' }}</td>
-            <td class="lbl"></td><td class="val"></td>
+            <td class="lbl">Business Unit</td><td class="val">{{ rv['case.al_businessunit'].label | escape }}</td>
           </tr>
           <tr>
             <td class="lbl">Client name / initials</td><td class="val"><input type="text" class="ot-hdr-input" data-ot-hdr="al_clientname" value="{{ rv['case.al_clientname'] | escape }}" aria-label="Client name or initials" /></td>
@@ -764,7 +765,7 @@
           <tr><td class="lbl">Case type</td><td class="val">{% if h_casetypeid.name %}{{ h_casetypeid.name | escape }}{% else %}{{ h_casetype.label | escape }}{% endif %}</td><td class="lbl">Date of meeting - Client contact</td><td class="val">{{ rv['case.al_advicedate'] | date: 'dd MMM yyyy' }}</td></tr>
           <tr><td class="lbl">Product / solution type</td><td class="val">{% comment %}The chosen option, else the choice column an un-backfilled case still carries (AD-187).{% endcomment %}{% if h_producttypeid.name %}{{ h_producttypeid.name | escape }}{% else %}{{ h_producttype.label | escape }}{% endif %}</td><td class="lbl">Sample source</td><td class="val">{% if h_samplesourceid.name %}{{ h_samplesourceid.name | escape }}{% else %}{{ h_samplesource.label | escape }}{% endif %}</td></tr>
           <tr><td class="lbl">Tax Checker</td><td class="val">{{ rv['case.al_taxcheckername'] | default: 'Not yet allocated' | escape }}</td><td class="lbl">AQS Checker</td><td class="val">{{ rv['case.al_aqscheckername'] | default: 'Not yet allocated' | escape }}</td></tr>
-          <tr><td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' }}</td><td class="lbl"></td><td class="val"></td></tr>
+          <tr><td class="lbl">Check date</td><td class="val">{{ rv['case.al_checkdate'] | date: 'dd MMM yyyy' }}</td><td class="lbl">Business Unit</td><td class="val">{{ rv['case.al_businessunit'].label | escape }}</td></tr>
           <tr><td class="lbl">Client name / initials</td><td class="val">{{ rv['case.al_clientname'] | escape }}</td><td class="lbl">IO reference</td><td class="val">{{ rv['case.al_ioreference'] | escape }}</td></tr>
           <tr><td class="lbl">Pre or post check</td><td class="val">{% if h_preorpostcheckid.name %}{{ h_preorpostcheckid.name | escape }}{% else %}{{ h_prepost.label | escape }}{% endif %}</td><td class="lbl">Vulnerable client?</td><td class="val">{% if h_vulnerableclientid.name %}{{ h_vulnerableclientid.name | escape }}{% else %}{{ h_vulnerable.label | escape }}{% endif %}</td></tr>
           {% endif %}
@@ -3723,8 +3724,11 @@
           <attribute name="al_remediationactioncode" />
           <attribute name="createdon" />
           <filter type="and">
-            <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | xml_escape }}" />
             <condition attribute="statecode" operator="eq" value="0" />
+            <filter type="or">
+              <condition attribute="al_reviewinstanceid" operator="eq" value="{{ review_id | xml_escape }}" />
+              <condition attribute="al_raisedbyreviewid" operator="eq" value="{{ review_id | xml_escape }}" />
+            </filter>
           </filter>
           <order attribute="createdon" descending="false" />
           <order attribute="al_remediationactioncode" descending="false" />

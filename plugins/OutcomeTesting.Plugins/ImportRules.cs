@@ -43,6 +43,35 @@ namespace OutcomeTesting.Plugins
         /// <summary>al_preorpostcheck, for a task retitled as a Post-Sale review.</summary>
         public const int PreOrPostCheckPost = 120910541;
 
+        /// <summary>al_outcomecase.al_businessunit (requirements log row 6).</summary>
+        public const string BusinessUnitAttribute = "al_businessunit";
+
+        /// <summary>The extract's column H, which IO fills with the adviser's market.</summary>
+        public const string BusinessUnitHeader = "Group2";
+
+        public const int BusinessUnitIndependent = 120910900;
+
+        public const int BusinessUnitRestricted = 120910901;
+
+        /// <summary>
+        /// The Business Unit a Group2 value means (project owner, 2026-11-18: "Whole of Market =
+        /// Independent", "Restricted Market" = Restricted), or null for anything else.
+        /// </summary>
+        public static int? BusinessUnitFor(string group2)
+        {
+            switch ((group2 ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "whole of market":
+                case "independent":
+                    return BusinessUnitIndependent;
+                case "restricted market":
+                case "restricted":
+                    return BusinessUnitRestricted;
+                default:
+                    return null;
+            }
+        }
+
         /// <summary>
         /// The title the business gives a Post-Sale review before importing it (UAT, 2026-11-06).
         /// IO has no task of its own for these, so the extract is amended by hand.
@@ -923,6 +952,14 @@ namespace OutcomeTesting.Plugins
                     .StartsWith("Pre-Advice", StringComparison.OrdinalIgnoreCase))
                 {
                     values["al_preorpostcheck"] = PreOrPostCheckPre;
+                }
+
+                // Business Unit (requirements log row 6) is derived here, not in Columns: an
+                // unrecognised Group2 value leaves it unset instead of rejecting the row.
+                var businessUnit = BusinessUnitFor(HeaderCell(fields, headerIndex, BusinessUnitHeader));
+                if (businessUnit.HasValue)
+                {
+                    values[BusinessUnitAttribute] = businessUnit.Value;
                 }
 
                 // People are identified by email (AD-228): a row without both people's name

@@ -91,13 +91,25 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void An_aqs_grade_wins_over_the_tax_grade_on_a_tax_then_aqs_case()
+        public void A_tax_then_aqs_case_names_both_grades_in_the_order_they_were_checked()
         {
+            // Requirements log row 11 (2026-11-18: "It should work on all cases"): the Tax
+            // grade is no longer dropped when an AQS grade exists.
             var service = Graded();
             var outcomeCase = service.Seed("al_outcomecase", CaseId, "al_taxoutcome", new OptionSetValue(120910652));
             outcomeCase.FormattedValues["al_taxoutcome"] = "Fail";
 
-            Assert.Equal("Pass with issues", NotificationTemplateRows.OutcomeTokens(service, CaseRef)[NotificationTemplates.TokenGrading]);
+            Assert.Equal(
+                "Tax check: Fail; AQS check: Pass with issues",
+                NotificationTemplateRows.OutcomeTokens(service, CaseRef)[NotificationTemplates.TokenGrading]);
+        }
+
+        [Fact]
+        public void An_aqs_only_case_keeps_the_plain_grade()
+        {
+            Assert.Equal(
+                "Pass with issues",
+                NotificationTemplateRows.OutcomeTokens(Graded(), CaseRef)[NotificationTemplates.TokenGrading]);
         }
 
         [Fact]

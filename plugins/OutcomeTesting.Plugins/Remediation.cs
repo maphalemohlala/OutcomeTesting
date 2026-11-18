@@ -27,6 +27,13 @@ namespace OutcomeTesting.Plugins
         private const string ActionEntity = "al_remediationaction";
         private const string ActionCodeAttr = "al_remediationactioncode";
 
+        /// <summary>
+        /// The check whose answers raised the action (requirements log row 18). On a Tax-then-AQS
+        /// case the Tax items are raised against the AQS review, so this is what lets the Tax
+        /// check's own document show them too.
+        /// </summary>
+        public const string RaisedByAttr = "al_raisedbyreviewid";
+
         // al_remediationaction.al_actionstatus.
         public const int StatusOpen = 120910600;
         public const int StatusInProgress = 120910601;
@@ -845,11 +852,14 @@ namespace OutcomeTesting.Plugins
             DateTime raisedOn,
             IList<string> remedialActions = null,
             string overallRemedialAction = null,
-            int? clientContact = null)
+            int? clientContact = null,
+            IList<Guid> sources = null,
+            Guid? overallSource = null)
         {
             var raised = RaiseActions(
                 service, caseRef, caseReference, reviewId, sequence, reason, observation,
-                items, adviserContact, raisedOn, remedialActions, overallRemedialAction, clientContact);
+                items, adviserContact, raisedOn, remedialActions, overallRemedialAction, clientContact,
+                sources, overallSource);
 
             // The letters were queued on the first create and drew one action; every action
             // exists now (2026-10-05).
@@ -871,7 +881,9 @@ namespace OutcomeTesting.Plugins
             DateTime raisedOn,
             IList<string> remedialActions = null,
             string overallRemedialAction = null,
-            int? clientContact = null)
+            int? clientContact = null,
+            IList<Guid> sources = null,
+            Guid? overallSource = null)
         {
             var raised = new List<Guid>();
 
@@ -890,7 +902,8 @@ namespace OutcomeTesting.Plugins
                     adviserContact,
                     raisedOn,
                     overallRemedialAction,
-                    clientContact));
+                    clientContact,
+                    overallSource));
                 return raised;
             }
 
@@ -917,7 +930,8 @@ namespace OutcomeTesting.Plugins
                     adviserContact,
                     raisedOn,
                     remedialActions != null && position < remedialActions.Count ? remedialActions[position] : null,
-                    clientContact));
+                    clientContact,
+                    sources != null && position < sources.Count ? sources[position] : (Guid?)null));
             }
 
             // Every item was blank, which the list should never carry - fall back to the one
@@ -934,7 +948,8 @@ namespace OutcomeTesting.Plugins
                     adviserContact,
                     raisedOn,
                     overallRemedialAction,
-                    clientContact));
+                    clientContact,
+                    overallSource));
             }
 
             return raised;
@@ -958,7 +973,8 @@ namespace OutcomeTesting.Plugins
             EntityReference adviserContact,
             DateTime raisedOn,
             string remedialAction,
-            int? clientContact = null)
+            int? clientContact = null,
+            Guid? raisedBy = null)
         {
             var existing = FindByCode(service, code);
             if (existing != Guid.Empty)
@@ -979,6 +995,7 @@ namespace OutcomeTesting.Plugins
                 ["al_description"] = description,
                 ["al_outcomecaseid"] = caseRef,
                 ["al_reviewinstanceid"] = new EntityReference("al_reviewinstance", reviewId),
+                [RaisedByAttr] = new EntityReference("al_reviewinstance", raisedBy ?? reviewId),
                 ["al_actionstatus"] = new OptionSetValue(StatusOpen),
                 ["al_duedate"] = AddWorkingDays(raisedOn, ThresholdWorkingDays),
             };

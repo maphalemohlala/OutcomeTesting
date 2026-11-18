@@ -147,6 +147,7 @@ describe('caseHeaderFields', () => {
     al_vulnerableclient: 120910552,
     al_taxcheckrequired: 120910560,
     al_taxteamdisposition: 120910570,
+    al_businessunit: 120910900,
   } as unknown as Al_outcomecases;
 
   it('lists the header fields in the order the document lays them out', () => {
@@ -162,6 +163,7 @@ describe('caseHeaderFields', () => {
       'Tax Checker',
       'AQS Checker',
       'Check date',
+      'Business Unit',
       'Client name / initials',
       'IO reference',
       'Pre or post check',
@@ -182,6 +184,8 @@ describe('caseHeaderFields', () => {
     expect(byLabel.get('IO reference')).toBe('IO-100001');
     expect(byLabel.get('IO reference')).not.toBe('TASK-100001');
     expect(byLabel.get('For Tax team usage')).toBe('Submit to AQS');
+    // Requirements log row 6: imported from Group2 (Whole of Market = Independent).
+    expect(byLabel.get('Business Unit')).toBe('Independent');
   });
 
   it('names the products the case covers, not the free text they replaced', () => {

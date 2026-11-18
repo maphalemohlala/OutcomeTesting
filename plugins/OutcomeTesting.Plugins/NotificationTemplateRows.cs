@@ -406,7 +406,8 @@ namespace OutcomeTesting.Plugins
         /// The case's grading, final outcome and latest sign-off notes as they stand now, each
         /// empty where the case has not got that far.
         ///
-        /// The newest graded outcome row wins, so a Tax-then-AQS case reads its AQS grade. The
+        /// The newest graded outcome row gives the AQS grade; a case with a Tax grade too reads
+        /// both ("Tax check: Fail; AQS check: Pass with issues"), a Tax-only case its Tax grade. The
         /// final outcome falls back to the newest sign-off's, because a letter queued inside
         /// the sign-off can run before the outcome row is written.
         /// </summary>
@@ -492,9 +493,14 @@ namespace OutcomeTesting.Plugins
                 // An extra token never costs the letter; it goes with the gap.
             }
 
-            if (tokens[NotificationTemplates.TokenGrading].Length == 0 && !string.IsNullOrWhiteSpace(taxGrading))
+            if (!string.IsNullOrWhiteSpace(taxGrading))
             {
-                tokens[NotificationTemplates.TokenGrading] = taxGrading;
+                // A Tax-then-AQS case carries both grades, named in the order the case was
+                // checked (requirements log row 11, 2026-11-18: "It should work on all cases").
+                var aqs = tokens[NotificationTemplates.TokenGrading];
+                tokens[NotificationTemplates.TokenGrading] = aqs.Length == 0
+                    ? taxGrading
+                    : "Tax check: " + taxGrading + "; AQS check: " + aqs;
             }
 
             return tokens;

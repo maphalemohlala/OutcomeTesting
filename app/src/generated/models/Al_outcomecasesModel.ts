@@ -101,6 +101,11 @@ export const Al_outcomecasesal_vulnerableclient = {
   120910553: 'N/A'
 } as const;
 export type Al_outcomecasesal_vulnerableclient = keyof typeof Al_outcomecasesal_vulnerableclient;
+export const Al_outcomecasesal_businessunit = {
+  120910900: 'Independent',
+  120910901: 'Restricted'
+} as const;
+export type Al_outcomecasesal_businessunit = keyof typeof Al_outcomecasesal_businessunit;
 export const Al_outcomecasesstatecode = {
   0: 'Active',
   1: 'Inactive'
@@ -169,6 +174,7 @@ export interface Al_outcomecasesBase {
   al_taxteamdisposition?: Al_outcomecasesal_taxteamdisposition;
   "al_TcSupervisorContactId@odata.bind"?: string;
   al_vulnerableclient?: Al_outcomecasesal_vulnerableclient;
+  al_businessunit?: Al_outcomecasesal_businessunit;
   "al_VulnerableClientId@odata.bind"?: string;
   al_workflowname?: string;
   importsequencenumber?: number;
@@ -212,6 +218,7 @@ export interface Al_outcomecases extends Al_outcomecasesBase {
   al_tcsupervisorcontactidyominame?: string;
   al_vulnerableclientidname?: string;
   al_vulnerableclientname?: string;
+  al_businessunitname?: string;
   createdbyname?: string;
   createdbyyominame: string;
   createdon?: string;

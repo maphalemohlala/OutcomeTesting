@@ -1,5 +1,6 @@
 import {
   Al_outcomecasesal_adviserstatus,
+  Al_outcomecasesal_businessunit,
   Al_outcomecasesal_casetype,
   Al_outcomecasesal_preorpostcheck,
   Al_outcomecasesal_productsolutiontype,
@@ -357,6 +358,11 @@ export function caseHeaderFields(
       value: checkerLabel(record.al_aqscheckername, headerRoute(record), 'AQS'),
     },
     { label: 'Check date', value: date(record.al_checkdate) },
+    // Imported from the extract's Group2 (requirements log row 6).
+    {
+      label: 'Business Unit',
+      value: choiceLabel(Al_outcomecasesal_businessunit, record.al_businessunit, record.al_businessunitname),
+    },
     { label: 'Client name / initials', value: text(record.al_clientname) },
     // ClientRef, not the TaskID. al_casereference is the TaskID and is the page heading;
     // binding it here showed a checker the wrong identifier on every case (F6, 2026-09-20).

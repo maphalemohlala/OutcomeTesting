@@ -516,6 +516,36 @@ namespace OutcomeTesting.Plugins.Tests
                 Assert.Single(result.Valid).Values["al_preorpostcheck"]);
         }
 
+        // Requirements log row 6 (2026-11-18): Business Unit from Group2, column H of the extract.
+        [Theory]
+        [InlineData("Whole of Market", ImportRules.BusinessUnitIndependent)]
+        [InlineData("whole of market ", ImportRules.BusinessUnitIndependent)]
+        [InlineData("Restricted Market", ImportRules.BusinessUnitRestricted)]
+        [InlineData("Independent", ImportRules.BusinessUnitIndependent)]
+        [InlineData("Restricted", ImportRules.BusinessUnitRestricted)]
+        public void Group2_sets_the_business_unit(string group2, int expected)
+        {
+            var result = ImportRules.ParseCsv(Header + ",Group2\r\n" + Row("1") + "," + group2 + "\r\n");
+
+            Assert.Equal(expected, Assert.Single(result.Valid).Values["al_businessunit"]);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("Organisation")]
+        public void Any_other_group2_imports_the_row_with_no_business_unit(string group2)
+        {
+            var result = ImportRules.ParseCsv(Header + ",Group2\r\n" + Row("1") + "," + group2 + "\r\n");
+
+            Assert.False(Assert.Single(result.Valid).Values.ContainsKey("al_businessunit"));
+        }
+
+        [Fact]
+        public void An_extract_without_group2_imports_with_no_business_unit()
+        {
+            Assert.False(Assert.Single(ImportRules.ParseCsv(File(Row("1"))).Valid).Values.ContainsKey("al_businessunit"));
+        }
+
         [Fact]
         public void Imports_every_row_of_the_supplied_workbook_shape()
         {

@@ -236,6 +236,94 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.Equal(new[] { "Correct the tax wrapper.", "Rewrite the suitability report." }, WordsOn(svc));
         }
 
+        // ---- requirements log row 18 (2026-11-18): the Tax check's own document shows the
+        // actions it raised, as well as the AQS document showing every action.
+
+        [Fact]
+        public void Each_action_records_the_check_that_raised_it()
+        {
+            var svc = Case(ResponseRules.ChoiceFail, ResponseRules.ChoicePassWithIssues);
+            var reason = FailReason(svc, "Tax - wrapper not suitable");
+            Tick(svc, TaxReviewId, reason);
+            ParkMap(svc, TaxReviewId, "Tax - wrapper not suitable", "Correct the tax wrapper.");
+            Park(svc, AqsReviewId, "Rewrite the suitability report.");
+
+            Submit(svc, TaxReviewId);
+            CaseTransitions.MoveThrough(svc, CaseId, CaseLifecycle.Assigned);
+            Submit(svc, AqsReviewId);
+
+            Assert.Equal(TaxReviewId, RaisedBy(svc, "Correct the tax wrapper."));
+            Assert.Equal(AqsReviewId, RaisedBy(svc, "Rewrite the suitability report."));
+        }
+
+        [Fact]
+        public void The_tax_document_shows_its_own_actions_and_the_aqs_document_shows_all()
+        {
+            var svc = Case(ResponseRules.ChoiceFail, ResponseRules.ChoicePassWithIssues);
+            var reason = FailReason(svc, "Record Keeping - TOB not provided or out of date");
+            Park(svc, TaxReviewId, "Correct the tax wrapper.");
+            Tick(svc, AqsReviewId, reason);
+            ParkMap(svc, AqsReviewId, "Record Keeping - TOB not provided or out of date", "Issue the current TOB.");
+
+            Submit(svc, TaxReviewId);
+            CaseTransitions.MoveThrough(svc, CaseId, CaseLifecycle.Assigned);
+            Submit(svc, AqsReviewId);
+
+            var tax = RemedialCells(svc, TaxReviewId);
+            Assert.Contains(tax, t => t.Contains("Correct the tax wrapper."));
+            Assert.DoesNotContain(tax, t => t.Contains("Issue the current TOB."));
+
+            var aqs = RemedialCells(svc, AqsReviewId);
+            Assert.Contains(aqs, t => t.Contains("Correct the tax wrapper."));
+            Assert.Contains(aqs, t => t.Contains("Issue the current TOB."));
+        }
+
+        [Fact]
+        public void One_action_carrying_both_checks_words_shows_in_the_tax_document_too()
+        {
+            // Nothing itemised on either leg: the single action carries both checkers' words.
+            var svc = Case(ResponseRules.ChoiceFail, ResponseRules.ChoicePassWithIssues);
+            Park(svc, TaxReviewId, "Correct the tax wrapper.");
+            Park(svc, AqsReviewId, "Rewrite the suitability report.");
+
+            Submit(svc, TaxReviewId);
+            CaseTransitions.MoveThrough(svc, CaseId, CaseLifecycle.Assigned);
+            Submit(svc, AqsReviewId);
+
+            Assert.Contains(RemedialCells(svc, TaxReviewId), t => t.Contains("Correct the tax wrapper."));
+            Assert.Contains(RemedialCells(svc, AqsReviewId), t => t.Contains("Rewrite the suitability report."));
+        }
+
+        private static Guid? RaisedBy(FakeOrganizationService svc, string words)
+        {
+            var query = new QueryExpression("al_remediationaction")
+            {
+                ColumnSet = new ColumnSet(RemedialActions.ActionAttr, Remediation.RaisedByAttr),
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, CaseId);
+            var action = svc.RetrieveMultiple(query).Entities
+                .Single(a => a.GetAttributeValue<string>(RemedialActions.ActionAttr) == words);
+            return action.GetAttributeValue<EntityReference>(Remediation.RaisedByAttr)?.Id;
+        }
+
+        private static string[] RemedialCells(FakeOrganizationService svc, Guid reviewId)
+        {
+            // Dataverse creates a row Active; the fake leaves statecode unset, and the document
+            // reads live actions only.
+            foreach (var action in ActionsOn(svc))
+            {
+                svc.Update(new Entity("al_remediationaction", action.Id) { ["statecode"] = new OptionSetValue(0) });
+            }
+
+            return CheckRemedialActions.Blocks(svc, reviewId)
+                .Where(b => b.Kind == PdfBlockKind.Table)
+                .SelectMany(b => b.Grid.Rows)
+                .SelectMany(r => r.Cells)
+                .Select(c => c.Text ?? string.Empty)
+                .ToArray();
+        }
+
         [Fact]
         public void Overall_words_from_a_leg_that_owes_nothing_are_not_raised()
         {

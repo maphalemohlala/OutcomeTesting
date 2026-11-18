@@ -106,7 +106,8 @@ namespace OutcomeTesting.Plugins
                         "al_samplesource", "al_samplesourceid", "al_taxcheckername",
                         "al_aqscheckername", "al_checkdate", "al_ioreference",
                         "al_preorpostcheck", "al_preorpostcheckid", "al_vulnerableclient", "al_vulnerableclientid",
-                        "al_taxcheckrequired", "al_taxteamdisposition", "al_checklistitems"));
+                        "al_taxcheckrequired", "al_taxteamdisposition", "al_checklistitems",
+                        ImportRules.BusinessUnitAttribute));
                 }
                 catch (Exception)
                 {
@@ -255,7 +256,7 @@ namespace OutcomeTesting.Plugins
             table.Add(PdfCell.Label("Tax Checker"), PdfCell.Of(Checker("al_taxcheckername")),
                 PdfCell.Label("AQS Checker"), PdfCell.Of(Checker("al_aqscheckername")));
             table.Add(PdfCell.Label("Check date"), PdfCell.Of(Day(row.GetAttributeValue<DateTime?>("al_checkdate"))),
-                PdfCell.Label(string.Empty), PdfCell.Blank());
+                PdfCell.Label("Business Unit"), PdfCell.Of(Choice(ImportRules.BusinessUnitAttribute)));
             table.Add(PdfCell.Label("Client name / initials"), PdfCell.Of(Text("al_clientname")),
                 PdfCell.Label("IO reference"), PdfCell.Of(Text("al_ioreference")));
             table.Add(PdfCell.Label("Pre or post check"), PdfCell.Of(Lookup("al_preorpostcheckid", "al_preorpostcheck")),
