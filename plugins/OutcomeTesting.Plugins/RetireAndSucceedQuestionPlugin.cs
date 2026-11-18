@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -64,7 +65,8 @@ namespace OutcomeTesting.Plugins
             }
 
             var current = ChecklistQueries.CurrentVersionOf(
-                userService, questionId, "al_versionnumber", "al_effectiveto", "al_responsetype", "al_ismandatory", "al_displayorder");
+                userService, questionId,
+                "al_versionnumber", "al_effectivefrom", "al_effectiveto", "al_responsetype", "al_ismandatory", "al_displayorder");
             if (current == null)
             {
                 throw new InvalidPluginExecutionException(
@@ -91,8 +93,25 @@ namespace OutcomeTesting.Plugins
              */
             var today = AddQuestionPlugin.ParseEffectiveFrom(
                 effectiveFromArg, DateTime.UtcNow.Date);
+            // A moved question's wording was carried to the question it became; a new version
+            // here would be answered under a wording the moved question does not ask, and the
+            // carry would hand that answer on as if it did.
+            var refusal = RefusalFor(current, DateTime.UtcNow.Date, today)
+                ?? ChecklistQueries.MovedRefusal(
+                    systemService,
+                    userService.Retrieve("al_question", questionId, new ColumnSet("al_questioncode"))
+                        .GetAttributeValue<string>("al_questioncode"),
+                    "edited");
+            if (refusal != null)
+            {
+                throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + refusal);
+            }
+
             var currentNumber = current.GetAttributeValue<int>("al_versionnumber");
             var newNumber = currentNumber + 1;
+
+            // Read before the update below dates the current version out.
+            var carriedEnd = ChecklistQueries.CarriedEnd(current, today);
 
             // Retire the current version by dating it out; its content stays frozen (BR-013).
             userService.Update(new Entity(VersionEntity, current.Id) { ["al_effectiveto"] = today });
@@ -110,7 +129,6 @@ namespace OutcomeTesting.Plugins
                 ["statuscode"] = new OptionSetValue(1),
             };
 
-            var carriedEnd = ChecklistQueries.CarriedEnd(current, today);
             if (carriedEnd.HasValue)
             {
                 successor["al_effectiveto"] = carriedEnd.Value;
@@ -159,6 +177,34 @@ namespace OutcomeTesting.Plugins
                 "Superseded v" + currentNumber, newNumber.ToString(), idempotencyKey, context);
 
             SetResponse(context, newVersionId.ToString("D"), newNumber.ToString(), auditId, false);
+        }
+
+        /// <summary>
+        /// Why the latest version cannot be succeeded from <paramref name="effectiveFrom"/>,
+        /// or null when it can. Succeeding a version dates it out on that day, so one already
+        /// out of force by then would be dated out later than it was - bringing a retired
+        /// question back, or quietly undoing a retirement planned for an earlier day.
+        /// </summary>
+        public static string RefusalFor(Entity current, DateTime today, DateTime effectiveFrom)
+        {
+            var scheduled = ChecklistQueries.ScheduledVersionRefusal(current, effectiveFrom);
+            if (scheduled != null)
+            {
+                return scheduled;
+            }
+
+            var end = current.GetAttributeValue<DateTime?>("al_effectiveto");
+            if (!end.HasValue || end.Value.Date > effectiveFrom.Date)
+            {
+                return null;
+            }
+
+            var on = end.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return end.Value.Date <= today.Date
+                ? "That question was retired on " + on + " and is no longer asked, so it cannot be edited. Add it as a new question instead."
+                : "That question is due to retire on " + on + ", so a change from "
+                    + effectiveFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    + " would bring it back. Date the change before " + on + ", or change the retirement date first.";
         }
 
         private static void SetResponse(IPluginExecutionContext context, string newVersionId, string versionNumber, Guid auditId, bool conflict)

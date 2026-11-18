@@ -27,3 +27,20 @@ describe('toSummary priority', () => {
     expect(toSummary(record({})).priority).toBeNull();
   });
 });
+
+describe('toSummary vulnerable client and CAS status (completed report)', () => {
+  it('reads the managed-list answer first, then the choice an un-backfilled case holds', () => {
+    const managed = record({
+      al_vulnerableclient: 120910551,
+      ['_al_vulnerableclientid_value@OData.Community.Display.V1.FormattedValue' as never]: 'Potentially vulnerable',
+    } as Partial<Al_outcomecases>);
+    expect(toSummary(managed).vulnerableClient).toBe('Potentially vulnerable');
+    expect(toSummary(record({ al_vulnerableclient: 120910550 })).vulnerableClient).toBe('Yes');
+    expect(toSummary(record({})).vulnerableClient).toBeNull();
+  });
+
+  it('labels the adviser status, which is the CAS status', () => {
+    expect(toSummary(record({ al_adviserstatus: 120910501 })).adviserStatus).toBe('CAS');
+    expect(toSummary(record({})).adviserStatus).toBeNull();
+  });
+});

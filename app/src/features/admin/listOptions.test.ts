@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   RESOURCE_KEYS,
   can,
-  pageResourceForPath,
   resolvePermissions,
 } from '../../types/permissions';
 import {
@@ -17,13 +16,11 @@ import {
   MULTI_CHOICE_LISTS,
   SINGLE_CHOICE_LISTS,
   type RawListOption,
-  caseOptionLabel,
   choicesIncludingHeld,
   describeTickSelection,
   filterTickOptions,
   heldOptionLabels,
   listByKey,
-  listByValue,
   lookupFormattedField,
   lookupLabelOn,
   lookupValueField,
@@ -196,7 +193,7 @@ describe('the managed lists', () => {
   });
 
   it('keeps naming the choice column each list replaces', () => {
-    // The fallback in caseOptionLabel reads it, so losing it would strand every case
+    // The legacy fallback reads it, so losing it would strand every case
     // imported before the migration.
     expect(MANAGED_LISTS.map((list) => list.legacyAttribute)).toEqual([
       'al_productsolutiontype',
@@ -208,11 +205,9 @@ describe('the managed lists', () => {
     ]);
   });
 
-  it('resolves a list by key and by value', () => {
+  it('resolves a list by key', () => {
     expect(listByKey('product-solution-type')?.value).toBe(LIST_PRODUCT_SOLUTION_TYPE);
-    expect(listByValue(LIST_PRODUCT_SOLUTION_TYPE)?.key).toBe('product-solution-type');
     expect(listByKey('no-such-list')).toBeNull();
-    expect(listByValue(999)).toBeNull();
   });
 
   it('builds the Web API field names for each list', () => {
@@ -220,10 +215,10 @@ describe('the managed lists', () => {
     expect(lookupFormattedField(PRODUCT)).toBe(
       '_al_producttypeid_value@OData.Community.Display.V1.FormattedValue',
     );
-    expect(lookupValueField(listByValue(LIST_SAMPLE_SOURCE)!)).toBe('_al_samplesourceid_value');
-    expect(lookupValueField(listByValue(LIST_CASE_TYPE)!)).toBe('_al_casetypeid_value');
-    expect(lookupValueField(listByValue(LIST_PRE_OR_POST_CHECK)!)).toBe('_al_preorpostcheckid_value');
-    expect(lookupValueField(listByValue(LIST_VULNERABLE_CLIENT)!)).toBe('_al_vulnerableclientid_value');
+    expect(lookupValueField(MANAGED_LISTS.find((list) => list.value === LIST_SAMPLE_SOURCE)!)).toBe('_al_samplesourceid_value');
+    expect(lookupValueField(MANAGED_LISTS.find((list) => list.value === LIST_CASE_TYPE)!)).toBe('_al_casetypeid_value');
+    expect(lookupValueField(MANAGED_LISTS.find((list) => list.value === LIST_PRE_OR_POST_CHECK)!)).toBe('_al_preorpostcheckid_value');
+    expect(lookupValueField(MANAGED_LISTS.find((list) => list.value === LIST_VULNERABLE_CLIENT)!)).toBe('_al_vulnerableclientid_value');
   });
 
   it('names a lookup distinctly from the choice column it supersedes', () => {
@@ -298,12 +293,6 @@ describe('retiring an option', () => {
     expect(offeredOptions(rows)).toHaveLength(5);
   });
 
-  it('still reads correctly on a case that already holds it', () => {
-    // The point of retiring rather than deleting. A closed case keeps saying what it said.
-    const rows = toOptionRows([...SEED, retired], PRODUCT, DAY);
-    expect(caseOptionLabel('Drawdown', null, rows)).toBe('Drawdown');
-  });
-
   it('takes effect from the day it is retired, not before', () => {
     const before = toOptionRows([...SEED, retired], PRODUCT, new Date('2026-09-19T12:00:00Z'));
     expect(offeredOptions(before).map((row) => row.label)).toContain('Drawdown');
@@ -371,51 +360,9 @@ describe('what a draft is refused for', () => {
   });
 });
 
-describe('a case that has not been backfilled yet', () => {
-  const rows = toOptionRows(SEED, PRODUCT, DAY);
-
-  it('reads through the choice value it was imported with', () => {
-    // THE migration safety net. Every case written before the lookup existed carries the
-    // integer and no lookup, and must keep reading correctly on every page until it is
-    // backfilled - not show a blank where the product type used to be.
-    expect(caseOptionLabel(null, 120910521, rows)).toBe('Accumulation Pension');
-  });
-
-  it('follows a rename, because it resolves through the row', () => {
-    // Matched on legacyValue rather than a second hard-coded map, so an administrator who
-    // renames an option renames it on the old cases too instead of splitting the history.
-    const renamed = toOptionRows(
-      SEED.map((row) =>
-        row.al_listoptionid === '2' ? { ...row, al_name: 'Pension accumulation' } : row,
-      ),
-      PRODUCT,
-      DAY,
-    );
-    expect(caseOptionLabel(null, 120910521, renamed)).toBe('Pension accumulation');
-  });
-
-  it('prefers the lookup once it has one', () => {
-    // A backfilled case must not be re-read through a stale integer, or correcting a case's
-    // product type would appear not to have worked.
-    expect(caseOptionLabel('IHT', 120910521, rows)).toBe('IHT');
-  });
-
-  it('reads as empty when it holds neither', () => {
-    expect(caseOptionLabel(null, null, rows)).toBeNull();
-    expect(caseOptionLabel('   ', undefined, rows)).toBeNull();
-  });
-
-  it('reads as empty for a choice value no option claims, rather than inventing one', () => {
-    // An integer from a deleted option is orphaned data. Saying nothing is honest; guessing
-    // the nearest row would put a wrong product type on a case nobody would think to check.
-    expect(caseOptionLabel(null, 120910999, rows)).toBeNull();
-  });
-});
-
 describe('the dropdown options page permission', () => {
-  it('is a known resource key, and the resource for its path', () => {
+  it('is a known resource key', () => {
     expect(RESOURCE_KEYS).toContain('page.admin.lists');
-    expect(pageResourceForPath('/admin/lists')).toBe('page.admin.lists');
   });
 
   it('is granted to the Outcome Testing Manager, who runs the process', () => {

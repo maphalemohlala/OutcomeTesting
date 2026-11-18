@@ -76,7 +76,7 @@ describe('the product name', () => {
       visit(source);
     }
     expect(found).toEqual([]);
-  });
+  }, 30_000); // parses every app source file: over the 5 s default when the whole suite runs at once
 
   it('is never written out in a plug-in string', () => {
     const found: string[] = [];

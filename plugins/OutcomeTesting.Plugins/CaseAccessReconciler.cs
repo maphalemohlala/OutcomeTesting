@@ -75,7 +75,8 @@ namespace OutcomeTesting.Plugins
                 caseId,
                 new ColumnSet(
                     "al_casestatus", "al_reviewrouteid", "al_adviseremail", CaseAdviser.NameAttr,
-                    TaxCheckerAttr, AqsCheckerAttr, QueueAccountAttr, QueuedOnAttr, AdviserAttr, SupervisorAttr));
+                    TaxCheckerAttr, AqsCheckerAttr, QueueAccountAttr, QueuedOnAttr, AdviserAttr, SupervisorAttr,
+                    TcManagerRouting.OverrideAttr));
 
             var status = outcomeCase.GetAttributeValue<OptionSetValue>("al_casestatus");
             var input = new CaseAccessInput
@@ -111,7 +112,8 @@ namespace OutcomeTesting.Plugins
                 // the case is the one who can sign it off.
                 var adviserEmail = outcomeCase.GetAttributeValue<string>("al_adviseremail");
                 input.ResolvedAdviser = lookups.AdviserFor(adviserEmail);
-                input.ResolvedSupervisor = lookups.SupervisorFor(adviserEmail);
+                // A manager an admin chose for this case wins over the mapping (requirements log row 4).
+                input.ResolvedSupervisor = TcManagerRouting.ChosenFor(outcomeCase) ?? lookups.SupervisorFor(adviserEmail);
             }
 
             var decided = CaseAccess.Decide(input);

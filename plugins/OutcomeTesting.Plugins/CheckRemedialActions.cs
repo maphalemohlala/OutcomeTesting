@@ -44,7 +44,7 @@ namespace OutcomeTesting.Plugins
         /// the catch below never runs for that case, because the platform does not let a sync
         /// plug-in reach "caught the fault and carried on".
         /// </summary>
-        public static List<PdfBlock> Blocks(IOrganizationService service, Guid reviewId)
+        public static List<PdfBlock> Blocks(IOrganizationService service, Guid reviewId, OptionLabels labels = null)
         {
             try
             {
@@ -54,7 +54,8 @@ namespace OutcomeTesting.Plugins
                     return new List<PdfBlock>();
                 }
 
-                var labels = new OptionLabels(service);
+                // The caller's, where it is drawing several documents and has already read some.
+                labels = labels ?? new OptionLabels(service);
                 var table = new PdfTable(0.05, 0.3, 0.3, 0.13, 0.11, 0.11);
                 table.AddHeader(
                     PdfCell.Head("No."), PdfCell.Head("Fail point"), PdfCell.Head("Remedial action"),

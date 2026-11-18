@@ -190,6 +190,11 @@
               <Description description="Values available to multi-select questions. V8 has one: Tax check reason (AD-022)." languagecode="1033" />
             </Descriptions>
             <options>
+              <option value="120910320" IsHidden="0">
+                <labels>
+                  <label description="FactFind quality" languagecode="1033" />
+                </labels>
+              </option>
               <option value="120910340" IsHidden="0">
                 <labels>
                   <label description="LSA/LSDBA/TTFAC" languagecode="1033" />
@@ -200,34 +205,24 @@
                   <label description="Trust" languagecode="1033" />
                 </labels>
               </option>
-              <option value="120910342" IsHidden="0">
-                <labels>
-                  <label description="IHT" languagecode="1033" />
-                </labels>
-              </option>
-              <option value="120910343" IsHidden="0">
-                <labels>
-                  <label description="Tax calculation" languagecode="1033" />
-                </labels>
-              </option>
-              <option value="120910344" IsHidden="0">
-                <labels>
-                  <label description="Other" languagecode="1033" />
-                </labels>
-              </option>
-              <option value="120910320" IsHidden="0">
-                <labels>
-                  <label description="FactFind quality" languagecode="1033" />
-                </labels>
-              </option>
               <option value="120910321" IsHidden="0">
                 <labels>
                   <label description="Risk / capacity mismatch" languagecode="1033" />
                 </labels>
               </option>
+              <option value="120910342" IsHidden="0">
+                <labels>
+                  <label description="IHT" languagecode="1033" />
+                </labels>
+              </option>
               <option value="120910322" IsHidden="0">
                 <labels>
                   <label description="Research / rationale" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910343" IsHidden="0">
+                <labels>
+                  <label description="Tax calculation" languagecode="1033" />
                 </labels>
               </option>
               <option value="120910323" IsHidden="0">
@@ -238,6 +233,11 @@
               <option value="120910324" IsHidden="0">
                 <labels>
                   <label description="Client communication" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910344" IsHidden="0">
+                <labels>
+                  <label description="Other" languagecode="1033" />
                 </labels>
               </option>
               <option value="120910325" IsHidden="0">

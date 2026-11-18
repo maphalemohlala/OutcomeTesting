@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 using Microsoft.Xrm.Sdk;
 
 namespace OutcomeTesting.Plugins
@@ -59,6 +58,15 @@ namespace OutcomeTesting.Plugins
             // slug would put a second identifier in play that nothing else references.
             var existing = WebRoleRegistry.FindByName(systemService, roleName);
             Guid roleId;
+            if (existing != null && !WebRoleRegistry.IsActive(existing))
+            {
+                // This reported "Created" and left the role retired, so the role the
+                // administrator believed they had made could be neither assigned nor granted.
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "A retired role already has this name. Restore it instead of creating it again.");
+            }
+
             if (existing != null)
             {
                 // Same name, same role: the idempotent re-run. Only the description moves.
@@ -101,27 +109,6 @@ namespace OutcomeTesting.Plugins
                 roleName, description, idempotencyKey, context);
 
             SetResponse(context, roleId.ToString("D"), "Created", auditId, false);
-        }
-
-        /// <summary>Uppercase, hyphen-separated stable code fragment from a role name.</summary>
-        private static string Slug(string value)
-        {
-            var sb = new StringBuilder();
-            var lastHyphen = false;
-            foreach (var ch in value.ToUpperInvariant())
-            {
-                if (char.IsLetterOrDigit(ch))
-                {
-                    sb.Append(ch);
-                    lastHyphen = false;
-                }
-                else if (!lastHyphen)
-                {
-                    sb.Append('-');
-                    lastHyphen = true;
-                }
-            }
-            return sb.ToString().Trim('-');
         }
 
         private static void SetResponse(IPluginExecutionContext context, string roleId, string status, Guid auditId, bool conflict)

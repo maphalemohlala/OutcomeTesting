@@ -116,6 +116,8 @@ namespace OutcomeTesting.Plugins
                 var mappings = DeactivateByRoleCode(userService, MappingEntity, "al_userrolemappingid", roleCode);
                 var rules = DeactivateByRoleCode(userService, PermissionEntity, "al_pagepermissionid", roleCode);
                 Append(details, "Cascaded to " + mappings + " assignment(s) and " + rules + " permission rule(s)");
+
+                PermissionHelpers.EnsureSomeoneCanManagePermissions(systemService);
             }
 
             var auditId = CommandHelpers.WriteAuditEvent(

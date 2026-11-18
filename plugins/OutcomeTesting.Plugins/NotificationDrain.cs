@@ -71,8 +71,15 @@ namespace OutcomeTesting.Plugins
                 "al_body",
                 "al_event",
                 "al_targettable",
-                "al_targetid");
+                "al_targetid",
+                "al_senton");
         }
+
+        /// <summary>
+        /// How long a claim holds a row against another drain. A drain that claimed a row and
+        /// then died leaves it claimed; after this it can be drained again.
+        /// </summary>
+        public static readonly TimeSpan ClaimTimeout = TimeSpan.FromMinutes(15);
 
         /// <summary>
         /// Sends one notification and stamps the outcome on the row.
@@ -85,6 +92,20 @@ namespace OutcomeTesting.Plugins
         /// saying so, which is the visible version of that gap.
         /// </summary>
         public static Result Send(IOrganizationService service, Entity notification, EntityReference sender)
+        {
+            return Send(service, notification, sender, false);
+        }
+
+        /// <summary>
+        /// As <see cref="Send(IOrganizationService, Entity, EntityReference)"/>.
+        /// <paramref name="insideTransaction"/> is true for al_DrainNotifications, which runs
+        /// synchronously: there a Dataverse fault cannot be recorded on the row and carried
+        /// past - the platform rolls back the whole batch, the Failed stamp with it, once a
+        /// plug-in has absorbed one - so it stops the batch with the row and the reason instead
+        /// of ending in the platform's own unexplained abort.
+        /// </summary>
+        public static Result Send(
+            IOrganizationService service, Entity notification, EntityReference sender, bool insideTransaction)
         {
             if (service == null)
             {
@@ -104,12 +125,27 @@ namespace OutcomeTesting.Plugins
             var recipient = notification.GetAttributeValue<string>("al_recipientemail");
             if (string.IsNullOrWhiteSpace(recipient))
             {
+                // A Failed row with nobody to send to already says why (an unreached
+                // recipient, a letter too long to hold); that reason is the useful one and is
+                // kept, rather than written over with this one on every drain.
+                if (Status(notification) == NotificationOutbox.StatusFailed)
+                {
+                    return Result.Skipped;
+                }
+
                 // The OD-030 gap made visible rather than guessed at. An event whose
                 // recipient could not be resolved is a routing question for a person, so it
                 // is parked where a person can see it — not sent to a plausible address.
                 return Fail(service, notification.Id,
                     "No recipient address. The event was queued with nobody to send it to, "
                     + "so nothing was sent.");
+            }
+
+            // The async step and al_DrainNotifications can both reach a Pending row; only the
+            // one that claims it sends it.
+            if (!Claim(service, notification.Id))
+            {
+                return Result.Skipped;
             }
 
             EntityReference from;
@@ -124,6 +160,8 @@ namespace OutcomeTesting.Plugins
             }
             catch (Exception error)
             {
+                StopInsideTransaction(insideTransaction, notification.Id, error);
+
                 // A queue the run-as account cannot read is a configuration fault like any
                 // other, and belongs on the row rather than in an async retry.
                 return Fail(service, notification.Id, Describe(error));
@@ -139,7 +177,7 @@ namespace OutcomeTesting.Plugins
 
                 var emailId = service.Create(email);
 
-                Attach(service, notification, emailId);
+                Attach(service, notification, emailId, insideTransaction);
 
                 var send = new OrganizationRequest(SendEmailMessage);
                 send["EmailId"] = emailId;
@@ -149,6 +187,8 @@ namespace OutcomeTesting.Plugins
             }
             catch (Exception error)
             {
+                StopInsideTransaction(insideTransaction, notification.Id, error);
+
                 // Broad on purpose. The row is the only record that this event needed an
                 // email, and losing the reason to an unexpected exception type would leave
                 // a Pending row that no one can explain. The reason is written, and the
@@ -174,14 +214,83 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static bool IsDrainable(Entity notification)
         {
-            var status = notification.GetAttributeValue<OptionSetValue>("al_status");
-            if (status == null)
+            var status = Status(notification);
+            if (status != NotificationOutbox.StatusPending && status != NotificationOutbox.StatusFailed)
             {
                 return false;
             }
 
-            return status.Value == NotificationOutbox.StatusPending
-                || status.Value == NotificationOutbox.StatusFailed;
+            // Claimed by a drain that is sending it now; see Claim.
+            var claimed = notification.GetAttributeValue<DateTime?>("al_senton");
+            return !claimed.HasValue || claimed.Value < DateTime.UtcNow - ClaimTimeout;
+        }
+
+        private static int? Status(Entity notification)
+        {
+            var status = notification.GetAttributeValue<OptionSetValue>("al_status");
+            return status == null ? (int?)null : status.Value;
+        }
+
+        /// <summary>
+        /// Marks the row as being sent, or false where another drain got there first.
+        ///
+        /// <para>
+        /// The row is read again and stamped with <c>al_senton</c> only if it has not changed
+        /// since that read (its row version), so of two drains holding the same Pending row one
+        /// claims it and the other finds it claimed and leaves it. Without this the async step
+        /// and al_DrainNotifications could each send the same letter. A send that fails clears
+        /// the stamp (<see cref="Fail"/>), and a stamp left by a drain that died lapses after
+        /// <see cref="ClaimTimeout"/>.
+        /// </para>
+        /// <para>
+        /// A row read without a version (only the test fake does that) is stamped plainly, as
+        /// AssignCasePlugin does with a missing version.
+        /// </para>
+        /// </summary>
+        private static bool Claim(IOrganizationService service, Guid notificationId)
+        {
+            var current = service.Retrieve(
+                NotificationOutbox.NotificationEntity, notificationId, new ColumnSet("al_status", "al_senton"));
+            if (!IsDrainable(current))
+            {
+                return false;
+            }
+
+            var claim = new Entity(NotificationOutbox.NotificationEntity, notificationId)
+            {
+                ["al_senton"] = DateTime.UtcNow,
+            };
+
+            if (string.IsNullOrEmpty(current.RowVersion))
+            {
+                service.Update(claim);
+                return true;
+            }
+
+            claim.RowVersion = current.RowVersion;
+            try
+            {
+                service.Execute(new Microsoft.Xrm.Sdk.Messages.UpdateRequest
+                {
+                    Target = claim,
+                    ConcurrencyBehavior = ConcurrencyBehavior.IfRowVersionMatches,
+                });
+            }
+            catch (System.ServiceModel.FaultException<OrganizationServiceFault> fault)
+            {
+                // Lost the race in the moment between the read and the stamp. Outside a
+                // transaction (the async step) that is simply the other drain's row; inside
+                // al_DrainNotifications's transaction the platform will roll the batch back
+                // whatever this returns, and nothing it held is sent, so a re-run is safe.
+                if (CommandHelpers.IsConcurrencyFault(fault))
+                {
+                    return false;
+                }
+
+                throw;
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -231,7 +340,7 @@ namespace OutcomeTesting.Plugins
         /// to fix a document.
         /// </para>
         /// </summary>
-        private static void Attach(IOrganizationService service, Entity notification, Guid emailId)
+        private static void Attach(IOrganizationService service, Entity notification, Guid emailId, bool insideTransaction)
         {
             var body = notification.GetAttributeValue<string>(NotificationOutbox.AttachmentBodyAttr);
             var name = notification.GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr);
@@ -252,11 +361,36 @@ namespace OutcomeTesting.Plugins
                         ["body"] = attachment.Value,
                     });
                 }
-                catch (Exception)
+                catch (Exception error)
                 {
                     // Deliberately swallowed; see the summary. One file that cannot be
-                    // attached does not cost the others.
+                    // attached does not cost the others - except inside a transaction, where
+                    // a swallowed fault would cost the whole batch.
+                    StopInsideTransaction(insideTransaction, notification.Id, error);
                 }
+            }
+        }
+
+        /// <summary>See <see cref="Send(IOrganizationService, Entity, EntityReference, bool)"/>.</summary>
+        private static void StopInsideTransaction(bool insideTransaction, Guid notificationId, Exception error)
+        {
+            if (!insideTransaction)
+            {
+                return;
+            }
+
+            // Already stopped by an inner step (an attachment).
+            if (error is InvalidPluginExecutionException)
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error).Throw();
+            }
+
+            if (error is System.ServiceModel.FaultException<OrganizationServiceFault>)
+            {
+                throw new InvalidPluginExecutionException(
+                    "Notification " + notificationId.ToString("D") + " could not be sent: " + Describe(error)
+                    + " The batch was stopped there; run it again once that is fixed.",
+                    error);
             }
         }
 
@@ -266,6 +400,9 @@ namespace OutcomeTesting.Plugins
             {
                 ["al_status"] = new OptionSetValue(NotificationOutbox.StatusFailed),
                 ["al_failurereason"] = CommandHelpers.Truncate(reason, FailureReasonLength),
+
+                // Releases the claim, so the row is retried rather than held.
+                ["al_senton"] = null,
             });
 
             return Result.Failed;

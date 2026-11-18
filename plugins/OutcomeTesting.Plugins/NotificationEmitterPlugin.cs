@@ -175,6 +175,12 @@ namespace OutcomeTesting.Plugins
             var targetTable = reviewRef == null ? ActionEntity : reviewRef.LogicalName;
             var targetId = reviewRef == null ? actionId : reviewRef.Id;
 
+            // And on the adviser it is assigned to, so actions moved to a different adviser
+            // tell that adviser too, while the many actions of one review to one adviser
+            // still make one letter.
+            var adviser = action.GetAttributeValue<EntityReference>("al_assignedcontactid");
+            var occurrence = adviser == null ? null : adviser.Id.ToString("N");
+
             // Asked before the body is built, not after. Everything below costs a round trip
             // apiece - the case, the contact, the grade, the portal domain - and on a review
             // that raised one action per marked-down item every action after the first would
@@ -182,7 +188,7 @@ namespace OutcomeTesting.Plugins
             // lot. The code depends on nothing but the action just read, so the cheap question
             // can be asked first.
             if (NotificationOutbox.AlreadyQueued(
-                service, NotificationOutbox.EventRemediationAssigned, targetId, null))
+                service, NotificationOutbox.EventRemediationAssigned, targetId, occurrence))
             {
                 return;
             }
@@ -199,7 +205,7 @@ namespace OutcomeTesting.Plugins
 
             var reference = (caseRow == null ? null : caseRow.GetAttributeValue<string>("al_casereference"))
                 ?? "a case";
-            var email = NotificationOutbox.ContactEmail(service, action.GetAttributeValue<EntityReference>("al_assignedcontactid"));
+            var email = NotificationOutbox.ContactEmail(service, adviser);
 
             var due = action.GetAttributeValue<DateTime?>("al_duedate");
             var dueText = due.HasValue
@@ -246,6 +252,10 @@ namespace OutcomeTesting.Plugins
                 },
                 caseRef);
 
+            // The same documents go on every letter this event queues, so they are drawn for
+            // the first and reused by the copies.
+            var drawn = new NotificationOutbox.DrawnCheck();
+
             // Every adviser letter carries the checks (project owner, 2026-10-05).
             NotificationOutbox.QueueWithCompletedCheck(
                 service,
@@ -257,7 +267,9 @@ namespace OutcomeTesting.Plugins
                 letter.Subject,
                 letter.Body,
                 code,
-                caseRef);
+                caseRef,
+                occurrence,
+                drawn);
 
             // The para-planner's own copy (project owner, 2026-10-05): the same documents, a
             // fixed line of wording, its own outbox row so it neither collides with the
@@ -276,14 +288,15 @@ namespace OutcomeTesting.Plugins
                 ParaplannerRemediationLetter.Body(paraplannerReference),
                 null,
                 caseRef,
-                ParaplannerRemediationLetter.Occurrence);
+                ParaplannerRemediationLetter.Occurrence,
+                drawn);
 
             // Tax only: the T&C Manager hears as the adviser does. New entrants: on a Pass with
             // issues, so sign-off needs no OTIS step (UAT decisions, 2026-11-06).
             if (IsTaxOnly(caseRow) || (IsNewEntrant(caseRow) && grade == OutcomeRules.OutcomePassWithIssues))
             {
                 QueueTcManagerCopy(service, correlationId, NotificationOutbox.EventRemediationAssigned,
-                    targetTable, targetId, caseRef, letter.Subject, letter.Body);
+                    targetTable, targetId, caseRef, letter.Subject, letter.Body, drawn);
             }
         }
 
@@ -296,7 +309,8 @@ namespace OutcomeTesting.Plugins
             Guid targetId,
             EntityReference caseRef,
             string subject,
-            string body)
+            string body,
+            NotificationOutbox.DrawnCheck drawn = null)
         {
             // No mapping is a configuration gap, never a reason to lose the adviser's letter.
             var routing = TcManagerRouting.ForCase(service, caseRef);
@@ -308,7 +322,7 @@ namespace OutcomeTesting.Plugins
             NotificationOutbox.QueueWithCompletedCheck(
                 service, correlationId, eventValue, targetTable, targetId, routing.Email,
                 subject, "<p>For your information, the adviser has been sent this letter.</p>" + body,
-                null, caseRef, TcManagerCopyOccurrence);
+                null, caseRef, TcManagerCopyOccurrence, drawn);
         }
 
         internal static bool IsTaxOnly(Entity caseRow)
@@ -385,6 +399,9 @@ namespace OutcomeTesting.Plugins
                 },
                 caseRef);
 
+            // Drawn for the adviser's letter and reused by the T&C Manager's copy.
+            var drawn = new NotificationOutbox.DrawnCheck();
+
             NotificationOutbox.QueueWithCompletedCheck(
                 service,
                 correlationId,
@@ -395,12 +412,14 @@ namespace OutcomeTesting.Plugins
                 passed.Subject,
                 passed.Body,
                 NotificationTemplates.CasePassed,
-                caseRef);
+                caseRef,
+                null,
+                drawn);
 
             if (IsNewEntrant(caseRow))
             {
                 QueueTcManagerCopy(service, correlationId, NotificationOutbox.EventCasePassed,
-                    "al_outcomecase", caseRef.Id, caseRef, passed.Subject, passed.Body);
+                    "al_outcomecase", caseRef.Id, caseRef, passed.Subject, passed.Body, drawn);
             }
         }
     }

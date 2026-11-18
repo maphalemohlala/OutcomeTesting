@@ -14,7 +14,7 @@ import {
   setRoleAssignmentActive,
 } from '../../services/commands/permissions';
 import { executeCommand } from '../../services/commands/commandClient';
-import { logTechnical } from '../../services/errors';
+import { logTechnical, messageForFailure } from '../../services/errors';
 import { ACCESS_LEVELS, RESOURCE_KEYS } from '../../types/permissions';
 import {
   AssignRoleModal,
@@ -23,7 +23,7 @@ import {
   type Notice,
   type RoleOption,
 } from './SecurityModals';
-import { classifyHolder, roleDetailPath, type RoleHolderRecord } from './roleDetail';
+import { classifyHolder, isRetiredRole, roleDetailPath, type RoleHolderRecord } from './roleDetail';
 import './SecurityConfigPage.css';
 
 /** One role whose holders include a state `classifyHolder` does not call `consistent` (AD-089). */
@@ -121,6 +121,9 @@ export function SecurityConfigPage() {
   // permission rules match on (al_rolecode, AD-044). The al_approle picklist is no longer
   // offered — the server still reads it, so anything already assigned by it keeps working,
   // but new configuration is written against the web roles the portal actually enforces.
+  // A retired role's withdrawn rules and assignments cannot be restored (the server refuses),
+  // so their rows offer no Restore.
+  const knownRoles = roles.status === 'ready' ? roles.roles : [];
   const roleOptions: RoleOption[] = roles.status === 'ready'
     ? roles.roles
         .filter((role) => role.active)
@@ -165,7 +168,7 @@ export function SecurityConfigPage() {
 
     if (!result.ok) {
       setAssignBusy(false);
-      setAssignNotice({ tone: 'error', message: result.message });
+      setAssignNotice({ tone: 'error', message: messageForFailure(result) });
       return;
     }
     intent.release(token);
@@ -185,7 +188,7 @@ export function SecurityConfigPage() {
         intent.release(withdrawToken);
         message = `${email.trim()} changed from ${replacing.role} to ${label}.`;
       } else {
-        message = `${label} assigned, but the previous ${replacing.role} assignment could not be withdrawn: ${withdrawn.message}`;
+        message = `${label} assigned, but the previous ${replacing.role} assignment could not be withdrawn: ${messageForFailure(withdrawn)}`;
         tone = 'error';
       }
     }
@@ -235,7 +238,7 @@ export function SecurityConfigPage() {
       setPermOpen(false);
       reloadConfig();
     } else {
-      setPermNotice({ tone: 'error', message: result.message });
+      setPermNotice({ tone: 'error', message: messageForFailure(result) });
     }
   }
 
@@ -287,7 +290,7 @@ export function SecurityConfigPage() {
       setRolesReloadKey((k) => k + 1);
       reloadConfig();
     } else {
-      setRoleNotice({ tone: 'error', message: result.message });
+      setRoleNotice({ tone: 'error', message: messageForFailure(result) });
     }
   }
 
@@ -310,7 +313,7 @@ export function SecurityConfigPage() {
       });
       reloadConfig();
     } else {
-      setRowNotice({ tone: 'error', message: result.message });
+      setRowNotice({ tone: 'error', message: messageForFailure(result) });
     }
   }
 
@@ -335,7 +338,7 @@ export function SecurityConfigPage() {
       });
       reloadConfig();
     } else {
-      setRowNotice({ tone: 'error', message: result.message });
+      setRowNotice({ tone: 'error', message: messageForFailure(result) });
     }
   }
 
@@ -362,7 +365,7 @@ export function SecurityConfigPage() {
       setRolesReloadKey((k) => k + 1);
       reloadConfig();
     } else {
-      setRowNotice({ tone: 'error', message: result.message });
+      setRowNotice({ tone: 'error', message: messageForFailure(result) });
     }
   }
 
@@ -561,14 +564,18 @@ export function SecurityConfigPage() {
                                 Change role
                               </button>
                             ) : null}
-                            <button
-                              type="button"
-                              className="security__link-btn"
-                              onClick={() => onSetAssignmentActive(m)}
-                              disabled={rowBusy !== null}
-                            >
-                              {rowBusy === m.id ? 'Working…' : m.active ? 'Withdraw' : 'Restore'}
-                            </button>
+                            {m.active || !isRetiredRole(m.role, knownRoles) ? (
+                              <button
+                                type="button"
+                                className="security__link-btn"
+                                onClick={() => onSetAssignmentActive(m)}
+                                disabled={rowBusy !== null}
+                              >
+                                {rowBusy === m.id ? 'Working…' : m.active ? 'Withdraw' : 'Restore'}
+                              </button>
+                            ) : (
+                              <span>Role retired</span>
+                            )}
                           </td>
                         ) : null}
                       </tr>
@@ -620,14 +627,18 @@ export function SecurityConfigPage() {
                                 Change level
                               </button>
                             ) : null}
-                            <button
-                              type="button"
-                              className="security__link-btn"
-                              onClick={() => onSetRuleActive(p)}
-                              disabled={rowBusy !== null}
-                            >
-                              {rowBusy === p.id ? 'Working…' : p.active ? 'Withdraw' : 'Restore'}
-                            </button>
+                            {p.active || !isRetiredRole(p.role, knownRoles) ? (
+                              <button
+                                type="button"
+                                className="security__link-btn"
+                                onClick={() => onSetRuleActive(p)}
+                                disabled={rowBusy !== null}
+                              >
+                                {rowBusy === p.id ? 'Working…' : p.active ? 'Withdraw' : 'Restore'}
+                              </button>
+                            ) : (
+                              <span>Role retired</span>
+                            )}
                           </td>
                         ) : null}
                       </tr>

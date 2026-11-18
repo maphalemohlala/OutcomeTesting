@@ -5,7 +5,8 @@
   <PluginTypeId>0dd9d5b9-c0a3-f111-aaac-e4fade069307</PluginTypeId>
   <PrimaryEntity>al_response</PrimaryEntity>
   <AsyncAutoDelete>0</AsyncAutoDelete>
-  <FilteringAttributes>al_answertext,al_answerchoice,al_answerchoices,al_answerdate</FilteringAttributes>
+  <FilteringAttributes>al_answertext,al_answerchoice,al_answerchoices,al_answerdate,al_answerrichtext</FilteringAttributes>
+  <ImpersonatingUserIdName></ImpersonatingUserIdName>
   <InvocationSource>1</InvocationSource>
   <Mode>0</Mode>
   <Rank>1</Rank>
@@ -26,7 +27,7 @@
   <SdkMessageProcessingStepImages>
     <SdkMessageProcessingStepImage Name="ResponseGuard Update pre-image">
       <SdkMessageProcessingStepImageId>{bc83a2e7-c0a3-f111-aaac-e4fade069307}</SdkMessageProcessingStepImageId>
-      <Attributes>al_reviewinstanceid,al_questionversionid,al_answertext,al_answerchoice,al_answerchoices,al_answerdate</Attributes>
+      <Attributes>al_reviewinstanceid,al_questionversionid,al_answertext,al_answerchoice,al_answerchoices,al_answerdate,al_answerrichtext</Attributes>
       <EntityAlias>PreImage</EntityAlias>
       <ImageType>0</ImageType>
       <MessagePropertyName>Target</MessagePropertyName>

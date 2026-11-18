@@ -1,7 +1,7 @@
 <powerpagecomponent powerpagecomponentid="28a859a4-c9b5-f111-aaac-e4fade069307">
   <content>{
-  "value": "al_questionversionid,al_questiontext,al_responsetype,al_ismandatory,al_effectivefrom,al_effectiveto,al_questionid,_al_questionid_value",
-  "source": 0
+  "description": "Columns the review page's freshness check reads on al_questionversion. Every one of them is already rendered into the page by the Liquid fetch above it, so this exposes nothing the checker cannot already see; it is the effective dates and the response type that let the page tell a superseded version from the one in force. _al_questionid_value is listed alongside al_questionid because a LOOKUP is allowlisted under the name the query actually SELECTS, and the page selects the _value form. Without it the WHOLE request is refused with 90040101, not just that one column, so the freshness check returned 403 on every page load from the day it shipped (2026-09-21) until 2026-09-22 - and failed silently, because the page renders from the Liquid fetch either way and the only symptom was a stale scale nobody could reproduce.",
+  "value": "al_questionversionid,al_questiontext,al_responsetype,al_ismandatory,al_effectivefrom,al_effectiveto,al_questionid,_al_questionid_value"
 }</content>
   <iscustomizable>1</iscustomizable>
   <name>Webapi/al_questionversion/fields</name>

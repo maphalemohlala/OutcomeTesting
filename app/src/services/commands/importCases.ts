@@ -20,7 +20,7 @@ export interface ImportCasesInput {
 }
 
 /** Raw shape returned by the Custom API: counts cross the wire as strings. */
-export interface ImportCasesOutput {
+interface ImportCasesOutput {
   BatchId: string;
   BatchReference: string;
   Total: string;
@@ -80,7 +80,7 @@ function parseReport(raw: unknown): ImportReportRow[] {
   }
 }
 
-export function toImportSummary(data: ImportCasesOutput): ImportSummary {
+function toImportSummary(data: ImportCasesOutput): ImportSummary {
   return {
     batchId: data.BatchId,
     batchReference: data.BatchReference,

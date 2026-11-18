@@ -24,7 +24,7 @@ const APPROVED = 'Approved';
 const REJECTED = 'Rejected';
 
 /** One labelled cell of the paper form's answer grid. */
-export interface FormCell {
+interface FormCell {
   label: string;
   value: string | null;
 }
@@ -130,7 +130,7 @@ function newestFirst(a: SignoffRow, b: SignoffRow): number {
 }
 
 /** The most recent supervisor decision on an action, or null when it has none. */
-export function latestSignoff(
+function latestSignoff(
   action: RemediationActionRow,
   signoffs: SignoffRow[],
 ): SignoffRow | null {
@@ -191,6 +191,18 @@ export function signoffNotes(action: RemediationActionRow, signoffs: SignoffRow[
 }
 
 /**
+ * The decision that still stands on an action, or null where none does. Completed again
+ * since the latest decision means that decision is history and a new one is awaited, so the
+ * Sign-off column and "All remedial actions checked and approved" read it the same way.
+ */
+function currentSignoff(action: RemediationActionRow, signoffs: SignoffRow[]): SignoffRow | null {
+  const latest = latestSignoff(action, signoffs);
+  const redone =
+    latest?.signedOffOnRaw && action.completedOnRaw && action.completedOnRaw > latest.signedOffOnRaw;
+  return latest && !redone ? latest : null;
+}
+
+/**
  * What the Sign-off column says for one action.
  *
  * Three states, as the portal draws them: the supervisor has decided; the adviser has
@@ -203,11 +215,8 @@ export function signoffCell(
   signoffs: SignoffRow[],
   caseStatus?: string | null,
 ): string {
-  const latest = latestSignoff(action, signoffs);
-  // Completed again since that decision: the rejection is history, and it now awaits a new one.
-  const redone =
-    latest?.signedOffOnRaw && action.completedOnRaw && action.completedOnRaw > latest.signedOffOnRaw;
-  if (latest && !redone) {
+  const latest = currentSignoff(action, signoffs);
+  if (latest) {
     return latest.signedOffOn ? `${latest.decision}, ${latest.signedOffOn}` : latest.decision;
   }
 
@@ -249,7 +258,7 @@ export function remediationForm(
   let allApproved = actions.length > 0;
   let anyRejected = false;
   for (const action of actions) {
-    const latest = latestSignoff(action, signoffs);
+    const latest = currentSignoff(action, signoffs);
     if (!latest) {
       allApproved = false;
       continue;

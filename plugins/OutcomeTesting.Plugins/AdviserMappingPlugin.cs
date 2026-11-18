@@ -47,6 +47,8 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static int Apply(IPluginExecutionContext context, IOrganizationService system, Action<string> trace = null)
         {
+            RefuseSelfManagement(context, system);
+
             var moved = 0;
             var lookups = new CaseAccessLookups(system);
             foreach (var email in EmailsOf(context, system))
@@ -68,7 +70,46 @@ namespace OutcomeTesting.Plugins
             return moved;
         }
 
-        private static void TellNewCoach(IOrganizationService system, Guid caseId, Guid correlationId, Action<string> trace)
+        /// <summary>
+        /// Refuses an active mapping that makes an adviser their own T&amp;C Manager. The
+        /// sign-off gate only asks whether the signer is the mapped manager
+        /// (<see cref="SupervisorMapping"/>), so such a row let an adviser attest to their own
+        /// remediation. Compared by email, as people are identified (AD-228). A withdrawn row
+        /// is left alone so a bad one can still be switched off. Runs inside the write's
+        /// transaction (synchronous post-operation), so the refusal undoes the save.
+        /// </summary>
+        public static void RefuseSelfManagement(IPluginExecutionContext context, IOrganizationService system)
+        {
+            object raw;
+            var target = context.InputParameters.TryGetValue("Target", out raw) ? raw as Entity : null;
+            if (target == null)
+            {
+                return;
+            }
+
+            var id = target.Id != Guid.Empty ? target.Id : context.PrimaryEntityId;
+            var row = system.Retrieve(
+                TcManagerRouting.MappingEntity, id,
+                new ColumnSet(TcManagerRouting.MappingEmailAttr, TcManagerRouting.ManagerAttr, "statecode"));
+            var adviser = CasePeople.Clean(row.GetAttributeValue<string>(TcManagerRouting.MappingEmailAttr));
+            var manager = row.GetAttributeValue<EntityReference>(TcManagerRouting.ManagerAttr);
+            if (!CommandHelpers.IsActive(row) || adviser == null || manager == null)
+            {
+                return;
+            }
+
+            var managerEmail = CasePeople.Clean(
+                system.Retrieve(ContactRegistry.Entity, manager.Id, new ColumnSet(ContactRegistry.EmailAttr))
+                    .GetAttributeValue<string>(ContactRegistry.EmailAttr));
+            if (string.Equals(managerEmail, adviser, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "An adviser cannot be their own T&C Manager. Choose someone else to sign off their cases.");
+            }
+        }
+
+        public static void TellNewCoach(IOrganizationService system, Guid caseId, Guid correlationId, Action<string> trace)
         {
             var row = system.Retrieve(
                 CaseEntity, caseId, new ColumnSet("al_casestatus", CaseAccessReconciler.SupervisorAttr));

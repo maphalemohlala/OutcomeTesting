@@ -90,7 +90,7 @@ export function adviceDateRefusal(
 }
 
 /** The label the business gives `al_duedate`, wherever a message names it. */
-export const DUE_DATE_LABEL = 'Due date';
+const DUE_DATE_LABEL = 'Due date';
 
 /**
  * Why this due date cannot be saved, or null when it can.

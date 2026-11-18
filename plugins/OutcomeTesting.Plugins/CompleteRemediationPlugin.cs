@@ -260,6 +260,21 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            // Before the actions are read, as the sign-off does (audit, 2026-11-16). Two last
+            // completions committing at the same moment each read the other's action as still
+            // open, so neither moved the case on and it sat at Remediation In Progress with
+            // everything done. The lock makes the second wait for the first to commit, and
+            // read what it wrote. From Awaiting Remediation the hop every branch below makes
+            // first is that write.
+            if (current == CaseLifecycle.AwaitingRemediation)
+            {
+                CaseTransitions.MoveThrough(service, caseRef.Id, CaseLifecycle.RemediationInProgress);
+            }
+            else
+            {
+                SignoffProgressPlugin.LockCase(service, caseRef.Id);
+            }
+
             // A review raises one action per thing the checker marked down (2026-09-10), so
             // completing one is no longer completing the remediation. The case moves to
             // Awaiting Sign-off only when nothing on THIS CHECK is still outstanding; until
@@ -281,6 +296,18 @@ namespace OutcomeTesting.Plugins
             // every action done and no one asked to act on it.
             if (!SignoffRequired(service, caseRef.Id))
             {
+                // Closing ends the whole case, so it waits for every check's actions, as the
+                // status guard holds a direct close to (MayCloseWithoutSignoff). An action
+                // still open on the other leg closes the case when it is completed.
+                if (AnyOutstanding(service, caseRef.Id, null))
+                {
+                    CaseTransitions.MoveThrough(
+                        service,
+                        caseRef.Id,
+                        new[] { CaseLifecycle.RemediationInProgress });
+                    return;
+                }
+
                 CaseTransitions.MoveThrough(
                     service,
                     caseRef.Id,

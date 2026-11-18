@@ -6,7 +6,8 @@ import {
 } from '../../components/form/RichTextEditor';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { usePermissions } from '../../app/permissions/permissionContext';
-import { builtInWording, hasText, unknownTokens } from './notificationTemplates';
+import { builtInWording, letterWordingMissing, unknownTokens } from './notificationTemplates';
+import { dateTime } from '../../lib/format';
 import {
   CUSTOM_TOKENS,
   ROLE_KINDS,
@@ -271,7 +272,7 @@ function NotSent({ state }: { state: ReturnType<typeof useFailedLetters> }) {
             <tbody>
               {state.letters.map((letter) => (
                 <tr key={letter.id}>
-                  <td>{letter.queuedOn ? new Date(letter.queuedOn).toLocaleString() : '—'}</td>
+                  <td>{dateTime(letter.queuedOn)}</td>
                   <td>{letter.subject}</td>
                   <td>{letter.recipient ?? <span className="templates__builtin">Nobody</span>}</td>
                   <td>{letter.reason}</td>
@@ -521,7 +522,7 @@ function TemplateForm({
   const offenders = row.custom
     ? unknownCustomTokens(subject, body)
     : unknownTokens(row.code, subject, body);
-  const empty = subject.trim() === '' || !hasText(body);
+  const empty = letterWordingMissing(subject, body);
   const unreachable = hasUnreachableContact(recipients, contacts, contactsKnown);
   const nobody = row.custom && recipients.kinds.length === 0 && recipients.contactIds.length === 0;
 
@@ -738,8 +739,7 @@ function NewTemplateForm({
     normalised === '' ||
     eventValue === null ||
     (recipients.kinds.length === 0 && recipients.contactIds.length === 0) ||
-    subject.trim() === '' ||
-    body.trim() === '';
+    letterWordingMissing(subject, body);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();

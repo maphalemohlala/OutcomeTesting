@@ -10,14 +10,9 @@ import { ukDayOf } from '../cases/caseHeaderDates';
 import { buildFullExtract } from './fullExtract';
 import { downloadWorkbook, stampedFilename } from '../../lib/tabular';
 import './ExportsPage.css';
+import { dateTime } from '../../lib/format';
 
 type Notice = { tone: 'ok' | 'error'; message: string } | null;
-
-function formatDate(iso: string | null): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
-}
 
 function inRange(iso: string | null, from: string, to: string): boolean {
   if (!from && !to) return true;
@@ -102,7 +97,7 @@ export function ExportsPage() {
       intent.release(batchId);
       const rows = Number(result.data.RowCount ?? 0);
       // A zero-row batch is a legitimate outcome, not a success worth celebrating: the
-      // export collects only cases at status Closed, so this means none are closed yet.
+      // export collects only checked cases (closed, or graded and still open), so none are.
       // Reporting it in the success tone and then disabling Download reads as a broken
       // button, which is exactly how it was reported.
       setNotice(
@@ -110,7 +105,7 @@ export function ExportsPage() {
           ? {
               tone: 'error',
               message:
-                'This batch generated 0 rows. The Trail Light export collects only cases at status Closed, and none are closed yet, so there is nothing to download.',
+                'This batch generated 0 rows. The Trail Light export collects only cases that have been checked, closed or not, and none have been, so there is nothing to download.',
             }
           : { tone: 'ok', message: `Generated ${rows} export record(s).` },
       );
@@ -124,7 +119,7 @@ export function ExportsPage() {
     <>
       <PageIntro
         title="Exports"
-        purpose="Produce the Trail Light export on demand. Each batch snapshots the closed cases for reconciliation. Open a batch to see its cases and download them for a range of check dates."
+        purpose="Produce the Trail Light export on demand. Each batch snapshots the checked cases, closed or not, for reconciliation. Open a batch to see its cases and download them for a range of check dates."
         actions={
           <>
             <button type="button" className="exports__btn exports__btn--ghost" onClick={onFullExtract} disabled={busy}>
@@ -159,7 +154,7 @@ export function ExportsPage() {
               Export batches
             </h2>
             {batches.length === 0 ? (
-              <p>No export batches yet. Create one to snapshot the closed cases.</p>
+              <p>No export batches yet. Create one to snapshot the checked cases.</p>
             ) : (
               <>
                 <FilterBar
@@ -230,7 +225,7 @@ export function ExportsPage() {
                               <Link to={`/exports/${b.id}`}>{b.name || b.code || 'Export batch'}</Link>
                             </td>
                             <td>{b.status}</td>
-                            <td>{formatDate(b.generatedOn)}</td>
+                            <td>{dateTime(b.generatedOn)}</td>
                             <td>{b.rowCount}</td>
                             <td className="exports__actions">
                               <button

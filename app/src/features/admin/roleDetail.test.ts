@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildRoleGrants, buildRoleHolders, classifyHolder } from './roleDetail';
-import type { PagePermissionRow, RoleMappingRow } from './useSecurityConfig';
+import { buildRoleGrants, classifyHolder } from './roleDetail';
+import type { PagePermissionRow } from './useSecurityConfig';
 
 const TAX = 'AL Portal - Tax Reviewer';
 
@@ -10,16 +10,6 @@ function rule(overrides: Partial<PagePermissionRow>): PagePermissionRow {
     role: TAX,
     resource: 'page.cases',
     level: 'Manage',
-    active: true,
-    ...overrides,
-  };
-}
-
-function mapping(overrides: Partial<RoleMappingRow>): RoleMappingRow {
-  return {
-    id: 'map-1',
-    email: 'someone@ascotlloyd.co.uk',
-    role: TAX,
     active: true,
     ...overrides,
   };
@@ -130,45 +120,6 @@ describe('buildRoleGrants', () => {
 
     expect(resources.indexOf('page.exports')).toBeLessThan(resources.indexOf('command.assign'));
     expect(resources.indexOf('page.cases')).toBeLessThan(resources.indexOf('page.exports'));
-  });
-});
-
-describe('buildRoleHolders', () => {
-  it('lists the people holding the role, active first', () => {
-    const holders = buildRoleHolders(TAX, [
-      mapping({ id: 'map-1', email: 'withdrawn@ascotlloyd.co.uk', active: false }),
-      mapping({ id: 'map-2', email: 'zoe@ascotlloyd.co.uk' }),
-      mapping({ id: 'map-3', email: 'adam@ascotlloyd.co.uk' }),
-    ]);
-
-    expect(holders.map((holder) => holder.email)).toEqual([
-      'adam@ascotlloyd.co.uk',
-      'zoe@ascotlloyd.co.uk',
-      'withdrawn@ascotlloyd.co.uk',
-    ]);
-    expect(holders[2].active).toBe(false);
-  });
-
-  it('leaves out people holding a different role', () => {
-    const holders = buildRoleHolders(TAX, [
-      mapping({ id: 'map-1', role: 'AL Portal - Planner' }),
-      mapping({ id: 'map-2', email: 'tax@ascotlloyd.co.uk' }),
-    ]);
-
-    expect(holders.map((holder) => holder.email)).toEqual(['tax@ascotlloyd.co.uk']);
-  });
-
-  it('matches the role code regardless of the casing the row was written with', () => {
-    const holders = buildRoleHolders(TAX, [mapping({ role: 'al portal - tax reviewer' })]);
-
-    expect(holders).toHaveLength(1);
-  });
-
-  it('says nothing rather than guessing when a row carries no email', () => {
-    const holders = buildRoleHolders(TAX, [mapping({ email: '  ' })]);
-
-    expect(holders).toHaveLength(1);
-    expect(holders[0].email).toBe('');
   });
 });
 

@@ -1,4 +1,11 @@
-import type { AdviserMappingRow } from './adviserMappingRows';
+import {
+  UNREACHABLE,
+  browserOnline,
+  isUnreachable,
+  serverReason,
+  textOf,
+} from '../../services/commands/failures';
+import type { AdviserMappingRow, ContactOption } from './adviserMappingRows';
 
 /**
  * Why a mapping could not be saved or removed, in a sentence that names the reason.
@@ -11,19 +18,6 @@ import type { AdviserMappingRow } from './adviserMappingRows';
  * None of this is a security boundary. The uniqueness of an adviser is a Dataverse
  * alternate key on `al_adviseremail` and stays the gate; this only reads the refusal back.
  */
-
-/** Everything in the error, whatever shape it arrived in, as one searchable string. */
-function textOf(error: unknown): string {
-  if (error === null || error === undefined) return '';
-  if (typeof error === 'string') return error;
-  if (error instanceof Error) return `${error.name} ${error.message}`;
-  try {
-    return JSON.stringify(error) ?? '';
-  } catch {
-    // A circular or otherwise unserialisable error still has a message worth reading.
-    return String((error as { message?: unknown }).message ?? '');
-  }
-}
 
 /**
  * The alternate key on al_adviseremail, refused. Dataverse says so three ways and the
@@ -39,18 +33,6 @@ function isDuplicateAdviser(text: string): boolean {
   );
 }
 
-/** The request never reached Dataverse. */
-function isUnreachable(text: string, online: boolean): boolean {
-  if (!online) return true;
-  return (
-    /Failed to fetch/i.test(text) ||
-    /NetworkError/i.test(text) ||
-    /Load failed/i.test(text) ||
-    /net::ERR/i.test(text) ||
-    /ERR_INTERNET_DISCONNECTED/i.test(text)
-  );
-}
-
 export const SAVE_FALLBACK = 'That mapping could not be saved.';
 export const REMOVE_FALLBACK = 'That mapping could not be removed.';
 
@@ -58,25 +40,15 @@ export const DUPLICATE_ADVISER =
   'That adviser is already mapped. Use Change on their row to point them at a different ' +
   'T&C Manager.';
 
-export const UNREACHABLE =
-  'The connection to Dataverse could not be reached, so nothing was changed. Check your ' +
-  'network and try again.';
-
-/** Whether the browser believes it is online, tolerating an environment without navigator. */
-function browserOnline(): boolean {
-  return typeof navigator === 'undefined' || navigator.onLine !== false;
-}
-
 export function describeSaveFailure(error: unknown, online = browserOnline()): string {
   const text = textOf(error);
   if (isDuplicateAdviser(text)) return DUPLICATE_ADVISER;
-  if (isUnreachable(text, online)) return UNREACHABLE;
-  return SAVE_FALLBACK;
+  // The server's reason before the connection: a reason proves the request arrived.
+  return serverReason(error) ?? (isUnreachable(text, online) ? UNREACHABLE : SAVE_FALLBACK);
 }
 
 export function describeRemoveFailure(error: unknown, online = browserOnline()): string {
-  if (isUnreachable(textOf(error), online)) return UNREACHABLE;
-  return REMOVE_FALLBACK;
+  return serverReason(error) ?? (isUnreachable(textOf(error), online) ? UNREACHABLE : REMOVE_FALLBACK);
 }
 
 /**
@@ -93,4 +65,23 @@ export function alreadyMappedRefusal(
   if (email === '') return null;
   const clash = mappings.some((m) => m.adviserEmail.trim().toLowerCase() === email);
   return clash ? DUPLICATE_ADVISER : null;
+}
+
+export const SELF_MAPPING =
+  'An adviser cannot be their own T&C Manager. Choose someone else to sign off their cases.';
+
+/**
+ * The refusal for naming the adviser as their own T&C Manager, or null. People are matched
+ * by work email, so this compares the adviser's email with the chosen manager's.
+ */
+export function selfMappingRefusal(
+  adviserEmail: string,
+  managerId: string,
+  people: readonly ContactOption[],
+): string | null {
+  const email = adviserEmail.trim().toLowerCase();
+  const id = managerId.trim().toLowerCase();
+  if (email === '' || id === '') return null;
+  const manager = people.find((p) => p.id.toLowerCase() === id);
+  return manager && manager.email.trim().toLowerCase() === email ? SELF_MAPPING : null;
 }

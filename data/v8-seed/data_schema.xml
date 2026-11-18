@@ -46,6 +46,7 @@
       <field displayname="Version number" name="al_versionnumber" type="number" customfield="true" />
       <field displayname="Display order" name="al_displayorder" type="number" customfield="true" />
       <field displayname="Effective from" name="al_effectivefrom" type="datetime" customfield="true" />
+      <field displayname="Effective to" name="al_effectiveto" type="datetime" customfield="true" />
       <field displayname="Mandatory" name="al_ismandatory" type="bool" customfield="true" />
       <field displayname="Response type" name="al_responsetype" type="optionsetvalue" customfield="true" />
       <field displayname="Question" name="al_questionid" type="entityreference" customfield="true" lookupType="al_question" />

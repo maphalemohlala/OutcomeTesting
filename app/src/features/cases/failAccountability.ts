@@ -78,11 +78,17 @@ export function effectiveAccountability(
   recorded: AccountabilityFlags,
   fileQualityFailed: boolean,
   adviceQualityFailed: boolean,
+  /**
+   * Whether an administrator is named for the File Quality fail (requirements log row 10).
+   * Mirrors GenerateExportPlugin.IsAccountable: that is a judgement on the file, so the
+   * paraplanner is no longer derived for it, and the administrator is never exported.
+   */
+  fqAdministratorNamed = false,
 ): { flags: AccountabilityFlags; source: AccountabilitySource } {
   const derived = derivedFlags(fileQualityFailed, adviceQualityFailed);
-  if (!isRecorded(recorded)) return { flags: derived, source: 'derived' };
+  if (!isRecorded(recorded) && !fqAdministratorNamed) return { flags: derived, source: 'derived' };
 
-  const fileJudged = recorded.fqAdviser || recorded.fqParaplanner;
+  const fileJudged = recorded.fqAdviser || recorded.fqParaplanner || fqAdministratorNamed;
   const adviceJudged = recorded.aqAdviser || recorded.aqParaplanner;
   return {
     flags: {
@@ -105,4 +111,59 @@ export function effectiveAccountability(
 export function adviceQualityFailedFrom(outcomeLabel: string | null): boolean {
   const normalised = outcomeLabel?.trim().toLowerCase();
   return normalised === 'insufficient evidence' || normalised === 'potential harm';
+}
+
+/**
+ * What makes a contact an adviser or a paraplanner: the web role they hold (project owner,
+ * 2026-11-17). Mirrors WebRoleRegistry.AdviserRole / PlannerRole, which al_SetFailAccountability
+ * enforces; only holders of one of them can be named as carrying a fail.
+ */
+export const ACCOUNTABLE_ROLES = ['AL Portal - Adviser Remediation', 'AL Portal - Planner'] as const;
+
+const accountableRoleSet = new Set<string>(ACCOUNTABLE_ROLES.map((role) => role.toLowerCase()));
+
+/**
+ * The lower-cased emails of everyone who can be named, from the active role assignments.
+ * shortcut: the server checks the web role association, which these rows mirror; a role
+ * granted in Power Pages only is missing here until it is adopted on the People page.
+ */
+export function accountableEmails(
+  mappings: readonly { email: string; role: string; active: boolean }[],
+): Set<string> {
+  return new Set(
+    mappings
+      .filter((row) => row.active && accountableRoleSet.has(row.role.trim().toLowerCase()))
+      .map((row) => row.email.trim().toLowerCase())
+      .filter((email) => email !== ''),
+  );
+}
+
+/**
+ * What the named-person fields say instead of offering a picker, or null when there is
+ * someone to pick from.
+ */
+export function namedPersonNote(
+  status: 'loading' | 'unavailable' | 'ready',
+  holders: ReadonlySet<string>,
+): string | null {
+  if (status === 'loading') return 'Loading who holds the Adviser or Planner role…';
+  if (status === 'unavailable') {
+    return 'Who holds the Adviser or Planner role could not be read, so nobody can be named right now. '
+      + 'Reload the page to try again.';
+  }
+  if (holders.size === 0) {
+    // What the People page records, not a claim about the portal: a role granted there alone is missing.
+    return 'Nobody is assigned the Adviser or Planner role on the People page, so nobody can be named. '
+      + 'An administrator can assign these roles there.';
+  }
+  return null;
+}
+
+/**
+ * Whether Record accountability is off. After a save the draft still differs from the row
+ * the page holds until the re-read lands, and the intent's key is already released, so a
+ * second click then would write the same judgement twice.
+ */
+export function recordDisabled(state: { changed: boolean; busy: boolean; awaitingReread: boolean }): boolean {
+  return !state.changed || state.busy || state.awaitingReread;
 }

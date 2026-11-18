@@ -74,10 +74,12 @@ export function describeSubmit(
 
     const error =
       saved.length > 0
-        ? `${sentenceCase(saved.join(', and '))}, but ${failures.length === 1 ? 'one check' : 'some checks'} could not be allocated — ${refusals}. Nothing else has been changed.`
+        ? `${sentenceCase(saved.join(', and '))}, but ${failures.length === 1 ? 'one check' : 'some checks'} could not be allocated — ${refusals}.`
         : `${refusals}.`;
 
-    return { notice: null, error, close: false, reload: fieldsSaved || allocated.length > 0 };
+    // A conflict re-reads too: the allocation carried a stale row version, and every retry would.
+    const conflicted = failures.some((a) => a.outcome.kind === 'failed' && a.outcome.conflict === true);
+    return { notice: null, error, close: false, reload: fieldsSaved || allocated.length > 0 || conflicted };
   }
 
   const parts: string[] = [];

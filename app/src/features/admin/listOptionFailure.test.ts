@@ -3,10 +3,10 @@ import {
   DELETE_FALLBACK,
   OPTION_IN_USE,
   SAVE_FALLBACK,
-  UNREACHABLE,
   describeDeleteFailure,
   describeSaveFailure,
 } from './listOptionFailure';
+import { UNREACHABLE } from '../../services/commands/failures';
 
 /**
  * The refusal an administrator is shown when an option cannot be deleted.

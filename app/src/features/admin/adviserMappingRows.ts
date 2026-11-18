@@ -1,3 +1,6 @@
+import { contactName, type NamedContact } from '../../lib/contactName';
+import { lookupLabel } from '../cases/lookupLabel';
+
 export interface AdviserMappingRow {
   id: string;
   adviserEmail: string;
@@ -14,6 +17,53 @@ export interface ContactOption {
   email: string;
 }
 
+/** Any contact, offered or not, so a mapping's held manager can still be named. */
+export interface KnownContact extends ContactOption {
+  active: boolean;
+}
+
+/** A contact as the mapping read returns it. */
+export interface RawContact extends NamedContact {
+  contactid: string;
+  statecode?: number | string | null;
+}
+
+/** Every contact, named by the rule every people list uses. */
+export function toKnownContacts(raw: readonly RawContact[]): KnownContact[] {
+  return raw.map((c) => ({
+    id: c.contactid,
+    name: contactName(c),
+    email: (c.emailaddress1 ?? '').trim(),
+    active: Number(c.statecode) === 0,
+  }));
+}
+
+/** Who can be chosen as a T&C Manager: active, and reachable at a work email. */
+export function offeredManagers(known: readonly KnownContact[]): ContactOption[] {
+  return known
+    .filter((c) => c.active && c.email !== '')
+    .map(({ id, name, email }) => ({ id, name, email }));
+}
+
+/**
+ * The T&C Manager choices, plus the manager a mapping already holds where they are no longer
+ * offered, marked as such, so the form shows who is recorded rather than "Choose…".
+ */
+export function managerChoices(
+  offered: readonly ContactOption[],
+  known: readonly KnownContact[],
+  heldId: string | null | undefined,
+): { id: string; label: string }[] {
+  const choices = offered.map((m) => ({ id: m.id, label: `${m.name} (${m.email})` }));
+  const held = (heldId ?? '').trim();
+  if (held === '' || offered.some((m) => m.id.toLowerCase() === held.toLowerCase())) return choices;
+
+  const person = known.find((c) => c.id.toLowerCase() === held.toLowerCase());
+  const why = person && !person.active ? 'inactive' : person && !person.email ? 'no email' : 'not listed';
+  const name = nonBlank(person?.name) ?? nonBlank(person?.email) ?? 'Manager on record';
+  return [...choices, { id: held, label: `${name} (${why})` }];
+}
+
 /** The shape the Web API returns for an al_advisermapping row. */
 export interface RawAdviserMapping {
   al_advisermappingid: string;
@@ -27,8 +77,6 @@ export interface RawAdviserMapping {
   al_tcmanageridname?: string | null;
   '_al_tcmanagerid_value@OData.Community.Display.V1.FormattedValue'?: string | null;
 }
-
-const FORMATTED = '_al_tcmanagerid_value@OData.Community.Display.V1.FormattedValue';
 
 /**
  * The T&C Manager's name for one mapping row, or null when no manager is mapped.
@@ -46,8 +94,8 @@ export function managerNameFor(
   row: RawAdviserMapping,
   contacts: readonly ContactOption[],
 ): string | null {
-  const labelled = (row[FORMATTED] ?? row.al_tcmanageridname ?? '').trim();
-  if (labelled !== '') return labelled;
+  const labelled = lookupLabel(row, 'al_tcmanagerid', row.al_tcmanageridname ?? undefined);
+  if (labelled) return labelled;
 
   const managerId = (row._al_tcmanagerid_value ?? '').trim();
   if (managerId === '') return null;

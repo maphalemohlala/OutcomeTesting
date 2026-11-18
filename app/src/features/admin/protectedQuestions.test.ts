@@ -3,14 +3,14 @@ import { describe, expect, it } from 'vitest';
 // ambient types to vite/client on purpose - app code must not reach for Node APIs that do
 // not exist in a browser, and one test is not a reason to widen that.
 import checklistGuardsSource from '../../../../plugins/OutcomeTesting.Plugins/ChecklistGuards.cs?raw';
-import { PROTECTED_QUESTION_CODES, protectedReason } from './protectedQuestions';
+import { PROTECTED_QUESTION_CODES, PROTECTED_QUESTION_PREFIXES, protectedReason } from './protectedQuestions';
 
 /**
  * Mirrors ChecklistGuards in plugins/OutcomeTesting.Plugins, which is authoritative: this
  * copy only hides a control the server would refuse anyway (AD-041).
  */
 describe('protectedQuestions', () => {
-  it('carries exactly the nine codes the plug-in assembly guards', () => {
+  it('carries exactly the codes the plug-in assembly guards', () => {
     expect([...PROTECTED_QUESTION_CODES].sort()).toEqual(
       [
         'Q-FQ-01',
@@ -21,9 +21,29 @@ describe('protectedQuestions', () => {
         'Q-FQTAX-03',
         'Q-GR-01',
         'Q-GR-02',
+        'Q-GR-03',
+        'Q-GR-04',
         'Q-TAX-02',
+        'Q-TAX-03',
+        'Q-TAX-04',
+        'Q-TAX-05',
+        'Q-TAX-06',
+        'Q-TAX-07',
+        'Q-TAX-08',
+        'Q-TAX-09',
+        'Q-TAX-10',
+        'Q-TAX-11',
+        'Q-TAX-12',
       ].sort(),
     );
+  });
+
+  it('guards every AML checking point by the start of its code', () => {
+    expect(protectedReason('Q-AML-01')).toBe(
+      'Q-AML-01 is an AML checking point, which grading reads by the start of its code.',
+    );
+    expect(protectedReason('q-aml-05')).not.toBeNull();
+    expect(protectedReason('Q-TAX-01')).toBeNull();
   });
 
   it('explains what a protected code is needed for', () => {
@@ -53,7 +73,8 @@ describe('the mirror matches the plug-in assembly', () => {
       .map((m) => m[1])
       .sort();
 
-    expect(inCsharp).toHaveLength(9);
-    expect(inCsharp).toEqual([...PROTECTED_QUESTION_CODES].sort());
+    // The C# holds codes and prefixes as dictionary entries of the same shape.
+    expect(inCsharp).toHaveLength(22);
+    expect(inCsharp).toEqual([...PROTECTED_QUESTION_CODES, ...PROTECTED_QUESTION_PREFIXES].sort());
   });
 });

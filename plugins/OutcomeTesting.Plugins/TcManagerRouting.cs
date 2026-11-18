@@ -47,6 +47,12 @@ namespace OutcomeTesting.Plugins
         /// <summary>The adviser's work email as the case carries it from the extract.</summary>
         public const string CaseAdviserEmailAttr = "al_adviseremail";
 
+        /// <summary>
+        /// A T&amp;C Manager chosen for one case by an admin (requirements log row 4), for when the
+        /// mapped manager is away. Empty means the adviser mapping decides.
+        /// </summary>
+        public const string OverrideAttr = "al_tcmanageroverrideid";
+
         private const string CaseEntity = "al_outcomecase";
 
         /// <summary>Why a case did or did not route to a T&amp;C Manager.</summary>
@@ -109,8 +115,30 @@ namespace OutcomeTesting.Plugins
             }
 
             // The stored adviser email only (AD-228). The name is never used to find one.
-            var row = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet(CaseAdviserEmailAttr));
+            var row = service.Retrieve(CaseEntity, caseRef.Id, new ColumnSet(CaseAdviserEmailAttr, OverrideAttr));
+
+            // A manager chosen for this case alone (requirements log row 4) wins over the mapping.
+            var chosen = row.GetAttributeValue<EntityReference>(OverrideAttr);
+            if (chosen != null)
+            {
+                var email = NotificationOutbox.ContactEmail(service, chosen);
+                return string.IsNullOrWhiteSpace(email)
+                    ? new Routing
+                    {
+                        Kind = RoutingKind.ManagerNotReachable,
+                        Manager = chosen,
+                        Reason = "The T&C Manager chosen for this case has no work email.",
+                    }
+                    : new Routing { Kind = RoutingKind.Matched, Manager = chosen, Email = email };
+            }
+
             return ForAdviserEmail(service, CaseAdviser.EmailFor(row.GetAttributeValue<string>(CaseAdviserEmailAttr)));
+        }
+
+        /// <summary>The case's own T&amp;C Manager where an admin chose one, in place of the mapping.</summary>
+        public static EntityReference ChosenFor(Entity caseRow)
+        {
+            return caseRow == null ? null : caseRow.GetAttributeValue<EntityReference>(OverrideAttr);
         }
 
         /// <summary>The T&amp;C Manager mapped to this adviser email, or why there is none.</summary>

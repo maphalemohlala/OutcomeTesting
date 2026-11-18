@@ -11,10 +11,7 @@ import { useUserDirectory } from '../../hooks/useUserDirectory';
 import { casesForPerson, contactEmailsOf, identityOf, isPersonRole, positions } from './peopleDirectory';
 import { checkerLabel } from '../cases/checkerNames';
 import './PeoplePage.css';
-
-function day(iso: string | null): string {
-  return iso ? iso.slice(0, 10) : '—';
-}
+import { isoDay } from '../../lib/format';
 
 export function PersonCasesPage() {
   const { role, key = '' } = useParams<{ role: string; key: string }>();
@@ -63,6 +60,8 @@ export function PersonCasesPage() {
     return { open, graded };
   }, [cases]);
 
+  const exportRows = useMemo(() => cases.map(caseExportRow), [cases]);
+
   if (!personRole) {
     return (
       <>
@@ -86,7 +85,7 @@ export function PersonCasesPage() {
               stem={`outcome-cases-${personRole.toLowerCase()}`}
               sheetName="Cases"
               headers={CASE_EXPORT_HEADERS}
-              rows={cases.map(caseExportRow)}
+              rows={exportRows}
               caption={`Exports the ${cases.length} case${cases.length === 1 ? '' : 's'} listed below`}
             />
           ) : null
@@ -166,7 +165,7 @@ export function PersonCasesPage() {
                       <td>{checkerLabel(item.taxChecker, item.route, 'Tax')}</td>
                       <td>{checkerLabel(item.aqsChecker, item.route, 'AQS')}</td>
                       <td>{item.productSolutionType ?? '—'}</td>
-                      <td>{day(item.checkDate)}</td>
+                      <td>{isoDay(item.checkDate, '—')}</td>
                       <td>
                         <StageLabel status={item.status} />
                       </td>

@@ -35,7 +35,7 @@ describe('the fail accountability editor', () => {
 
   it('is reading the panel at all', () => {
     expect(panel).toContain('OutcomeAccountability');
-    expect(panel).toContain('reloadKey');
+    expect(panel).toContain('onSaved={onSaved}');
   });
 
   it('is not rebuilt on the key that fires when the request is sent', () => {

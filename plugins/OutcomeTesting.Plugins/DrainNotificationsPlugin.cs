@@ -69,7 +69,7 @@ namespace OutcomeTesting.Plugins
             var failed = 0;
             foreach (var row in pending)
             {
-                switch (NotificationDrain.Send(systemService, row, CommandHelpers.Sender(context)))
+                switch (NotificationDrain.Send(systemService, row, CommandHelpers.Sender(context), true))
                 {
                     case NotificationDrain.Result.Sent:
                         sent++;
@@ -108,6 +108,14 @@ namespace OutcomeTesting.Plugins
                 ConditionOperator.In,
                 NotificationOutbox.StatusPending,
                 NotificationOutbox.StatusFailed);
+
+            // Only rows somebody can be sent to. A row parked with no address (a recipient
+            // who could not be reached, a letter too long to hold) can never be sent by a
+            // retry, and taking it would spend a slot of every batch on it, oldest first,
+            // until the batch held nothing else.
+            var addressed = new FilterExpression(LogicalOperator.And);
+            addressed.AddCondition("al_recipientemail", ConditionOperator.NotNull);
+            query.Criteria.AddFilter(addressed);
 
             return query;
         }

@@ -93,7 +93,7 @@ namespace OutcomeTesting.Plugins
             if (!SectionRules.IsSectionEffective(
                 section.GetAttributeValue<DateTime?>("al_effectivefrom"),
                 section.GetAttributeValue<DateTime?>("al_effectiveto"),
-                DateTime.UtcNow))
+                effectiveFrom))
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix +

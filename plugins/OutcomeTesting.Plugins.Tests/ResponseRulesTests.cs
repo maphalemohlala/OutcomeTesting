@@ -112,14 +112,6 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Theory]
-        [InlineData(120910200, 120910100)]
-        [InlineData(120910201, 120910101)]
-        public void OwnerRoleFor_maps_review_type_to_the_section_owner_role(int reviewType, int expected)
-        {
-            Assert.Equal(expected, ResponseRules.OwnerRoleFor(reviewType));
-        }
-
-        [Theory]
         [InlineData(120910301, true)]
         [InlineData(120910302, true)]
         [InlineData(120910304, true)]

@@ -1,0 +1,75 @@
+{
+  "name": "al_AmendOutcome",
+  "title": "al_AmendOutcome",
+  "type": "Microsoft.PowerApps/dataverseOperation",
+  "properties": {
+    "displayName": "al_AmendOutcome",
+    "swagger": {
+      "swagger": "2.0",
+      "info": {
+        "title": "al_AmendOutcome",
+        "version": "1.0"
+      },
+      "basePath": "/api/data/v9.2",
+      "paths": {
+        "/al_AmendOutcome": {
+          "post": {
+            "operationId": "al_AmendOutcome",
+            "parameters": [
+              {
+                "name": "TargetId",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "Reason",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "IdempotencyKey",
+                "in": "body",
+                "required": true,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "FileGrade",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "AdviceGrade",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              }
+            ],
+            "responses": {
+              "200": {
+                "description": "Success",
+                "schema": {
+                  "type": "object",
+                  "x-ms-dataverse-type": "LookupType",
+                  "x-ms-csdl-type": "mscrm.al_AmendOutcomeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

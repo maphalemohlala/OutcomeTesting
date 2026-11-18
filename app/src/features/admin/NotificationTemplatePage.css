@@ -46,10 +46,6 @@
   font-style: italic;
 }
 
-.templates__subject {
-  max-width: 28rem;
-}
-
 .templates__form {
   display: grid;
   gap: var(--space-2);

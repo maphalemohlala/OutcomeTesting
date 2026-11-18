@@ -4,7 +4,7 @@ import {
   Al_listoptionsService,
   Al_outcomecasesService,
 } from '../../generated';
-import { heldOptionLabels, listByKey } from '../admin/listOptions';
+import { LIST_OPTION_COLUMNS, heldOptionLabels, listByKey, type RawListOption } from '../admin/listOptions';
 import { logTechnical } from '../../services/errors';
 import { toDetail } from './caseDetailMapping';
 import type { CaseDetail } from './caseDetailMapping';
@@ -15,7 +15,12 @@ export type { CaseDetail, CaseEditValues } from './caseDetailMapping';
 export type CaseDetailState =
   | { status: 'unavailable'; reason: string }
   | { status: 'loading' }
-  | { status: 'ready'; detail: CaseDetail };
+  | {
+      status: 'ready';
+      detail: CaseDetail;
+      /** The managed-list catalogue read for the product names; empty where that read failed. */
+      listOptions: readonly RawListOption[];
+    };
 
 /**
  * Reads a single Outcome Case by id from Dataverse. Row-level visibility is enforced
@@ -59,7 +64,7 @@ export function useCaseDetail(caseId: string | undefined, reloadKey = 0): CaseDe
       // The catalogue, to turn those ids into the names the header shows. A handful of rows
       // shared by all five lists, and read alongside rather than after so a case opens in
       // one round trip rather than two.
-      readAll((o) => Al_listoptionsService.getAll(o), { orderBy: ['al_listoptionid asc'] }).catch((error) => {
+      readAll((o) => Al_listoptionsService.getAll(o), { orderBy: ['al_listoptionid asc'], select: LIST_OPTION_COLUMNS }).catch((error) => {
         logTechnical('case product names load', error);
         return { success: false as const, data: undefined };
       }),
@@ -91,6 +96,7 @@ export function useCaseDetail(caseId: string | undefined, reloadKey = 0): CaseDe
         setState({
           status: 'ready',
           detail: toDetail(result.data, productIds, productNames, productResult.success),
+          listOptions: catalogue.success && catalogue.data ? catalogue.data : [],
         });
       })
       .catch((error) => {

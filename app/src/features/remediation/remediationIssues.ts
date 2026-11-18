@@ -24,7 +24,7 @@ import type { RemediationActionRow } from './remediationMapping';
  */
 const OUTCOME_MARKER = 'submitted (';
 
-export interface RemediationIssues {
+interface RemediationIssues {
   /** One entry per item the checker marked down; empty when the description carries none. */
   issues: string[];
   /** The outcome the remediation was raised for; null when the description names none. */
@@ -91,7 +91,7 @@ export function splitIssues(description: string | null | undefined): Remediation
   return { issues, outcome: outcomeIn(description ?? '') };
 }
 
-export interface IssueLine {
+interface IssueLine {
   number: number;
   issue: string;
 }

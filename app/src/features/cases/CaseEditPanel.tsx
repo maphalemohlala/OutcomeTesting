@@ -18,27 +18,39 @@ import {
 } from './caseEditSubmit';
 import { ADVICE_DATE_LABEL, ukToday } from './caseHeaderDates';
 import {
-  MIGRATED_LISTS,
+  allocationOpenFor,
+  allocationVersionAfterSave,
+  changedFrom,
+  checkerHelp,
+  rebaseForm,
+  statusOf,
+} from './caseEditForm';
+import { Al_reviewinstancesService } from '../../generated';
+import { ownerIdOf } from './reviewRows';
+import { ListOptionSelect } from './ListOptionSelect';
+import {
   choicesIncludingHeld,
   describeTickSelection,
   filterTickOptions,
+  managedList,
   setValues,
   toOptionRows,
   toggleValue,
   type ListOptionRow,
   type ManagedList,
+  type RawListOption,
 } from '../admin/listOptions';
-import { useAllListOptions } from '../admin/useListOptions';
 import {
   emailDirectoryNote,
   personRefusals,
   staleEmailAfterRename,
   withPersonPairs,
 } from './casePeople';
-import { useCaseReviews } from './useCaseReviews';
-import { allocatableDisciplines } from './allocationScope';
+import type { CaseReviewsState } from './useCaseReviews';
+import { allocatableDisciplines, CHECKER_ROLE, checkerEmails } from './allocationScope';
+import { useSecurityConfig } from '../admin/useSecurityConfig';
 import { useProductName } from '../../app/product/useProductName';
-import { useUserDirectory } from '../../hooks/useUserDirectory';
+import type { UserDirectoryState } from '../../hooks/useUserDirectory';
 import {
   Al_outcomecasesal_adviserstatus,
   Al_outcomecasesal_casestatus,
@@ -65,13 +77,6 @@ import './CaseEditPanel.css';
  * an option value, which is why it cannot just be another 'choice'.
  */
 type FieldKind = 'text' | 'date' | 'email' | 'choice' | 'user' | 'listoption' | 'listoptionset';
-
-/** MIGRATED_LISTS is the single place that says which lists have a lookup on the case. */
-function managedList(key: string): ManagedList {
-  const found = MIGRATED_LISTS.find((list) => list.key === key);
-  if (!found) throw new Error(`No migrated list '${key}'`);
-  return found;
-}
 
 interface FieldDef {
   attr: keyof CaseEditValues;
@@ -196,8 +201,11 @@ function toOptions(map: Record<number, string>): { value: number; label: string 
 
 interface Props {
   detail: CaseDetail;
-  /** Moves after any save, so the checks shown here follow an allocation. */
-  reloadKey: number;
+  /** The page's own reads, handed down so the panel does not make them a second time. */
+  reviews: CaseReviewsState;
+  directory: UserDirectoryState;
+  /** Every managed list's options, unshaped; empty until read or where the read failed. */
+  listRows: readonly RawListOption[];
   onSaved: () => void;
 }
 
@@ -288,6 +296,13 @@ function TickSet({
             placeholder={`Search ${options.length} options`}
             aria-label={`Search ${label.toLowerCase()}`}
             onChange={(e) => setTerm(e.target.value)}
+            onKeyDown={(e) => {
+              // Escape clears the search first; marked handled so the modal stays open.
+              if (e.key === 'Escape' && term !== '') {
+                e.preventDefault();
+                setTerm('');
+              }
+            }}
           />
           {list}
         </>
@@ -295,11 +310,19 @@ function TickSet({
     </div>
   );
 }
-export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
+export function CaseEditPanel({ detail, reviews, directory, listRows, onSaved }: Props) {
   const { can, roles } = usePermissions();
   const product = useProductName();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<CaseEditValues>(detail.edit);
+  // The read the form was opened on. A newer read (the re-read after a conflict) moves the
+  // form onto it, keeping only what this user changed, so the next save cannot send stale
+  // values back as edits. Adjusted during render, React's way of following a prop.
+  const [base, setBase] = useState<CaseEditValues>(detail.edit);
+  if (detail.edit !== base) {
+    setForm(rebaseForm(form, base, detail.edit));
+    setBase(detail.edit);
+  }
   const [reason, setReason] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
   const [panelNotice, setPanelNotice] = useState<string | null>(null);
@@ -325,10 +348,20 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
   // fields the extract does not carry. An affordance, not a boundary - al_UpdateCaseDetails
   // re-checks case.duedate and refuses the write (AD-041).
   const mayMoveDueDate = can('case.duedate', 'Edit');
-  const reviews = useCaseReviews(detail.id, reloadKey);
-  const directory = useUserDirectory();
 
   const allReviews = reviews.status === 'ready' ? reviews.reviews : [];
+
+  // al_AssignCase moves the case to Assigned, so allocation is offered only where the
+  // lifecycle allows that move. The form's status, so choosing Queued in the same save counts.
+  const statusNow = statusOf(form.al_casestatus);
+  const allocationOpen = allocationOpenFor(form.al_casestatus);
+
+  // al_AssignCase refuses anyone without the discipline's checker role, so only they are offered.
+  const security = useSecurityConfig(0);
+  const checkersOf = useMemo(() => {
+    const mappings = security.status === 'ready' ? security.mappings : [];
+    return { Tax: checkerEmails(mappings, 'Tax'), AQS: checkerEmails(mappings, 'AQS') };
+  }, [security]);
 
   // Which checks this case owes, from the route - and the route follows the Tax check
   // required answer (BR-004). Derived from the form rather than from the saved case so the
@@ -373,6 +406,7 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
     // with no review named, and the server would put it on whichever check is open.
     ([discipline, email]) =>
       email &&
+      allocationOpen &&
       owed.includes(discipline) &&
       inScope.includes(discipline) &&
       isAllocatable(discipline, stateOf(discipline), nextOwed),
@@ -387,10 +421,8 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
    *
    * ONE read for all four lists. They share a table, the whole catalogue is a handful of
    * rows, and a panel drawing four managed dropdowns should not make four round trips to
-   * fill them; the per-list shaping is pure.
+   * fill them; the per-list shaping is pure. The page reads them with the case (listRows).
    */
-  const listOptions = useAllListOptions();
-  const listRows = listOptions.status === 'ready' ? listOptions.rows : [];
 
   const optionLists = useMemo(() => {
     const lists = new Map<keyof CaseEditValues, { value: number; label: string }[]>();
@@ -431,20 +463,14 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
   }
 
   function changedFields(): Record<string, string> {
-    const changed: Record<string, string> = {};
-    for (const field of allFields()) {
+    const attrs = allFields()
+      .map((field) => field.attr)
       // A field this user was never offered cannot be one they changed. Belt and braces:
       // the control is read-only, so `form` holds what the record holds - but the command
       // refuses a payload naming al_duedate whether or not the value moved, and losing a
       // whole save to a field nobody touched is exactly the failure item 6 fixed.
-      if (field.attr === 'al_duedate' && !mayMoveDueDate) continue;
-
-      const current = form[field.attr];
-      const original = detail.edit[field.attr];
-      if (current === original) continue;
-      changed[field.attr] = current == null ? '' : String(current);
-    }
-    return withPersonPairs(changed, form);
+      .filter((attr) => attr !== 'al_duedate' || mayMoveDueDate);
+    return withPersonPairs(changedFrom(form, base, attrs), form);
   }
 
   /** al_UpdateCaseDetails, or 'skipped' when the user changed no fields. */
@@ -473,8 +499,27 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
     return { kind: 'ok' };
   }
 
+  /** The check's owner and row version as they are now, or null when they could not be read. */
+  async function readCheck(reviewId: string) {
+    try {
+      const result = await Al_reviewinstancesService.getAll({
+        filter: `al_reviewinstanceid eq ${reviewId}`,
+        select: ['al_reviewinstanceid', 'versionnumber', '_ownerid_value'],
+        top: 1,
+      });
+      const row = result.success ? result.data[0] : undefined;
+      if (!row) return null;
+      return {
+        ownerId: ownerIdOf(row),
+        rowVersion: row.versionnumber != null ? String(row.versionnumber) : null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   /** al_AssignCase once per check whose checker was changed. */
-  async function allocateAll(): Promise<AllocationOutcome[]> {
+  async function allocateAll(fieldsSaved: boolean): Promise<AllocationOutcome[]> {
     const results: AllocationOutcome[] = [];
 
     for (const [discipline, email] of chosen) {
@@ -485,17 +530,48 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
       // offers when that is this one.
       const token = `assign:${detail.id}:${discipline}:${email}`;
       try {
+        // The check's row version as this modal read it, so allocating over somebody else's
+        // allocation is refused rather than silently replacing it. After a field save in the
+        // same submit the check is re-read first (see allocationVersionAfterSave).
+        let expectedRowVersion = review ? review.rowVersion : null;
+        if (fieldsSaved && review) {
+          const after = allocationVersionAfterSave(
+            { ownerId: review.ownerId, rowVersion: review.rowVersion },
+            await readCheck(review.id),
+          );
+          if (after === 'conflict' || after === 'unknown') {
+            results.push({
+              label: discipline,
+              outcome: {
+                kind: 'failed',
+                conflict: after === 'conflict',
+                message:
+                  after === 'conflict'
+                    ? `Someone else allocated the ${discipline} check while you were editing, so it was not changed. Reload the case to see who holds it.`
+                    : `The case details were saved, but the ${discipline} check could not be read again to confirm nobody else had allocated it, so it was not allocated. Reload the case and allocate it again.`,
+              },
+            });
+            continue;
+          }
+          expectedRowVersion = after.rowVersion;
+        }
+
         const result = await assignCase({
           caseId: detail.id,
           assigneeEmail: email,
           reviewInstanceId: review ? review.id : null,
+          expectedRowVersion,
           idempotencyKey: intent.keyFor(token),
         });
 
         if (!result.ok) {
           results.push({
             label: discipline,
-            outcome: { kind: 'failed', message: messageForFailure(result) },
+            outcome: {
+              kind: 'failed',
+              message: messageForFailure(result),
+              conflict: result.kind === 'conflict',
+            },
           });
           continue;
         }
@@ -556,7 +632,7 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
     // allocated — see caseEditSubmit for what each combination reports.
     saveFields(changed)
       .then(async (fields) => {
-        const allocations = fields.kind === 'failed' ? [] : await allocateAll();
+        const allocations = fields.kind === 'failed' ? [] : await allocateAll(fields.kind === 'ok');
         return describeSubmit(fields, allocations);
       })
       .then((outcome) => {
@@ -579,6 +655,7 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
 
   function openForm() {
     setForm(detail.edit);
+    setBase(detail.edit);
     setReason('');
     setCheckerBy({ Tax: '', AQS: '' });
     setModalError(null);
@@ -630,13 +707,17 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
             <p className="case-edit__help">
               This case&apos;s products could not be read, so they cannot be changed right now.
             </p>
+          ) : listRows.length === 0 ? (
+            <p className="case-edit__help" role="status">
+              The options for this list could not be read, so it cannot be changed right now.
+            </p>
           ) : (
           <TickSet
             labelledBy={`${inputId}-label`}
             label={field.label}
             options={choicesIncludingHeld(
               toOptionRows(listRows, field.list!, new Date()),
-              null,
+              setValues(typeof value === 'string' ? value : ''),
             )}
             chosen={setValues(typeof value === 'string' ? value : '')}
             onToggle={(chosen, id, on) =>
@@ -645,36 +726,29 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
           />
           )
         ) : field.kind === 'listoption' ? (
-          <select
+          <ListOptionSelect
             id={inputId}
             value={typeof value === 'string' ? value : ''}
-            onChange={(e) => setField(field.attr, field.kind, e.target.value)}
-          >
-            <option value="">Not set</option>
-            {/*
-              Only the options offered TODAY. A retired one is not listed, and
-              al_UpdateCaseDetails refuses it anyway - listing it would produce a choice the
-              save rejects. A case already holding a retired option keeps it: the value is
-              simply not among the choices, and leaving the field alone leaves it alone.
-            */}
-            {choicesIncludingHeld(
-              toOptionRows(listRows, field.list!, new Date()),
-              typeof value === 'string' ? value : null,
-            ).map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            list={field.list!}
+            listRows={listRows}
+            onChange={(next) => setField(field.attr, field.kind, next)}
+          />
         ) : field.kind === 'choice' ? (
           <select
             id={inputId}
             value={value == null ? '' : String(value)}
             onChange={(e) => setField(field.attr, field.kind, e.target.value)}
           >
-            {/* Status is mandatory and always set, so "Not set" is not one of its
-                choices; the server refuses a cleared status too. */}
-            {field.attr === 'al_casestatus' ? null : <option value="">Not set</option>}
+            {/* Status is mandatory, so "Not set" is not one of its choices; the server
+                refuses a cleared status too. A case with none stored gets a placeholder,
+                or the browser shows the first status and choosing it changes nothing. */}
+            {field.attr !== 'al_casestatus' ? (
+              <option value="">Not set</option>
+            ) : detail.edit.al_casestatus == null ? (
+              <option value="" disabled>
+                Choose a status…
+              </option>
+            ) : null}
             {(optionLists.get(field.attr) ?? []).map((option) => (
               <option key={option.value} value={String(option.value)}>
                 {option.label}
@@ -742,7 +816,7 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
       <div className="case-edit__bar">
         <h2 id="case-edit-heading">Case management</h2>
         <div className="case-edit__bar-actions">
-          <CaseRemoveAction detail={detail} onRemoved={onSaved} />
+          <CaseRemoveAction detail={detail} onRemoved={onSaved} onStale={onSaved} />
           <button type="button" className="case-edit__save" onClick={openForm}>
             Edit case details
           </button>
@@ -778,7 +852,7 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
                 unresolved, so the queue name is free text and nothing stops a Tax lead
                 allocating an AQS check; a filter would imply an enforcement that does not
                 exist. */}
-            {mayAssign ? (
+            {mayAssign && allocationOpen ? (
               <fieldset className="case-edit__section">
                 <legend>Checkers</legend>
 
@@ -881,7 +955,14 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
                             }))
                           }
                           placeholder={`Leave as it is — ${review ? held : 'not opened yet'}`}
+                          onlyEmails={checkersOf[discipline]}
                         />
+                        <small
+                          className="case-edit__help"
+                          role={security.status === 'loading' ? 'status' : undefined}
+                        >
+                          {checkerHelp(security.status, CHECKER_ROLE[discipline])}
+                        </small>
                         {!review ? (
                           <small className="case-edit__help">
                             Allocating opens this check.
@@ -905,6 +986,15 @@ export function CaseEditPanel({ detail, reloadKey, onSaved }: Props) {
                     after the checker has started it.
                   </p>
                 ) : null}
+              </fieldset>
+            ) : null}
+
+            {mayAssign && !allocationOpen ? (
+              <fieldset className="case-edit__section">
+                <legend>Checkers</legend>
+                <p className="case-edit__help">
+                  Checks cannot be allocated while a case is at {statusNow}.
+                </p>
               </fieldset>
             ) : null}
 

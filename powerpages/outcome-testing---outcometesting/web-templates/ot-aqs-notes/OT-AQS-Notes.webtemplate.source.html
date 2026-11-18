@@ -18,10 +18,15 @@
   - Every submitted AQS review is rendered, not one. A recheck leaves a case with more than
     one, and this Liquid applies no cross-entity order, so "the latest" would be an arbitrary
     one. When there is more than one, each note carries its check's submission date.
-  - Plain text is escaped with its line breaks kept. A rich-text answer is emitted as markup,
-    exactly as the Tax panel does, because al_answerrichtext is reduced to an allow-list by
-    HtmlSanitiser pre-operation on al_response; today both questions are plain text, and this
-    only keeps the panel right if a later checklist version changes that.
+  - Plain text is escaped with its line breaks kept. Both questions are multi-line text, so
+    their answers are in al_answertext and that is the only answer column the fetch asks for:
+    the server refuses a formatted answer on a question that is not Rich text
+    (ResponseRules), so al_answerrichtext can never be filled for them, and
+    Check-PortalTemplates.ps1 fails a fetch that selects a column none of its questions can
+    fill. The rich-text branch below is kept so the panel still reads as the Tax panel does,
+    and it is never taken while the column is not fetched. If either question is ever
+    retyped to Rich text, add al_answerrichtext back to the fetch; the same check fails
+    until it is.
 
   Unlike the Tax panel, every note is labelled, not only when there are several: the two
   questions ask different things, and an adviser should not have to guess which one a
@@ -40,7 +45,6 @@
     <entity name="al_response">
       <attribute name="al_responseid" />
       <attribute name="al_answertext" />
-      <attribute name="al_answerrichtext" />
       <link-entity name="al_questionversion" from="al_questionversionid" to="al_questionversionid" alias="qv">
         <link-entity name="al_question" from="al_questionid" to="al_questionid" alias="q">
           <attribute name="al_questioncode" />

@@ -539,6 +539,40 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void Copies_of_one_event_share_one_drawing_and_carry_the_same_files()
+        {
+            var service = new CountingOrganizationService(Case());
+            var drawn = new NotificationOutbox.DrawnCheck();
+
+            // The adviser's letter and a copy under its own occurrence, as the emitter queues them.
+            var first = NotificationOutbox.QueueWithCompletedCheck(
+                service, Guid.NewGuid(), NotificationOutbox.EventRemediationAssigned,
+                "al_reviewinstance", AqsReviewId, "adviser@example.com", "Subject", "Body.",
+                null, Ref(), null, drawn);
+            var drawnOnce = service.QueriesOf("al_reviewinstance");
+
+            var copy = NotificationOutbox.QueueWithCompletedCheck(
+                service, Guid.NewGuid(), NotificationOutbox.EventRemediationAssigned,
+                "al_reviewinstance", AqsReviewId, "para@example.com", "Subject", "Body.",
+                null, Ref(), "COPY", drawn);
+
+            // The documents start from the case's reviews; the copy did not ask for them again.
+            Assert.True(drawnOnce > 0);
+            Assert.Equal(drawnOnce, service.QueriesOf("al_reviewinstance"));
+
+            var columns = new ColumnSet(NotificationOutbox.AttachmentNameAttr, NotificationOutbox.AttachmentBodyAttr);
+            var firstRow = service.Retrieve(NotificationOutbox.NotificationEntity, first, columns);
+            var copyRow = service.Retrieve(NotificationOutbox.NotificationEntity, copy, columns);
+            Assert.False(string.IsNullOrEmpty(firstRow.GetAttributeValue<string>(NotificationOutbox.AttachmentBodyAttr)));
+            Assert.Equal(
+                firstRow.GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr),
+                copyRow.GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
+            Assert.Equal(
+                firstRow.GetAttributeValue<string>(NotificationOutbox.AttachmentBodyAttr),
+                copyRow.GetAttributeValue<string>(NotificationOutbox.AttachmentBodyAttr));
+        }
+
+        [Fact]
         public void A_row_written_before_the_change_still_unpacks_to_its_one_file()
         {
             var pairs = NotificationOutbox.UnpackAttachments("Completed check 1.pdf", "JVBERi0=");
@@ -613,6 +647,40 @@ namespace OutcomeTesting.Plugins.Tests
             NotificationEmitterPlugin.QueueCasePassed(service, Guid.NewGuid(), Ref());
 
             Assert.Equal(Checks, LetterTo(service, AdviserEmail).GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
+        }
+
+        [Fact]
+        public void The_case_passed_copy_to_the_tc_manager_reuses_the_advisers_drawing()
+        {
+            const string managerEmail = "tc.manager@example.com";
+
+            // One letter, one drawing: what a case-passed letter with no copy asks of the reviews.
+            var alone = new CountingOrganizationService(WithAdviser());
+            NotificationEmitterPlugin.QueueCasePassed(alone, Guid.NewGuid(), Ref());
+
+            // A new entrant's case, so the T&C Manager mapped to the adviser gets a copy.
+            var service = WithAdviser();
+            service.Row("al_outcomecase", CaseId)["al_adviserstatus"] = new OptionSetValue(120910500);
+            var manager = Guid.NewGuid();
+            service.Seed("contact", manager,
+                "fullname", "Tia Manager", "emailaddress1", managerEmail, "statecode", new OptionSetValue(0));
+            service.Seed("al_advisermapping", Guid.NewGuid(),
+                "al_adviseremail", AdviserEmail,
+                "al_tcmanagerid", new EntityReference("contact", manager),
+                "statecode", new OptionSetValue(0));
+            var counting = new CountingOrganizationService(service);
+
+            NotificationEmitterPlugin.QueueCasePassed(counting, Guid.NewGuid(), Ref());
+
+            var adviser = LetterTo(service, AdviserEmail);
+            var copy = LetterTo(service, managerEmail);
+            Assert.Equal(Checks, adviser.GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
+            Assert.Equal(Checks, copy.GetAttributeValue<string>(NotificationOutbox.AttachmentNameAttr));
+            Assert.Equal(
+                adviser.GetAttributeValue<string>(NotificationOutbox.AttachmentBodyAttr),
+                copy.GetAttributeValue<string>(NotificationOutbox.AttachmentBodyAttr));
+            Assert.True(alone.QueriesOf("al_reviewinstance") > 0);
+            Assert.Equal(alone.QueriesOf("al_reviewinstance"), counting.QueriesOf("al_reviewinstance"));
         }
 
         [Fact]

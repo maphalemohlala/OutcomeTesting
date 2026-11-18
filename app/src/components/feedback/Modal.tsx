@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { closesOnBackdrop, closesOnEscape } from './modalDismiss';
 import './Modal.css';
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
 export function Modal({ title, onClose, children }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Where the last press began, so a drag that ends on the backdrop is not taken for a click on it.
+  const pressedOnBackdrop = useRef(false);
 
   // Focus the dialog once on open only. Keeping this out of the keydown effect stops
   // focus being stolen from inputs whenever the parent re-renders (e.g. on each keystroke).
@@ -21,14 +24,24 @@ export function Modal({ title, onClose, children }: Props) {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (closesOnEscape(event)) onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
   return createPortal(
-    <div className="modal__overlay" role="presentation" onClick={onClose}>
+    <div
+      className="modal__overlay"
+      role="presentation"
+      onPointerDown={(event) => {
+        pressedOnBackdrop.current = event.target === event.currentTarget;
+      }}
+      onClick={(event) => {
+        if (closesOnBackdrop(pressedOnBackdrop.current, event.target, event.currentTarget)) onClose();
+        pressedOnBackdrop.current = false;
+      }}
+    >
       <div
         ref={dialogRef}
         className="modal__dialog"

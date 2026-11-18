@@ -78,6 +78,11 @@
 
 /* A tick set takes the whole row: its options are laid out in 16rem columns, which do not
    fit in a 12rem grid cell. */
+/* Fields stacked straight in a dialog (Delete, Amend outcome) have no grid gap to part them. */
+:not(.case-edit__grid) > .case-edit__field + .case-edit__field {
+  margin-top: var(--space-3);
+}
+
 .case-edit__field--wide {
   grid-column: 1 / -1;
 }
@@ -258,4 +263,28 @@
 
 .case-edit__set-item input {
   flex: none;
+}
+
+/* Delete case (requirements log row 40): the harm hue marks the one action nothing undoes.
+   White on #b65a52 is 4.6:1, so the text stays legible at this size. */
+.case-edit__danger {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--colour-outcome-harm);
+  background: transparent;
+  border: 1px solid var(--colour-outcome-harm);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.case-edit__danger:hover:not(:disabled) {
+  color: var(--colour-action-text);
+  background: var(--colour-outcome-harm);
+}
+
+.case-edit__danger:disabled {
+  color: var(--colour-text-muted);
+  border-color: var(--colour-border);
+  cursor: not-allowed;
 }

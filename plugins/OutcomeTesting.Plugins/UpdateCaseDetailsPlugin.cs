@@ -116,6 +116,10 @@ namespace OutcomeTesting.Plugins
                 fields[DueDateAttr] = dueDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             }
 
+            // Application RBAC gate (AD-041): manager-level edit on the case worklist. Before
+            // the replay below, so a caller without it is not answered with another's result.
+            PermissionHelpers.EnsureAppPermission(systemService, context, "page.cases", PermissionHelpers.AccessEdit);
+
             // Idempotency: a replay with the same key returns the original result (NFR-REL-01).
             var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandUpdateCaseDetails);
             if (existingAudit != null)
@@ -123,9 +127,6 @@ namespace OutcomeTesting.Plugins
                 SetResponse(context, targetId.ToString("D"), existingAudit.Id, false);
                 return;
             }
-
-            // Application RBAC gate (AD-041): manager-level edit on the case worklist.
-            PermissionHelpers.EnsureAppPermission(systemService, context, "page.cases", PermissionHelpers.AccessEdit);
 
             // A second gate for one field. The due date is derived at import and is a
             // deadline the business manages, not a detail of the check, so moving it is a
@@ -180,6 +181,14 @@ namespace OutcomeTesting.Plugins
             // is reading the reference catalogue, not reading the caller's data, and it must
             // answer the same way whoever is asking.
             ApplyFields(systemService, fields, before, update, changes, labels);
+
+            // The portal's rule for the Tax team's two fields (CaseHeaderRequestPlugin): once
+            // the Tax check is submitted they are refused, because they re-derive the route and
+            // the submit has already acted on it.
+            if (ChangesTaxFields(before, update))
+            {
+                CaseHeaderRequestPlugin.EnsureTaxCheckNotSubmitted(systemService, targetId);
+            }
 
             // One lifecycle check for both status paths — the legacy Status parameter and
             // the Fields payload both land on the same attribute, so validating after they
@@ -724,7 +733,58 @@ namespace OutcomeTesting.Plugins
             if (RemovesCase(update))
             {
                 AssignCasePlugin.ReleasePriorAssignments(service, caseId);
+                ReleaseOpenReviews(service, caseId);
                 changes.Add("Allocation released: the case was removed from checking");
+            }
+        }
+
+        /// <summary>
+        /// Whether this save moves Tax check required or Tax team disposition off its stored
+        /// value. A restated value is not a change, so a save carrying the whole header after
+        /// the Tax submit is not refused for it.
+        /// </summary>
+        public static bool ChangesTaxFields(Entity before, Entity update)
+        {
+            foreach (var attr in new[] { TaxRequiredAttr, DispositionAttr })
+            {
+                if (!update.Contains(attr))
+                {
+                    continue;
+                }
+
+                var was = before.GetAttributeValue<OptionSetValue>(attr);
+                var now = update.GetAttributeValue<OptionSetValue>(attr);
+                if ((was == null ? (int?)null : was.Value) != (now == null ? (int?)null : now.Value))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Takes the checker off every unsubmitted review on the case. The portal's "assigned
+        /// to me" permission and the queue both read the review's assigned contact, so
+        /// releasing only the assignment row left the old checker able to write the review
+        /// and kept the case out of the queue for anybody else. Submitted reviews keep their
+        /// checker: that is who did the work.
+        /// </summary>
+        public static void ReleaseOpenReviews(IOrganizationService service, Guid caseId)
+        {
+            var query = new QueryExpression("al_reviewinstance")
+            {
+                ColumnSet = new ColumnSet(false),
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition("al_submittedon", ConditionOperator.Null);
+            query.Criteria.AddCondition("al_assignedcontactid", ConditionOperator.NotNull);
+
+            foreach (var review in CommandHelpers.RetrieveAll(service, query))
+            {
+                service.Update(new Entity("al_reviewinstance", review.Id) { ["al_assignedcontactid"] = null });
             }
         }
 
@@ -813,9 +873,14 @@ namespace OutcomeTesting.Plugins
         /// the history read as two decisions.
         ///
         /// The active assignment is released with the move, because a case in the queue
-        /// carrying a live assignment is the same inconsistency the Tax-to-AQS handoff
-        /// already avoids (AD-076). The row itself is preserved, never deleted (AD-037), so
-        /// the allocation trail survives (BR-003, BR-012).
+        /// carrying a live assignment reads as still allocated. (The Tax-to-AQS handoff does
+        /// NOT release: it keeps the Tax leg's assignment until the AQS claim releases it,
+        /// see ClaimCasePlugin.) The row itself is preserved, never deleted (AD-037), so
+        /// the allocation trail survives (BR-003, BR-012). The unsubmitted reviews lose their
+        /// assigned contact with it (<see cref="ReleaseOpenReviews"/>).
+        ///
+        /// At Queued a route change that leaves nothing owed is refused rather than ignored:
+        /// nothing could claim the case or move it on.
         /// </summary>
         public static bool RequeueAfterRouteChange(
             IOrganizationService service, Entity before, Entity update, List<string> changes)
@@ -836,7 +901,8 @@ namespace OutcomeTesting.Plugins
             }
 
             var status = CaseTransitions.CurrentStatus(service, before.Id);
-            if (status != CaseLifecycle.Assigned && status != CaseLifecycle.ReviewInProgress)
+            var queued = status == CaseLifecycle.Queued;
+            if (!queued && status != CaseLifecycle.Assigned && status != CaseLifecycle.ReviewInProgress)
             {
                 return false;
             }
@@ -849,6 +915,21 @@ namespace OutcomeTesting.Plugins
             int due;
             if (!ClaimCasePlugin.TryNextDiscipline(service, effective, out due))
             {
+                // A queued case owing nothing can be neither claimed nor moved on, so the
+                // route change that would leave it there is refused.
+                if (queued)
+                {
+                    throw new InvalidPluginExecutionException(
+                        CommandHelpers.PreconditionPrefix +
+                        "This case is waiting in the queue, and the new route owes no check that has not already been submitted, "
+                        + "so nobody could pick it up. Choose a route that still owes a check, or remove the case.");
+                }
+
+                return false;
+            }
+
+            if (queued)
+            {
                 return false;
             }
 
@@ -858,12 +939,13 @@ namespace OutcomeTesting.Plugins
             }
 
             AssignCasePlugin.ReleasePriorAssignments(service, before.Id);
+            ReleaseOpenReviews(service, before.Id);
             CaseTransitions.MoveThrough(service, before.Id, status, new[] { CaseLifecycle.Queued });
 
             changes.Add(
                 "Status " + CaseLifecycle.NameOf(status.Value) + " -> " + CaseLifecycle.NameOf(CaseLifecycle.Queued)
-                + " (returned to the queue: the new route owes a "
-                + (due == ResponseRules.ReviewTypeTax ? "Tax" : "AQS")
+                + " (returned to the queue: the new route owes "
+                + (due == ResponseRules.ReviewTypeTax ? "a Tax" : "an AQS")
                 + " check that has not been opened)");
 
             return true;

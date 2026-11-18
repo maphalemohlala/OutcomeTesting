@@ -17,10 +17,24 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>
         /// The current value, else the shipped default, else null. Never throws: a caller
-        /// reading configuration inside someone's save must not cost them the save.
+        /// reading configuration inside someone's save must not cost them the save. A read
+        /// that failed answers null exactly as an unset variable does; a caller that has a
+        /// known-wrong fallback for "unset" uses <see cref="TryRead"/> instead.
         /// </summary>
         public static string Read(IOrganizationService service, string schemaName)
         {
+            string value;
+            TryRead(service, schemaName, out value);
+            return value;
+        }
+
+        /// <summary>
+        /// As <see cref="Read"/>, but false where the variable could not be read at all, so a
+        /// read that failed is not mistaken for a variable nobody set.
+        /// </summary>
+        public static bool TryRead(IOrganizationService service, string schemaName, out string value)
+        {
+            value = null;
             try
             {
                 var definitions = new QueryExpression(DefinitionEntity)
@@ -34,7 +48,7 @@ namespace OutcomeTesting.Plugins
                 var found = service.RetrieveMultiple(definitions).Entities;
                 if (found.Count == 0)
                 {
-                    return null;
+                    return true;
                 }
 
                 var definition = found[0];
@@ -59,13 +73,14 @@ namespace OutcomeTesting.Plugins
 
                 // The shipped default is what the solution carried, and it is the right answer
                 // where nobody has set one - which is how DEV can work with no configuration.
-                return string.IsNullOrWhiteSpace(current)
+                value = string.IsNullOrWhiteSpace(current)
                     ? definition.GetAttributeValue<string>("defaultvalue")
                     : current;
+                return true;
             }
             catch (Exception)
             {
-                return null;
+                return false;
             }
         }
     }

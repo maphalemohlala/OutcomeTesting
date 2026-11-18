@@ -3,6 +3,7 @@ import type { CellValue } from '../../lib/tabular';
 import { ADVICE_DATE_LABEL } from './caseHeaderDates';
 import { UPLOADED_BY_LABEL } from '../../types/domain';
 import type { CaseSummary } from './caseWorklistMapping';
+import { isoDay } from '../../lib/format';
 
 /**
  * The case extract used by the worklist, the person view and the full data extract.
@@ -36,11 +37,6 @@ export const CASE_EXPORT_HEADERS = [
   'Finalised on',
 ];
 
-/** Dates are exported as the calendar day only; a time component is noise in a report. */
-function day(iso: string | null): string {
-  return iso ? iso.slice(0, 10) : '';
-}
-
 /** A timestamp's UK day, so an export agrees with the date filter that chose the row. */
 function ukDate(iso: string | null): string {
   return iso ? (ukDayOf(iso) ?? '') : '';
@@ -63,11 +59,11 @@ export function caseExportRow(item: CaseSummary): CellValue[] {
     item.caseType ?? '',
     item.productSolutionType ?? '',
     item.products ?? '',
-    day(item.adviceDate),
-    day(item.checkDate),
+    isoDay(item.adviceDate),
+    isoDay(item.checkDate),
     item.preOrPostCheck ?? '',
     ukDate(item.createdOn),
-    day(item.dueDate),
+    isoDay(item.dueDate),
     item.ageInDays,
     item.initialOutcome ?? '',
     item.finalOutcome ?? '',
@@ -94,6 +90,8 @@ export const COMPLETED_CASE_HEADERS = [
   'Received on',
   'Check date',
   'Pre or post check',
+  'Vulnerable client',
+  'CAS status',
   'Tax outcome',
   'Initial outcome',
   'Final outcome',
@@ -125,8 +123,10 @@ export function completedCaseRow(item: CaseSummary): CellValue[] {
     item.productSolutionType ?? '',
     item.products ?? '',
     ukDate(item.createdOn),
-    day(item.checkDate),
+    isoDay(item.checkDate),
     item.preOrPostCheck ?? '',
+    item.vulnerableClient ?? '',
+    item.adviserStatus ?? '',
     item.taxOutcome ?? '',
     item.initialOutcome ?? '',
     item.finalOutcome ?? '',

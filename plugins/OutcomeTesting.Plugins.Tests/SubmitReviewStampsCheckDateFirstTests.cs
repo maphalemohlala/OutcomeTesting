@@ -18,9 +18,7 @@ namespace OutcomeTesting.Plugins.Tests
         public void StampCheckDate_runs_before_the_remediation_and_pass_letters_are_raised()
         {
             var source = File.ReadAllText(Path.Combine(PluginsPath(), "SubmitReviewPlugin.cs"));
-            var start = source.IndexOf(
-                "private static void FinaliseReview(IOrganizationService service, Entity review, Guid targetId, Guid correlationId)",
-                StringComparison.Ordinal);
+            var start = source.IndexOf("private static void FinaliseReview(", StringComparison.Ordinal);
             var end = source.IndexOf("private static void CreateOutcome(", StringComparison.Ordinal);
             Assert.True(start >= 0, "FinaliseReview was not found.");
             Assert.True(end > start, "CreateOutcome was not found after FinaliseReview.");

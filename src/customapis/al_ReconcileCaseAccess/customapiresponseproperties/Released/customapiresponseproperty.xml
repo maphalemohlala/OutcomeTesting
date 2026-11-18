@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Released">
+  <description default="True when the case is released to its adviser.">
+    <label description="True when the case is released to its adviser." languagecode="1033" />
+  </description>
+  <displayname default="Released">
+    <label description="Released" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>Released</name>
+  <type>0</type>
+</customapiresponseproperty>

@@ -1,28 +1,52 @@
 import { useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
 import { Notice } from '../../components/feedback/Notice';
-import { useIntentKeys } from '../../hooks/useIntentKey';
+import { useIntentKeys, type IntentKeys } from '../../hooks/useIntentKey';
 import { messageForFailure } from '../../services/errors';
 import { updateCaseDetails } from '../../services/commands/updateCaseDetails';
-import { canTransition, type CaseStatus } from '../../types/domain';
+import type { CaseStatus } from '../../types/domain';
+import { canRemoveCase } from './caseRemoval';
 
 const NO_CHECK_REQUIRED = 120910592;
-
-/** Removal is only open until the check is graded; the lifecycle decides that, not this page. */
-export function canRemoveCase(status: CaseStatus | null | undefined): boolean {
-  return Boolean(status) && status !== 'No Check Required' && canTransition(status, 'No Check Required');
-}
 
 interface Props {
   detail: { id: string; status: CaseStatus | null; rowVersion?: string | null };
   onRemoved: () => void;
+  /** Re-reads the case. Called after a conflict, so the next try carries the fresh row version. */
+  onStale?: () => void;
+}
+
+export type RemovalOutcome = { kind: 'removed' } | { kind: 'refused'; message: string; reread: boolean };
+
+/** One removal attempt. A conflict asks for a re-read: every retry on the old version would fail too. */
+// eslint-disable-next-line react-refresh/only-export-components -- exported for its test
+export async function runRemoval(
+  detail: Props['detail'],
+  reason: string,
+  intent: IntentKeys,
+): Promise<RemovalOutcome> {
+  const token = `remove:${detail.id}:${reason.trim()}`;
+  const result = await updateCaseDetails({
+    caseId: detail.id,
+    status: NO_CHECK_REQUIRED,
+    reason: reason.trim(),
+    expectedRowVersion: detail.rowVersion,
+    idempotencyKey: intent.keyFor(token),
+  });
+
+  if (!result.ok) {
+    return { kind: 'refused', message: messageForFailure(result), reread: result.kind === 'conflict' };
+  }
+
+  intent.release(token);
+  return { kind: 'removed' };
 }
 
 /**
  * Removes a case added in error, or one that will not go ahead. Case data is kept, so this
  * takes the case out of checking rather than deleting it, and the reason goes on its history.
  */
-export function CaseRemoveAction({ detail, onRemoved }: Props) {
+export function CaseRemoveAction({ detail, onRemoved, onStale }: Props) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
@@ -32,24 +56,17 @@ export function CaseRemoveAction({ detail, onRemoved }: Props) {
   if (!canRemoveCase(detail.status)) return null;
 
   async function remove() {
-    const token = `remove:${detail.id}:${reason.trim()}`;
     setSaving(true);
     setError(null);
-    const result = await updateCaseDetails({
-      caseId: detail.id,
-      status: NO_CHECK_REQUIRED,
-      reason: reason.trim(),
-      expectedRowVersion: detail.rowVersion,
-      idempotencyKey: intent.keyFor(token),
-    });
+    const outcome = await runRemoval(detail, reason, intent);
     setSaving(false);
 
-    if (!result.ok) {
-      setError(messageForFailure(result));
+    if (outcome.kind === 'refused') {
+      setError(outcome.message);
+      if (outcome.reread) onStale?.();
       return;
     }
 
-    intent.release(token);
     setOpen(false);
     onRemoved();
   }

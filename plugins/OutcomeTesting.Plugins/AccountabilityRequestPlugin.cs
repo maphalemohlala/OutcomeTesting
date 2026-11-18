@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
@@ -72,6 +72,10 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            // Only the site's own write is a request: the app's Dataverse role can write this
+            // row too, and the request is trusted as the signed-in person's.
+            WriteProvenance.EnsurePortalCaller(localPluginContext.OrgSvcFactory.CreateOrganizationService(null), context);
+
             var payload = AccountabilityRequestPayload.Parse(raw);
             if (payload == null)
             {
@@ -104,7 +108,8 @@ namespace OutcomeTesting.Plugins
 
             var outcome = service.Retrieve(
                 OutcomeEntity, outcomeId,
-                new ColumnSet(Outcomes.InitialOutcomeAttr, Outcomes.FinalOutcomeAttr, CaseAttr));
+                new ColumnSet(Outcomes.InitialOutcomeAttr, Outcomes.FinalOutcomeAttr, CaseAttr,
+                    "al_fqaccountablecontactid", "al_aqaccountablecontactid"));
 
             var caseRef = outcome.GetAttributeValue<EntityReference>(CaseAttr);
             if (caseRef == null)
@@ -136,6 +141,13 @@ namespace OutcomeTesting.Plugins
 
             var fqContact = ParseOptionalContact(payload.FqContactId, "File Quality");
             var aqContact = ParseOptionalContact(payload.AqContactId, "Advice Quality");
+            var fqAdministrator = ParseOptionalContact(payload.FqAdministratorId, "the File Quality administrator");
+
+            // The command's rule, through the same check (owner, 2026-11-17).
+            WebRoleRegistry.EnsureAccountable(
+                service, fqContact, outcome.GetAttributeValue<EntityReference>("al_fqaccountablecontactid"));
+            WebRoleRegistry.EnsureAccountable(
+                service, aqContact, outcome.GetAttributeValue<EntityReference>("al_aqaccountablecontactid"));
 
             service.Update(new Entity(OutcomeEntity, outcomeId)
             {
@@ -148,11 +160,13 @@ namespace OutcomeTesting.Plugins
                 // case's own adviser or paraplanner back into the extract.
                 ["al_fqaccountablecontactid"] = fqContact,
                 ["al_aqaccountablecontactid"] = aqContact,
+                [GenerateExportPlugin.FqAdministratorContactAttr] = fqAdministrator,
             });
 
             var details = "FQ adviser " + payload.FqAdviser + ", FQ paraplanner " + payload.FqParaplanner
                 + ", AQ adviser " + payload.AqAdviser + ", AQ paraplanner " + payload.AqParaplanner
                 + ", FQ named " + Describe(fqContact) + ", AQ named " + Describe(aqContact)
+                + ", FQ administrator " + (fqAdministrator == null ? "(none)" : fqAdministrator.Id.ToString("D"))
                 + " (from the portal)";
 
             // Named to the contact, not the caller: a portal write reaches Dataverse as the
@@ -187,7 +201,8 @@ namespace OutcomeTesting.Plugins
             AccountabilityRequestPayload payload)
         {
             var review = service.Retrieve(
-                "al_reviewinstance", reviewId, new ColumnSet("al_outcomecaseid", "al_submittedon"));
+                "al_reviewinstance", reviewId,
+                new ColumnSet("al_outcomecaseid", "al_submittedon", "al_assignedcontactid", "al_pendingaccountability"));
 
             if (review.GetAttributeValue<DateTime?>("al_submittedon").HasValue)
             {
@@ -203,12 +218,31 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.PreconditionPrefix + "That check is not attached to a case.");
             }
 
-            CaseHeaderRequestPlugin.EnsureAssignedToCase(service, contactId, caseRef.Id);
+            // The check itself must be theirs. Being assigned to some other open check on the
+            // same case let one checker set who carries the fail on another's review.
+            var holder = review.GetAttributeValue<EntityReference>("al_assignedcontactid");
+            if (holder == null || holder.Id != contactId)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "You can only record who carries the fail on a check assigned to you.");
+            }
 
-            // Validated now rather than at submit, so a bad id is refused while the person
-            // who chose it is still looking at the form.
-            ParseOptionalContact(payload.FqContactId, "File Quality");
-            ParseOptionalContact(payload.AqContactId, "Advice Quality");
+            // Validated now rather than at submit, so a bad id or a person without the Adviser
+            // or Planner role is refused while the person who chose it is still looking at
+            // the form. ApplyParked does not ask again: a role withdrawn after this point must
+            // not refuse the submit or drop the person from the extract.
+            //
+            // A person already parked passes, as the command and Apply let the person already
+            // named pass: ticking one more box re-sends the whole choice, and a role withdrawn
+            // since must not refuse that.
+            var already = AccountabilityRequestPayload.Parse(review.GetAttributeValue<string>("al_pendingaccountability"));
+            WebRoleRegistry.EnsureAccountable(
+                service, ParseOptionalContact(payload.FqContactId, "File Quality"), ParkedContact(already, true));
+            WebRoleRegistry.EnsureAccountable(
+                service, ParseOptionalContact(payload.AqContactId, "Advice Quality"), ParkedContact(already, false));
+            // Read now so a bad id is refused while the checker is still looking at the form.
+            ParseOptionalContact(payload.FqAdministratorId, "the File Quality administrator");
 
             service.Update(new Entity(ContactEntity, contactId) { [RequestAttr] = null });
 
@@ -229,6 +263,7 @@ namespace OutcomeTesting.Plugins
                 AqParaplanner = payload.AqParaplanner,
                 FqContactId = payload.FqContactId,
                 AqContactId = payload.AqContactId,
+                FqAdministratorId = payload.FqAdministratorId,
             };
 
             using (var stream = new MemoryStream())
@@ -257,12 +292,28 @@ namespace OutcomeTesting.Plugins
                 return false;
             }
 
+            // The command's own rule: accountability describes a fail. It is judged here, not
+            // at park, because the grade only exists once the submit writes it. A choice the
+            // command would refuse is consumed (true, so the submit clears it) but not applied.
+            var grade = outcome.GetAttributeValue<OptionSetValue>(Outcomes.InitialOutcomeAttr);
+            if (grade != null)
+            {
+                var caseRef = outcome.GetAttributeValue<EntityReference>(CaseAttr);
+                var fileQualityFailed = caseRef != null && FileQuality.FailedOn(service, caseRef.Id);
+                if (SetFailAccountabilityPlugin.RefusalFor(grade.Value, fileQualityFailed) != null)
+                {
+                    return true;
+                }
+            }
+
             outcome["al_fqadviseraccountable"] = parked.FqAdviser;
             outcome["al_fqparaplanneraccountable"] = parked.FqParaplanner;
             outcome["al_aqadviseraccountable"] = parked.AqAdviser;
             outcome["al_aqparaplanneraccountable"] = parked.AqParaplanner;
             outcome["al_fqaccountablecontactid"] = ParseOptionalContact(parked.FqContactId, "File Quality");
             outcome["al_aqaccountablecontactid"] = ParseOptionalContact(parked.AqContactId, "Advice Quality");
+            outcome[GenerateExportPlugin.FqAdministratorContactAttr] =
+                ParseOptionalContact(parked.FqAdministratorId, "the File Quality administrator");
             return true;
         }
 
@@ -282,6 +333,16 @@ namespace OutcomeTesting.Plugins
             }
 
             return new EntityReference(ContactEntity, id);
+        }
+
+        // A parked id that no longer reads as a contact is simply not "already named".
+        private static EntityReference ParkedContact(AccountabilityRequestPayload parked, bool fileQuality)
+        {
+            Guid id;
+            var raw = parked == null ? null : (fileQuality ? parked.FqContactId : parked.AqContactId);
+            return raw != null && Guid.TryParse(raw.Trim(), out id) && id != Guid.Empty
+                ? new EntityReference(ContactEntity, id)
+                : null;
         }
 
         private static string Describe(EntityReference contact)
@@ -328,6 +389,10 @@ namespace OutcomeTesting.Plugins
 
         [DataMember(Name = "aqContactId")]
         public string AqContactId { get; set; }
+
+        // The administrator carrying a File Quality fail (requirements log row 10); never exported.
+        [DataMember(Name = "fqAdministratorId")]
+        public string FqAdministratorId { get; set; }
 
         public static AccountabilityRequestPayload Parse(string json)
         {

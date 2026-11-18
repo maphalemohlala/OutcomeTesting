@@ -41,6 +41,81 @@ namespace OutcomeTesting.Plugins
         public const string TcSupervisorRole = "AL Portal - T&C Supervisor";
 
         /// <summary>
+        /// What makes a contact an adviser or a paraplanner: the web role they hold (project
+        /// owner, 2026-11-17). Only holders of one of these can be named as carrying a fail.
+        /// </summary>
+        public const string AdviserRole = "AL Portal - Adviser Remediation";
+        public const string PlannerRole = "AL Portal - Planner";
+
+        /// <summary>Refuses a named person <see cref="AccountableRefusal"/> rejects; nobody named passes.</summary>
+        public static void EnsureAccountable(IOrganizationService service, EntityReference contact)
+        {
+            EnsureAccountable(service, contact, null);
+        }
+
+        /// <summary>
+        /// As above, but the person the check already names passes: re-saving the ticks must not
+        /// be refused because a role was withdrawn after that person was named.
+        /// </summary>
+        public static void EnsureAccountable(IOrganizationService service, EntityReference contact, EntityReference alreadyNamed)
+        {
+            if (contact != null && alreadyNamed != null && contact.Id == alreadyNamed.Id)
+            {
+                return;
+            }
+
+            var refusal = contact == null ? null : AccountableRefusal(service, contact.Id);
+            if (refusal != null)
+            {
+                throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + refusal);
+            }
+        }
+
+        /// <summary>
+        /// Why this contact cannot be named as accountable for a fail, or null when they can.
+        ///
+        /// The one copy of the rule, used by al_SetFailAccountability and by the portal's
+        /// accountability request. A deactivated contact still passes when they hold the role:
+        /// the person may have left since the check, and the fail is still theirs. It reads the
+        /// web-role link, which every Outcome Testing role can read (Global on powerpagecomponent).
+        /// </summary>
+        public static string AccountableRefusal(IOrganizationService service, Guid contactId)
+        {
+            foreach (var role in RolesForContact(service, contactId))
+            {
+                if (string.Equals(role, AdviserRole, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(role, PlannerRole, StringComparison.OrdinalIgnoreCase))
+                {
+                    return null;
+                }
+            }
+
+            // A query rather than a Retrieve: a missing contact answers with no row instead
+            // of a fault, which a plug-in may not catch and carry on from.
+            var query = new QueryExpression(ContactRegistry.Entity)
+            {
+                ColumnSet = new ColumnSet(ContactRegistry.FullNameAttr, ContactRegistry.EmailAttr),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("contactid", ConditionOperator.Equal, contactId);
+            var found = service.RetrieveMultiple(query).Entities;
+            if (found.Count == 0)
+            {
+                return "The person named as accountable could not be found, so they can't be named. "
+                    + "Choose someone else and try again.";
+            }
+
+            var name = (found[0].GetAttributeValue<string>(ContactRegistry.FullNameAttr) ?? string.Empty).Trim();
+            var email = (found[0].GetAttributeValue<string>(ContactRegistry.EmailAttr) ?? string.Empty).Trim();
+            var who = name == string.Empty ? (email == string.Empty ? "This person" : email)
+                : email == string.Empty ? name : name + " (" + email + ")";
+
+            return who + " can't be named as accountable because they don't hold the Adviser or "
+                + "Planner role. An administrator can assign it on the People page.";
+        }
+
+        /// <summary>
         /// Roles that exist to make Power Pages work rather than to describe a job. Offering
         /// them as application roles would invite granting business access to "everyone who
         /// is signed in", which is not a decision any requirement makes.
@@ -164,6 +239,7 @@ namespace OutcomeTesting.Plugins
                     "<link-entity name='" + ContactRelationship + "' from='contactid' to='contactid' intersect='true'>" +
                       "<link-entity name='powerpagecomponent' from='powerpagecomponentid' to='powerpagecomponentid' alias='role'>" +
                         "<attribute name='name'/>" +
+                        "<attribute name='statecode'/>" +
                       "</link-entity>" +
                     "</link-entity>" +
                   "</entity>" +
@@ -172,6 +248,16 @@ namespace OutcomeTesting.Plugins
             var names = new List<string>();
             foreach (var row in service.RetrieveMultiple(new FetchExpression(fetch)).Entities)
             {
+                // A retired role grants nothing. Retiring withdraws the mappings and rules but
+                // leaves the association, so without this a retired role still counted here,
+                // and through here on every portal gate and in the caller's resolved roles.
+                var state = row.GetAttributeValue<AliasedValue>("role.statecode");
+                var stateValue = state == null ? null : state.Value as OptionSetValue;
+                if (stateValue != null && stateValue.Value != 0)
+                {
+                    continue;
+                }
+
                 var aliased = row.GetAttributeValue<AliasedValue>("role.name");
                 var name = aliased == null ? null : aliased.Value as string;
                 if (!string.IsNullOrWhiteSpace(name) && !names.Contains(name.Trim()))
@@ -216,16 +302,27 @@ namespace OutcomeTesting.Plugins
             return service.RetrieveMultiple(new FetchExpression(fetch)).Entities.Count > 0;
         }
 
-        /// <summary>The contact carrying a work email, or null. Web roles hang off contacts.</summary>
+        /// <summary>
+        /// The contact carrying a work email, or null. Web roles hang off contacts.
+        ///
+        /// Two contacts can share an email (a rehire beside the leaver's old row), so the pick
+        /// is ordered: an active row first, then the oldest. It used to be whichever row the
+        /// platform returned first, so the gate could read a deactivated duplicate and refuse
+        /// someone the app showed as active. The app reads the same way: one active row is
+        /// enough (types/permissions.ts, isDeactivated).
+        /// </summary>
         public static Entity FindContactByEmail(IOrganizationService service, string email)
         {
             var query = new QueryExpression(ContactRegistry.Entity)
             {
-                ColumnSet = new ColumnSet(ContactRegistry.FullNameAttr, ContactRegistry.EmailAttr),
+                ColumnSet = new ColumnSet(
+                    ContactRegistry.FullNameAttr, ContactRegistry.EmailAttr, ContactRegistry.StateCodeAttr),
                 TopCount = 1,
                 Criteria = new FilterExpression(),
             };
             query.Criteria.AddCondition(ContactRegistry.EmailAttr, ConditionOperator.Equal, email);
+            query.AddOrder(ContactRegistry.StateCodeAttr, OrderType.Ascending);
+            query.AddOrder("createdon", OrderType.Ascending);
 
             var found = service.RetrieveMultiple(query).Entities;
             return found.Count == 0 ? null : found[0];
@@ -244,6 +341,9 @@ namespace OutcomeTesting.Plugins
                     "<attribute name='" + NameAttr + "'/>" +
                     "<attribute name='" + AuthenticatedAttr + "'/>" +
                     "<attribute name='" + WebsiteAttr + "'/>" +
+                    // IsActive reads this. Without it the platform returns no statecode, and
+                    // every retired role read as active to every caller of IsActive.
+                    "<attribute name='statecode'/>" +
                     "<filter><condition attribute='" + NameAttr + "' operator='eq' value='" +
                       System.Security.SecurityElement.Escape(roleName) + "'/></filter>" +
                   "</entity>" +
@@ -261,6 +361,21 @@ namespace OutcomeTesting.Plugins
         {
             var state = role.GetAttributeValue<OptionSetValue>("statecode");
             return state == null || state.Value == 0;
+        }
+
+        /// <summary>
+        /// True when a web role by this name exists and is retired. A name no web role carries
+        /// is not retired: it may be a legacy picklist label, which this registry never held.
+        /// </summary>
+        public static bool IsRetired(IOrganizationService service, string roleName)
+        {
+            if (string.IsNullOrWhiteSpace(roleName))
+            {
+                return false;
+            }
+
+            var role = FindByName(service, roleName.Trim());
+            return role != null && !IsActive(role);
         }
 
         /// <summary>The website every web role belongs to, taken from any existing role.</summary>

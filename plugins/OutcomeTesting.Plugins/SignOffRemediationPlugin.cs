@@ -19,7 +19,11 @@ namespace OutcomeTesting.Plugins
     /// completed the work is not the person attesting to it, and until AD-143 only the
     /// portal half (<see cref="SignoffRequestPlugin"/>) actually enforced that.
     ///
-    /// This command records the decision and nothing else. Creating the <c>al_signoff</c>
+    /// This command records the decision - and, when the caller gives them, the supervisor's
+    /// final outcome and recheck answers (project owner, 2026-11-17), through the same
+    /// <see cref="SignoffRequestPlugin.RecordSupervisorAnswers"/> the portal uses, so the same
+    /// approval ends the same way through either door. Omitted, the case waits at Awaiting
+    /// Recheck for a separate regrade, which is the portal's own choice too. Creating the <c>al_signoff</c>
     /// row is what fires <see cref="SignoffGuardPlugin"/> (validation and stamping) and
     /// <see cref="SignoffProgressPlugin"/> (reopening the action on a rejection, moving the
     /// case, notifying the adviser) — the same two steps the portal's own create fires — so
@@ -48,6 +52,9 @@ namespace OutcomeTesting.Plugins
         private const string InNotes = "Notes";
         private const string InExpectedRowVersion = "ExpectedRowVersion";
         private const string InIdempotencyKey = "IdempotencyKey";
+        private const string InFinalOutcome = "FinalOutcome";
+        private const string InRecheckRequired = "RecheckRequired";
+        private const string InChangesAdvice = "ChangesAdvice";
 
         private const string OutSignoffId = "SignoffId";
         private const string OutStatus = "Status";
@@ -103,6 +110,15 @@ namespace OutcomeTesting.Plugins
             var notes = CommandHelpers.GetOptionalString(context, InNotes);
             var expectedRowVersion = CommandHelpers.GetOptionalString(context, InExpectedRowVersion);
 
+            // The portal payload's own fields, so the shared rule reads one shape. Omitted is 0,
+            // which is what the page sends for "none" as well.
+            var answers = new SignoffRequestPayload
+            {
+                FinalOutcome = CommandHelpers.GetOptionalInt(context, InFinalOutcome) ?? 0,
+                RecheckRequired = CommandHelpers.GetOptionalInt(context, InRecheckRequired) ?? 0,
+                ChangesAdvice = CommandHelpers.GetOptionalInt(context, InChangesAdvice) ?? 0,
+            };
+
             // Idempotency: a replay with the same key returns the original sign-off
             // (NFR-REL-01). Resolved from the sign-off row itself rather than from the audit
             // event's details text, so the replay reports the decision that was recorded.
@@ -119,7 +135,12 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            var signoffId = CreateSignoff(userService, systemService, targetId, decision, notes, expectedRowVersion);
+            // As SYSTEM, not the plug-in user (which is the caller): the response guard lets the
+            // T&C-only answers through only on a SYSTEM write or a portal sign-off in flight.
+            var signoffId = CreateSignoff(
+                userService,
+                localPluginContext.OrgSvcFactory.CreateOrganizationService(null),
+                targetId, decision, notes, expectedRowVersion, answers);
 
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService,
@@ -150,13 +171,18 @@ namespace OutcomeTesting.Plugins
             Guid targetId,
             string decision,
             string notes,
-            string expectedRowVersion)
+            string expectedRowVersion,
+            SignoffRequestPayload answers = null)
         {
-            // BR-008: a rejected sign-off must return with a reason for the adviser.
-            if (decision == DecisionRejected && string.IsNullOrWhiteSpace(notes))
+            // The guard's own decision rules, asked first so nothing is written before a
+            // refusal: a rejection needs notes, and a final outcome needs an approval, a value
+            // on the final scale and notes saying why.
+            var finalOutcome = answers == null || answers.FinalOutcome == 0 ? (int?)null : answers.FinalOutcome;
+            var refusal = SignoffGuardPlugin.DecisionRefusal(
+                decision == DecisionApproved ? DecisionApprovedValue : DecisionRejectedValue, finalOutcome, notes);
+            if (refusal != null)
             {
-                throw new InvalidPluginExecutionException(
-                    CommandHelpers.PreconditionPrefix + "A rejected sign-off must record notes explaining the return.");
+                throw new InvalidPluginExecutionException(refusal);
             }
 
             var action = CommandHelpers.RetrieveOrNotFound(
@@ -222,6 +248,11 @@ namespace OutcomeTesting.Plugins
             {
                 signoff["al_notes"] = notes;
             }
+
+            // The supervisor's answers, through the portal's own rule and with the same service
+            // the portal writes them with. Before the create, because SignoffProgressPlugin reads
+            // al_recheckrequired on it to decide whether the case closes.
+            SignoffRequestPlugin.RecordSupervisorAnswers(systemService, targetId, answers, signoff);
 
             // Runs as the caller: a user without create-al_signoff privilege is refused here.
             // The name, code and timestamp are stamped by SignoffGuardPlugin on the way in,

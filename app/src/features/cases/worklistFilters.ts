@@ -22,6 +22,8 @@ export const FILTER_KEYS = [
   'status',
   'route',
   'priority',
+  // Pre or post check (requirements log row 2: post-sale cases can be picked out).
+  'check',
   'outcome',
   'remediation',
   'person',
@@ -34,8 +36,6 @@ export const FILTER_KEYS = [
 export type FilterKey = (typeof FILTER_KEYS)[number];
 
 export type Filters = Record<FilterKey, string>;
-
-export const EMPTY_FILTERS = Object.fromEntries(FILTER_KEYS.map((key) => [key, ''])) as Filters;
 
 export function withinRange(createdOn: string | null, from: string, to: string): boolean {
   if (!from && !to) return true;
@@ -117,6 +117,9 @@ export function applyFilters(
       return false;
     }
     if (filters.priority && (item.priority ?? '') !== filters.priority) return false;
+    if (filters.check && (item.preOrPostCheck ?? '').trim().toLowerCase() !== filters.check.trim().toLowerCase()) {
+      return false;
+    }
     // "Not yet graded" is what the Outcome cell says, and that cell shows the Tax grade where
     // a case has no BR-005 outcome (AD-055), so a Tax-graded case is not ungraded.
     if (filters.outcome === 'none' && (item.latestOutcome || item.taxOutcome)) return false;

@@ -44,7 +44,13 @@ namespace OutcomeTesting.Plugins
             try
             {
                 var email = PermissionHelpers.GetCallerEmail(systemService, context);
-                codes = PermissionHelpers.ResolveRoleCodesForEmail(systemService, email);
+
+                // A deactivated person holds nothing, as the gate decides before it reads any
+                // role. The resolver stays a pure "what is mapped" read; this is where the
+                // answer handed to the client is made to match the gate.
+                codes = PermissionHelpers.IsRegisteredActive(systemService, email)
+                    ? PermissionHelpers.ResolveRoleCodesForEmail(systemService, email)
+                    : new List<string>();
             }
             catch (InvalidPluginExecutionException)
             {

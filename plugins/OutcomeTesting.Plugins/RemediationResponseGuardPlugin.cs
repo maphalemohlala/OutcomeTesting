@@ -39,9 +39,12 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>
         /// The columns that carry the adviser's submission: the remedial action text, the
-        /// Intelligent Office reference, the one remediation-form answer that is still
-        /// theirs to give (AD-095, narrowed 2026-09-21), and the adviser's Yes / No
-        /// answer on the checker's remedial action.
+        /// Intelligent Office reference, and the adviser's Yes / No answer on the checker's
+        /// remedial action.
+        ///
+        /// <c>al_clientcontactrequired</c> left this list on 2026-11-16: "Client contact
+        /// required?" is the AQS checker's answer from 2026-11-06, set once when the check is
+        /// submitted, and <see cref="WriteOnceRefusal"/> refuses every later write to it.
         ///
         /// <c>al_recheckrequired</c> and <c>al_changesadvice</c> USED to be here. They are
         /// now <see cref="TcOnlyColumns"/>: the project owner directed on 2026-09-21 that
@@ -56,9 +59,14 @@ namespace OutcomeTesting.Plugins
         {
             "al_adviserresponse",
             "al_evidencereference",
-            "al_clientcontactrequired",
             "al_actionperformed",
         };
+
+        /// <summary>
+        /// The checker's answer on the action: "Client contact required?", written once by
+        /// <c>Remediation.Raise</c> when the check is submitted (2026-11-06).
+        /// </summary>
+        public const string ClientContactAttr = "al_clientcontactrequired";
 
         /// <summary>
         /// The two answers only the T&amp;C Manager may give (project owner, 2026-09-21:
@@ -109,7 +117,16 @@ namespace OutcomeTesting.Plugins
 
             // The T&C-only pair first: it is refused whatever the action's status is, so it
             // must not sit behind the Completed gate below.
-            var trespass = TcOnlyRefusal(update, IsSignoffInFlight(service));
+            // A SYSTEM write is the al_SignOffRemediation command recording the supervisor's
+            // answers (it has checked command.signoff first); the portal's sign-off shows as a
+            // request in flight, and only counts when the portal itself is writing: a contact
+            // created with the request column set fires no request plug-in, so on its own it
+            // would open these columns to every caller.
+            var system = localPluginContext.OrgSvcFactory.CreateOrganizationService(null);
+            var trespass = TcOnlyRefusal(
+                update,
+                WriteProvenance.IsSystemWrite(system, context)
+                    || (WriteProvenance.IsApplicationUser(system, context.InitiatingUserId) && IsSignoffInFlight(service)));
             if (trespass != null)
             {
                 throw new InvalidPluginExecutionException(trespass);
@@ -274,7 +291,9 @@ namespace OutcomeTesting.Plugins
 
             var kept = stored == null ? null : stored.GetAttributeValue<string>(RemedialActions.ResponseHistoryAttr);
             var written = update.GetAttributeValue<string>(RemedialActions.ResponseHistoryAttr) ?? string.Empty;
-            var onlyAdds = string.IsNullOrEmpty(kept) || written.StartsWith(kept.TrimEnd(), StringComparison.Ordinal);
+            var onlyAdds = string.IsNullOrEmpty(kept)
+                || written.StartsWith(kept.TrimEnd(), StringComparison.Ordinal)
+                || KeepsWhatTheTrimLeft(kept.TrimEnd(), written);
 
             if (reopening && onlyAdds && rejectionJustRecorded)
             {
@@ -283,6 +302,32 @@ namespace OutcomeTesting.Plugins
 
             return CommandHelpers.PreconditionPrefix +
                 "The earlier responses are recorded by the sign-off when it sends work back, and cannot be edited.";
+        }
+
+        /// <summary>
+        /// Whether a full history is the stored one with its oldest characters dropped to make
+        /// room for one more answer, as <see cref="RemedialActions.WithEarlierResponse"/> does
+        /// once the column is full. Without this every rejection after the column filled was
+        /// refused (audit, 2026-11-16: about the tenth). What is left of the stored text must
+        /// be unchanged, and no more of it may go than one answer adds.
+        /// </summary>
+        private static bool KeepsWhatTheTrimLeft(string kept, string written)
+        {
+            if (written.Length != RemedialActions.ResponseHistoryLength)
+            {
+                return false;
+            }
+
+            var mostDropped = kept.Length - RemedialActions.ResponseHistoryLength + RemedialActions.LongestHistoryEntry;
+            for (var dropped = 1; dropped <= mostDropped && dropped < kept.Length; dropped++)
+            {
+                if (string.CompareOrdinal(kept, dropped, written, 0, kept.Length - dropped) == 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -347,7 +392,18 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string WriteOnceRefusal(Entity update)
         {
-            if (update == null || !update.Contains(RemedialActions.ActionAttr))
+            if (update == null)
+            {
+                return null;
+            }
+
+            if (update.Contains(ClientContactAttr))
+            {
+                return CommandHelpers.PreconditionPrefix +
+                    "'Client contact required?' is the checker's answer, set when the check was submitted, and cannot be changed here.";
+            }
+
+            if (!update.Contains(RemedialActions.ActionAttr))
             {
                 return null;
             }

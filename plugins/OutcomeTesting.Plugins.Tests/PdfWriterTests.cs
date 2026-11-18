@@ -182,6 +182,29 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.DoesNotContain("?", pdf);
         }
 
+        /// <summary>
+        /// Symbols WinAnsi has no glyph for but a checker types: spelled out, not '?'. The
+        /// arrow is the one from a real Tax check (requirements log row 36).
+        /// </summary>
+        [Theory]
+        [InlineData("£2,840,901 → £3,989,939", "\\2432,840,901 -> \\2433,989,939")]
+        [InlineData("value ≥ 10 and ≤ 20", "value >= 10 and <= 20")]
+        public void Symbols_without_a_glyph_are_spelled_out(string input, string expected)
+        {
+            var pdf = Text(PdfWriter.Build(new[] { PdfBlock.Paragraph(input) }));
+
+            Assert.Contains(expected, pdf);
+            Assert.DoesNotContain("?", pdf);
+        }
+
+        [Fact]
+        public void A_spelled_out_symbol_is_measured_as_drawn()
+        {
+            Assert.Equal(
+                PdfWriter.Width("a -> b", "F1", 10),
+                PdfWriter.Width("a → b", "F1", 10));
+        }
+
         // ------------------------------------------------------------ layout
 
         [Fact]

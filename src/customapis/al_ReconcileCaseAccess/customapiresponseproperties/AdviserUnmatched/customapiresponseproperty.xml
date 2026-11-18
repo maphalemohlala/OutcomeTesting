@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="AdviserUnmatched">
+  <description default="True when the case is released but its adviser matched no single contact.">
+    <label description="True when the case is released but its adviser matched no single contact." languagecode="1033" />
+  </description>
+  <displayname default="Adviser unmatched">
+    <label description="Adviser unmatched" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>AdviserUnmatched</name>
+  <type>0</type>
+</customapiresponseproperty>

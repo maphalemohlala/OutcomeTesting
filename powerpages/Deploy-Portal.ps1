@@ -37,7 +37,11 @@
     permissions with `restoretablepermissions`, which writes `powerpagecomponent`
     type 18 rows directly and is the only thing on this site that can create a
     table permission at all. Finally it verifies by query, because on this site a
-    successful-looking upload is not evidence that a component landed.
+    successful-looking upload is not evidence that a component landed: the table
+    permissions of THIS site (not every site in the environment), and the most recently
+    edited web template's source against what -OrgUrl serves, which is what shows the
+    upload itself reached -OrgUrl. Every pac call names -OrgUrl with --environment; the
+    active pac profile is never used.
 
     The manifest is deliberately left stripped. `pac` does not own table
     permissions here, so a manifest section for them is not tracking — it is the
@@ -85,6 +89,14 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
 $permissionsFolder = Join-Path $SitePath 'table-permissions'
 $portalConfig      = Join-Path $SitePath '.portalconfig'
+
+# The site this folder describes. Every query below is scoped to it, so a second site in the
+# same environment can neither hide a missing permission nor appear as drift.
+$siteIdLine = @(Get-Content -Path (Join-Path $SitePath 'website.yml') | Where-Object { $_ -match '^adx_websiteid:\s*(\S+)\s*$' })
+if ($siteIdLine.Count -ne 1 -or $siteIdLine[0] -notmatch '^adx_websiteid:\s*([0-9a-fA-F-]{36})\s*$') {
+    throw "No adx_websiteid in $(Join-Path $SitePath 'website.yml')."
+}
+$siteId = $Matches[1].ToLowerInvariant()
 
 # The manifest section names that must never reach a `pac pages upload` on this
 # site. Both describe table permissions: the records and their web-role links.
@@ -139,6 +151,13 @@ function Get-SourcePermissions {
 
 # ---------------------------------------------------------------- verify
 
+# pac exits 0 when it cannot connect (a revoked token, AADSTS50173), and its error text
+# carries a Trace ID and a Correlation ID - two GUIDs a pattern match would read as data.
+# On 2026-11-17 that made a DEV site holding all 44 permissions look like it held 2.
+function Test-PacFailed([string]$text) {
+    return $text -match 'Failed to connect to Dataverse|Could not connect to the Dataverse|AADSTS\d+'
+}
+
 function Get-DeployedPermissionIds {
     $fetch = @"
 <fetch>
@@ -146,6 +165,7 @@ function Get-DeployedPermissionIds {
     <attribute name="powerpagecomponentid" />
     <filter>
       <condition attribute="powerpagecomponenttype" operator="eq" value="18" />
+      <condition attribute="powerpagesiteid" operator="eq" value="$siteId" />
     </filter>
   </entity>
 </fetch>
@@ -156,7 +176,9 @@ function Get-DeployedPermissionIds {
         # One logical blob, matched by pattern: the column layout of `pac env
         # fetch` is presentation, not a contract, so nothing here parses columns.
         $raw = (& $pac env fetch --environment $OrgUrl --xmlFile $queryFile 2>&1 | Out-String)
-        if ($LASTEXITCODE -ne 0) { throw "pac env fetch failed:`n$raw" }
+        if ($LASTEXITCODE -ne 0 -or (Test-PacFailed $raw)) {
+            throw "pac env fetch could not read $OrgUrl, so it reported nothing about the permissions there. Run 'pac auth create' and retry:`n$raw"
+        }
         $ids = [regex]::Matches($raw, '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}') |
                ForEach-Object { $_.Value.ToLowerInvariant() }
         return @($ids | Sort-Object -Unique)
@@ -168,14 +190,23 @@ function Get-DeployedPermissionIds {
 
 function Test-Deployment {
     $source     = @(Get-SourcePermissions)
-    $deployed   = @(Get-DeployedPermissionIds)
+    try {
+        $deployed = @(Get-DeployedPermissionIds)
+    }
+    catch {
+        # Reported, not fatal: the template check below reads through another client and
+        # still says whether the site is current. The run still fails.
+        Write-Host ''
+        Write-Host "Table permissions NOT checked: $($_.Exception.Message.Split([char]10)[0])" -ForegroundColor Red
+        return $false
+    }
     $sourceIds  = @($source | ForEach-Object { $_.Id })
 
     $missing = @($source   | Where-Object { $deployed  -notcontains $_.Id })
     $extra   = @($deployed | Where-Object { $sourceIds -notcontains $_ })
 
     Write-Host ''
-    Write-Host "Table permissions: $($source.Count) in source, $($deployed.Count) in $OrgUrl."
+    Write-Host "Table permissions: $($source.Count) in source, $($deployed.Count) for site $siteId in $OrgUrl."
 
     if ($missing.Count -gt 0) {
         Write-Host ''
@@ -193,6 +224,91 @@ function Test-Deployment {
     }
 
     return ($missing.Count -eq 0)
+}
+
+# The table-permission check above proves restoretablepermissions reached -OrgUrl; it says
+# nothing about where `pac pages upload` went. This compares the web templates in source
+# with what -OrgUrl serves for this site. The most recently edited template - the change
+# being deployed - must match, or the upload did not land here. Others that differ are
+# reported as drift: pac uploads only what its manifest thinks changed.
+function Get-DeployedTemplates {
+    $fetch = @"
+<fetch>
+  <entity name="powerpagecomponent">
+    <attribute name="powerpagecomponentid" />
+    <attribute name="content" />
+    <filter>
+      <condition attribute="powerpagecomponenttype" operator="eq" value="8" />
+      <condition attribute="powerpagesiteid" operator="eq" value="$siteId" />
+    </filter>
+  </entity>
+</fetch>
+"@
+    $queryFile = Join-Path ([System.IO.Path]::GetTempPath()) ("ot-templates-{0}.xml" -f ([guid]::NewGuid().ToString('N')))
+    try {
+        Set-Content -Path $queryFile -Value $fetch -Encoding UTF8
+        # stderr stays on the console: under Stop, 2>&1 on a native exe throws on its first line.
+        $raw = (& $dotnet run --project (Join-Path $repoRoot 'plugins\OutcomeTesting.Registration') -- fetch $OrgUrl "@$queryFile" | Out-String)
+        if ($LASTEXITCODE -ne 0) { throw "fetch of web templates failed:`n$raw" }
+        # The verb prints its sign-in lines, then the indented JSON from a line holding only "{".
+        $json = [regex]::Match($raw, '(?ms)^\{\s*$.*')
+        if (-not $json.Success) { throw "fetch of web templates returned no JSON:`n$raw" }
+        $map = @{}
+        foreach ($row in @(($json.Value | ConvertFrom-Json).rows)) {
+            $source = ''
+            if ($row.content) { $source = [string](($row.content | ConvertFrom-Json).source) }
+            $map[([string]$row.powerpagecomponentid).ToLowerInvariant()] = $source
+        }
+        return $map
+    }
+    finally {
+        Remove-Item -Path $queryFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Test-UploadLanded {
+    $deployed = Get-DeployedTemplates
+    if ($deployed.Count -eq 0) {
+        Write-Host "No web templates for site $siteId in ${OrgUrl}: this site is not there, so the upload did not land in it." -ForegroundColor Red
+        return $false
+    }
+
+    $local = @()
+    foreach ($yml in @(Get-ChildItem -Path (Join-Path $SitePath 'web-templates') -Filter '*.webtemplate.yml' -Recurse)) {
+        $idLine = @(Get-Content -Path $yml.FullName | Where-Object { $_ -match '^adx_webtemplateid:\s*(\S+)' })
+        $sourceFile = Join-Path $yml.DirectoryName ($yml.Name -replace '\.webtemplate\.yml$', '.webtemplate.source.html')
+        if ($idLine.Count -eq 0 -or -not (Test-Path $sourceFile)) { continue }
+        [void]($idLine[0] -match '^adx_webtemplateid:\s*(\S+)')
+        # Stored templates keep the file's own line endings (DEV, 2026-11-16: CRLF stored as
+        # CRLF), so both sides are folded the same way rather than guessing what upload does.
+        $text = [System.IO.File]::ReadAllText($sourceFile, (New-Object System.Text.UTF8Encoding($false))).TrimStart([char]0xFEFF) -replace "`r`n", "`n"
+        $local += [pscustomobject]@{
+            Id       = $Matches[1].ToLowerInvariant()
+            Name     = $yml.Directory.Name
+            Source   = $text
+            Modified = (Get-Item $sourceFile).LastWriteTimeUtc
+        }
+    }
+
+    $differs = @($local | Where-Object {
+        -not $deployed.ContainsKey($_.Id) -or ($deployed[$_.Id].TrimStart([char]0xFEFF) -replace "`r`n", "`n") -cne $_.Source
+    })
+    $newest = $local | Sort-Object Modified -Descending | Select-Object -First 1
+
+    Write-Host ''
+    Write-Host "Web templates: $($local.Count) in source, $($deployed.Count) for this site in $OrgUrl, $($differs.Count) differ."
+    foreach ($d in $differs) {
+        if ($d.Id -ne $newest.Id) { Write-Host "  differs (drift, not uploaded by this run): $($d.Name)" -ForegroundColor Yellow }
+    }
+
+    if ($differs | Where-Object { $_.Id -eq $newest.Id }) {
+        Write-Host "The most recently edited template, $($newest.Name), does not match $OrgUrl." -ForegroundColor Red
+        Write-Host 'The upload did not land in this environment.' -ForegroundColor Red
+        return $false
+    }
+
+    Write-Host "The most recently edited template, $($newest.Name), matches $OrgUrl." -ForegroundColor Green
+    return $true
 }
 
 # ---------------------------------------------------------------- manifest
@@ -252,7 +368,9 @@ Write-Host "Site        $SitePath"
 Write-Host "Environment $OrgUrl"
 
 if ($VerifyOnly) {
-    if (Test-Deployment) { exit 0 }
+    $permissionsOk = Test-Deployment
+    $templatesOk = Test-UploadLanded
+    if ($permissionsOk -and $templatesOk) { exit 0 }
     exit 1
 }
 
@@ -267,6 +385,13 @@ if (-not $SkipGates) {
             Write-Host "$gate failed. Nothing uploaded." -ForegroundColor Red
             exit 1
         }
+    }
+    # The stylesheet the site serves is built from powerpages\outcome-testing.src.css.
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Build-PortalCss.ps1') -SitePath $SitePath -Check
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ''
+        Write-Host 'Build-PortalCss.ps1 -Check failed. Nothing uploaded.' -ForegroundColor Red
+        exit 1
     }
 }
 
@@ -305,10 +430,13 @@ $uploadFailed = $false
 try {
     Write-Host ''
     Write-Host '--- pac pages upload ----------------------------------------------'
-    $uploadArgs = @('pages', 'upload', '--path', $SitePath, '--modelVersion', 'Enhanced')
+    # --environment: without it pac uploads to the active profile, which defaults to neither
+    # DEV nor TEST, while everything after this writes to and verifies -OrgUrl.
+    $uploadArgs = @('pages', 'upload', '--path', $SitePath, '--modelVersion', 'Enhanced', '--environment', $OrgUrl)
     if ($ForceUploadAll) { $uploadArgs += '--forceUploadAll' }
-    & $pac @uploadArgs
-    if ($LASTEXITCODE -ne 0) { $uploadFailed = $true }
+    $uploadOut = (& $pac @uploadArgs 2>&1 | Out-String)
+    Write-Host $uploadOut
+    if ($LASTEXITCODE -ne 0 -or (Test-PacFailed $uploadOut)) { $uploadFailed = $true }
 }
 finally {
     # Unconditional: the source tree must never be left without its permissions,
@@ -341,7 +469,9 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ''
 Write-Host '--- Verification by query -----------------------------------------'
-if (-not (Test-Deployment)) {
+$permissionsOk = Test-Deployment
+$uploadLanded = Test-UploadLanded
+if (-not $permissionsOk -or -not $uploadLanded) {
     Write-Host ''
     Write-Host 'Deployment incomplete. Do not treat this run as successful.' -ForegroundColor Red
     exit 1

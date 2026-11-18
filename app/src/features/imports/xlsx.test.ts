@@ -157,6 +157,24 @@ describe('readWorkbook', () => {
     expect(rows).toEqual([['2026-08-06', '46240']]);
   });
 
+  it('sends a time-only cell as its time, which the server refuses, not as 30 December 1899', async () => {
+    const rows = await readWorkbook(
+      workbook('<row r="1"><c r="A1" s="1"><v>0.5791666666666667</v></c></row>', { dateStyle: true }),
+    );
+
+    expect(rows).toEqual([['13:54']]);
+  });
+
+  it('sends a midnight time-only cell as 00:00, never as a blank cell', async () => {
+    const rows = await readWorkbook(
+      workbook('<row r="1"><c r="A1" s="1"><v>0</v></c><c r="B1" s="1"><v>0.999999</v></c></row>', {
+        dateStyle: true,
+      }),
+    );
+
+    expect(rows).toEqual([['00:00', '00:00']]);
+  });
+
   it('fills the gap left by a missing cell', async () => {
     const rows = await readWorkbook(workbook('<row r="1"><c r="A1"><v>1</v></c><c r="C1"><v>3</v></c></row>'));
 

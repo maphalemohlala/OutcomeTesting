@@ -219,3 +219,23 @@
 .case-detail__checks-table tbody th {
   font-weight: 600;
 }
+
+/* Delete case sits apart from the everyday edit actions, at the end of the panel. */
+.case-detail__delete {
+  display: flex;
+  justify-content: flex-end;
+  margin-block: var(--space-2) var(--space-4);
+}
+
+/* Under the grades it amends (requirements log row 39). */
+.case-detail__tcmanager .case-detail__checks-note {
+  margin-bottom: var(--space-2);
+}
+
+.case-detail__amend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block: var(--space-2) var(--space-4);
+}

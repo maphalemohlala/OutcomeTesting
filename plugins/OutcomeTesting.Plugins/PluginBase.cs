@@ -70,7 +70,10 @@ namespace OutcomeTesting.Plugins
             }
             catch (FaultException<OrganizationServiceFault> orgServiceFault)
             {
-                localPluginContext.Trace($"Exception: {orgServiceFault.ToString()}");
+                // The technical detail - class, fault code, message, stack - goes here and to
+                // InnerException only; the caller reads a plain sentence (owner, 2026-11-17).
+                localPluginContext.Trace($"{PluginClassName} failed. ErrorCode: " +
+                    $"{(orgServiceFault.Detail == null ? 0 : orgServiceFault.Detail.ErrorCode):X8}. Exception: {orgServiceFault}");
 
                 // A refusal that crossed a service boundary is still a refusal.
                 //
@@ -87,24 +90,20 @@ namespace OutcomeTesting.Plugins
                     throw new InvalidPluginExecutionException(carriedRefusal, orgServiceFault);
                 }
 
-                // The platform refusing the CALLER is an authorisation answer, not a crash,
-                // and it is the one platform fault a person can actually act on. It is turned
-                // into a sentence here rather than left to leak the user id, the privilege id,
-                // the privilege name and this class's own name to a browser (APP-003,
-                // NFR-OBS-01). Nothing is swallowed: it is still thrown, the transaction still
-                // aborts, and the full fault is on the trace above and in InnerException.
-                if (CommandHelpers.IsPrivilegeDenied(orgServiceFault.Message))
+                // A called command's own friendly UNEXPECTED sentence says more than
+                // re-wrapping it as a server problem would.
+                var carriedUnexpected = FaultMessages.CarriedUnexpected(orgServiceFault.Message);
+                if (carriedUnexpected != null)
                 {
-                    throw new InvalidPluginExecutionException(
-                        CommandHelpers.PrivilegeDeniedMessage,
-                        orgServiceFault);
+                    throw new InvalidPluginExecutionException(carriedUnexpected, orgServiceFault);
                 }
 
-                // Anything else genuinely is unexpected, and keeps saying so. Naming the
-                // plug-in and the fault is what makes an unforeseen failure diagnosable at
-                // all, so this branch is deliberately left alone.
+                // Everything else is mapped by its error code to what failed and why: a
+                // privilege denial (UNAUTHORIZED), a duplicate key or an edit conflict
+                // (CONFLICT), a missing row, a timeout or a server problem (UNEXPECTED).
+                // Nothing is swallowed: it is still thrown and the transaction still aborts.
                 throw new InvalidPluginExecutionException(
-                    $"UNEXPECTED: {PluginClassName} could not complete. OrganizationServiceFault: {orgServiceFault.Message}",
+                    FaultMessages.ForFault(GetType(), orgServiceFault),
                     orgServiceFault);
             }
             catch (Exception error)
@@ -120,15 +119,14 @@ namespace OutcomeTesting.Plugins
                  * the pages' careful prefix branching could never fire. A submit refused
                  * exactly that way was reported on 2026-09-10.
                  *
-                 * The type and the message are named because a message that does not say
-                 * what happened is the fault being fixed. The stack trace is deliberately
-                 * not included: it goes to the trace above and to InnerException, which the
-                 * platform logs, and PP-16 keeps it out of the browser.
+                 * Since 2026-11-17 the caller reads what failed and why in plain words; the
+                 * class, the exception type, its message and the stack go to the trace and
+                 * to InnerException only.
                  */
-                localPluginContext.Trace($"Exception: {error.ToString()}");
+                localPluginContext.Trace($"{PluginClassName} failed. Exception: {error}");
 
                 throw new InvalidPluginExecutionException(
-                    $"UNEXPECTED: {PluginClassName} could not complete. {error.GetType().Name}: {error.Message}",
+                    FaultMessages.ForException(GetType(), error),
                     error);
             }
             finally

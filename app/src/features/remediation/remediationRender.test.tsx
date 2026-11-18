@@ -7,7 +7,6 @@ import type { RemediationActionRow } from './remediationMapping';
 // The page reaches Dataverse through these; the table itself takes its rows as props, so
 // they are stubbed rather than the SDK being loaded to import the module.
 vi.mock('./useRemediation', () => ({ useRemediation: () => null }));
-vi.mock('../../services/commands/completeRemediation', () => ({ completeRemediation: vi.fn() }));
 vi.mock('../../services/errors', () => ({ messageForFailure: () => '' }));
 vi.mock('../../hooks/useIntentKey', () => ({ useIntentKeys: () => ({ keyFor: () => '' }) }));
 

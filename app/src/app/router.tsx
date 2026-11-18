@@ -1,30 +1,45 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Suspense, lazy } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
+import { ErrorBoundary } from '../components/feedback/ErrorBoundary';
 import { PageUnavailable } from '../components/feedback/PageUnavailable';
 import { RequirePermission } from './permissions/PermissionGate';
 import { CaseWorklistPage } from '../features/cases/CaseWorklistPage';
 import { CaseDetailPage } from '../features/cases/CaseDetailPage';
 import { RecheckPage } from '../features/cases/RecheckPage';
-import { CaseIntakePage } from '../features/imports/CaseIntakePage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
-import { PeoplePage } from '../features/people/PeoplePage';
 import { PersonCasesPage } from '../features/people/PersonCasesPage';
-import { AdviserMappingPage } from '../features/admin/AdviserMappingPage';
-import { NotificationTemplatePage } from '../features/admin/NotificationTemplatePage';
-import { QuestionLibraryPage } from '../features/admin/QuestionLibraryPage';
-import { ListOptionsPage } from '../features/admin/ListOptionsPage';
-import { SecurityConfigPage } from '../features/admin/SecurityConfigPage';
-import { RoleDetailPage } from '../features/admin/RoleDetailPage';
 import { ReviewDetailPage } from '../features/reviews/ReviewDetailPage';
 import { RemediationPage } from '../features/remediation/RemediationPage';
-import { ReportsPage } from '../features/reports/ReportsPage';
-import { ExportsPage } from '../features/reports/ExportsPage';
-import { ExportBatchPage } from '../features/reports/ExportBatchPage';
+
+/*
+ * Administration, reporting and intake are loaded when first opened, not with the app: most
+ * people never open them, and they were nearly half of what every sign-in downloaded. The
+ * permission gate sits outside each, so a screen somebody may not open is never fetched.
+ */
+const CaseIntakePage = lazy(() => import('../features/imports/CaseIntakePage').then((m) => ({ default: m.CaseIntakePage })));
+const PeoplePage = lazy(() => import('../features/people/PeoplePage').then((m) => ({ default: m.PeoplePage })));
+const AdviserMappingPage = lazy(() => import('../features/admin/AdviserMappingPage').then((m) => ({ default: m.AdviserMappingPage })));
+const NotificationTemplatePage = lazy(() => import('../features/admin/NotificationTemplatePage').then((m) => ({ default: m.NotificationTemplatePage })));
+const QuestionLibraryPage = lazy(() => import('../features/admin/QuestionLibraryPage').then((m) => ({ default: m.QuestionLibraryPage })));
+const ListOptionsPage = lazy(() => import('../features/admin/ListOptionsPage').then((m) => ({ default: m.ListOptionsPage })));
+const SecurityConfigPage = lazy(() => import('../features/admin/SecurityConfigPage').then((m) => ({ default: m.SecurityConfigPage })));
+const RoleDetailPage = lazy(() => import('../features/admin/RoleDetailPage').then((m) => ({ default: m.RoleDetailPage })));
+const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
+const ExportsPage = lazy(() => import('../features/reports/ExportsPage').then((m) => ({ default: m.ExportsPage })));
+const ExportBatchPage = lazy(() => import('../features/reports/ExportBatchPage').then((m) => ({ default: m.ExportBatchPage })));
 
 /** Routes follow 09-Application-Screens. Screens without a data source say so explicitly. */
 export function AppRoutes() {
+  const { pathname } = useLocation();
+
   return (
     <AppShell>
+      {/* Inside the shell, so a screen that fails - or one whose code could not be fetched
+          after a new release - leaves the menu standing. Keyed on the path so choosing
+          another screen clears the failure rather than repeating it. */}
+      <ErrorBoundary key={pathname}>
+      <Suspense fallback={<p role="status">Loading page…</p>}>
       <Routes>
         {/* Gated like every other screen. It was not until 2026-09-21 (F43), and the
             dashboard is the one screen where that mattered most: it is what a sign-in lands
@@ -190,6 +205,8 @@ export function AppRoutes() {
           }
         />
       </Routes>
+      </Suspense>
+      </ErrorBoundary>
     </AppShell>
   );
 }

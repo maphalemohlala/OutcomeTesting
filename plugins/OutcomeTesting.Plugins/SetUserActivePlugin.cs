@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -66,17 +67,47 @@ namespace OutcomeTesting.Plugins
             var workEmail = before.GetAttributeValue<string>(ContactRegistry.EmailAttr);
             var wasActive = ContactRegistry.IsActive(before);
 
-            // statuscode travels with statecode: setting the state alone leaves the reason
-            // code pointing at the state the row just left, which reads as a half-applied
-            // change wherever the reason is displayed.
-            var update = new Entity(ContactRegistry.Entity, userId)
+            if (!active && IsCaller(systemService, context, workEmail))
             {
-                [ContactRegistry.StateCodeAttr] = new OptionSetValue(
-                    active ? ContactRegistry.StateActive : ContactRegistry.StateInactive),
-                [ContactRegistry.StatusCodeAttr] = new OptionSetValue(
-                    active ? ContactRegistry.StatusActive : ContactRegistry.StatusInactive),
-            };
-            userService.Update(update);
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "You cannot deactivate your own account. Ask another administrator to do it.");
+            }
+
+            // A person is their email (AD-228), and one active row is enough to keep access,
+            // so deactivating only the chosen row left a duplicate contact still letting them
+            // in. Every row holding the email goes. Reactivation restores the chosen row alone.
+            var targets = new List<Guid> { userId };
+            if (!active && !string.IsNullOrWhiteSpace(workEmail))
+            {
+                var query = new QueryExpression(ContactRegistry.Entity)
+                {
+                    ColumnSet = new ColumnSet(ContactRegistry.StateCodeAttr),
+                    Criteria = new FilterExpression(),
+                };
+                query.Criteria.AddCondition(ContactRegistry.EmailAttr, ConditionOperator.Equal, workEmail.Trim());
+                foreach (var row in CommandHelpers.RetrieveAll(systemService, query))
+                {
+                    if (row.Id != userId && ContactRegistry.IsActive(row))
+                    {
+                        targets.Add(row.Id);
+                    }
+                }
+            }
+
+            foreach (var target in targets)
+            {
+                // statuscode travels with statecode: setting the state alone leaves the reason
+                // code pointing at the state the row just left, which reads as a half-applied
+                // change wherever the reason is displayed.
+                userService.Update(new Entity(ContactRegistry.Entity, target)
+                {
+                    [ContactRegistry.StateCodeAttr] = new OptionSetValue(
+                        active ? ContactRegistry.StateActive : ContactRegistry.StateInactive),
+                    [ContactRegistry.StatusCodeAttr] = new OptionSetValue(
+                        active ? ContactRegistry.StatusActive : ContactRegistry.StatusInactive),
+                });
+            }
 
             var details = "Active " + wasActive + " -> " + active;
             var auditId = CommandHelpers.WriteAuditEvent(
@@ -84,6 +115,15 @@ namespace OutcomeTesting.Plugins
                 ContactRegistry.Entity, userId, null, details, idempotencyKey, context);
 
             SetResponse(context, userId.ToString("D"), active, auditId);
+        }
+
+        /// <summary>Whether the email is the caller's own work email.</summary>
+        private static bool IsCaller(IOrganizationService service, IPluginExecutionContext context, string email)
+        {
+            var caller = service.Retrieve("systemuser", context.InitiatingUserId, new ColumnSet("internalemailaddress"))
+                .GetAttributeValue<string>("internalemailaddress");
+            return !string.IsNullOrWhiteSpace(caller) && !string.IsNullOrWhiteSpace(email)
+                && string.Equals(caller.Trim(), email.Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
         private static void SetResponse(IPluginExecutionContext context, string userId, bool active, Guid auditId)

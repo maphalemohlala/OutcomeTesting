@@ -5,6 +5,25 @@
  * imported under the test runner because ../../generated pulls in the Power Apps client.
  */
 
+import {
+  UNREACHABLE,
+  browserOnline,
+  isUnreachable,
+  serverReason,
+  textOf,
+} from '../../services/commands/failures';
+
+export const FAIL_POINT_SAVE_FALLBACK = 'That fail point could not be saved.';
+
+/** Why a fail point could not be added, changed, retired or reinstated. */
+export function describeFailPointSaveFailure(error: unknown, online = browserOnline()): string {
+  // The server's reason before the connection: a reason proves the request arrived.
+  return (
+    serverReason(error) ??
+    (isUnreachable(textOf(error), online) ? UNREACHABLE : FAIL_POINT_SAVE_FALLBACK)
+  );
+}
+
 /** al_failreason.al_category. The code prefix is what the V8 seed codes already use. */
 export const FAIL_REASON_CATEGORIES = [
   { value: 120910400, label: 'AML', prefix: 'AML' },

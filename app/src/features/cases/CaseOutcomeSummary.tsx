@@ -1,4 +1,4 @@
-import { useCaseOutcome } from './useCaseOutcome';
+import type { CaseOutcomeState } from './useCaseOutcome';
 import './CaseOutcomeSummary.css';
 
 /**
@@ -7,15 +7,11 @@ import './CaseOutcomeSummary.css';
  * the preserved initial and final outcomes so the case's standing is visible here.
  */
 export function CaseOutcomeSummary({
-  caseId,
-  reloadKey = 0,
+  state,
 }: {
-  caseId: string;
-  /** Bumped by the page when a command has written something this summary reads. */
-  reloadKey?: number;
+  /** The page's read of the case's outcomes, shared with the accountability editor. */
+  state: CaseOutcomeState;
 }) {
-  const state = useCaseOutcome(caseId, reloadKey);
-
   return (
     <section className="case-outcome" aria-labelledby="panel-outcome">
       <h2 id="panel-outcome">Outcome</h2>

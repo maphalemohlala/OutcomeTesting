@@ -1,6 +1,7 @@
 import type { CellValue } from '../../lib/tabular';
 import type { Al_exportrecords } from '../../generated/models/Al_exportrecordsModel';
-import { ukToday } from '../cases/caseHeaderDates';
+import { ukDayOf, ukToday } from '../cases/caseHeaderDates';
+import { MONTHS, isoDay } from '../../lib/format';
 
 /** The export record as the file builder needs it. */
 export type ExportRecord = Al_exportrecords;
@@ -25,8 +26,10 @@ export type ExportRecord = Al_exportrecords;
  * the file is named for yesterday. `ukToday` is the same helper the case header uses for
  * the same reason.
  */
-export function trailLightFilename(extension: string, now: Date = new Date()): string {
-  return `DFALIN1_outcometesting_${ukToday(now).replace(/-/g, '_')}.${extension}`;
+export function trailLightFilename(extension: string, now: Date = new Date(), day?: string | null): string {
+  // A daily file cut to one day is named for that day, so tomorrow's download of today's file
+  // still arrives under today's name.
+  return `DFALIN1_outcometesting_${(day || ukToday(now)).replace(/-/g, '_')}.${extension}`;
 }
 
 /**
@@ -76,57 +79,154 @@ export const TRAIL_LIGHT_HEADERS = [
 ];
 
 /**
- * AD-039 types the code columns as NUMBER. A code that is genuinely numeric is written as a
- * number so Excel does not left-pad or text-align it; anything else is passed through
- * unchanged rather than being silently dropped or coerced to zero.
+ * AD-039 types the code columns as NUMBER, but a number cannot hold every code (owner,
+ * 2026-11-17): "00123" would arrive as 123. So a code is written as a number only when that
+ * number reads back as exactly the same text; leading zeros, signs, spaces, decimals such as
+ * "1.50" and digit strings too long to hold exactly stay text, unchanged. CSV and XLSX alike.
  *
  * Six columns use it now, not four: columns B and D carry codes again as of 2026-09-22.
  */
 function code(value: string | undefined): CellValue {
   const text = value?.trim();
   if (!text) return '';
-  return /^-?\d+(\.\d+)?$/.test(text) ? Number(text) : text;
+  const asNumber = Number(text);
+  return Number.isFinite(asNumber) && String(asNumber) === text ? asNumber : text;
 }
 
 function text(value: string | undefined): string {
   return value?.trim() ?? '';
 }
 
-function day(value: string | undefined): string {
-  return value ? value.slice(0, 10) : '';
-}
-
 /**
  * Whether a row's check date (column G) falls in the range chosen for a download, inclusive
- * at both ends; an empty bound is open. Each batch snapshots every closed case, so the range
- * is how a download is cut to a period (2026-09-28). A row with no check date cannot be shown
- * to fall inside a range, so it is left out once one is set.
+ * at both ends; an empty bound is open. Each batch snapshots every closed case and every
+ * graded case not yet closed, so the range is how a download is cut to a period (2026-09-28).
+ * A row with no check date cannot be shown to fall inside a range, so it is left out once one
+ * is set.
  */
 export function withinCheckDates(record: ExportRecord, from: string, to: string): boolean {
   if (!from && !to) return true;
-  const checked = day(record.al_checkdate);
+  const checked = isoDay(record.al_checkdate);
   if (!checked) return false;
   if (from && checked < from) return false;
   if (to && checked > to) return false;
   return true;
 }
 
+/** Which Trail Light file is being built from a batch. */
+export type TrailLightFile = 'daily' | 'quarterly';
+
 /**
- * Whether the row belongs in the daily file (client, 2026-11-06): File Quality is Fail, and/or
- * Advice Quality is Insufficient evidence or Potential harm. A Pass with issues alone does not
- * qualify. The quarterly 12-month file keeps every row. A Tax-only case has no advice grade, so
- * its file grade decides.
+ * Whether the case was closed when the batch snapshotted it. A batch also holds graded cases
+ * still open (owner, 2026-11-17), marked in the separator column the file no longer carries
+ * (GenerateExportPlugin.NotYetClosedMarker); every batch before that holds closed cases only.
+ * The quarterly file takes closed rows only.
+ */
+export function closedWhenSnapshotted(record: ExportRecord): boolean {
+  return text(record.al_separator) === '';
+}
+
+/**
+ * The check dates a file is cut to: the ones chosen on the page, else, for the daily file, the
+ * UK days since the previous batch up to the day before this one. A batch holds what was checked
+ * by the moment it was generated, so its own day is not over; cutting on it lost every case
+ * checked later that day from every default file. Cut this way the batches tile the calendar:
+ * each check day falls in exactly one batch's default file, a weekend without batches included.
+ * `previousGeneratedOn` is the latest batch generated on an earlier UK day (none for the first).
+ */
+export function fileRange(
+  file: TrailLightFile,
+  from: string,
+  to: string,
+  generatedOn: string | null,
+  previousGeneratedOn: string | null = null,
+): { from: string; to: string } {
+  const day = file === 'daily' && !from && !to && generatedOn ? ukDayOf(generatedOn) : null;
+  if (!day) return { from, to };
+  const last = dayBefore(day);
+  const since = previousGeneratedOn ? ukDayOf(previousGeneratedOn) : null;
+  return { from: since && since <= last ? since : last, to: last };
+}
+
+/** The calendar day before a yyyy-mm-dd day. */
+export function dayBefore(isoDay: string): string {
+  const [y, m, d] = isoDay.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+}
+
+/** The latest batch generated on a UK day before this one's, which is where its default file starts. */
+export function previousBatchGeneratedOn(
+  batches: { id: string; generatedOn: string | null }[],
+  batchId: string,
+): string | null {
+  const own = batches.find((b) => b.id === batchId)?.generatedOn;
+  const ownDay = own ? ukDayOf(own) : null;
+  if (!ownDay) return null;
+  let best: string | null = null;
+  for (const b of batches) {
+    const day = b.generatedOn ? ukDayOf(b.generatedOn) : null;
+    if (b.id !== batchId && day && day < ownDay && (!best || b.generatedOn! > best)) best = b.generatedOn;
+  }
+  return best;
+}
+
+const ADVICE_FAILS = ['insufficient evidence', 'potential harm'];
+const NOT_A_PASS = ['pass with issues', 'fail', ...ADVICE_FAILS];
+
+/**
+ * The Advice Quality grade a file reports (client, 2026-11-16): the daily file the grade first
+ * recorded, the quarterly file the one in force after any regrade.
+ */
+export function adviceGradeFor(record: ExportRecord, file: TrailLightFile): string {
+  if (file === 'quarterly') return text(record.al_advicequalitygrade);
+  // shortcut: a batch generated before 2026-11-16 holds no initial grade until
+  // `backfillinitialgrade <org> --confirm <org>` (registration tool) is run in each environment;
+  // until then such a row falls back to the grade in force. The fallback stays as the safety net.
+  return text(record.al_initialadvicequalitygrade) || text(record.al_advicequalitygrade);
+}
+
+/**
+ * Whether the row belongs in the daily file (client, 2026-11-16): any type of failure keeps it -
+ * a File Quality Fail; an initial Advice Quality grade of Pass with issues, Insufficient
+ * evidence or Potential harm (the Suitability Assessment grade); or a Tax-only check that came
+ * back Fail or Pass with issues, which no Trail Light column carries. A clean pass is left out.
+ * The quarterly 12-month file keeps every row.
  */
 export function belongsInDailyFile(record: ExportRecord): boolean {
-  const advice = text(record.al_advicequalitygrade).toLowerCase();
   return (
     text(record.al_filequalitygrade).toLowerCase() === 'fail' ||
-    advice === 'insufficient evidence' ||
-    advice === 'potential harm'
+    NOT_A_PASS.includes(adviceGradeFor(record, 'daily').toLowerCase()) ||
+    NOT_A_PASS.includes(text(record.al_taxoutcome).toLowerCase())
   );
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/**
+ * The calendar quarter a day falls in, as the two inclusive ISO days of its range, and a
+ * label. Quarters are calendar quarters (Jan-Mar, Apr-Jun, Jul-Sep, Oct-Dec).
+ */
+export function quarterOf(isoDay: string): { from: string; to: string; label: string } {
+  const [year, month] = isoDay.split('-').map(Number);
+  const q = Math.floor((month - 1) / 3);
+  const first = q * 3 + 1;
+  const last = first + 2;
+  const lastDay = new Date(Date.UTC(year, last, 0)).getUTCDate();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return {
+    from: `${year}-${pad(first)}-01`,
+    to: `${year}-${pad(last)}-${pad(lastDay)}`,
+    label: `Q${q + 1} ${year} (${MONTHS[first - 1]} to ${MONTHS[last - 1]})`,
+  };
+}
+
+/** The current quarter and the ones before it, newest first. */
+export function recentQuarters(today: string, count = 8): { from: string; to: string; label: string }[] {
+  const quarters = [quarterOf(today)];
+  while (quarters.length < count) {
+    const [y, m] = quarters[quarters.length - 1].from.split('-').map(Number);
+    quarters.push(quarterOf(m === 1 ? `${y - 1}-10-01` : `${y}-${String(m - 3).padStart(2, '0')}-01`));
+  }
+  return quarters;
+}
 
 /** `2026-09-28` as `28 Sep 2026`, read from the digits so no time zone can move the day. */
 export function ukDay(isoDay: string): string {
@@ -152,12 +252,13 @@ export function fileContentsSummary(
   from: string,
   to: string,
   leftOut = 0,
+  file: TrailLightFile = 'daily',
 ): string {
   const range = describeCheckRange(from, to);
   if (leftOut > 0) {
     const held = inRange - leftOut;
     if (held === 0) {
-      return `No case in this batch${range ? ` ${range}` : ''} belongs in the daily file, so it has nothing to download.`;
+      return `No case in this batch${range ? ` ${range}` : ''} belongs in the ${file} file, so it has nothing to download.`;
     }
     const left = leftOut === 1 ? '1 case that does not belong in it' : `${leftOut} cases that do not belong in it`;
     return `The file will contain ${held} of the ${total} cases in this batch${range ? `: those ${range}` : ''}, leaving out ${left}.`;
@@ -173,7 +274,11 @@ export function fileContentsSummary(
   return `The file will contain ${inRange} of the ${total} cases in this batch: those ${range}.`;
 }
 
-export function trailLightRow(record: ExportRecord): CellValue[] {
+export function trailLightRow(record: ExportRecord, file: TrailLightFile): CellValue[] {
+  const advice = adviceGradeFor(record, file);
+  // The batch keeps the advice-accountable people whenever either grade failed
+  // (GenerateExportPlugin.AccountabilityGate); a file names them only beside its own fail.
+  const aq = (value: string | undefined) => (ADVICE_FAILS.includes(advice.toLowerCase()) ? value : undefined);
   return [
     text(record.al_advisername),
     code(record.al_advisercode),
@@ -185,7 +290,7 @@ export function trailLightRow(record: ExportRecord): CellValue[] {
     code(record.al_paraplannercode),
     text(record.al_casetype),
     text(record.al_productsolutiontype),
-    day(record.al_checkdate),
+    isoDay(record.al_checkdate),
     text(record.al_clientname),
     text(record.al_preorpostcheck),
     text(record.al_filequalitygrade),
@@ -193,10 +298,29 @@ export function trailLightRow(record: ExportRecord): CellValue[] {
     code(record.al_fqfailadvisercode),
     text(record.al_fqfailparaplannername),
     code(record.al_fqfailparaplannercode),
-    text(record.al_advicequalitygrade),
-    text(record.al_aqfailadvisername),
-    code(record.al_aqfailadvisercode),
-    text(record.al_aqfailparaplannername),
-    code(record.al_aqfailparaplannercode),
+    advice,
+    text(aq(record.al_aqfailadvisername)),
+    code(aq(record.al_aqfailadvisercode)),
+    text(aq(record.al_aqfailparaplannername)),
+    code(aq(record.al_aqfailparaplannercode)),
   ];
+}
+
+/** The one check day a daily file covers, or null when it is quarterly or spans several days. */
+export function dailyFileDay(file: TrailLightFile, range: { from: string; to: string }): string | null {
+  return file === 'daily' && range.from && range.from === range.to ? range.from : null;
+}
+
+/**
+ * True when a daily file reaches the day its batch was generated, or later: cases checked after
+ * the batch was generated that day are not in the batch, so the file may be short.
+ */
+export function dailyFileMayBeShort(
+  file: TrailLightFile,
+  range: { from: string; to: string },
+  generatedOn: string | null,
+): boolean {
+  if (file !== 'daily' || !generatedOn) return false;
+  const generatedDay = ukDayOf(generatedOn);
+  return generatedDay !== null && (!range.to || range.to >= generatedDay);
 }

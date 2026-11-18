@@ -34,11 +34,12 @@ export function downloadValidationReport(
 }
 
 /** Tokenise CSV text into rows of fields, honouring quotes and embedded newlines. */
-function tokenise(text: string): string[][] {
+export function tokenise(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = '';
   let inQuotes = false;
+  let fieldStart = true;
 
   for (let i = 0; i < text.length; i += 1) {
     const ch = text[i];
@@ -55,18 +56,24 @@ function tokenise(text: string): string[][] {
       }
       continue;
     }
-    if (ch === '"') {
+    // RFC 4180: a quote opens a quoted field only as its first character; one inside an
+    // unquoted field (5" Ltd) is literal, or it swallows the rows after. Same rule as the server.
+    if (ch === '"' && fieldStart) {
       inQuotes = true;
+      fieldStart = false;
     } else if (ch === ',') {
       row.push(cell);
       cell = '';
+      fieldStart = true;
     } else if (ch === '\n') {
       row.push(cell);
       rows.push(row);
       row = [];
       cell = '';
+      fieldStart = true;
     } else if (ch !== '\r') {
       cell += ch;
+      fieldStart = false;
     }
   }
   if (cell !== '' || row.length > 0) {
@@ -84,8 +91,15 @@ export function checkExtract(text: string): string | null {
   if (!rows[0].some((header) => header.trim().toLowerCase() === 'taskid')) {
     return 'The file is missing the "TaskID" column. Use the Intelligent Office task extract.';
   }
-  return rows.length === 1 ? 'The file has no case rows to import.' : null;
+  if (rows.length === 1) return 'The file has no case rows to import.';
+  const caseRows = rows.length - 1;
+  return caseRows > MAX_IMPORT_ROWS
+    ? `This file has ${caseRows} rows. Import at most ${MAX_IMPORT_ROWS} at a time, so the import completes rather than timing out part-written.`
+    : null;
 }
+
+/** The server's limit (ImportRules.MaxRows), checked here so a big file is not uploaded first. */
+export const MAX_IMPORT_ROWS = 1000;
 
 /** A CSV's text. Excel's plain "CSV" save is Windows-1252, and read as UTF-8 that garbles names. */
 export function decodeCsv(bytes: ArrayBuffer): string {
@@ -94,4 +108,14 @@ export function decodeCsv(bytes: ArrayBuffer): string {
   } catch {
     return new TextDecoder('windows-1252').decode(bytes);
   }
+}
+
+/**
+ * Why a chosen file could not be read, in words. The workbook reader's own refusals are plain
+ * Errors written for the user; anything else (a file locked by another program, a damaged zip
+ * the browser could not inflate) is the browser's text, which names nothing the user can act on.
+ */
+export function readFailureMessage(error: unknown): string {
+  if (error instanceof Error && error.name === 'Error' && error.message) return error.message;
+  return 'The file could not be read. It may be open in another program, damaged, or not an .xlsx or .csv file. Close it, save a fresh copy and upload that.';
 }

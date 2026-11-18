@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useDeferredValue, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PageIntro } from '../../components/layout/PageIntro';
 import { OutcomeIndicator, TaxOutcomeIndicator } from '../../components/status/OutcomeIndicator';
@@ -112,11 +112,23 @@ export function CaseWorklistPage() {
     [allCases],
   );
 
-  const filtered = useMemo(
-    () => applyFilters(allCases, filters, contactEmails),
-    [allCases, filters, contactEmails],
+  const checks = useMemo(
+    () =>
+      [...new Set(allCases.map((c) => c.preOrPostCheck).filter((p): p is string => Boolean(p)))].sort(),
+    [allCases],
   );
-  const isFiltered = FILTER_KEYS.some((key) => filters[key] !== '');
+
+  // The URL and the inputs move on every keystroke; the list follows a beat behind, so
+  // typing in the search box is never held up by re-filtering and redrawing every row.
+  const appliedFilters = useDeferredValue(filters);
+  const filtered = useMemo(
+    () => applyFilters(allCases, appliedFilters, contactEmails),
+    [allCases, appliedFilters, contactEmails],
+  );
+  const exportRows = useMemo(() => filtered.map(caseExportRow), [filtered]);
+  // From the filters the rows were drawn with, so the file's name and the banners never
+  // describe a list other than the one on screen.
+  const isFiltered = FILTER_KEYS.some((key) => appliedFilters[key] !== '');
 
   function set(key: FilterKey, value: string) {
     const next = new URLSearchParams(params);
@@ -137,7 +149,7 @@ export function CaseWorklistPage() {
               stem={isFiltered ? 'outcome-cases-filtered' : 'outcome-cases'}
               sheetName="Cases"
               headers={CASE_EXPORT_HEADERS}
-              rows={filtered.map(caseExportRow)}
+              rows={exportRows}
               caption={`Exports the ${filtered.length} case${filtered.length === 1 ? '' : 's'} currently listed`}
             />
           ) : null
@@ -246,6 +258,22 @@ export function CaseWorklistPage() {
                 </select>
               </FilterField>
             ) : null}
+            {checks.length > 0 ? (
+              <FilterField label="Pre or post check" htmlFor="worklist-check">
+                <select
+                  id="worklist-check"
+                  value={filters.check}
+                  onChange={(e) => set('check', e.target.value)}
+                >
+                  <option value="">Pre and post</option>
+                  {checks.map((check) => (
+                    <option key={check} value={check}>
+                      {check}
+                    </option>
+                  ))}
+                </select>
+              </FilterField>
+            ) : null}
             <FilterField label="Imported from" htmlFor="worklist-from">
               <input
                 id="worklist-from"
@@ -264,10 +292,10 @@ export function CaseWorklistPage() {
             </FilterField>
           </FilterBar>
 
-          {filters.adviser || filters.checker ? (
+          {appliedFilters.adviser || appliedFilters.checker ? (
             <p className="worklist__scope" role="status">
               Showing cases
-              {filters.adviser ? (
+              {appliedFilters.adviser ? (
                 <>
                   {' '}
                   advised by{' '}
@@ -275,17 +303,17 @@ export function CaseWorklistPage() {
                     {allCases.find(
                       (item) =>
                         (item.adviserEmail ?? '').trim().toLowerCase() ===
-                        filters.adviser.trim().toLowerCase(),
-                    )?.adviser ?? filters.adviser}
+                        appliedFilters.adviser.trim().toLowerCase(),
+                    )?.adviser ?? appliedFilters.adviser}
                   </strong>
                 </>
               ) : null}
-              {filters.adviser && filters.checker ? ' and' : null}
-              {filters.checker ? (
+              {appliedFilters.adviser && appliedFilters.checker ? ' and' : null}
+              {appliedFilters.checker ? (
                 <>
                   {' '}
                   checked by{' '}
-                  <strong>{labelForIdentity(allCases, filters.checker, contactEmails)}</strong>
+                  <strong>{labelForIdentity(allCases, appliedFilters.checker, contactEmails)}</strong>
                 </>
               ) : null}
               .{' '}
@@ -304,10 +332,10 @@ export function CaseWorklistPage() {
             </p>
           ) : null}
 
-          {filters.person ? (
+          {appliedFilters.person ? (
             <p className="worklist__scope" role="status">
               Showing cases involving{' '}
-              <strong>{labelForIdentity(allCases, filters.person, contactEmails)}</strong>.{' '}
+              <strong>{labelForIdentity(allCases, appliedFilters.person, contactEmails)}</strong>.{' '}
               <button
                 type="button"
                 className="worklist__scope-clear"

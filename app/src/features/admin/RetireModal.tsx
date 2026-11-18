@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal } from '../../components/feedback/Modal';
 import { today } from './effectiveDay';
 import type { CommandResult } from '../../services/commands/commandClient';
+import { messageForFailure } from '../../services/errors';
 
 /**
  * Confirms taking a question or a section out of the checklist (AD-122, AD-123).
@@ -58,7 +59,7 @@ export function RetireModal({
       onRetired();
       onClose();
     } else {
-      setError(result.message);
+      setError(messageForFailure(result));
     }
   }
 

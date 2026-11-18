@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import templatesSource from '../../../../plugins/OutcomeTesting.Plugins/NotificationTemplates.cs?raw';
 import { TEMPLATE_CODES, templateHint, unknownTokens } from './notificationTemplates';
 import { ALWAYS_ALLOWED_TOKENS } from './notificationRouting';
-import { can, pageResourceForPath, resolvePermissions } from '../../types/permissions';
+import { can, resolvePermissions } from '../../types/permissions';
 
 /**
  * Mirrors NotificationTemplates in plugins/OutcomeTesting.Plugins, which is authoritative:
@@ -170,10 +170,6 @@ describe('notificationTemplates', () => {
     // Not administrators alone: the letters are the checking team's words to advisers.
     expect(can(resolvePermissions(['AL Portal - Outcome Testing Manager']), 'page.admin.templates', 'Manage')).toBe(true);
     expect(can(resolvePermissions(['AL Portal - Adviser Remediation']), 'page.admin.templates', 'View')).toBe(false);
-  });
-
-  it('is the resource for its path', () => {
-    expect(pageResourceForPath('/admin/templates')).toBe('page.admin.templates');
   });
 
   it('says nothing about a code it does not know, rather than guessing', () => {

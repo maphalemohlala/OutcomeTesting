@@ -4,6 +4,7 @@ import {
   TAX_TEAM_MANAGER,
   adviserUnmatched,
   allocatableDisciplines,
+  checkerEmails,
 } from './allocationScope';
 
 /** Mirrors AllocationScope in the plug-in assembly (AD-218). The command is the authority. */
@@ -33,5 +34,20 @@ describe('adviserUnmatched', () => {
     expect(adviserUnmatched(120910587, 'x')).toBe(false);
     expect(adviserUnmatched(120910591, null)).toBe(false);
     expect(adviserUnmatched(120910584, null)).toBe(false);
+  });
+});
+
+/** al_AssignCase refuses an assignee without the discipline's reviewer web role. */
+describe('checkerEmails', () => {
+  const mappings = [
+    { email: 'Tax.One@x.com ', role: 'AL Portal - Tax Reviewer', active: true },
+    { email: 'aqs@x.com', role: 'al portal - aqs reviewer', active: true },
+    { email: 'gone@x.com', role: 'AL Portal - Tax Reviewer', active: false },
+    { email: 'adviser@x.com', role: 'AL Portal - Adviser Remediation', active: true },
+  ];
+
+  it('holds only active holders of that discipline role, matched as the server does', () => {
+    expect([...checkerEmails(mappings, 'Tax')]).toEqual(['tax.one@x.com']);
+    expect([...checkerEmails(mappings, 'AQS')]).toEqual(['aqs@x.com']);
   });
 });

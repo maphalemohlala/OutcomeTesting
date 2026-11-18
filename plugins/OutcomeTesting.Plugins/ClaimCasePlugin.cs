@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -7,7 +8,8 @@ namespace OutcomeTesting.Plugins
     /// <summary>
     /// Portal self-claim: a checker picks up an unassigned case from the shared queue
     /// (AD-076, extending the AD-040 queue model, BR-003). Registered as a synchronous
-    /// pre-operation step on Create of <c>al_caseassignment</c>.
+    /// pre-operation step on Create of <c>al_caseassignment</c>, and on Update of it filtered
+    /// to <see cref="AllocationColumns"/>, where a direct write is held to the same checks.
     ///
     /// A create rather than a trigger column, for the AD-074 reason: the Portals Web API
     /// supports create, and a separate table carries a separate permission. The permission
@@ -56,8 +58,6 @@ namespace OutcomeTesting.Plugins
 
         private const string ReviewStatusAttr = "al_reviewstatus";
         private const string ChecklistVersionAttr = "al_checklistversionid";
-        private const string EffectiveFromAttr = "al_effectivefrom";
-        private const string EffectiveToAttr = "al_effectiveto";
         private const string SequenceAttr = "al_sequence";
         private const string SubmittedOnAttr = "al_submittedon";
 
@@ -67,6 +67,9 @@ namespace OutcomeTesting.Plugins
         // Shares the AD-072 allocation audit value: a self-claim is an allocation of the
         // case, and the details line records that the checker took it themselves.
         private const int CommandAssignCase = 120910751;
+
+        // The permission al_AssignCase checks.
+        private const string AssignResource = "command.assign";
 
         public ClaimCasePlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(ClaimCasePlugin))
@@ -100,8 +103,38 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            // The app's Dataverse role creates assignments at Global depth, so a row written
+            // straight onto the table is held to what al_AssignCase checks. Only the portal's
+            // claim (and our own SYSTEM code) is trusted to name the contact as it stands.
+            var system = localPluginContext.OrgSvcFactory.CreateOrganizationService(null);
+            var allocator = !WriteProvenance.IsTrusted(system, context);
+
+            // Also registered on Update, filtered to AllocationColumns: moving an existing row to
+            // another person or check is an allocation too.
+            if (string.Equals(context.MessageName, "Update", StringComparison.OrdinalIgnoreCase))
+            {
+                var row = allocator ? AllocationAfterUpdate(system, assignment) : null;
+                if (row != null)
+                {
+                    PermissionHelpers.EnsureAppPermission(system, context, AssignResource, PermissionHelpers.AccessEdit);
+                    EnsureDirectAllocation(system, context, row);
+                }
+
+                return;
+            }
+
+            if (allocator)
+            {
+                PermissionHelpers.EnsureAppPermission(system, context, AssignResource, PermissionHelpers.AccessEdit);
+            }
+
             if (assignment.GetAttributeValue<EntityReference>(AssignedUserAttr) != null)
             {
+                if (allocator)
+                {
+                    EnsureDirectAllocation(system, context, assignment);
+                }
+
                 return;
             }
 
@@ -139,6 +172,13 @@ namespace OutcomeTesting.Plugins
             EnsureQueued(outcomeCase);
 
             var review = ResolveOrCreateReview(service, outcomeCase, assignee);
+            if (allocator)
+            {
+                // After the review, because the discipline is the review's; a refusal rolls
+                // back any review it opened. ResolveOrCreateReview has already held the contact
+                // to the discipline's reviewer role (EnsureDisciplineRole).
+                AllocationScope.EnsureCallerMayAllocate(system, context, CommandHelpers.ReviewTypeOf(review) ?? 0);
+            }
 
             // A case returns to Queued for the BR-004 Tax-then-AQS handoff still carrying
             // the Tax leg's active assignment, so a claim that skipped this would leave two
@@ -276,7 +316,7 @@ namespace OutcomeTesting.Plugins
             {
                 // The narrow race two checkers can hit: both read a queued case, one wins.
                 // The loser is told rather than silently made a co-assignee.
-                if (existing[0].GetAttributeValue<EntityReference>(AssignedContactAttr) != null)
+                if (HeldByAnother(existing[0], assignee))
                 {
                     throw new InvalidPluginExecutionException(
                         CommandHelpers.PreconditionPrefix +
@@ -287,6 +327,16 @@ namespace OutcomeTesting.Plugins
             }
 
             return OpenNextReview(service, outcomeCase, assignee, next);
+        }
+
+        /// <summary>
+        /// True when someone other than the claimant already holds this check. The current
+        /// holder claiming it again is not a race to lose.
+        /// </summary>
+        private static bool HeldByAnother(Entity review, AssignCasePlugin.Assignee assignee)
+        {
+            var holder = review.GetAttributeValue<EntityReference>(AssignedContactAttr);
+            return holder != null && holder.Id != assignee.ContactId;
         }
 
         /// <summary>
@@ -320,7 +370,7 @@ namespace OutcomeTesting.Plugins
                 return OpenNextReview(service, outcomeCase, assignee, NextDiscipline(service, outcomeCase));
             }
 
-            if (existing[0].GetAttributeValue<EntityReference>(AssignedContactAttr) != null)
+            if (HeldByAnother(existing[0], assignee))
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix +
@@ -592,6 +642,119 @@ namespace OutcomeTesting.Plugins
                 [ReviewStatusAttr] = new OptionSetValue(ReviewAssigned),
                 ["ownerid"] = new EntityReference(UserEntity, assignee.UserId),
             });
+        }
+
+        /// <summary>The columns that say who holds which check; the Update step filters on them.</summary>
+        public static readonly string[] AllocationColumns =
+        {
+            AssignedUserAttr, AssignedContactAttr, ReviewLookupAttr, CaseLookup, IsActiveAttr,
+        };
+
+        /// <summary>
+        /// Held to what al_AssignCase checks: a named person, a named unsubmitted check on the
+        /// named case, the caller's scope over its discipline, and the assignee holding that
+        /// discipline's reviewer role.
+        /// </summary>
+        private static void EnsureDirectAllocation(IOrganizationService system, IPluginExecutionContext context, Entity row)
+        {
+            if (row.GetAttributeValue<EntityReference>(AssignedUserAttr) == null)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.ValidationPrefix + "An allocation must name the person it is for.");
+            }
+
+            var reviewRef = row.GetAttributeValue<EntityReference>(ReviewLookupAttr);
+            if (reviewRef == null)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.ValidationPrefix + "An allocation must name the check it is for.");
+            }
+
+            var allocated = system.Retrieve(
+                ReviewEntity, reviewRef.Id, new ColumnSet(ReviewTypeAttr, CaseLookup, SubmittedOnAttr));
+            var namedCase = row.GetAttributeValue<EntityReference>(CaseLookup);
+            var reviewCase = allocated.GetAttributeValue<EntityReference>(CaseLookup);
+            if (namedCase == null || reviewCase == null || reviewCase.Id != namedCase.Id
+                || allocated.GetAttributeValue<DateTime?>(SubmittedOnAttr).HasValue)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + "That check is already submitted, or does not belong to this case.");
+            }
+
+            var reviewType = CommandHelpers.ReviewTypeOf(allocated) ?? 0;
+            AllocationScope.EnsureCallerMayAllocate(system, context, reviewType);
+            AllocationScope.EnsureAssigneeHoldsDiscipline(system, AssigneeOf(system, row), reviewType);
+        }
+
+        /// <summary>
+        /// The allocation an Update leaves behind, or null when it allocates nothing: no column
+        /// of <see cref="AllocationColumns"/> changes, or the only change is a release
+        /// (<c>al_isactive</c> to false), which AssignCase and the claim make on prior rows.
+        /// </summary>
+        public static Entity AllocationAfterUpdate(IOrganizationService system, Entity update)
+        {
+            if (!AllocationColumns.Any(update.Contains))
+            {
+                return null;
+            }
+
+            var stored = system.Retrieve(AssignmentEntity, update.Id, new ColumnSet(AllocationColumns));
+            var row = new Entity(AssignmentEntity, update.Id);
+            var reallocates = false;
+            foreach (var column in AllocationColumns)
+            {
+                var before = stored.Contains(column) ? stored[column] : null;
+                row[column] = update.Contains(column) ? update[column] : before;
+                if (!update.Contains(column) || SameValue(update[column], before))
+                {
+                    continue;
+                }
+
+                reallocates |= column != IsActiveAttr || update.GetAttributeValue<bool>(IsActiveAttr);
+            }
+
+            return reallocates ? row : null;
+        }
+
+        private static bool SameValue(object written, object stored)
+        {
+            var writtenRef = written as EntityReference;
+            var storedRef = stored as EntityReference;
+            if (writtenRef != null || storedRef != null)
+            {
+                return writtenRef != null && storedRef != null && writtenRef.Id == storedRef.Id;
+            }
+
+            return Equals(written ?? false, stored ?? false);
+        }
+
+        /// <summary>
+        /// The person a direct allocation names, resolved from the user's work email as
+        /// al_AssignCase resolves it (enabled, an active contact, able to own a review). A
+        /// contact on the row must be that same person: the role check reads the contact, so
+        /// a mismatched pair would check one person and hand the work to another.
+        /// </summary>
+        private static AssignCasePlugin.Assignee AssigneeOf(IOrganizationService system, Entity assignment)
+        {
+            var user = system.Retrieve(
+                UserEntity, assignment.GetAttributeValue<EntityReference>(AssignedUserAttr).Id,
+                new ColumnSet("internalemailaddress"));
+            var email = user.GetAttributeValue<string>("internalemailaddress");
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + "That user has no work email recorded, so the case cannot be allocated to them.");
+            }
+
+            var assignee = AssignCasePlugin.ResolveAssignee(system, email.Trim());
+            var contactRef = assignment.GetAttributeValue<EntityReference>(AssignedContactAttr);
+            if (contactRef != null && contactRef.Id != assignee.ContactId)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + "The portal contact on this allocation is not the user it names.");
+            }
+
+            return assignee;
         }
     }
 }

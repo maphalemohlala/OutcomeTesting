@@ -711,12 +711,11 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void A_numeric_date_carrying_a_time_is_refused_by_ParseDate_itself()
+        public void A_numeric_date_carrying_a_time_is_read_uk_first_by_ParseDate_itself()
         {
-            // ParseDate is public and feeds every mapped date column, not only the checklist
-            // stamp. If an extract ever wrote "06/08/2026 00:00" into StartDate, the same
-            // month-first misreading would have happened there and gone equally unseen.
-            Assert.Null(ImportRules.ParseDate("06/08/2026 14:49"));
+            // Owner decision 2026-11-17: a UK date-time in a date column imports as its UK date
+            // instead of rejecting the row. Still never month-first: 6 August, not 8 June.
+            Assert.Equal(new DateTime(2026, 8, 6), ImportRules.ParseDate("06/08/2026 14:49"));
         }
 
         [Fact]

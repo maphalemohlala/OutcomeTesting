@@ -1,6 +1,5 @@
 using System;
 using Microsoft.Xrm.Sdk;
-using Microsoft.Xrm.Sdk.Query;
 
 namespace OutcomeTesting.Plugins
 {
@@ -8,8 +7,8 @@ namespace OutcomeTesting.Plugins
     /// Server-side command CreateUser (AD-003, AD-041, AD-044). Registered against the
     /// Custom API <c>al_CreateUser</c>. An Administrator adds a person to the application
     /// user registry, keyed on work email (AD-010). Enforces the caller holds Manage on
-    /// <c>permission.manage</c>, upserts on the work email (idempotent, NFR-REL-01) and
-    /// writes an immutable Audit Event (BR-012, NFR-AUD-01).
+    /// <c>permission.manage</c>, refuses an email already registered, replays a repeated
+    /// idempotency key (NFR-REL-01) and writes an immutable Audit Event (BR-012, NFR-AUD-01).
     ///
     /// The registry is <c>contact</c>; see <see cref="ContactRegistry"/> for why. The
     /// display name is written as firstname/lastname because fullname is calculated.
@@ -66,7 +65,12 @@ namespace OutcomeTesting.Plugins
             // their row active again under a new display name — restoring the role mappings
             // that deactivation withdrew (OD-010), audited only as "Created". Reactivation
             // is its own command, al_SetUserActive, and its own Audit Event.
-            var existing = FindByWorkEmail(userService, workEmail);
+            //
+            // Looked up as SYSTEM, not as the caller: a row the caller cannot see is still the
+            // person, and missing it created a duplicate contact for one email. Nothing is
+            // written to an existing row, so the wider read cannot overwrite anything.
+            var lookup = localPluginContext.OrgSvcFactory.CreateOrganizationService(null);
+            var existing = WebRoleRegistry.FindContactByEmail(lookup, workEmail);
             if (existing != null && !ContactRegistry.IsActive(existing))
             {
                 throw new InvalidPluginExecutionException(
@@ -74,56 +78,35 @@ namespace OutcomeTesting.Plugins
                     "A deactivated account already exists for this work email. Reactivate it instead of registering it again.");
             }
 
-            Guid userId;
+            // An active person is not registered again. This used to rename them to whatever
+            // the form said and audit it as "Created"; a name change is al_UpdateUser's job.
             if (existing != null)
             {
-                // Already registered and active: this is the idempotent re-run. Only the
-                // display name is refreshed — the active state is not this command's to set.
-                userId = existing.Id;
-                var rename = new Entity(ContactRegistry.Entity, userId);
-                ContactRegistry.SetName(rename, fullName);
-                userService.Update(rename);
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix +
+                    "Someone is already registered with this work email. Edit their details instead of adding them again.");
             }
-            else
+
+            // statecode is left alone: a new contact is created active, and setting it
+            // here would make this command a reactivation path, which it must not be.
+            var contact = new Entity(ContactRegistry.Entity)
             {
-                // statecode is left alone: a new contact is created active, and setting it
-                // here would make this command a reactivation path, which it must not be.
-                var contact = new Entity(ContactRegistry.Entity)
-                {
-                    [ContactRegistry.EmailAttr] = workEmail,
-                };
-                ContactRegistry.SetName(contact, fullName);
+                [ContactRegistry.EmailAttr] = workEmail,
+            };
+            ContactRegistry.SetName(contact, fullName);
 
-                // On the create branch only: a person made here has to be able to sign in to
-                // the portal, and Power Pages only writes this for contacts it creates
-                // itself. The idempotent re-run above must not touch it — rotating a stamp
-                // signs the person out everywhere.
-                ContactRegistry.SetSecurityStamp(contact);
+            // A person made here has to be able to sign in to the portal, and Power Pages
+            // only writes this for contacts it creates itself. Never on an existing row:
+            // rotating a stamp signs the person out everywhere.
+            ContactRegistry.SetSecurityStamp(contact);
 
-                userId = userService.Create(contact);
-            }
+            var userId = userService.Create(contact);
 
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandCreateUser, "CreateUser " + workEmail, ContactRegistry.Entity, userId,
                 fullName, workEmail, idempotencyKey, context);
 
             SetResponse(context, userId.ToString("D"), "Created", auditId, false);
-        }
-
-        /// <summary>The registry row for a work email, or null. Read as the caller, so a
-        /// row they cannot see is not silently overwritten on their behalf.</summary>
-        private static Entity FindByWorkEmail(IOrganizationService service, string workEmail)
-        {
-            var query = new QueryExpression(ContactRegistry.Entity)
-            {
-                ColumnSet = new ColumnSet(ContactRegistry.StateCodeAttr),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition(ContactRegistry.EmailAttr, ConditionOperator.Equal, workEmail);
-
-            var found = service.RetrieveMultiple(query).Entities;
-            return found.Count > 0 ? found[0] : null;
         }
 
         private static void SetResponse(IPluginExecutionContext context, string userId, string status, Guid auditId, bool conflict)

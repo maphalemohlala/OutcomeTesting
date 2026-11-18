@@ -25,6 +25,29 @@ export function allocatableDisciplines(roles: readonly string[], product: string
   return out;
 }
 
+/** The web role al_AssignCase requires of whoever takes each discipline's check. */
+export const CHECKER_ROLE: Record<Discipline, string> = {
+  Tax: 'AL Portal - Tax Reviewer',
+  AQS: 'AL Portal - AQS Reviewer',
+};
+
+/**
+ * The lower-cased emails of everyone holding a discipline's checker role, from the active
+ * role assignments. shortcut: the server checks the web role association, which these rows
+ * mirror; a role granted in Power Pages only is missing here until it is adopted.
+ */
+export function checkerEmails(
+  mappings: readonly { email: string; role: string; active: boolean }[],
+  discipline: Discipline,
+): Set<string> {
+  const wanted = normalise(CHECKER_ROLE[discipline]);
+  return new Set(
+    mappings
+      .filter((row) => row.active && normalise(row.role) === wanted)
+      .map((row) => normalise(row.email)),
+  );
+}
+
 /** Awaiting Remediation, Remediation In Progress, Awaiting Sign-off, Awaiting Recheck. */
 const RELEASE_OPEN = new Set([120910587, 120910588, 120910589, 120910590]);
 

@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Al_sectionsService, Al_questionsService, Al_questionversionsService } from '../../generated';
+import {
+  Al_auditeventsService,
+  Al_sectionsService,
+  Al_questionsService,
+  Al_questionversionsService,
+} from '../../generated';
 import type { Al_sections } from '../../generated/models/Al_sectionsModel';
 import { Al_sectionsal_ownerrole } from '../../generated/models/Al_sectionsModel';
 import type { Al_questions } from '../../generated/models/Al_questionsModel';
@@ -9,6 +14,11 @@ import { hasEnded } from '../../lib/effectiveWindow';
 import { versionsAsOf } from './questionSchedule';
 import { OWNER_ROLE_LABEL } from '../../lib/ownerRole';
 import { readAll } from '../../services/readAll';
+import { logTechnical } from '../../services/errors';
+import { movesByCode } from './questionHistory';
+
+/** al_auditevent.al_command for MoveQuestion (ChecklistQueries.CommandMoveQuestion on the server). */
+const COMMAND_MOVE_QUESTION = 120910795;
 
 /**
  * The al_section columns AD-123 added. The generated Al_sections model predates them, and
@@ -35,6 +45,10 @@ export interface LibraryQuestion {
   retired: boolean;
   /** A dated change still to come, in words, or null. No edit is offered until it lands. */
   scheduled: string | null;
+  /** A planned retirement, in words, or null. Edit and Retire stay offered. */
+  retires: string | null;
+  /** The code a move gave this question, or null. The server refuses an edit or a retire on it. */
+  movedTo: string | null;
 }
 
 /** Response-type options (value + label) for the question editor, from the generated choice map. */
@@ -92,6 +106,7 @@ function build(
   sections: Al_sections[],
   questions: Al_questions[],
   versions: Al_questionversions[],
+  moves: Map<string, string>,
 ): LibrarySection[] {
   const asOf = new Date();
   const currentVersion = versionsAsOf(versions, asOf);
@@ -101,7 +116,8 @@ function build(
     const sectionId = question._al_sectionid_value;
     const shown = currentVersion.get(question.al_questionid);
     if (!sectionId || !shown) continue;
-    const { version, scheduled } = shown;
+    const { version, scheduled, retires } = shown;
+    const movedTo = moves.get((question.al_questioncode ?? '').toLowerCase()) ?? null;
 
     const row: LibraryQuestion = {
       id: question.al_questionid,
@@ -117,6 +133,9 @@ function build(
       // where an administrator sees what was taken out.
       retired: hasEnded(version.al_effectiveto, asOf),
       scheduled,
+      // A move dates the version out on its day; that end is the move, not a retirement.
+      retires: movedTo ? null : retires,
+      movedTo,
     };
     const list = questionsBySection.get(sectionId) ?? [];
     list.push(row);
@@ -165,8 +184,23 @@ export function useQuestionLibrary(reloadKey = 0): QuestionLibraryState {
       // the whole table. A truncated read here is silent and wrong in both directions: a
       // question shows an older version's wording, or drops out of the library entirely.
       readAll((o) => Al_questionversionsService.getAll(o), { orderBy: ['al_questionversionid asc'] }),
+      // Which questions were moved, from the moves' own audit events. A trail this role cannot
+      // read leaves the rows as they were: the server still refuses an edit or a retire.
+      readAll((o) => Al_auditeventsService.getAll(o), {
+        filter: `al_command eq ${COMMAND_MOVE_QUESTION}`,
+        select: ['al_name'],
+        orderBy: ['al_auditeventid asc'],
+      })
+        .then((events) => {
+          if (!events.success) throw events.error;
+          return movesByCode(events.data);
+        })
+        .catch((error: unknown) => {
+          logTechnical('question library moves', error);
+          return new Map<string, string>();
+        }),
     ])
-      .then(([sections, questions, versions]) => {
+      .then(([sections, questions, versions, moves]) => {
         if (cancelled) return;
         if (!sections.success || !questions.success || !versions.success) {
           setState({
@@ -177,7 +211,7 @@ export function useQuestionLibrary(reloadKey = 0): QuestionLibraryState {
         }
         setState({
           status: 'ready',
-          sections: build(sections.data, questions.data, versions.data),
+          sections: build(sections.data, questions.data, versions.data, moves),
         });
       })
       .catch(() => {

@@ -71,6 +71,14 @@
       "isoptional": true
     },
     {
+      "uniquename": "FqAdministratorId",
+      "name": "FqAdministratorId",
+      "displayname": "FQ administrator at fault",
+      "description": "Id of the administrator contact who carries the File Quality fail (requirements log row 10). Never exported; once set the paraplanner is no longer derived for the File Quality fail. Empty clears it.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
       "uniquename": "IdempotencyKey",
       "name": "IdempotencyKey",
       "displayname": "Idempotency key",

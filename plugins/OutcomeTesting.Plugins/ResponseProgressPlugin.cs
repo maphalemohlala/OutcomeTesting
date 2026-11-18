@@ -74,7 +74,7 @@ namespace OutcomeTesting.Plugins
             var review = service.Retrieve(
                 ReviewEntity,
                 reviewRef.Id,
-                new ColumnSet("al_reviewstatus", "al_startedon", "al_outcomecaseid"));
+                new ColumnSet("al_reviewstatus", "al_startedon"));
 
             var status = review.GetAttributeValue<OptionSetValue>("al_reviewstatus");
             if (status == null || status.Value != ResponseRules.StatusAssigned)

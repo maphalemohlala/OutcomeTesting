@@ -11,19 +11,13 @@
  * CascadeType.Restrict on al_listoption_al_outcomecase_producttype, which holds against any
  * caller by any route. This only reads the refusal back in words.
  */
-
-/** Everything in the error, whatever shape it arrived in, as one searchable string. */
-function textOf(error: unknown): string {
-  if (error === null || error === undefined) return '';
-  if (typeof error === 'string') return error;
-  if (error instanceof Error) return `${error.name} ${error.message}`;
-  try {
-    return JSON.stringify(error) ?? '';
-  } catch {
-    // A circular or otherwise unserialisable error still has a message worth reading.
-    return String((error as { message?: unknown }).message ?? '');
-  }
-}
+import {
+  UNREACHABLE,
+  browserOnline,
+  isUnreachable,
+  serverReason,
+  textOf,
+} from '../../services/commands/failures';
 
 /**
  * The Restrict cascade, refused.
@@ -40,18 +34,6 @@ function isInUse(text: string): boolean {
   );
 }
 
-/** The request never reached Dataverse. */
-function isUnreachable(text: string, online: boolean): boolean {
-  if (!online) return true;
-  return (
-    /Failed to fetch/i.test(text) ||
-    /NetworkError/i.test(text) ||
-    /Load failed/i.test(text) ||
-    /net::ERR/i.test(text) ||
-    /ERR_INTERNET_DISCONNECTED/i.test(text)
-  );
-}
-
 export const SAVE_FALLBACK = 'That option could not be saved.';
 export const DELETE_FALLBACK = 'That option could not be deleted.';
 
@@ -60,19 +42,9 @@ export const OPTION_IN_USE =
   'stops being offered on new cases, and the cases that already have it keep reading ' +
   'correctly.';
 
-export const UNREACHABLE =
-  'The connection to Dataverse could not be reached, so nothing was changed. Check your ' +
-  'network and try again.';
-
-/** Whether the browser believes it is online, tolerating an environment without navigator. */
-function browserOnline(): boolean {
-  return typeof navigator === 'undefined' || navigator.onLine !== false;
-}
-
 export function describeSaveFailure(error: unknown, online = browserOnline()): string {
-  const text = textOf(error);
-  if (isUnreachable(text, online)) return UNREACHABLE;
-  return SAVE_FALLBACK;
+  // The server's reason before the connection: a reason proves the request arrived.
+  return serverReason(error) ?? (isUnreachable(textOf(error), online) ? UNREACHABLE : SAVE_FALLBACK);
 }
 
 export function describeDeleteFailure(error: unknown, online = browserOnline()): string {
@@ -80,6 +52,5 @@ export function describeDeleteFailure(error: unknown, online = browserOnline()):
   // In use before unreachable: a Restrict refusal is a real answer from Dataverse, and
   // reporting it as a network problem would send the administrator to check their wifi.
   if (isInUse(text)) return OPTION_IN_USE;
-  if (isUnreachable(text, online)) return UNREACHABLE;
-  return DELETE_FALLBACK;
+  return serverReason(error) ?? (isUnreachable(text, online) ? UNREACHABLE : DELETE_FALLBACK);
 }

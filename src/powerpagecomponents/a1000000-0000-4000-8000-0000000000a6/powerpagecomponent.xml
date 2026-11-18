@@ -1,7 +1,7 @@
 <powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a6">
   <content>{
-  "description": "Allowlist of columns the browser may write on al_remediationaction. The adviser's own words, the Intelligent Office reference (PP-14), the completion trigger, and the three remediation-form answers (AD-095): client contact required, recheck required, changes the advice. Status and completed-on stay off the list so the plug-in remains the sole authority over the transition.",
-  "value": "al_adviserresponse,al_evidencereference,al_completerequested,al_clientcontactrequired",
+  "description": "Allowlist of columns the browser may write on al_remediationaction: the adviser's own words (al_adviserresponse), the Intelligent Office reference (al_evidencereference), the completion trigger (al_completerequested) and al_actionperformed, the adviser's Yes/No on a row carrying the checker's remedial action. Status and completed-on stay off the list so CompleteRequestPlugin remains the sole authority over the transition. Removed 2026-11-16: al_recheckrequired and al_changesadvice, the T and C Manager's answers, which travel on the sign-off request and which RemediationResponseGuardPlugin refuses by any other route; and al_clientcontactrequired, the AQS checker's answer since 2026-11-06, written server-side when the action is raised from the review's pending remedial actions. No portal script sends any of the three to this table, and Check-PortalSecurity.ps1 fails if one returns.",
+  "value": "al_adviserresponse,al_evidencereference,al_completerequested,al_actionperformed",
   "source": 0
 }</content>
   <iscustomizable>1</iscustomizable>

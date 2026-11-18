@@ -10,14 +10,7 @@ import {
   type Al_outcomecases,
 } from '../../generated/models/Al_outcomecasesModel';
 import { ADVICE_DATE_LABEL } from '../cases/caseHeaderDates';
-import { MIGRATED_LISTS, lookupLabelOn } from '../admin/listOptions';
-
-/** MIGRATED_LISTS is the single place that says which lists have a lookup on the case. */
-function managedList(key: string) {
-  const found = MIGRATED_LISTS.find((list) => list.key === key);
-  if (!found) throw new Error(`No migrated list '${key}'`);
-  return found;
-}
+import { lookupLabelOn, managedList } from '../admin/listOptions';
 import { choiceLabel } from '../../lib/choiceLabel';
 import { date, text } from '../../lib/format';
 import { withoutUnaskedRootCause } from './gradingRules';
@@ -220,15 +213,6 @@ export function inlineOptionsFor(
 }
 
 /**
- * The number of columns the document lays an inline option list out in, or null for a
- * single row. Primary root cause is the one list it grids: nine causes in three rows of
- * three, read left to right.
- */
-export function optionGridColumns(responseTypeValue: number | null): number | null {
-  return responseTypeValue === 120910003 || responseTypeValue === 120910013 ? 3 : null;
-}
-
-/**
  * How a section lays out on the form. A section whose rows all share one tick scale is a
  * grid - one column per option, as E1 to E5, AML and CRA, CRP and Consumer Duty are on
  * the document. Anything else (Tax check, File Quality outcome, grading) is a row per
@@ -261,11 +245,6 @@ export function isTicked(row: FormRow<TickedAnswer>, option: ChoiceOption): bool
   return response.answerChoice === option.value || response.answerChoices.includes(option.value);
 }
 
-/** Whether the section's help text is the document's "Outcome lens" footer line (E1 to E5). */
-export function isOutcomeLens(section: ReviewSection): boolean {
-  return /^S-E\d/.test(section.code ?? '');
-}
-
 /**
  * Whether the row is a section's outcome-lens tick rather than a test point of its own.
  *
@@ -274,7 +253,7 @@ export function isOutcomeLens(section: ReviewSection): boolean {
  * and recognised by the -LENS code suffix rather than by the section, so a second one could
  * be added to the seed without touching either page.
  */
-export function isLensTick(row: FormRow<SectionedAnswer>): boolean {
+function isLensTick(row: FormRow<SectionedAnswer>): boolean {
   return /-LENS$/.test(row.code ?? '');
 }
 
@@ -477,19 +456,6 @@ export function failPoints(
       label: reason.name,
       ticked: ticked.has(reason.id),
     }));
-}
-
-// ---------------------------------------------------------------------------------------
-// Remediation and escalation
-// ---------------------------------------------------------------------------------------
-
-export interface RemediationLine {
-  id: string;
-  issue: string;
-  remedialAction: string | null;
-  owner: string | null;
-  targetDate: string | null;
-  signOff: string | null;
 }
 
 // ---------------------------------------------------------------------------------------

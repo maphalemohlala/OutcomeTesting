@@ -7,6 +7,8 @@ import {
   fileContentsSummary,
   belongsInDailyFile,
   withinCheckDates,
+  quarterOf,
+  recentQuarters,
   type ExportRecord,
 } from './trailLight';
 
@@ -48,6 +50,7 @@ describe('Trail Light contract (AD-039)', () => {
   it('writes the two codes into columns B and D, numeric ones as numbers', () => {
     const row = trailLightRow(
       record({ al_advisercode: '4471', al_paraplannercode: 'PP-01' }),
+      'quarterly',
     );
 
     expect(row).toHaveLength(19);
@@ -61,6 +64,7 @@ describe('Trail Light contract (AD-039)', () => {
     // a code for is a real outcome here.
     const row = trailLightRow(
       record({ al_advisername: 'Jane Adviser', al_paraplannername: 'Sam Paraplanner' }),
+      'quarterly',
     );
 
     expect(row[1]).toBe('');
@@ -86,6 +90,7 @@ describe('Trail Light contract (AD-039)', () => {
         al_aqfailparaplannername: 'Sam Paraplanner',
         al_aqfailparaplannercode: '5678',
       }),
+      'quarterly',
     );
 
     expect(row).toHaveLength(TRAIL_LIGHT_HEADERS.length);
@@ -101,15 +106,46 @@ describe('Trail Light contract (AD-039)', () => {
     // Only B and D were asked for. These four name a person picked out of a fail rather
     // than the case's own adviser and para-planner, and they stay codes.
     const row = trailLightRow(
-      record({ al_fqfailadvisercode: '42', al_aqfailparaplannercode: 'ADV-01' }),
+      record({ al_fqfailadvisercode: '42', al_aqfailparaplannercode: 'ADV-01', al_advicequalitygrade: 'Potential harm' }),
+      'quarterly',
     );
 
     expect(row[11]).toBe(42);
     expect(row[18]).toBe('ADV-01');
   });
 
+  it('reports the initial grade in the daily file and the final one in the quarterly file', () => {
+    // A Potential harm regraded to Pass: the batch keeps the adviser named (AccountabilityGate).
+    const regraded = record({
+      al_initialadvicequalitygrade: 'Potential harm',
+      al_advicequalitygrade: 'Pass',
+      al_aqfailadvisername: 'Jane Adviser',
+      al_aqfailadvisercode: '4471',
+    });
+
+    const daily = trailLightRow(regraded, 'daily');
+    expect(daily[14]).toBe('Potential harm');
+    expect(daily[15]).toBe('Jane Adviser');
+    expect(daily[16]).toBe(4471);
+
+    // Nobody is named beside a Pass.
+    const quarterly = trailLightRow(regraded, 'quarterly');
+    expect(quarterly[14]).toBe('Pass');
+    expect(quarterly[15]).toBe('');
+    expect(quarterly[16]).toBe('');
+  });
+
+  it('names nobody for a Pass with issues, which is in the daily file but is not a fail', () => {
+    const row = trailLightRow(
+      record({ al_initialadvicequalitygrade: 'Pass with issues', al_aqfailadvisername: 'Jane Adviser' }),
+      'daily',
+    );
+    expect(row[14]).toBe('Pass with issues');
+    expect(row[15]).toBe('');
+  });
+
   it('leaves the accountable pair blank where nobody is accountable', () => {
-    const row = trailLightRow(record());
+    const row = trailLightRow(record(), 'quarterly');
 
     expect(row[11]).toBe('');
     expect(row[12]).toBe('');
@@ -228,6 +264,7 @@ describe('how the range is put into words on a batch page', () => {
 });
 
 describe('the daily file leaving out passes with no fails', () => {
+  // A batch from before 2026-11-16 has no initial grade; these rows read as one (the fallback).
   const row = (advice?: string, file?: string) =>
     ({ al_advicequalitygrade: advice, al_filequalitygrade: file }) as ExportRecord;
 
@@ -235,8 +272,23 @@ describe('the daily file leaving out passes with no fails', () => {
     expect(belongsInDailyFile(row('Pass', 'Pass'))).toBe(false);
   });
 
-  it('leaves out a Pass with issues when the file passed', () => {
-    expect(belongsInDailyFile(row('Pass with issues', 'Pass'))).toBe(false);
+  it('keeps a Pass with issues: issues are a type of failure (client, 2026-11-16)', () => {
+    expect(belongsInDailyFile(row('Pass with issues', 'Pass'))).toBe(true);
+  });
+
+  it('decides on the grade first recorded, not the regraded one', () => {
+    const regraded = (initial: string, final: string) =>
+      ({ al_initialadvicequalitygrade: initial, al_advicequalitygrade: final, al_filequalitygrade: 'Pass' }) as ExportRecord;
+    expect(belongsInDailyFile(regraded('Potential harm', 'Pass'))).toBe(true);
+    expect(belongsInDailyFile(regraded('Pass', 'Insufficient evidence'))).toBe(false);
+  });
+
+  it('keeps a Tax-only check that failed or passed with issues, whatever its file grade', () => {
+    const tax = (outcome: string) =>
+      ({ al_taxoutcome: outcome, al_filequalitygrade: 'Pass' }) as ExportRecord;
+    expect(belongsInDailyFile(tax('Fail'))).toBe(true);
+    expect(belongsInDailyFile(tax('Pass with issues'))).toBe(true);
+    expect(belongsInDailyFile(tax('Pass'))).toBe(false);
   });
 
   it('keeps a File Quality fail whatever the advice grade', () => {
@@ -273,5 +325,23 @@ describe('the daily file leaving out passes with no fails', () => {
     expect(fileContentsSummary(3, 24, '2026-11-02', '', 3)).toBe(
       'No case in this batch checked on or after 2 Nov 2026 belongs in the daily file, so it has nothing to download.',
     );
+  });
+});
+
+describe('choosing a quarter', () => {
+  it('gives the calendar quarter a day falls in, both ends inclusive', () => {
+    expect(quarterOf('2026-11-16')).toEqual({ from: '2026-10-01', to: '2026-12-31', label: 'Q4 2026 (Oct to Dec)' });
+    expect(quarterOf('2024-02-29')).toEqual({ from: '2024-01-01', to: '2024-03-31', label: 'Q1 2024 (Jan to Mar)' });
+    expect(quarterOf('2026-06-30').to).toBe('2026-06-30');
+    expect(quarterOf('2026-09-01').to).toBe('2026-09-30');
+  });
+
+  it('lists the current quarter and the seven before it, across the year boundary', () => {
+    const quarters = recentQuarters('2026-02-10');
+    expect(quarters).toHaveLength(8);
+    expect(quarters.map((q) => q.from)).toEqual([
+      '2026-01-01', '2025-10-01', '2025-07-01', '2025-04-01',
+      '2025-01-01', '2024-10-01', '2024-07-01', '2024-04-01',
+    ]);
   });
 });

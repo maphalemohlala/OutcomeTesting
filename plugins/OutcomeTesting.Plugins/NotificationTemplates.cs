@@ -251,7 +251,16 @@ namespace OutcomeTesting.Plugins
         public static TemplateDefinition Definition(string code)
         {
             TemplateDefinition found;
-            return code != null && Catalogue.TryGetValue(code, out found) ? found : null;
+            return code != null && Catalogue.TryGetValue(NormaliseCode(code), out found) ? found : null;
+        }
+
+        /// <summary>
+        /// A template code as it is stored and compared everywhere: trimmed and upper case, as
+        /// the app saves one. " case-passed" and "CASE-PASSED" are the same letter.
+        /// </summary>
+        public static string NormaliseCode(string code)
+        {
+            return code == null ? null : code.Trim().ToUpperInvariant();
         }
 
         // ---------------------------------------------------------------- rendering
@@ -351,17 +360,18 @@ namespace OutcomeTesting.Plugins
                 // as markup regardless - so a client called "Smith & Co" has to be escaped
                 // here or it lands in markup raw.
                 //
-                // The COMPILED copy keeps its own flag. It is code-authored and known safe,
-                // and the plain-text fallbacks are compared byte for byte in
-                // NotificationBodiesTests; changing them would be changing what the system
-                // sent before anybody edited anything.
+                // The COMPILED plain copy keeps its text as written - "Smith & Co" stays as it
+                // is, compared byte for byte in NotificationBodiesTests - but its values are
+                // not code-authored (a supervisor's sign-off notes, a client's name), and
+                // NotificationFrame sends a plain body as markup. So the two characters that
+                // open and close a tag are neutralised in its values, and nothing else.
                 // Stripped rather than left to Substitute, which only replaces tokens it was
                 // given a value for - and this one never has a value, because it is an
                 // instruction about the letter rather than a thing the letter says.
                 Body = Substitute(
                     Strip(body, TokenCompletedCheck),
                     tokens,
-                    escape: fromTemplate || definition.IsHtml),
+                    fromTemplate || definition.IsHtml ? (Func<string, string>)Html : TagSafe),
                 FromTemplate = fromTemplate,
             };
         }
@@ -504,7 +514,7 @@ namespace OutcomeTesting.Plugins
                 TopCount = 1,
                 Criteria = new FilterExpression(),
             };
-            query.Criteria.AddCondition(CodeAttr, ConditionOperator.Equal, code);
+            query.Criteria.AddCondition(CodeAttr, ConditionOperator.Equal, NormaliseCode(code));
             query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
 
             var found = service.RetrieveMultiple(query).Entities;
@@ -526,15 +536,51 @@ namespace OutcomeTesting.Plugins
         public static string Substitute(
             string template, IDictionary<string, string> tokens, bool escape)
         {
+            return Substitute(template, tokens, escape ? (Func<string, string>)Html : null);
+        }
+
+        /// <summary>A plain value with nothing in it that could open a tag.</summary>
+        private static string TagSafe(string text)
+        {
+            return (text ?? string.Empty).Replace("<", "&lt;").Replace(">", "&gt;");
+        }
+
+        private static string Substitute(
+            string template, IDictionary<string, string> tokens, Func<string, string> encode)
+        {
             if (string.IsNullOrEmpty(template))
             {
                 return string.Empty;
             }
 
-            var result = new StringBuilder(template);
+            // One pass over the template, so a value is never searched for tokens itself - a
+            // client called "Smith {{caseButton}}" prints as typed - and each token is found
+            // however it is spaced, exactly as the guard and Mentions find it.
+            var result = new StringBuilder(template.Length);
+            var at = 0;
 
-            foreach (var name in AllTokenNames)
+            while (true)
             {
+                var open = template.IndexOf("{{", at, StringComparison.Ordinal);
+                var close = open < 0 ? -1 : template.IndexOf("}}", open + 2, StringComparison.Ordinal);
+                if (close < 0)
+                {
+                    result.Append(template, at, template.Length - at);
+                    return result.ToString();
+                }
+
+                var name = template.Substring(open + 2, close - open - 2).Trim();
+                result.Append(template, at, open - at);
+
+                if (Array.IndexOf(AllTokenNames, name) < 0)
+                {
+                    // Not a token this solution knows: left as written, as it always was, and
+                    // read on from just inside it so "{{ {{reference}}" still finds the token.
+                    result.Append("{{");
+                    at = open + 2;
+                    continue;
+                }
+
                 string value = null;
                 if (tokens != null)
                 {
@@ -542,16 +588,9 @@ namespace OutcomeTesting.Plugins
                 }
 
                 value = value ?? string.Empty;
-
-                if (escape && !RawTokens.Contains(name))
-                {
-                    value = Html(value);
-                }
-
-                result.Replace("{{" + name + "}}", value);
+                result.Append(encode != null && !RawTokens.Contains(name) ? encode(value) : value);
+                at = close + 2;
             }
-
-            return result.ToString();
         }
 
         /// <summary>Every token name this solution knows, raw ones included.</summary>

@@ -159,21 +159,6 @@ namespace OutcomeTesting.Plugins
             }
         }
 
-        /// <summary>AD-020 section ownership, keyed by the review's discipline.</summary>
-        public static int OwnerRoleFor(int reviewType)
-        {
-            switch (reviewType)
-            {
-                case ReviewTypeTax:
-                    return OwnerRoleTaxTeam;
-                case ReviewTypeAqs:
-                    return OwnerRoleAqsChecker;
-                default:
-                    throw new ArgumentOutOfRangeException(
-                        nameof(reviewType), reviewType, "Unknown review type.");
-            }
-        }
-
         /// <summary>BR-006: these are the outcomes that require remediation, and so a fail reason.</summary>
         public static bool IsNonPass(int choice)
         {

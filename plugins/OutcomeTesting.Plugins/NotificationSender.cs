@@ -45,7 +45,17 @@ namespace OutcomeTesting.Plugins
         {
             problem = null;
 
-            var address = (EnvironmentVariable.Read(service, AddressVariable) ?? string.Empty).Trim();
+            string configured;
+            if (!EnvironmentVariable.TryRead(service, AddressVariable, out configured))
+            {
+                // Unreadable is not unset: sending from the run-as account would be sending
+                // from the wrong mailbox whenever the address is in fact set.
+                problem = "The sender address (" + AddressVariable + ") could not be read, so nothing "
+                    + "was sent. Check the drain's account can read environment variables, then retry.";
+                return null;
+            }
+
+            var address = (configured ?? string.Empty).Trim();
             if (address.Length == 0)
             {
                 if (runAs == null)

@@ -141,22 +141,22 @@
   adx_name: Webapi/al_response/fields
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a2
   adx_value: al_answertext,al_answerchoice,al_answerchoices,al_answerdate
-- adx_description: "Exposes al_signoff to the portal Web API so a T&C Manager can attest to a completed remediation (PP-12, FR-023, BR-008). Sign-off is a create, which the Web API does support, so this needs no trigger column - and a separate table means create can be bound to the T&C Supervisor role alone."
+- adx_description: "DISABLED 2026-11-16. This exposed al_signoff to the portal Web API for the original sign-off path, a create from the browser (PP-12, FR-023, BR-008). That path no longer exists: the remediation page PATCHes contact.al_signoffrequest and SignoffRequestPlugin writes the al_signoff server-side, after checking the web role and the adviser mapping. No template, web file or app code addresses /_api/al_signoffs, so left enabled this was a reachable endpoint nothing used - the same shape as Webapi/al_response/enabled, disabled 2026-09-20. The table permission stays, because the pages still read sign-offs through Liquid."
   adx_name: Webapi/al_signoff/enabled
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a7
-  adx_value: 'true'
+  adx_value: 'false'
 - adx_description: "Allowlist of columns the browser may write on al_signoff. The decision, the notes and the action it relates to. The name, business code, case and timestamp are stamped by SignoffGuardPlugin, so the browser cannot choose a key or backdate a sign-off."
   adx_name: Webapi/al_signoff/fields
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a8
   adx_value: al_signoffdecision,al_notes,al_remediationactionid
-- adx_description: "Exposes al_remediationaction to the portal Web API so an adviser can record their response and ask for the action to be completed (PP-12, AD-045). Paired with a three-column allowlist; CompleteRequestPlugin does the rest."
+- adx_description: "Exposes al_remediationaction to the portal Web API so an adviser can record their response and ask for the action to be completed (PP-12, AD-045). Paired with the allowlist of adviser columns (Webapi/al_remediationaction/fields); CompleteRequestPlugin does the rest."
   adx_name: Webapi/al_remediationaction/enabled
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a5
   adx_value: 'true'
-- adx_description: "Allowlist of columns the browser may write on al_remediationaction. The adviser's own words, the Intelligent Office reference (PP-14), the completion trigger, the three remediation-form answers (AD-095): client contact required, recheck required, changes the advice; and al_actionperformed, the adviser's Yes/No on a row carrying the checker's remedial action (2026-09-29) - on those rows al_adviserresponse is now the adviser's optional note rather than the whole of their answer. Status and completed-on stay off the list so the plug-in remains the sole authority over the transition."
+- adx_description: "Allowlist of columns the browser may write on al_remediationaction: the adviser's own words (al_adviserresponse), the Intelligent Office reference (al_evidencereference), the completion trigger (al_completerequested) and al_actionperformed, the adviser's Yes/No on a row carrying the checker's remedial action. Status and completed-on stay off the list so CompleteRequestPlugin remains the sole authority over the transition. Removed 2026-11-16: al_recheckrequired and al_changesadvice, the T and C Manager's answers, which travel on the sign-off request and which RemediationResponseGuardPlugin refuses by any other route; and al_clientcontactrequired, the AQS checker's answer since 2026-11-06, written server-side when the action is raised from the review's pending remedial actions. No portal script sends any of the three to this table, and Check-PortalSecurity.ps1 fails if one returns."
   adx_name: Webapi/al_remediationaction/fields
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000a6
-  adx_value: al_adviserresponse,al_evidencereference,al_completerequested,al_clientcontactrequired,al_recheckrequired,al_changesadvice,al_actionperformed
+  adx_value: al_adviserresponse,al_evidencereference,al_completerequested,al_actionperformed
 - adx_description: "Exposes al_questionversion to the portal Web API so an unsubmitted review page can re-read its own checklist live (2026-09-21). Power Pages renders from a server-side cache that learns about a Dataverse write through polled change tracking, so a question retyped in the Code App could leave the form drawing the previous scale for up to fifteen minutes (AD-094, AD-117); the Web API is not that cache. READ ONLY in effect: the 'Question Version - read' table permission grants read alone, and the Web API cannot exceed a table permission, so enabling this adds no way to alter the checklist from a browser."
   adx_name: Webapi/al_questionversion/enabled
   adx_sitesettingid: e00c019c-c9b5-f111-aaac-e4fade069307
@@ -181,7 +181,7 @@
   adx_name: Webapi/contact/fields
   adx_sitesettingid: a1000000-0000-4000-8000-0000000000ad
   adx_value: al_claimrequest,al_signoffrequest,al_regraderequest,al_caseheaderrequest,al_accountabilityrequest,al_remedialactionsrequest
-- adx_description: "Returns the plug-in's own refusal to the browser instead of the platform's generic \"Common Data Service error occurred.\" Without it every refusal on this site reaches the page as that one sentence and a 400, whatever it was: the review submit's list of unanswered required questions, the edit-conflict prompt, the sign-off and regrade preconditions. Every friendlyError on the site reads error.innererror.message and was written for this setting, which had never been created - reported 2026-09-13, against a submit that named the one question left unanswered in the plug-in trace and told the checker nothing. Documented default is False. Safe here because these messages are written to be read by the person who hit them: they carry a VALIDATION, PRECONDITION, CONFLICT or UNAUTHORIZED prefix, say what to do next, and never expose a table name, query, id or stack trace (PP-16). The pages cap anything else at 300 characters."
+- adx_description: "Carries the server plug-in's own sentence to the page with a refusal, instead of the platform's generic \"Common Data Service error occurred.\" It is what lets every error on this site say exactly what failed and why (project owner, 2026-11-17). Documented default is False. The page never shows the raw text: one reader in OT Layout (window.otApi) takes only a sentence carrying a refusal prefix (VALIDATION, PRECONDITION, UNAUTHORIZED, CONFLICT, NOTFOUND, UNEXPECTED), strips the prefix, and refuses anything that looks like JSON, an id, a .NET type or a class name; everything else - the inner error's platform text and stack included - goes to the browser console for support, and the reader is told what the HTTP outcome means instead. Check-PortalTemplates.ps1 rule F fails any template that reads the error body itself."
   adx_name: Webapi/error/innererror
   adx_sitesettingid: 8dea7fe4-27b0-f111-aaac-e4fade069307
   adx_value: 'true'

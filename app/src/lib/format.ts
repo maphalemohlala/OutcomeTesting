@@ -21,7 +21,7 @@ const UK_DAY = new Intl.DateTimeFormat('en-CA', {
 });
 
 // Spelled out because en-GB writes "Sept" in current browsers, and the portal writes "Sep".
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** A trimmed string, or null when there is nothing left after trimming. */
 export function text(value: string | null | undefined): string | null {
@@ -39,4 +39,29 @@ export function date(value: string | null | undefined): string | null {
   if (Number.isNaN(time)) return null;
   const [year, month, day] = UK_DAY.format(time).split('-');
   return `${day} ${MONTHS[Number(month) - 1]} ${year}`;
+}
+/** The UK clock time, 24-hour. Built once for the same reason as UK_DAY. */
+const UK_CLOCK = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Europe/London',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/**
+ * A timestamp as the app writes it ("16 Nov 2026, 22:30"), on the UK clock, or an em dash
+ * when the value is absent or is not a date. UK time rather than the browser's, so a time
+ * lands on the same day the UK-day filters put it on wherever the reader is.
+ */
+export function dateTime(iso: string | null | undefined): string {
+  const day = date(iso);
+  return day && iso ? `${day}, ${UK_CLOCK.format(new Date(iso))}` : '—';
+}
+
+/**
+ * The calendar day of an ISO value (`YYYY-MM-DD`), read from the digits so no time zone can
+ * move it. `empty` is what an absent value reads as: blank in an export, a dash on a screen.
+ */
+export function isoDay(value: string | null | undefined, empty = ''): string {
+  return value ? value.slice(0, 10) : empty;
 }

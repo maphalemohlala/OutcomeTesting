@@ -21,18 +21,14 @@ import {
 } from '../cases/caseWorklistMapping';
 import { remediationTotals } from './remediationTotals';
 import { readAll } from '../../services/readAll';
+import type { AgeingBucket } from '../reports/reportAggregate';
 
-export interface StatusCount {
+interface StatusCount {
   status: CaseStatus;
   count: number;
 }
 
-export interface AgeingBucket {
-  label: string;
-  count: number;
-}
-
-export interface OutcomeCount {
+interface OutcomeCount {
   outcome: Outcome;
   count: number;
 }

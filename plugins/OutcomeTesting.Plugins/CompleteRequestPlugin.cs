@@ -58,6 +58,10 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            // Only the site's own write is a request: the app's Dataverse role can write this
+            // row too, and the request is trusted as the signed-in person's.
+            WriteProvenance.EnsurePortalCaller(localPluginContext.OrgSvcFactory.CreateOrganizationService(null), context);
+
             var actionId = entity.Id;
 
             var action = service.Retrieve(ActionEntity, actionId, new ColumnSet(AssignedContactAttr, ClockStartedOnAttr));
@@ -78,7 +82,10 @@ namespace OutcomeTesting.Plugins
                 actorId: contact == null ? context.InitiatingUserId : contact.Id,
                 correlationId: context.CorrelationId,
                 requireCallerOwnsAction: false,
-                details: details);
+                details: details,
+                // As the command path does: an unmapped adviser's completion emails no manager
+                // by design, and the trace is the only place that says why.
+                trace: message => localPluginContext.Trace(message));
         }
 
         private const string ClockStartedOnAttr = "al_clockstartedon";

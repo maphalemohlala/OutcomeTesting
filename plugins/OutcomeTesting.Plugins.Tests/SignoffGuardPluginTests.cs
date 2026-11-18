@@ -118,7 +118,17 @@ namespace OutcomeTesting.Plugins.Tests
         [Fact]
         public void An_approval_with_a_final_grade_and_notes_is_accepted()
         {
-            Assert.Null(SignoffGuardPlugin.DecisionRefusal(Approved, OutcomeRules.FinalOutcomePassWithIssues, "Rework accepted."));
+            Assert.Null(SignoffGuardPlugin.DecisionRefusal(Approved, OutcomeRules.FinalOutcomePass, "Rework accepted."));
+            Assert.Null(SignoffGuardPlugin.DecisionRefusal(Approved, OutcomeRules.FinalOutcomePotentialHarm, "Harm confirmed."));
+        }
+
+        [Theory]
+        [InlineData(OutcomeRules.FinalOutcomePassWithIssues)]
+        [InlineData(OutcomeRules.FinalOutcomeInsufficient)]
+        public void An_approval_cannot_close_on_an_unclear_grade(int finalOutcome)
+        {
+            Assert.Contains("must be Pass or Potential harm",
+                SignoffGuardPlugin.DecisionRefusal(Approved, finalOutcome, "Notes."));
         }
 
         [Fact]
@@ -142,7 +152,7 @@ namespace OutcomeTesting.Plugins.Tests
         public void A_final_outcome_must_be_on_the_final_scale_and_must_be_explained()
         {
             Assert.Contains("must be Pass", SignoffGuardPlugin.DecisionRefusal(Approved, 1, "Why."));
-            Assert.Contains("must say why the grade was set", SignoffGuardPlugin.DecisionRefusal(Approved, OutcomeRules.FinalOutcomePassWithIssues, null));
+            Assert.Contains("must say why the grade was set", SignoffGuardPlugin.DecisionRefusal(Approved, OutcomeRules.FinalOutcomePass, null));
         }
 
         [Fact]

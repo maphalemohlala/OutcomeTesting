@@ -66,9 +66,9 @@
       "uniquename": "Reason",
       "name": "Reason",
       "displayname": "Reason",
-      "description": "Mandatory reason for the change, recorded on the Audit Event (BR-012, NFR-AUD-01).",
+      "description": "Optional reason for the change, recorded on the Audit Event (BR-012, NFR-AUD-01). When omitted the Audit Event records that no reason was given; removing a case (No Check Required) still requires one.",
       "type": 10,
-      "isoptional": false
+      "isoptional": true
     },
     {
       "uniquename": "ExpectedRowVersion",

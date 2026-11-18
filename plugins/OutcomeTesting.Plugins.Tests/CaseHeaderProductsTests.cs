@@ -74,6 +74,8 @@ namespace OutcomeTesting.Plugins.Tests
         private static void Save(FakeOrganizationService service, string fieldsJson)
         {
             var provider = new FakeServiceProvider(service);
+            // The portal writes request columns as its application user.
+            service.Seed("systemuser", provider.Context.InitiatingUserId, "applicationid", Guid.NewGuid());
             provider.Context.MessageName = "Update";
             provider.Context.PrimaryEntityName = "contact";
             provider.Context.PrimaryEntityId = Checker;

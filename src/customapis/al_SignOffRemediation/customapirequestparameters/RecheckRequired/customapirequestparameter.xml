@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="RecheckRequired">
+  <description default="Optional. The supervisor's 'Recheck required?' answer, written to every action of this check before the sign-off is recorded: 120910796 Yes, 120910797 No. No lets the approval close the case. Omit or 0 to leave the stored answer.">
+    <label description="Optional. The supervisor's 'Recheck required?' answer, written to every action of this check before the sign-off is recorded: 120910796 Yes, 120910797 No. No lets the approval close the case. Omit or 0 to leave the stored answer." languagecode="1033" />
+  </description>
+  <displayname default="Recheck required">
+    <label description="Recheck required" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>RecheckRequired</name>
+  <type>7</type>
+</customapirequestparameter>

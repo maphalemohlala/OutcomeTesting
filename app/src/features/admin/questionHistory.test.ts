@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  movesByCode,
   questionHistory,
   type HistoryAuditSource,
   type HistoryVersionSource,
@@ -212,5 +213,25 @@ describe('questionHistory', () => {
     };
 
     expect(questionHistory('q-1', [seeded], [])[0].who).toBe('svc automate aq');
+  });
+});
+
+describe('movesByCode', () => {
+  it('maps each code a move left, folded to lower case, to the code it became', () => {
+    const moves = movesByCode([
+      { al_name: 'MoveQuestion Q-E1-01 -> Q-B-01' },
+      { al_name: 'MoveQuestion Q-B-01 -> Q-C-01' },
+      { al_name: 'RetireQuestion Q-E1-02' },
+      { al_name: undefined },
+    ]);
+
+    expect([...moves]).toEqual([
+      ['q-e1-01', 'Q-B-01'],
+      ['q-b-01', 'Q-C-01'],
+    ]);
+  });
+
+  it('reads nothing from no events, so the rows keep their buttons', () => {
+    expect(movesByCode([]).size).toBe(0);
   });
 });

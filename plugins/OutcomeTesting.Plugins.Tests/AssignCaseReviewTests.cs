@@ -119,6 +119,20 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void Follows_the_route_past_an_open_check_it_no_longer_owes_first()
+        {
+            // A Tax check left open by a route change to AQS only must not take the AQS
+            // allocation; the route owes AQS, so the AQS check is opened instead.
+            var svc = Environment(tax: false, aqs: true);
+            var staleTax = SeedReview(svc, ResponseRules.ReviewTypeTax, 1, null);
+
+            var review = AssignCasePlugin.ResolveReviewInstance(svc, svc, Case(), null, Ada);
+
+            Assert.NotEqual(staleTax.Id, review.Id);
+            Assert.Equal(ResponseRules.ReviewTypeAqs, review.GetAttributeValue<OptionSetValue>("al_reviewtype").Value);
+        }
+
+        [Fact]
         public void An_explicit_check_wins()
         {
             var svc = Environment(tax: true, aqs: true);

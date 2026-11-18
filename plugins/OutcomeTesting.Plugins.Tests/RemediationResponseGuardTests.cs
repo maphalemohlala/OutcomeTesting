@@ -83,6 +83,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             var action = Action(status);
             action["al_clientcontactrequired"] = new OptionSetValue(120910794);
+            action["al_actionperformed"] = new OptionSetValue(RemedialActions.ActionPerformedYes);
             action["al_recheckrequired"] = new OptionSetValue(120910797);
             action["al_changesadvice"] = new OptionSetValue(120910799);
             return action;
@@ -92,7 +93,7 @@ namespace OutcomeTesting.Plugins.Tests
         public void The_form_answers_are_editable_until_the_action_is_submitted()
         {
             var update = new Entity("al_remediationaction", ActionId);
-            update["al_clientcontactrequired"] = new OptionSetValue(120910795);
+            update["al_actionperformed"] = new OptionSetValue(RemedialActions.ActionPerformedNo);
 
             Assert.Null(RemediationResponseGuardPlugin.Refusal(ActionWithAnswers(Remediation.StatusInProgress), update));
         }
@@ -104,13 +105,12 @@ namespace OutcomeTesting.Plugins.Tests
             // otherwise the T&C Manager attests to a form the adviser can still rewrite
             // underneath.
             //
-            // Asserted on al_clientcontactrequired, which is the only form answer still the
-            // adviser's. It used to be asserted on al_recheckrequired, and that column is now
-            // refused OUTRIGHT rather than frozen at completion (project owner, 2026-09-21) -
-            // see TcOnlyRemediationAnswersTests. Freezing a column nobody may write would be
-            // testing the weaker of two rules.
+            // Asserted on al_actionperformed, the adviser's Yes / No. Client contact required?
+            // became the checker's answer on 2026-11-06 and al_recheckrequired the T&C
+            // Manager's on 2026-09-21; both are refused outright rather than frozen at
+            // completion, so freezing them would be testing the weaker of two rules.
             var update = new Entity("al_remediationaction", ActionId);
-            update["al_clientcontactrequired"] = new OptionSetValue(120910793);
+            update["al_actionperformed"] = new OptionSetValue(RemedialActions.ActionPerformedNo);
 
             var refusal = RemediationResponseGuardPlugin.Refusal(ActionWithAnswers(Remediation.StatusCompleted), update);
 
@@ -122,7 +122,7 @@ namespace OutcomeTesting.Plugins.Tests
         public void Re_sending_the_same_answer_after_submission_is_not_a_change()
         {
             var update = new Entity("al_remediationaction", ActionId);
-            update["al_clientcontactrequired"] = new OptionSetValue(120910794);
+            update["al_actionperformed"] = new OptionSetValue(RemedialActions.ActionPerformedYes);
 
             Assert.Null(RemediationResponseGuardPlugin.Refusal(ActionWithAnswers(Remediation.StatusCompleted), update));
         }
@@ -144,7 +144,7 @@ namespace OutcomeTesting.Plugins.Tests
         public void Clearing_a_submitted_answer_is_a_change()
         {
             var update = new Entity("al_remediationaction", ActionId);
-            update["al_clientcontactrequired"] = null;
+            update["al_actionperformed"] = null;
 
             Assert.NotNull(RemediationResponseGuardPlugin.Refusal(ActionWithAnswers(Remediation.StatusCompleted), update));
         }

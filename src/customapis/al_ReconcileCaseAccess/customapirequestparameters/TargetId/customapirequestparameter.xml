@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="TargetId">
+  <description default="Id of the al_outcomecase to reconcile.">
+    <label description="Id of the al_outcomecase to reconcile." languagecode="1033" />
+  </description>
+  <displayname default="Case id">
+    <label description="Case id" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>0</isoptional>
+  <name>TargetId</name>
+  <type>10</type>
+</customapirequestparameter>

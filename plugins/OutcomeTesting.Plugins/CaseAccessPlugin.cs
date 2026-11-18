@@ -40,7 +40,41 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            if (IsLaterRemediationAction(localPluginContext.PluginExecutionContext, system, caseId.Value))
+            {
+                return;
+            }
+
             CaseAccessReconciler.Reconcile(system, caseId.Value, DateTime.UtcNow);
+        }
+
+        /// <summary>
+        /// True for the create of a remediation action on a case that already holds another.
+        /// An action changes access only by existing (CaseAccess.IsReleased asks whether the
+        /// case has any), so the first one on a case is the only one that can change the
+        /// answer, and a submit raising one action per marked-down item reconciles once
+        /// rather than once per item. Post-operation, so the row just created is counted.
+        ///
+        /// The cost: a later action's create no longer re-runs the reconcile, so it no longer
+        /// repairs access that has drifted on a case which already has actions. The status
+        /// hop and the review, contact and mapping triggers still do.
+        /// </summary>
+        public static bool IsLaterRemediationAction(IPluginExecutionContext context, IOrganizationService service, Guid caseId)
+        {
+            if (!string.Equals(context.MessageName, "Create", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(context.PrimaryEntityName, "al_remediationaction", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var query = new QueryExpression("al_remediationaction")
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 2,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+            return service.RetrieveMultiple(query).Entities.Count > 1;
         }
 
         /// <summary>The case a write belongs to, or null where it belongs to none.</summary>

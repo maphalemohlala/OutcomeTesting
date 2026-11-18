@@ -77,6 +77,14 @@ namespace OutcomeTesting.Plugins
 
             var code = Merged(service, row, NotificationTemplates.CodeAttr);
 
+            // Stored the way every reader compares it, so a code typed through the Web API in
+            // another case or with a stray space is still the letter it names.
+            var sentCode = row.GetAttributeValue<string>(NotificationTemplates.CodeAttr);
+            if (sentCode != null && sentCode != NotificationTemplates.NormaliseCode(sentCode))
+            {
+                row[NotificationTemplates.CodeAttr] = NotificationTemplates.NormaliseCode(sentCode);
+            }
+
             // Cleaned BEFORE anything is judged, so the refusals below rule on what will
             // actually be stored rather than on what was sent.
             var emptied = SanitiseBody(row);
@@ -175,6 +183,16 @@ namespace OutcomeTesting.Plugins
             if (recipientProblem != null)
             {
                 return recipientProblem;
+            }
+
+            if (body != null && body.Length > NotificationOutbox.BodyLength)
+            {
+                // The outbox holds a letter of at most this length and never sends one cut
+                // short, so a longer template could be saved but never sent.
+                return "That letter is " + body.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    + " characters long, including its formatting. A letter can be at most "
+                    + NotificationOutbox.BodyLength.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    + " once its details are filled in, so this one could never be sent. Shorten it.";
             }
 
             var definition = NotificationTemplates.Definition(code.Trim());
@@ -304,20 +322,26 @@ namespace OutcomeTesting.Plugins
 
             foreach (var contact in recipients.Contacts)
             {
-                Entity row;
-                try
-                {
-                    row = service.Retrieve("contact", contact.Id, new ColumnSet("fullname", "emailaddress1"));
-                }
-                catch (Exception)
+                var row = NotificationRecipients.Contact(service, contact.Id);
+                if (row == null)
                 {
                     return "One of the chosen contacts no longer exists. Take them off the letter.";
                 }
 
+                var name = row.GetAttributeValue<string>("fullname");
+                var who = string.IsNullOrWhiteSpace(name) ? "One of the chosen contacts" : name.Trim();
+
+                // The app lists an inactive contact as unreachable too; a letter to them is
+                // never sent, so the save that names them is refused here as well.
+                if (!NotificationRecipients.IsActive(row))
+                {
+                    return who + " is no longer an active contact, so this letter could never reach "
+                        + "them. Take them off the letter.";
+                }
+
                 if (string.IsNullOrWhiteSpace(row.GetAttributeValue<string>("emailaddress1")))
                 {
-                    var name = row.GetAttributeValue<string>("fullname");
-                    return (string.IsNullOrWhiteSpace(name) ? "One of the chosen contacts" : name.Trim())
+                    return who
                         + " has no email address, so this letter could never reach them. Add one to "
                         + "their contact record, or take them off the letter.";
                 }

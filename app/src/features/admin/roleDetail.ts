@@ -8,7 +8,7 @@ import {
   type PermissionRule,
   type ResourceKey,
 } from '../../types/permissions';
-import type { PagePermissionRow, RoleMappingRow } from './useSecurityConfig';
+import type { PagePermissionRow } from './useSecurityConfig';
 
 /**
  * Where a role's detail screen lives. The code is the business key assignments and
@@ -20,7 +20,7 @@ export function roleDetailPath(roleCode: string): string {
 }
 
 /** Whether a level came from the code defaults or from a rule an administrator stored. */
-export type GrantSource = 'Default' | 'Set by administrator';
+type GrantSource = 'Default' | 'Set by administrator';
 
 export interface RoleGrant {
   resource: ResourceKey;
@@ -30,13 +30,6 @@ export interface RoleGrant {
   overrideId: string | null;
 }
 
-export interface RoleHolder {
-  id: string;
-  email: string;
-  /** False once the assignment is withdrawn; the row is kept for the audit trail. */
-  active: boolean;
-}
-
 /**
  * Whether two role codes name the same role. Compared loosely because the code is a
  * free-text column (AD-044) written by three different paths — the app, the portal and the
@@ -44,6 +37,15 @@ export interface RoleHolder {
  */
 export function sameRoleCode(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+/**
+ * True when a web role with this code exists and is retired. The server refuses to restore a
+ * rule or an assignment for one, so the page does not offer it. A code no web role carries
+ * (a legacy picklist label) is not retired.
+ */
+export function isRetiredRole(roleCode: string, roles: readonly { code: string; active: boolean }[]): boolean {
+  return roles.some((role) => !role.active && sameRoleCode(role.code, roleCode));
 }
 
 function isAccessLevel(value: string): value is AccessLevel {
@@ -92,13 +94,9 @@ export function buildRoleGrants(
     }
   }
 
-  // resolvePermissions matches the role name exactly, so the rules are re-keyed to the code
-  // as written. That matters for a role whose web role name differs from a stored rule or
-  // from the default matrix only in casing: it should still show what it will be granted.
-  const rules = rulesInForce(stored)
-    .filter((rule) => sameRoleCode(rule.role, roleCode))
-    .map((rule) => ({ ...rule, role: roleCode }));
-  const set = resolvePermissions([roleCode], rules);
+  // resolvePermissions folds case and spacing itself, so a role whose web role name differs
+  // from a stored rule or the default matrix only in casing still shows what it is granted.
+  const set = resolvePermissions([roleCode], rulesInForce(stored));
 
   return RESOURCE_KEYS.map((resource) => {
     const overrideId = overrideById.get(resource) ?? null;
@@ -111,33 +109,6 @@ export function buildRoleGrants(
   }).filter((grant) => grant.level !== 'None' || grant.overrideId !== null);
 }
 
-/**
- * The people holding a role, active assignments first and withdrawn ones after.
- *
- * Read from the role mappings, as the People page is (AD-041): assigning writes both the
- * mapping and the web role association, so the mapping carries the same facts and is a
- * table the app can already read. An assignment made in Power Pages management writes no
- * mapping row and so does not appear here — the screen says as much rather than implying
- * the list is complete.
- */
-export function buildRoleHolders(
-  roleCode: string,
-  mappings: readonly RoleMappingRow[],
-): RoleHolder[] {
-  return mappings
-    .filter((mapping) => sameRoleCode(mapping.role, roleCode))
-    .map((mapping) => ({
-      id: mapping.id,
-      email: mapping.email.trim(),
-      active: mapping.active,
-    }))
-    .sort(
-      (a, b) =>
-        Number(b.active) - Number(a.active) ||
-        a.email.localeCompare(b.email),
-    );
-}
-
 /** One person's relationship to one role, as al_GetRoleHolders reports it. */
 export interface RoleHolderRecord {
   email: string;
@@ -148,7 +119,7 @@ export interface RoleHolderRecord {
   associated: boolean;
 }
 
-export type HolderState =
+type HolderState =
   | 'consistent'
   | 'portal-only'
   | 'withdrawn-still-granted'

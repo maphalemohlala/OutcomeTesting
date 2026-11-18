@@ -6,10 +6,12 @@ import {
   Al_reviewinstancesService,
   Al_signoffsService,
 } from '../../generated';
-import { Al_auditeventsal_command } from '../../generated/models/Al_auditeventsModel';
+import { Al_auditeventsal_command, type Al_auditevents } from '../../generated/models/Al_auditeventsModel';
 import { logTechnical } from '../../services/errors';
 import { choiceLabel } from '../../lib/choiceLabel';
 import { isRecordId } from '../../services/odata';
+import { readAll } from '../../services/readAll';
+import { dateTime } from '../../lib/format';
 
 export interface HistoryEntry {
   id: string;
@@ -42,10 +44,10 @@ const TARGET_LABELS: Record<string, string> = {
 async function relatedIds(caseId: string): Promise<string[]> {
   const filter = `_al_outcomecaseid_value eq ${caseId}`;
   const [reviews, actions, outcomes, signoffs] = await Promise.all([
-    Al_reviewinstancesService.getAll({ filter, top: 200 }),
-    Al_remediationactionsService.getAll({ filter, top: 200 }),
-    Al_outcomesService.getAll({ filter, top: 200 }),
-    Al_signoffsService.getAll({ filter, top: 200 }),
+    Al_reviewinstancesService.getAll({ filter, top: 200, select: ['al_reviewinstanceid'] }),
+    Al_remediationactionsService.getAll({ filter, top: 200, select: ['al_remediationactionid'] }),
+    Al_outcomesService.getAll({ filter, top: 200, select: ['al_outcomeid'] }),
+    Al_signoffsService.getAll({ filter, top: 200, select: ['al_signoffid'] }),
   ]);
 
   const ids = [caseId];
@@ -57,9 +59,36 @@ async function relatedIds(caseId: string): Promise<string[]> {
 }
 
 function formatDate(iso: string | undefined): string | null {
-  if (!iso) return null;
-  const time = new Date(iso).getTime();
-  return Number.isNaN(time) ? null : new Date(time).toLocaleString('en-GB');
+  const shown = dateTime(iso);
+  return shown === '—' ? null : shown;
+}
+
+/** One audit event as the history panel lists it. */
+export function toHistoryEntry(event: Al_auditevents): HistoryEntry {
+  return {
+    id: event.al_auditeventid,
+    occurredOn: formatDate(event.al_occurredon ?? event.createdon),
+    command:
+      choiceLabel(Al_auditeventsal_command, event.al_command, event.al_commandname) ??
+      'Unknown command',
+    actor: event.al_actorname?.trim() || event.createdbyname?.trim() || null,
+    target: TARGET_LABELS[event.al_targettable ?? ''] ?? event.al_targettable ?? '—',
+    reason: event.al_reason?.trim() || null,
+    details: event.al_details?.trim() || null,
+  };
+}
+
+/**
+ * Every audit event on the case and its related records, newest first. Paged, because a
+ * busy case outgrows one page and a short trail would pass for the whole one.
+ */
+export async function readCaseHistory(caseId: string) {
+  const ids = await relatedIds(caseId);
+  const filter = ids.map((id) => `al_targetid eq '${id}'`).join(' or ');
+  return readAll((o) => Al_auditeventsService.getAll(o), {
+    filter,
+    orderBy: ['al_occurredon desc', 'al_auditeventid asc'],
+  });
 }
 
 /**
@@ -88,15 +117,7 @@ export function useCaseHistory(caseId: string | undefined, reloadKey = 0): CaseH
     if (!isRecordId(caseId)) return;
     let cancelled = false;
 
-    relatedIds(caseId)
-      .then((ids) => {
-        const filter = ids.map((id) => `al_targetid eq '${id}'`).join(' or ');
-        return Al_auditeventsService.getAll({
-          filter,
-          orderBy: ['al_occurredon desc'],
-          top: 500,
-        });
-      })
+    readCaseHistory(caseId)
       .then((result) => {
         if (cancelled) return;
         if (!result.success) {
@@ -110,17 +131,7 @@ export function useCaseHistory(caseId: string | undefined, reloadKey = 0): CaseH
         }
         setState({
           status: 'ready',
-          entries: result.data.map((event) => ({
-            id: event.al_auditeventid,
-            occurredOn: formatDate(event.al_occurredon ?? event.createdon),
-            command:
-              choiceLabel(Al_auditeventsal_command, event.al_command, event.al_commandname) ??
-              'Unknown command',
-            actor: event.al_actorname?.trim() || event.createdbyname?.trim() || null,
-            target: TARGET_LABELS[event.al_targettable ?? ''] ?? event.al_targettable ?? '—',
-            reason: event.al_reason?.trim() || null,
-            details: event.al_details?.trim() || null,
-          })),
+          entries: result.data.map(toHistoryEntry),
         });
       })
       .catch((error) => {

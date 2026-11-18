@@ -23,6 +23,10 @@ interface Props {
    * email, so two people of one name are two options.
    */
   onPick?: (user: DirectoryUser | null) => void;
+  /** When given, only people whose lower-cased work email is in it are offered. */
+  onlyEmails?: ReadonlySet<string>;
+  /** Offer deactivated people too: someone who has left can still carry a past fail. */
+  includeInactive?: boolean;
 }
 
 /**
@@ -50,6 +54,8 @@ export function UserPicker({
   placeholder = 'Search for a person',
   field = 'name',
   onPick,
+  onlyEmails,
+  includeInactive = false,
 }: Props) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
@@ -61,9 +67,15 @@ export function UserPicker({
   // the owner, 2026-10-02) and the email is what tells them apart.
   const withEmail = onPick !== undefined;
 
-  const active = useMemo(
-    () => (directory.status === 'ready' ? directory.users.filter((u) => u.active) : []),
-    [directory],
+  const offered = useMemo(
+    () =>
+      directory.status === 'ready'
+        ? directory.users.filter(
+            (u) =>
+              (includeInactive || u.active) && (!onlyEmails || onlyEmails.has(u.email.trim().toLowerCase())),
+          )
+        : [],
+    [directory, onlyEmails, includeInactive],
   );
 
   const stored = (user: DirectoryUser) =>
@@ -76,9 +88,9 @@ export function UserPicker({
     // the stored value alone cannot say which one was meant. Shown as typed; the email field
     // beside it is what disambiguates.
     if (field === 'name' && onPick) return held;
-    const match = active.find((user) => stored(user) === held);
+    const match = offered.find((user) => stored(user) === held);
     // An id with no match shows empty rather than a raw guid: the person is gone from the
-    // directory, and a guid in a text box reads as corruption.
+    // directory or no longer among those offered, and a guid in a text box reads as corruption.
     return match ? pickerOptionText(match, field, withEmail) : field === 'id' ? '' : held;
   };
 
@@ -92,12 +104,30 @@ export function UserPicker({
     // The re-sync is the effect's whole job, and the updater bails out when the text is unchanged.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setText((current) =>
-      keepsTypedText(active, field, withEmail, current, value) ? current : textFor(value),
+      keepsTypedText(offered, field, withEmail, current, value) ? current : textFor(value),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, active]);
+  }, [value, offered]);
 
   if (directory.status !== 'ready') {
+    // An id, or a choice limited to certain people, cannot be typed: a guessed guid or an
+    // unchecked email is not a person. Shown as waiting or unavailable, never as a raw value.
+    if (field === 'id' || onlyEmails) {
+      return (
+        <input
+          id={inputId}
+          type="text"
+          className="user-picker__fallback"
+          value=""
+          readOnly
+          disabled
+          placeholder={
+            directory.status === 'loading' ? 'Loading people…' : 'The people list could not be loaded'
+          }
+        />
+      );
+    }
+
     return (
       <input
         id={inputId}
@@ -113,7 +143,7 @@ export function UserPicker({
     );
   }
 
-  const unresolved = text.trim() !== '' && resolvePicker(active, field, withEmail, text) === null;
+  const unresolved = text.trim() !== '' && resolvePicker(offered, field, withEmail, text) === null;
 
   return (
     <>
@@ -138,7 +168,7 @@ export function UserPicker({
             return;
           }
 
-          const match = resolvePicker(active, field, withEmail, typed);
+          const match = resolvePicker(offered, field, withEmail, typed);
           if (match) {
             onChange(stored(match));
             onPick?.(match);
@@ -153,7 +183,7 @@ export function UserPicker({
         }}
       />
       <datalist id={listId}>
-        {active.map((user) => (
+        {offered.map((user) => (
           <option key={user.id} value={pickerOptionText(user, field, withEmail)}>
             {field === 'name' ? (withEmail ? '' : user.email) : field === 'email' ? user.name : ''}
           </option>
@@ -161,7 +191,7 @@ export function UserPicker({
       </datalist>
       {unresolved && field === 'id' ? (
         <p id={`${inputId}-note`} className="user-picker__note" role="status">
-          Nobody in the directory matches that, so nobody is recorded. Pick a name from the
+          Nobody on the list matches that, so nobody is recorded. Pick a name from the
           list.
         </p>
       ) : null}

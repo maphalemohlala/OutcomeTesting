@@ -18,6 +18,7 @@ import {
 } from './notificationRouting';
 import { describeRemoveFailure } from './notificationTemplateRemoval';
 import { readAll } from '../../services/readAll';
+import { CONTACT_NAME_COLUMNS, contactName } from '../../lib/contactName';
 
 export interface TemplateRow {
   /** Null for a letter that has no stored row and is running on the built-in wording. */
@@ -80,102 +81,106 @@ export function useNotificationTemplates(reloadKey = 0): TemplatesState {
 
   useEffect(() => {
     let cancelled = false;
-
-    Promise.all([
-      readAll((o) => Al_notificationtemplatesService.getAll(o), { orderBy: ['al_templatecode asc', 'al_notificationtemplateid asc'] }),
-      readAll((o) => ContactsService.getAll(o), { orderBy: ['fullname asc', 'contactid asc'] }),
-    ])
-      .then(([result, contactResult]) => {
-        if (cancelled) return;
-
-        if (!result.success || !result.data) {
-          logTechnical('notification templates load', result.error);
-          setState({
-            status: 'unavailable',
-            reason: 'The email templates could not be loaded right now.',
-          });
-          return;
-        }
-
-        const active = result.data.filter((r) => Number(r.statecode) === 0);
-        const byCode = new Map(active.map((r) => [(r.al_templatecode ?? '').trim(), r]));
-
-        const builtIn: TemplateRow[] = TEMPLATE_CODES.map((code) => {
-          const hint = templateHint(code)!;
-          const row = byCode.get(code);
-          return {
-            id: row?.al_notificationtemplateid ?? null,
-            code,
-            name: hint.name,
-            subject: row?.al_subject ?? '',
-            body: row?.al_body ?? '',
-            tokens: hint.tokens,
-            isHtml: hint.isHtml,
-            stored: row !== undefined,
-            custom: false,
-            eventValue: row?.al_event != null ? Number(row.al_event) : null,
-            recipients: readRecipients(row ?? {}),
-          };
-        });
-
-        const custom: TemplateRow[] = active
-          .filter((r) => !templateHint((r.al_templatecode ?? '').trim()))
-          .map((r) => ({
-            id: r.al_notificationtemplateid,
-            code: (r.al_templatecode ?? '').trim(),
-            name: (r.al_name ?? '').trim(),
-            subject: r.al_subject ?? '',
-            body: r.al_body ?? '',
-            // A letter of your own may use only what a case can always answer, whatever
-            // raised it. The plug-in refuses anything else.
-            tokens: CUSTOM_TOKENS,
-            isHtml: true,
-            stored: true,
-            custom: true,
-            eventValue: r.al_event != null ? Number(r.al_event) : null,
-            recipients: readRecipients(r),
-          }));
-
-        // Contacts are for the "a named contact" recipient. A failure here is not fatal: the
-        // four role recipients still work. `contactsKnown` stops the page reading the empty
-        // list as every chosen contact having no email.
-        const contacts: ContactOption[] =
-          contactResult.success && contactResult.data
-            ? contactResult.data
-                .filter((c) => Number(c.statecode) === 0 && (c.emailaddress1 ?? '').trim() !== '')
-                .map((c) => ({
-                  id: c.contactid.toLowerCase(),
-                  name: (c.fullname ?? '').trim() || (c.emailaddress1 ?? '').trim(),
-                  email: (c.emailaddress1 ?? '').trim(),
-                }))
-            : [];
-
-        if (!contactResult.success) {
-          logTechnical('notification templates contacts load', contactResult.error);
-        }
-
-        setState({
-          status: 'ready',
-          templates: [...builtIn, ...custom],
-          contacts,
-          contactsKnown: contactResult.success,
-        });
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        logTechnical('notification templates load', error);
-        setState({
-          status: 'unavailable',
-          reason: 'The email templates could not be loaded right now.',
-        });
-      });
-
+    void loadNotificationTemplates().then((next) => {
+      if (!cancelled) setState(next);
+    });
     return () => {
       cancelled = true;
     };
   }, [reloadKey]);
 
   return state;
+}
+
+/** The letters and the contacts a letter can name. Never rejects. */
+export function loadNotificationTemplates(): Promise<TemplatesState> {
+  return Promise.all([
+    readAll((o) => Al_notificationtemplatesService.getAll(o), { orderBy: ['al_templatecode asc', 'al_notificationtemplateid asc'] }),
+    readAll((o) => ContactsService.getAll(o), {
+      orderBy: ['fullname asc', 'contactid asc'],
+      // All the contact mapping below reads.
+      select: ['contactid', ...CONTACT_NAME_COLUMNS, 'statecode'],
+    }).catch((error: unknown) => ({ success: false as const, data: undefined, error })),
+  ])
+    .then(([result, contactResult]): TemplatesState => {
+      if (!result.success || !result.data) {
+        logTechnical('notification templates load', result.error);
+        return {
+          status: 'unavailable',
+          reason: 'The email templates could not be loaded right now.',
+        };
+      }
+      const active = result.data.filter((r) => Number(r.statecode) === 0);
+      const byCode = new Map(active.map((r) => [(r.al_templatecode ?? '').trim(), r]));
+
+      const builtIn: TemplateRow[] = TEMPLATE_CODES.map((code) => {
+        const hint = templateHint(code)!;
+        const row = byCode.get(code);
+        return {
+          id: row?.al_notificationtemplateid ?? null,
+          code,
+          name: hint.name,
+          subject: row?.al_subject ?? '',
+          body: row?.al_body ?? '',
+          tokens: hint.tokens,
+          isHtml: hint.isHtml,
+          stored: row !== undefined,
+          custom: false,
+          eventValue: row?.al_event != null ? Number(row.al_event) : null,
+          recipients: readRecipients(row ?? {}),
+        };
+      });
+
+      const custom: TemplateRow[] = active
+        .filter((r) => !templateHint((r.al_templatecode ?? '').trim()))
+        .map((r) => ({
+          id: r.al_notificationtemplateid,
+          code: (r.al_templatecode ?? '').trim(),
+          name: (r.al_name ?? '').trim(),
+          subject: r.al_subject ?? '',
+          body: r.al_body ?? '',
+          // A letter of your own may use only what a case can always answer, whatever
+          // raised it. The plug-in refuses anything else.
+          tokens: CUSTOM_TOKENS,
+          isHtml: true,
+          stored: true,
+          custom: true,
+          eventValue: r.al_event != null ? Number(r.al_event) : null,
+          recipients: readRecipients(r),
+        }));
+
+      // Contacts are for the "a named contact" recipient. A failure here is not fatal: the
+      // four role recipients still work. `contactsKnown` stops the page reading the empty
+      // list as every chosen contact having no email.
+      const contacts: ContactOption[] =
+        contactResult.success && contactResult.data
+          ? contactResult.data
+              .filter((c) => Number(c.statecode) === 0 && (c.emailaddress1 ?? '').trim() !== '')
+              .map((c) => ({
+                id: c.contactid.toLowerCase(),
+                name: contactName(c),
+                email: (c.emailaddress1 ?? '').trim(),
+              }))
+          : [];
+
+      if (!contactResult.success) {
+        logTechnical('notification templates contacts load', contactResult.error);
+      }
+
+      return {
+        status: 'ready',
+        templates: [...builtIn, ...custom],
+        contacts,
+        contactsKnown: contactResult.success,
+      };
+    })
+    .catch((error): TemplatesState => {
+      logTechnical('notification templates load', error);
+      return {
+        status: 'unavailable',
+        reason: 'The email templates could not be loaded right now.',
+      };
+    });
 }
 
 /**
@@ -302,7 +307,7 @@ function refusalFrom(error: unknown): string {
 }
 
 /** A letter the outbox could not send, as the page lists it. */
-export interface FailedLetter {
+interface FailedLetter {
   id: string;
   queuedOn: string | null;
   subject: string;

@@ -16,6 +16,9 @@ namespace OutcomeTesting.Plugins.Tests
             _inner = inner;
         }
 
+        /// <summary>Every query issued, in order, for a test that asks what one was about.</summary>
+        public List<QueryExpression> Queries { get; } = new List<QueryExpression>();
+
         public int QueriesOf(string entity)
         {
             int count;
@@ -27,6 +30,7 @@ namespace OutcomeTesting.Plugins.Tests
             var expression = query as QueryExpression;
             if (expression != null)
             {
+                Queries.Add(expression);
                 int count;
                 _queries.TryGetValue(expression.EntityName, out count);
                 _queries[expression.EntityName] = count + 1;

@@ -106,11 +106,15 @@ Write-Host "  using: $PacPath"
 Write-Host '1. Pushing plug-in assembly (pac plugin push)...'
 # PAC CLI 2.11.2 takes --pluginId / --pluginFile / --type. It has no --settingsFile
 # parameter; that form belonged to an older CLI and fails outright on 2.11.2.
-$dll = Join-Path $pluginProject 'bin\Debug\net462\OutcomeTesting.Plugins.dll'
+# Release, the build the C# registration tool pushes too, so the two never disagree about
+# which binary is live. pac does not build: run dotnet build -c Release first.
+$dll = Join-Path $pluginProject 'bin\Release\net462\OutcomeTesting.Plugins.dll'
 if (-not (Test-Path -LiteralPath $dll)) {
-    throw "Plug-in assembly not found: $dll. Run 'dotnet build' in $pluginProject first."
+    throw "Plug-in assembly not found: $dll. Run 'dotnet build -c Release' in $pluginProject first."
 }
-& $PacPath plugin push --pluginId $PluginAssemblyId --pluginFile $dll --type Assembly
+# --environment: without it pac pushes to the active profile, not $OrgUrl, while every Web API
+# call below goes to $OrgUrl.
+& $PacPath plugin push --pluginId $PluginAssemblyId --pluginFile $dll --type Assembly --environment $OrgUrl
 if ($LASTEXITCODE -ne 0) {
     throw "pac plugin push failed with exit code $LASTEXITCODE (see its output above). Fix the push, then re-run this script; the Web API steps below are idempotent."
 }

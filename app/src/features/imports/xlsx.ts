@@ -184,17 +184,17 @@ function isDateFormatCode(code: string): boolean {
   return /[ymdhs]/i.test(bare);
 }
 
-/**
- * An Excel serial as ISO. A whole serial is a plain date; a fractional one carries a time,
- * which is what the checklist completion stamps are. Seconds are rounded, so
- * 46252.57916666667 reads as 13:54:00 rather than 13:53:59.
- */
 /** The largest serial Excel holds: 31 December 9999. Anything above is not a date. */
 const LAST_SERIAL = 2958465;
 
 /** Days between the 1900 and 1904 date systems. */
 const DATE_1904_OFFSET = 1462;
 
+/**
+ * An Excel serial as ISO. A whole serial is a plain date; a fractional one carries a time,
+ * which is what the checklist completion stamps are. Seconds are rounded, so
+ * 46252.57916666667 reads as 13:54:00 rather than 13:53:59.
+ */
 export function serialToIso(serial: number): string {
   const seconds = Math.round(serial * 86400);
   const date = new Date(Date.UTC(1899, 11, 30) + seconds * 1000);
@@ -323,7 +323,13 @@ export async function readWorkbook(buffer: ArrayBuffer): Promise<string[][]> {
           numeric <= LAST_SERIAL &&
           isDateStyle(styles, attribute(cell.attributes, 's'))
         ) {
-          text = serialToIso(numeric + dateOffset);
+          // Below 1 the cell holds a time of day and no date. Sent as the time alone, which the
+          // server refuses as not a date, rather than as a date in December 1899. Midnight is
+          // "00:00", not a blank cell that would drop the value without a word.
+          text =
+            numeric < 1
+              ? new Date(Math.round(numeric * 86400) * 1000).toISOString().slice(11, 16)
+              : serialToIso(numeric + dateOffset);
         }
       }
 

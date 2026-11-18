@@ -4,7 +4,6 @@ import {
   GRADE_RESPONSE_TYPE,
   ROOT_CAUSE_QUESTION_CODE,
   ROOT_CAUSE_RESPONSE_TYPE,
-  rootCauseCleared,
   rootCauseRequired,
   withoutUnaskedRootCause,
 } from './gradingRules';
@@ -86,23 +85,6 @@ describe('rootCauseRequired', () => {
     // of a refusal that cannot yet know whether it is owed.
     expect(rootCauseRequired(null)).toBe(false);
     expect(rootCauseRequired(undefined)).toBe(false);
-  });
-});
-
-describe('rootCauseCleared', () => {
-  it('clears on a pass', () => {
-    expect(rootCauseCleared(PASS)).toBe(true);
-  });
-
-  it.each([PASS_WITH_ISSUES, INSUFFICIENT, POTENTIAL_HARM, 999])('leaves %i alone', (value) => {
-    expect(rootCauseCleared(value)).toBe(false);
-  });
-
-  it('clears nothing while the grade is unanswered', () => {
-    // The case the two rules are deliberately not each other's negation for: a checker who
-    // picks the cause before the grade must not see it wiped on the way past.
-    expect(rootCauseCleared(null)).toBe(false);
-    expect(rootCauseRequired(null)).toBe(false);
   });
 });
 

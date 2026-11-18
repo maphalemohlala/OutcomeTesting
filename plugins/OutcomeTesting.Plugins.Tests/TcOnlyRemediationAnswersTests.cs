@@ -95,7 +95,8 @@ namespace OutcomeTesting.Plugins.Tests
             // two rules arguing. The split is the whole change.
             Assert.DoesNotContain("al_recheckrequired", RemediationResponseGuardPlugin.ResponseColumns);
             Assert.DoesNotContain("al_changesadvice", RemediationResponseGuardPlugin.ResponseColumns);
-            Assert.Contains("al_clientcontactrequired", RemediationResponseGuardPlugin.ResponseColumns);
+            // The checker's answer since 2026-11-06, refused by WriteOnceRefusal at every status.
+            Assert.DoesNotContain("al_clientcontactrequired", RemediationResponseGuardPlugin.ResponseColumns);
         }
 
         // --- The write -------------------------------------------------------------------

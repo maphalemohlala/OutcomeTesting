@@ -15,6 +15,8 @@ export type Al_exportrecordsstatuscode = keyof typeof Al_exportrecordsstatuscode
 
 export interface Al_exportrecordsBase {
   al_advicequalitygrade?: string;
+  al_initialadvicequalitygrade?: string;
+  al_taxoutcome?: string;
   al_advisercode?: string;
   al_adviseremail?: string;
   al_advisername?: string;

@@ -144,10 +144,8 @@
         <attribute name="al_advisername" />
         <attribute name="al_adviseremail" />
         <attribute name="al_adviserstatus" />
-        <attribute name="al_advisercode" />
         <attribute name="al_paraplanner" />
         <attribute name="al_paraplanneremail" />
-        <attribute name="al_paraplannercode" />
         <attribute name="al_products" />
         <attribute name="al_casetype" />
         <attribute name="al_advicedate" />
@@ -167,6 +165,17 @@
         <attribute name="al_taxteamdisposition" />
         <attribute name="al_checklistitems" />
         <attribute name="al_reviewrouteid" />
+        {% comment %}
+          The case status decides whether anything on this page can still be changed (see
+          `case_checking` below), and the route whether an AQS submit must wait for Tax (see
+          `tax_pending` above the Submit card). Outer, as the case link is: a case with no
+          route yet is still a case.
+        {% endcomment %}
+        <attribute name="al_casestatus" />
+        <link-entity name="al_reviewroute" from="al_reviewrouteid" to="al_reviewrouteid" link-type="outer" alias="route">
+          <attribute name="al_requirestaxreview" />
+          <attribute name="al_requiresaqsreview" />
+        </link-entity>
       </link-entity>
     </entity>
   </fetch>
@@ -198,6 +207,14 @@
     {% endcomment %}
     {% assign is_tax_review = false %}
     {% if rv.al_reviewtype.value == 120910200 %}{% assign is_tax_review = true %}{% endif %}
+    {% comment %}
+      The submit gate excuses the Tax File Quality outcome and remedial answer on a Tax
+      review while the case still owes an AQS check, because AQS grades File Quality then.
+      The route is how the page knows; a case with no route keeps the mark the question
+      carries, and the script re-marks those rows when the reader switches to Tax only.
+    {% endcomment %}
+    {% assign tax_fq_excused = false %}
+    {% if is_tax_review and rv['route.al_requiresaqsreview'] == true %}{% assign tax_fq_excused = true %}{% endif %}
 
     {% comment %}
       AD-020 section ownership, keyed by the review's discipline. Filtering in the query
@@ -236,18 +253,18 @@
       no longer changes anything is a query to delete, not to leave wired to a variable
       nothing reads.
 
-      So the header follows `locked` alone: read-only exactly when THIS review is submitted
-      (PP-11), and editable by whichever team holds the open review otherwise. That matches
-      what the server now does - CaseHeaderRequestPlugin asks EnsureAssignedToCase and
-      nothing else about the ordinary fields - and keeping the two readings identical is
-      what stops the page offering an edit the server refuses, or refusing one it would
-      allow.
+      So the header is editable by whichever team holds the open review, and read-only once
+      THIS review is submitted (PP-11). "Holds" matters: the header follows `editable`
+      below, not `locked` alone. It used to follow `locked` alone, so a reader opening
+      someone else's open review got live header inputs that autosaved, and the server
+      refused every save ("You can only edit the header of a case you are checking") -
+      CaseHeaderRequestPlugin asks EnsureAssignedToCase. Same line as the answers, so the
+      page never offers an edit the server refuses.
 
-      The Tax team's own two fields are the exception and are handled where they are drawn,
-      below: they re-derive the review route (BR-004, AD-036), so EnsureTaxReviewOpen goes
-      on refusing them once the Tax check is submitted.
+      The Tax team's own two fields are handled where they are drawn, below: they
+      re-derive the review route (BR-004, AD-036), so they are offered only on a Tax review
+      and EnsureTaxReviewOpen goes on refusing them once the Tax check is submitted.
     {% endcomment %}
-    {% assign header_locked = locked %}
 
     {% comment %}
       AD-056: a reviewer reads every review but changes only their own. Because reading
@@ -262,11 +279,23 @@
       {% assign mine = false %}
     {% endif %}
 
-    {% if locked or mine == false %}
+    {% comment %}
+      Only a case at a checking stage - Assigned (120910584) or Review In Progress
+      (120910585) - takes answers, header edits or a submit. A review left open on a case
+      that was removed (No Check Required), closed or sent back to the queue used to stay
+      editable here, and every submit from it was refused, so a checker could answer the
+      whole form and only then find out. No case at all reads as not checking.
+    {% endcomment %}
+    {% assign h_casestatus = rv['case.al_casestatus'] %}
+    {% assign case_checking = false %}
+    {% if h_casestatus.value == 120910584 or h_casestatus.value == 120910585 %}{% assign case_checking = true %}{% endif %}
+
+    {% if locked or mine == false or case_checking == false %}
       {% assign editable = false %}
     {% else %}
       {% assign editable = true %}
     {% endif %}
+    {% if editable %}{% assign header_locked = false %}{% else %}{% assign header_locked = true %}{% endif %}
 
     <section class="ot-card" aria-labelledby="ot-review-summary">
       <h2 class="ot-card__title" id="ot-review-summary">
@@ -340,6 +369,11 @@
         <strong>This review is assigned to someone else.</strong>
         You can read it, but only the assigned reviewer can record or change answers on it.
       </div>
+    {% elsif case_checking == false %}
+      <div class="ot-notice" role="status">
+        <strong>This case is no longer at a checking stage{% assign cs_label = h_casestatus.label | default: '' %}{% if cs_label != '' %} (it is {{ cs_label | escape }}){% endif %}.</strong>
+        You can read this review, but it can no longer be changed or submitted.
+      </div>
     {% endif %}
 
     {% comment %}
@@ -407,6 +441,11 @@
       editable at all, so there is no case where the two should agree.
     {% endcomment %}
     {% assign product_day = now | date: 'yyyy-MM-dd' %}
+    {% comment %}
+      The six option lists below feed the editable header only (the header_locked == false
+      branch further down), so a submitted review, whose header is text, does not read them.
+    {% endcomment %}
+    {% unless header_locked %}
     {% fetchxml product_types %}
     <fetch>
       <entity name="al_listoption">
@@ -557,6 +596,7 @@
   </entity>
 </fetch>
 {% endfetchxml %}
+    {% endunless %}
 
 {% fetchxml case_products %}
 <fetch>
@@ -579,7 +619,7 @@
 {% endcomment %}
 {% assign products_any = false %}
 {% assign offered_product_ids = '|' %}
-{% for o in products.results.entities %}{% assign products_any = true %}{% assign offered_product_ids = offered_product_ids | append: o.al_listoptionid | append: '|' %}{% endfor %}
+{% unless header_locked %}{% for o in products.results.entities %}{% assign products_any = true %}{% assign offered_product_ids = offered_product_ids | append: o.al_listoptionid | append: '|' %}{% endfor %}{% endunless %}
 {% assign held_product_ids = '|' %}
 {% for h in case_products.results.entities %}{% assign held_product_ids = held_product_ids | append: h.al_listoptionid | append: '|' %}{% endfor %}
     {% assign h_samplesource = rv['case.al_samplesource'] %}
@@ -750,15 +790,17 @@
             The dash is a placeholder, not a choice: the request encodes an unchanged field as
             0 and CaseHeaderRequestPlugin reads 0 as "not sent", so selecting the dash could
             never clear a value - the page reported Saved and the value stayed. Disabled, so
-            it shows only while the field is still empty. Clearing a recorded answer is not a
+            it shows only while the field is still empty - and selected then, because a
+            browser skips a disabled option and would show the first real one as if recorded. Clearing a recorded answer is not a
             Tax checker's edit; that is a case correction through al_UpdateCaseDetails.
           {% endcomment %}
-          {% if rv.al_reviewtype.value == 120910200 and locked == false %}
+          {% comment %}On header_locked, not `locked`: these save through the same header script, which is emitted only for the review's own open, checkable holder.{% endcomment %}
+          {% if rv.al_reviewtype.value == 120910200 and header_locked == false %}
           <tr>
             <td class="lbl">Tax check required<br>(Tax team to complete)</td>
             <td class="val">
               <select class="ot-field" id="ot-taxrequired" data-ot-header-field aria-label="Tax check required">
-                <option value="" disabled>—</option>
+                <option value="" disabled {% unless h_taxrequired.value %}selected{% endunless %}>—</option>
                 <option value="120910560" {% if h_taxrequired.value == 120910560 %}selected{% endif %}>Yes</option>
                 <option value="120910561" {% if h_taxrequired.value == 120910561 %}selected{% endif %}>No</option>
               </select>
@@ -766,7 +808,7 @@
             <td class="lbl">For Tax team usage</td>
             <td class="val">
               <select class="ot-field" id="ot-taxdisposition" data-ot-header-field aria-label="For Tax team usage">
-                <option value="" disabled>—</option>
+                <option value="" disabled {% unless h_taxdisposition.value %}selected{% endunless %}>—</option>
                 <option value="120910570" {% if h_taxdisposition.value == 120910570 %}selected{% endif %}>Submit to AQS</option>
                 <option value="120910571" {% if h_taxdisposition.value == 120910571 %}selected{% endif %}>Return to paraplanner</option>
               </select>
@@ -834,7 +876,6 @@
           <attribute name="al_questiontext" />
           <attribute name="al_responsetype" />
           <attribute name="al_ismandatory" />
-          <attribute name="al_versionnumber" />
           <attribute name="al_displayorder" />
           <filter type="and">
             <filter type="or">
@@ -858,7 +899,6 @@
               <attribute name="al_name" />
               <attribute name="al_displayorder" />
               <attribute name="al_helptext" />
-              <attribute name="al_ownerrole" />
               <attribute name="al_sectioncode" />
               <attribute name="al_isoptional" />
               <filter type="and">
@@ -1489,6 +1529,8 @@
           {% endif %}
 
           {% assign qcode = qv['q.al_questioncode'] %}
+          {% assign qv_excused = false %}
+          {% if tax_fq_excused %}{% if qcode == 'Q-FQTAX-01' or qcode == 'Q-FQTAX-03' %}{% assign qv_excused = true %}{% endif %}{% endif %}
           {% comment %}
             Whether this row draws in the grid's tick columns. A plain suitability row sits on
             an N/A grid (2026-09-24) and simply leaves the N/A cell empty, because N/A is not
@@ -1521,7 +1563,7 @@
                 data-response-id="{{ existing.al_responseid }}"
                 data-response-type="{{ rt }}"
                 data-column="choice">
-              <td class="label">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></td>
+              <td class="label">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required"{% if qv_excused %} hidden{% endif %}>Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></td>
               {% for v in gvalues %}
                 {% assign cell_off = false %}
                 {% if rt == 120910006 %}{% if v == '120910307' or v == '120910303' %}{% assign cell_off = true %}{% endif %}{% endif %}
@@ -1575,7 +1617,7 @@
                    data-response-type="{{ rt }}"
                    data-column="{% if rt == 120910013 %}choices{% else %}choice{% endif %}"{% if hide_rootcause %} hidden{% endif %}>
               <tbody>
-                <tr><th colspan="3">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></th></tr>
+                <tr><th colspan="3">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required"{% if qv_excused %} hidden{% endif %}>Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></th></tr>
                 <tr>
                 {% for v in rcvalues %}
                   {% comment %}
@@ -1608,7 +1650,7 @@
                 data-response-id="{{ existing.al_responseid }}"
                 data-response-type="{{ rt }}"
                 data-column="{{ column }}">
-              <td class="{% if blk_layout == 'grid' %}label{% else %}lbl{% endif %}">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required">Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></td>
+              <td class="{% if blk_layout == 'grid' %}label{% else %}lbl{% endif %}">{{ qv.al_questiontext | escape }}{% if qv.al_ismandatory %}<span class="ot-required"{% if qv_excused %} hidden{% endif %}>Required</span>{% endif %}<span class="ot-answer__status" data-ot-status aria-live="polite"></span></td>
               <td colspan="{{ ncols | minus: 1 }}">
               {% if column == 'text' %}
                 {% if rt == 120910001 %}
@@ -1806,10 +1848,10 @@
             var SCALES;
             try { SCALES = JSON.parse(scalesEl.textContent); } catch (e) { return; }
 
-            /*
+            {% comment %}/*
              * The day the server rendered against, so the client cannot disagree with it
              * about what "in force" means because of a time zone.
-             */
+             */{% endcomment %}
             var AS_OF = '{{ as_of }}';
 
             var ids = [];
@@ -1853,9 +1895,9 @@
               apply(byQuestion);
             };
 
-            try { request.send(); } catch (e) { /* offline; the rendered form stands */ }
+            try { request.send(); } catch (e) { {% comment %}/* offline; the rendered form stands */{% endcomment %} }
 
-            /* The words on a row, so the notice can name what moved rather than count it. */
+            {% comment %}/* The words on a row, so the notice can name what moved rather than count it. */{% endcomment %}
             function labelOf(row) {
               var cell = row.querySelector('td.label, td.lbl');
               if (!cell) { return 'A question'; }
@@ -1883,22 +1925,22 @@
                 var renderedType = Number(row.getAttribute('data-response-type'));
                 var liveType = Number(current.al_responsetype);
 
-                /*
+                {% comment %}/*
                  * The row now answers a different version, whatever else changed: point the
                  * autosave at it before anything else, so a save made a moment later is
                  * written against the version the server will accept.
-                 */
+                 */{% endcomment %}
                 row.setAttribute('data-question-version', current.al_questionversionid);
                 row.setAttribute('data-response-type', String(liveType));
 
                 retext(row, current.al_questiontext);
 
-                /*
+                {% comment %}/*
                  * And the text the remedial-actions card keys this row's item by. The server
                  * names the item by the version in force, so a card still keyed by the old
                  * wording would have the submit refused naming a row it does not show. Blank
                  * where the successor has no wording, which the server skips as well.
-                 */
+                 */{% endcomment %}
                 row.setAttribute('data-question-text', current.al_questiontext || '');
 
                 if (liveType !== renderedType) {
@@ -1913,15 +1955,15 @@
               reheadGrids();
               announce(moved, cleared);
 
-              // Nothing above fires a change event - a re-keyed row, or a tick rebuild()
-              // dropped - so the card is told directly. Absent on a read-only review.
+              {% comment %}// Nothing above fires a change event - a re-keyed row, or a tick rebuild()
+              // dropped - so the card is told directly. Absent on a read-only review.{% endcomment %}
               if (window.otRemedial && typeof window.otRemedial.redraw === 'function') { window.otRemedial.redraw(); }
             }
 
-            /*
+            {% comment %}/*
              * The question's own wording, replaced without disturbing the Required marker or
              * the live status span the autosave writes into.
-             */
+             */{% endcomment %}
             function retext(row, wording) {
               if (!wording) { return; }
               var cell = row.querySelector('td.label, td.lbl');
@@ -1934,11 +1976,11 @@
               }
             }
 
-            /*
+            {% comment %}/*
              * The answer options, redrawn from the live scale. Returns true when a tick was
              * dropped because the new scale has no such value - the one consequence a
              * checker has to be told about.
-             */
+             */{% endcomment %}
             function rebuild(row, liveType, current) {
               var opts = row.querySelector('.opts');
               var scale = SCALES.inline[String(liveType)];
@@ -1947,7 +1989,7 @@
               var chosen = opts.querySelector('input[type="radio"]:checked');
               var chosenValue = chosen ? chosen.value : null;
 
-              /*
+              {% comment %}/*
                * WHICH options were locked, one by one - not WHETHER any of them was.
                *
                * This read querySelector('[disabled]') into a single flag and applied that
@@ -1965,7 +2007,7 @@
                * Read-only still holds, because it is the same rule read honestly: a row
                * where every option was locked sets allLocked, and any option the new scale
                * ADDS is locked with it rather than arriving live on a form nobody may edit.
-               */
+               */{% endcomment %}
               var priorInputs = opts.querySelectorAll('input[type="radio"]');
               var lockedValues = '|';
               var lockedCount = 0;
@@ -2008,12 +2050,12 @@
               return chosenValue !== null && !keeps;
             }
 
-            /*
+            {% comment %}/*
              * A tick grid heads its columns from the scale its rows answer on. Re-headed only
              * where every row in the table now agrees, which is the same test the server
              * makes: a table whose rows disagree has no honest column heading, and leaving
              * the old one is better than inventing one.
-             */
+             */{% endcomment %}
             function reheadGrids() {
               var grids = document.querySelectorAll('table.grid');
               for (var g = 0; g < grids.length; g += 1) {
@@ -2061,7 +2103,7 @@
         {% endunless %}
         {% if editable %}
         <script>
-          /*
+          {% comment %}/*
            * Answer autosave and fail points (PP-07, PP-08, FR-013, AD-053, AD-096).
            *
            * Path: page -> Portals Web API PATCH al_reviewinstance.al_answerrequest ->
@@ -2086,7 +2128,7 @@
            * Every rule that matters - the submission lock, the AD-023 column match, the
            * option subset and AD-020 section ownership - is enforced in the plug-in. This
            * script is convenience, never access control (NFR-SEC-01).
-           */
+           */{% endcomment %}
           (function () {
             'use strict';
 
@@ -2097,7 +2139,7 @@
             var REVIEW_ID = shell.getAttribute('data-review-id');
             if (!REVIEW_ID) { return; }
 
-            /*
+            {% comment %}/*
              * The anti-forgery token comes from shell.getTokenDeferred(), which is the
              * only supported way to obtain it and the way the claim and remediation
              * writes on this site already do it.
@@ -2109,10 +2151,10 @@
              * and every write left the browser unauthenticated. That is why the refusal
              * was 401 rather than the 403 a table permission produces - the request was
              * never attributed to the signed-in contact at all.
-             */
+             */{% endcomment %}
             function api(method, path, body, onDone, onFail) {
               if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
-                onFail('', 0);
+                onFail(null);
                 return;
               }
 
@@ -2124,134 +2166,38 @@
                 xhr.setRequestHeader('OData-MaxVersion', '4.0');
                 xhr.setRequestHeader('OData-Version', '4.0');
                 xhr.setRequestHeader('__RequestVerificationToken', token);
-                // If-Match: * pins this PATCH to a row that already exists. Without it the
+                {% comment %}// If-Match: * pins this PATCH to a row that already exists. Without it the
                 // Web API treats the PATCH as an upsert, and the Review Instance - assigned
                 // to me table permission grants write but not create, so the create half of
                 // an upsert is refused. Every caller of api() now PATCHes an al_reviewinstance
                 // row the page already loaded, so the header is always safe here - see the
                 // submit block below (data-ot-submit script, "If-Match: * matters") for the
-                // fuller account of why it exists and what broke without it.
+                // fuller account of why it exists and what broke without it.{% endcomment %}
                 xhr.setRequestHeader('If-Match', '*');
 
                 xhr.onload = function () {
-                  if (xhr.status >= 200 && xhr.status < 300) {
+                  if (window.otApi.ok(xhr)) {
                     onDone(xhr);
                   } else {
-                    // The status travels with the body. A refusal carrying no plug-in prefix
-                    // did not come from the plug-in at all, and only the status says whether
-                    // it was the portal turning the write away or something transient.
-                    onFail(xhr.responseText || xhr.statusText, xhr.status);
+                    {% comment %}// The whole request goes to the shared reader in OT Layout, which takes the
+                    // plug-in's sentence when there is one and the HTTP outcome when there is not.{% endcomment %}
+                    onFail(xhr);
                   }
                 };
-                xhr.onerror = function () { onFail('', 0); };
+                xhr.onerror = function () { onFail(xhr); };
                 xhr.send(body ? JSON.stringify(body) : null);
-              }).fail(function () { onFail('', 0); });
+              }).fail(function () { onFail(null); });
             }
 
-            /*
-             * The plug-in prefixes its failures so the client can branch without parsing
-             * prose. Messages say what happened, what is still safe and what to do next,
-             * and never expose a table name, query, id or stack trace (PP-16).
-             *
-             * The status is read as well as the body, because the most common failure here
-             * never reaches the plug-in and so carries no prefix: the portal refuses the
-             * write on the table permission chain and answers 403. "Not saved - retry" was
-             * wrong for that case in the only way that matters - it is not going to work on
-             * the retry, or the one after, and the person is given nothing to act on.
-             *
-             * The write path is Contact-scoped through contact_al_reviewinstance and carried
-             * by the two checker web roles, so a 403 means one of exactly two things, and
-             * both are worth naming rather than summarising as "permission".
-             */
-            /*
-             * The server's own words, out of the response body.
-             *
-             * The body is an OData error object, so the message has to be read out of it rather than
-             * scanned for in the raw text: a prefix found by indexOf and taken to the end of the
-             * string carries the JSON tail with it, which is why the branches below used to cut at
-             * the next quote and why one of them did not and showed it.
-             *
-             * A body that will not parse is returned as it stands - it is still more than "something
-             * went wrong" - and it is collapsed onto one line and capped, because an error line is
-             * read on screen and the whole of a platform fault is not readable there.
-             */
-            function serverMessage(raw) {
-              var text = String(raw || '').trim();
-              if (!text) { return ''; }
-
-              var message = text;
-              try {
-                var body = JSON.parse(text);
-                var error = body && body.error ? body.error : body;
-                if (error && error.innererror && error.innererror.message) {
-                  message = error.innererror.message;
-                } else if (error && error.message) {
-                  message = error.message;
-                }
-              } catch (ignored) {
-                // Not JSON. Keep the raw text.
-              }
-
-              message = String(message || '').replace(/\s+/g, ' ').trim();
-              if (message.length > 300) { message = message.substring(0, 300) + '...'; }
-              return message;
-            }
-
-            function friendlyError(raw, httpStatus) {
-              var text = serverMessage(raw);
-              if (text.indexOf('CONFLICT:') !== -1) {
-                return 'This review has been submitted and can no longer be changed. Reload the page.';
-              }
-              if (text.indexOf('UNAUTHORIZED:') !== -1) {
-                return 'You do not have permission to change this answer.';
-              }
-              if (text.indexOf('PRECONDITION:') !== -1) {
-                // serverMessage has already taken the message out of the JSON, so this is
-                // the message and nothing else. It used to be cut at the next quote to keep
-                // the trailing JSON off the screen; that is now unnecessary.
-                var idx = text.indexOf('PRECONDITION:');
-                return text.substring(idx + 'PRECONDITION:'.length).trim();
-              }
-              if (text.indexOf('UNEXPECTED:') !== -1) {
-                var unexpected = text.indexOf('UNEXPECTED:');
-                return 'That answer was not saved. ' + text.substring(unexpected + 'UNEXPECTED:'.length).trim();
-              }
-              /*
-               * 401 and 403 are deliberately not the same message. They were, and that
-               * cost three rounds of investigation: a 401 was read as a table permission
-               * refusal and sent everyone to look at web roles that were correct all
-               * along. The portal answers 403 when the permission chain turns a write
-               * away, and 401 when the request never authenticated - an expired session,
-               * or a missing anti-forgery token.
-               */
-              if (httpStatus === 403) {
-                return 'Your account is not allowed to record answers on this review, so nothing was saved. '
-                  + 'Answering needs a Tax or AQS reviewer role on your portal account, and the review has to be '
-                  + 'assigned to you. Ask an administrator to check both - retrying will not help.';
-              }
-              if (httpStatus === 401) {
-                return 'Your session was not accepted, so nothing was saved. Reload the page and sign in again, '
-                  + 'then check this answer is still on screen before carrying on.';
-              }
-              if (httpStatus === 0) {
-                return 'That answer did not reach the server. Check your connection; it will save when you next change it.';
-              }
-              // The server's message rather than "retry": a refusal the page cannot
-              // classify is exactly the one whose detail the reader needs.
-              return 'Not saved. Your other answers are unaffected.'
-                + (text ? ' The server said: ' + text : '')
-                + (httpStatus ? ' (status ' + httpStatus + ')' : '');
-            }
-
-            // idFromHeader() used to read the new row's id back out of OData-EntityId
+            {% comment %}// idFromHeader() used to read the new row's id back out of OData-EntityId
             // after a direct al_response create, so save() could remember it for the next
             // PATCH. There is no create here any more - AnswerWriter finds or creates the
             // row server-side - so nothing on this page needs the id, and the function is
-            // gone with the create it served.
+            // gone with the create it served.{% endcomment %}
 
             function two(n) { return (n < 10 ? '0' : '') + n; }
 
-            /*
+            {% comment %}/*
              * CACHE_LAG. F5, found in DEV on 2026-09-20. An answer saves correctly, the page
              * says "Saved", and reloading within the next fifteen minutes can render the form
              * empty. The page reads al_response through Liquid; the write is made by
@@ -2268,7 +2214,7 @@
              * server did not send is indistinguishable from one it did, and a reviewer could
              * not tell which they were reading. A sentence they can act on is worth more than
              * a value they cannot trust.
-             */
+             */{% endcomment %}
             var CACHE_LAG_KEY = 'ot.savedAnswers.' + REVIEW_ID;
             var CACHE_LAG_WINDOW_MS = 20 * 60 * 1000;
             var cacheLagProbes = {};
@@ -2279,10 +2225,10 @@
             }
 
             function writeSavedAnswers(map) {
-              // Private browsing and a full store both throw. The notice is a courtesy, so
-              // losing it is not worth breaking the save that has just succeeded.
+              {% comment %}// Private browsing and a full store both throw. The notice is a courtesy, so
+              // losing it is not worth breaking the save that has just succeeded.{% endcomment %}
               try { window.sessionStorage.setItem(CACHE_LAG_KEY, JSON.stringify(map)); }
-              catch (e) { /* no notice this time */ }
+              catch (e) { {% comment %}/* no notice this time */{% endcomment %} }
             }
 
             function isBlankRequest(request) {
@@ -2298,8 +2244,8 @@
               var questionVersion = root.getAttribute('data-question-version');
               var column = root.getAttribute('data-column');
               var status = root.querySelector('[data-ot-status]');
-              // The standalone fail points list (AD-096) belongs to the File quality outcome
-              // answer, so only that answer's bind() finds one; every other answer has none.
+              {% comment %}// The standalone fail points list (AD-096) belongs to the File quality outcome
+              // answer, so only that answer's bind() finds one; every other answer has none.{% endcomment %}
               var reasons = document.querySelector('[data-ot-failpoints-for="' + questionVersion + '"]');
               var inputs = root.querySelectorAll('[data-ot-input]');
               var timer = null;
@@ -2324,11 +2270,11 @@
                 if (column === 'text') {
                   body.al_answertext = inputs[0].value || null;
                 } else if (column === 'richtext') {
-                  // What the editor holds, as markup. Sent as it stands: ResponseGuardPlugin
+                  {% comment %}// What the editor holds, as markup. Sent as it stands: ResponseGuardPlugin
                   // reduces it to the allow-list pre-operation on al_response, so the
                   // cleaning that matters happens where no caller can skip it. Markup with
                   // no words is sent as null, so an emptied editor clears the answer rather
-                  // than storing a paragraph holding a line break.
+                  // than storing a paragraph holding a line break.{% endcomment %}
                   var markup = inputs[0].innerHTML;
                   var words = markup.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
                   body.al_answerrichtext = words === '' ? null : markup;
@@ -2341,22 +2287,22 @@
                   for (i = 0; i < inputs.length; i++) {
                     if (inputs[i].checked) { picked.push(parseInt(inputs[i].value, 10)); }
                   }
-                  // AnswerRequestPlugin's answerChoices is an int[] (AnswerRequest.cs,
+                  {% comment %}// AnswerRequestPlugin's answerChoices is an int[] (AnswerRequest.cs,
                   // AnswerChoices), not the comma-separated value list this used to build -
                   // that format was for the OData multiselect column this page no longer
-                  // writes directly. currentRequest() below sends this array through as-is.
+                  // writes directly. currentRequest() below sends this array through as-is.{% endcomment %}
                   body.al_answerchoices = picked.length ? picked : null;
                 }
 
                 return body;
               }
 
-              /*
+              {% comment %}/*
                * The answer and its reasons in one object. It travels as a JSON string on
                * al_answerrequest rather than as an al_response create, because Power Pages
                * refuses the create's @odata.bind association (90040106) whatever the table
                * permissions say. AnswerRequestPlugin does the write.
-               */
+               */{% endcomment %}
               function currentRequest() {
                 var answer = currentPayload();
                 var request = {
@@ -2381,7 +2327,7 @@
                 return ids;
               }
 
-              /*
+              {% comment %}/*
                * Every reason checkbox the fail points block put on screen, ticked or not -
                * the category-filtered failreasons fetch (template ~line 264), not the full
                * catalogue. AnswerWriter.ReconcileFailReasons only ever disassociates an id
@@ -2389,7 +2335,7 @@
                * linked to the answer but outside this list (the other team's category) is
                * left alone, because its absent checkbox never gave the reviewer a chance to
                * untick it (finding 2, 2026-09-08 review).
-               */
+               */{% endcomment %}
               function renderedReasonIds() {
                 var boxes = reasons ? reasons.querySelectorAll('[data-ot-reason]') : [];
                 var ids = [];
@@ -2397,12 +2343,12 @@
                 return ids;
               }
 
-              // Nothing on an answer is revealed conditionally any more. The evidence note
+              {% comment %}// Nothing on an answer is revealed conditionally any more. The evidence note
               // that revealConditional() used to open on a non-pass is not a field on the
               // Checker Checklist and has been removed, and the fail points block is always
-              // on screen (AD-096), so every control an answer has is visible from the start.
+              // on screen (AD-096), so every control an answer has is visible from the start.{% endcomment %}
 
-              /*
+              {% comment %}/*
                * One PATCH replaces the create/update pair that used to target al_response
                * directly. The create branch used to set two @odata.bind lookups
                * (al_reviewinstance_response, al_questionversion_response) so Power Pages
@@ -2413,7 +2359,7 @@
                * create-or-update against al_response server-side. The responseId branch and
                * the data-response-id bookkeeping that went with it go with it - there is no
                * create left here to remember an id for.
-               */
+               */{% endcomment %}
               function save() {
                 var request = currentRequest();
                 var body = { al_answerrequest: JSON.stringify(request) };
@@ -2421,13 +2367,13 @@
 
                 function done() {
                   var now = new Date();
-                  // An answer just saved is no longer one the submit refused for.
+                  {% comment %}// An answer just saved is no longer one the submit refused for.{% endcomment %}
                   root.classList.remove('ot-answer--missing');
                   show('Saved ' + two(now.getHours()) + ':' + two(now.getMinutes()), 'saved');
 
-                  // CACHE_LAG: what this tab knows it has saved. Clearing an answer is
+                  {% comment %}// CACHE_LAG: what this tab knows it has saved. Clearing an answer is
                   // recorded as nothing to catch up on, so blanking a value never raises
-                  // the notice.
+                  // the notice.{% endcomment %}
                   var saved = readSavedAnswers();
                   if (isBlankRequest(request)) { delete saved[questionVersion]; }
                   else { saved[questionVersion] = now.getTime(); }
@@ -2436,7 +2382,7 @@
 
                 api('PATCH', 'al_reviewinstances(' + REVIEW_ID + ')', body,
                   done,
-                  function (raw, httpStatus) { show(friendlyError(raw, httpStatus), 'error'); });
+                  function (xhr) { show(window.otApi.error('Saving your answer', xhr), 'error'); });
               }
 
               function queue() {
@@ -2444,11 +2390,11 @@
                 timer = window.setTimeout(save, DEBOUNCE_MS);
               }
 
-              /*
+              {% comment %}/*
                * A reason is now part of the answer payload, so ticking one is just another
                * change to save. The old "choose an answer first" rule went with the
                * association it protected.
-               */
+               */{% endcomment %}
               function toggleReason() {
                 queue();
               }
@@ -2458,22 +2404,22 @@
                 if (inputs[i].tagName === 'TEXTAREA' || inputs[i].type === 'text') {
                   inputs[i].addEventListener('input', queue);
                 }
-                // contenteditable fires no change event at all, so without this a rich-text
-                // answer would save only when something else on the row did.
+                {% comment %}// contenteditable fires no change event at all, so without this a rich-text
+                // answer would save only when something else on the row did.{% endcomment %}
                 if (inputs[i].hasAttribute('data-ot-rich')) {
                   inputs[i].addEventListener('input', queue);
                   inputs[i].addEventListener('blur', queue);
                 }
               }
 
-              /*
+              {% comment %}/*
                * execCommand is deprecated and is still the only thing every browser here
                * implements: there is no replacement API for "bold the selection". The
                * commands offered are the ones HtmlSanitiser keeps, so the toolbar cannot
                * produce formatting the save would discard. mousedown rather than click, and
                * prevented, so pressing a button does not take the selection out of the
                * editor before the command runs on it.
-               */
+               */{% endcomment %}
               var area = root.querySelector('[data-ot-rich]');
               if (area) {
                 var buttons = root.querySelectorAll('[data-ot-rte-cmd]');
@@ -2490,11 +2436,11 @@
                   });
                 }
 
-                // Clear empties the answer. It used to be removeFormat, which only unbolds a
+                {% comment %}// Clear empties the answer. It used to be removeFormat, which only unbolds a
                 // selection: with the caret merely in the field it did nothing, and the text a
                 // checker meant to clear stayed. selectAll + delete rather than innerHTML = '' so
                 // Ctrl+Z brings the text back after a mis-press. currentPayload() sends an editor
-                // with no words as null, and AnswerWriter stores that as cleared.
+                // with no words as null, and AnswerWriter stores that as cleared.{% endcomment %}
                 var clear = root.querySelector('[data-ot-rte-clear]');
                 if (clear) {
                   clear.addEventListener('mousedown', function (event) {
@@ -2510,9 +2456,9 @@
                   });
                 }
 
-                // A paste arrives as whatever the source page was. Taking the plain text
+                {% comment %}// A paste arrives as whatever the source page was. Taking the plain text
                 // keeps a paste from Word or a web page out of an answer that would only be
-                // stripped back to words on the way in anyway.
+                // stripped back to words on the way in anyway.{% endcomment %}
                 area.addEventListener('paste', function (event) {
                   var clip = event.clipboardData || window.clipboardData;
                   if (!clip) { return; }
@@ -2522,14 +2468,14 @@
                 });
               }
 
-              // No closure over the box is needed any more: toggleReason() no longer takes
-              // one, since a tick is just another field feeding queue() -> save().
+              {% comment %}// No closure over the box is needed any more: toggleReason() no longer takes
+              // one, since a tick is just another field feeding queue() -> save().{% endcomment %}
               var reasonBoxes = reasons ? reasons.querySelectorAll('[data-ot-reason]') : [];
               for (var r = 0; r < reasonBoxes.length; r++) {
                 reasonBoxes[r].addEventListener('change', toggleReason);
               }
 
-              // CACHE_LAG: how this answer reports whether the page came back empty for it.
+              {% comment %}// CACHE_LAG: how this answer reports whether the page came back empty for it.{% endcomment %}
               cacheLagProbes[questionVersion] = function () {
                 return isBlankRequest(currentRequest());
               };
@@ -2538,12 +2484,12 @@
             var answers = document.querySelectorAll('[data-ot-answer]');
             for (var i = 0; i < answers.length; i++) { bind(answers[i]); }
 
-            /*
+            {% comment %}/*
              * CACHE_LAG, the read side. Runs once, after every answer has bound and
              * registered how to read itself. An answer counts as behind when this tab saved
              * it recently and the page has come back with nothing in it - never when the page
              * shows something, so a value the server did send is never contradicted.
-             */
+             */{% endcomment %}
             (function reportCacheLag() {
               var saved = readSavedAnswers();
               var now = Date.now();
@@ -2583,7 +2529,7 @@
               notice.hidden = false;
             })();
 
-            /*
+            {% comment %}/*
              * The primary root cause appears only while the grade says the file did not pass
              * (item 3, 2026-09-19). The server is where this is actually enforced -
              * SubmitReviewPlugin stops demanding Q-GR-02 on a Pass, and ResponseProgressPlugin
@@ -2594,25 +2540,25 @@
              * answer: the grade's scale belongs to Q-GR-01 and the nine-cause single select to
              * Q-GR-02, and to no other question (AD-055). The template has decided the opening
              * state already, so this only has to keep up with changes.
-             */
+             */{% endcomment %}
             var gradeRow = document.querySelector('[data-ot-answer][data-response-type="120910010"]');
             var rootCause = document.querySelector('[data-ot-rootcause]');
 
-            /*
+            {% comment %}/*
              * NOT guarded on the grade row, though everything inside already is: `gradeInputs`
              * is empty where there is no grade row, and `syncRootCause` returns early without
              * one. A TAX review has no grade at all - S-GRADE is AQS-owned and AD-020 filters
              * it out of that form - so wrapping this in `if (gradeRow)` would cost a line to
              * say what the guards below already say for themselves.
-             */
+             */{% endcomment %}
             {
               var gradeInputs = gradeRow
                 ? gradeRow.querySelectorAll('[data-ot-input]')
                 : [];
 
-              // Function expressions rather than declarations: this script runs in strict
+              {% comment %}// Function expressions rather than declarations: this script runs in strict
               // mode, where a function declared inside a block is not something every
-              // engine agrees on, and everything else in this file is ES5.
+              // engine agrees on, and everything else in this file is ES5.{% endcomment %}
               var gradeChosen = function () {
                 for (var g = 0; g < gradeInputs.length; g++) {
                   if (gradeInputs[g].checked) { return gradeInputs[g].value; }
@@ -2626,7 +2572,7 @@
                 var owed = grade !== '' && grade !== '120910300';
                 rootCause.hidden = !owed;
 
-                /*
+                {% comment %}/*
                  * Untick on the way out, so the page stops showing a cause the server is
                  * clearing on this very save. Only on a Pass: that is the grade the server
                  * clears for, and unticking when the grade merely went back to unanswered
@@ -2635,7 +2581,7 @@
                  * Nothing is sent from here either way. The grade's own save is what clears
                  * the row, and a second request racing it would be the one to decide which
                  * write landed last.
-                 */
+                 */{% endcomment %}
                 if (grade === '120910300') {
                   var causes = rootCause.querySelectorAll('[data-ot-input]');
                   for (var c = 0; c < causes.length; c++) { causes[c].checked = false; }
@@ -2646,7 +2592,7 @@
                 gradeInputs[h].addEventListener('change', syncRootCause);
               }
 
-              /*
+              {% comment %}/*
                * The grade, file quality outcome and remedial action rules that used to
                * run here - greying out options the server would refuse, defaulting
                * Remedial action required? from the outcome, and saying when a stored
@@ -2655,7 +2601,7 @@
                * greyed out or selected by default - leave them open, allow any answer").
                * The server accepts any answer since 2026-10-05 (AD-231); the page simply
                * draws every option open.
-               */
+               */{% endcomment %}
             }
           })();
         </script>
@@ -2700,10 +2646,9 @@
       creates it when this review is submitted. So the choice is parked on the review and
       applied to the outcome the submit creates, in the same write as the grade.
 
-      The people come from the contact directory, which checkers can now read: a global
-      read-only table permission was added for it (Contact - directory read). They can see
-      the directory and still write only their own row, which is the row the request below
-      is PATCHed onto.
+      The people come from the contact directory, which checkers can read through a global
+      read-only table permission (Contact - directory read). They can see the directory and
+      still write only their own row, which is the row the request below is PATCHed onto.
     {% endcomment %}
     {% if editable %}
       {% comment %}
@@ -2727,14 +2672,58 @@
         {% endif %}
       {% endfor %}
 
+      {% comment %}
+        Only advisers and paraplanners (project owner, 2026-11-17): a person is one by the web
+        role they hold - AL Portal - Adviser Remediation or AL Portal - Planner - and the
+        server refuses anyone else. Contacts that are no longer active are listed while they
+        still hold the role, because the server accepts them too, and a saved pick has to stay
+        in this list or the next save would clear it (restoreSaved leaves the box blank for an
+        id it cannot find).
+
+        The roles are matched by their record ids, the ones webrole.yml gives them and the
+        solution carries to every environment; Check-PortalTemplates.ps1 (rule G) fails if
+        those ids stop naming these two roles. Matching by name would need a link to
+        powerpagecomponent, which no portal role may read, and an unreadable linked table
+        empties the whole result. The contact root is read under Contact - directory read,
+        the permission this panel already relies on; the intersect is permissioned through
+        its two ends. distinct, because a person holding both roles is joined twice. The
+        count is the platform's largest page, stated so the list is never cut at a smaller
+        default without anyone noticing.
+      {% endcomment %}
       {% fetchxml directory %}
-      <fetch>
+      <fetch count="5000" distinct="true">
+        <entity name="contact">
+          <attribute name="contactid" />
+          <attribute name="fullname" />
+          <attribute name="emailaddress1" />
+          <link-entity name="powerpagecomponent_mspp_webrole_contact" from="contactid" to="contactid" intersect="true">
+            <filter type="and">
+              <condition attribute="powerpagecomponentid" operator="in">
+                <value>a1000000-0000-4000-8000-000000000092</value>
+                <value>a1000000-0000-4000-8000-000000000097</value>
+              </condition>
+            </filter>
+          </link-entity>
+          <order attribute="fullname" />
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+      {% assign ot_acc_people = directory.results.entities.size | default: 0 %}
+
+      {% comment %}
+        The administrator at fault for a File Quality fail (requirements log row 10). Any active
+        contact, since an administrator holds neither role above; read under the same Contact -
+        directory read permission. Recorded for reporting only - the export never carries it.
+      {% endcomment %}
+      {% fetchxml everyone %}
+      <fetch count="5000">
         <entity name="contact">
           <attribute name="contactid" />
           <attribute name="fullname" />
           <attribute name="emailaddress1" />
           <filter type="and">
             <condition attribute="statecode" operator="eq" value="0" />
+            <condition attribute="emailaddress1" operator="not-null" />
           </filter>
           <order attribute="fullname" />
         </entity>
@@ -2763,9 +2752,17 @@
             <label class="ot-accountability__person">
               <span>Or someone else</span>
               <input type="text" class="ot-hdr-input" list="ot-acc-people"
-                     data-ot-acc-person="fq" placeholder="Search for a person"
+                     data-ot-acc-person="fq" placeholder="Search advisers and paraplanners"
                      autocomplete="off" role="combobox"
+                     {% if ot_acc_people == 0 %}disabled{% endif %}
                      aria-label="Person carrying the File Quality fail" />
+            </label>
+            <label class="ot-accountability__person">
+              <span>Administrator at fault (not exported)</span>
+              <input type="text" class="ot-hdr-input" list="ot-acc-everyone"
+                     data-ot-acc-person="fqadmin" placeholder="Search everyone"
+                     autocomplete="off" role="combobox"
+                     aria-label="Administrator carrying the File Quality fail" />
             </label>
           </fieldset>
 
@@ -2776,8 +2773,9 @@
             <label class="ot-accountability__person">
               <span>Or someone else</span>
               <input type="text" class="ot-hdr-input" list="ot-acc-people"
-                     data-ot-acc-person="aq" placeholder="Search for a person"
+                     data-ot-acc-person="aq" placeholder="Search advisers and paraplanners"
                      autocomplete="off" role="combobox"
+                     {% if ot_acc_people == 0 %}disabled{% endif %}
                      aria-label="Person carrying the Advice Quality fail" />
             </label>
           </fieldset>
@@ -2792,11 +2790,20 @@
           contact's id rides on data-id, because a datalist yields TEXT and cannot carry a
           record; the script maps the text back.
         {% endcomment %}
+        {% if ot_acc_people == 0 %}
+          <p class="ot-notice" data-ot-acc-nobody>No advisers or paraplanners could be listed here, so nobody can be named yet. Ask an administrator of the {{ ot_product | escape }} app to check the People page.</p>
+        {% endif %}
         <datalist id="ot-acc-people">
           {% for c in directory.results.entities %}
           <option value="{{ c.fullname | escape }} - {{ c.emailaddress1 | escape }}" data-id="{{ c.contactid }}"></option>
           {% endfor %}
         </datalist>
+        <datalist id="ot-acc-everyone">
+          {% for c in everyone.results.entities %}
+          <option value="{{ c.fullname | escape }} - {{ c.emailaddress1 | escape }}" data-id="{{ c.contactid }}"></option>
+          {% endfor %}
+        </datalist>
+        <p class="ot-accountability__note">Naming an administrator records who made the File Quality fail for reporting only: it is not written to the export, and the paraplanner is then no longer named for the File Quality fail by default.</p>
 
         <p class="ot-accountability__status" data-ot-acc-status role="status" aria-live="polite"></p>
       </section>
@@ -2812,17 +2819,25 @@
           var boxes = root.querySelectorAll('[data-ot-acc]');
           var timer = null;
           var saving = false;
-          // Something moved while a save was on its way. Every save sends the whole state, so
+          {% comment %}// Something moved while a save was on its way. Every save sends the whole state, so
           // one more save when that one lands is all it takes (2026-09-24, the same fault the
-          // case header had on 900000006).
+          // case header had on 900000006).{% endcomment %}
           var saveAgain = false;
+          {% comment %}// Callbacks waiting on the save in hand, the submit's among them; told once it settles.{% endcomment %}
+          var waiting = [];
+
+          function finish(ok) {
+            var list = waiting;
+            waiting = [];
+            for (var i = 0; i < list.length; i++) { list[i](ok); }
+          }
 
           function show(message, kind) {
             status.textContent = message;
             status.className = 'ot-accountability__status' + (kind ? ' ot-inline-status--' + kind : '');
           }
 
-          /*
+          {% comment %}/*
            * The box IS the search (project owner, 2026-09-19). A native datalist: the
            * browser filters as you type and owns the keyboard, the scrolling and the
            * screen-reader semantics, none of which a hand-rolled list gets right for free.
@@ -2830,9 +2845,11 @@
            * What it costs is that it yields TEXT, not a record, so the text has to identify
            * one person on its own and be mapped back to an id. Anything that matches nobody
            * records nobody, and says so rather than failing at the server.
-           */
+           */{% endcomment %}
           var byText = {};
-          var options = document.querySelectorAll('#ot-acc-people option');
+          var options = document.querySelectorAll('#ot-acc-people option, #ot-acc-everyone option');
+          {% comment %}// Which saved field each person box holds; fqadmin is the administrator (row 10).{% endcomment %}
+          var SIDES = { fq: 'fqContactId', aq: 'aqContactId', fqadmin: 'fqAdministratorId' };
           for (var o = 0; o < options.length; o++) {
             byText[options[o].value.trim().toLowerCase()] = options[o].getAttribute('data-id');
           }
@@ -2850,20 +2867,20 @@
             return byText[typed] || '';
           }
 
-          /** Names anyone the boxes hold text for but could not match. */
+          {% comment %}/** Names anyone the boxes hold text for but could not match. */{% endcomment %}
           function unmatched() {
             var stray = [];
-            var which = ['fq', 'aq'];
+            var which = ['fq', 'aq', 'fqadmin'];
             for (var i = 0; i < which.length; i++) {
               var box = root.querySelector('[data-ot-acc-person="' + which[i] + '"]');
               if (box && box.value.trim() !== '' && person(which[i]) === '') {
-                stray.push(box.value.trim());
+                stray.push({ text: box.value.trim(), admin: which[i] === 'fqadmin' });
               }
             }
             return stray;
           }
 
-          /** The section as it stands, in the shape a save sends and al_pendingaccountability keeps. */
+          {% comment %}/** The section as it stands, in the shape a save sends and al_pendingaccountability keeps. */{% endcomment %}
           function currentState() {
             return {
               fqAdviser: value('fqAdviser'),
@@ -2871,17 +2888,18 @@
               aqAdviser: value('aqAdviser'),
               aqParaplanner: value('aqParaplanner'),
               fqContactId: person('fq'),
-              aqContactId: person('aq')
+              aqContactId: person('aq'),
+              fqAdministratorId: person('fqadmin')
             };
           }
 
-          /*
+          {% comment %}/*
            * Draws the accountability this check already holds (2026-09-24). The page used to
            * draw four empty boxes and empty names on every visit, and because every save
            * carries the whole state, the first change after reopening saved that emptiness
            * over the checker's earlier choices. A saved person is named from the directory by
            * id; one no longer in it is left blank rather than guessed.
-           */
+           */{% endcomment %}
           function restoreSaved() {
             var saved = null;
             try { saved = JSON.parse(root.getAttribute('data-ot-acc-saved') || 'null'); }
@@ -2892,9 +2910,9 @@
               boxes[r].checked = saved[boxes[r].getAttribute('data-ot-acc')] === true;
             }
 
-            var sides = ['fq', 'aq'];
+            var sides = ['fq', 'aq', 'fqadmin'];
             for (var k = 0; k < sides.length; k++) {
-              var id = saved[sides[k] + 'ContactId'];
+              var id = saved[SIDES[sides[k]]];
               var input = root.querySelector('[data-ot-acc-person="' + sides[k] + '"]');
               if (!input || !id) { continue; }
               for (var o2 = 0; o2 < options.length; o2++) {
@@ -2903,13 +2921,13 @@
             }
           }
 
-          /*
+          {% comment %}/*
            * CACHE_LAG, as the header and the answers handle it. The save goes through a
            * plug-in, so the site's render cache learns of it late (AD-094: up to fifteen
            * minutes) and a reload inside that window draws the state from before the save.
            * The tab remembers what it saved and says so; it never re-applies it, because a
            * value on screen the server did not send cannot be told from one it did.
-           */
+           */{% endcomment %}
           var ACC_LAG_KEY = 'ot.savedAccountability.' + reviewId;
           var ACC_LAG_WINDOW_MS = 20 * 60 * 1000;
 
@@ -2919,11 +2937,11 @@
           }
 
           function writeSavedAccountability(saved) {
-            // Private browsing and a full store both throw; the notice is a courtesy.
+            {% comment %}// Private browsing and a full store both throw; the notice is a courtesy.{% endcomment %}
             try {
               if (saved === null) { window.sessionStorage.removeItem(ACC_LAG_KEY); }
               else { window.sessionStorage.setItem(ACC_LAG_KEY, JSON.stringify(saved)); }
-            } catch (e) { /* no notice this time */ }
+            } catch (e) { {% comment %}/* no notice this time */{% endcomment %} }
           }
 
           function sameState(a, b) {
@@ -2932,7 +2950,8 @@
               if ((a[flags[f]] === true) !== (b[flags[f]] === true)) { return false; }
             }
             return (a.fqContactId || '') === (b.fqContactId || '')
-              && (a.aqContactId || '') === (b.aqContactId || '');
+              && (a.aqContactId || '') === (b.aqContactId || '')
+              && (a.fqAdministratorId || '') === (b.fqAdministratorId || '');
           }
 
           function reportAccountabilityLag() {
@@ -2948,26 +2967,29 @@
               + ' the next change would save what is on screen over it.', 'error');
           }
 
-          function save() {
+          function save(done) {
+            if (typeof done === 'function') { waiting.push(done); }
             if (timer) { window.clearTimeout(timer); timer = null; }
             if (saving) { saveAgain = true; return; }
             if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
-              show('This page did not load completely. Refresh and try again.', 'error');
+              show(window.otApi.error('Recording who carries the fail', null), 'error');
+              finish(false);
               return;
             }
 
             var stray = unmatched();
             if (stray.length > 0) {
-              show('Nobody in the directory matches "' + stray[0] + '", so nobody was'
-                + ' recorded for it. Pick a name from the list.', 'error');
+              show((stray[0].admin ? 'Nobody in the directory matches "' : 'Nobody holding the Adviser or Planner role matches "')
+                + stray[0].text + '", so nobody was recorded for it. Pick a name from the list.', 'error');
+              finish(false);
               return;
             }
 
             saving = true;
             show('Saving...', null);
 
-            // What this save sends, kept so a reload inside the cache window can be told apart
-            // from one that has caught up (reportAccountabilityLag).
+            {% comment %}// What this save sends, kept so a reload inside the cache window can be told apart
+            // from one that has caught up (reportAccountabilityLag).{% endcomment %}
             var sent = currentState();
             var body = {
               al_accountabilityrequest: JSON.stringify({
@@ -2977,7 +2999,8 @@
                 aqAdviser: sent.aqAdviser,
                 aqParaplanner: sent.aqParaplanner,
                 fqContactId: sent.fqContactId,
-                aqContactId: sent.aqContactId
+                aqContactId: sent.aqContactId,
+                fqAdministratorId: sent.fqAdministratorId
               })
             };
 
@@ -2991,34 +3014,29 @@
                 if (request.readyState !== 4) { return; }
                 saving = false;
 
-                if (request.status >= 200 && request.status < 300) {
+                if (window.otApi.ok(request)) {
                   writeSavedAccountability({ at: Date.now(), state: sent });
-                  // Not "Saved" yet if something moved meanwhile: send it first.
+                  {% comment %}// Not "Saved" yet if something moved meanwhile: send it first.{% endcomment %}
                   if (saveAgain) { saveAgain = false; save(); return; }
                   var now = new Date();
                   show('Saved ' + ('0' + now.getHours()).slice(-2) + ':'
                     + ('0' + now.getMinutes()).slice(-2), 'success');
+                  finish(true);
                   return;
                 }
 
-                // A failed save is not retried: the error stays on screen, and the next change
-                // sends the whole state again.
+                {% comment %}// A failed save is not retried: the error stays on screen, and the next change
+                // sends the whole state again.{% endcomment %}
                 saveAgain = false;
-                var message = 'That could not be saved (' + request.status + ').';
-                try {
-                  var parsed = JSON.parse(request.responseText);
-                  if (parsed && parsed.error && parsed.error.message) {
-                    message = parsed.error.message
-                      .replace('PRECONDITION: ', '').replace('VALIDATION: ', '').replace('UNAUTHORIZED: ', '');
-                  }
-                } catch (e) { /* the status code is all there is */ }
-                show(message, 'error');
+                show(window.otApi.error('Recording who carries the fail', request), 'error');
+                finish(false);
               };
 
               request.send(JSON.stringify(body));
             }).fail(function () {
               saving = false;
-              show('This page did not load completely. Refresh and try again.', 'error');
+              show(window.otApi.error('Recording who carries the fail', null), 'error');
+              finish(false);
             });
           }
 
@@ -3027,30 +3045,30 @@
             timer = window.setTimeout(save, 700);
           }
 
-          // Before anything is wired, so drawing the saved state is not itself a change to save.
+          {% comment %}// Before anything is wired, so drawing the saved state is not itself a change to save.{% endcomment %}
           restoreSaved();
           reportAccountabilityLag();
 
           for (var i = 0; i < boxes.length; i++) { boxes[i].addEventListener('change', queue); }
 
-          // change fires when a suggestion is picked; input covers typing the whole thing
-          // out, which a datalist also allows.
+          {% comment %}// change fires when a suggestion is picked; input covers typing the whole thing
+          // out, which a datalist also allows.{% endcomment %}
           var people = root.querySelectorAll('[data-ot-acc-person]');
           for (var q = 0; q < people.length; q++) {
             people[q].addEventListener('change', queue);
             people[q].addEventListener('input', queue);
           }
 
-          // The submit waits on this the way it waits on the header: a choice made a moment
-          // before pressing Submit must reach the review before the outcome is created from it.
-          /*
+          {% comment %}// The submit waits on this the way it waits on the header: a choice made a moment
+          // before pressing Submit must reach the review before the outcome is created from it.{% endcomment %}
+          {% comment %}/*
            * Shown and hidden as the answers change (2026-09-19). A non-pass anywhere on the
            * outcome scale means this check recorded a fail and somebody carries it.
            *
            * Bound to the questionnaire rather than to each answer's own save, because an
            * answer is saved on a debounce and the card should appear the moment the option
            * is ticked, not a second later.
-           */
+           */{% endcomment %}
           var NON_PASS = ['120910301', '120910302', '120910303', '120910304'];
 
           function failed() {
@@ -3074,7 +3092,13 @@
 
           refresh();
 
-          window.otAccountability = { flush: function (done) { save(); if (done) { done(true); } } };
+          window.otAccountability = {
+            flush: function (done) {
+              {% comment %}// Hidden: no fail is ticked, so nobody carries one and the submit need not wait.{% endcomment %}
+              if (root.hidden) { save(null); if (done) { done(true); } return; }
+              save(done);
+            }
+          };
         })();
       </script>
     {% endif %}
@@ -3268,11 +3292,11 @@
             status.className = 'ot-accountability__status' + (kind ? ' ot-inline-status--' + kind : '');
           }
 
-          /*
+          {% comment %}/*
            * Every text the checker has written on this review, drawn or not. A row that drops
            * out of the list keeps its words here, so unticking and re-ticking a fail point does
            * not lose them; the server ignores keys that are no longer items.
-           */
+           */{% endcomment %}
           var texts = {};
           var saved = [];
           try {
@@ -3308,10 +3332,10 @@
           }
           /* ot-remedial-canonical:end */
 
-          // What the server sent, fixed at load: the thing a remembered save is compared to.
+          {% comment %}// What the server sent, fixed at load: the thing a remembered save is compared to.{% endcomment %}
           var rendered = canonical(saved);
 
-          /*
+          {% comment %}/*
            * CACHE_LAG, as the header, the answers and "Who carries this fail" handle it. The
            * save goes through a plug-in that writes the review, so the site's render cache
            * learns of it late (AD-094: up to fifteen minutes) and a reload inside that window
@@ -3319,7 +3343,7 @@
            * newer one, and a submit would stamp into the write-once al_remedialaction. The tab
            * remembers what it saved and says so; it never re-applies it, because words on
            * screen the server did not send cannot be told from words it did.
-           */
+           */{% endcomment %}
           var REMEDIAL_LAG_KEY = 'ot.savedRemedial.' + reviewId;
           var REMEDIAL_LAG_WINDOW_MS = 20 * 60 * 1000;
 
@@ -3329,11 +3353,11 @@
           }
 
           function writeSavedRemedial(remembered) {
-            // Private browsing and a full store both throw; the notice is a courtesy.
+            {% comment %}// Private browsing and a full store both throw; the notice is a courtesy.{% endcomment %}
             try {
               if (remembered === null) { window.sessionStorage.removeItem(REMEDIAL_LAG_KEY); }
               else { window.sessionStorage.setItem(REMEDIAL_LAG_KEY, JSON.stringify(remembered)); }
-            } catch (e) { /* no notice this time */ }
+            } catch (e) { {% comment %}/* no notice this time */{% endcomment %} }
           }
 
           var current = [];
@@ -3354,7 +3378,7 @@
             if (timer) { window.clearTimeout(timer); timer = null; }
             if (saving) { saveAgain = true; return; }
             if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
-              show('This page did not load completely. Refresh and try again.', 'error');
+              show(window.otApi.error('Saving the remedial actions', null), 'error');
               finish(false);
               return;
             }
@@ -3365,8 +3389,8 @@
                 entries.push({ item: key, text: texts[key] });
               }
             }
-            // What this save sends, kept so a reload inside the cache window can be told apart
-            // from one that has caught up (reportRemedialLag).
+            {% comment %}// What this save sends, kept so a reload inside the cache window can be told apart
+            // from one that has caught up (reportRemedialLag).{% endcomment %}
             var sent = entries;
 
             saving = true;
@@ -3381,7 +3405,7 @@
                 if (request.readyState !== 4) { return; }
                 saving = false;
 
-                if (request.status >= 200 && request.status < 300) {
+                if (window.otApi.ok(request)) {
                   writeSavedRemedial({ at: Date.now(), map: canonical(sent) });
                   if (saveAgain) { saveAgain = false; save(null); return; }
                   var now = new Date();
@@ -3391,15 +3415,7 @@
                 }
 
                 saveAgain = false;
-                var message = 'Your remedial actions could not be saved (' + request.status + ').';
-                try {
-                  var parsed = JSON.parse(request.responseText);
-                  if (parsed && parsed.error && parsed.error.message) {
-                    message = parsed.error.message
-                      .replace('PRECONDITION: ', '').replace('VALIDATION: ', '').replace('UNAUTHORIZED: ', '');
-                  }
-                } catch (e) { /* the status code is all there is */ }
-                show(message, 'error');
+                show(window.otApi.error('Saving the remedial actions', request), 'error');
                 finish(false);
               };
               request.send(JSON.stringify({
@@ -3407,7 +3423,7 @@
               }));
             }).fail(function () {
               saving = false;
-              show('This page did not load completely. Refresh and try again.', 'error');
+              show(window.otApi.error('Saving the remedial actions', null), 'error');
               finish(false);
             });
           }
@@ -3422,7 +3438,7 @@
             queue();
           }
 
-          // Each further action on an item, by number: "item ##2" (RemedialActions.ExtraMark).
+          {% comment %}// Each further action on an item, by number: "item ##2" (RemedialActions.ExtraMark).{% endcomment %}
           function extras(key) {
             var stem = key + ' ##';
             var found = [];
@@ -3479,7 +3495,7 @@
             return root.getAttribute('data-ot-tax-only') === 'true' || (option && option.parentNode.value === '120910571');
           }
 
-          // The Tax form: comments follow their Yes, and File Quality is AQS's unless Tax only.
+          {% comment %}// The Tax form: comments follow their Yes, and File Quality is AQS's unless Tax only.{% endcomment %}
           function syncTax(list, fails) {
             var pairs = [['Q-TAX-05', 'Q-TAX-06'], ['Q-TAX-07', 'Q-TAX-08'], ['Q-TAX-09', 'Q-TAX-10'], ['Q-TAX-11', 'Q-TAX-12']];
             var owed = fails.length > 0;
@@ -3502,6 +3518,9 @@
             for (var c = 0; c < codes.length; c++) {
               var row = hideRow(codes[c], !alone);
               if (row) { table = row.closest('table'); }
+              {% comment %}// The Required mark follows the same rule the submit gate applies.{% endcomment %}
+              var mark = row && codes[c] !== 'Q-FQTAX-02' ? row.querySelector('.ot-required') : null;
+              if (mark) { mark.hidden = !alone; }
             }
             if (table) {
               table.hidden = !alone;
@@ -3535,7 +3554,7 @@
             }
 
             var result = otRemedialItems(list, fails, isTax);
-            // Tax categories carry their own words, so only a check with nothing else needs the card.
+            {% comment %}// Tax categories carry their own words, so only a check with nothing else needs the card.{% endcomment %}
             root.hidden = !result.owed || (result.categories > 0 && result.items.length === 0);
 
             var keys = withExtras(result.items.length ? result.items : [OVERALL]);
@@ -3560,13 +3579,13 @@
               box.setAttribute('aria-label', 'Remedial action for ' + (keys[i] === OVERALL ? 'this check' : keys[i]));
               box.setAttribute('data-ot-remedial-item', keys[i]);
               box.value = texts[keys[i]] || '';
-              // A redraw after submit must not hand back a live box (lock).
+              {% comment %}// A redraw after submit must not hand back a live box (lock).{% endcomment %}
               box.disabled = locked;
               box.addEventListener('input', onInput);
               box.addEventListener('blur', function () { save(null); });
               cell.appendChild(box);
 
-              // One query per box: another action on this item raises its own remediation row.
+              {% comment %}// One query per box: another action on this item raises its own remediation row.{% endcomment %}
               var more = document.createElement('button');
               more.type = 'button';
               more.className = 'ot-btn';
@@ -3598,7 +3617,7 @@
             return null;
           }
 
-          // The AQS checker's answer, parked with the words and written onto each action raised.
+          {% comment %}// The AQS checker's answer, parked with the words and written onto each action raised.{% endcomment %}
           var contact = root.querySelector('[data-ot-remedial-contact]');
           if (contact) {
             contact.value = texts.__clientcontact__ || '';
@@ -3621,11 +3640,11 @@
               + ' the next change would save what is on screen over it.', 'error');
           }
 
-          /*
+          {% comment %}/*
            * The review has been submitted (lockPage). The card sits outside the questionnaire,
            * so the page's own lock does not reach it: its boxes are disabled here and a save
            * still in its debounce is dropped - the server would refuse it for a submitted check.
-           */
+           */{% endcomment %}
           function lock() {
             locked = true;
             if (timer) { window.clearTimeout(timer); timer = null; }
@@ -3633,7 +3652,7 @@
             for (var b = 0; b < boxes.length; b++) { boxes[b].disabled = true; }
           }
 
-          // Any change outside the card may move the list: an answer, a fail point tick.
+          {% comment %}// Any change outside the card may move the list: an answer, a fail point tick.{% endcomment %}
           document.addEventListener('change', function (event) {
             if (event.target && !root.contains(event.target)) { draw(); }
           });
@@ -3839,7 +3858,48 @@
       {% endif %}
     {% endunless %}
 
-    {% if editable %}
+    {% comment %}
+      Tax before AQS, mirrored from SubmitReviewPlugin.EnsureTaxPrecedesAqs so an AQS
+      checker is told before answering everything rather than refused at the end. The same
+      two tests, in the same order: any active Tax review on the case that is not at
+      Submitted (120910212) holds the AQS submit; and where the route requires Tax, no
+      active Tax review at all holds it too. A case with no route is judged on the reviews
+      alone, as the server does. Answering stays open - only the submit waits.
+    {% endcomment %}
+    {% assign tax_pending = false %}
+    {% if editable and rv.al_reviewtype.value == 120910201 %}
+      {% fetchxml tax_first %}
+      <fetch>
+        <entity name="al_reviewinstance">
+          <attribute name="al_reviewstatus" />
+          <filter type="and">
+            <condition attribute="statecode" operator="eq" value="0" />
+            <condition attribute="al_outcomecaseid" operator="eq" value="{{ rv['case.al_outcomecaseid'] | xml_escape }}" />
+            <condition attribute="al_reviewtype" operator="eq" value="120910200" />
+          </filter>
+        </entity>
+      </fetch>
+      {% endfetchxml %}
+      {% assign tax_found = 0 %}
+      {% for t in tax_first.results.entities %}
+        {% assign tax_found = tax_found | plus: 1 %}
+        {% comment %}Through default: the server's not-equal skips a review with no status at all, and null != a value is true here.{% endcomment %}
+        {% assign t_status = t.al_reviewstatus.value | default: '' %}
+        {% if t_status != '' and t_status != 120910212 %}{% assign tax_pending = true %}{% endif %}
+      {% endfor %}
+      {% if tax_found == 0 and rv['route.al_requirestaxreview'] == true %}{% assign tax_pending = true %}{% endif %}
+    {% endif %}
+
+    {% if editable and tax_pending %}
+      <section class="ot-card ot-submit" aria-labelledby="ot-submit-heading">
+        <h2 class="ot-card__title" id="ot-submit-heading">Submit this review</h2>
+        <p class="ot-note ot-note--blocked">
+          The Tax check on this case has not been submitted yet, and Tax must be completed
+          before AQS. You can keep answering, but this review cannot be submitted until the
+          Tax check is in.
+        </p>
+      </section>
+    {% elsif editable %}
       <section class="ot-card ot-submit"
                data-ot-submit
                data-review-id="{{ rv.al_reviewinstanceid }}"
@@ -3859,7 +3919,7 @@
         <p class="ot-submit__status" data-ot-submit-status aria-live="polite"></p>
       </section>
       <script>
-        /*
+        {% comment %}/*
          * Submit Review (PP-07, PP-08, PP-11).
          *
          * Path: review page -> PATCH al_reviewinstance -> SubmitRequestPlugin -> Dataverse.
@@ -3892,7 +3952,7 @@
          * transition, mandatory questions, Tax before AQS, idempotency and the submission
          * lock - is enforced in the plug-in. Disabling the button here is a courtesy to the
          * user, never an access control (NFR-SEC-01).
-         */
+         */{% endcomment %}
         (function () {
           'use strict';
 
@@ -3904,12 +3964,12 @@
           var reviewId = root.getAttribute('data-review-id');
           var caseId = root.getAttribute('data-case-id');
 
-          /*
+          {% comment %}/*
            * Where the submit left the case, read from Dataverse rather than predicted
            * (reported 2026-10-07: the wording suggested the case was going to the T&C
            * Manager when it was not). SubmitReviewPlugin decides; the page only reports. The
            * values are CaseLifecycle.cs's, and portalNextStepMessages.test.ts holds them to it.
-           */
+           */{% endcomment %}
           var CASE_STATUS = {
             queued: 120910583,
             awaitingRemediation: 120910587,
@@ -3935,8 +3995,8 @@
             read.send();
           }
 
-          // Nothing is said about a status the submit cannot lead to; a read that fails says
-          // only what is certain.
+          {% comment %}// Nothing is said about a status the submit cannot lead to; a read that fails says
+          // only what is certain.{% endcomment %}
           function whereItWent(value) {
             if (value === CASE_STATUS.closed) {
               return ' The case passed and is now closed.';
@@ -3959,7 +4019,7 @@
             status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
           }
 
-          /*
+          {% comment %}/*
            * The rows the plug-in refused for, marked where they are. Until 2026-09-13 the
            * refusal said "3 of 42 required questions are unanswered" and the page showed
            * that sentence under the button, leaving the checker to scan forty-two rows for
@@ -3968,7 +4028,7 @@
            * and its status line says why. The first is scrolled into view. A row clears its
            * own mark when its answer next saves. Presentation only - the plug-in still
            * decides (NFR-SEC-01).
-           */
+           */{% endcomment %}
           function markUnanswered(ids) {
             var previous = document.querySelectorAll('.ot-answer--missing');
             for (var p = 0; p < previous.length; p += 1) { previous[p].classList.remove('ot-answer--missing'); }
@@ -3994,148 +4054,22 @@
             }
           }
 
-          /*
-           * The plug-in prefixes its failures so the client can branch without parsing
-           * prose. Messages here say what happened, what is still safe, and what to do
-           * next, and never expose a table name, query, id or stack trace (PP-16).
-           *
-           * httpStatus is read as well as the body. A refusal that carries no prefix did
-           * not come from the plug-in at all - it came from the portal, before Dataverse
-           * was reached - and 401/403 there means the site would not accept the write
-           * rather than that anything went wrong transiently. Telling that user to "try
-           * again" sends them round a loop that cannot terminate, which is what the single
-           * generic message used to do for every non-2xx alike.
-           */
-          /*
-           * The server's own words, out of the response body.
-           *
-           * The body is an OData error object, so the message has to be read out of it rather than
-           * scanned for in the raw text: a prefix found by indexOf and taken to the end of the
-           * string carries the JSON tail with it, which is how a PRECONDITION message came to be
-           * shown with '","innererror":{...}}' on the end of it.
-           *
-           * A body that will not parse is returned as it stands - it is still more than "something
-           * went wrong" - and it is collapsed onto one line and capped, because an error line is
-           * read on screen and the whole of a platform fault is not readable there.
-           */
-          function serverMessage(raw) {
-            var text = String(raw || '').trim();
-            if (!text) { return ''; }
-
-            var message = text;
-            try {
-              var body = JSON.parse(text);
-              var error = body && body.error ? body.error : body;
-              if (error && error.innererror && error.innererror.message) {
-                message = error.innererror.message;
-              } else if (error && error.message) {
-                message = error.message;
-              }
-            } catch (ignored) {
-              // Not JSON. Keep the raw text.
-            }
-
-            return String(message || '').replace(/\s+/g, ' ').trim();
-          }
-
-          /*
-           * The cap belongs here, not in serverMessage, and that is the whole of a defect
-           * found on 2026-09-13.
-           *
-           * The unanswered-questions refusal carries its question version ids in a bracketed
-           * tail at the END of the message, and friendlyError reads that tail to mark the
-           * rows. Capping the message before the tail was read cut it off from FOUR
-           * unanswered questions upward - 311 characters at four, against a 300 cap - so the
-           * rows went unmarked and the text on screen ended mid-identifier. One or three
-           * unanswered fitted, which is why it looked like it worked.
-           *
-           * Each branch below now caps what it actually puts on screen, after the tail has
-           * been taken off. An error line is still read on screen, and the whole of a
-           * platform fault is still not readable there.
-           */
-          function cap(text) {
-            return text.length > 300 ? text.substring(0, 300) + '...' : text;
-          }
-
-          function friendlyError(raw, httpStatus) {
-            var text = serverMessage(raw);
-            if (text.indexOf('CONFLICT:') !== -1) {
-              return 'This review changed since you opened it. Reload the page and try again - your answers are still saved.';
-            }
-            if (text.indexOf('UNAUTHORIZED:') !== -1) {
-              return 'You do not have permission to submit this review.';
-            }
-            if (text.indexOf('PRECONDITION:') !== -1) {
-              // Carries the actionable detail: which required questions remain, by code, and
-              // in a bracketed tail their question version ids, which mark the rows below and
-              // are never shown.
-              var idx = text.indexOf('PRECONDITION:');
-              var detail = text.substring(idx + 'PRECONDITION:'.length).trim();
-              var tail = /\s*\[unanswered:([^\]]*)\]\s*$/.exec(detail);
-              if (tail) {
-                markUnanswered(tail[1].split(','));
-                detail = detail.substring(0, tail.index).trim();
-              }
-              return cap(detail);
-            }
-            if (text.indexOf('UNEXPECTED:') !== -1) {
-              var unexpected = text.indexOf('UNEXPECTED:');
-              return 'This review was not submitted. ' + cap(text.substring(unexpected + 'UNEXPECTED:'.length).trim());
-            }
-            if (httpStatus === 403) {
-              /*
-               * Reloading and trying once more was the wrong advice: this refusal is the
-               * permission chain, and it will refuse again.
-               *
-               * It also used to promise "your answers are still saved", and that promise was
-               * false in the case that produces it. Answering and submitting travel the same
-               * Contact-scoped permission chain, so an account refused here was refused on
-               * every autosave too - the answers were never written, and a reader who trusts
-               * the message loses the lot on reload. Reported exactly that way. It now says
-               * what is true, which is that it does not know.
-               */
-              return 'Your account is not allowed to submit this review, so nothing was submitted. Check your answers '
-                + 'are still on screen before leaving the page - the same permission stops them being saved, so they '
-                + 'may not have been. Submitting needs a Tax or AQS reviewer role on your portal account, and the '
-                + 'review has to be assigned to you. Ask an administrator to check both rather than retrying.';
-            }
-            /*
-             * Split from 403 for the reason given on the autosave's friendlyError: a 401
-             * is the session, not the permission chain, and conflating them sent three
-             * rounds of investigation at web roles that were correct.
-             */
-            if (httpStatus === 401) {
-              return 'Your session was not accepted, so nothing was submitted. Reload the page and sign in again, '
-                + 'then check your answers are still on screen before submitting.';
-            }
-            /*
-             * The server's message rather than an invented sentence. "We could not submit
-             * this review, please try again" was true of every refusal alike and told the
-             * reader nothing they could act on or quote - which is what was reported on
-             * 2026-09-10, against a refusal whose real cause the page had been handed and
-             * discarded.
-             */
-            return 'This review was not submitted, and nothing has been changed. '
-              + (text ? 'The server said: ' + cap(text) : 'The server gave no detail.')
-              + (httpStatus ? ' (status ' + httpStatus + ')' : '');
-          }
-
           function setBusy(busy) {
             button.disabled = busy;
             button.setAttribute('aria-busy', busy ? 'true' : 'false');
             button.textContent = busy ? 'Submitting...' : 'Submit review';
           }
 
-          /*
+          {% comment %}/*
            * What the server render does for a submitted review, done to the page in hand:
            * every control the questionnaire owns is disabled and the submit button stays
            * disabled, leaving the status line so the confirmation stays readable. The
            * autosave script sees disabled controls as nothing to save.
-           */
-          /*
+           */{% endcomment %}
+          {% comment %}/*
            * 'dd MMM yyyy', the format the Liquid date filter renders into the cell below, so
            * the date this writes cannot be told from the date the server drew.
-           */
+           */{% endcomment %}
           function today() {
             var now = new Date();
             var day = now.getDate();
@@ -4144,7 +4078,7 @@
             return (day < 10 ? '0' + day : String(day)) + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
           }
 
-          /*
+          {% comment %}/*
            * Locking the controls is not the whole of what a submit changes on this page.
            *
            * The summary above carries the review's status and its Submitted date, both
@@ -4156,7 +4090,7 @@
            * Both are certain here: the PATCH returned 2xx, so the review IS submitted, by
            * this person, today. The badge class mirrors OT Status Badge, where 'Submitted'
            * matches its 'submitted' branch and is ot-badge--active.
-           */
+           */{% endcomment %}
           function markSubmitted() {
             var status = document.querySelector('[data-ot-review-status]');
             if (status) {
@@ -4175,8 +4109,8 @@
             var controls = document.querySelectorAll(
               '[data-ot-questionnaire] input, [data-ot-questionnaire] textarea, [data-ot-questionnaire] select, [data-ot-questionnaire] button');
             for (var i = 0; i < controls.length; i++) { controls[i].disabled = true; }
-            // The remedial-actions card sits outside the questionnaire; a word typed into it
-            // now would only be refused by the server, the check being submitted.
+            {% comment %}// The remedial-actions card sits outside the questionnaire; a word typed into it
+            // now would only be refused by the server, the check being submitted.{% endcomment %}
             if (window.otRemedial && typeof window.otRemedial.lock === 'function') { window.otRemedial.lock(); }
             button.disabled = true;
             button.textContent = 'Submitted';
@@ -4188,11 +4122,11 @@
             if (button.disabled) { return; }
 
             if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
-              show('This page did not load completely. Refresh and try again.', 'error');
+              show(window.otApi.error('Submitting the check', null), 'error');
               return;
             }
 
-            /*
+            {% comment %}/*
              * Any outstanding header edit first (project owner, 2026-09-19).
              *
              * The header saves itself as it is edited, so there is usually nothing waiting -
@@ -4201,27 +4135,47 @@
              * the checker had already corrected. A header edit that will not save stops the
              * submit rather than being lost under it: the review is the thing that cannot be
              * taken back (BR-012).
-             */
-            // The accountability choice, if the checker made one a moment ago: it is parked
-            // on the review and the submit is what turns it into part of the outcome, so it
-            // has to land first.
-            if (window.otAccountability && typeof window.otAccountability.flush === 'function') {
-              window.otAccountability.flush(null);
-            }
-
-            /*
-             * The remedial actions next (project owner, 2026-09-29). Checked here so the
-             * checker is told before a round trip, and saved with a callback rather than fired
-             * and forgotten: the submit reads them off the review, so a save still in its
-             * debounce when Submit is pressed would be refused by the server as missing.
-             */
+             */{% endcomment %}
+            {% comment %}/*
+             * The remedial actions are checked here so the checker is told before a round
+             * trip (project owner, 2026-09-29); they are saved after the accountability choice.
+             */{% endcomment %}
             if (window.otRemedial) {
               var unwritten = window.otRemedial.missing();
               if (unwritten) {
                 show(unwritten, 'error');
                 return;
               }
+            }
 
+            {% comment %}// The accountability choice, if the checker made one a moment ago: it is parked
+            // on the review and the submit is what turns it into part of the outcome, so it
+            // has to land first, and a save that fails stops the submit.{% endcomment %}
+            if (window.otAccountability && typeof window.otAccountability.flush === 'function') {
+              setBusy(true);
+              show('Saving who carries this fail...', 'info');
+              window.otAccountability.flush(function (ok) {
+                if (!ok) {
+                  show('Your choice of who carries this fail could not be saved, so the review was'
+                    + ' not submitted. The message in the "Who carries this fail" card says why.', 'error');
+                  setBusy(false);
+                  return;
+                }
+                afterAccountability();
+              });
+              return;
+            }
+
+            afterAccountability();
+          });
+
+          function afterAccountability() {
+            {% comment %}/*
+             * The remedial actions next, saved with a callback rather than fired and
+             * forgotten: the submit reads them off the review, so a save still in its
+             * debounce when Submit is pressed would be refused by the server as missing.
+             */{% endcomment %}
+            if (window.otRemedial) {
               setBusy(true);
               show('Saving your remedial actions...', 'info');
               window.otRemedial.flush(function (ok) {
@@ -4237,7 +4191,7 @@
             }
 
             afterRemedial();
-          });
+          }
 
           function afterRemedial() {
             if (window.otHeader && typeof window.otHeader.flush === 'function') {
@@ -4263,16 +4217,16 @@
             setBusy(true);
             show('Submitting your review...', 'info');
 
-            function unreachable() {
-              show('The submission did not reach the server. Check your connection and try again - your answers are still saved.', 'error');
+            function unreachable(request) {
+              show(window.otApi.error('Submitting the check', request || null), 'error');
               setBusy(false);
             }
 
-            // Power Pages requires the request verification token on every write, and
+            {% comment %}// Power Pages requires the request verification token on every write, and
             // shell.getTokenDeferred() is the only supported way to obtain it. Same
             // mechanism the autosave above uses, so both writes present the same
             // credential - which is what the hidden-field read was meant to achieve and
-            // did not, because this page renders no form to carry that field.
+            // did not, because this page renders no form to carry that field.{% endcomment %}
             window.shell.getTokenDeferred().done(function (token) {
               var request = new XMLHttpRequest();
               request.open('PATCH', '/_api/al_reviewinstances(' + reviewId + ')', true);
@@ -4284,8 +4238,8 @@
               request.setRequestHeader('__RequestVerificationToken', token);
 
               request.onload = function () {
-                if (request.status >= 200 && request.status < 300) {
-                  /*
+                if (window.otApi.ok(request)) {
+                  {% comment %}/*
                    * Locked here, in the page already on screen, rather than by reloading.
                    * Power Pages renders from a server-side cache that a website write clears
                    * only for the record it wrote; al_submittedon is stamped by
@@ -4294,7 +4248,7 @@
                    * still editable with no answers on it (AD-094). Change tracking on the
                    * portal tables is what makes the next visit right; not reloading is what
                    * makes this one right.
-                   */
+                   */{% endcomment %}
                   lockPage();
                   caseStatusNow(function (value) {
                     show('Review submitted and locked.' + whereItWent(value)
@@ -4303,14 +4257,18 @@
                   return;
                 }
 
-                show(friendlyError(request.responseText, request.status), 'error');
+                {% comment %}// The unanswered-questions refusal ends in a bracketed list of question version
+                // ids. They mark the rows below and are never shown: the shared reader drops the tail.{% endcomment %}
+                var tail = /\[unanswered:([^\]]*)\]\s*$/.exec(window.otApi.refusal(request));
+                if (tail) { markUnanswered(tail[1].split(',')); }
+                show(window.otApi.error('Submitting the check', request), 'error');
                 setBusy(false);
               };
 
-              request.onerror = unreachable;
+              request.onerror = function () { unreachable(request); };
 
               request.send(JSON.stringify({ al_submitrequested: true }));
-            }).fail(unreachable);
+            }).fail(function () { unreachable(null); });
           }
         })();
       </script>
@@ -4357,28 +4315,28 @@
           var DEBOUNCE_MS = 900;
           var timer = null;
           var saving = false;
-          // A save asked for while one is in flight, and who is waiting on it (see saveNow).
+          {% comment %}// A save asked for while one is in flight, and who is waiting on it (see saveNow).{% endcomment %}
           var saveAgain = false;
           var waiting = [];
 
-          /*
+          {% comment %}/*
            * The Tax team's two selects exist only on an unsubmitted Tax review. Everything
-           * else on the header is editable on any open review, so both are optional here
+           * else on the header is editable on any open review the checker holds, so both are optional here
            * and the payload names only what is present and changed.
-           */
+           */{% endcomment %}
           var required = document.getElementById('ot-taxrequired');
           var disposition = document.getElementById('ot-taxdisposition');
 
           var initialRequired = required ? required.value : '';
           var initialDisposition = disposition ? disposition.value : '';
 
-          /** Whether either Tax team select still differs from what was last saved. */
+          {% comment %}/** Whether either Tax team select still differs from what was last saved. */{% endcomment %}
           function taxStillMoving() {
             return (required && required.value !== initialRequired)
               || (disposition && disposition.value !== initialDisposition);
           }
 
-          /*
+          {% comment %}/*
            * CACHE_LAG for the two Tax team selects (reported 2026-09-22: the disposition
            * "doesn't stick after reload").
            *
@@ -4399,7 +4357,7 @@
            * own cache-lag notice follows: a value on screen that the server did not send is
            * indistinguishable from one it did, and a reader could not tell which they had.
            * A sentence they can act on is worth more than a value they cannot trust.
-           */
+           */{% endcomment %}
           var HEADER_LAG_KEY = 'ot.savedHeader.' + status.getAttribute('data-case-id');
           var HEADER_LAG_WINDOW_MS = 20 * 60 * 1000;
 
@@ -4409,29 +4367,22 @@
           }
 
           function writeSavedHeader(saved) {
-            // Private browsing and a full store both throw. The notice is a courtesy, so
-            // losing it is not worth breaking the save that has just succeeded.
+            {% comment %}// Private browsing and a full store both throw. The notice is a courtesy, so
+            // losing it is not worth breaking the save that has just succeeded.{% endcomment %}
             try {
               if (saved === null) {
                 window.sessionStorage.removeItem(HEADER_LAG_KEY);
               } else {
                 window.sessionStorage.setItem(HEADER_LAG_KEY, JSON.stringify(saved));
               }
-            } catch (e) { /* no notice this time */ }
+            } catch (e) { {% comment %}/* no notice this time */{% endcomment %} }
           }
 
-          /** The label of a select's chosen option, for a message a reader can check. */
-          function labelOfSelect(select) {
-            if (!select) { return ''; }
-            var option = select.options[select.selectedIndex];
-            return option ? option.text : '';
-          }
-
-          /*
+          {% comment %}/*
            * Says the page is behind, naming what this tab saved. Runs once, before anything is
            * wired, so the comparison is against what the SERVER rendered rather than against
            * anything the reader has since touched.
-           */
+           */{% endcomment %}
           (function reportHeaderLag() {
             var saved = readSavedHeader();
             if (!saved) { return; }
@@ -4450,7 +4401,7 @@
               behind.push('For Tax team usage');
             }
 
-            /*
+            {% comment %}/*
              * The tick lists, and the reason this notice needed widening at all.
              *
              * A product is applied by ASSOCIATION, and the page reads it back through its own
@@ -4462,7 +4413,7 @@
              *
              * setValueOf is a function declaration, so it is hoisted and usable here even
              * though it is written further down.
-             */
+             */{% endcomment %}
             if (saved.sets) {
               var lagSets = document.querySelectorAll('[data-ot-hdr-set]');
               for (var ls = 0; ls < lagSets.length; ls++) {
@@ -4474,8 +4425,8 @@
             }
 
             if (behind.length === 0) {
-              // The page has caught up, so there is nothing left to warn about and nothing
-              // left to remember.
+              {% comment %}// The page has caught up, so there is nothing left to warn about and nothing
+              // left to remember.{% endcomment %}
               writeSavedHeader(null);
               return;
             }
@@ -4488,16 +4439,16 @@
               + 'actually holds is what was saved, not what is on screen.', 'error');
           })();
 
-          // The rest of the header, remembered as rendered so an untouched field is never
+          {% comment %}// The rest of the header, remembered as rendered so an untouched field is never
           // sent. Sending the current value would be harmless but would put a field in the
-          // audit line that nobody moved.
+          // audit line that nobody moved.{% endcomment %}
           var headerInputs = [];
           var rendered = document.querySelectorAll('[data-ot-hdr]');
           for (var h = 0; h < rendered.length; h++) {
             headerInputs.push({ el: rendered[h], initial: rendered[h].value });
           }
 
-          /*
+          {% comment %}/*
            * A managed list the case may hold SEVERAL of (AD-190) is a group of checkboxes,
            * not one input with a value, so it is collected separately and read by ticking
            * rather than by `.value`.
@@ -4507,7 +4458,7 @@
            * changed, and the command would be asked to rewrite associations that already
            * match - a write, an audit line, and a reader wondering what moved. The Code
            * App's panel sorts for the same reason.
-           */
+           */{% endcomment %}
           function setValueOf(container) {
             var boxes = container.querySelectorAll('input[type="checkbox"]');
             var chosen = [];
@@ -4524,7 +4475,7 @@
             headerSets.push({ el: renderedSets[g], initial: setValueOf(renderedSets[g]) });
           }
 
-          /*
+          {% comment %}/*
            * Today in the UK, as yyyy-MM-dd (item 9, 2026-09-19).
            *
            * Users are in the UK and the browser may not be, and on a British Summer Time
@@ -4532,31 +4483,31 @@
            * their own today would be refused. en-CA is used because it formats as
            * YYYY-MM-DD, which is what a date input takes. The app reads the day the same
            * way in caseHeaderDates.ts, and CaseHeaderRules is the authority server-side.
-           */
+           */{% endcomment %}
           function ukToday() {
             try {
               return new Intl.DateTimeFormat('en-CA', {
                 timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit'
               }).format(new Date());
             } catch (e) {
-              // A runtime without the zone data still gets a cap, just the browser's own
-              // day. The command refuses a future date whatever the page allowed.
+              {% comment %}// A runtime without the zone data still gets a cap, just the browser's own
+              // day. The command refuses a future date whatever the page allowed.{% endcomment %}
               return new Date().toISOString().slice(0, 10);
             }
           }
 
-          /*
+          {% comment %}/*
            * A meeting that has not happened yet cannot have been checked, so the picker
            * will not offer a future day. An affordance only: al_CaseHeaderRequest reaches
            * the same rule through ApplyFields, because a typed date gets past a max on
            * some browsers and the request can be made by hand in any case.
-           */
+           */{% endcomment %}
           var noFuture = document.querySelectorAll('[data-ot-no-future]');
           for (var n = 0; n < noFuture.length; n++) {
             noFuture[n].setAttribute('max', ukToday());
           }
 
-          /** The changed header fields, as the flat object the plug-in parses. */
+          {% comment %}/** The changed header fields, as the flat object the plug-in parses. */{% endcomment %}
           function changedFields() {
             var fields = {};
             var any = false;
@@ -4571,14 +4522,14 @@
               var group = headerSets[j];
               var now = setValueOf(group.el);
               if (now === group.initial) { continue; }
-              // The WHOLE set, not the boxes that moved: a payload of additions could never
-              // remove one, and the server replaces what it is given.
+              {% comment %}// The WHOLE set, not the boxes that moved: a payload of additions could never
+              // remove one, and the server replaces what it is given.{% endcomment %}
               fields[group.el.getAttribute('data-ot-hdr-set')] = now;
               any = true;
             }
 
-            // People are identified by email (the server refuses a name sent alone), so a
-            // person's name and email travel together whenever either one changed.
+            {% comment %}// People are identified by email (the server refuses a name sent alone), so a
+            // person's name and email travel together whenever either one changed.{% endcomment %}
             var PERSON_PAIRS = [['al_advisername', 'al_adviseremail'], ['al_paraplanner', 'al_paraplanneremail']];
             for (var p = 0; p < PERSON_PAIRS.length; p++) {
               var pair = PERSON_PAIRS[p];
@@ -4597,11 +4548,11 @@
             status.className = kind ? 'ot-inline-status ot-inline-status--' + kind : 'ot-inline-status';
           }
 
-          /*
+          {% comment %}/*
            * The reload the reader asks for, added once beside the status line. A button
            * rather than a timer, for the reason the success branch below gives: the page
            * cannot promise that a reload shows the new state, so it must not spring one.
-           */
+           */{% endcomment %}
           function offerReload() {
             if (status.parentNode.querySelector('[data-ot-reload]')) { return; }
             var button = document.createElement('button');
@@ -4613,32 +4564,14 @@
             status.parentNode.insertBefore(button, status.nextSibling);
           }
 
-          function friendly(body, code) {
-            // The server's own words where it gave any: the refusals here are business
-            // rules - the role, and the review already being submitted - and a checker can
-            // act on both. A bare status code cannot be acted on by anyone.
-            try {
-              var parsed = JSON.parse(body);
-              var text = parsed && parsed.error && parsed.error.message;
-              if (text) {
-                return text
-                  .replace('PRECONDITION: ', '')
-                  .replace('VALIDATION: ', '')
-                  .replace('UNAUTHORIZED: ', '');
-              }
-            } catch (e) { /* fall through to the code */ }
-            if (code === 403) { return 'Your portal account is not permitted to change these fields.'; }
-            return 'The change could not be saved (' + code + ').';
-          }
-
-          /*
+          {% comment %}/*
            * Saves whatever has moved, or reports that nothing has.
            *
            * `done` is called with true when there was nothing to save or the save
            * succeeded, and false when it failed. The submit waits on it, so a header edit
            * that could not be stored stops the review being submitted on top of it rather
            * than being lost quietly.
-           */
+           */{% endcomment %}
           function saveNow(done) {
             done = done || function () {};
 
@@ -4662,7 +4595,7 @@
             show('Saving...', null);
 
             if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
-              show('This page did not load completely. Refresh and try again.', 'error');
+              show(window.otApi.error('Saving the case details', null), 'error');
               saving = false;
               done(false);
               return;
@@ -4676,17 +4609,17 @@
                 ? parseInt(disposition.value || '0', 10) : 0
             };
 
-            // Only when something moved: an empty object would make the plug-in read this
-            // as a header edit and run the assignment guard for no reason.
+            {% comment %}// Only when something moved: an empty object would make the plug-in read this
+            // as a header edit and run the assignment guard for no reason.{% endcomment %}
             if (fields) { request_body.fields = JSON.stringify(fields); }
 
             var payload = { al_caseheaderrequest: JSON.stringify(request_body) };
 
-            /*
+            {% comment %}/*
              * What THIS request carries. On success the saved baseline moves to these, not to
              * whatever the controls hold when the reply arrives - a value changed in between
              * was never sent, and taking it as saved is how it was lost.
-             */
+             */{% endcomment %}
             var sentInputs = [];
             for (var si = 0; si < headerInputs.length; si++) { sentInputs.push(headerInputs[si].el.value); }
             var sentSets = [];
@@ -4694,13 +4627,13 @@
             var sentRequired = required ? required.value : '';
             var sentDisposition = disposition ? disposition.value : '';
 
-            /*
+            {% comment %}/*
              * Ends this save: sends anything that moved while it was in flight, then answers
              * everyone who asked - this caller and any that queued behind it - with the
              * outcome of the LAST save, so a submit never proceeds over an unsaved change.
              * A failed save is not retried; the error stays on screen and the next edit or
              * the submit tries again.
-             */
+             */{% endcomment %}
             function finish(ok) {
               var callbacks = [done].concat(waiting);
               waiting = [];
@@ -4725,14 +4658,14 @@
                 if (request.readyState !== 4) { return; }
                 saving = false;
 
-                if (request.status >= 200 && request.status < 300) {
+                if (window.otApi.ok(request)) {
                   var routeMayHaveMoved = (required && sentRequired !== initialRequired)
                     || (disposition && sentDisposition !== initialDisposition);
 
                   if (required) { initialRequired = sentRequired; }
                   if (disposition) { initialDisposition = sentDisposition; }
 
-                  /*
+                  {% comment %}/*
                    * CACHE_LAG, the write side: the two selects, because they are the two the
                    * reader comes back to check, and every tick list, because those are the
                    * ones that are actually behind when they do. A text field they typed is
@@ -4741,7 +4674,7 @@
                    *
                    * Taken BEFORE the initial values below are reset, or every set would
                    * compare equal to itself and nothing would ever be remembered.
-                   */
+                   */{% endcomment %}
                   var setsMoved = false;
                   var snapshotSets = {};
                   for (var s2 = 0; s2 < headerSets.length; s2++) {
@@ -4761,21 +4694,21 @@
                   for (var k = 0; k < headerInputs.length; k++) {
                     headerInputs[k].initial = sentInputs[k];
                   }
-                  // The tick lists too, or the next save would re-send a set nobody touched.
+                  {% comment %}// The tick lists too, or the next save would re-send a set nobody touched.{% endcomment %}
                   for (var m = 0; m < headerSets.length; m++) {
                     headerSets[m].initial = sentSets[m];
                   }
 
                   if (!routeMayHaveMoved) {
-                    // An ordinary header field. Nothing else on the page depends on it, so
-                    // it is confirmed the way a saved answer is and nothing is offered.
+                    {% comment %}// An ordinary header field. Nothing else on the page depends on it, so
+                    // it is confirmed the way a saved answer is and nothing is offered.{% endcomment %}
                     var now = new Date();
                     show('Saved ' + ('0' + now.getHours()).slice(-2) + ':'
                       + ('0' + now.getMinutes()).slice(-2), 'success');
                     finish(true);
                     return;
                   }
-                  /*
+                  {% comment %}/*
                    * Confirmed in place, and the reload offered rather than taken.
                    *
                    * The rows this write changes are al_outcomecase and, where the route
@@ -4790,7 +4723,7 @@
                    * The two selects already show what was saved, because the reader chose
                    * them. What the page cannot know is whether the route moved, so it says
                    * that plainly instead of showing a stale answer to it.
-                   */
+                   */{% endcomment %}
                   show('Saved. The route can change with these fields, and Review progress'
                     + ' above still shows what the page read before you saved. Reload it when'
                     + ' you want that re-read, and if it still looks unchanged the site cache'
@@ -4800,35 +4733,29 @@
                   return;
                 }
 
-                show(friendly(request.responseText, request.status), 'error');
-                finish(false);
-              };
-
-              request.onerror = function () {
-                saving = false;
-                show('The change could not be saved. Check your connection and try again.', 'error');
+                show(window.otApi.error('Saving the case details', request), 'error');
                 finish(false);
               };
 
               request.send(JSON.stringify(payload));
             }).fail(function () {
               saving = false;
-              show('This page did not load completely. Refresh and try again.', 'error');
+              show(window.otApi.error('Saving the case details', null), 'error');
               finish(false);
             });
           }
 
-          /** Saves shortly after typing stops, so a half-typed name is not sent per keystroke. */
+          {% comment %}/** Saves shortly after typing stops, so a half-typed name is not sent per keystroke. */{% endcomment %}
           function queue() {
             if (timer) { window.clearTimeout(timer); }
             timer = window.setTimeout(function () { saveNow(); }, DEBOUNCE_MS);
           }
 
-          /*
+          {% comment %}/*
            * A tick is a whole decision, so the group saves on change. There is no typing to
            * debounce here and no blur to wait for - a checker who ticks a box and submits
            * immediately must not race a timer.
-           */
+           */{% endcomment %}
           for (var q = 0; q < headerSets.length; q++) {
             var boxes = headerSets[q].el.querySelectorAll('input[type="checkbox"]');
             for (var r = 0; r < boxes.length; r++) {
@@ -4842,15 +4769,15 @@
             if (control.tagName === 'INPUT' && control.type === 'text') {
               control.addEventListener('input', queue);
             }
-            // Leaving a field is a decision. Saving on blur as well as on the timer means a
-            // checker who edits and immediately submits does not race the debounce.
+            {% comment %}// Leaving a field is a decision. Saving on blur as well as on the timer means a
+            // checker who edits and immediately submits does not race the debounce.{% endcomment %}
             control.addEventListener('blur', function () { saveNow(); });
           }
 
           if (required) { required.addEventListener('change', function () { saveNow(); }); }
           if (disposition) { disposition.addEventListener('change', function () { saveNow(); }); }
 
-          /*
+          {% comment %}/*
            * The Products picker (project owner, 2026-09-23, on a catalogue of 55).
            *
            * Everything here is TIDYING. The list, the boxes and the collector are already
@@ -4862,7 +4789,7 @@
            * Written against [data-ot-picker] rather than the Products cell by name, so the
            * next managed list long enough to need it gets the same behaviour by marking it
            * up the same way.
-           */
+           */{% endcomment %}
           var pickers = document.querySelectorAll('[data-ot-picker]');
           for (var pk = 0; pk < pickers.length; pk++) {
             (function (picker) {
@@ -4874,12 +4801,12 @@
               var items = picker.querySelectorAll('.ot-hdr-set__item');
               if (!toggle || !panel) { return; }
 
-              /*
+              {% comment %}/*
                * The summary names what is ticked rather than counting it. "3 selected" sends
                * a checker back into the panel to find out WHICH three, which is the whole
                * cost the fold was meant to save. Past three it counts the rest, because the
                * cell is one line wide and a fourth name is what pushes it to two.
-               */
+               */{% endcomment %}
               function describe() {
                 var names = [];
                 for (var i = 0; i < items.length; i++) {
@@ -4909,11 +4836,11 @@
                 var shown = 0;
                 for (var i = 0; i < items.length; i++) {
                   var text = (items[i].textContent || '').toLowerCase();
-                  /*
+                  {% comment %}/*
                    * A ticked product is never filtered out. Searching is for FINDING the
                    * next one, and hiding a tick behind a search term is how a checker
                    * unticks something by accident and never sees it go.
-                   */
+                   */{% endcomment %}
                   var box = items[i].querySelector('input[type="checkbox"]');
                   var keep = term === '' || text.indexOf(term) !== -1 || (box && box.checked);
                   items[i].hidden = !keep;
@@ -4933,8 +4860,8 @@
 
               if (search) {
                 search.addEventListener('input', filter);
-                // Escape closes the panel rather than clearing the box, which is what a
-                // native select does and therefore what a checker expects.
+                {% comment %}// Escape closes the panel rather than clearing the box, which is what a
+                // native select does and therefore what a checker expects.{% endcomment %}
                 search.addEventListener('keydown', function (event) {
                   if (event.key === 'Escape' || event.keyCode === 27) {
                     open(false);
@@ -4943,18 +4870,18 @@
                 });
               }
 
-              // The collector is already listening for change on these boxes; this only
-              // keeps the closed summary honest.
+              {% comment %}// The collector is already listening for change on these boxes; this only
+              // keeps the closed summary honest.{% endcomment %}
               picker.addEventListener('change', redescribe);
             })(pickers[pk]);
           }
 
-          /*
+          {% comment %}/*
            * What the submit waits on. The header saves itself as it is edited, so by the
            * time anyone submits there is usually nothing outstanding - but a field changed a
            * moment earlier can still be inside the debounce, and submitting on top of it
            * would store the review against a header the checker had already corrected.
-           */
+           */{% endcomment %}
           window.otHeader = {
             flush: function (done) { saveNow(done); }
           };

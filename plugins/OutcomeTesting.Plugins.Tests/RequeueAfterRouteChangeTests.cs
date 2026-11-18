@@ -91,7 +91,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.True(moved);
             Assert.Equal(CaseLifecycle.Queued, Status(svc));
-            Assert.Contains(changes, line => line.Contains("Tax") && line.Contains("returned to the queue"));
+            Assert.Contains(changes, line => line.Contains("owes a Tax check") && line.Contains("returned to the queue"));
         }
 
         [Fact]
@@ -212,7 +212,7 @@ namespace OutcomeTesting.Plugins.Tests
                 svc, Before(svc), RouteChangedTo(TaxAqsRouteId), changes);
 
             Assert.True(moved);
-            Assert.Contains(changes, line => line.Contains("AQS"));
+            Assert.Contains(changes, line => line.Contains("owes an AQS check"));
         }
     }
 }

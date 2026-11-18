@@ -1,7 +1,7 @@
 <powerpagecomponent powerpagecomponentid="e00c019c-c9b5-f111-aaac-e4fade069307">
   <content>{
-  "value": "true",
-  "source": 0
+  "description": "Exposes al_questionversion to the portal Web API so an unsubmitted review page can re-read its own checklist live (2026-09-21). Power Pages renders from a server-side cache that learns about a Dataverse write through polled change tracking, so a question retyped in the Code App could leave the form drawing the previous scale for up to fifteen minutes (AD-094, AD-117); the Web API is not that cache. READ ONLY in effect: the 'Question Version - read' table permission grants read alone, and the Web API cannot exceed a table permission, so enabling this adds no way to alter the checklist from a browser.",
+  "value": "true"
 }</content>
   <iscustomizable>1</iscustomizable>
   <name>Webapi/al_questionversion/enabled</name>

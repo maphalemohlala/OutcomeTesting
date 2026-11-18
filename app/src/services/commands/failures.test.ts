@@ -31,6 +31,22 @@ describe('sentenceAfterPrefix', () => {
     );
   });
 
+  it('keeps double quotes that are part of the sentence', () => {
+    expect(sentenceAfterPrefix('VALIDATION: Choose "Adviser" or "Planner" first.', 'VALIDATION:')).toBe(
+      'Choose "Adviser" or "Planner" first.',
+    );
+  });
+
+  it('keeps them inside a raw body and a stringified one, and still stops at the string end', () => {
+    expect(
+      sentenceAfterPrefix('{"message":"VALIDATION: Pick \\"Adviser\\" first.","code":"1"}', 'VALIDATION:'),
+    ).toBe('Pick "Adviser" first.');
+    expect(
+      sentenceAfterPrefix('{\\"message\\":\\"VALIDATION: Pick \\\\\\"Adviser\\\\\\" first.\\",\\"code\\":\\"1\\"}', 'VALIDATION:'),
+    ).toBe('Pick "Adviser" first.');
+    expect(sentenceAfterPrefix('{"error":{"message":"NOTFOUND: Gone \\"x\\"."}}', 'NOTFOUND:')).toBe('Gone "x".');
+  });
+
   it('returns the whole remainder when there is no boundary', () => {
     expect(sentenceAfterPrefix('CONFLICT: Someone else saved first.', 'CONFLICT:')).toBe(
       'Someone else saved first.',
@@ -66,11 +82,18 @@ describe('classify', () => {
     expect(failure.message).toBe('Case reference is required.');
   });
 
-  it('classifies an unprefixed failure as unavailable without leaking the cause', () => {
+  it('keeps a quoted word in the sentence a plug-in wrote', () => {
+    const failure = classify({
+      error: { code: '0x80040265', message: 'PRECONDITION: The section "Advice" is retired, so nothing can be added to it.' },
+    });
+    expect(failure.message).toBe('The section "Advice" is retired, so nothing can be added to it.');
+  });
+
+  it('classifies an unprefixed failure that reached the server as unexpected, without leaking the cause', () => {
     const failure = classify({ message: 'socket hang up at 10.0.0.1' });
 
-    expect(failure.kind).toBe('unavailable');
-    expect(failure.message).toBe(DEFAULT_FAILURE_MESSAGES.unavailable);
+    expect(failure.kind).toBe('unexpected');
+    expect(failure.message).toBe('');
     expect(failure.message).not.toContain('10.0.0.1');
   });
 });

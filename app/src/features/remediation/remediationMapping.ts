@@ -82,15 +82,15 @@ export interface SignoffRow {
 
 
 /** Labels for the three remedial-form answers (AD-095); values from the 1209107xx band. */
-export const CLIENT_CONTACT_REQUIRED: Record<number, string> = {
+const CLIENT_CONTACT_REQUIRED: Record<number, string> = {
   120910793: 'Yes',
   120910794: 'No',
   120910795: 'Potentially',
 };
-export const RECHECK_REQUIRED: Record<number, string> = { 120910796: 'Yes', 120910797: 'No' };
-export const CHANGES_ADVICE: Record<number, string> = { 120910798: 'Yes', 120910799: 'No' };
+const RECHECK_REQUIRED: Record<number, string> = { 120910796: 'Yes', 120910797: 'No' };
+const CHANGES_ADVICE: Record<number, string> = { 120910798: 'Yes', 120910799: 'No' };
 /** al_actionperformed; the same two values the plug-ins and the portal use. */
-export const ACTION_PERFORMED: Record<number, string> = { 120910815: 'Yes', 120910816: 'No' };
+const ACTION_PERFORMED: Record<number, string> = { 120910815: 'Yes', 120910816: 'No' };
 
 /** The SDK returns an empty choice as null, and the generated model does not know these columns yet. */
 function choice(record: Al_remediationactions, attr: string, labels: Record<number, string>): string | null {

@@ -139,76 +139,62 @@
   so the figure on a card and the count on the page it opens are the same number - the
   mismatch AD-047 already had to fix once between My Work's tile and this list.
 
-  Six small aggregates rather than one grouped query, for the reason the Home cards record:
-  a grouped fetch would make the page depend on how an aliased choice column renders in
-  Liquid, and a card showing "120910583" instead of a stage is worse than a sixth round trip.
-  Status values are numeric literals from src/Entities/al_OutcomeCase/Entity.xml.
+  One aggregate grouped by status, not one query per card. It used to be five, on the worry
+  that a page should not depend on how an aliased choice column comes back from a grouped
+  fetch in this Liquid - a card showing "120910583" instead of a count would be worse than
+  the extra round trips. That worry is met below rather than avoided: the group's status is
+  never printed and never trusted in one shape. It is read as its option value where the
+  platform hands back an option object, otherwise as whatever came back, turned into text and
+  compared as text - so a number, a string and an object all land on the same card - and the
+  option's label is accepted as a last resort. A status with no cases has no row in a grouped
+  result, so every count starts at 0 and stays there. Status values are numeric literals from
+  src/Entities/al_OutcomeCase/Entity.xml, and the labels are that file's too.
 {% endcomment %}
 
 {% capture scope_qs %}{% if f_mine == '1' %}mine=1&amp;{% endif %}{% endcapture %}
 
-{% fetchxml n_queued %}
+{% fetchxml stage_counts %}
 <fetch aggregate="true">
   <entity name="al_outcomecase">
+    <attribute name="al_casestatus" alias="stage" groupby="true" />
     <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
-    <filter type="and"><condition attribute="al_casestatus" operator="eq" value="120910583" /></filter>
+    <filter type="and">
+      <condition attribute="al_casestatus" operator="in">
+        <value>120910583</value>
+        <value>120910584</value>
+        <value>120910585</value>
+        <value>120910586</value>
+        <value>120910587</value>
+      </condition>
+    </filter>
     {% if f_mine == '1' %}<link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="mine"><filter type="and"><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" /></filter></link-entity>{% endif %}
   </entity>
 </fetch>
 {% endfetchxml %}
-
-{% fetchxml n_assigned %}
-<fetch aggregate="true">
-  <entity name="al_outcomecase">
-    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
-    <filter type="and"><condition attribute="al_casestatus" operator="eq" value="120910584" /></filter>
-    {% if f_mine == '1' %}<link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="mine"><filter type="and"><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" /></filter></link-entity>{% endif %}
-  </entity>
-</fetch>
-{% endfetchxml %}
-
-{% fetchxml n_inprogress %}
-<fetch aggregate="true">
-  <entity name="al_outcomecase">
-    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
-    <filter type="and"><condition attribute="al_casestatus" operator="eq" value="120910585" /></filter>
-    {% if f_mine == '1' %}<link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="mine"><filter type="and"><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" /></filter></link-entity>{% endif %}
-  </entity>
-</fetch>
-{% endfetchxml %}
-
-{% fetchxml n_submitted %}
-<fetch aggregate="true">
-  <entity name="al_outcomecase">
-    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
-    <filter type="and"><condition attribute="al_casestatus" operator="eq" value="120910586" /></filter>
-    {% if f_mine == '1' %}<link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="mine"><filter type="and"><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" /></filter></link-entity>{% endif %}
-  </entity>
-</fetch>
-{% endfetchxml %}
-
-{% fetchxml n_remediation %}
-<fetch aggregate="true">
-  <entity name="al_outcomecase">
-    <attribute name="al_outcomecaseid" alias="total" aggregate="countcolumn" distinct="true" />
-    <filter type="and"><condition attribute="al_casestatus" operator="eq" value="120910587" /></filter>
-    {% if f_mine == '1' %}<link-entity name="al_reviewinstance" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="mine"><filter type="and"><condition attribute="al_assignedcontactid" operator="eq" value="{{ user.id | xml_escape }}" /></filter></link-entity>{% endif %}
-  </entity>
-</fetch>
-{% endfetchxml %}
-
 
 {% comment %}
-  An aggregate fetch returns no result set at all when the caller cannot read the table, and
-  indexing entities[0] straight away then fails with "Index was outside the bounds of the
-  array" - which renders as the card's number. Same guard as Home and My Work, for the same
-  reason: a card shows a figure or nothing, never an error string.
+  No entities[0] here: the rows are walked, so a caller who cannot read the table, or a
+  scope with no case at any of the five stages, simply leaves the five zeros standing. A
+  card shows a figure or nothing, never an error string.
 {% endcomment %}
-{% assign c_queued = 0 %}{% if n_queued.results and n_queued.results.entities.size > 0 %}{% assign c_queued = n_queued.results.entities[0].total %}{% endif %}
-{% assign c_assigned = 0 %}{% if n_assigned.results and n_assigned.results.entities.size > 0 %}{% assign c_assigned = n_assigned.results.entities[0].total %}{% endif %}
-{% assign c_inprogress = 0 %}{% if n_inprogress.results and n_inprogress.results.entities.size > 0 %}{% assign c_inprogress = n_inprogress.results.entities[0].total %}{% endif %}
-{% assign c_submitted = 0 %}{% if n_submitted.results and n_submitted.results.entities.size > 0 %}{% assign c_submitted = n_submitted.results.entities[0].total %}{% endif %}
-{% assign c_remediation = 0 %}{% if n_remediation.results and n_remediation.results.entities.size > 0 %}{% assign c_remediation = n_remediation.results.entities[0].total %}{% endif %}
+{% assign c_queued = 0 %}
+{% assign c_assigned = 0 %}
+{% assign c_inprogress = 0 %}
+{% assign c_submitted = 0 %}
+{% assign c_remediation = 0 %}
+{% for row in stage_counts.results.entities %}
+  {% assign stage_raw = row.stage.value | default: row.stage %}
+  {% capture stage_key %}{{ stage_raw }}{% endcapture %}
+  {% assign stage_key = stage_key | replace: ',', '' | replace: ' ', '' | strip %}
+  {% capture stage_label %}{{ row.stage.label }}{% endcapture %}
+  {% assign stage_label = stage_label | strip | downcase %}
+  {% if stage_key == '120910583' or stage_label == 'queued' %}{% assign c_queued = row.total %}
+  {% elsif stage_key == '120910584' or stage_label == 'assigned' %}{% assign c_assigned = row.total %}
+  {% elsif stage_key == '120910585' or stage_label == 'review in progress' %}{% assign c_inprogress = row.total %}
+  {% elsif stage_key == '120910586' or stage_label == 'submitted' %}{% assign c_submitted = row.total %}
+  {% elsif stage_key == '120910587' or stage_label == 'awaiting remediation' %}{% assign c_remediation = row.total %}
+  {% endif %}
+{% endfor %}
 
 {% comment %}
   The stage tiles, drawn as My work draws its own: the strip opens the page rather than

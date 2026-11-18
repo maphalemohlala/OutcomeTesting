@@ -6,6 +6,8 @@
   <PrimaryEntity>al_advisermapping</PrimaryEntity>
   <AsyncAutoDelete>0</AsyncAutoDelete>
   <Description>Takes an adviser's cases off the coach when the mapping is removed. PreImage: al_adviseremail.</Description>
+  <FilteringAttributes></FilteringAttributes>
+  <ImpersonatingUserIdName></ImpersonatingUserIdName>
   <InvocationSource>1</InvocationSource>
   <Mode>0</Mode>
   <Rank>1</Rank>

@@ -10,6 +10,22 @@
       "x-ms-dataverse-primary-id": "al_exportrecordid",
       "x-ms-dataverse-primary-name": "al_name",
       "properties": {
+        "al_initialadvicequalitygrade": {
+          "type": "string",
+          "title": "Initial advice quality grade",
+          "x-ms-dataverse-attribute": "al_initialadvicequalitygrade",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_Initialadvicequalitygrade",
+          "maxLength": 50
+        },
+        "al_taxoutcome": {
+          "type": "string",
+          "title": "Tax check outcome",
+          "x-ms-dataverse-attribute": "al_taxoutcome",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "al_Taxoutcome",
+          "maxLength": 50
+        },
         "al_advicequalitygrade": {
           "type": "string",
           "title": "Advice quality grade",

@@ -276,22 +276,35 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void A_queue_failure_after_create_still_counts_the_case_as_created()
+        public void A_queue_failure_after_create_is_not_swallowed()
         {
-            // Important 2: a throw from QueueIfRouted (a privilege refusal or an AD-057
-            // refusal) happens after userService.Create already succeeded. The case must not
-            // be treated as though it never existed - it stays Imported and the result says
-            // it was not queued, rather than the row being counted failed.
+            // Owner decision 2026-11-17: the platform has already aborted the import's
+            // transaction, so the fault propagates and the whole file fails, not one row.
             var service = WithRoutes();
             service.UpdateThrows = new InvalidOperationException("Refused.");
 
-            var result = ImportCasesPlugin.CreateRoutedCase(service, Resolver(service), ImportedRecord(TaxCheckRequiredNo));
+            var error = Assert.Throws<InvalidOperationException>(
+                () => ImportCasesPlugin.CreateRoutedCase(service, Resolver(service), ImportedRecord(TaxCheckRequiredNo)));
 
-            var row = service.Row("al_outcomecase", result.CaseId);
-            Assert.NotNull(row);
-            Assert.Equal(CaseLifecycle.Imported, row.GetAttributeValue<OptionSetValue>("al_casestatus").Value);
-            Assert.False(result.Queued);
-            Assert.Equal("Refused.", result.QueueError);
+            Assert.Equal("Refused.", error.Message);
+        }
+
+        [Fact]
+        public void Reads_a_guard_refusal_that_arrives_as_a_platform_fault()
+        {
+            var fault = new System.ServiceModel.FaultException<OrganizationServiceFault>(
+                new OrganizationServiceFault { Message = "x PRECONDITION: No route." }, "x PRECONDITION: No route.");
+
+            Assert.Equal("No route.", ImportCasesPlugin.RowFailureReason(fault));
+        }
+
+        [Fact]
+        public void Never_shows_an_unexpected_crash_as_the_reason()
+        {
+            var reason = ImportCasesPlugin.RowFailureReason(new InvalidPluginExecutionException(
+                "UNEXPECTED: CaseAccessGuardPlugin could not complete. NullReferenceException: Object reference not set."));
+
+            Assert.DoesNotContain("NullReference", reason);
         }
     }
 }

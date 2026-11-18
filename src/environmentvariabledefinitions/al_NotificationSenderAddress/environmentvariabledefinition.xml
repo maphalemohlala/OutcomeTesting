@@ -1,0 +1,13 @@
+<environmentvariabledefinition schemaname="al_NotificationSenderAddress">
+  <description default="The shared mailbox all notification email is sent from, through the queue carrying this address. Empty: the drain's run-as account sends. Set per environment; one mailbox can be enabled for server-side sync in one environment only.">
+    <label description="The shared mailbox all notification email is sent from, through the queue carrying this address. Empty: the drain's run-as account sends. Set per environment; one mailbox can be enabled for server-side sync in one environment only." languagecode="1033" />
+  </description>
+  <displayname default="Notification sender address">
+    <label description="Notification sender address" languagecode="1033" />
+  </displayname>
+  <introducedversion>1.0</introducedversion>
+  <iscustomizable>1</iscustomizable>
+  <isrequired>0</isrequired>
+  <secretstore>0</secretstore>
+  <type>100000000</type>
+</environmentvariabledefinition>

@@ -24,6 +24,8 @@ namespace OutcomeTesting.Plugins
             CaseAccessReconciler.QueuedOnAttr,
             CaseAccessReconciler.AdviserAttr,
             CaseAccessReconciler.SupervisorAttr,
+            // Set only by al_ReassignTcManager, which checks who may hand a case over.
+            TcManagerRouting.OverrideAttr,
         };
 
         public CaseAccessGuardPlugin(string unsecureConfiguration, string secureConfiguration)

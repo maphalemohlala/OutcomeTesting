@@ -38,8 +38,42 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static Entity Resolve(IOrganizationService service, Guid caseId)
         {
-            return ResolveAnswer(service, caseId, QuestionCode)
+            return Resolve(service, caseId, !RouteIsTaxOnly(service, caseId));
+        }
+
+        /// <summary>
+        /// The answer in force from the reviews the case's route owes. Where no AQS review is
+        /// owed (<paramref name="aqsOwed"/> false) only the Tax answer counts: a Q-FQ-01 left
+        /// by an AQS review abandoned when the route changed is not this case's grade, the
+        /// same rule that keeps such a review's outcome out of the advice columns.
+        /// </summary>
+        public static Entity Resolve(IOrganizationService service, Guid caseId, bool aqsOwed)
+        {
+            return (aqsOwed ? ResolveAnswer(service, caseId, QuestionCode) : null)
                 ?? ResolveAnswer(service, caseId, TaxQuestionCode);
+        }
+
+        // True only when the case's route says no AQS review is owed. A case with no route
+        // (or none found) keeps reading both codes, as it always has.
+        public static bool RouteIsTaxOnly(IOrganizationService service, Guid caseId)
+        {
+            var query = new QueryExpression("al_outcomecase")
+            {
+                ColumnSet = new ColumnSet("al_reviewrouteid"),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+
+            var found = service.RetrieveMultiple(query).Entities;
+            var route = found.Count == 0 ? null : found[0].GetAttributeValue<EntityReference>("al_reviewrouteid");
+            if (route == null)
+            {
+                return false;
+            }
+
+            var row = service.Retrieve("al_reviewroute", route.Id, new ColumnSet("al_requiresaqsreview"));
+            return !(row.GetAttributeValue<bool?>("al_requiresaqsreview") ?? false);
         }
 
         /// <summary>The formatted answer, which is what AD-039 column 10 carries.</summary>

@@ -88,6 +88,12 @@ export function refusalFor(submission: QuestionSubmission): string | null {
     return 'Enter a new code for the question in its new section. Codes are never reused.';
   }
 
+  // The server refuses it too: a move's audit record, which carries open reviews' answers
+  // to the moved question, cannot read back a code with a space in it.
+  if ((mode === 'add' || isMove) && /\s/.test(questionCode.trim())) {
+    return 'A question code cannot contain spaces.';
+  }
+
   if (isMove && !reason.trim()) {
     return 'Say why the question is moving. The reason is recorded on the audit trail.';
   }

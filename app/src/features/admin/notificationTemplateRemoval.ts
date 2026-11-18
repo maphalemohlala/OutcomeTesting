@@ -1,4 +1,10 @@
-import { plainMessage } from '../../services/commands/failures';
+import {
+  UNREACHABLE,
+  browserOnline,
+  isUnreachable,
+  plainMessage,
+  textOf,
+} from '../../services/commands/failures';
 import type { TemplateRow } from './useNotificationTemplates';
 
 /**
@@ -25,16 +31,6 @@ import type { TemplateRow } from './useNotificationTemplates';
  * adviser mappings, and it is the same table shape, so it gets the same answer.
  */
 export const REMOVE_FALLBACK = 'That letter could not be removed.';
-
-/**
- * A network that is not there, told apart from a refusal.
- *
- * "Could not be removed" after the browser went offline reads as a rule about the letter,
- * and the administrator goes looking for what is wrong with it.
- */
-export const UNREACHABLE =
-  'The connection to Dataverse could not be reached, so nothing was changed. Check your ' +
-  'network and try again.';
 
 export interface RemovalPrompt {
   /** The dialog's heading, and the wording of the button that opens it. */
@@ -104,26 +100,4 @@ export function describeRemoveFailure(error: unknown, online = browserOnline()):
   }
 
   return message;
-}
-
-/** Everything in the error, whatever shape it arrived in, as one searchable string. */
-function textOf(error: unknown): string {
-  if (error === null || error === undefined) return '';
-  if (typeof error === 'string') return error;
-  if (error instanceof Error) return `${error.name} ${error.message}`;
-  try {
-    return JSON.stringify(error) ?? '';
-  } catch {
-    return String((error as { message?: unknown }).message ?? '');
-  }
-}
-
-/** The request never reached Dataverse. */
-function isUnreachable(text: string, online: boolean): boolean {
-  if (!online) return true;
-  return /Failed to fetch|NetworkError|Load failed|net::ERR|ERR_INTERNET_DISCONNECTED/i.test(text);
-}
-
-function browserOnline(): boolean {
-  return typeof navigator === 'undefined' || navigator.onLine !== false;
 }

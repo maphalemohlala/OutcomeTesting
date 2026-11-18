@@ -12,7 +12,7 @@ import {
 } from '../../generated/models/Al_importexceptionsModel';
 import { readAll } from '../../services/readAll';
 
-export interface BatchSummary {
+interface BatchSummary {
   id: string;
   reference: string;
   name: string;
@@ -39,7 +39,7 @@ export interface ExceptionSummary {
   isOpen: boolean;
 }
 
-export type IntakeState =
+type IntakeState =
   | { status: 'unavailable'; reason: string }
   | { status: 'loading' }
   | { status: 'ready'; batches: BatchSummary[]; exceptions: ExceptionSummary[] };

@@ -248,6 +248,45 @@
             <Description description="Who the checker said carries the fail, chosen before submitting (item 8, 2026-09-19). SubmitReviewPlugin.CreateOutcome applies it to the outcome it creates and clears it; al_outcome does not exist until then." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_PendingRemedialActions">
+          <Type>ntext</Type>
+          <Name>al_pendingremedialactions</Name>
+          <LogicalName>al_pendingremedialactions</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.13.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>textarea</Format>
+          <MaxLength>100000</MaxLength>
+          <displaynames>
+            <displayname description="Pending remedial actions" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The checker's remedial actions, parked until the submit raises the actions they belong to." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_ReviewInstanceCode">
           <Type>nvarchar</Type>
           <Name>al_reviewinstancecode</Name>

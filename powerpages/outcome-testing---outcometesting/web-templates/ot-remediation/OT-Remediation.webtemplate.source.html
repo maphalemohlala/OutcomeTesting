@@ -281,6 +281,8 @@
         not, which is the whole reason TcManagerRouting matches on the email server-side.
       {% endcomment %}
       <attribute name="al_adviseremail" />
+      {% comment %}A T&C Manager an admin chose for this case alone, which wins over the mapping (requirements log row 4).{% endcomment %}
+      <attribute name="al_tcmanageroverrideid" />
       <attribute name="al_casestatus" />
       {% comment %}Read for ot_signoff_due below: a Tax Fail is one the T&C Manager verifies.{% endcomment %}
       <attribute name="al_taxoutcome" />
@@ -387,7 +389,6 @@
       <attribute name="al_finaloutcome" />
       <attribute name="al_finalisedon" />
       <attribute name="al_regradedon" />
-      <attribute name="al_regradereason" />
       {% comment %}
         Carried into the regrade so a save against a stale read is refused rather than
         overwriting another correction, which is the same ExpectedRowVersion the Code App
@@ -474,7 +475,13 @@
     outside the bounds of the array" for on an empty result.
   {% endcomment %}
   {% assign ot_adviser_holders = 0 %}
-  {% if ot_case_adviser_email != '' %}
+  {% comment %}
+    The count is read in one place only, the "Nobody assigned" cell of an action with no
+    assignee, so it is asked for only when this case has such an action. It stays 0 otherwise.
+  {% endcomment %}
+  {% assign ot_any_unassigned = false %}
+  {% for a in rows %}{% unless a.al_assignedcontactid %}{% assign ot_any_unassigned = true %}{% endunless %}{% endfor %}
+  {% if ot_case_adviser_email != '' %}{% if ot_any_unassigned %}
     {% fetchxml adviserholders %}
     <fetch>
       <entity name="contact">
@@ -487,9 +494,24 @@
     </fetch>
     {% endfetchxml %}
     {% assign ot_adviser_holders = adviserholders.results.entities.size %}
-  {% endif %}
+  {% endif %}{% endif %}
 
-  {% if c and ot_case_adviser_email != '' and user %}
+  {% comment %}
+    The answer is used only together with the sign-off role (can_signoff, below), so a reader
+    without that role is not asked about. ot_is_case_tcmanager stays false for them.
+  {% endcomment %}
+  {% comment %}
+    A manager chosen for this case (requirements log row 4) answers the question on its own,
+    exactly as TcManagerRouting.ForCase does: the mapping is not read at all, so the mapped
+    manager cannot sign off a case handed to someone else.
+  {% endcomment %}
+  {% assign ot_case_chosen = '' %}
+  {% if c.al_tcmanageroverrideid %}{% assign ot_case_chosen = c.al_tcmanageroverrideid.id | default: '' | downcase %}{% endif %}
+  {% if ot_case_chosen != '' %}{% if user %}
+    {% assign ot_user_id = user.id | default: '' | downcase %}
+    {% if ot_case_chosen == ot_user_id %}{% assign ot_is_case_tcmanager = true %}{% endif %}
+  {% endif %}{% endif %}
+  {% if ot_case_chosen == '' %}{% if c and ot_case_adviser_email != '' and user %}{% if user.roles contains 'AL Portal - T&C Supervisor' %}
     {% fetchxml mymapping %}
     <fetch top="1">
       <entity name="al_advisermapping">
@@ -508,7 +530,7 @@
       normal case here rather than the exception.
     {% endcomment %}
     {% for m in mymapping.results.entities %}{% assign ot_is_case_tcmanager = true %}{% endfor %}
-  {% endif %}
+  {% endif %}{% endif %}{% endif %}
 
   <p class="ot-back"><a href="?">&laquo; All cases in remediation</a></p>
 
@@ -1502,7 +1524,7 @@
 {% endif %}
 
 <script>
-  /*
+  {% comment %}/*
    * Working-day ageing for the BR-010 remediation clock (OD-018).
    *
    * Mirrors app/src/lib/workingDays.ts: Monday to Friday, the opening day counts as
@@ -1518,7 +1540,7 @@
    * Input is a yyyy-MM-dd calendar date the server already resolved, so nothing here
    * converts a timezone. Each date is pinned to midday UTC before arithmetic, which is
    * what stops a day slipping when the browser sits in another region.
-   */
+   */{% endcomment %}
   (function () {
     'use strict';
 
@@ -1557,9 +1579,9 @@
 
       cell.textContent = age + (age === 1 ? ' working day' : ' working days');
 
-      // A clock that has been reset carries an earlier period. Show it, because a case
+      {% comment %}// A clock that has been reset carries an earlier period. Show it, because a case
       // that has been round twice is not the same as one on its first ten days, and the
-      // adviser and the T&C Manager both need to see that it went back.
+      // adviser and the T&C Manager both need to see that it went back.{% endcomment %}
       var created = midday(cell.getAttribute('data-created'));
       if (created && created.getTime() < opened.getTime()) {
         var previous = workingDaysBetween(created, opened);
@@ -1580,7 +1602,7 @@
       }
     }
 
-    /*
+    {% comment %}/*
      * Target date missed (F52, fixed 2026-09-21).
      *
      * This is a DIFFERENT question from the age beside it and is marked separately on
@@ -1596,7 +1618,7 @@
      *
      * A completed action is never overdue. It was finished, and marking history red says
      * something about the person rather than about the work.
-     */
+     */{% endcomment %}
     var dues = document.querySelectorAll('[data-ot-due]');
     for (var d = 0; d < dues.length; d += 1) {
       var due = dues[d];
@@ -1619,7 +1641,7 @@
 </script>
 
 <script>
-  /*
+  {% comment %}/*
    * Bringing the rows up to date after a write, without asking the server again.
    *
    * Every write on this page PATCHes a trigger column and a synchronous plug-in does the
@@ -1639,15 +1661,15 @@
    *
    * Deliberately not innerHTML: the labels come from a select the user just used, and text
    * that reaches the DOM as text cannot be anything else.
-   */
+   */{% endcomment %}
   window.otRemediationRows = (function () {
     'use strict';
 
     var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    // 'dd MMM yyyy', matching the Liquid date filter the cells are rendered with, so a
-    // row this rewrites cannot be told apart from a row the server drew.
+    {% comment %}// 'dd MMM yyyy', matching the Liquid date filter the cells are rendered with, so a
+    // row this rewrites cannot be told apart from a row the server drew.{% endcomment %}
     function today() {
       var now = new Date();
       var day = now.getDate();
@@ -1669,7 +1691,7 @@
       cell.textContent = text;
     }
 
-    /*
+    {% comment %}/*
      * The badge markup OT Status Badge produces for a label, mirroring that template's
      * cascade in its own order. Mirrored rather than improved - a cell the page rewrites has
      * to look like the ones around it, and choosing a nicer colour here would make the two
@@ -1677,7 +1699,7 @@
      *
      * The labels this page can put through it: 'Completed' (no keyword, so the default
      * waiting), 'In progress' (active), and 'Closed', which a regrade leaves the case in.
-     */
+     */{% endcomment %}
     function badgeClass(label) {
       var name = String(label || '').toLowerCase();
       if (name === '') { return 'none'; }
@@ -1700,21 +1722,21 @@
     }
 
     return {
-      /* The adviser has signed the form off: every action they answered is now Completed
-         and waiting on the supervisor. */
+      {% comment %}/* The adviser has signed the form off: every action they answered is now Completed
+         and waiting on the supervisor. */{% endcomment %}
       completed: function (ids) {
         var status = cells('data-ot-row-status', ids);
         for (var i = 0; i < status.length; i += 1) { badge(status[i], 'Completed'); }
 
         var decision = cells('data-ot-row-decision', ids);
         for (var j = 0; j < decision.length; j += 1) {
-          // No "awaiting supervisor" where the page was told the case needs no sign-off.
+          {% comment %}// No "awaiting supervisor" where the page was told the case needs no sign-off.{% endcomment %}
           setText(decision[j], 'Adviser completed ' + today()
             + (decision[j].hasAttribute('data-ot-no-signoff') ? '' : '; awaiting supervisor'));
         }
       },
 
-      /*
+      {% comment %}/*
        * The supervisor has decided. The decision cell carries the label and the date, the
        * same two things the server renders there from the al_signoff row.
        *
@@ -1722,7 +1744,7 @@
        * progress for the rework (AD-125), so the status cell has to move with it or the
        * page would show a rejected action still sitting at Completed. An approval leaves
        * the action Completed, which is what the cell already says.
-       */
+       */{% endcomment %}
       decided: function (ids, label, rejected) {
         var decision = cells('data-ot-row-decision', ids);
         for (var i = 0; i < decision.length; i += 1) {
@@ -1735,11 +1757,11 @@
         for (var j = 0; j < status.length; j += 1) { badge(status[j], 'In progress'); }
       },
 
-      /*
+      {% comment %}/*
        * The adviser has signed the form off, so the row that reports who last completed one
        * says so. Certain: the form completes the signed-in adviser's own open actions, and
        * the cell names that person and the date.
-       */
+       */{% endcomment %}
       adviserCompleted: function (name) {
         var cell = document.querySelector('[data-ot-adviser-cell]');
         if (cell) {
@@ -1747,14 +1769,14 @@
         }
       },
 
-      /*
+      {% comment %}/*
        * The supervisor has decided, so the row that reports the last decision says so, and
        * the "All remedial actions checked and approved?" cell moves with it.
        *
        * Both are certain. The panel signs off EVERY action awaiting a decision on this case
        * in one go, so after an approval every action is approved and after a rejection one
        * is rejected - which is exactly what the cell is derived from server-side.
-       */
+       */{% endcomment %}
       supervisorDecided: function (label, name, rejected) {
         var cell = document.querySelector('[data-ot-supervisor-cell]');
         if (cell) {
@@ -1767,7 +1789,7 @@
         }
       },
 
-      /*
+      {% comment %}/*
        * Where the case went is the server's to decide, and the page must not guess it.
        *
        * Completing or approving can move a case to Awaiting Sign-off, Awaiting Recheck,
@@ -1776,7 +1798,7 @@
        * with a guess; it is marked as possibly out of date, which is the honest thing a page
        * can say about a value it knows may have changed and cannot recompute. A regrade is
        * the exception and sets Closed outright, because there the outcome is certain.
-       */
+       */{% endcomment %}
       caseStatusMayHaveMoved: function () {
         var status = document.querySelector('[data-ot-case-status]');
         if (!status || status.querySelector('[data-ot-stale]')) { return; }
@@ -1787,7 +1809,7 @@
         status.appendChild(note);
       },
 
-      /*
+      {% comment %}/*
        * The final outcome has just been recorded, so the two cells that report it elsewhere
        * on the page have to move with it.
        *
@@ -1800,12 +1822,12 @@
        *
        * Closed is certain rather than assumed: the panel is only drawn at Awaiting Recheck
        * or at Closed (AD-127), a regrade closes the first, and the second is already there.
-       */
+       */{% endcomment %}
       regraded: function (label) {
         var cell = document.querySelector('[data-ot-regraded-cell]');
         if (cell) {
-          // The grade, then the regraded-on date as its own note - the two parts the server
-          // renders into this cell, in that order, so the rewritten cell matches it.
+          {% comment %}// The grade, then the regraded-on date as its own note - the two parts the server
+          // renders into this cell, in that order, so the rewritten cell matches it.{% endcomment %}
           cell.textContent = label + ' ';
           var when = document.createElement('span');
           when.className = 'ot-remedial-form__note';
@@ -1815,30 +1837,30 @@
 
         var status = document.querySelector('[data-ot-case-status]');
         if (status) {
-          // badge() clears the cell, which takes any "may have moved" marker with it. The
-          // case status is no longer uncertain: a regrade from this panel closes the case.
+          {% comment %}// badge() clears the cell, which takes any "may have moved" marker with it. The
+          // case status is no longer uncertain: a regrade from this panel closes the case.{% endcomment %}
           badge(status, 'Closed');
         }
       },
 
-      /*
+      {% comment %}/*
        * The case status as Dataverse has just reported it, replacing whatever the server
        * rendered from cache. Certain, because the caller read it from the Web API rather
        * than deriving it - so it clears the "may have moved" marker the same way `regraded`
        * does, and for the same reason.
-       */
+       */{% endcomment %}
       caseStatusIs: function (label) {
         var status = document.querySelector('[data-ot-case-status]');
         if (!status || !label) { return; }
         badge(status, label);
       },
 
-      /*
+      {% comment %}/*
        * The reload the reader asks for. The page cannot draw the parts that need a server
        * render - the supervisor's panel after an adviser sign-off, the regrade panel after
        * the case reaches recheck - so it offers the reload instead of timing one, and says
        * what may still be stale when it lands.
-       */
+       */{% endcomment %}
       offerReload: function (after) {
         if (!after || after.parentNode.querySelector('[data-ot-reload]')) { return; }
         var button = document.createElement('button');
@@ -1854,7 +1876,7 @@
 </script>
 
 <script>
-  /*
+  {% comment %}/*
    * The case status, re-read from Dataverse on every load (AD-133, answering AD-094).
    *
    * The badge above is server-rendered from a Liquid fetchxml result, and Power Pages serves
@@ -1879,7 +1901,7 @@
    * refusal, or a browser that never runs this leaves the server-rendered badge alone. A
    * stale badge is what we already have, so there is nothing to lose by failing quietly -
    * and nothing here is a permission decision the page is entitled to make (NFR-SEC-01).
-   */
+   */{% endcomment %}
   (function () {
     'use strict';
 
@@ -1894,9 +1916,9 @@
     var request = new XMLHttpRequest();
     request.open('GET', '/_api/al_outcomecases(' + caseId + ')?$select=al_casestatus', true);
     request.setRequestHeader('Accept', 'application/json');
-    // The label rather than the option-set number. Without this the response carries
+    {% comment %}// The label rather than the option-set number. Without this the response carries
     // al_casestatus as an integer and the page would have to keep its own copy of the
-    // lifecycle's values - a second place for them to drift from CaseLifecycle.cs.
+    // lifecycle's values - a second place for them to drift from CaseLifecycle.cs.{% endcomment %}
     request.setRequestHeader(
       'Prefer', 'odata.include-annotations="OData.Community.Display.V1.FormattedValue"');
 
@@ -1913,10 +1935,10 @@
 
       if (!live) { return; }
 
-      // Only when it actually differs, so a page that was already current is not rewritten -
+      {% comment %}// Only when it actually differs, so a page that was already current is not rewritten -
       // the badge would render identically, but replacing it would also silently discard a
       // "may have moved" marker that a write in this session had put there for another
-      // reason.
+      // reason.{% endcomment %}
       var shown = (status.textContent || '').replace(/^\s+|\s+$/g, '');
       if (shown === live) { return; }
 
@@ -1930,7 +1952,7 @@
 </script>
 
 <script>
-  /*
+  {% comment %}/*
    * Where the case is NOW, read from Dataverse after a write (reported 2026-10-07: "the
    * wording sometimes suggests that a case is going to T&C or adviser even when that isn't
    * the case").
@@ -1942,7 +1964,7 @@
    * the server did instead. The values are CaseLifecycle.cs's; portalNextStepMessages.test.ts
    * holds them to it. A read that fails answers null, and the messages then say only what is
    * certain.
-   */
+   */{% endcomment %}
   window.OT_CASE_STATUS = {
     queued: 120910583,
     awaitingRemediation: 120910587,
@@ -1973,7 +1995,7 @@
 </script>
 
 <script>
-  /*
+  {% comment %}/*
    * The adviser's half of the BR-008 loop, as one form (PP-12, FR-020, FR-021).
    *
    * Path: this page -> PATCH al_remediationaction -> CompleteRequestPlugin -> Dataverse.
@@ -1995,7 +2017,7 @@
    *
    * Progressive enhancement only. The status transition, the mandatory response and the
    * audit event are all enforced server-side (NFR-SEC-01).
-   */
+   */{% endcomment %}
   (function () {
     'use strict';
 
@@ -2006,79 +2028,6 @@
     var status = document.querySelector('[data-ot-form-status]');
     var cells = document.querySelectorAll('[data-ot-response], [data-ot-performed]');
 
-    /*
-     * The server's own words, out of the response body.
-     *
-     * The body is an OData error object, so the message has to be read out of it rather than
-     * scanned for in the raw text: a prefix found by indexOf and taken to the end of the
-     * string carries the JSON tail with it, which is why the branches below used to cut at
-     * the next quote and why one of them did not and showed it.
-     *
-     * A body that will not parse is returned as it stands - it is still more than "something
-     * went wrong" - and it is collapsed onto one line and capped, because an error line is
-     * read on screen and the whole of a platform fault is not readable there.
-     */
-    function serverMessage(raw) {
-      var text = String(raw || '').trim();
-      if (!text) { return ''; }
-
-      var message = text;
-      try {
-        var body = JSON.parse(text);
-        var error = body && body.error ? body.error : body;
-        if (error && error.innererror && error.innererror.message) {
-          message = error.innererror.message;
-        } else if (error && error.message) {
-          message = error.message;
-        }
-      } catch (ignored) {
-        // Not JSON. Keep the raw text.
-      }
-
-      message = String(message || '').replace(/\s+/g, ' ').trim();
-      if (message.length > 300) { message = message.substring(0, 300) + '...'; }
-      return message;
-    }
-
-    // Shared with the form-answers script above, which is parsed first but only reads
-    // this inside a request callback. One wording for a refusal, wherever it surfaced.
-    function friendlyError(raw, httpStatus) {
-      var text = serverMessage(raw);
-      if (text.indexOf('CONFLICT:') !== -1) {
-        return 'This action changed since you opened it. Reload the page and try again.';
-      }
-      if (text.indexOf('UNAUTHORIZED:') !== -1) {
-        return 'You do not have permission to change this action.';
-      }
-      if (text.indexOf('PRECONDITION:') !== -1) {
-        var idx = text.indexOf('PRECONDITION:');
-        return text.substring(idx + 'PRECONDITION:'.length).trim();
-      }
-      if (text.indexOf('UNEXPECTED:') !== -1) {
-        var unexpected = text.indexOf('UNEXPECTED:');
-        return 'Nothing was saved. ' + text.substring(unexpected + 'UNEXPECTED:'.length).trim();
-      }
-      /*
-       * A 403 is the permission chain, not a transient fault: the write on al_remediationaction
-       * is Contact-scoped and bound to the Adviser Remediation and Planner roles (AD-069), so an
-       * account without one of them is refused on every save and "try again" cannot help. The
-       * generic line below hid exactly that on 2026-09-09.
-       */
-      if (httpStatus === 403) {
-        return 'Your account is not allowed to change this action, so nothing was saved. Responding needs the '
-          + 'Adviser Remediation or Planner role on your portal account, and the action has to be assigned to you. '
-          + 'Ask an administrator to check both rather than retrying.';
-      }
-      if (httpStatus === 401) {
-        return 'Your session was not accepted, so nothing was saved. Reload the page and sign in again.';
-      }
-      return 'That was not saved, and nothing has been changed. '
-        + (text ? 'The server said: ' + text : 'The server gave no detail.')
-        + (httpStatus ? ' (status ' + httpStatus + ')' : '');
-    }
-
-    window.otFriendlyError = friendlyError;
-
     function show(message, kind) {
       if (!status) { return; }
       status.textContent = message;
@@ -2086,12 +2035,7 @@
       status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
     }
 
-    function answer(name) {
-      var picked = document.querySelector('[data-ot-fq="' + name + '"]:checked');
-      return picked ? Number(picked.value) : null;
-    }
-
-    /* Every row this adviser owns, with what they wrote in it. */
+    {% comment %}/* Every row this adviser owns, with what they wrote in it. */{% endcomment %}
     function rows() {
       var found = [];
       for (var i = 0; i < cells.length; i += 1) {
@@ -2114,15 +2058,15 @@
       if (draft) { draft.disabled = on; }
     }
 
-    // The viewer's own name, for the summary row that reports who last completed an action.
+    {% comment %}// The viewer's own name, for the summary row that reports who last completed an action.
     // Rendered into the answers span rather than fetched, for the reason every other value
-    // on this page is: the page already knows who is signed in.
+    // on this page is: the page already knows who is signed in.{% endcomment %}
     function viewerName() {
       var carrier = document.querySelector('[data-ot-form-answers]');
       return carrier ? (carrier.getAttribute('data-user-name') || '') : '';
     }
 
-    // The actions this form answers, in the order the cells appear.
+    {% comment %}// The actions this form answers, in the order the cells appear.{% endcomment %}
     function ids() {
       var found = [];
       for (var i = 0; i < cells.length; i += 1) {
@@ -2131,12 +2075,12 @@
       return found;
     }
 
-    /*
+    {% comment %}/*
      * A signed-off form is not editable again from here. RemediationResponseGuard refuses a
      * response-column change once the action is Completed (BR-008 - that is what the
      * supervisor attests to), so leaving the fields live would invite an edit the server
      * would refuse. The draft button goes with them: there is no longer a draft to save.
-     */
+     */{% endcomment %}
     function markSaved() {
       for (var i = 0; i < cells.length; i += 1) {
         var text = cells[i].querySelector('[data-ot-response-text], [data-ot-performed-note]');
@@ -2152,23 +2096,26 @@
       if (draft) { draft.disabled = true; }
     }
 
-    /*
+    {% comment %}/*
      * markComplete false is a draft: it keeps what has been written and signs nothing off.
      *
      * A draft is deliberately not held to the completion rules - a half-filled form is the
      * point of it - so blank rows pass, and a question not yet answered is left out of the
      * payload rather than sent as null. Sending null would clear an answer the adviser had
      * already given, which is the opposite of saving.
-     */
+     */{% endcomment %}
     function send(markComplete) {
+      {% comment %}// What the adviser was doing, in their words, for a failure message.{% endcomment %}
+      function action() { return markComplete ? 'Completing the remedial action' : 'Saving the draft'; }
+
       if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
-        show('This page did not load completely. Refresh and try again.', 'error');
+        show(window.otApi.error(action(), null), 'error');
         return;
       }
 
       var pending = rows();
       if (!pending.length) {
-        /*
+        {% comment %}/*
          * Say so. This used to be a bare `return` (F45): pressing Save and sign off with
          * no editable rows on the page did nothing whatsoever - no request, no error, no
          * confirmation - and the adviser had no way to tell the difference between a
@@ -2177,7 +2124,7 @@
          * With the cell above fixed this should not be reachable for an assigned open
          * action, which is exactly why it must not fail quietly: if it happens again it is
          * a symptom, and a button that does nothing in silence is how the first one hid.
-         */
+         */{% endcomment %}
         show(markComplete
           ? 'There is nothing here for you to sign off. None of the remedial actions on this'
             + ' case are open and assigned to you. If you expected to answer one, reload the'
@@ -2188,8 +2135,8 @@
       }
 
       if (markComplete) {
-        // Checked here only so the adviser is told before a round trip; the plug-in
-        // refuses a completion with no response regardless.
+        {% comment %}// Checked here only so the adviser is told before a round trip; the plug-in
+        // refuses a completion with no response regardless.{% endcomment %}
         for (var i = 0; i < pending.length; i += 1) {
           if (pending[i].performed) {
             if (pending[i].choice === null) {
@@ -2202,12 +2149,12 @@
           }
         }
 
-        /*
+        {% comment %}/*
          * No question of the adviser's here. "Recheck required?" and "Do the remedial actions
          * change the advice?" are the T&C Manager's, on the sign-off panel, and the PATCH
          * carrying them is refused server-side (RemediationResponseGuardPlugin.TcOnlyRefusal).
          * "Client contact required?" is the AQS checker's from 2026-11-06.
-         */
+         */{% endcomment %}
       }
 
       busy(true);
@@ -2224,7 +2171,7 @@
               return;
             }
 
-            /*
+            {% comment %}/*
              * Confirmed in place, and no reload. The rows this wrote are the adviser's
              * remedial actions, which the page did not write itself - it PATCHed them and
              * CompleteRequestPlugin did the rest - so the portal's render cache does not
@@ -2236,7 +2183,7 @@
              * The two cells the page can be certain of are brought up to date here; the
              * supervisor's panel needs a server render, so the reload is offered rather
              * than timed.
-             */
+             */{% endcomment %}
             markSaved();
             if (window.otRemediationRows) {
               window.otRemediationRows.completed(ids());
@@ -2276,22 +2223,26 @@
           request.onreadystatechange = function () {
             if (request.readyState !== 4) { return; }
 
-            if (request.status >= 200 && request.status < 300) {
+            if (window.otApi.ok(request)) {
               index += 1;
               next();
               return;
             }
 
-            show('Issue ' + row.number + ': ' + friendlyError(request.responseText, request.status), 'error');
+            {% comment %}/* Rows go one by one, so the ones before this were written; resending them is safe. */{% endcomment %}
+            var saved = pending.slice(0, index).map(function (r) { return r.number; });
+            show(window.otApi.error(action() + ' for issue ' + row.number, request)
+              + (saved.length ? ' ' + (saved.length === 1 ? 'Issue ' + saved[0] + ' was' : 'Issues ' + saved.join(', ') + ' were')
+                + ' already saved; sending again is safe.' : ''), 'error');
             busy(false);
           };
 
-          /*
+          {% comment %}/*
            * al_recheckrequired and al_changesadvice are deliberately absent (project owner,
            * 2026-09-21). They are the T&C Manager's answers and travel on the sign-off
            * request instead; sending them here is refused by the server, so leaving them out
            * is what keeps a legitimate save from failing rather than a workaround.
-           */
+           */{% endcomment %}
           var payload = { al_adviserresponse: row.text };
           if (row.performed && row.choice !== null) { payload.al_actionperformed = row.choice; }
           if (markComplete) { payload.al_completerequested = true; }
@@ -2301,7 +2252,7 @@
 
         next();
       }).fail(function () {
-        show('This page did not load completely. Refresh and try again.', 'error');
+        show(window.otApi.error(action(), null), 'error');
         busy(false);
       });
     }
@@ -2312,7 +2263,7 @@
 </script>
 
 <script>
-  /*
+  {% comment %}/*
    * T&C attestation (PP-12, FR-023, BR-008).
    *
    * Path: this page -> PATCH contact.al_signoffrequest -> SignoffRequestPlugin -> al_signoff
@@ -2326,7 +2277,7 @@
    * and SignoffRequestPlugin creates the al_signoff server-side after checking the contact
    * holds the T&C Supervisor web role (AD-099). Everything identifying is still stamped by
    * SignoffGuardPlugin; nothing here is a security boundary (NFR-SEC-01).
-   */
+   */{% endcomment %}
   (function () {
     'use strict';
 
@@ -2336,97 +2287,33 @@
     var REJECTED = '120910721';
     var contactId = '{{ user.id }}';
 
-    /*
-     * The server's own words, out of the response body.
-     *
-     * The body is an OData error object, so the message has to be read out of it rather than
-     * scanned for in the raw text: a prefix found by indexOf and taken to the end of the
-     * string carries the JSON tail with it, which is why the branches below used to cut at
-     * the next quote and why one of them did not and showed it.
-     *
-     * A body that will not parse is returned as it stands - it is still more than "something
-     * went wrong" - and it is collapsed onto one line and capped, because an error line is
-     * read on screen and the whole of a platform fault is not readable there.
-     */
-    function serverMessage(raw) {
-      var text = String(raw || '').trim();
-      if (!text) { return ''; }
-
-      var message = text;
-      try {
-        var body = JSON.parse(text);
-        var error = body && body.error ? body.error : body;
-        if (error && error.innererror && error.innererror.message) {
-          message = error.innererror.message;
-        } else if (error && error.message) {
-          message = error.message;
-        }
-      } catch (ignored) {
-        // Not JSON. Keep the raw text.
-      }
-
-      message = String(message || '').replace(/\s+/g, ' ').trim();
-      if (message.length > 300) { message = message.substring(0, 300) + '...'; }
-      return message;
-    }
-
-    function friendlyError(raw, httpStatus) {
-      var text = serverMessage(raw);
-      if (text.indexOf('PRECONDITION:') !== -1) {
-        var idx = text.indexOf('PRECONDITION:');
-        return text.substring(idx + 'PRECONDITION:'.length).trim();
-      }
-      if (text.indexOf('VALIDATION:') !== -1) {
-        var v = text.indexOf('VALIDATION:');
-        return text.substring(v + 'VALIDATION:'.length).trim();
-      }
-      if (text.indexOf('UNEXPECTED:') !== -1) {
-        var unexpected = text.indexOf('UNEXPECTED:');
-        return 'Nothing was recorded. ' + text.substring(unexpected + 'UNEXPECTED:'.length).trim();
-      }
-      /*
-       * Nothing our code raised, so the platform refused before SignoffRequestPlugin ran.
-       * Say what the platform said rather than guessing at a role: a 400 is never a
-       * permission problem, an association code names the missing grant, and a 403 on this
-       * write is the contact permission, which is bound to the reviewer and supervisor
-       * roles - the role check itself now answers with a PRECONDITION above.
-       */
-      if (httpStatus === 400) {
-        return 'The portal rejected the request before checking any permission, so nothing was '
-          + 'recorded. This is a fault in the page rather than in your account - please report it.';
-      }
-      var code = /9004010[0-9]/.exec(text);
-      if (code) {
-        return 'The site refused this write (error ' + code[0] + '), so nothing was recorded. '
-          + 'Your role is not the problem - please report it.';
-      }
-      if (httpStatus === 403) {
-        return 'Your portal account is not allowed to write a sign-off request, so nothing was recorded. '
-          + 'The contact permission is bound to the reviewer and T&C Supervisor roles; ask an administrator '
-          + 'to check your account rather than retrying.';
-      }
-      if (httpStatus === 401) {
-        return 'Your session was not accepted, so nothing was recorded. Reload the page and sign in again.';
-      }
-      return 'That sign-off was not recorded, and nothing has been changed. '
-        + (text ? 'The server said: ' + text : 'The server gave no detail.')
-        + (httpStatus ? ' (status ' + httpStatus + ')' : '');
-    }
-
     function wire(panel) {
-      // Every action still awaiting a supervisor. One decision covers the remediation
+      {% comment %}// Every action still awaiting a supervisor. One decision covers the remediation
       // (project owner, 2026-09-10), so the same decision and notes are recorded against
       // each of them in turn - the sign-off row is per action because that is what BR-008
-      // attests to, but the person makes the judgement once.
+      // attests to, but the person makes the judgement once.{% endcomment %}
       var actionIds = (panel.getAttribute('data-action-ids') || '').split(',');
       var decision = panel.querySelector('[data-ot-signoff-decision]');
       var notes = panel.querySelector('[data-ot-signoff-notes]');
       var grade = panel.querySelector('[data-ot-signoff-outcome]');
-      // The two remediation-form answers that are this role's (project owner, 2026-09-21).
+      {% comment %}// The two remediation-form answers that are this role's (project owner, 2026-09-21).{% endcomment %}
       var recheck = panel.querySelector('[data-ot-signoff-recheck]');
       var changesAdvice = panel.querySelector('[data-ot-signoff-changesadvice]');
       var save = panel.querySelector('[data-ot-signoff-save]');
       var status = panel.querySelector('[data-ot-signoff-status]');
+      {% comment %}// Actions this panel has already recorded, kept across clicks: a retry after a
+      // mid-way failure sends only the rest. Re-sending action 1 was refused as already
+      // approved (or, for a rejection, as no longer completed) and stopped the loop there.{% endcomment %}
+      var recorded = {};
+
+      {% comment %}// Once some actions carry the decision, the rest must get the same one.{% endcomment %}
+      function lockDecision() {
+        decision.disabled = true;
+        notes.disabled = true;
+        if (grade) { grade.disabled = true; }
+        if (recheck) { recheck.disabled = true; }
+        if (changesAdvice) { changesAdvice.disabled = true; }
+      }
 
       function show(message, kind) {
         status.textContent = message;
@@ -2434,13 +2321,13 @@
         status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
       }
 
-      // The words on the option the supervisor chose, for the message and for the cells.
+      {% comment %}// The words on the option the supervisor chose, for the message and for the cells.{% endcomment %}
       function decisionLabel() {
         var chosen = decision.options[decision.selectedIndex];
         return chosen ? chosen.textContent.replace(/^\s+|\s+$/g, '') : 'Decision';
       }
 
-      /*
+      {% comment %}/*
        * Where the approval left the case, from its status read back after the write.
        *
        * This used to say "once the case reaches its recheck" whatever happened, which was
@@ -2448,7 +2335,7 @@
        * AQS goes back to the QUEUE (OD-038), and an approval before the last one moves
        * nothing. The page does not hold those rules, so it reports the status the server left
        * (reported 2026-10-07), and says nothing about a status it cannot read.
-       */
+       */{% endcomment %}
       function afterApproval(value, graded) {
         var S = window.OT_CASE_STATUS;
         if (value === S.closed) {
@@ -2469,8 +2356,8 @@
         return '';
       }
 
-      // A decision made is not made again from here; the guard refuses a second one on an
-      // action already approved, so the controls go with it.
+      {% comment %}// A decision made is not made again from here; the guard refuses a second one on an
+      // action already approved, so the controls go with it.{% endcomment %}
       function settle() {
         decision.disabled = true;
         notes.disabled = true;
@@ -2481,14 +2368,14 @@
         markFormAnswers();
       }
 
-      /*
+      {% comment %}/*
        * The two read-only cells in the form above, brought up to date in place.
        *
        * The same reason every other cell on this page is updated rather than reloaded: the
        * page did not write these rows - SignoffRequestPlugin did - so the portal's render
        * cache does not clear on this write, and a reload inside the change-tracking window
        * re-draws the form still saying the T&C Manager has not answered (AD-094, AD-117).
-       */
+       */{% endcomment %}
       function markFormAnswers() {
         var pairs = [
           { select: recheck, cell: document.querySelector('[data-ot-recheck-cell]') },
@@ -2512,13 +2399,13 @@
           return;
         }
 
-        // Told before the round trip; SignoffGuardPlugin refuses it regardless.
+        {% comment %}// Told before the round trip; SignoffGuardPlugin refuses it regardless.{% endcomment %}
         if (decision.value === REJECTED && !notes.value.trim()) {
           show('A rejection must say what the adviser needs to put right.', 'error');
           return;
         }
 
-        /*
+        {% comment %}/*
          * An approval answers the form (project owner, 2026-09-21). Checked before the round
          * trip only; nothing server-side requires it, because an approval on a check that
          * predates these columns has no answers to give and must still be recordable.
@@ -2526,29 +2413,29 @@
          * "Recheck required?" decides where the case goes next - No waives the recheck and
          * closes the case on this approval (AD-138) - so an approval that leaves it unset is
          * a judgement not made rather than a field not filled.
-         */
+         */{% endcomment %}
         if (decision.value !== REJECTED && recheck && !recheck.value) {
           show('Answer "Recheck required?" before approving: it decides whether this case'
             + ' closes now or waits for a recheck.', 'error');
           return;
         }
 
-        // A rejection sends the work back, so it grades nothing. The guard refuses the
-        // combination rather than ignoring it, so catch it here where it can be corrected.
+        {% comment %}// A rejection sends the work back, so it grades nothing. The guard refuses the
+        // combination rather than ignoring it, so catch it here where it can be corrected.{% endcomment %}
         if (decision.value === REJECTED && grade && grade.value) {
           show('A rejection sends the remediation back to the adviser, so it cannot record a final outcome.', 'error');
           return;
         }
 
-        // AD-031: setting a grade records why. Required in SignoffGuardPlugin too, because a
-        // page is not a boundary.
+        {% comment %}// AD-031: setting a grade records why. Required in SignoffGuardPlugin too, because a
+        // page is not a boundary.{% endcomment %}
         if (grade && grade.value && !notes.value.trim()) {
           show('Recording a final outcome must say why the grade was set.', 'error');
           return;
         }
 
         if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
-          show('This page did not load completely. Refresh and try again.', 'error');
+          show(window.otApi.error('Signing off', null), 'error');
           return;
         }
 
@@ -2558,18 +2445,18 @@
         window.shell.getTokenDeferred().done(function (token) {
           var index = 0;
 
-          // One at a time, and a refusal stops the rest: each is a separate write, so
-          // firing them together would leave the supervisor guessing which ones landed.
+          {% comment %}// One at a time, and a refusal stops the rest: each is a separate write, so
+          // firing them together would leave the supervisor guessing which ones landed.{% endcomment %}
           function next() {
             if (index >= actionIds.length) {
-              /*
+              {% comment %}/*
                * Confirmed in place, for the reason the adviser's form gives above: the rows
                * this wrote are al_signoff and al_remediationaction, the page wrote neither,
                * and a reload inside the change-tracking window re-draws the remediation
                * exactly as it was. Reported on case 254398988 on 2026-09-13, whose six
                * actions were Completed and approved in Dataverse while the page still
                * showed them awaiting a decision.
-               */
+               */{% endcomment %}
               settle();
               if (window.otRemediationRows) {
                 window.otRemediationRows.decided(
@@ -2596,22 +2483,22 @@
             }
 
             var actionId = actionIds[index];
-            if (!actionId) { index += 1; next(); return; }
+            if (!actionId || recorded[actionId]) { index += 1; next(); return; }
 
-            // One JSON column on the signatory's own contact row. SignoffRequestPlugin
+            {% comment %}// One JSON column on the signatory's own contact row. SignoffRequestPlugin
             // parses it and creates the al_signoff; the browser no longer names a
-            // navigation property at all, which is what Power Pages kept refusing.
+            // navigation property at all, which is what Power Pages kept refusing.{% endcomment %}
             var payload = {
               al_signoffrequest: JSON.stringify({
                 actionId: actionId,
                 decision: Number(decision.value),
                 notes: notes.value,
-                // Zero where the supervisor left it for a separate regrade, or where the
-                // case has no graded outcome and the field was not rendered at all.
+                {% comment %}// Zero where the supervisor left it for a separate regrade, or where the
+                // case has no graded outcome and the field was not rendered at all.{% endcomment %}
                 finalOutcome: grade && grade.value ? Number(grade.value) : 0,
-                // The two answers this role owns. Zero is "leave as recorded", which is what
+                {% comment %}// The two answers this role owns. Zero is "leave as recorded", which is what
                 // a rejection sends: it does not ask these questions and must not erase what
-                // an earlier approval attempt answered.
+                // an earlier approval attempt answered.{% endcomment %}
                 recheckRequired: recheck && recheck.value ? Number(recheck.value) : 0,
                 changesAdvice: changesAdvice && changesAdvice.value ? Number(changesAdvice.value) : 0
               })
@@ -2625,13 +2512,29 @@
             request.onreadystatechange = function () {
               if (request.readyState !== 4) { return; }
 
-              if (request.status >= 200 && request.status < 300) {
+              {% comment %}// An approval refused as "already approved" is this same decision already
+              // on the action (the guard refuses only a second approval), so it counts as done.{% endcomment %}
+              var alreadyApproved = decision.value !== REJECTED
+                && window.otApi.refusal(request).indexOf('has already been approved') !== -1;
+
+              if (window.otApi.ok(request) || alreadyApproved) {
+                recorded[actionId] = true;
                 index += 1;
                 next();
                 return;
               }
 
-              show(friendlyError(request.responseText, request.status), 'error');
+              var done = 0;
+              for (var k = 0; k < actionIds.length; k += 1) { if (recorded[actionIds[k]]) { done += 1; } }
+              if (done > 0) {
+                lockDecision();
+                show(window.otApi.error('Signing off remedial action ' + (index + 1) + ' of ' + actionIds.length, request)
+                  + ' ' + done + ' of '
+                  + actionIds.length + ' already carry this decision; Save again to record it'
+                  + ' on the rest.', 'error');
+              } else {
+                show(window.otApi.error('Signing off', request), 'error');
+              }
               save.disabled = false;
             };
 
@@ -2640,7 +2543,7 @@
 
           next();
         }).fail(function () {
-          show('This page did not load completely. Refresh and try again.', 'error');
+          show(window.otApi.error('Signing off', null), 'error');
           save.disabled = false;
         });
       });
@@ -2653,7 +2556,7 @@
 </script>
 
 <script>
-  /*
+  {% comment %}/*
    * The regrade (OD-041, AD-031, BR-005, BR-007).
    *
    *   page -> PATCH contact.al_regraderequest (JSON)
@@ -2666,7 +2569,7 @@
    * permission makes that the only row it can reach - and the work happens server-side as
    * the application user. Nothing here is a security boundary (NFR-SEC-01): the role is
    * checked in the plug-in, against the contact that was actually written.
-   */
+   */{% endcomment %}
   (function () {
     'use strict';
 
@@ -2674,67 +2577,6 @@
     if (!panels.length) { return; }
 
     var contactId = '{{ user.id }}';
-
-    // The server's own words, out of the OData error body. Same reasoning as the sign-off's
-    // reader above: scanning the raw text for a prefix drags the JSON tail along with it.
-    function serverMessage(raw) {
-      var text = String(raw || '').trim();
-      if (!text) { return ''; }
-
-      var message = text;
-      try {
-        var body = JSON.parse(text);
-        var error = body && body.error ? body.error : body;
-        if (error && error.innererror && error.innererror.message) {
-          message = error.innererror.message;
-        } else if (error && error.message) {
-          message = error.message;
-        }
-      } catch (ignored) {
-        // Not JSON. Keep the raw text.
-      }
-
-      message = String(message || '').replace(/\s+/g, ' ').trim();
-      if (message.length > 300) { message = message.substring(0, 300) + '...'; }
-      return message;
-    }
-
-    function friendlyError(raw, httpStatus) {
-      var text = serverMessage(raw);
-
-      var prefixes = ['PRECONDITION:', 'VALIDATION:', 'CONFLICT:'];
-      for (var i = 0; i < prefixes.length; i += 1) {
-        var at = text.indexOf(prefixes[i]);
-        if (at !== -1) {
-          return text.substring(at + prefixes[i].length).trim();
-        }
-      }
-
-      var unexpected = text.indexOf('UNEXPECTED:');
-      if (unexpected !== -1) {
-        return 'Nothing was recorded. ' + text.substring(unexpected + 'UNEXPECTED:'.length).trim();
-      }
-
-      if (httpStatus === 400) {
-        return 'The portal rejected the request before checking any permission, so nothing was '
-          + 'recorded. This is a fault in the page rather than in your account - please report it.';
-      }
-      var code = /9004010[0-9]/.exec(text);
-      if (code) {
-        return 'The site refused this write (error ' + code[0] + '), so nothing was recorded. '
-          + 'Your role is not the problem - please report it.';
-      }
-      if (httpStatus === 403) {
-        return 'Your portal account is not allowed to write a regrade request, so nothing was recorded. '
-          + 'Ask an administrator to check your account rather than retrying.';
-      }
-      if (httpStatus === 401) {
-        return 'Your session was not accepted, so nothing was recorded. Reload the page and sign in again.';
-      }
-      return 'That outcome was not recorded, and nothing has been changed. '
-        + (text ? 'The server said: ' + text : 'The server gave no detail.')
-        + (httpStatus ? ' (status ' + httpStatus + ')' : '');
-    }
 
     function wire(panel) {
       var outcomeId = panel.getAttribute('data-outcome-id') || '';
@@ -2751,8 +2593,8 @@
         status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
       }
 
-      // The panel's own summary line, brought up to date with what was just recorded so
-      // the page in hand agrees with Dataverse without waiting for the cache.
+      {% comment %}// The panel's own summary line, brought up to date with what was just recorded so
+      // the page in hand agrees with Dataverse without waiting for the cache.{% endcomment %}
       function recorded(label) {
         grade.disabled = true;
         reason.disabled = true;
@@ -2780,15 +2622,15 @@
           return;
         }
 
-        // AD-031 makes this mandatory and RegradeRequestPlugin refuses without it. Told
-        // here so the supervisor is not made to wait for a round trip to find out.
+        {% comment %}// AD-031 makes this mandatory and RegradeRequestPlugin refuses without it. Told
+        // here so the supervisor is not made to wait for a round trip to find out.{% endcomment %}
         if (!reason.value.trim()) {
           show('A regrade must say why the outcome was changed.', 'error');
           return;
         }
 
         if (!window.shell || typeof window.shell.getTokenDeferred !== 'function') {
-          show('This page did not load completely. Refresh and try again.', 'error');
+          show(window.otApi.error('Recording the final outcome', null), 'error');
           return;
         }
 
@@ -2813,8 +2655,8 @@
           request.onreadystatechange = function () {
             if (request.readyState !== 4) { return; }
 
-            if (request.status >= 200 && request.status < 300) {
-              // Confirmed in place, and no reload. The rows a regrade writes are the
+            if (window.otApi.ok(request)) {
+              {% comment %}// Confirmed in place, and no reload. The rows a regrade writes are the
               // outcome and the case, and this page did not write them - it wrote the
               // request column and RegradeRequestPlugin did the rest - so the portal's
               // render cache is not cleared by this write and learns through change
@@ -2822,7 +2664,7 @@
               // re-drew the old grade under a success message, and was read as "it did
               // not save" on IO-300005 and again on case 254398988. The controls stay
               // disabled: the row version this panel holds is now stale, and a further
-              // regrade has to start from a fresh read.
+              // regrade has to start from a fresh read.{% endcomment %}
               recorded(grade.value);
               if (window.otRemediationRows) {
                 window.otRemediationRows.regraded(grade.value);
@@ -2837,13 +2679,13 @@
               return;
             }
 
-            show(friendlyError(request.responseText, request.status), 'error');
+            show(window.otApi.error('Recording the final outcome', request), 'error');
             save.disabled = false;
           };
 
           request.send(JSON.stringify(payload));
         }).fail(function () {
-          show('This page did not load completely. Refresh and try again.', 'error');
+          show(window.otApi.error('Recording the final outcome', null), 'error');
           save.disabled = false;
         });
       });

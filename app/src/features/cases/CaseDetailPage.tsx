@@ -9,10 +9,14 @@ import { useCaseDetail } from './useCaseDetail';
 import { CaseHeaderTable } from '../reviews/CaseHeaderTable';
 import { ChecklistSection } from '../reviews/ChecklistSection';
 import { useCaseReviews } from './useCaseReviews';
+import { useCaseOutcome } from './useCaseOutcome';
 import { CaseOutcomeSummary } from './CaseOutcomeSummary';
 import { FailAccountabilityPanel } from './FailAccountabilityPanel';
 import { CaseHistoryPanel } from './CaseHistoryPanel';
 import { CaseEditPanel } from './CaseEditPanel';
+import { CaseDeleteAction } from './CaseDeleteAction';
+import { CaseAmendOutcomeAction } from './CaseAmendOutcomeAction';
+import { CaseTcManagerPanel } from './CaseTcManagerPanel';
 import { CaseRemedialActionsPanel } from './CaseRemedialActions';
 import { sharedEmailNote } from './casePeople';
 import { useUserDirectory } from '../../hooks/useUserDirectory';
@@ -34,6 +38,10 @@ export function CaseDetailPage() {
   // still listing one check underneath it (F27).
   const reviews = useCaseReviews(caseId, reloadKey);
   const directory = useUserDirectory();
+  // One read for the outcome summary and the accountability editor. It follows the page's
+  // key, and the editor's own after it records, so its row flips to "Recorded" (F29).
+  const [outcomeKey, setOutcomeKey] = useState(0);
+  const outcomes = useCaseOutcome(caseId, reloadKey + outcomeKey);
 
   // Spec §1 / F4 (2026-10-04 final review): "two contacts share <email>" is a different
   // problem from "no contact holds <email>" - a duplicate onboarding to clean up, not a typo
@@ -109,9 +117,17 @@ export function CaseDetailPage() {
 
           <CaseEditPanel
             detail={state.detail}
-            reloadKey={reloadKey}
+            reviews={reviews}
+            directory={directory}
+            listRows={state.listOptions}
             onSaved={() => setReloadKey((key) => key + 1)}
           />
+
+          <div className="case-detail__delete">
+            <CaseDeleteAction
+              detail={{ id: state.detail.id, caseReference: state.detail.caseReference }}
+            />
+          </div>
 
           <Tabs
             label="Case detail"
@@ -186,7 +202,20 @@ export function CaseDetailPage() {
                       ) : null}
                     </section>
 
-                    <CaseOutcomeSummary caseId={state.detail.id} reloadKey={reloadKey} />
+                    <CaseOutcomeSummary state={outcomes} />
+
+                    <CaseAmendOutcomeAction
+                      caseId={state.detail.id}
+                      adviceGrade={
+                        outcomes.status === 'ready' && outcomes.outcomes.length > 0
+                          ? outcomes.outcomes[outcomes.outcomes.length - 1].initialOutcome
+                          : null
+                      }
+                      onSaved={() => {
+                        setOutcomeKey((key) => key + 1);
+                        setReloadKey((key) => key + 1);
+                      }}
+                    />
 
                     {/*
                       Directly under the grades it describes (item 8, 2026-09-19).
@@ -195,7 +224,8 @@ export function CaseDetailPage() {
                       paraplanner, which the header above already shows.
                     */}
                     <FailAccountabilityPanel
-                      caseId={state.detail.id}
+                      state={outcomes}
+                      onSaved={() => setOutcomeKey((key) => key + 1)}
                       people={{
                         adviser: state.detail.edit.al_advisername || null,
                         paraplanner: state.detail.edit.al_paraplanner || null,
@@ -214,6 +244,11 @@ export function CaseDetailPage() {
                         </Link>
                       </section>
                     </PermissionGate>
+
+                    <CaseTcManagerPanel
+                      caseId={state.detail.id}
+                      onSaved={() => setReloadKey((key) => key + 1)}
+                    />
 
                     {state.detail.adviserUnmatched ? (
                       <p className="case-detail__notice" role="status">

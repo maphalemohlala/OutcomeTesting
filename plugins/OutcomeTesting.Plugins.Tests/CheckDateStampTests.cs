@@ -44,7 +44,7 @@ namespace OutcomeTesting.Plugins.Tests
             var update = Assert.Single(service.Updates);
             Assert.Equal("al_outcomecase", update.LogicalName);
             Assert.Equal(CaseId, update.Id);
-            Assert.Equal(DateTime.UtcNow.Date, update.GetAttributeValue<DateTime>("al_checkdate"));
+            Assert.Equal(CaseHeaderRules.UkDate(DateTime.UtcNow), update.GetAttributeValue<DateTime>("al_checkdate"));
         }
 
         [Fact]
@@ -71,7 +71,7 @@ namespace OutcomeTesting.Plugins.Tests
             SubmitReviewPlugin.StampCheckDate(service, CaseId);
 
             var update = Assert.Single(service.Updates);
-            Assert.Equal(DateTime.UtcNow.Date, update.GetAttributeValue<DateTime>("al_checkdate"));
+            Assert.Equal(CaseHeaderRules.UkDate(DateTime.UtcNow), update.GetAttributeValue<DateTime>("al_checkdate"));
         }
 
         [Fact]
@@ -86,7 +86,7 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Equal(2, service.Updates.Count);
             Assert.Equal(
-                DateTime.UtcNow.Date,
+                CaseHeaderRules.UkDate(DateTime.UtcNow),
                 service.Updates[1].GetAttributeValue<DateTime>("al_checkdate"));
         }
 

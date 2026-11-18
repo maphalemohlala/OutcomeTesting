@@ -103,6 +103,10 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            // Only the site's own write is a request: the app's Dataverse role can write this
+            // row too, and the request is trusted as the signed-in person's.
+            WriteProvenance.EnsurePortalCaller(localPluginContext.OrgSvcFactory.CreateOrganizationService(null), context);
+
             var payload = CaseHeaderRequestPayload.Parse(raw);
             if (payload == null)
             {

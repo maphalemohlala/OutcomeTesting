@@ -17,7 +17,7 @@ const row = (id: string, advice: string, file: string) => ({
 let recordedRows = 3;
 
 vi.mock('./useExports', () => ({
-  useExportBatches: () => ({
+  useExportBatch: () => ({
     status: 'ready',
     batches: [{ id: 'b1', status: 'Generated', name: 'Batch', generatedOn: null, rowCount: recordedRows }],
   }),

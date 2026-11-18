@@ -6,6 +6,7 @@ import { ExportMenu } from '../../components/export/ExportMenu';
 import { Notice } from '../../components/feedback/Notice';
 import { OUTCOMES } from '../../types/domain';
 import { usePermissions } from '../../app/permissions/permissionContext';
+import { useCurrentUser } from '../../services/auth/useCurrentUser';
 import { useUserDirectory, type DirectoryUser } from '../../hooks/useUserDirectory';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { messageForFailure } from '../../services/errors';
@@ -18,6 +19,7 @@ import {
   caseloadByIdentity,
   contactEmailsOf,
   emailFromIdentity,
+  isSignedInPerson,
   type PersonCaseload,
   type PersonRole,
 } from './peopleDirectory';
@@ -80,6 +82,8 @@ function drillTo(load: PersonCaseload | null): string | null {
 export function PeoplePage() {
   const { can, ready } = usePermissions();
   const canManage = ready && can('permission.manage', 'Manage');
+  const signedIn = useCurrentUser();
+  const signedInEmail = signedIn.status === 'ready' ? signedIn.user.userPrincipalName : undefined;
 
   const [reloadKey, setReloadKey] = useState(0);
   const directory = useUserDirectory(reloadKey);
@@ -200,6 +204,28 @@ export function PeoplePage() {
     });
   }, [rows, search, activeFilter, roleFilter]);
 
+  const exportRows = useMemo(
+    () =>
+      filtered.map((row) => {
+        const outcomes = row.load?.outcomes ?? zeroes();
+        return [
+          row.name,
+          row.email,
+          row.user ? (row.active ? 'Active' : 'Inactive') : 'Not in directory',
+          row.roles.join(', '),
+          (row.load?.roles ?? []).join(', '),
+          row.user?.staffCode ?? '',
+          row.load?.totalCases ?? 0,
+          row.load?.openCases ?? 0,
+          row.load?.closedCases ?? 0,
+          ...OUTCOMES.map((outcome) => outcomes[outcome] ?? 0),
+          row.load?.notGraded ?? 0,
+          row.load?.oldestOpenDays ?? 0,
+        ];
+      }),
+    [filtered],
+  );
+
   const isFiltered = search.trim() !== '' || activeFilter !== 'all' || roleFilter !== 'all';
   const unregisteredCount = rows.filter((row) => row.user === null).length;
 
@@ -280,23 +306,7 @@ export function PeoplePage() {
                 stem="outcome-people"
                 sheetName="People"
                 headers={EXPORT_HEADERS}
-                rows={filtered.map((row) => {
-                  const outcomes = row.load?.outcomes ?? zeroes();
-                  return [
-                    row.name,
-                    row.email,
-                    row.user ? (row.active ? 'Active' : 'Inactive') : 'Not in directory',
-                    row.roles.join(', '),
-                    (row.load?.roles ?? []).join(', '),
-                    row.user?.staffCode ?? '',
-                    row.load?.totalCases ?? 0,
-                    row.load?.openCases ?? 0,
-                    row.load?.closedCases ?? 0,
-                    ...OUTCOMES.map((outcome) => outcomes[outcome] ?? 0),
-                    row.load?.notGraded ?? 0,
-                    row.load?.oldestOpenDays ?? 0,
-                  ];
-                })}
+                rows={exportRows}
                 caption={`Exports the ${filtered.length} person row${filtered.length === 1 ? '' : 's'} currently listed`}
               />
             ) : null}
@@ -447,13 +457,15 @@ export function PeoplePage() {
                                 >
                                   Edit
                                 </button>
-                                <button
-                                  type="button"
-                                  className="users__link"
-                                  onClick={() => onToggleActive(row.user!)}
-                                >
-                                  {row.active ? 'Deactivate' : 'Reactivate'}
-                                </button>
+                                {row.active && isSignedInPerson(row.email, signedInEmail) ? null : (
+                                  <button
+                                    type="button"
+                                    className="users__link"
+                                    onClick={() => onToggleActive(row.user!)}
+                                  >
+                                    {row.active ? 'Deactivate' : 'Reactivate'}
+                                  </button>
+                                )}
                               </>
                             ) : (
                               '—'

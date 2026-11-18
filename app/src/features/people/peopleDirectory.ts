@@ -8,26 +8,9 @@ import type { CaseSummary } from '../cases/caseWorklistMapping';
  * is the Dataverse user the case is allocated to (BR-003). Adviser and paraplanner are keyed
  * by the email the case stores; checkers by their contact, through the directory's email.
  */
-export const PERSON_ROLES = ['Adviser', 'Paraplanner', 'Checker', 'Owner'] as const;
+const PERSON_ROLES = ['Adviser', 'Paraplanner', 'Checker', 'Owner'] as const;
 
 export type PersonRole = (typeof PERSON_ROLES)[number];
-
-export interface PersonSummary {
-  key: string;
-  role: PersonRole;
-  name: string;
-  code: string | null;
-  totalCases: number;
-  openCases: number;
-  closedCases: number;
-  notGraded: number;
-  outcomes: Record<Outcome, number>;
-  oldestOpenDays: number;
-}
-
-export function personKey(role: PersonRole, identity: string): string {
-  return `${role}:${identity.toLowerCase()}`;
-}
 
 const IDENTITY_PREFIXES = ['email:', 'contact:', 'name:'];
 
@@ -46,12 +29,21 @@ export function isIdentityKey(value: string): boolean {
  * review): that is what the bookmark always meant, so it goes on meaning that rather than
  * silently matching nobody.
  */
-export function normalizeIdentityKey(value: string): string {
+function normalizeIdentityKey(value: string): string {
   const trimmed = value.trim().toLowerCase();
   return isIdentityKey(trimmed) ? trimmed : `name:${trimmed}`;
 }
 
 export type ContactEmails = ReadonlyMap<string, string>;
+
+/**
+ * Whether a directory row is the signed-in person. The server refuses deactivating
+ * yourself, so the page does not offer it; emails compare without case or spaces.
+ */
+export function isSignedInPerson(rowEmail: string, signedInEmail: string | undefined): boolean {
+  const mine = (signedInEmail ?? '').trim().toLowerCase();
+  return mine !== '' && rowEmail.trim().toLowerCase() === mine;
+}
 
 export function contactEmailsOf(users: { id: string; email: string }[]): ContactEmails {
   return new Map(
@@ -204,57 +196,6 @@ function emptyOutcomes(): Record<Outcome, number> {
 
 const CLOSED_STATUSES = new Set(['Closed', 'No Check Required']);
 
-/** One row per person per position, so someone who both checks and advises shows as both. */
-export function buildDirectory(
-  cases: CaseSummary[],
-  contactEmails: ContactEmails = new Map(),
-): PersonSummary[] {
-  const people = new Map<string, PersonSummary>();
-
-  for (const item of cases) {
-    for (const position of positions(item)) {
-      const identity = identityOf(position, contactEmails);
-      if (identity === 'name:') continue;
-
-      const name = (position.name ?? '').trim();
-      const key = personKey(position.role, identity);
-      const person =
-        people.get(key) ??
-        ({
-          key,
-          role: position.role,
-          name,
-          code: null,
-          totalCases: 0,
-          openCases: 0,
-          closedCases: 0,
-          notGraded: 0,
-          outcomes: emptyOutcomes(),
-          oldestOpenDays: 0,
-        } satisfies PersonSummary);
-
-      person.totalCases += 1;
-      person.code = person.code ?? position.code ?? null;
-
-      if (CLOSED_STATUSES.has(item.status)) {
-        person.closedCases += 1;
-      } else {
-        person.openCases += 1;
-        if (item.ageInDays > person.oldestOpenDays) person.oldestOpenDays = item.ageInDays;
-      }
-
-      if (item.latestOutcome) person.outcomes[item.latestOutcome] += 1;
-      else if (!item.taxOutcome) person.notGraded += 1;
-
-      people.set(key, person);
-    }
-  }
-
-  return [...people.values()].sort(
-    (a, b) => b.totalCases - a.totalCases || a.name.localeCompare(b.name),
-  );
-}
-
 export function casesForPerson(
   cases: CaseSummary[],
   role: PersonRole,
@@ -276,8 +217,7 @@ export function isPersonRole(value: string | undefined): value is PersonRole {
 /**
  * One person's whole caseload, across every position they hold.
  *
- * `buildDirectory` deliberately emits a row per person *per position*, because that is
- * how a workload is read. Joining to the registry needs the opposite: one row per human,
+ * Joining to the registry needs one row per human, not one per position they hold,
  * keyed on something the registry also has. The email wherever it is known is that key -
  * stored on the case for the adviser and paraplanner, through the directory for a checker -
  * so two people of one name stay two people and one person in two positions stays one. A

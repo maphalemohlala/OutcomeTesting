@@ -6,8 +6,8 @@ import {
   DUPLICATE_ADVISER,
   REMOVE_FALLBACK,
   SAVE_FALLBACK,
-  UNREACHABLE,
 } from './adviserMappingFailure';
+import { UNREACHABLE } from '../../services/commands/failures';
 import type { AdviserMappingRow } from './adviserMappingRows';
 
 /**

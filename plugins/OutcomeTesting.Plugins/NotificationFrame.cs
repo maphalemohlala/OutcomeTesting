@@ -23,9 +23,10 @@ namespace OutcomeTesting.Plugins
     /// <para>
     /// <b>Plain letters too</b> (owner, same day: every email the same). A body that does not
     /// open with a tag - allocation, approval, the para-planner's note - becomes one paragraph,
-    /// its line breaks kept and its bare web address made a link. It is not escaped: a stored
-    /// template is markup whatever its letter (AD-170), so its values arrive escaped already,
-    /// and the email has always rendered it as markup.
+    /// its line breaks kept and its bare web address made a link. It is not escaped here: a
+    /// stored template is markup whatever its letter (AD-170), so its values arrive escaped
+    /// already, and a compiled plain letter's values arrive with their tag brackets
+    /// neutralised (<see cref="NotificationTemplates.Render"/>).
     /// </para>
     /// </summary>
     public static class NotificationFrame
@@ -97,12 +98,19 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         private static string Linked(string text)
         {
-            return Regex.Replace(text, @"https?://[^\s<>""]+", match =>
+            // An anchor already written, or any other tag, is matched first and kept as it is,
+            // so an address inside an href or a link's own text is never linked a second time.
+            return Regex.Replace(text, @"<a\b.*?</a\s*>|<[^>]*>|https?://[^\s<>""]+", match =>
             {
+                if (match.Value.StartsWith("<", StringComparison.Ordinal))
+                {
+                    return match.Value;
+                }
+
                 var url = match.Value.TrimEnd('.', ',', ';', ':', ')', '!', '?');
                 return "<a href=\"" + url + "\" style=\"color:" + Brand + ";\">" + url + "</a>"
                     + match.Value.Substring(url.Length);
-            });
+            }, RegexOptions.IgnoreCase | RegexOptions.Singleline);
         }
     }
 }

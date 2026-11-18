@@ -67,8 +67,17 @@ export interface ReviewSection<T extends SectionedAnswer = SectionedAnswer> {
   rows: FormRow<T>[];
 }
 
+/**
+ * Whether every read the checklist is drawn from came back. The form is a compliance record
+ * with a Save as PDF button: without the question versions or the questions, the unanswered
+ * questions silently drop off it, so any one of them failing makes the review unavailable.
+ */
+export function formReadsComplete(reads: readonly { success: boolean }[]): boolean {
+  return reads.every((read) => read.success);
+}
+
 /** Where an answer lands when its version, question or section row could not be read. */
-export const OTHER_SECTION_ID = 'other';
+const OTHER_SECTION_ID = 'other';
 
 export function buildSections<T extends SectionedAnswer>(
   sections: SectionRef[],

@@ -79,6 +79,14 @@
                 "type": "string",
                 "x-ms-dataverse-type": "StringType",
                 "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "FqAdministratorId",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
               }
             ],
             "responses": {

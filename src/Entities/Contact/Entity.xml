@@ -160,6 +160,45 @@
             <Description description="The final regraded outcome as JSON {outcomeId, finalOutcome, reason, expectedRowVersion}, written by the T&amp;C Supervisor onto their own contact row. RegradeRequestPlugin checks the web role, clears the column and calls RegradeCasePlugin.Regrade (OD-041, AD-111)." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_RemedialActionsRequest">
+          <Type>ntext</Type>
+          <Name>al_remedialactionsrequest</Name>
+          <LogicalName>al_remedialactionsrequest</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.13.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>textarea</Format>
+          <MaxLength>100000</MaxLength>
+          <displaynames>
+            <displayname description="Remedial actions request" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="Portal trigger: the checker's remedial actions for RemedialActionsRequestPlugin." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_SignoffRequest">
           <Type>ntext</Type>
           <Name>al_signoffrequest</Name>
@@ -212,7 +251,7 @@
           <IsCustomField>1</IsCustomField>
           <IsAuditEnabled>1</IsAuditEnabled>
           <IsSecured>0</IsSecured>
-          <IntroducedVersion>1.0.7.0</IntroducedVersion>
+          <IntroducedVersion>1.0.6.0</IntroducedVersion>
           <IsCustomizable>1</IsCustomizable>
           <IsRenameable>1</IsRenameable>
           <CanModifySearchSettings>1</CanModifySearchSettings>
@@ -225,17 +264,18 @@
           <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
           <IsDataSourceSecret>0</IsDataSourceSecret>
           <AutoNumberFormat></AutoNumberFormat>
-          <IsSearchable>1</IsSearchable>
-          <IsFilterable>1</IsFilterable>
-          <IsRetrievable>1</IsRetrievable>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
           <IsLocalizable>0</IsLocalizable>
           <Format>text</Format>
           <MaxLength>50</MaxLength>
+          <Length>100</Length>
           <displaynames>
             <displayname description="Employee code" languagecode="1033" />
           </displaynames>
           <Descriptions>
-            <Description description="The person's staff code, used to fill the Trail Light export's code columns (2026-09-22). Replaces the per-case adviser and paraplanner codes." languagecode="1033" />
+            <Description description="The person's staff/employee code, used to populate the adviser, paraplanner and accountability code columns on the Trail Light export." languagecode="1033" />
           </Descriptions>
         </attribute>
       </attributes>

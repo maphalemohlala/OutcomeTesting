@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -67,6 +68,347 @@ namespace OutcomeTesting.Plugins
             return found.Entities.Count == 0 ? (Guid?)null : found.Entities[0].Id;
         }
 
+        private static readonly string[] AnswerColumns =
+            { "al_answertext", "al_answerrichtext", "al_answerchoice", "al_answerchoices", "al_answerdate" };
+
+        private static readonly string[] ReviewColumns =
+            { "al_reviewstatus", "al_reviewtype", "al_checklistversionid" };
+
+        /// <summary>
+        /// Carries this review's answers over to the questions they were moved to (project
+        /// owner, 2026-11-17). A move gives the question a new code and version in the target
+        /// section, so the answer on the old version would otherwise be left behind and the
+        /// checker made to give it again. Run at save and at submit, so a move dated forward
+        /// carries the first time the review is touched on or after its day. Returns how many
+        /// answers it carried.
+        ///
+        /// Only an answer to the version a move dated out (its question's newest, ending the day
+        /// the moved question's first version starts), along each move of a chain, and only into that first version:
+        /// an answer to an older wording, or carried into a newer one, answers a question nobody
+        /// asked. Only to a version in force today, in a section this review's discipline answers,
+        /// on the review's checklist version, on the same answer scale, and never where the review
+        /// already holds a row on the new question: each of those is a write ResponseGuardPlugin
+        /// would refuse or a checker's answer it would overwrite. A submitted review is left alone.
+        /// </summary>
+        public static int CarryMovedAnswers(IOrganizationService service, Guid reviewId)
+        {
+            var moves = ChecklistQueries.QuestionMoves(service);
+            if (moves.Count == 0)
+            {
+                return 0;
+            }
+
+            // Only answers on a moved question or one it became: no other answer can carry or block a carry.
+            var codes = moves.Keys.Concat(moves.Values.Select(m => m.Key))
+                .Distinct(StringComparer.OrdinalIgnoreCase).Select(c => (object)c).ToArray();
+            var query = new QueryExpression(ResponseEntity)
+            {
+                ColumnSet = new ColumnSet(AnswerColumns.Concat(new[] { "al_questionversionid" }).ToArray()),
+            };
+            query.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
+            var version = query.AddLink(ChecklistQueries.VersionEntity, "al_questionversionid", "al_questionversionid");
+            version.EntityAlias = "v";
+            version.Columns = new ColumnSet("al_questionid", "al_versionnumber", "al_responsetype", "al_effectiveto");
+            var question = version.AddLink(ChecklistQueries.QuestionEntity, "al_questionid", "al_questionid");
+            question.EntityAlias = "q";
+            question.Columns = new ColumnSet("al_questioncode");
+            question.LinkCriteria.AddCondition("al_questioncode", ConditionOperator.In, codes);
+            var rows = service.RetrieveMultiple(query).Entities;
+
+            var held = new HashSet<Guid>(
+                rows.Select(r => Aliased<EntityReference>(r, "v.al_questionid")).Where(r => r != null).Select(r => r.Id));
+            var answered = rows.Where(SubmitReviewPlugin.HasAnswer).ToList();
+
+            var reachable = new HashSet<Guid>();
+            foreach (var source in answered)
+            {
+                var code = Aliased<string>(source, "q.al_questioncode");
+                KeyValuePair<string, Guid> next;
+                for (var hops = 1; code != null && hops <= moves.Count && moves.TryGetValue(code, out next); hops++)
+                {
+                    reachable.Add(next.Value);
+                    code = next.Key;
+                }
+            }
+
+            if (reachable.Count == 0)
+            {
+                return 0;
+            }
+
+            // Each question a moved one became, with the answer nearest it along the moves: an
+            // answer given after an earlier move is newer than one given before it. A hop counts
+            // only from the newest version of its question - the one the move dated out - and
+            // where that version ends the day the next question starts. An older wording can end
+            // that day too, when a change of wording was dated on the move's day.
+            Dictionary<Guid, int> newest;
+            var firsts = FirstVersions(
+                service,
+                reachable.Concat(answered.Select(r => Aliased<EntityReference>(r, "v.al_questionid")).Where(r => r != null).Select(r => r.Id)),
+                out newest);
+            var sources = new Dictionary<Guid, Entity>();
+            var distance = new Dictionary<Guid, int>();
+            foreach (var source in answered)
+            {
+                var code = Aliased<string>(source, "q.al_questioncode");
+                var endsOn = Aliased<DateTime?>(source, "v.al_effectiveto");
+                var from = Aliased<EntityReference>(source, "v.al_questionid");
+                var fromId = from == null ? Guid.Empty : from.Id;
+                var number = VersionNumber(source);
+                KeyValuePair<string, Guid> next;
+                for (var hops = 1; code != null && hops <= moves.Count && moves.TryGetValue(code, out next); hops++)
+                {
+                    Entity first;
+                    int latest;
+                    if (!newest.TryGetValue(fromId, out latest) || latest != number
+                        || !firsts.TryGetValue(next.Value, out first)
+                        || !SameDay(endsOn, first.GetAttributeValue<DateTime?>("al_effectivefrom")))
+                    {
+                        break;
+                    }
+
+                    int known;
+                    if (!distance.TryGetValue(next.Value, out known) || hops < known)
+                    {
+                        distance[next.Value] = hops;
+                        sources[next.Value] = source;
+                    }
+
+                    endsOn = first.GetAttributeValue<DateTime?>("al_effectiveto");
+                    fromId = next.Value;
+                    number = 1;
+                    code = next.Key;
+                }
+            }
+
+            var now = DateTime.UtcNow;
+            var targets = sources.Keys.Where(id => !held.Contains(id)).Select(id => firsts[id]).Where(v => InForce(v, now)).ToList();
+            if (targets.Count == 0)
+            {
+                return 0;
+            }
+
+            var review = service.Retrieve("al_reviewinstance", reviewId, new ColumnSet(ReviewColumns));
+            if (IsSubmitted(review))
+            {
+                return 0;
+            }
+
+            var carried = 0;
+            foreach (var target in targets)
+            {
+                if (CarryInto(service, review, sources[target.GetAttributeValue<EntityReference>("al_questionid").Id], target, now))
+                {
+                    carried++;
+                }
+            }
+
+            return carried;
+        }
+
+        /// <summary>
+        /// The move's own half of the carry: every open review's answer to the version the move
+        /// dated out, written onto the new question when the move is already in force. A move
+        /// dated forward finds no version in force here and is carried at save or submit instead.
+        /// The new question is brand new, so no review holds an answer on it yet.
+        /// </summary>
+        public static int CarryMovedAnswers(IOrganizationService service, Guid movedVersionId, Guid toQuestionId)
+        {
+            var now = DateTime.UtcNow;
+            Entity target;
+            if (!FirstVersions(service, new[] { toQuestionId }, out _).TryGetValue(toQuestionId, out target) || !InForce(target, now))
+            {
+                return 0;
+            }
+
+            var query = new QueryExpression(ResponseEntity)
+            {
+                ColumnSet = new ColumnSet(AnswerColumns.Concat(new[] { "al_reviewinstanceid" }).ToArray()),
+            };
+            query.Criteria.AddCondition("al_questionversionid", ConditionOperator.Equal, movedVersionId);
+            var version = query.AddLink(ChecklistQueries.VersionEntity, "al_questionversionid", "al_questionversionid");
+            version.EntityAlias = "v";
+            version.Columns = new ColumnSet("al_responsetype");
+            var review = query.AddLink("al_reviewinstance", "al_reviewinstanceid", "al_reviewinstanceid");
+            review.EntityAlias = "r";
+            review.Columns = new ColumnSet(ReviewColumns);
+
+            // A submitted review is never carried into, so its answers are not read at all.
+            var open = new FilterExpression(LogicalOperator.Or);
+            open.AddCondition("al_reviewstatus", ConditionOperator.NotEqual, ResponseRules.StatusSubmitted);
+            open.AddCondition("al_reviewstatus", ConditionOperator.Null);
+            review.LinkCriteria.AddFilter(open);
+
+            var carried = 0;
+            foreach (var source in CommandHelpers.RetrieveAll(service, query).Where(SubmitReviewPlugin.HasAnswer))
+            {
+                var reviewRow = Unaliased(source, "r", "al_reviewinstance", ReviewColumns);
+                reviewRow.Id = source.GetAttributeValue<EntityReference>("al_reviewinstanceid").Id;
+                if (!IsSubmitted(reviewRow) && CarryInto(service, reviewRow, source, target, now))
+                {
+                    carried++;
+                }
+            }
+
+            return carried;
+        }
+
+        /// <summary>
+        /// The first version of each of these questions - the one a move creates - each with its
+        /// section as "s.", by question; and, in <paramref name="newest"/>, each one's highest
+        /// version number. One read for both.
+        /// </summary>
+        private static Dictionary<Guid, Entity> FirstVersions(
+            IOrganizationService service, IEnumerable<Guid> questionIds, out Dictionary<Guid, int> newest)
+        {
+            var ids = questionIds.Distinct().Select(id => (object)id).ToArray();
+            if (ids.Length == 0)
+            {
+                newest = new Dictionary<Guid, int>();
+                return new Dictionary<Guid, Entity>();
+            }
+
+            var query = new QueryExpression(ChecklistQueries.VersionEntity)
+            {
+                ColumnSet = new ColumnSet("al_questionid", "al_versionnumber", "al_responsetype", "al_effectivefrom", "al_effectiveto"),
+            };
+            query.Criteria.AddCondition("al_questionid", ConditionOperator.In, ids);
+            var section = query.AddLink(ChecklistQueries.QuestionEntity, "al_questionid", "al_questionid")
+                .AddLink("al_section", "al_sectionid", "al_sectionid");
+            section.EntityAlias = "s";
+            section.Columns = new ColumnSet(ResponseGuardPlugin.SectionColumns);
+
+            var byQuestion = service.RetrieveMultiple(query).Entities
+                .GroupBy(v => v.GetAttributeValue<EntityReference>("al_questionid").Id)
+                .ToList();
+            newest = byQuestion.ToDictionary(g => g.Key, g => g.Max(v => v.GetAttributeValue<int>("al_versionnumber")));
+            return byQuestion
+                .Select(g => g.FirstOrDefault(v => v.GetAttributeValue<int>("al_versionnumber") == 1))
+                .Where(v => v != null)
+                .ToDictionary(v => v.GetAttributeValue<EntityReference>("al_questionid").Id);
+        }
+
+        private static bool InForce(Entity version, DateTime asOf)
+        {
+            return ResponseRules.IsVersionEffective(
+                version.GetAttributeValue<DateTime?>("al_effectivefrom"),
+                version.GetAttributeValue<DateTime?>("al_effectiveto"),
+                asOf);
+        }
+
+        private static bool SameDay(DateTime? a, DateTime? b)
+        {
+            return a.HasValue && b.HasValue && a.Value.Date == b.Value.Date;
+        }
+
+        /// <summary>
+        /// Writes <paramref name="source"/>'s answer and its live fail points onto
+        /// <paramref name="target"/> when ResponseGuardPlugin would accept it; false, writing
+        /// nothing, when it would not. Checked here first because a refused write inside a move
+        /// or a submit would fail the whole command, not just this answer.
+        /// </summary>
+        private static bool CarryInto(IOrganizationService service, Entity review, Entity source, Entity target, DateTime now)
+        {
+            var reviewType = review.GetAttributeValue<OptionSetValue>("al_reviewtype");
+            var section = Unaliased(target, "s", "al_section", ResponseGuardPlugin.SectionColumns);
+            if (reviewType == null || ResponseGuardPlugin.SectionRefusal(section, reviewType.Value, now) != null)
+            {
+                return false;
+            }
+
+            var issued = review.GetAttributeValue<EntityReference>("al_checklistversionid");
+            var sectionVersion = section.GetAttributeValue<EntityReference>("al_checklistversionid");
+            if (issued == null || sectionVersion == null || issued.Id != sectionVersion.Id)
+            {
+                return false;
+            }
+
+            var fromType = Aliased<OptionSetValue>(source, "v.al_responsetype");
+            var toType = target.GetAttributeValue<OptionSetValue>("al_responsetype");
+            if (fromType == null || toType == null || fromType.Value != toType.Value)
+            {
+                return false;
+            }
+
+            var choice = source.GetAttributeValue<OptionSetValue>("al_answerchoice");
+            var choices = source.GetAttributeValue<OptionSetValueCollection>("al_answerchoices");
+            if (ResponseRules.ValidateAnswer(
+                    toType.Value,
+                    !string.IsNullOrWhiteSpace(source.GetAttributeValue<string>("al_answertext")),
+                    source.GetAttributeValue<object>("al_answerdate") is DateTime,
+                    choice == null ? (int?)null : choice.Value,
+                    choices == null ? new int[0] : choices.Select(c => c.Value).ToArray(),
+                    HtmlSanitiser.HasText(source.GetAttributeValue<string>("al_answerrichtext"))) != null)
+            {
+                return false;
+            }
+
+            var row = new Entity(ResponseEntity)
+            {
+                ["al_reviewinstanceid"] = new EntityReference("al_reviewinstance", review.Id),
+                ["al_questionversionid"] = new EntityReference(ChecklistQueries.VersionEntity, target.Id),
+            };
+            foreach (var column in AnswerColumns.Where(source.Contains))
+            {
+                row[column] = source[column];
+            }
+
+            var responseId = service.Create(row);
+
+            // Retired points are left behind: the submit would untick them anyway, and
+            // ReconcileFailReasons refuses a new tick on one.
+            var points = CurrentReasons(service, source.Id);
+            if (points.Count > 0)
+            {
+                var retired = new QueryExpression(FailReasonEntity) { ColumnSet = new ColumnSet(false) };
+                retired.Criteria.AddCondition("al_failreasonid", ConditionOperator.In, points.Select(p => (object)p).ToArray());
+                retired.Criteria.AddCondition("statecode", ConditionOperator.Equal, 1);
+                points.ExceptWith(service.RetrieveMultiple(retired).Entities.Select(r => r.Id));
+            }
+
+            if (points.Count > 0)
+            {
+                service.Associate(
+                    ResponseEntity, responseId, new Relationship(FailReasonRelationship),
+                    new EntityReferenceCollection(points.Select(p => new EntityReference(FailReasonEntity, p)).ToList()));
+            }
+
+            return true;
+        }
+
+        private static bool IsSubmitted(Entity review)
+        {
+            var status = review.GetAttributeValue<OptionSetValue>("al_reviewstatus");
+            return status != null && status.Value == ResponseRules.StatusSubmitted;
+        }
+
+        private static int VersionNumber(Entity response)
+        {
+            return Aliased<int>(response, "v.al_versionnumber");
+        }
+
+        private static T Aliased<T>(Entity row, string key)
+        {
+            var aliased = row.GetAttributeValue<AliasedValue>(key);
+            return aliased != null && aliased.Value is T ? (T)aliased.Value : default(T);
+        }
+
+        /// <summary>A linked row's columns, read back off their alias onto a plain entity.</summary>
+        private static Entity Unaliased(Entity row, string alias, string logicalName, string[] columns)
+        {
+            var plain = new Entity(logicalName);
+            foreach (var column in columns)
+            {
+                var aliased = row.GetAttributeValue<AliasedValue>(alias + "." + column);
+                if (aliased != null)
+                {
+                    plain[column] = aliased.Value;
+                }
+            }
+
+            return plain;
+        }
+
         public static Guid Save(IOrganizationService service, Guid reviewId, AnswerRequestPayload payload)
         {
             var questionVersionId = AnswerRequest.RequireQuestionVersion(payload);
@@ -96,6 +438,9 @@ namespace OutcomeTesting.Plugins
             // very first save has to attach just as much as one added on a later edit, and a
             // reason dropped from the list has to be disassociated whichever path got here.
             ReconcileFailReasons(service, responseId, payload.FailReasons, payload.RenderedReasons);
+
+            // After the checker's own write, so an answer they have just given is never carried over.
+            CarryMovedAnswers(service, reviewId);
             return responseId;
         }
 
@@ -248,9 +593,9 @@ namespace OutcomeTesting.Plugins
             if (retired != null)
             {
                 throw new InvalidPluginExecutionException(
-                    CommandHelpers.PreconditionPrefix + "The fail point \""
+                    CommandHelpers.PreconditionPrefix + "The fail point '"
                     + retired.GetAttributeValue<string>("al_name")
-                    + "\" has been retired and can no longer be ticked. Reload the page to see the current list.");
+                    + "' has been retired and can no longer be ticked. Reload the page to see the current list.");
             }
         }
 

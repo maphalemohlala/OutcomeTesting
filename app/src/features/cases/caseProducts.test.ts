@@ -70,3 +70,15 @@ describe('a case in a report', () => {
     expect(row).toContain('2026-08-01');
   });
 });
+
+describe('the completed report', () => {
+  it('carries the vulnerable client answer and the CAS status', () => {
+    const row = completedCaseRow({
+      vulnerableClient: 'Potentially vulnerable',
+      adviserStatus: 'PreCAS',
+    } as unknown as CaseSummary);
+    expect(row).toHaveLength(COMPLETED_CASE_HEADERS.length);
+    expect(row[COMPLETED_CASE_HEADERS.indexOf('Vulnerable client')]).toBe('Potentially vulnerable');
+    expect(row[COMPLETED_CASE_HEADERS.indexOf('CAS status')]).toBe('PreCAS');
+  });
+});

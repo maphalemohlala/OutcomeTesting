@@ -1,0 +1,14 @@
+<environmentvariabledefinition schemaname="al_ProductName">
+  <defaultvalue>Outcome Testing</defaultvalue>
+  <description default="What this environment calls the product, for titles and for the names of its roles and teams. Unset means Outcome Testing; PROD sets OTIS. Read by the plug-ins and the Code App; the portal reads the site setting OT/ProductName.">
+    <label description="What this environment calls the product, for titles and for the names of its roles and teams. Unset means Outcome Testing; PROD sets OTIS. Read by the plug-ins and the Code App; the portal reads the site setting OT/ProductName." languagecode="1033" />
+  </description>
+  <displayname default="Product name">
+    <label description="Product name" languagecode="1033" />
+  </displayname>
+  <introducedversion>1.0</introducedversion>
+  <iscustomizable>1</iscustomizable>
+  <isrequired>0</isrequired>
+  <secretstore>0</secretstore>
+  <type>100000000</type>
+</environmentvariabledefinition>

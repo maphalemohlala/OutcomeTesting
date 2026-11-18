@@ -130,6 +130,21 @@ describe('refusalFor', () => {
     ).toBeNull();
   });
 
+  it('refuses a code with a space, on a new question and on a move', () => {
+    expect(
+      refusalFor({ ...add, draft: { ...original, responseType: 120910006 }, questionCode: 'Q E1 06' }),
+    ).toBe('A question code cannot contain spaces.');
+    expect(
+      refusalFor({
+        mode: 'edit',
+        intent: 'move',
+        draft: { ...original, sectionId: 'sec-2' },
+        questionCode: ' Q-E2\t04 ',
+        reason: 'Belongs under outcome 2.',
+      }),
+    ).toBe('A question code cannot contain spaces.');
+  });
+
   it('refuses a move with no new code', () => {
     expect(
       refusalFor({

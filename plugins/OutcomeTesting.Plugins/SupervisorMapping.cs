@@ -67,7 +67,7 @@ namespace OutcomeTesting.Plugins
             // in al_advisermapping and the reader is the person who can have it filled in.
             var detail = routing.Manager == null
                 ? " " + routing.Reason
-                : " Your portal account is not the T&C Manager mapped to this case's adviser.";
+                : " Your portal account is not this case's T&C Manager.";
 
             throw new InvalidPluginExecutionException(
                 CommandHelpers.PreconditionPrefix +

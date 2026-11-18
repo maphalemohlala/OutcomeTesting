@@ -1,0 +1,26 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000d2">
+  <content>{
+  "append": false,
+  "appendto": false,
+  "create": false,
+  "delete": false,
+  "entitylogicalname": "al_remediationaction",
+  "entityname": "Case - my clients / remedial actions",
+  "parententitypermission": "a1000000-0000-4000-8000-0000000000c3",
+  "parentrelationship": "al_outcomecase_remediationaction",
+  "read": true,
+  "scope": 756150003,
+  "write": false,
+  "adx_entitypermission_webrole": [
+    "a1000000-0000-4000-8000-000000000092"
+  ]
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Case - my clients / remedial actions</name>
+  <powerpagecomponenttype>18</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

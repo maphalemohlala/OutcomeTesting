@@ -3,7 +3,7 @@ import { isVersionEffective } from './versionEffective';
 import { buildSectionFilter, referenceDay } from './sectionFilter';
 import { answerOf, richTextOf } from './reviewAnswer';
 import { date, text } from '../../lib/format';
-import { buildSections, type ReviewSection } from './reviewSections';
+import { buildSections, formReadsComplete, type ReviewSection } from './reviewSections';
 import {
   caseChecklist,
   caseHeaderFields,
@@ -29,7 +29,7 @@ import {
   Al_listoption_al_outcomecase_productssetService,
   Al_listoptionsService,
 } from '../../generated';
-import { heldOptionLabels, listByKey } from '../admin/listOptions';
+import { LIST_OPTION_COLUMNS, heldOptionLabels, listByKey } from '../admin/listOptions';
 import {
   Al_reviewinstancesal_reviewstatus,
   Al_reviewinstancesal_reviewtype,
@@ -54,7 +54,7 @@ export interface ReviewResponse extends TickedAnswer {
   answeredOn: string | null;
 }
 
-export interface ReviewHeader {
+interface ReviewHeader {
   id: string;
   reference: string;
   type: ReviewType | string;
@@ -71,7 +71,7 @@ export interface ReviewHeader {
   typeMismatch: boolean;
 }
 
-export interface ReviewDetail {
+interface ReviewDetail {
   header: ReviewHeader;
   /** The document's case header block; null when the case could not be read. */
   caseHeader: HeaderField[] | null;
@@ -187,6 +187,18 @@ function toHeader(record: Al_reviewinstances, expected: ReviewType): ReviewHeade
   };
 }
 
+/** Every column this page reads off a question version: toResponse, isVersionEffective, the form. */
+const VERSION_COLUMNS = [
+  'al_questionversionid', '_al_questionid_value', 'al_name', 'al_questiontext', 'al_responsetype',
+  'al_displayorder', 'al_ismandatory', 'al_effectivefrom', 'al_effectiveto',
+];
+
+/** Every column the form's ordering reads off a question. */
+const QUESTION_COLUMNS = ['al_questionid', '_al_sectionid_value', 'al_displayorder', 'al_questioncode'];
+
+/** Every column toFailReason reads. */
+const FAIL_REASON_COLUMNS = ['al_failreasonid', 'al_name', 'al_category', 'al_displayorder', 'statecode'];
+
 function toFailReason(record: Al_failreasons) {
   return {
     id: record.al_failreasonid,
@@ -234,11 +246,14 @@ export function useReviewDetail(
       // filter - so the cap has to clear the whole table rather than the current checklist.
       // Truncation here is silent and asymmetric: a question drops off the form while the
       // submit gate, which pages server-side, still demands its answer (AD-122).
-      readAll((o) => Al_questionversionsService.getAll(o), { orderBy: ['al_questionversionid asc'] }),
-      readAll((o) => Al_questionsService.getAll(o), { orderBy: ['al_questionid asc'] }),
-      readAll((o) => Al_failreasonsService.getAll(o), { orderBy: ['al_failreasonid asc'] }),
+      readAll((o) => Al_questionversionsService.getAll(o), { orderBy: ['al_questionversionid asc'], select: VERSION_COLUMNS }),
+      readAll((o) => Al_questionsService.getAll(o), { orderBy: ['al_questionid asc'], select: QUESTION_COLUMNS }),
+      readAll((o) => Al_failreasonsService.getAll(o), { orderBy: ['al_failreasonid asc'], select: FAIL_REASON_COLUMNS }),
+      // Needs nothing off the review, so it does not wait for it. A failed read costs the
+      // product names in the header, not the page.
+      readAll((o) => Al_listoptionsService.getAll(o), { orderBy: ['al_listoptionid asc'], select: LIST_OPTION_COLUMNS }).catch(() => null),
     ])
-      .then(async ([review, responses, versions, questions, reasons]) => {
+      .then(async ([review, responses, versions, questions, reasons, catalogue]) => {
         if (cancelled) return;
         if (!review.success || !review.data) {
           setState({
@@ -274,7 +289,7 @@ export function useReviewDetail(
         // The products the case covers are a many-to-many, so they are not on the case row.
         // Read and joined here exactly as useCaseDetail does, so the header this page draws
         // and the header the case page draws cannot say different things about one case.
-        const [sections, outcomeCase, linked, caseProducts, catalogue] = await Promise.all([
+        const [sections, outcomeCase, linked, caseProducts] = await Promise.all([
           Al_sectionsService.getAll({ filter: sectionFilter, top: 100 }),
           header.caseId
             ? Al_outcomecasesService.get(header.caseId).catch(() => null)
@@ -286,14 +301,13 @@ export function useReviewDetail(
                 top: 200,
               }).catch(() => null)
             : Promise.resolve(null),
-          readAll((o) => Al_listoptionsService.getAll(o), { orderBy: ['al_listoptionid asc'] }).catch(() => null),
         ]);
 
         if (cancelled) return;
 
         // This page is a compliance record with a Save as PDF button: a blank form or a box
         // left unticked by a failed read would pass for what the checker recorded.
-        if (!responses.success || !sections.success || !reasons.success) {
+        if (!formReadsComplete([responses, sections, reasons, versions, questions])) {
           setState({ status: 'unavailable', reason: 'This review could not be loaded from Dataverse.' });
           return;
         }
@@ -302,7 +316,7 @@ export function useReviewDetail(
         // submission day once submitted, otherwise today (AD-015, BR-013). A retired version
         // keeps the answers written against it, but showing them beside the current
         // version's is how one review came to list Tax check reason three times. An answer
-        // whose version is unknown (the versions read failed) is kept rather than hidden.
+        // whose version the read did not return is kept rather than hidden.
         const asOf = new Date(referenceDayValue);
 
         const productsList = listByKey('products');

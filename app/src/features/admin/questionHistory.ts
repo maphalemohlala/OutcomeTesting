@@ -1,6 +1,7 @@
 import { Al_auditeventsal_command } from '../../generated/models/Al_auditeventsModel';
 import { Al_questionversionsal_responsetype } from '../../generated/models/Al_questionversionsModel';
 import { lookupLabel } from '../cases/lookupLabel';
+import { isoDay } from '../../lib/format';
 
 /**
  * One question's history: what changed, when, and by whom (2026-09-28).
@@ -58,7 +59,7 @@ export interface HistoryChange {
   after: string;
 }
 
-export type HistoryAction = 'Added' | 'Moved here' | 'Edited' | 'Retired';
+type HistoryAction = 'Added' | 'Moved here' | 'Edited' | 'Retired';
 
 /** One thing that happened to a question or a section. Sections carry no version. */
 export interface HistoryEntry {
@@ -111,10 +112,6 @@ export function person(record: object, attribute: 'createdby' | 'modifiedby', na
   return lookupLabel(record, attribute, name);
 }
 
-export function day(value: string | undefined): string {
-  return value ? value.slice(0, 10) : '';
-}
-
 /**
  * The plug-ins narrate their own mechanics in the reason field on a succession. That is not
  * a reason anybody gave, and showing it beside every edit would read as though they had.
@@ -141,9 +138,29 @@ function diff(before: HistoryVersionSource, after: HistoryVersionSource): Histor
     .map(([field, was, now]) => ({ field, before: was, after: now }));
 }
 
+/** The code a move left and the code it became, read off the move's audit name, or null. */
+export function moveCodes(name: string | undefined): { from: string; to: string } | null {
+  const match = /MoveQuestion\s+(\S+)\s*->\s*(\S+)/.exec(name ?? '');
+  return match ? { from: match[1], to: match[2] } : null;
+}
+
 function movedCodes(event: HistoryAuditSource): HistoryChange[] {
-  const match = /MoveQuestion\s+(\S+)\s*->\s*(\S+)/.exec(event.al_name ?? '');
-  return match ? [{ field: 'Question code', before: match[1], after: match[2] }] : [];
+  const codes = moveCodes(event.al_name);
+  return codes ? [{ field: 'Question code', before: codes.from, after: codes.to }] : [];
+}
+
+/**
+ * Each moved question's code, lower-cased because the server compares codes ignoring case,
+ * mapped to the code it became. Codes are never reused, so a code left by a move names that
+ * one question for good.
+ */
+export function movesByCode(events: Pick<HistoryAuditSource, 'al_name'>[]): Map<string, string> {
+  const moves = new Map<string, string>();
+  for (const event of events) {
+    const codes = moveCodes(event.al_name);
+    if (codes) moves.set(codes.from.toLowerCase(), codes.to);
+  }
+  return moves;
 }
 
 /** Newest first. */
@@ -202,7 +219,7 @@ export function questionHistory(
     const retirement = retiredBy.get(key(version.al_questionversionid));
     const isLast = index === ordered.length - 1;
     if (isLast && (retirement || version.al_effectiveto)) {
-      const until = day(retirement?.al_details) || day(version.al_effectiveto);
+      const until = isoDay(retirement?.al_details) || isoDay(version.al_effectiveto);
       entries.push({
         id: `${version.al_questionversionid}:retired`,
         action: 'Retired',

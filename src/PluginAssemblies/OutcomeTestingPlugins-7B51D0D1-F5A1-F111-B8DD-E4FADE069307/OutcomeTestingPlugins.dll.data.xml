@@ -17,14 +17,29 @@
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.AdoptRoleAssignmentPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="a62dfa98-8caa-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.AdoptRoleAssignmentPlugin">
       <FriendlyName>OutcomeTesting.Plugins.AdoptRoleAssignmentPlugin</FriendlyName>
     </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.AdviserContactPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="2e5c3fd7-e3bf-f111-aaad-70a8a5b3561e" Name="OutcomeTesting.Plugins.AdviserContactPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.AdviserContactPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.AdviserMappingPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="fc05e542-d0d9-f111-84e8-70a8a5b3561e" Name="OutcomeTesting.Plugins.AdviserMappingPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.AdviserMappingPlugin</FriendlyName>
+    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.AnswerRequestPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="7a753514-aaab-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.AnswerRequestPlugin">
       <FriendlyName>OutcomeTesting.Plugins.AnswerRequestPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.AqsQueueMembershipPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="f009b564-86b7-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.AqsQueueMembershipPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.AqsQueueMembershipPlugin</FriendlyName>
     </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.AssignCasePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="81aadd88-aca6-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.AssignCasePlugin">
       <FriendlyName>OutcomeTesting.Plugins.AssignCasePlugin</FriendlyName>
     </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.AssignUserRolePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="be558da9-20a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.AssignUserRolePlugin">
       <FriendlyName>OutcomeTesting.Plugins.AssignUserRolePlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CaseAccessGuardPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="41982ebd-7ab7-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.CaseAccessGuardPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.CaseAccessGuardPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CaseAccessPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="94cb62c6-7ab7-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.CaseAccessPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.CaseAccessPlugin</FriendlyName>
     </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.CaseHeaderRequestPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="1a0fa190-56af-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.CaseHeaderRequestPlugin">
       <FriendlyName>OutcomeTesting.Plugins.CaseHeaderRequestPlugin</FriendlyName>
@@ -80,11 +95,20 @@
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.NotificationTemplateGuardPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="07b31cc7-d4b4-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.NotificationTemplateGuardPlugin">
       <FriendlyName>OutcomeTesting.Plugins.NotificationTemplateGuardPlugin</FriendlyName>
     </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.OutcomeGuardPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="bf435f18-57e2-f111-84e8-70a8a5b3561e" Name="OutcomeTesting.Plugins.OutcomeGuardPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.OutcomeGuardPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.ReconcileCaseAccessPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="613f4b04-7ab7-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.ReconcileCaseAccessPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.ReconcileCaseAccessPlugin</FriendlyName>
+    </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.RegradeCasePlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="4b61d8ba-07a2-f111-b8dd-e4fade069307" Name="OutcomeTesting.Plugins.RegradeCasePlugin">
       <FriendlyName>OutcomeTesting.Plugins.RegradeCasePlugin</FriendlyName>
     </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.RegradeRequestPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="06f4c7e3-0ead-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.RegradeRequestPlugin">
       <FriendlyName>OutcomeTesting.Plugins.RegradeRequestPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.RemedialActionsRequestPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="f88e4098-fabb-f111-aaad-e4fade0775c0" Name="OutcomeTesting.Plugins.RemedialActionsRequestPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.RemedialActionsRequestPlugin</FriendlyName>
     </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.RemediationResponseGuardPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="df7246ec-21ac-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.RemediationResponseGuardPlugin">
       <FriendlyName>OutcomeTesting.Plugins.RemediationResponseGuardPlugin</FriendlyName>
@@ -106,6 +130,9 @@
     </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.RetireSectionPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="669cdf47-8fae-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.RetireSectionPlugin">
       <FriendlyName>OutcomeTesting.Plugins.RetireSectionPlugin</FriendlyName>
+    </PluginType>
+    <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.ReviewSubmissionGuardPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="c0435f18-57e2-f111-84e8-70a8a5b3561e" Name="OutcomeTesting.Plugins.ReviewSubmissionGuardPlugin">
+      <FriendlyName>OutcomeTesting.Plugins.ReviewSubmissionGuardPlugin</FriendlyName>
     </PluginType>
     <PluginType AssemblyQualifiedName="OutcomeTesting.Plugins.SetFailAccountabilityPlugin, OutcomeTesting.Plugins, Version=1.0.0.0, Culture=neutral, PublicKeyToken=86b764d5a2430b1f" PluginTypeId="11aa9608-7fa4-f111-aaac-e4fade069307" Name="OutcomeTesting.Plugins.SetFailAccountabilityPlugin">
       <FriendlyName>OutcomeTesting.Plugins.SetFailAccountabilityPlugin</FriendlyName>

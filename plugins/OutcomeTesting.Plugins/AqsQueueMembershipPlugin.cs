@@ -112,8 +112,8 @@ namespace OutcomeTesting.Plugins
                 // leaving it would grant a role whose queue stays empty. Refusing says which.
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix
-                    + "An AQS reviewer reads the AQS queue through the \"" + ProductName.AqsQueueAccount(ProductName.Read(service))
-                    + "\" account, but this person's contact already belongs to another account. "
+                    + "An AQS reviewer reads the AQS queue through the '" + ProductName.AqsQueueAccount(ProductName.Read(service))
+                    + "' account, but this person's contact already belongs to another account. "
                     + "Clear their company on the contact, then grant the role again.");
             }
 

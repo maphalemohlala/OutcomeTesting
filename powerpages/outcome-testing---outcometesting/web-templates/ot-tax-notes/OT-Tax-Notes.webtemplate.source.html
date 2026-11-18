@@ -67,7 +67,6 @@
       </link-entity>
       <link-entity name="al_reviewinstance" from="al_reviewinstanceid" to="al_reviewinstanceid" alias="ri">
         <attribute name="al_submittedon" />
-        <attribute name="al_sequence" />
         <filter type="and">
           <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
           <condition attribute="al_reviewtype" operator="eq" value="120910200" />

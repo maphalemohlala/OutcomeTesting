@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PermissionGate } from '../../app/permissions/PermissionGate';
 import { setFailAccountability } from '../../services/commands/setFailAccountability';
 import { useIntentKeys } from '../../hooks/useIntentKey';
 import { UserPicker } from '../../components/form/UserPicker';
-import { useCaseOutcome, type CaseOutcomeRow } from './useCaseOutcome';
+import type { CaseOutcomeRow, CaseOutcomeState } from './useCaseOutcome';
+import { messageForFailure } from '../../services/errors';
+import { useSecurityConfig } from '../admin/useSecurityConfig';
 import {
+  accountableEmails,
   adviceQualityFailedFrom,
+  namedPersonNote,
   effectiveAccountability,
+  recordDisabled,
   type AccountabilityFlags,
   NOBODY,
 } from './failAccountability';
@@ -42,13 +47,21 @@ interface PeopleNames {
   paraplanner: string | null;
 }
 
+/** Who can be named: everyone holding the Adviser or Planner role, once that is known. */
+interface NameableHolders {
+  status: 'loading' | 'unavailable' | 'ready';
+  emails: ReadonlySet<string>;
+}
+
 function OutcomeAccountability({
   outcome,
   people,
+  holders,
   onSaved,
 }: {
   outcome: CaseOutcomeRow;
   people: PeopleNames;
+  holders: NameableHolders;
   onSaved: () => void;
 }) {
   const adviceQualityFailed = adviceQualityFailedFrom(outcome.finalOutcome ?? outcome.initialOutcome);
@@ -65,6 +78,7 @@ function OutcomeAccountability({
     outcome.accountability,
     false,
     adviceQualityFailed,
+    Boolean(outcome.fqAdministrator),
   );
 
   const intent = useIntentKeys();
@@ -74,6 +88,8 @@ function OutcomeAccountability({
   // own adviser or paraplanner, which is what the extract falls back to.
   const [fqPerson, setFqPerson] = useState(outcome.fqAccountable?.id ?? '');
   const [aqPerson, setAqPerson] = useState(outcome.aqAccountable?.id ?? '');
+  // The administrator carrying the File Quality fail (requirements log row 10). Never exported.
+  const [fqAdministrator, setFqAdministrator] = useState(outcome.fqAdministrator?.id ?? '');
 
   /*
    * Take the record's values when the record itself changes, and not before (F29).
@@ -85,13 +101,18 @@ function OutcomeAccountability({
    * React's documented way of adjusting state to a prop, done during render rather than in an
    * effect so there is no frame where the old values are painted.
    */
+  // Set by a successful save, cleared below when the re-read's row version lands.
+  const [awaitingReread, setAwaitingReread] = useState(false);
   const [seenVersion, setSeenVersion] = useState(outcome.rowVersion);
   if (outcome.rowVersion !== seenVersion) {
     setSeenVersion(outcome.rowVersion);
     setDraft(effective);
     setFqPerson(outcome.fqAccountable?.id ?? '');
     setAqPerson(outcome.aqAccountable?.id ?? '');
+    setFqAdministrator(outcome.fqAdministrator?.id ?? '');
+    setAwaitingReread(false);
   }
+  const personNote = namedPersonNote(holders.status, holders.emails);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; kind: 'error' | 'success' } | null>(null);
 
@@ -101,7 +122,8 @@ function OutcomeAccountability({
     draft.aqAdviser !== effective.aqAdviser ||
     draft.aqParaplanner !== effective.aqParaplanner ||
     fqPerson !== (outcome.fqAccountable?.id ?? '') ||
-    aqPerson !== (outcome.aqAccountable?.id ?? '');
+    aqPerson !== (outcome.aqAccountable?.id ?? '') ||
+    fqAdministrator !== (outcome.fqAdministrator?.id ?? '');
 
   function nameFor(who: 'adviser' | 'paraplanner'): string {
     const name = who === 'adviser' ? people.adviser : people.paraplanner;
@@ -130,7 +152,7 @@ function OutcomeAccountability({
       outcome.id +
       '-' +
       [flags.fqAdviser, flags.fqParaplanner, flags.aqAdviser, flags.aqParaplanner].join('-') +
-      '-' + fqPerson + '-' + aqPerson;
+      '-' + fqPerson + '-' + aqPerson + '-' + fqAdministrator;
 
     const result = await setFailAccountability({
       outcomeId: outcome.id,
@@ -140,17 +162,19 @@ function OutcomeAccountability({
       aqParaplanner: flags.aqParaplanner,
       fqContactId: fqPerson,
       aqContactId: aqPerson,
+      fqAdministratorId: fqAdministrator,
       idempotencyKey: intent.keyFor(token),
     });
 
     setBusy(false);
 
     if (!result.ok) {
-      setMessage({ text: result.message, kind: 'error' });
+      setMessage({ text: messageForFailure(result), kind: 'error' });
       return;
     }
 
     intent.release(token);
+    setAwaitingReread(true);
     setMessage({ text: 'Accountability recorded.', kind: 'success' });
     onSaved();
   }
@@ -205,32 +229,64 @@ function OutcomeAccountability({
         them this person fills; this says whose name goes in it. Left empty, the extract
         uses the case's own adviser or paraplanner.
       */}
+      {personNote ? (
+        <p className="accountability__note" role="status">
+          {personNote}
+        </p>
+      ) : (
+        <div className="accountability__people">
+          <label className="accountability__person">
+            <span>File Quality &mdash; named person</span>
+            <UserPicker
+              field="id"
+              value={fqPerson}
+              onChange={setFqPerson}
+              onlyEmails={holders.emails}
+              includeInactive
+              placeholder={outcome.fqAccountable?.name ?? "The case's own adviser or paraplanner"}
+            />
+          </label>
+          <label className="accountability__person">
+            <span>Advice Quality &mdash; named person</span>
+            <UserPicker
+              field="id"
+              value={aqPerson}
+              onChange={setAqPerson}
+              onlyEmails={holders.emails}
+              includeInactive
+              placeholder={outcome.aqAccountable?.name ?? "The case's own adviser or paraplanner"}
+            />
+          </label>
+        </div>
+      )}
+
+      {/*
+        Requirements log row 10: a File Quality fail can be the administrator's (an AML point,
+        say). Any contact can be chosen - administrators hold neither the Adviser nor the
+        Planner role - and the export never carries this person.
+      */}
       <div className="accountability__people">
         <label className="accountability__person">
-          <span>File Quality &mdash; named person</span>
+          <span>File Quality &mdash; administrator at fault</span>
           <UserPicker
             field="id"
-            value={fqPerson}
-            onChange={setFqPerson}
-            placeholder={outcome.fqAccountable?.name ?? "The case's own adviser or paraplanner"}
-          />
-        </label>
-        <label className="accountability__person">
-          <span>Advice Quality &mdash; named person</span>
-          <UserPicker
-            field="id"
-            value={aqPerson}
-            onChange={setAqPerson}
-            placeholder={outcome.aqAccountable?.name ?? "The case's own adviser or paraplanner"}
+            value={fqAdministrator}
+            onChange={setFqAdministrator}
+            includeInactive
+            placeholder={outcome.fqAdministrator?.name ?? 'No administrator named'}
           />
         </label>
       </div>
+      <p className="accountability__note">
+        The administrator is recorded for reporting only and is not written to the export. Naming
+        one stops the paraplanner being named by default for the File Quality fail.
+      </p>
 
       <div className="accountability__actions">
         <button
           type="button"
           className="accountability__save"
-          disabled={!changed || busy}
+          disabled={recordDisabled({ changed, busy, awaitingReread })}
           onClick={save}
         >
           {busy ? 'Recording…' : 'Record accountability'}
@@ -246,58 +302,85 @@ function OutcomeAccountability({
 }
 
 export function FailAccountabilityPanel({
-  caseId,
+  state,
   people,
+  onSaved,
 }: {
-  caseId: string;
+  /** The page's read of the case's outcomes, shared with the outcome summary. */
+  state: CaseOutcomeState;
   people: PeopleNames;
+  // The page re-reads after a save, so the row flips from "Derived by default" to "Recorded"
+  // and the ticks shown are the ones the extract will now use.
+  onSaved: () => void;
 }) {
-  // Re-read after a save, so the row flips from "Derived by default" to "Recorded" and
-   // the ticks shown are the ones the extract will now use.
-  const [reloadKey, setReloadKey] = useState(0);
-  const state = useCaseOutcome(caseId, reloadKey);
-
   return (
     <PermissionGate resource="page.cases" need="Edit">
-      <section className="accountability" aria-labelledby="panel-accountability">
-        <h2 id="panel-accountability">Who carries a fail</h2>
-
-        {state.status === 'loading' ? <p role="status">Loading outcomes…</p> : null}
-
-        {state.status === 'unavailable' ? (
-          <p className="accountability__note">The outcomes for this case could not be loaded.</p>
-        ) : null}
-
-        {state.status === 'ready' && state.outcomes.length === 0 ? (
-          <p className="accountability__note">
-            No outcome has been recorded for this case yet, so there is no fail to attribute.
-          </p>
-        ) : null}
-
-        {state.status === 'ready' && state.outcomes.length > 0 ? (
-          <ul className="accountability__list">
-            {state.outcomes.map((outcome) => (
-              <OutcomeAccountability
-                /*
-                 * Keyed on the outcome alone. It used to carry reloadKey, which onSaved bumps
-                 * the instant the write returns - so React tore the editor down and built it
-                 * again while the re-read was still in flight, seeding the new one from the
-                 * outcome it already had. The ticks and the named people sprang back to what
-                 * they were before the save, the success message went with the old instance,
-                 * and both stayed wrong until the page was left and returned to (F29).
-                 *
-                 * The draft now follows the record instead, below, which happens when the
-                 * data actually lands rather than when the request is sent.
-                 */
-                key={outcome.id}
-                outcome={outcome}
-                people={people}
-                onSaved={() => setReloadKey((current) => current + 1)}
-              />
-            ))}
-          </ul>
-        ) : null}
-      </section>
+      <AccountabilitySection state={state} people={people} onSaved={onSaved} />
     </PermissionGate>
+  );
+}
+
+/** Inside the gate, so the role holders are read only for someone who can record. */
+function AccountabilitySection({
+  state,
+  people,
+  onSaved,
+}: {
+  state: CaseOutcomeState;
+  people: PeopleNames;
+  onSaved: () => void;
+}) {
+  // One read of the role holders for every outcome on the case (owner, 2026-11-17: a
+  // contact is an adviser or paraplanner by the role assigned to them).
+  const security = useSecurityConfig(0);
+  const holders = useMemo<NameableHolders>(
+    () => ({
+      status: security.status,
+      emails: accountableEmails(security.status === 'ready' ? security.mappings : []),
+    }),
+    [security],
+  );
+
+  return (
+    <section className="accountability" aria-labelledby="panel-accountability">
+      <h2 id="panel-accountability">Who carries a fail</h2>
+
+      {state.status === 'loading' ? <p role="status">Loading outcomes…</p> : null}
+
+      {state.status === 'unavailable' ? (
+        <p className="accountability__note">The outcomes for this case could not be loaded.</p>
+      ) : null}
+
+      {state.status === 'ready' && state.outcomes.length === 0 ? (
+        <p className="accountability__note">
+          No outcome has been recorded for this case yet, so there is no fail to attribute.
+        </p>
+      ) : null}
+
+      {state.status === 'ready' && state.outcomes.length > 0 ? (
+        <ul className="accountability__list">
+          {state.outcomes.map((outcome) => (
+            <OutcomeAccountability
+              /*
+               * Keyed on the outcome alone. It used to carry reloadKey, which onSaved bumps
+               * the instant the write returns - so React tore the editor down and built it
+               * again while the re-read was still in flight, seeding the new one from the
+               * outcome it already had. The ticks and the named people sprang back to what
+               * they were before the save, the success message went with the old instance,
+               * and both stayed wrong until the page was left and returned to (F29).
+               *
+               * The draft now follows the record instead, below, which happens when the
+               * data actually lands rather than when the request is sent.
+               */
+              key={outcome.id}
+              outcome={outcome}
+              people={people}
+              holders={holders}
+              onSaved={onSaved}
+            />
+          ))}
+        </ul>
+      ) : null}
+    </section>
   );
 }

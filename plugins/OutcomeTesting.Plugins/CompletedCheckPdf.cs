@@ -78,11 +78,17 @@ namespace OutcomeTesting.Plugins
                 return documents;
             }
 
+            // Read once for every document of the case: the labels cache per column, and the
+            // product name is the same on each footer.
+            var labels = new OptionLabels(service);
+            string product = null;
+
             foreach (var review in SubmittedReviews(service, caseRef))
             {
                 try
                 {
-                    var blocks = CompletedCheck.Blocks(service, review.Id);
+                    product = product ?? ProductName.Read(service);
+                    var blocks = CompletedCheck.Blocks(service, review.Id, labels, product);
                     if (blocks.Count == 0)
                     {
                         continue;
@@ -103,7 +109,7 @@ namespace OutcomeTesting.Plugins
             {
                 if (RemediationDocument.AnyCompleted(service, caseRef))
                 {
-                    var blocks = RemediationDocument.Blocks(service, caseRef, DateTime.UtcNow);
+                    var blocks = RemediationDocument.Blocks(service, caseRef, DateTime.UtcNow, labels, product);
                     if (blocks.Count > 0)
                     {
                         documents.Add(new Document(FileName("Remediation", reference), PdfWriter.Build(blocks, true)));

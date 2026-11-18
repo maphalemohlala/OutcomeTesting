@@ -34,7 +34,7 @@ export const ROOT_CAUSE_RESPONSE_TYPE = 120910003;
  * version. The single select stays recognised: reviews submitted before the change hold their
  * one cause against the earlier version. GradingRules.IsRootCauseResponseType is the server's.
  */
-export const ROOT_CAUSES_RESPONSE_TYPE = 120910013;
+const ROOT_CAUSES_RESPONSE_TYPE = 120910013;
 
 /** Whether a question on this response type is the primary root cause. */
 export function isRootCauseResponseType(responseType: number | null | undefined): boolean {
@@ -56,18 +56,6 @@ const PASS = 120910300;
  */
 export function rootCauseRequired(gradeAnswer: number | null | undefined): boolean {
   return gradeAnswer != null && gradeAnswer !== PASS;
-}
-
-/**
- * Whether a recorded root cause must be let go, because the grade now says the file passed.
- *
- * Deliberately not the negation of `rootCauseRequired`: an unanswered grade owes no root
- * cause and destroys none either, so a checker who picks the cause before the grade does not
- * have it wiped on the way past. The clearing itself happens server-side; this is here so
- * both copies of the rule read the same way.
- */
-export function rootCauseCleared(gradeAnswer: number | null | undefined): boolean {
-  return gradeAnswer != null && gradeAnswer === PASS;
 }
 
 /** The answer recorded against a row, where the row's answer type carries one. */

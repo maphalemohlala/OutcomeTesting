@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="SupervisorUnmatched">
+  <description default="True when the case is released but no single adviser mapping names a supervisor.">
+    <label description="True when the case is released but no single adviser mapping names a supervisor." languagecode="1033" />
+  </description>
+  <displayname default="Supervisor unmatched">
+    <label description="Supervisor unmatched" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>SupervisorUnmatched</name>
+  <type>0</type>
+</customapiresponseproperty>

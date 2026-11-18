@@ -64,7 +64,6 @@ namespace OutcomeTesting.Plugins
         // The check this assignment allocates. Read by the allocation letter to name the
         // check; the code above carries the review too, but only as part of a key.
         private const string ReviewLookupAttr = "al_reviewinstanceid";
-        private const string CheckerNameAttr = "al_checkername";
         private const string CaseRefAttr = "al_casereference";
         private const string ReviewStatusAttr = "al_reviewstatus";
         private const string ReviewTypeAttr = "al_reviewtype";
@@ -101,14 +100,16 @@ namespace OutcomeTesting.Plugins
             var expectedRowVersion = CommandHelpers.GetOptionalString(context, InExpectedRowVersion);
             var requestedReviewId = ParseOptionalGuid(context, InReviewInstanceId);
 
+            // Before the replay below, so a caller without the permission is not answered
+            // with another's result.
+            PermissionHelpers.EnsureAppPermission(systemService, context, "command.assign", PermissionHelpers.AccessEdit);
+
             var existingAudit = CommandHelpers.FindAuditByKey(systemService, idempotencyKey, CommandAssignCase);
             if (existingAudit != null)
             {
                 SetResponse(context, null, requestedReviewId, "AlreadyAssigned", existingAudit.Id, false);
                 return;
             }
-
-            PermissionHelpers.EnsureAppPermission(systemService, context, "command.assign", PermissionHelpers.AccessEdit);
 
             // Retrieved through the caller's service so read privilege on the case is part of the gate.
             var outcomeCase = CommandHelpers.RetrieveOrNotFound(
@@ -341,7 +342,8 @@ namespace OutcomeTesting.Plugins
             throw new InvalidPluginExecutionException(
                 CommandHelpers.PreconditionPrefix +
                 userName + " has no " + product + " security role in Dataverse, so they cannot be made the owner of a review. " +
-                "Ask an administrator to assign \"" + appUserRoleName + "\" alongside Basic User, then allocate again.");
+                // No double quotes: the app ends a refusal sentence at the first one.
+                "Ask an administrator to assign the " + appUserRoleName + " role alongside Basic User, then allocate again.");
         }
 
         /// <summary>
@@ -383,10 +385,17 @@ namespace OutcomeTesting.Plugins
                 Orders = { new OrderExpression(SequenceAttr, OrderType.Ascending) },
             };
 
+            int due;
             if (requestedReviewId.HasValue)
             {
                 query.Criteria.AddCondition(
                     "al_reviewinstanceid", ConditionOperator.Equal, requestedReviewId.Value);
+            }
+            else if (ClaimCasePlugin.TryNextDiscipline(userService, outcomeCase, out due))
+            {
+                // The route decides, as it does for a claim: an open check the route no longer
+                // owes first (left by a route change) must not take the allocation.
+                query.Criteria.AddCondition(ReviewTypeAttr, ConditionOperator.Equal, due);
             }
 
             var matches = userService.RetrieveMultiple(query).Entities;

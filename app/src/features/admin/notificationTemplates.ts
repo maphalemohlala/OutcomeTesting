@@ -210,3 +210,8 @@ export function unknownTokens(code: string, subject: string, body: string): stri
 export function hasText(html: string): boolean {
   return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() !== '';
 }
+
+/** A letter cannot be saved without a subject and a body that says something. */
+export function letterWordingMissing(subject: string, body: string): boolean {
+  return subject.trim() === '' || !hasText(body);
+}

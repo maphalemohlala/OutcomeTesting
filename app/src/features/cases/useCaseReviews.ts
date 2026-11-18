@@ -3,7 +3,6 @@ import { isRecordId } from '../../services/odata';
 import { Al_reviewinstancesService } from '../../generated';
 import { toReview, type CaseReview } from './reviewRows';
 
-export type { CaseReview } from './reviewRows';
 
 export type CaseReviewsState =
   | { status: 'unavailable' }

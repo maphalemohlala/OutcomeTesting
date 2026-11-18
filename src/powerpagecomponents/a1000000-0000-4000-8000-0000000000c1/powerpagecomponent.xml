@@ -1,0 +1,25 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000c1">
+  <content>{
+  "append": false,
+  "appendto": false,
+  "contactrelationship": "contact_al_aqscheckercontactid_al_outcomecase",
+  "create": false,
+  "delete": false,
+  "entitylogicalname": "al_outcomecase",
+  "entityname": "Case - my AQS checks",
+  "read": true,
+  "scope": 756150001,
+  "write": false,
+  "adx_entitypermission_webrole": [
+    "a1000000-0000-4000-8000-000000000091"
+  ]
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Case - my AQS checks</name>
+  <powerpagecomponenttype>18</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

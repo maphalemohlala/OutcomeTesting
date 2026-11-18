@@ -68,7 +68,8 @@ namespace OutcomeTesting.Plugins
             Entity before;
             try
             {
-                before = userService.Retrieve(PermissionEntity, permissionId, new ColumnSet("al_resourcekey", "statecode"));
+                before = userService.Retrieve(
+                    PermissionEntity, permissionId, new ColumnSet("al_resourcekey", "al_rolecode", "al_approle", "statecode"));
             }
             catch (System.ServiceModel.FaultException<OrganizationServiceFault>)
             {
@@ -79,7 +80,21 @@ namespace OutcomeTesting.Plugins
             var resourceKey = before.GetAttributeValue<string>("al_resourcekey");
             var wasActive = CommandHelpers.IsActive(before);
 
+            // Retiring a role withdraws its rules; restoring one would bring the role's access
+            // back while the role stays retired.
+            var roleCode = PermissionHelpers.EffectiveRoleCode(before);
+            if (active && WebRoleRegistry.IsRetired(systemService, roleCode))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + roleCode + " is retired, so its permission rule cannot be restored.");
+            }
+
             CommandHelpers.SetState(userService, PermissionEntity, permissionId, active);
+
+            if (!active && resourceKey == "permission.manage")
+            {
+                PermissionHelpers.EnsureSomeoneCanManagePermissions(systemService);
+            }
 
             var details = "Active " + wasActive + " -> " + active;
             var auditId = CommandHelpers.WriteAuditEvent(

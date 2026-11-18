@@ -35,6 +35,11 @@ export interface SetFailAccountabilityInput {
   fqContactId?: string;
   /** The same for Advice Quality. */
   aqContactId?: string;
+  /**
+   * The administrator carrying the File Quality fail (requirements log row 10). Any contact;
+   * never exported. Empty clears it.
+   */
+  fqAdministratorId?: string;
   /** Stable idempotency key for this intent; reuse across retries. */
   idempotencyKey: string;
 }
@@ -57,6 +62,7 @@ export function setFailAccountability(
     // clearing a named person here is what puts the case's own back in the extract.
     FqContactId: input.fqContactId ?? '',
     AqContactId: input.aqContactId ?? '',
+    FqAdministratorId: input.fqAdministratorId ?? '',
     IdempotencyKey: input.idempotencyKey,
   });
 }

@@ -1,0 +1,11 @@
+<customapiresponseproperty uniquename="Changed">
+  <description default="Comma-separated access columns that were written; empty when nothing changed.">
+    <label description="Comma-separated access columns that were written; empty when nothing changed." languagecode="1033" />
+  </description>
+  <displayname default="Changed">
+    <label description="Changed" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <name>Changed</name>
+  <type>10</type>
+</customapiresponseproperty>

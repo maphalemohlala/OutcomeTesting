@@ -6,6 +6,8 @@
   <PrimaryEntity>al_advisermapping</PrimaryEntity>
   <AsyncAutoDelete>0</AsyncAutoDelete>
   <Description>Moves an adviser's cases to the T&amp;C Manager a new mapping names.</Description>
+  <FilteringAttributes></FilteringAttributes>
+  <ImpersonatingUserIdName></ImpersonatingUserIdName>
   <InvocationSource>1</InvocationSource>
   <Mode>0</Mode>
   <Rank>1</Rank>
@@ -23,4 +25,5 @@
        see Restore-StepState there. Do not remove either without reading that. -->
   <StateCode>Enabled</StateCode>
   <StatusCode>Enabled</StatusCode>
+  <SdkMessageProcessingStepImages />
 </SdkMessageProcessingStep>

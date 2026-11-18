@@ -1,0 +1,73 @@
+{
+  "$comment": "Contract for the DeleteCase server-side command (requirements log row 40). Deployed via the registration console (plugins/OutcomeTesting.Registration). Custom API parameter Type codes: 10=String.",
+  "customApi": {
+    "uniquename": "al_DeleteCase",
+    "name": "al_DeleteCase",
+    "displayname": "Delete Case",
+    "description": "Deletes a case and everything recorded against it, at any stage. Needs the case.delete capability and the case reference typed to confirm; writes an Audit Event naming the case and the reason.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.DeleteCasePlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "TargetId",
+      "name": "TargetId",
+      "displayname": "Target id",
+      "description": "Id of the al_outcomecase to delete.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "ConfirmReference",
+      "name": "ConfirmReference",
+      "displayname": "Confirm reference",
+      "description": "The case reference, typed by the person deleting it. Refused unless it matches.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "Reason",
+      "name": "Reason",
+      "displayname": "Reason",
+      "description": "Why the case is being deleted; kept on the audit event.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay returns the same result.",
+      "type": 10,
+      "isoptional": false
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "Status",
+      "name": "Status",
+      "displayname": "Status",
+      "description": "Result status.",
+      "type": 10
+    },
+    {
+      "uniquename": "Summary",
+      "name": "Summary",
+      "displayname": "Summary",
+      "description": "What was deleted, as written to the audit event.",
+      "type": 10
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written for this command.",
+      "type": 10
+    }
+  ]
+}

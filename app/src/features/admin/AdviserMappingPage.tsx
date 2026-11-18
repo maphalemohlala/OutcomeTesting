@@ -9,9 +9,10 @@ import {
   removeAdviserMapping,
   type AdviserMappingRow,
   type ContactOption,
+  type KnownContact,
 } from './useAdviserMappings';
-import { alreadyMappedRefusal } from './adviserMappingFailure';
-import { filterMappings } from './adviserMappingRows';
+import { alreadyMappedRefusal, selfMappingRefusal } from './adviserMappingFailure';
+import { filterMappings, managerChoices } from './adviserMappingRows';
 import './AdviserMappingPage.css';
 
 /**
@@ -150,6 +151,7 @@ export function AdviserMappingPage() {
             <MappingForm
               row={editing === 'new' ? null : editing}
               contacts={state.contacts}
+              known={state.known}
               mappings={state.mappings}
               onClose={() => setEditing(null)}
               onSaved={() => {
@@ -182,12 +184,14 @@ export function AdviserMappingPage() {
 function MappingForm({
   row,
   contacts,
+  known,
   mappings,
   onClose,
   onSaved,
 }: {
   row: AdviserMappingRow | null;
   contacts: ContactOption[];
+  known: KnownContact[];
   /** What is already mapped, so a duplicate is named here rather than guessed at. */
   mappings: AdviserMappingRow[];
   onClose: () => void;
@@ -211,6 +215,13 @@ function MappingForm({
         setProblem(clash);
         return;
       }
+    }
+
+    // Matched by email against everyone known, so an inactive manager on record counts too.
+    const self = selfMappingRefusal(adviserEmail, managerId, known);
+    if (self) {
+      setProblem(self);
+      return;
     }
 
     setSaving(true);
@@ -267,9 +278,9 @@ function MappingForm({
         <label htmlFor="manager">T&amp;C Manager</label>
         <select id="manager" value={managerId} onChange={(e) => setManagerId(e.target.value)}>
           <option value="">Choose…</option>
-          {contacts.map((m) => (
+          {managerChoices(contacts, known, row?.managerId).map((m) => (
             <option key={m.id} value={m.id}>
-              {m.name} ({m.email})
+              {m.label}
             </option>
           ))}
         </select>

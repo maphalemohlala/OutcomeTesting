@@ -64,6 +64,22 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.False(Names(row, Fq, ResponseRules.ChoicePass, OutcomeRules.OutcomePassWithIssues));
         }
 
+        [Theory]
+        // A fail regraded to a pass: the daily file reports the initial fail, so it still names someone.
+        [InlineData(OutcomeRules.OutcomePass, OutcomeRules.OutcomePotentialHarm, true)]
+        [InlineData(OutcomeRules.OutcomePassWithIssues, OutcomeRules.OutcomeInsufficient, true)]
+        // A pass with issues regraded to a fail: the quarterly file reports the final fail.
+        [InlineData(OutcomeRules.OutcomeInsufficient, OutcomeRules.OutcomePassWithIssues, true)]
+        // Neither grade failed: nobody, in either file.
+        [InlineData(OutcomeRules.OutcomePass, OutcomeRules.OutcomePassWithIssues, false)]
+        [InlineData(OutcomeRules.OutcomePassWithIssues, OutcomeRules.OutcomePassWithIssues, false)]
+        public void Names_are_kept_when_either_the_final_or_the_initial_grade_failed(
+            int effective, int initial, bool named)
+        {
+            var gate = GenerateExportPlugin.AccountabilityGate(effective, initial);
+            Assert.Equal(named, Names(null, Aq, ResponseRules.ChoicePass, gate.Value));
+        }
+
         [Fact]
         public void A_tax_only_case_has_no_advice_grade_to_name_anyone_for()
         {

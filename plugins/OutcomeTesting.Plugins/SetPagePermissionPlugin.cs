@@ -83,6 +83,9 @@ namespace OutcomeTesting.Plugins
                 {
                     ["al_name"] = (normalizedCode + " / " + resourceKey),
                     ["al_rolecode"] = normalizedCode,
+                    // Explicitly null, as al_AssignUserRole does: al_approle carries a schema
+                    // default (Adviser), and a rule left carrying it reads as naming two roles.
+                    ["al_approle"] = null,
                     ["al_resourcekey"] = resourceKey,
                     ["al_accesslevel"] = new OptionSetValue(levelValue),
                     ["al_pagepermissioncode"] = code,
@@ -112,6 +115,13 @@ namespace OutcomeTesting.Plugins
             }
 
             var permissionId = AssignUserRolePlugin.Upsert(userService, PermissionEntity, "al_pagepermissioncode", code, permission);
+
+            // Lowering a permission.manage rule can strand the configuration with nobody able to
+            // change it back.
+            if (resourceKey == "permission.manage" && levelValue < PermissionHelpers.AccessManage)
+            {
+                PermissionHelpers.EnsureSomeoneCanManagePermissions(systemService);
+            }
 
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandSetPagePermission, "SetPagePermission " + code, PermissionEntity, permissionId,

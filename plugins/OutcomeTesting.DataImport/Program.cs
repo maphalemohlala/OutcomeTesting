@@ -109,13 +109,19 @@ namespace OutcomeTesting.DataImport
                 Console.WriteLine($"  {line}");
             }
 
-            WriteLog(handler);
+            var failedRecords = WriteLog(handler);
 
             Console.WriteLine(ok
                 ? $"Import reported success. Entities processed: {handler.ImportEntityObjectCount}."
                 : "Import reported failure.");
 
-            return ok ? 0 : 1;
+            // The engine can report success while records failed; any failed record fails the run.
+            if (failedRecords > 0)
+            {
+                Console.Error.WriteLine($"{failedRecords} record(s) failed. Treat this import as failed.");
+            }
+
+            return ok && failedRecords == 0 ? 0 : 1;
         }
 
         /// <summary>
@@ -152,13 +158,13 @@ namespace OutcomeTesting.DataImport
         /// package should report updates, not creates. Row counts alone cannot tell those
         /// apart — a wrong match key duplicates rows, and only the action says so.
         /// </summary>
-        private static void WriteLog(ImportCrmDataHandler handler)
+        private static int WriteLog(ImportCrmDataHandler handler)
         {
             var entries = handler.ImportLog?.Entries;
             if (entries == null || entries.Count == 0)
             {
                 Console.WriteLine("The engine recorded no per-record results.");
-                return;
+                return 0;
             }
 
             var failures = entries.Where(entry => !entry.Success).ToList();
@@ -176,6 +182,8 @@ namespace OutcomeTesting.DataImport
             {
                 Console.WriteLine($"  FAILED {failure.EntityName} [{failure.Action}]: {failure.LogEntry}");
             }
+
+            return failures.Count;
         }
     }
 }

@@ -169,18 +169,9 @@ namespace OutcomeTesting.Plugins
 
             foreach (var contact in choice.Contacts)
             {
-                string name = null;
-                string email = null;
-                try
-                {
-                    var row = service.Retrieve("contact", contact.Id, new ColumnSet("fullname", "emailaddress1"));
-                    name = row.GetAttributeValue<string>("fullname");
-                    email = row.GetAttributeValue<string>("emailaddress1");
-                }
-                catch (Exception)
-                {
-                    // A contact that has been deleted since it was chosen: reported below.
-                }
+                var row = Contact(service, contact.Id);
+                var name = row == null ? null : row.GetAttributeValue<string>("fullname");
+                var email = row == null || !IsActive(row) ? null : row.GetAttributeValue<string>("emailaddress1");
 
                 var who = string.IsNullOrWhiteSpace(name) ? "A named contact" : name.Trim();
                 resolved.Add(new Resolved
@@ -188,12 +179,43 @@ namespace OutcomeTesting.Plugins
                     Who = who,
                     Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
                     Problem = !string.IsNullOrWhiteSpace(email) ? null
-                        : name == null ? "The chosen contact no longer exists."
+                        : row == null ? "The chosen contact no longer exists."
+                        : !IsActive(row) ? who + " is no longer an active contact."
                         : who + " has no email address on their contact record.",
                 });
             }
 
             return resolved;
+        }
+
+        /// <summary>
+        /// A contact's name, work email and state, or null where there is no such contact.
+        ///
+        /// A query rather than a Retrieve: a contact deleted since somebody chose it is an
+        /// ordinary answer here, and a Retrieve of it faults - which, caught or not, aborts the
+        /// transaction of the save that raised the letter.
+        /// </summary>
+        public static Entity Contact(IOrganizationService service, Guid contactId)
+        {
+            var query = new QueryExpression("contact")
+            {
+                ColumnSet = new ColumnSet("fullname", "emailaddress1", "statecode"),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("contactid", ConditionOperator.Equal, contactId);
+
+            var rows = service.RetrieveMultiple(query).Entities;
+            return rows.Count == 0 ? null : rows[0];
+        }
+
+        /// <summary>Whether a contact read by <see cref="Contact"/> is active. No state read is active.</summary>
+        public static bool IsActive(Entity contact)
+        {
+            var raw = contact.Contains("statecode") ? contact["statecode"] : null;
+            var option = raw as OptionSetValue;
+            var state = option != null ? option.Value : raw as int?;
+            return !state.HasValue || state.Value == 0;
         }
 
         /// <summary>Why a role resolved to nobody, in the words of the person who chose it.</summary>

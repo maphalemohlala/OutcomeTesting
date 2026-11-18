@@ -30,6 +30,7 @@ describe('everything on the case detail page re-reads after a command', () => {
     // Guards the test: a renamed or moved page would otherwise make it vacuously true.
     expect(page).toContain('useCaseDetail(');
     expect(page).toContain('const [reloadKey, setReloadKey]');
+    expect(page).toContain('useCaseOutcome(');
   });
 
   it('passes the reload key to every panel that reads case data', () => {
@@ -37,10 +38,10 @@ describe('everything on the case detail page re-reads after a command', () => {
     // re-reads on its own. Any called with the case id alone will still be showing the
     // state from before.
     //
-    // FailAccountabilityPanel is deliberately absent: it holds its own key and bumps it
-    // after its own save, which is the only command that writes what it reads. Handing it
-    // the page's key as well would make it re-read on every unrelated header edit.
-    const readers = ['useCaseDetail(', 'useCaseReviews(', '<CaseOutcomeSummary'];
+    // The outcome read is the page's own now, shared by CaseOutcomeSummary and
+    // FailAccountabilityPanel, so it is the call that has to carry the key. The editor's
+    // draft follows the row version, so a re-read after an unrelated edit leaves it alone.
+    const readers = ['useCaseDetail(', 'useCaseReviews(', 'useCaseOutcome('];
 
     const stale = readers
       .filter((reader) => page.includes(reader))

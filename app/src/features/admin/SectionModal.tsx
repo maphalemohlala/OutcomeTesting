@@ -10,6 +10,7 @@ import {
   type SectionQuestionInput,
 } from '../../services/commands/sections';
 import { RESPONSE_TYPE_OPTIONS, type LibrarySection } from './useQuestionLibrary';
+import { messageForFailure } from '../../services/errors';
 
 /**
  * The section editor (AD-123). Add creates a section under the checklist version in force,
@@ -151,7 +152,7 @@ export function SectionModal({ mode, section, intent, onClose, onSaved }: Props)
       onSaved();
       onClose();
     } else {
-      setError(result.message);
+      setError(messageForFailure(result));
     }
   }
 

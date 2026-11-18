@@ -1,6 +1,6 @@
 <powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000a5">
   <content>{
-  "description": "Exposes al_remediationaction to the portal Web API so an adviser can record their response and ask for the action to be completed (PP-12, AD-045). Paired with a three-column allowlist; CompleteRequestPlugin does the rest.",
+  "description": "Exposes al_remediationaction to the portal Web API so an adviser can record their response and ask for the action to be completed (PP-12, AD-045). Paired with the allowlist of adviser columns (Webapi/al_remediationaction/fields); CompleteRequestPlugin does the rest.",
   "value": "true"
 }</content>
   <iscustomizable>1</iscustomizable>

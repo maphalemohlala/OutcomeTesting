@@ -5,9 +5,7 @@ import {
   caseHeaderFields,
   failPoints,
   inlineOptionsFor,
-  isOutcomeLens,
   isTicked,
-  optionGridColumns,
   optionsFor,
   sectionLayout,
   type FailReasonRef,
@@ -118,15 +116,6 @@ describe('isTicked', () => {
 
   it('ticks nothing on an unanswered row', () => {
     expect(isTicked(row('a', 120910006), { value: 120910300, label: 'Pass' })).toBe(false);
-  });
-});
-
-describe('isOutcomeLens', () => {
-  it('is true for the suitability sections E1 to E5 only', () => {
-    expect(isOutcomeLens(section('S-E1', []))).toBe(true);
-    expect(isOutcomeLens(section('S-E5', []))).toBe(true);
-    expect(isOutcomeLens(section('S-CD', []))).toBe(false);
-    expect(isOutcomeLens({ ...section('x', []), code: null })).toBe(false);
   });
 });
 
@@ -426,18 +415,6 @@ describe('inlineOptionsFor', () => {
   it('reports nothing for a response type with no options', () => {
     expect(inlineOptionsFor(null)).toEqual([]);
     expect(inlineOptionsFor(120910001)).toEqual([]);
-  });
-});
-
-describe('optionGridColumns', () => {
-  it('grids the nine root causes three to a row, as the document lays them out', () => {
-    expect(optionGridColumns(120910003)).toBe(3);
-  });
-
-  it('leaves every other list on one row', () => {
-    expect(optionGridColumns(120910010)).toBeNull();
-    expect(optionGridColumns(120910004)).toBeNull();
-    expect(optionGridColumns(null)).toBeNull();
   });
 });
 

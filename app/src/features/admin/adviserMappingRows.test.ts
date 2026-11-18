@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { managerNameFor, toMappingRows, type ContactOption } from './adviserMappingRows';
+import { managerChoices, managerNameFor, toMappingRows, type ContactOption } from './adviserMappingRows';
 
 /**
  * F16, found in DEV on 2026-09-20. A mapping was saved with a T&C Manager, Dataverse held
@@ -115,5 +115,26 @@ describe('toMappingRows', () => {
         managerEmail: null,
       },
     ]);
+  });
+});
+
+/** A mapping whose manager is no longer offered still shows who is recorded. */
+describe('managerChoices', () => {
+  const offered = [{ id: 'a', name: 'Ann', email: 'ann@x.com' }];
+  const known = [
+    { ...offered[0], active: true },
+    { id: 'b', name: 'Bob', email: 'bob@x.com', active: false },
+    { id: 'c', name: 'Cat', email: '', active: true },
+  ];
+
+  it('offers only the listed managers when the held one is among them, or none is held', () => {
+    expect(managerChoices(offered, known, 'A')).toEqual([{ id: 'a', label: 'Ann (ann@x.com)' }]);
+    expect(managerChoices(offered, known, null)).toHaveLength(1);
+  });
+
+  it('keeps an inactive or emailless held manager, marked', () => {
+    expect(managerChoices(offered, known, 'b').at(-1)).toEqual({ id: 'b', label: 'Bob (inactive)' });
+    expect(managerChoices(offered, known, 'c').at(-1)).toEqual({ id: 'c', label: 'Cat (no email)' });
+    expect(managerChoices(offered, known, 'z').at(-1)).toEqual({ id: 'z', label: 'Manager on record (not listed)' });
   });
 });

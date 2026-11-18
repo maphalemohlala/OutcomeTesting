@@ -23,6 +23,7 @@ import {
   type RoleOption,
 } from './SecurityModals';
 import './SecurityConfigPage.css';
+import { messageForFailure } from '../../services/errors';
 
 function NotFound({ code }: { code: string }) {
   return (
@@ -157,7 +158,7 @@ export function RoleDetailPage() {
       setPermOpen(false);
       reloadConfig();
     } else {
-      setPermNotice({ tone: 'error', message: result.message });
+      setPermNotice({ tone: 'error', message: messageForFailure(result) });
     }
   }
 
@@ -182,7 +183,7 @@ export function RoleDetailPage() {
       });
       reloadConfig();
     } else {
-      setRowNotice({ tone: 'error', message: result.message });
+      setRowNotice({ tone: 'error', message: messageForFailure(result) });
     }
   }
 
@@ -211,7 +212,7 @@ export function RoleDetailPage() {
       setAssignOpen(false);
       reloadConfig();
     } else {
-      setAssignNotice({ tone: 'error', message: result.message });
+      setAssignNotice({ tone: 'error', message: messageForFailure(result) });
     }
   }
 
@@ -239,7 +240,7 @@ export function RoleDetailPage() {
       });
       reloadConfig();
     } else {
-      setRowNotice({ tone: 'error', message: result.message });
+      setRowNotice({ tone: 'error', message: messageForFailure(result) });
     }
   }
 
@@ -279,7 +280,7 @@ export function RoleDetailPage() {
       setRolesReloadKey((key) => key + 1);
       reloadConfig();
     } else {
-      setRoleNotice({ tone: 'error', message: result.message });
+      setRoleNotice({ tone: 'error', message: messageForFailure(result) });
     }
   }
 
@@ -308,7 +309,7 @@ export function RoleDetailPage() {
       setRolesReloadKey((key) => key + 1);
       reloadConfig();
     } else {
-      setRowNotice({ tone: 'error', message: result.message });
+      setRowNotice({ tone: 'error', message: messageForFailure(result) });
     }
   }
 

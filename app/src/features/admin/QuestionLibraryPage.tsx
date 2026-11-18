@@ -25,7 +25,7 @@ type Editing =
   | { kind: 'edit-section'; section: LibrarySection }
   | { kind: 'retire-section'; section: LibrarySection };
 
-function QuestionRow({
+export function QuestionRow({
   question,
   canEdit,
   onEdit,
@@ -39,6 +39,10 @@ function QuestionRow({
   onHistory: () => void;
 }) {
   const guarded = protectedReason(question.code);
+  // The server's refusal, word for word but for naming both actions it refuses.
+  const moved = question.movedTo
+    ? `That question has already been moved to ${question.movedTo}, so it cannot be edited or retired. Make the change to ${question.movedTo} instead.`
+    : null;
 
   return (
     <li className="library__question" data-retired={question.retired ? 'true' : 'false'}>
@@ -55,17 +59,26 @@ function QuestionRow({
             screen reader, and "is this still asked" is the whole point of the row. */}
         {question.retired ? <span className="library__flag">Retired</span> : null}
         {question.scheduled ? <span className="library__flag">{question.scheduled}</span> : null}
+        {question.retires ? <span className="library__flag">{question.retires}</span> : null}
+        {moved ? (
+          <span className="library__flag" title={moved}>
+            Moved to {question.movedTo}
+          </span>
+        ) : null}
 
         {guarded ? (
           <span className="library__flag" title={guarded}>
-            Required by grading
+            Read by the system
           </span>
         ) : null}
 
         {/* A retired question offers no action: there is nothing to do to it, and offering
             something that would be refused is worse than offering nothing. Nor does one with
-            a dated change to come: the server edits the newest version, not the one shown. */}
-        {canEdit && !question.retired && !question.scheduled ? (
+            a dated change to come: the server edits the newest version, not the one shown.
+            A planned retirement alone hides nothing: an edit dated before it keeps it, and
+            Retire can move it. A moved question offers neither: the server refuses both, and
+            the chip says where to make the change. */}
+        {canEdit && !question.retired && !question.scheduled && !moved ? (
           <button type="button" className="library__btn library__btn--ghost" onClick={onEdit}>
             Edit question
           </button>
@@ -73,7 +86,7 @@ function QuestionRow({
 
         {/* Retire is hidden for a protected code because the server refuses it (AD-122).
             The chip above already says which question it is and why. */}
-        {canEdit && !question.retired && !question.scheduled && !guarded ? (
+        {canEdit && !question.retired && !question.scheduled && !guarded && !moved ? (
           <button type="button" className="library__btn library__btn--ghost" onClick={onRetire}>
             Retire
           </button>

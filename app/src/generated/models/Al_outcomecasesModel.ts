@@ -207,6 +207,7 @@ export interface Al_outcomecases extends Al_outcomecasesBase {
   al_taxcheckrequiredname?: string;
   al_taxoutcomename?: string;
   al_taxteamdispositionname?: string;
+  al_tcmanageroverrideidname?: string;
   al_tcsupervisorcontactidname?: string;
   al_tcsupervisorcontactidyominame?: string;
   al_vulnerableclientidname?: string;
@@ -249,6 +250,8 @@ export interface Al_outcomecases extends Al_outcomecasesBase {
   _al_samplesourceid_value?: string;
   al_taxcheckercontactid?: object;
   _al_taxcheckercontactid_value?: string;
+  al_tcmanageroverrideid?: object;
+  _al_tcmanageroverrideid_value?: string;
   al_tcsupervisorcontactid?: object;
   _al_tcsupervisorcontactid_value?: string;
   al_vulnerableclientid?: object;

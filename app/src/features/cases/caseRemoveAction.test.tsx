@@ -5,7 +5,8 @@ import { CASE_STATUSES, type CaseStatus } from '../../types/domain';
 
 vi.mock('../../services/commands/updateCaseDetails', () => ({ updateCaseDetails: vi.fn() }));
 
-const { CaseRemoveAction, canRemoveCase } = await import('./CaseRemoveAction');
+const { CaseRemoveAction } = await import('./CaseRemoveAction');
+const { canRemoveCase } = await import('./caseRemoval');
 
 const REMOVABLE: CaseStatus[] = [
   'Imported',

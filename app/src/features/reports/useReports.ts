@@ -1,17 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Al_outcomes } from '../../generated/models/Al_outcomesModel';
 import type { Al_remediationactions } from '../../generated/models/Al_remediationactionsModel';
 import type { Al_signoffs } from '../../generated/models/Al_signoffsModel';
-import {
-  Al_outcomesService,
-  Al_remediationactionsService,
-  Al_signoffsService,
-} from '../../generated';
+import { Al_signoffsService } from '../../generated';
 import { readAll } from '../../services/readAll';
-import { ACTION_COUNT_COLUMNS } from '../cases/caseRemediation';
-import { OUTCOME_GRADE_COLUMNS } from '../cases/caseWorklistMapping';
-
-export type { OutcomeVolume, AgeingBucket, ReportData } from './reportAggregate';
+import type { WorklistState } from '../cases/useCaseWorklist';
 
 export type ReportState =
   | { status: 'unavailable'; reason: string }
@@ -27,45 +20,34 @@ export type ReportState =
       signoffs: Al_signoffs[];
     };
 
+const UNAVAILABLE: ReportState = {
+  status: 'unavailable',
+  reason: 'Management reporting could not be loaded from Dataverse.',
+};
+
 /**
  * Management information for BR-010: outcome volumes, remediation ageing and sign-off
  * accountability, read from live Dataverse (AD-034, no Power BI). Read-only aggregation;
  * row visibility is enforced by Dataverse security (BR-012), so the figures reflect only
  * the cases the signed-in user may see.
+ *
+ * The outcomes and remediation actions are the rows the page's case list read already
+ * fetched, so they come from `worklist` rather than a second read; only sign-offs are read
+ * here. All three must have been read, as before, or the report says it cannot be shown.
  */
-export function useReports(): ReportState {
-  const [state, setState] = useState<ReportState>({ status: 'loading' });
+export function useReports(worklist: WorklistState): ReportState {
+  // undefined while reading, null when the read failed.
+  const [signoffs, setSignoffs] = useState<Al_signoffs[] | null | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([
-      readAll((o) => Al_outcomesService.getAll(o), { orderBy: ['al_outcomeid asc'], select: OUTCOME_GRADE_COLUMNS }),
-      readAll((o) => Al_remediationactionsService.getAll(o), { orderBy: ['al_remediationactionid asc'], select: ACTION_COUNT_COLUMNS }),
-      readAll((o) => Al_signoffsService.getAll(o), { orderBy: ['al_signoffid asc'], select: ['al_signoffid', '_al_outcomecaseid_value', 'al_signoffdecision'] }),
-    ])
-      .then(([outcomes, actions, signoffs]) => {
-        if (cancelled) return;
-        if (!outcomes.success || !actions.success || !signoffs.success) {
-          setState({
-            status: 'unavailable',
-            reason: 'Management reporting could not be loaded from Dataverse.',
-          });
-          return;
-        }
-        setState({
-          status: 'ready',
-          outcomes: outcomes.data,
-          actions: actions.data,
-          signoffs: signoffs.data,
-        });
+    readAll((o) => Al_signoffsService.getAll(o), { orderBy: ['al_signoffid asc'], select: ['al_signoffid', '_al_outcomecaseid_value', 'al_signoffdecision'] })
+      .then((result) => {
+        if (!cancelled) setSignoffs(result.success ? result.data : null);
       })
       .catch(() => {
-        if (cancelled) return;
-        setState({
-          status: 'unavailable',
-          reason: 'Management reporting could not be loaded from Dataverse.',
-        });
+        if (!cancelled) setSignoffs(null);
       });
 
     return () => {
@@ -73,5 +55,14 @@ export function useReports(): ReportState {
     };
   }, []);
 
-  return state;
+  const outcomes = worklist.status === 'loading' ? undefined : worklist.outcomes;
+  const actions = worklist.status === 'loading' ? undefined : worklist.actions;
+
+  return useMemo<ReportState>(() => {
+    if (outcomes === undefined || actions === undefined || signoffs === undefined) {
+      return { status: 'loading' };
+    }
+    if (!outcomes || !actions || !signoffs) return UNAVAILABLE;
+    return { status: 'ready', outcomes, actions, signoffs };
+  }, [outcomes, actions, signoffs]);
 }

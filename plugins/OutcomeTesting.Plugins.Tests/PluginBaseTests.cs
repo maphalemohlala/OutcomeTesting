@@ -167,23 +167,26 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         /// <summary>
-        /// And a fault that is genuinely unexpected still says so, naming the plug-in and the
-        /// fault. Cleaning up refusals must not quietly swallow the diagnostics that make an
-        /// unforeseen failure findable - that would trade one silent failure for another.
+        /// A fault that is genuinely unexpected still says so - but, since the owner's
+        /// decision of 2026-11-17, in plain words: what failed and why. The plug-in and the
+        /// raw fault, which make it diagnosable, go to the trace instead of the screen.
         /// </summary>
         [Fact]
-        public void Still_names_the_plug_in_for_a_genuinely_unexpected_fault()
+        public void Says_unexpected_in_plain_words_and_traces_the_plug_in_and_the_fault()
         {
             var raw = "Entity 'al_remediationaction' With Id = 0000 Does Not Exist";
             var fault = new FaultException<OrganizationServiceFault>(
                 new OrganizationServiceFault { Message = raw },
                 new FaultReason(raw));
+            var provider = new FakeServiceProvider();
 
-            var thrown = Run(fault);
+            var thrown = Assert.Throws<InvalidPluginExecutionException>(
+                () => new ThrowingPlugin(fault).Execute(provider));
 
-            Assert.StartsWith("UNEXPECTED:", thrown.Message, StringComparison.Ordinal);
-            Assert.Contains("ThrowingPlugin", thrown.Message);
-            Assert.Contains(raw, thrown.Message);
+            Assert.StartsWith("UNEXPECTED: Saving your change could not be completed because", thrown.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("ThrowingPlugin", thrown.Message);
+            Assert.DoesNotContain("al_remediationaction", thrown.Message);
+            Assert.Contains(provider.Traces, t => t.Contains("ThrowingPlugin") && t.Contains(raw));
         }
 
         [Theory]
@@ -191,19 +194,19 @@ namespace OutcomeTesting.Plugins.Tests
         [InlineData(typeof(InvalidOperationException))]
         [InlineData(typeof(FormatException))]
         [InlineData(typeof(ArgumentException))]
-        public void Names_the_plug_in_and_the_error_for_anything_else(Type errorType)
+        public void Wraps_anything_else_as_unexpected_without_naming_the_plug_in_or_the_error(Type errorType)
         {
-            // The gap this closes. Only FaultException<OrganizationServiceFault> used to be
-            // caught, so every one of these left the pipeline as a system fault and reached
-            // the browser as 9004010D with nothing in it.
+            // The gap closed on 2026-09-10: only FaultException<OrganizationServiceFault> used
+            // to be caught, so every one of these reached the browser as 9004010D with
+            // nothing in it. It is still caught and prefixed; the detail is on the trace.
             var error = (Exception)Activator.CreateInstance(errorType, new object[] { "the underlying detail" });
 
             var thrown = Run(error);
 
             Assert.StartsWith("UNEXPECTED:", thrown.Message);
-            Assert.Contains("ThrowingPlugin", thrown.Message);
-            Assert.Contains(errorType.Name, thrown.Message);
-            Assert.Contains("the underlying detail", thrown.Message);
+            Assert.DoesNotContain("ThrowingPlugin", thrown.Message);
+            Assert.DoesNotContain(errorType.Name, thrown.Message);
+            Assert.DoesNotContain("the underlying detail", thrown.Message);
         }
 
         [Fact]

@@ -2,21 +2,25 @@ import { useEffect, useState } from 'react';
 import { Al_advisermappingsService, ContactsService } from '../../generated';
 import { logTechnical } from '../../services/errors';
 import {
+  offeredManagers,
+  toKnownContacts,
   toMappingRows,
   type AdviserMappingRow,
   type ContactOption,
+  type KnownContact,
 } from './adviserMappingRows';
+import { CONTACT_NAME_COLUMNS } from '../../lib/contactName';
 import { describeRemoveFailure, describeSaveFailure } from './adviserMappingFailure';
 import { readAll } from '../../services/readAll';
 
 // Held in adviserMappingRows so the shaping can be tested; this module cannot be imported
 // under the test runner because ../../generated pulls in the Power Apps client.
-export type { AdviserMappingRow, ContactOption } from './adviserMappingRows';
+export type { AdviserMappingRow, ContactOption, KnownContact } from './adviserMappingRows';
 
 export type AdviserMappingsState =
   | { status: 'loading' }
   | { status: 'unavailable'; reason: string }
-  | { status: 'ready'; mappings: AdviserMappingRow[]; contacts: ContactOption[] };
+  | { status: 'ready'; mappings: AdviserMappingRow[]; contacts: ContactOption[]; known: KnownContact[] };
 
 /**
  * The adviser -> T&C Manager mapping, and the contacts that can be chosen as a manager
@@ -42,7 +46,11 @@ export function useAdviserMappings(reloadKey = 0): AdviserMappingsState {
 
     Promise.all([
       readAll((o) => Al_advisermappingsService.getAll(o), { orderBy: ['al_adviseremail asc', 'al_advisermappingid asc'] }),
-      readAll((o) => ContactsService.getAll(o), { orderBy: ['fullname asc', 'contactid asc'] }),
+      readAll((o) => ContactsService.getAll(o), {
+        orderBy: ['fullname asc', 'contactid asc'],
+        // All the contact mapping below reads.
+        select: ['contactid', ...CONTACT_NAME_COLUMNS, 'statecode'],
+      }),
     ])
       .then(([mappingResult, contactResult]) => {
         if (cancelled) return;
@@ -65,19 +73,15 @@ export function useAdviserMappings(reloadKey = 0): AdviserMappingsState {
           return;
         }
 
-        const contacts: ContactOption[] = contactResult.data
-          .filter((c) => Number(c.statecode) === 0 && (c.emailaddress1 ?? '').trim() !== '')
-          .map((c) => ({
-            id: c.contactid,
-            name: (c.fullname ?? '').trim(),
-            email: (c.emailaddress1 ?? '').trim(),
-          }))
-          .filter((m) => m.name.length > 0);
+        const known: KnownContact[] = toKnownContacts(contactResult.data);
+        const contacts: ContactOption[] = offeredManagers(known);
 
         setState({
           status: 'ready',
           contacts,
-          mappings: toMappingRows(mappingResult.data, contacts),
+          known,
+          // Offered contacts first, then everyone, so an inactive manager on record is still named.
+          mappings: toMappingRows(mappingResult.data, [...contacts, ...known]),
         });
       })
       .catch((error) => {

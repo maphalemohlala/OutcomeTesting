@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Imports the OutcomeTesting solution and proves the plug-in steps are running.
+    Imports the OutcomeTesting solution and proves it landed and its plug-in steps are running.
 
 .DESCRIPTION
     Audit finding 3, 2026-09-20.
@@ -17,32 +17,39 @@
     the answer guards - so a silent deactivation turns every rule into a suggestion while
     every screen still looks right.
 
-    Two belts, because the cost of being wrong is silent:
+    And "pac exited 0" is not "the import happened": on a revoked token pac can exit 0
+    without ever connecting. So there are three checks, because the cost of being wrong is
+    silent:
 
       1. --activate-plugins is not a parameter of this script. It is always passed, and
          there is no switch to turn it off. Anyone who wants an import without it can call
          pac directly and own that decision.
-      2. The import is not finished until `verifysteps` has confirmed every step the
-         solution declares is present AND enabled in the target. A non-zero exit here means
-         the environment is not safe to use, whatever the import said.
+      2. The target's solution version is read back after the import and must equal the
+         version in the package's solution.xml (and its managed flag must match).
+      3. `verifysteps` confirms every step the PACKAGE declares (its customizations.xml,
+         not the working tree) is present AND enabled in the target.
+
+      A non-zero exit means the environment is not safe to use, whatever pac said.
 
     The solution files themselves also now carry <StateCode>Enabled</StateCode>, re-applied
-    after every export by Restore-StepState in round-trip-src.ps1. That is the third belt,
-    and it is the one that would survive somebody bypassing this script.
+    after every export by Restore-StepState in round-trip-src.ps1. That is the extra belt
+    that would survive somebody bypassing this script.
 
 .PARAMETER Environment
-    The target environment URL or id. Required - there is deliberately no default, because
+    The target environment URL. Required - there is deliberately no default, because
     the active pac profile points somewhere that is not always what the caller meant.
 
 .PARAMETER ZipFile
     The solution package to import.
 
 .PARAMETER Managed
-    Import as managed. TEST and PROD take managed packages; DEV is the authoring
-    environment and takes unmanaged.
+    Asserts the package is managed. TEST and PROD take managed packages; DEV is the
+    authoring environment and takes unmanaged. Without it the package must be unmanaged.
+    The script refuses before importing when the package says otherwise, and fails when the
+    target does not hold the solution in the same form afterwards.
 
 .EXAMPLE
-    ./scripts/Import-Solution.ps1 -Environment https://orgXXXX.crm11.dynamics.com/ -ZipFile OutcomeTesting.zip -Managed
+    ./scripts/Import-Solution.ps1 -Environment https://orgXXXX.crm11.dynamics.com/ -ZipFile release/OutcomeTesting_1_0_32_0_managed.zip -Managed
 
 .NOTES
     AD-062: anything packing the whole of src/ must strip PluginAssemblies/ first, because
@@ -68,12 +75,41 @@ $registration = Join-Path $repoRoot 'plugins/OutcomeTesting.Registration'
 if (-not (Test-Path $ZipFile)) {
     throw "Solution package not found: $ZipFile"
 }
+$ZipFile = (Resolve-Path $ZipFile).Path
 
-if (-not (Test-Path (Join-Path $repoRoot 'src/SdkMessageProcessingSteps'))) {
-    throw "src/SdkMessageProcessingSteps not found under $repoRoot. verifysteps reads the expected step list from there, so the import cannot be verified."
+# ---------------------------------------------------------------- the package
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = [System.IO.Compression.ZipFile]::OpenRead($ZipFile)
+try {
+    $entry = $zip.GetEntry('solution.xml')
+    if (-not $entry) { throw "No solution.xml in $ZipFile - not a solution package." }
+    $reader = New-Object System.IO.StreamReader($entry.Open())
+    try { [xml]$manifestXml = $reader.ReadToEnd() } finally { $reader.Dispose() }
+}
+finally {
+    $zip.Dispose()
+}
+
+$manifest = $manifestXml.ImportExportXml.SolutionManifest
+$uniqueName = [string]$manifest.UniqueName
+$packageVersion = [string]$manifest.Version
+$packageManaged = ([string]$manifest.Managed) -eq '1'
+
+if (-not $uniqueName -or -not $packageVersion) {
+    throw "solution.xml in $ZipFile names no UniqueName or Version."
+}
+if ($uniqueName -notmatch '^[A-Za-z0-9_]+$') {
+    throw "Unexpected solution unique name '$uniqueName' in $ZipFile."
+}
+if ($packageManaged -ne [bool]$Managed) {
+    $isForm = if ($packageManaged) { 'managed' } else { 'unmanaged' }
+    $askedForm = if ($Managed) { 'managed (-Managed)' } else { 'unmanaged (no -Managed)' }
+    throw "$ZipFile is a $isForm package, but the call asked for $askedForm. Nothing imported."
 }
 
 Write-Host "Importing $ZipFile into $Environment" -ForegroundColor Cyan
+Write-Host "  package: $uniqueName $packageVersion, $(if ($packageManaged) { 'managed' } else { 'unmanaged' })"
 Write-Host "  --activate-plugins is always passed. See the notes in this script." -ForegroundColor DarkGray
 Write-Host ""
 
@@ -85,8 +121,8 @@ $importArgs = @(
     '--publish-changes'
 )
 
-# A silent pac CLI does not mean nothing happened - the job runs server-side. The step
-# verification below is what actually settles whether the import did its work.
+# A silent pac CLI does not mean nothing happened - the job runs server-side - and an exit
+# of 0 does not mean something did. The version read-back below settles which.
 & pac @importArgs
 $importExit = $LASTEXITCODE
 
@@ -96,13 +132,59 @@ if ($importExit -ne 0) {
     Write-Host "Check the importjob table before assuming nothing landed; the job runs server-side." -ForegroundColor Yellow
 }
 
+# ---------------------------------------------------------------- read-back
+
 Write-Host ""
-Write-Host "Verifying plug-in steps..." -ForegroundColor Cyan
+Write-Host "Reading back the solution version in $Environment..." -ForegroundColor Cyan
+
+$query = "solutions?`$filter=uniquename eq '$uniqueName'&`$select=version,ismanaged"
+Push-Location $registration
+try {
+    # stderr is left on the console: under Stop, 2>&1 on a native exe turns its first line into a throw.
+    $raw = (& dotnet run --project . -- webapi $Environment GET $query | Out-String)
+    $readExit = $LASTEXITCODE
+}
+finally {
+    Pop-Location
+}
+
+$target = $null
+$httpAt = $raw.IndexOf("HTTP 200")
+$start = if ($httpAt -ge 0) { $raw.IndexOf("{", $httpAt) } else { -1 }
+if ($readExit -eq 0 -and $start -ge 0) {
+    try { $target = @(($raw.Substring($start) | ConvertFrom-Json).value) } catch { $target = $null }
+}
+
+if ($null -eq $target) {
+    Write-Host $raw
+    Write-Host "IMPORT NOT VERIFIED: could not read the solution back from $Environment." -ForegroundColor Red
+    exit 1
+}
+if ($target.Count -ne 1) {
+    Write-Host "IMPORT NOT COMPLETE: $Environment holds no solution '$uniqueName'." -ForegroundColor Red
+    exit 1
+}
+
+$targetVersion = [string]$target[0].version
+$targetManaged = [bool]$target[0].ismanaged
+Write-Host "  $Environment holds $uniqueName $targetVersion, $(if ($targetManaged) { 'managed' } else { 'unmanaged' })"
+
+if ($targetVersion -ne $packageVersion -or $targetManaged -ne $packageManaged) {
+    Write-Host ""
+    Write-Host "IMPORT NOT COMPLETE: the package is $packageVersion but $Environment holds $targetVersion" -ForegroundColor Red
+    Write-Host "(or the managed form differs). The import did not land, whatever pac reported." -ForegroundColor Red
+    exit 1
+}
+
+# ---------------------------------------------------------------- steps
+
+Write-Host ""
+Write-Host "Verifying the plug-in steps the package declares..." -ForegroundColor Cyan
 Write-Host ""
 
 Push-Location $registration
 try {
-    & dotnet run --project . -- verifysteps $Environment (Join-Path $repoRoot 'src/SdkMessageProcessingSteps')
+    & dotnet run --project . -- verifysteps $Environment $ZipFile
     $verifyExit = $LASTEXITCODE
 }
 finally {
@@ -119,8 +201,8 @@ if ($verifyExit -ne 0) {
 }
 
 if ($importExit -ne 0) {
-    Write-Host "Steps verified, but pac reported a non-zero exit. Read the importjob row before proceeding." -ForegroundColor Yellow
+    Write-Host "Version and steps verified, but pac reported a non-zero exit. Read the importjob row before proceeding." -ForegroundColor Yellow
     exit $importExit
 }
 
-Write-Host "Import complete and every step verified enabled." -ForegroundColor Green
+Write-Host "Import complete: $Environment holds $uniqueName $packageVersion and every step the package declares is enabled." -ForegroundColor Green

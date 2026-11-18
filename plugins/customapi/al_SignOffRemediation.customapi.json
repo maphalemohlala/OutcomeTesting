@@ -1,10 +1,10 @@
 {
-  "$comment": "Contract for the SignOffRemediation server-side command (AD-003, command-concurrency skill). Deployed via the registration console (plugins/OutcomeTesting.Registration) and added to the OutcomeTesting solution via a solution-file import (src/customapis/al_SignOffRemediation). Custom API parameter Type codes: 0=Boolean, 10=String.",
+  "$comment": "Contract for the SignOffRemediation server-side command (AD-003, command-concurrency skill). Deployed via the registration console (plugins/OutcomeTesting.Registration) and added to the OutcomeTesting solution via a solution-file import (src/customapis/al_SignOffRemediation). Custom API parameter Type codes: 0=Boolean, 7=Integer, 10=String.",
   "customApi": {
     "uniquename": "al_SignOffRemediation",
     "name": "al_SignOffRemediation",
     "displayname": "Sign Off Remediation",
-    "description": "T&C Manager validates a completed remediation action (BR-008, FR-023). Records an Approved or Rejected sign-off; a Rejected sign-off requires notes and returns the action to the adviser. Enforces the transition guard, optimistic concurrency and idempotency, and writes an immutable Audit Event.",
+    "description": "T&C Manager validates a completed remediation action. Records Approved or Rejected; a rejection needs notes and returns the action to the adviser. An approval may carry FinalOutcome, RecheckRequired and ChangesAdvice, recorded as the portal does; omitted, the case waits at Awaiting Recheck.",
     "bindingtype": 0,
     "boundentitylogicalname": null,
     "isfunction": false,
@@ -53,6 +53,30 @@
       "description": "Stable key for the intent; a replay returns the same sign-off.",
       "type": 10,
       "isoptional": false
+    },
+    {
+      "uniquename": "FinalOutcome",
+      "name": "FinalOutcome",
+      "displayname": "Final outcome",
+      "description": "Optional. The final grade the supervisor records as they approve: 120910710 Pass, 120910711 Pass with issues, 120910712 Insufficient evidence, 120910713 Potential harm. Approvals only, and Notes must say why. Omit or 0 to leave the grade for a separate regrade.",
+      "type": 7,
+      "isoptional": true
+    },
+    {
+      "uniquename": "RecheckRequired",
+      "name": "RecheckRequired",
+      "displayname": "Recheck required",
+      "description": "Optional. The supervisor's 'Recheck required?' answer, written to every action of this check before the sign-off is recorded: 120910796 Yes, 120910797 No. No lets the approval close the case. Omit or 0 to leave the stored answer.",
+      "type": 7,
+      "isoptional": true
+    },
+    {
+      "uniquename": "ChangesAdvice",
+      "name": "ChangesAdvice",
+      "displayname": "Changes advice",
+      "description": "Optional. The supervisor's 'Do the remedial actions change the advice?' answer, written to every action of this check: 120910798 Yes, 120910799 No. Omit or 0 to leave the stored answer.",
+      "type": 7,
+      "isoptional": true
     }
   ],
   "responseProperties": [

@@ -64,6 +64,17 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static List<PdfBlock> Blocks(IOrganizationService service, Guid reviewId)
         {
+            return Blocks(service, reviewId, null, null);
+        }
+
+        /// <summary>
+        /// As <see cref="Blocks(IOrganizationService, Guid)"/>, with the option labels and
+        /// the product name a caller drawing several documents has already read. Either may
+        /// be null and is then read here.
+        /// </summary>
+        public static List<PdfBlock> Blocks(
+            IOrganizationService service, Guid reviewId, OptionLabels labels, string product)
+        {
             var blocks = new List<PdfBlock>();
 
             Entity review;
@@ -78,7 +89,7 @@ namespace OutcomeTesting.Plugins
                 return blocks;
             }
 
-            var labels = new OptionLabels(service);
+            labels = labels ?? new OptionLabels(service);
             var type = review.GetAttributeValue<OptionSetValue>("al_reviewtype");
             var isTax = type != null && type.Value == ResponseRules.ReviewTypeTax;
             var caseRef = review.GetAttributeValue<EntityReference>("al_outcomecaseid");
@@ -106,7 +117,7 @@ namespace OutcomeTesting.Plugins
             blocks.AddRange(Summary(review, row, labels, isTax));
 
             blocks.Add(PdfBlock.Spacer());
-            var product = ProductName.Read(service);
+            product = product ?? ProductName.Read(service);
             blocks.Add(PdfBlock.Note(ProductName.ChecklistFooter(product)));
             blocks.Add(PdfBlock.Title(ProductName.ChecklistTitle(product)));
 
@@ -122,7 +133,7 @@ namespace OutcomeTesting.Plugins
             Draw(blocks, items, reasons, isTax);
 
             // What the check raised, last, as the review page now prints it (2026-10-05).
-            blocks.AddRange(CheckRemedialActions.Blocks(service, reviewId));
+            blocks.AddRange(CheckRemedialActions.Blocks(service, reviewId, labels));
             return blocks;
         }
 
@@ -1058,6 +1069,7 @@ namespace OutcomeTesting.Plugins
             }
 
             var text = new StringBuilder();
+            var tag = new StringBuilder();
             var inTag = false;
 
             foreach (var ch in html)
@@ -1065,29 +1077,59 @@ namespace OutcomeTesting.Plugins
                 if (ch == '<')
                 {
                     inTag = true;
-
-                    // A tag boundary is a word boundary: "a<br>b" is two words.
-                    if (text.Length > 0 && text[text.Length - 1] != ' ')
-                    {
-                        text.Append(' ');
-                    }
-
+                    tag.Clear();
                     continue;
                 }
 
-                if (ch == '>')
+                if (ch == '>' && inTag)
                 {
                     inTag = false;
+
+                    // A tag boundary is a word boundary: "a<b>b" is two words. A paragraph,
+                    // line break, list item or division is a line of its own, as on the page.
+                    text.Append(BlockTags.Contains(TagName(tag.ToString())) ? '\n' : ' ');
                     continue;
                 }
 
-                if (!inTag)
+                if (inTag)
+                {
+                    tag.Append(ch);
+                }
+                else
                 {
                     text.Append(ch == '\r' || ch == '\n' || ch == '\t' ? ' ' : ch);
                 }
             }
 
-            return Collapse(Decode(text.ToString()));
+            var lines = new List<string>();
+            foreach (var line in Decode(text.ToString()).Split('\n'))
+            {
+                var collapsed = Collapse(line);
+                if (collapsed.Length > 0)
+                {
+                    lines.Add(collapsed);
+                }
+            }
+
+            return string.Join("\n", lines);
+        }
+
+        private static readonly HashSet<string> BlockTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "p", "br", "li", "div", "ul", "ol", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote",
+        };
+
+        /// <summary>"p" from "p class=x", "/p" or "br /".</summary>
+        private static string TagName(string tag)
+        {
+            var name = tag.Trim().TrimStart('/');
+            var end = 0;
+            while (end < name.Length && char.IsLetterOrDigit(name[end]))
+            {
+                end++;
+            }
+
+            return name.Substring(0, end);
         }
 
         /// <summary>The five entities the sanitiser's allow-list can leave behind, plus nbsp.</summary>
@@ -1134,8 +1176,18 @@ namespace OutcomeTesting.Plugins
         internal static string Day(DateTime? value)
         {
             return value.HasValue
-                ? value.Value.ToString("dd MMM yyyy", CultureInfo.InvariantCulture)
+                ? UkDay(value.Value).ToString("dd MMM yyyy", CultureInfo.InvariantCulture)
                 : string.Empty;
+        }
+
+        /// <summary>
+        /// The UK calendar day of a value Dataverse handed back. A UTC timestamp is moved to
+        /// UK time first - 23:30 UTC on a summer evening is already tomorrow there; a value
+        /// with no zone is a date already and is left as it is.
+        /// </summary>
+        internal static DateTime UkDay(DateTime value)
+        {
+            return value.Kind == DateTimeKind.Utc ? CaseHeaderRules.UkDate(value) : value.Date;
         }
 
         /// <summary>The ticked items, one per line, as the case stores them.</summary>

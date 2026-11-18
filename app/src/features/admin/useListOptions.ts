@@ -13,10 +13,12 @@ import {
 } from './listOptions';
 import { describeDeleteFailure, describeSaveFailure } from './listOptionFailure';
 import { readAll } from '../../services/readAll';
+// The case list kept between screens joins product names from this table.
+import { noteWrite } from '../../services/commands/commandClient';
 
 // The shaping lives in listOptions so it can be tested; this module cannot be imported under
 // the test runner because ../../generated pulls in the Power Apps client.
-export type { ListOptionRow, ManagedList, OptionDraft } from './listOptions';
+export type { ManagedList, OptionDraft } from './listOptions';
 
 export type ListOptionsState =
   | { status: 'loading' }
@@ -133,6 +135,8 @@ export async function saveListOption(
   } catch (error) {
     logTechnical('list option save', error);
     return { ok: false, reason: describeSaveFailure(error) };
+  } finally {
+    noteWrite();
   }
 }
 
@@ -156,6 +160,8 @@ export async function retireListOption(
   } catch (error) {
     logTechnical('list option retire', error);
     return { ok: false, reason: describeSaveFailure(error) };
+  } finally {
+    noteWrite();
   }
 }
 
@@ -173,6 +179,8 @@ export async function reinstateListOption(
   } catch (error) {
     logTechnical('list option reinstate', error);
     return { ok: false, reason: describeSaveFailure(error) };
+  } finally {
+    noteWrite();
   }
 }
 
@@ -194,5 +202,7 @@ export async function deleteListOption(
   } catch (error) {
     logTechnical('list option delete', error);
     return { ok: false, reason: describeDeleteFailure(error) };
+  } finally {
+    noteWrite();
   }
 }

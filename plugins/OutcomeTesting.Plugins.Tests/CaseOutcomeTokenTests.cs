@@ -80,6 +80,27 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
+        public void A_tax_only_case_is_graded_by_its_tax_check()
+        {
+            // No outcome row: a Tax check writes its grade on the case (requirements log row 11).
+            var service = new FakeOrganizationService();
+            var outcomeCase = service.Seed("al_outcomecase", CaseId, "al_taxoutcome", new OptionSetValue(120910651));
+            outcomeCase.FormattedValues["al_taxoutcome"] = "Pass with issues";
+
+            Assert.Equal("Pass with issues", NotificationTemplateRows.OutcomeTokens(service, CaseRef)[NotificationTemplates.TokenGrading]);
+        }
+
+        [Fact]
+        public void An_aqs_grade_wins_over_the_tax_grade_on_a_tax_then_aqs_case()
+        {
+            var service = Graded();
+            var outcomeCase = service.Seed("al_outcomecase", CaseId, "al_taxoutcome", new OptionSetValue(120910652));
+            outcomeCase.FormattedValues["al_taxoutcome"] = "Fail";
+
+            Assert.Equal("Pass with issues", NotificationTemplateRows.OutcomeTokens(service, CaseRef)[NotificationTemplates.TokenGrading]);
+        }
+
+        [Fact]
         public void The_case_is_not_read_when_the_wording_does_not_ask()
         {
             var service = Graded();

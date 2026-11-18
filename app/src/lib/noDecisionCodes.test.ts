@@ -85,7 +85,7 @@ describe('decision and requirement codes', () => {
       visit(source);
     }
     expect(found).toEqual([]);
-  });
+  }, 30_000); // parses every app source file: over the 5 s default when the whole suite runs at once
 
   it('never appear in a plug-in’s message, audit text or notification', () => {
     const found: string[] = [];

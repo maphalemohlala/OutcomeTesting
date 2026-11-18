@@ -55,6 +55,11 @@
               <Description description="The grouping headings the V8 fail point list is published under." languagecode="1033" />
             </Descriptions>
             <options>
+              <option value="120910404" IsHidden="0">
+                <labels>
+                  <label description="Tax file quality" languagecode="1033" />
+                </labels>
+              </option>
               <option value="120910400" IsHidden="0">
                 <labels>
                   <label description="AML" languagecode="1033" />
@@ -73,11 +78,6 @@
               <option value="120910403" IsHidden="0">
                 <labels>
                   <label description="Tax check" languagecode="1033" />
-                </labels>
-              </option>
-              <option value="120910404" IsHidden="0">
-                <labels>
-                  <label description="Tax file quality" languagecode="1033" />
                 </labels>
               </option>
             </options>

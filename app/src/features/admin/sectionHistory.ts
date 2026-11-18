@@ -1,6 +1,6 @@
+import { isoDay } from '../../lib/format';
 import {
   command,
-  day,
   givenReason,
   person,
   type HistoryAuditSource,
@@ -88,7 +88,7 @@ export function sectionHistory(section: HistorySectionSource, events: HistoryAud
     else if (name === 'UpdateSection') {
       entries.push({ ...base, action: 'Edited', changes: parseSectionChanges(event.al_details) });
     } else if (name === 'RetireSection') {
-      entries.push({ ...base, action: 'Retired', changes: retiredChange(day(event.al_details)) });
+      entries.push({ ...base, action: 'Retired', changes: retiredChange(isoDay(event.al_details)) });
     }
   }
 
@@ -101,7 +101,7 @@ export function sectionHistory(section: HistorySectionSource, events: HistoryAud
       when: section.modifiedon ?? null,
       who: person(section, 'modifiedby', section.modifiedbyname),
       reason: null,
-      changes: retiredChange(day(section.al_effectiveto)),
+      changes: retiredChange(isoDay(section.al_effectiveto)),
     });
   }
 

@@ -202,6 +202,11 @@
                   <Description description="The products a case covers. A case may hold several, so this list is attached through a many-to-many rather than a lookup." languagecode="1033" />
                 </Descriptions>
               </option>
+              <option value="120910845" IsHidden="0">
+                <labels>
+                  <label description="Vulnerable client" languagecode="1033" />
+                </labels>
+              </option>
             </options>
           </optionset>
           <displaynames>

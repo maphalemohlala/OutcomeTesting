@@ -82,6 +82,27 @@ describe('every parameter a command sends is declared in the schema', () => {
   // precisely the one whose absence from the schema nobody notices.
   const calls: Array<[string, () => Promise<unknown>]> = [
     [
+      'al_AmendOutcome',
+      async () => {
+        const { amendOutcome } = await import('./amendOutcome');
+        return amendOutcome({ caseId: 'c', fileGrade: 'Pass', adviceGrade: 'Pass', reason: 'r', idempotencyKey: 'k' });
+      },
+    ],
+    [
+      'al_ReassignTcManager',
+      async () => {
+        const { reassignTcManager } = await import('./reassignTcManager');
+        return reassignTcManager({ caseId: 'c', managerId: 'm', reason: 'r', idempotencyKey: 'k' });
+      },
+    ],
+    [
+      'al_DeleteCase',
+      async () => {
+        const { deleteCase } = await import('./deleteCase');
+        return deleteCase({ caseId: 'c', confirmReference: 'IO-1', reason: 'r', idempotencyKey: 'k' });
+      },
+    ],
+    [
       'al_AddQuestion',
       async () => {
         const { addQuestion } = await import('./questions');
@@ -195,17 +216,6 @@ describe('every parameter a command sends is declared in the schema', () => {
           reviewInstanceId: 'r',
           team: 't',
           reason: 'r',
-          expectedRowVersion: '1',
-          idempotencyKey: 'k',
-        });
-      },
-    ],
-    [
-      'al_CompleteRemediation',
-      async () => {
-        const { completeRemediation } = await import('./completeRemediation');
-        return completeRemediation({
-          actionId: 'a',
           expectedRowVersion: '1',
           idempotencyKey: 'k',
         });
@@ -422,5 +432,26 @@ describe('every parameter a command sends is declared in the schema', () => {
       (name) => !covered.has(name) && declaredFor(name).size > 0,
     );
     expect(uncovered).toEqual([]);
+  });
+});
+
+/**
+ * The case list kept between screens is shown only while this count has not moved since its
+ * read began. It has to move twice per command: a read begun while the command was in flight
+ * may have seen either side of it.
+ */
+describe('the count of writes a cached read is judged against', () => {
+  it('moves when a command is sent, again when it settles, and for a direct table write', async () => {
+    const { commandsSent, executeCommand, noteWrite } = await import('./commandClient');
+    const before = commandsSent();
+
+    const command = executeCommand('al_GetMyRoles', {});
+    expect(commandsSent()).toBe(before + 1);
+
+    await command;
+    expect(commandsSent()).toBe(before + 2);
+
+    noteWrite();
+    expect(commandsSent()).toBe(before + 3);
   });
 });

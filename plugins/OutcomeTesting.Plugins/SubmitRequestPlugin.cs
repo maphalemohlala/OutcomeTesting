@@ -65,6 +65,10 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            // Only the site's own write is a request: the app's Dataverse role can write this
+            // row too, and the request is trusted as the signed-in person's.
+            WriteProvenance.EnsurePortalCaller(localPluginContext.OrgSvcFactory.CreateOrganizationService(null), context);
+
             var reviewId = entity.Id;
 
             // One intent per review, so a retry after a dropped response replays the original
@@ -89,7 +93,8 @@ namespace OutcomeTesting.Plugins
                 correlationId: context.CorrelationId,
                 requireCallerOwnsReview: false,
                 details: details,
-                actorName: contact == null ? null : contact.Name);
+                actorName: contact == null ? null : contact.Name,
+                systemService: localPluginContext.OrgSvcFactory.CreateOrganizationService(null));
         }
 
         private static EntityReference AssignedContact(IOrganizationService service, Guid reviewId)

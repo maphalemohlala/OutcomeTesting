@@ -5,7 +5,8 @@
   <PluginTypeId>df7246ec-21ac-f111-aaac-e4fade069307</PluginTypeId>
   <PrimaryEntity>al_remediationaction</PrimaryEntity>
   <AsyncAutoDelete>0</AsyncAutoDelete>
-  <FilteringAttributes>al_adviserresponse,al_evidencereference,al_clientcontactrequired,al_recheckrequired,al_changesadvice,al_actionperformed,al_remedialaction</FilteringAttributes>
+  <FilteringAttributes>al_adviserresponse,al_evidencereference,al_clientcontactrequired,al_recheckrequired,al_changesadvice,al_actionperformed,al_remedialaction,al_responsehistory</FilteringAttributes>
+  <ImpersonatingUserIdName></ImpersonatingUserIdName>
   <InvocationSource>1</InvocationSource>
   <Mode>0</Mode>
   <Rank>1</Rank>

@@ -42,9 +42,9 @@
     <CascadeAssign>NoCascade</CascadeAssign>
     <CascadeDelete>Restrict</CascadeDelete>
     <CascadeArchive>NoCascade</CascadeArchive>
-    <CascadeReparent>NoCascade</CascadeReparent>
-    <CascadeShare>NoCascade</CascadeShare>
-    <CascadeUnshare>NoCascade</CascadeUnshare>
+    <CascadeReparent>Cascade</CascadeReparent>
+    <CascadeShare>Cascade</CascadeShare>
+    <CascadeUnshare>Cascade</CascadeUnshare>
     <CascadeRollupView>NoCascade</CascadeRollupView>
     <IsValidForAdvancedFind>1</IsValidForAdvancedFind>
     <ReferencingAttributeName>al_outcomecaseid</ReferencingAttributeName>
@@ -112,9 +112,9 @@
     <CascadeAssign>NoCascade</CascadeAssign>
     <CascadeDelete>Restrict</CascadeDelete>
     <CascadeArchive>NoCascade</CascadeArchive>
-    <CascadeReparent>NoCascade</CascadeReparent>
-    <CascadeShare>NoCascade</CascadeShare>
-    <CascadeUnshare>NoCascade</CascadeUnshare>
+    <CascadeReparent>Cascade</CascadeReparent>
+    <CascadeShare>Cascade</CascadeShare>
+    <CascadeUnshare>Cascade</CascadeUnshare>
     <CascadeRollupView>NoCascade</CascadeRollupView>
     <IsValidForAdvancedFind>1</IsValidForAdvancedFind>
     <ReferencingAttributeName>al_outcomecaseid</ReferencingAttributeName>
@@ -182,9 +182,9 @@
     <CascadeAssign>NoCascade</CascadeAssign>
     <CascadeDelete>Restrict</CascadeDelete>
     <CascadeArchive>NoCascade</CascadeArchive>
-    <CascadeReparent>NoCascade</CascadeReparent>
-    <CascadeShare>NoCascade</CascadeShare>
-    <CascadeUnshare>NoCascade</CascadeUnshare>
+    <CascadeReparent>Cascade</CascadeReparent>
+    <CascadeShare>Cascade</CascadeShare>
+    <CascadeUnshare>Cascade</CascadeUnshare>
     <CascadeRollupView>NoCascade</CascadeRollupView>
     <IsValidForAdvancedFind>1</IsValidForAdvancedFind>
     <ReferencingAttributeName>al_outcomecaseid</ReferencingAttributeName>
@@ -217,9 +217,9 @@
     <CascadeAssign>NoCascade</CascadeAssign>
     <CascadeDelete>Restrict</CascadeDelete>
     <CascadeArchive>NoCascade</CascadeArchive>
-    <CascadeReparent>NoCascade</CascadeReparent>
-    <CascadeShare>NoCascade</CascadeShare>
-    <CascadeUnshare>NoCascade</CascadeUnshare>
+    <CascadeReparent>Cascade</CascadeReparent>
+    <CascadeShare>Cascade</CascadeShare>
+    <CascadeUnshare>Cascade</CascadeUnshare>
     <CascadeRollupView>NoCascade</CascadeRollupView>
     <IsValidForAdvancedFind>1</IsValidForAdvancedFind>
     <ReferencingAttributeName>al_outcomecaseid</ReferencingAttributeName>
@@ -252,9 +252,9 @@
     <CascadeAssign>NoCascade</CascadeAssign>
     <CascadeDelete>Restrict</CascadeDelete>
     <CascadeArchive>NoCascade</CascadeArchive>
-    <CascadeReparent>NoCascade</CascadeReparent>
-    <CascadeShare>NoCascade</CascadeShare>
-    <CascadeUnshare>NoCascade</CascadeUnshare>
+    <CascadeReparent>Cascade</CascadeReparent>
+    <CascadeShare>Cascade</CascadeShare>
+    <CascadeUnshare>Cascade</CascadeUnshare>
     <CascadeRollupView>NoCascade</CascadeRollupView>
     <IsValidForAdvancedFind>1</IsValidForAdvancedFind>
     <ReferencingAttributeName>al_outcomecaseid</ReferencingAttributeName>

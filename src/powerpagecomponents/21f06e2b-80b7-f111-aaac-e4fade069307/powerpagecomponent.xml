@@ -1,0 +1,15 @@
+<powerpagecomponent powerpagecomponentid="21f06e2b-80b7-f111-aaac-e4fade069307">
+  <content>{
+  "authenticatedusersrole": false,
+  "anonymoususersrole": false,
+  "description": "Views the AQS team's cases, allocates AQS checks to AQS reviewers, and monitors their workload (AD-218)."
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>AL Portal - AQS Team Manager</name>
+  <powerpagecomponenttype>11</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

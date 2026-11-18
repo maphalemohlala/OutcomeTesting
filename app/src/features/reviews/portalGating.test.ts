@@ -46,12 +46,14 @@ describe('the case header stays editable after the Tax check is submitted', () =
     expect(reviewTemplate).not.toContain('tax_has_submitted');
   });
 
-  it('follows the review\'s own submitted state and nothing else', () => {
-    // `locked` alone: read-only exactly when THIS review is submitted (PP-11), which is what
-    // the server now does too - CaseHeaderRequestPlugin asks EnsureAssignedToCase and
-    // nothing else about the ordinary fields.
-    expect(reviewTemplate).toContain('{% assign header_locked = locked %}');
-    expect(reviewTemplate).not.toContain('{% assign header_locked = true %}');
+  it('follows the same editable rule as the answers, not the Tax check', () => {
+    // Read-only when THIS review is submitted (PP-11), when it is someone else's (the server
+    // refuses their header saves), or when the case has left its checking stage - the three
+    // things `editable` already asks. Never on whether the OTHER discipline submitted.
+    expect(reviewTemplate).toContain('{% if locked or mine == false or case_checking == false %}');
+    expect(reviewTemplate).toContain(
+      '{% if editable %}{% assign header_locked = false %}{% else %}{% assign header_locked = true %}{% endif %}',
+    );
   });
 
   it('still renders the header read-only for a checker whose own review is submitted', () => {

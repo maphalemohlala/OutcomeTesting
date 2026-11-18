@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -21,68 +23,64 @@ namespace OutcomeTesting.Plugins
         public const string VersionEntity = "al_questionversion";
         public const string ChecklistVersionEntity = "al_checklistversion";
 
-        /// <summary>
-        /// The section code the question behind this answer belongs to, or null where any
-        /// link in the chain is missing (item 10, 2026-09-19).
-        ///
-        /// Response -> Question Version -> Question -> Section is the single-parent chain in
-        /// the model, so there is no ambiguity to resolve - only three reads, which is why
-        /// callers reach this behind a cheap test on the answer value itself.
-        /// </summary>
-        public static string SectionCodeForVersion(IOrganizationService service, Guid questionVersionId)
+        /// <summary>al_auditevent.al_command for MoveQuestion.</summary>
+        public const int CommandMoveQuestion = 120910795;
+
+        private static readonly System.Text.RegularExpressions.Regex MoveName =
+            new System.Text.RegularExpressions.Regex(@"^MoveQuestion\s+(\S+)\s*->\s*(\S+)\s*$");
+
+        /// <summary>al_auditevent.al_name's maximum length (src/Entities/al_AuditEvent/Entity.xml).</summary>
+        public const int AuditNameMaxLength = 100;
+
+        /// <summary>The name MoveQuestion gives its audit event; <see cref="QuestionMoves"/> reads it back.</summary>
+        public static string MoveAuditName(string fromCode, string toCode)
         {
-            var version = service.Retrieve(
-                VersionEntity, questionVersionId, new ColumnSet("al_questionid"));
-            var questionRef = version == null
-                ? null
-                : version.GetAttributeValue<EntityReference>("al_questionid");
-            if (questionRef == null)
-            {
-                return null;
-            }
-
-            var question = service.Retrieve(
-                QuestionEntity, questionRef.Id, new ColumnSet("al_sectionid"));
-            var sectionRef = question == null
-                ? null
-                : question.GetAttributeValue<EntityReference>("al_sectionid");
-            if (sectionRef == null)
-            {
-                return null;
-            }
-
-            var section = service.Retrieve(
-                "al_section", sectionRef.Id, new ColumnSet("al_sectioncode"));
-            return section == null ? null : section.GetAttributeValue<string>("al_sectioncode");
+            return "MoveQuestion " + fromCode + " -> " + toCode;
         }
 
         /// <summary>
-        /// The business code of the question behind this answer, or null where the chain
-        /// cannot be walked (project owner, 2026-09-22).
-        ///
-        /// Response -> Question Version -> Question, the single-parent chain in the model, so
-        /// there is nothing to disambiguate - two reads, which is why the caller reaches this
-        /// only after a cheap test on the answer value itself.
-        ///
-        /// Read rather than inferred from the response type: a type is a convention that
-        /// checklist administration can reassign (AD-123) and the code is the AD-122 contract,
-        /// carried forward whole when a question is retired and succeeded (BR-013, AD-004).
+        /// Why a question already moved cannot be moved or retired again, or null when it has
+        /// not been moved. Its version is dated out on the move's day; a second move or a
+        /// retirement would date it out again, so the old question and the one it became would
+        /// both be asked (or neither), and the carry, which follows one move per code, would
+        /// stop finding the answer.
         /// </summary>
-        public static string QuestionCodeForVersion(IOrganizationService service, Guid questionVersionId)
+        public static string MovedRefusal(IOrganizationService service, string questionCode, string action)
         {
-            var version = service.Retrieve(
-                VersionEntity, questionVersionId, new ColumnSet("al_questionid"));
-            var questionRef = version == null
-                ? null
-                : version.GetAttributeValue<EntityReference>("al_questionid");
-            if (questionRef == null)
+            KeyValuePair<string, Guid> move;
+            if (string.IsNullOrEmpty(questionCode) || !QuestionMoves(service).TryGetValue(questionCode, out move))
             {
                 return null;
             }
 
-            var question = service.Retrieve(
-                QuestionEntity, questionRef.Id, new ColumnSet("al_questioncode"));
-            return question == null ? null : question.GetAttributeValue<string>("al_questioncode");
+            return "That question has already been moved to " + move.Key + ", so it cannot be " + action
+                + ". Make the change to " + move.Key + " instead.";
+        }
+
+        /// <summary>
+        /// Every question move, as the code it left mapped to the code and question it became.
+        /// The move's audit event is the link: it is written in the move's own transaction, names
+        /// both codes, and targets the new question. Codes are unique and never freed, so the old
+        /// code names one question for good. No column on the question records where it came from.
+        /// </summary>
+        public static Dictionary<string, KeyValuePair<string, Guid>> QuestionMoves(IOrganizationService service)
+        {
+            // shortcut: reads every move ever made; moves are rare administrator acts. Filter by date if they number thousands.
+            var query = new QueryExpression("al_auditevent") { ColumnSet = new ColumnSet("al_name", "al_targetid") };
+            query.Criteria.AddCondition("al_command", ConditionOperator.Equal, CommandMoveQuestion);
+
+            var moves = new Dictionary<string, KeyValuePair<string, Guid>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var audit in service.RetrieveMultiple(query).Entities)
+            {
+                var match = MoveName.Match(audit.GetAttributeValue<string>("al_name") ?? string.Empty);
+                Guid moved;
+                if (match.Success && Guid.TryParse(audit.GetAttributeValue<string>("al_targetid"), out moved))
+                {
+                    moves[match.Groups[1].Value] = new KeyValuePair<string, Guid>(match.Groups[2].Value, moved);
+                }
+            }
+
+            return moves;
         }
 
         /// <summary>
@@ -151,6 +149,14 @@ namespace OutcomeTesting.Plugins
             {
                 if (!string.IsNullOrWhiteSpace(code))
                 {
+                    // The move's audit name, which the answer carry reads back, splits on spaces.
+                    if (code.Trim().Any(char.IsWhiteSpace))
+                    {
+                        throw new InvalidPluginExecutionException(
+                            CommandHelpers.PreconditionPrefix +
+                            "Question code '" + code.Trim() + "' contains a space. Question codes cannot contain spaces.");
+                    }
+
                     codes.Add(code.Trim());
                 }
             }
@@ -182,6 +188,10 @@ namespace OutcomeTesting.Plugins
         /// null when it has none. The version number, not the effective window, decides
         /// which is current: a dated-out version is still the latest until a successor
         /// exists, which is what lets RetireQuestion see that it has already been retired.
+        ///
+        /// A command changing the question from a given day may act on it only when it is
+        /// also the version in force that day: <see cref="ScheduledVersionRefusal"/> says why
+        /// not when a later version is already waiting to start.
         /// </summary>
         public static Entity CurrentVersionOf(IOrganizationService service, Guid questionId, params string[] columns)
         {
@@ -201,6 +211,26 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// Why a change from <paramref name="day"/> cannot act on <paramref name="latest"/>,
+        /// or null when it can. A version still waiting to start on that day is not the one
+        /// in force: ending it would leave the version before it running alongside whatever
+        /// the change creates, so the question would be asked twice. A first version with
+        /// nothing before it has nothing to overlap, so it may be changed before it starts.
+        /// </summary>
+        public static string ScheduledVersionRefusal(Entity latest, DateTime day)
+        {
+            var from = latest.GetAttributeValue<DateTime?>("al_effectivefrom");
+            if (!from.HasValue || from.Value.Date <= day.Date || latest.GetAttributeValue<int>("al_versionnumber") <= 1)
+            {
+                return null;
+            }
+
+            return "A change to that question is already scheduled to start on "
+                + from.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                + ". Date this change on or after that day, so the question is never asked in two versions at once.";
+        }
+
+        /// <summary>
         /// The end date a successor starting on <paramref name="startsOn"/> must keep: a
         /// retirement scheduled for later would otherwise end with the version it was set on,
         /// and the question would stay asked for good.
@@ -217,10 +247,10 @@ namespace OutcomeTesting.Plugins
         ///
         /// The window is applied in memory rather than in the query: there are a handful of
         /// versions, and a date-range condition would put the answer at the mercy of how the
-        /// platform compares a date-only column to a UTC timestamp. The effective-to day is
-        /// counted as in force here, as both callers always have; whether that should match
-        /// the question-version window (out of force from the start of effective-to) is a
-        /// question for the checklist publisher, not one this consolidation answers.
+        /// platform compares a date-only column to a UTC timestamp. The window is the one
+        /// every other effective-dated row uses (<see cref="ResponseRules.IsVersionEffective"/>):
+        /// out of force from the start of the effective-to day. This alone used to count that
+        /// day as in force, so on a changeover day a claim opened against the outgoing version.
         /// </summary>
         public static Guid ChecklistVersionInForce(IOrganizationService service, string refusal)
         {
@@ -234,13 +264,13 @@ namespace OutcomeTesting.Plugins
                 Orders = { new OrderExpression("al_effectivefrom", OrderType.Descending) },
             };
 
-            var today = DateTime.UtcNow.Date;
+            var now = DateTime.UtcNow;
             foreach (var version in service.RetrieveMultiple(query).Entities)
             {
-                var from = version.GetAttributeValue<DateTime?>("al_effectivefrom");
-                var to = version.GetAttributeValue<DateTime?>("al_effectiveto");
-
-                if ((!from.HasValue || from.Value.Date <= today) && (!to.HasValue || to.Value.Date >= today))
+                if (ResponseRules.IsVersionEffective(
+                    version.GetAttributeValue<DateTime?>("al_effectivefrom"),
+                    version.GetAttributeValue<DateTime?>("al_effectiveto"),
+                    now))
                 {
                     return version.Id;
                 }

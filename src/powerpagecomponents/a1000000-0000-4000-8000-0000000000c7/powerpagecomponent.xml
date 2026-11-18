@@ -1,0 +1,26 @@
+<powerpagecomponent powerpagecomponentid="a1000000-0000-4000-8000-0000000000c7">
+  <content>{
+  "append": false,
+  "appendto": false,
+  "create": false,
+  "delete": false,
+  "entitylogicalname": "al_outcome",
+  "entityname": "Case - my Tax checks / outcome",
+  "parententitypermission": "a1000000-0000-4000-8000-0000000000c0",
+  "parentrelationship": "al_outcomecase_outcome",
+  "read": true,
+  "scope": 756150003,
+  "write": false,
+  "adx_entitypermission_webrole": [
+    "a1000000-0000-4000-8000-000000000090"
+  ]
+}</content>
+  <iscustomizable>1</iscustomizable>
+  <name>Case - my Tax checks / outcome</name>
+  <powerpagecomponenttype>18</powerpagecomponenttype>
+  <powerpagesiteid>
+    <powerpagesiteid>b4cfe195-fd15-42e8-94e5-f27bcceaf5fc</powerpagesiteid>
+  </powerpagesiteid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</powerpagecomponent>

@@ -269,13 +269,30 @@ namespace OutcomeTesting.Plugins
             string body,
             string templateCode,
             EntityReference caseRef,
-            string occurrence = null)
+            string occurrence = null,
+            DrawnCheck drawn = null)
         {
             // Guid.Empty back means the event was already queued, so the attachment is already
             // on the row that exists and writing it again would replace a sent document.
             return QueueLetter(
                 service, correlationId, eventValue, targetTable, targetId,
-                recipientEmail, subject, body, templateCode, occurrence, caseRef, true);
+                recipientEmail, subject, body, templateCode, occurrence, caseRef, true, drawn);
+        }
+
+        /// <summary>
+        /// One case's completed-check documents, drawn once and handed to every letter a
+        /// single caller queues one after another. The adviser's letter, the para-planner's
+        /// copy and the T&amp;C Manager's copy of one event carry the same documents, and
+        /// nothing a letter writes changes what they show, so the second and third need not
+        /// draw them again. A caller keeps it a local of one plug-in execution.
+        /// </summary>
+        public sealed class DrawnCheck
+        {
+            internal Guid CaseId;
+            internal bool Drawn;
+            internal bool HasDocuments;
+            internal string Names;
+            internal string Bodies;
         }
 
         public static Guid Queue(
@@ -304,7 +321,7 @@ namespace OutcomeTesting.Plugins
         {
             return QueueLetter(
                 service, correlationId, eventValue, targetTable, targetId,
-                recipientEmail, subject, body, templateCode, occurrence, null, false);
+                recipientEmail, subject, body, templateCode, occurrence, null, false, null);
         }
 
         /// <summary>
@@ -331,7 +348,8 @@ namespace OutcomeTesting.Plugins
             string templateCode,
             string occurrence,
             EntityReference caseRef,
-            bool withCompletedCheck)
+            bool withCompletedCheck,
+            DrawnCheck drawn)
         {
             var code = CodeFor(eventValue, targetId, occurrence);
 
@@ -396,7 +414,7 @@ namespace OutcomeTesting.Plugins
             // it (every adviser letter, AD-164). Every copy carries the same documents.
             if (wantsCheck)
             {
-                AttachCompletedCheck(service, created, caseRef);
+                AttachCompletedCheck(service, created, caseRef, drawn);
             }
 
             // The letters an administrator attached to this event, sent in addition to this
@@ -449,10 +467,26 @@ namespace OutcomeTesting.Plugins
                 ["al_targettable"] = targetTable,
                 ["al_targetid"] = targetId.ToString("D"),
                 ["al_subject"] = CommandHelpers.Truncate(subject, 400),
-                ["al_body"] = CommandHelpers.Truncate(body, 4000),
+                ["al_body"] = CommandHelpers.Truncate(body, BodyLength),
                 ["al_queuedon"] = DateTime.UtcNow,
                 ["al_correlationid"] = correlationId.ToString("D"),
             };
+
+            if (body != null && body.Length > BodyLength)
+            {
+                // Never cut and sent: a letter cut at the column's length loses its closing
+                // markup and its link. It is parked Failed with no address, which the drain
+                // never sends, and says why where the Email Templates page shows it.
+                row["al_status"] = new OptionSetValue(StatusFailed);
+                row["al_failurereason"] = CommandHelpers.Truncate(
+                    "Not sent" + (string.IsNullOrWhiteSpace(recipientEmail) ? string.Empty : " to " + recipientEmail.Trim())
+                    + ". The letter came to " + body.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    + " characters, and a letter can be at most "
+                    + BodyLength.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    + " once its details are filled in. Shorten the letter's wording or the notes it carries.",
+                    FailureReasonLength);
+                return row;
+            }
 
             if (!string.IsNullOrWhiteSpace(recipientEmail))
             {
@@ -461,6 +495,12 @@ namespace OutcomeTesting.Plugins
 
             return row;
         }
+
+        /// <summary>
+        /// The longest body al_body holds. It is a single-line text column, whose type cannot
+        /// be changed after creation and whose length cannot exceed 4000.
+        /// </summary>
+        public const int BodyLength = 4000;
 
         /// <summary>
         /// A Failed row for each chosen recipient who could not be reached, carrying the reason.
@@ -622,7 +662,7 @@ namespace OutcomeTesting.Plugins
         /// </para>
         /// </summary>
         private static void AttachCompletedCheck(
-            IOrganizationService service, List<Guid> notificationIds, EntityReference caseRef)
+            IOrganizationService service, List<Guid> notificationIds, EntityReference caseRef, DrawnCheck drawn = null)
         {
             if (notificationIds.Count == 0 || caseRef == null)
             {
@@ -633,9 +673,35 @@ namespace OutcomeTesting.Plugins
             {
                 string packedNames;
                 string packedBodies;
-                if (!TryPackCompletedCheck(service, caseRef, out packedNames, out packedBodies))
+                if (drawn != null && drawn.Drawn && drawn.CaseId == caseRef.Id)
                 {
-                    return;
+                    // Already drawn for an earlier letter of the same event.
+                    if (!drawn.HasDocuments)
+                    {
+                        return;
+                    }
+
+                    packedNames = drawn.Names;
+                    packedBodies = drawn.Bodies;
+                }
+                else
+                {
+                    var any = TryPackCompletedCheck(service, caseRef, out packedNames, out packedBodies);
+                    if (drawn != null)
+                    {
+                        // Kept whether it drew documents or found none to draw; only a drawing
+                        // that threw is tried again by the next letter, as it was before.
+                        drawn.CaseId = caseRef.Id;
+                        drawn.HasDocuments = any;
+                        drawn.Names = packedNames;
+                        drawn.Bodies = packedBodies;
+                        drawn.Drawn = true;
+                    }
+
+                    if (!any)
+                    {
+                        return;
+                    }
                 }
 
                 // Drawn once, written to every copy.
@@ -784,7 +850,10 @@ namespace OutcomeTesting.Plugins
             return service.RetrieveMultiple(query).Entities.Count > 0;
         }
 
-        /// <summary>Work email of a contact (AD-010), or null when there is none to reach.</summary>
+        /// <summary>
+        /// Work email of a contact (AD-010), or null when there is none to reach: no email, a
+        /// contact that has been deactivated, or one that no longer exists.
+        /// </summary>
         public static string ContactEmail(IOrganizationService service, EntityReference contact)
         {
             if (contact == null)
@@ -792,8 +861,10 @@ namespace OutcomeTesting.Plugins
                 return null;
             }
 
-            var row = service.Retrieve("contact", contact.Id, new ColumnSet("emailaddress1"));
-            return row.GetAttributeValue<string>("emailaddress1");
+            var row = NotificationRecipients.Contact(service, contact.Id);
+            return row == null || !NotificationRecipients.IsActive(row)
+                ? null
+                : row.GetAttributeValue<string>("emailaddress1");
         }
 
         /// <summary>Work email of a Dataverse user, or null when there is none to reach.</summary>

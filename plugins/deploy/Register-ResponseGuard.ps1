@@ -14,7 +14,9 @@
            ResponseProgressPlugin Create/Update  al_response  stage 40 (post-op) sync
       4. Pre-images on the Update steps, so the guard sees columns the Target omits.
 
-    Idempotent: existing components are looked up and reused rather than duplicated.
+    Idempotent: existing components are looked up and reused rather than duplicated. The
+    Update steps' filtering columns and pre-image columns are written on every run, so an
+    environment registered earlier is brought to the columns listed here.
 
 .PARAMETER OrgUrl
     The Dataverse environment URL to deploy to. No environment is assumed or defaulted.
@@ -84,11 +86,15 @@ if (-not $PacPath -or -not (Test-Path -LiteralPath $PacPath)) {
 Write-Host "  using: $PacPath"
 
 Write-Host '1. Pushing plug-in assembly...'
-$dll = Join-Path $pluginProject 'bin\Debug\net462\OutcomeTesting.Plugins.dll'
+# Release, the build the C# registration tool pushes too, so the two never disagree about
+# which binary is live. pac does not build: run dotnet build -c Release first.
+$dll = Join-Path $pluginProject 'bin\Release\net462\OutcomeTesting.Plugins.dll'
 if (-not (Test-Path -LiteralPath $dll)) {
-    throw "Plug-in assembly not found: $dll. Run 'dotnet build' in $pluginProject first."
+    throw "Plug-in assembly not found: $dll. Run 'dotnet build -c Release' in $pluginProject first."
 }
-& $PacPath plugin push --pluginId $PluginAssemblyId --pluginFile $dll --type Assembly
+# --environment: without it pac pushes to the active profile, not $OrgUrl, while every Web API
+# call below goes to $OrgUrl.
+& $PacPath plugin push --pluginId $PluginAssemblyId --pluginFile $dll --type Assembly --environment $OrgUrl
 if ($LASTEXITCODE -ne 0) {
     throw "pac plugin push failed with exit code $LASTEXITCODE. Fix the push, then re-run; the Web API steps below are idempotent."
 }
@@ -160,8 +166,13 @@ function New-Step {
 Write-Host '3. Registering steps...'
 $answerColumns = 'al_answertext,al_answerchoice,al_answerchoices,al_answerdate'
 
+# The guard also fires on, and sees the stored value of, the rich-text answer: it is what
+# sanitises that column, so a write carrying nothing else must still reach it. Progress
+# does not read rich text and keeps the four. Matches src/SdkMessageProcessingSteps.
+$guardColumns = "$answerColumns,al_answerrichtext"
+
 New-Step -Name 'ResponseGuard: Create of al_response' -PluginTypeId $guardTypeId -Message 'Create' -Entity 'al_response' -Stage 20 | Out-Null
-$guardUpdate = New-Step -Name 'ResponseGuard: Update of al_response' -PluginTypeId $guardTypeId -Message 'Update' -Entity 'al_response' -Stage 20 -FilteringAttributes $answerColumns
+$guardUpdate = New-Step -Name 'ResponseGuard: Update of al_response' -PluginTypeId $guardTypeId -Message 'Update' -Entity 'al_response' -Stage 20 -FilteringAttributes $guardColumns
 
 # Associate and Disassociate carry no per-entity message filter, so these register
 # unfiltered and the plug-in checks the relationship name itself.
@@ -175,8 +186,8 @@ Write-Host '4. Registering pre-images on the Update steps...'
 # imagetype 0 = pre-image. The guard needs the review and question links on Update,
 # which the Target omits because only changed columns travel in it.
 foreach ($step in @(
-    @{ Id = $guardUpdate;    Name = 'ResponseGuard Update pre-image' },
-    @{ Id = $progressUpdate; Name = 'ResponseProgress Update pre-image' }
+    @{ Id = $guardUpdate;    Name = 'ResponseGuard Update pre-image';    Columns = $guardColumns },
+    @{ Id = $progressUpdate; Name = 'ResponseProgress Update pre-image'; Columns = $answerColumns }
 )) {
     $body = [ordered]@{
         name                                    = $step.Name
@@ -186,10 +197,21 @@ foreach ($step in @(
         # from. For Create and Update that parameter is Target. Omitting it fails with
         # 0x80040203 "Attribute messagepropertyname is required".
         messagepropertyname                     = 'Target'
-        attributes                              = "al_reviewinstanceid,al_questionversionid,$answerColumns"
+        attributes                              = "al_reviewinstanceid,al_questionversionid,$($step.Columns)"
         'sdkmessageprocessingstepid@odata.bind' = "/sdkmessageprocessingsteps($($step.Id))"
     }
-    Get-OrCreate -Set 'sdkmessageprocessingstepimages' -IdField 'sdkmessageprocessingstepimageid' -Filter "name eq '$($step.Name)'" -Body $body | Out-Null
+    $imageId = Get-OrCreate -Set 'sdkmessageprocessingstepimages' -IdField 'sdkmessageprocessingstepimageid' -Filter "name eq '$($step.Name)'" -Body $body
+
+    # Get-OrCreate leaves an existing row as it was, so the columns are written here as well.
+    # The image PATCH is refused (400) without messagepropertyname and the step binding. Image
+    # first, step row second: an image change is only delivered once the step row is written.
+    Invoke-Dv -Method Patch -Path "sdkmessageprocessingstepimages($imageId)" -Body ([ordered]@{
+        messagepropertyname                     = 'Target'
+        attributes                              = $body.attributes
+        'sdkmessageprocessingstepid@odata.bind' = "/sdkmessageprocessingsteps($($step.Id))"
+    }) | Out-Null
+    Invoke-Dv -Method Patch -Path "sdkmessageprocessingsteps($($step.Id))" -Body @{ filteringattributes = $step.Columns } | Out-Null
+    Write-Host "  columns set: $($step.Name)"
 }
 
 Write-Host "Done. ResponseGuard and ResponseProgress are registered in '$SolutionUniqueName'." -ForegroundColor Green

@@ -319,7 +319,7 @@ namespace OutcomeTesting.Plugins
                     TopCount = 1,
                     Criteria = new FilterExpression(),
                 };
-                query.Criteria.AddCondition(NotificationTemplates.CodeAttr, ConditionOperator.Equal, code);
+                query.Criteria.AddCondition(NotificationTemplates.CodeAttr, ConditionOperator.Equal, NotificationTemplates.NormaliseCode(code));
                 query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
 
                 var rows = service.RetrieveMultiple(query).Entities;
@@ -426,12 +426,16 @@ namespace OutcomeTesting.Plugins
                 return tokens;
             }
 
+            // A Tax-only case has no outcome row - only its Tax grade on the case - so that is its
+            // grading (requirements log row 11: {{grading}} came out empty on Tax-only cases).
+            string taxGrading = null;
+
             // Its own try: a case that cannot be read must not cost the grading below.
             try
             {
-                tokens[NotificationTemplates.TokenClient] = service
-                    .Retrieve("al_outcomecase", caseRef.Id, new ColumnSet("al_clientname"))
-                    .GetAttributeValue<string>("al_clientname") ?? string.Empty;
+                var outcomeCase = service.Retrieve("al_outcomecase", caseRef.Id, new ColumnSet("al_clientname", "al_taxoutcome"));
+                tokens[NotificationTemplates.TokenClient] = outcomeCase.GetAttributeValue<string>("al_clientname") ?? string.Empty;
+                taxGrading = CommandHelpers.Formatted(outcomeCase, "al_taxoutcome");
             }
             catch (Exception)
             {
@@ -486,6 +490,11 @@ namespace OutcomeTesting.Plugins
             catch (Exception)
             {
                 // An extra token never costs the letter; it goes with the gap.
+            }
+
+            if (tokens[NotificationTemplates.TokenGrading].Length == 0 && !string.IsNullOrWhiteSpace(taxGrading))
+            {
+                tokens[NotificationTemplates.TokenGrading] = taxGrading;
             }
 
             return tokens;

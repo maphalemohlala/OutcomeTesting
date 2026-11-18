@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="AqContactId">
+  <description default="Id of the contact named as accountable for the Advice Quality fail, on the same terms as FqContactId.">
+    <label description="Id of the contact named as accountable for the Advice Quality fail, on the same terms as FqContactId." languagecode="1033" />
+  </description>
+  <displayname default="AQ accountable contact">
+    <label description="AQ accountable contact" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>AqContactId</name>
+  <type>10</type>
+</customapirequestparameter>

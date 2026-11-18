@@ -78,15 +78,21 @@ namespace OutcomeTesting.Plugins
 
             var today = DateTime.UtcNow.Date;
             var effectiveTo = ParseEffectiveTo(effectiveToArg, today);
-            var current = ChecklistQueries.CurrentVersionOf(userService, questionId, "al_versionnumber", "al_effectiveto");
+            var current = ChecklistQueries.CurrentVersionOf(
+                userService, questionId, "al_versionnumber", "al_effectivefrom", "al_effectiveto");
             if (current == null)
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix + "That question has no version to retire.");
             }
 
-            var alreadyRetired = AlreadyRetiredRefusal(
-                current.GetAttributeValue<DateTime?>("al_effectiveto"), today, "question");
+            // Dating out a version still waiting to start would leave the one before it
+            // running to that start: the question would stop later than the day chosen.
+            // A moved question is dated out on the move's day; a second date would leave it and
+            // the question it became asked together, or neither.
+            var alreadyRetired = ChecklistQueries.ScheduledVersionRefusal(current, effectiveTo) ?? AlreadyRetiredRefusal(
+                current.GetAttributeValue<DateTime?>("al_effectiveto"), today, "question")
+                ?? ChecklistQueries.MovedRefusal(systemService, questionCode, "retired separately");
             if (alreadyRetired != null)
             {
                 throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + alreadyRetired);

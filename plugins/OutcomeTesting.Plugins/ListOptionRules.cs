@@ -29,8 +29,6 @@ namespace OutcomeTesting.Plugins
 
         public const string NameAttribute = "al_name";
         public const string ListAttribute = "al_list";
-        public const string SortOrderAttribute = "al_sortorder";
-        public const string LegacyValueAttribute = "al_legacyvalue";
         public const string EffectiveFromAttribute = "al_effectivefrom";
         public const string EffectiveToAttribute = "al_effectiveto";
 

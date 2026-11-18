@@ -97,6 +97,14 @@ export function canTransition(from: CaseStatus | null | undefined, to: CaseStatu
   return nextStatuses(from).includes(to);
 }
 
+/**
+ * Whether al_RegradeCase accepts a case at this status. Mirrors
+ * RegradeCasePlugin.EnsureCaseIsAtTheRecheck: the final outcome is the recheck decision.
+ */
+export function mayRegradeAt(status: CaseStatus | null | undefined): boolean {
+  return !status || status === 'Awaiting Recheck' || status === 'Closed';
+}
+
 /** BR-005. The only four outcomes the solution may record. */
 export const OUTCOMES = [
   'Pass',
@@ -106,11 +114,6 @@ export const OUTCOMES = [
 ] as const;
 
 export type Outcome = (typeof OUTCOMES)[number];
-
-/** BR-006: every non-pass outcome requires remediation. */
-export function requiresRemediation(outcome: Outcome): boolean {
-  return outcome !== 'Pass';
-}
 
 /** BR-004. Tax always precedes AQS when both are required. */
 export const REVIEW_ROUTES = ['Tax only', 'AQS only', 'Tax then AQS'] as const;
@@ -134,87 +137,3 @@ export type ReviewType = (typeof REVIEW_TYPES)[number];
  * show the action's owner (the adviser). Renaming those would be a lie rather than a fix.
  */
 export const UPLOADED_BY_LABEL = 'Uploaded by';
-
-/** AD-020, AD-031. The elevated role that owns outcome corrections. */
-export const OUTCOME_CORRECTION_ROLE = 'T&C Manager' as const;
-
-/** AD-031. Platform-level escalation roles that may also perform a correction. */
-export const OUTCOME_CORRECTION_ESCALATION_ROLES = [
-  'Outcome Testing Manager',
-  'Administrator',
-] as const;
-
-/** AD-031. Only the owning role or a platform escalation may correct an outcome. */
-export function canCorrectOutcome(role: string): boolean {
-  return (
-    role === OUTCOME_CORRECTION_ROLE ||
-    (OUTCOME_CORRECTION_ESCALATION_ROLES as readonly string[]).includes(role)
-  );
-}
-
-/** BR-012, NFR-AUD-01, AD-031. A correction is rejected without a reason. */
-export function isValidCorrectionReason(reason: string): boolean {
-  return reason.trim().length > 0;
-}
-
-/** FR-023, BR-008. The decision a T&C Manager records when validating remediation. */
-export const SIGNOFF_DECISIONS = ['Approved', 'Rejected'] as const;
-
-export type SignoffDecision = (typeof SIGNOFF_DECISIONS)[number];
-
-/**
- * The result of a client-side command guard. The authoritative check runs
- * server-side (AD-003); the guard stops an unauthorised or incomplete attempt
- * from ever being submitted and gives the UI a message to show.
- */
-export interface CommandGuardResult {
-  allowed: boolean;
-  reason?: string;
-}
-
-/**
- * OD-007, AD-031 command guard for RegradeCase, mirrored client-side. Only the
- * T&C Manager (or a platform escalation) may regrade, and every regrade needs a
- * mandatory reason. The initial outcome is preserved as a new record (BR-007).
- */
-export function guardRegradeCase(input: { role: string; reason: string }): CommandGuardResult {
-  if (!canCorrectOutcome(input.role)) {
-    return {
-      allowed: false,
-      reason: `Only ${OUTCOME_CORRECTION_ROLE} or a platform escalation may regrade a case.`,
-    };
-  }
-  if (!isValidCorrectionReason(input.reason)) {
-    return {
-      allowed: false,
-      reason: 'A regrade requires a mandatory reason for the audit event.',
-    };
-  }
-  return { allowed: true };
-}
-
-/**
- * BR-008, FR-023, AD-020 command guard for SignOffRemediation, mirrored
- * client-side. The T&C Manager validates Insufficient evidence and Potential
- * harm; a rejected sign-off must carry notes so the remediation returns with a
- * reason.
- */
-export function guardSignOffRemediation(input: {
-  role: string;
-  decision: SignoffDecision;
-  notes: string;
-}): CommandGuardResult {
-  if (!canCorrectOutcome(input.role)) {
-    return {
-      allowed: false,
-      reason: `Only ${OUTCOME_CORRECTION_ROLE} or a platform escalation may sign off remediation.`,
-    };
-  }
-  if (input.decision === 'Rejected' && input.notes.trim().length === 0) {
-    return {
-      allowed: false,
-      reason: 'A rejected sign-off must record notes explaining the return.',
-    };
-  }
-  return { allowed: true };
-}

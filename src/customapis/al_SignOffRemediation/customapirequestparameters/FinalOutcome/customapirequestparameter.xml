@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="FinalOutcome">
+  <description default="Optional. The final grade the supervisor records as they approve: 120910710 Pass, 120910711 Pass with issues, 120910712 Insufficient evidence, 120910713 Potential harm. Approvals only, and Notes must say why. Omit or 0 to leave the grade for a separate regrade.">
+    <label description="Optional. The final grade the supervisor records as they approve: 120910710 Pass, 120910711 Pass with issues, 120910712 Insufficient evidence, 120910713 Potential harm. Approvals only, and Notes must say why. Omit or 0 to leave the grade for a separate regrade." languagecode="1033" />
+  </description>
+  <displayname default="Final outcome">
+    <label description="Final outcome" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>FinalOutcome</name>
+  <type>7</type>
+</customapirequestparameter>

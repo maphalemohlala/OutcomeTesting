@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.ServiceModel;
 using System.Text;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -61,7 +62,7 @@ namespace OutcomeTesting.Plugins
             "TaskID already exists in Dataverse - skipped to avoid a duplicate case.";
 
         private const string RejectedReason =
-            "Dataverse rejected this case. Check the values and try again.";
+            "Dataverse rejected this case without a reason that can be shown here; an administrator can find it in the plug-in trace log.";
 
         public ImportCasesPlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(ImportCasesPlugin))
@@ -142,11 +143,22 @@ namespace OutcomeTesting.Plugins
             // was up to 1000 round trips inside the two-minute plug-in budget.
             var findRoute = BuildRouteResolver(systemService);
 
+            // The same for the two contact checks below: one query per address per import,
+            // not two per row, since a file names the same few advisers and para-planners.
+            var matchParaplanner = CasePeople.CachedMatcher(systemService, "para-planner");
+            var matchAdviser = CasePeople.CachedMatcher(systemService, "adviser");
+
             var imported = 0;
             var duplicates = 0;
             var failed = 0;
             var report = new List<string>();
+            var invalid = new List<ImportRules.ImportRowError>(parsed.Invalid);
+            var ready = new List<KeyValuePair<ImportRules.ImportRow, Entity>>();
 
+            // Pass 1 (project owner, 2026-11-17): everything that can be known before writing
+            // is checked here, so a refused row is reported as invalid and every other row
+            // still imports. Inside this synchronous plug-in a fault from a write aborts the
+            // platform transaction, so finding a bad row by failing to write it cannot work.
             foreach (var row in parsed.Valid)
             {
                 if (existingReferences.Contains(row.Reference))
@@ -174,76 +186,82 @@ namespace OutcomeTesting.Plugins
                 // al_duedate left the editable set, by anyone editing the case afterwards.
                 record["al_duedate"] = ImportRules.DueDateFor(uploadedAt);
 
+                // A route that is not configured is a refusal raised here, not a service
+                // fault, so it can be caught and the row reported. CreateRoutedCase derives
+                // the route again below from the resolver's cache, at no extra query.
                 try
                 {
-                    var result = CreateRoutedCase(userService, findRoute, record);
-                    imported++;
-
-                    // Two rows in the same file naming the same reference are already caught
-                    // in the parse; this covers the reference becoming taken mid-import.
-                    existingReferences.Add(row.Reference);
-
-                    if (!result.Queued && result.QueueError != null)
+                    UpdateCaseDetailsPlugin.DeriveRoute(new Entity(CaseEntity), record, new List<string>(), findRoute);
+                }
+                catch (InvalidPluginExecutionException refusal)
+                {
+                    invalid.Add(new ImportRules.ImportRowError
                     {
-                        // Important 2: the case exists - only the automatic queue hop failed
-                        // (a privilege refusal or an AD-057 refusal). That is not a row
-                        // failure, so it is reported, not written as an al_importexception.
-                        report.Add(ReportRow(row.RowNumber, row.Reference, "Imported (not queued)", result.QueueError, row.Raw));
-                    }
+                        RowNumber = row.RowNumber,
+                        Reference = row.Reference,
+                        Reason = RowFailureReason(refusal),
+                        Raw = row.Raw,
+                    });
+                    continue;
+                }
 
-                    // Both emails are now required on the row (Task 3); this reports one that
-                    // no active contact holds, or that two hold, on the day of the upload.
-                    //
-                    // Reported, never fatal: the case is real and the check must still happen.
-                    // Refusing the row would throw away work over a contact record that can be
-                    // fixed afterwards, and the row is not dropped silently either - it is
-                    // named in the report with the reason and the value that failed.
-                    //
-                    // Read as the system user: the person running the import is not guaranteed
-                    // read on Contact, and a diagnostic must not fail for want of a privilege.
-                    var paraplanner = NotificationOutbox.MatchParaplanner(
-                        systemService,
-                        record.GetAttributeValue<string>(ImportRules.ParaplannerEmailAttribute));
-                    if (!paraplanner.IsMatch)
-                    {
-                        report.Add(ReportRow(
-                            row.RowNumber, row.Reference, "Imported (para-planner unmatched)",
-                            paraplanner.Reason, row.Raw));
-                    }
+                // Both emails are now required on the row (Task 3); this reports one that
+                // no active contact holds, or that two hold, on the day of the upload.
+                //
+                // Reported, never fatal: the case is real and the check must still happen.
+                // Refusing the row would throw away work over a contact record that can be
+                // fixed afterwards, and the row is not dropped silently either - it is
+                // named in the report with the reason and the value that failed.
+                //
+                // Read as the system user: the person running the import is not guaranteed
+                // read on Contact, and a diagnostic must not fail for want of a privilege.
+                var paraplanner = matchParaplanner(
+                    record.GetAttributeValue<string>(ImportRules.ParaplannerEmailAttribute));
+                if (!paraplanner.IsMatch)
+                {
+                    report.Add(ReportRow(
+                        row.RowNumber, row.Reference, "Imported (para-planner unmatched)",
+                        paraplanner.Reason, row.Raw));
+                }
 
-                    // The adviser, on the same terms (project owner, 2026-09-20). Reported
-                    // rather than fatal for the reason above, and it is a WEAKER statement
-                    // than the para-planner's: an adviser letter is still sent to the stored
-                    // address when no contact holds it, because losing a letter is worse than
-                    // sending one to an address the directory does not happen to carry. What
-                    // this line buys is knowing on the day that the adviser on this case is
-                    // nobody the system can point at.
-                    var adviser = NotificationOutbox.MatchAdviser(
-                        systemService, record.GetAttributeValue<string>("al_adviseremail"));
-                    if (!adviser.IsMatch)
-                    {
-                        report.Add(ReportRow(
-                            row.RowNumber, row.Reference, "Imported (adviser unmatched)",
-                            adviser.Reason, row.Raw));
-                    }
+                // The adviser, on the same terms (project owner, 2026-09-20). Reported
+                // rather than fatal for the reason above, and it is a WEAKER statement
+                // than the para-planner's: an adviser letter is still sent to the stored
+                // address when no contact holds it, because losing a letter is worse than
+                // sending one to an address the directory does not happen to carry. What
+                // this line buys is knowing on the day that the adviser on this case is
+                // nobody the system can point at.
+                var adviser = matchAdviser(record.GetAttributeValue<string>("al_adviseremail"));
+                if (!adviser.IsMatch)
+                {
+                    report.Add(ReportRow(
+                        row.RowNumber, row.Reference, "Imported (adviser unmatched)",
+                        adviser.Reason, row.Raw));
+                }
+
+                ready.Add(new KeyValuePair<ImportRules.ImportRow, Entity>(row, record));
+            }
+
+            // Pass 2: the writes. A fault here has already doomed the platform transaction, so
+            // it is not swallowed into a count the platform would then throw away: the whole
+            // file fails with one sentence naming the row (project owner, 2026-11-17).
+            foreach (var item in ready)
+            {
+                try
+                {
+                    CreateRoutedCase(userService, findRoute, item.Value);
                 }
                 catch (Exception error)
                 {
-                    failed++;
-
-                    // A guard plug-in refusing the row has already written a message meant
-                    // for a person, so keep it; anything else is technical detail that goes
-                    // to the trace log and never to the screen (NFR-OBS-01).
-                    var reason = RowFailureReason(error);
-                    localPluginContext.Trace("Row " + row.RowNumber + " rejected: " + error.Message);
-
-                    report.Add(ReportRow(row.RowNumber, row.Reference, "Failed", reason, row.Raw));
-                    RecordException(systemService, batchId, batchCode, row.RowNumber, row.Reference,
-                        reason, row.Raw, ExceptionStatusOpen);
+                    localPluginContext.Trace("Row " + item.Key.RowNumber + " could not be saved: " + error);
+                    throw new InvalidPluginExecutionException(
+                        WholeFileFailure(item.Key.RowNumber, item.Key.Reference, error), error);
                 }
+
+                imported++;
             }
 
-            foreach (var bad in parsed.Invalid)
+            foreach (var bad in invalid)
             {
                 failed++;
                 report.Add(ReportRow(bad.RowNumber, bad.Reference, "Invalid", bad.Reason, bad.Raw));
@@ -283,14 +301,11 @@ namespace OutcomeTesting.Plugins
         /// name="changes"/> is not kept: the import's audit event is batch-level, not a
         /// per-case history line the way the case-edit command's is.
         ///
-        /// Inside the caller's per-row try: a missing route configuration surfaces as that
-        /// row failing with the precondition message DeriveRoute already writes, not as a
-        /// case created in a state the queue will never offer. The queue hop itself (AD-093,
-        /// after the create) is different (Important 2): it runs inside its own try/catch
-        /// here, because by the time it can fail the case already exists. A refusal there -
-        /// privilege or AD-057 - does not throw out of this method; it comes back on the
-        /// result so the caller counts the row imported rather than failed, and does not
-        /// write an al_importexception for a case that is live.
+        /// A missing route configuration throws DeriveRoute's precondition before anything is
+        /// written; the import finds that in its first pass and reports the row. A fault from
+        /// the create or the queue hop is not caught here (project owner, 2026-11-17): inside
+        /// the import's transaction it has already aborted the whole file, so the caller
+        /// fails the file rather than counting a case the platform will roll back.
         /// </summary>
         public static RoutedCaseResult CreateRoutedCase(IOrganizationService userService, Func<string, Guid?> findRoute, Entity record)
         {
@@ -319,21 +334,14 @@ namespace OutcomeTesting.Plugins
             // status.
             var status = record.GetAttributeValue<OptionSetValue>("al_casestatus");
 
-            try
-            {
-                var queued = CaseQueueing.QueueIfRouted(
-                    userService,
-                    caseId,
-                    status != null ? status.Value : (int?)null,
-                    record.Contains("al_reviewrouteid"),
-                    changes);
+            var queued = CaseQueueing.QueueIfRouted(
+                userService,
+                caseId,
+                status != null ? status.Value : (int?)null,
+                record.Contains("al_reviewrouteid"),
+                changes);
 
-                return new RoutedCaseResult(caseId, queued, null);
-            }
-            catch (Exception error)
-            {
-                return new RoutedCaseResult(caseId, false, error.Message);
-            }
+            return new RoutedCaseResult(caseId, queued);
         }
 
         /// <summary>
@@ -360,27 +368,20 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// What <see cref="CreateRoutedCase"/> produced: the case's id always, and whether the
-        /// post-create queue hop moved it. AD-093's hop runs after the case exists, so a
-        /// failure there (Important 2) must not be mistaken for the row itself having failed -
-        /// the case is live either way. <see cref="QueueError"/> carries the failure's message
-        /// when the hop did not run to completion, and is null when it either queued the case
-        /// or had nothing to do.
+        /// What <see cref="CreateRoutedCase"/> produced: the case's id, and whether the
+        /// post-create queue hop moved it (false when the case had no route to queue on).
         /// </summary>
         public struct RoutedCaseResult
         {
-            public RoutedCaseResult(Guid caseId, bool queued, string queueError)
+            public RoutedCaseResult(Guid caseId, bool queued)
             {
                 CaseId = caseId;
                 Queued = queued;
-                QueueError = queueError;
             }
 
             public Guid CaseId { get; }
 
             public bool Queued { get; }
-
-            public string QueueError { get; }
         }
 
         /// <summary>
@@ -502,32 +503,45 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string RowFailureReason(Exception error)
         {
-            var refusal = error as InvalidPluginExecutionException;
-            if (refusal == null || string.IsNullOrWhiteSpace(refusal.Message))
+            // A guard on the case's create reaches this plug-in as a platform fault carrying
+            // the guard's prefixed sentence, not as the guard's own exception type.
+            var message = error == null ? null : error.Message;
+            if (!(error is InvalidPluginExecutionException || error is FaultException<OrganizationServiceFault>)
+                || string.IsNullOrWhiteSpace(message)
+                || message.IndexOf("UNEXPECTED:", StringComparison.Ordinal) >= 0)
             {
                 return RejectedReason;
             }
 
-            var message = refusal.Message;
-            var prefixes = new[]
+            var refusal = CommandHelpers.RefusalWithin(message);
+            if (refusal != null)
             {
-                CommandHelpers.ValidationPrefix,
-                CommandHelpers.PreconditionPrefix,
-                CommandHelpers.UnauthorizedPrefix,
-                CommandHelpers.NotFoundPrefix,
-                CommandHelpers.ConflictPrefix,
-            };
-
-            foreach (var prefix in prefixes)
-            {
-                var at = message.IndexOf(prefix, StringComparison.Ordinal);
-                if (at >= 0)
-                {
-                    return message.Substring(at + prefix.Length).Trim();
-                }
+                return refusal.Substring(refusal.IndexOf(": ", StringComparison.Ordinal) + 2).Trim();
             }
 
-            return message;
+            if (CommandHelpers.IsPrivilegeDenied(message))
+            {
+                return CommandHelpers.PrivilegeDeniedMessage.Substring(CommandHelpers.UnauthorizedPrefix.Length);
+            }
+
+            return error is InvalidPluginExecutionException ? message : RejectedReason;
+        }
+
+        /// <summary>
+        /// The one sentence a failed write sends back for the whole file (project owner,
+        /// 2026-11-17). Double quotes and backslashes are swapped out because the app cuts a
+        /// refusal at the first of either, which would end the sentence mid-reason.
+        /// </summary>
+        public static string WholeFileFailure(int rowNumber, string reference, Exception error)
+        {
+            var reason = RowFailureReason(error).Trim();
+            var sentence = "Row " + rowNumber.ToString(CultureInfo.InvariantCulture) + " (TaskID " + reference
+                + ") could not be saved, so nothing from this file was imported: " + reason
+                + (reason.EndsWith(".", StringComparison.Ordinal) ? string.Empty : ".")
+                + " Fix that row and upload the file again.";
+
+            return CommandHelpers.ValidationPrefix + sentence
+                .Replace('"', '\'').Replace('\\', '/').Replace('\r', ' ').Replace('\n', ' ');
         }
 
         /// <summary>

@@ -55,6 +55,8 @@ namespace OutcomeTesting.Plugins.Tests
             var service = Ready(out var oldAdviser, out _, out var actionId);
 
             var provider = new FakeServiceProvider(service);
+            // The portal writes request columns as its application user.
+            service.Seed("systemuser", provider.Context.InitiatingUserId, "applicationid", Guid.NewGuid());
             provider.Context.MessageName = "Update";
             provider.Context.PrimaryEntityName = "contact";
             provider.Context.PrimaryEntityId = Checker;
@@ -85,6 +87,8 @@ namespace OutcomeTesting.Plugins.Tests
             var service = Ready(out var oldAdviser, out _, out var actionId);
 
             var provider = new FakeServiceProvider(service);
+            // The portal writes request columns as its application user.
+            service.Seed("systemuser", provider.Context.InitiatingUserId, "applicationid", Guid.NewGuid());
             provider.Context.MessageName = "Update";
             provider.Context.PrimaryEntityName = "contact";
             provider.Context.PrimaryEntityId = Checker;

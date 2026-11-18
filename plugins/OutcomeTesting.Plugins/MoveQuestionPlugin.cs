@@ -1,4 +1,6 @@
 using System;
+using System.Globalization;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -38,7 +40,7 @@ namespace OutcomeTesting.Plugins
         private const string SectionEntity = "al_section";
         private const string QuestionEntity = "al_question";
         private const string VersionEntity = "al_questionversion";
-        private const int CommandMoveQuestion = 120910795;
+        private const int CommandMoveQuestion = ChecklistQueries.CommandMoveQuestion;
 
         public MoveQuestionPlugin(string unsecureConfiguration, string secureConfiguration)
             : base(typeof(MoveQuestionPlugin))
@@ -91,40 +93,58 @@ namespace OutcomeTesting.Plugins
                 throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + refusal);
             }
 
+            var today = DateTime.UtcNow.Date;
+            var effectiveFrom = AddQuestionPlugin.ParseEffectiveFrom(effectiveFromArg, today);
+
+            // Checked on the day the question arrives, not today: a section starting that day
+            // is a fit home, and one retiring before it would receive a question nobody sees.
             var target = userService.Retrieve(
                 SectionEntity, targetSectionId,
                 new ColumnSet("al_effectivefrom", "al_effectiveto", "al_name"));
             if (!SectionRules.IsSectionEffective(
                 target.GetAttributeValue<DateTime?>("al_effectivefrom"),
                 target.GetAttributeValue<DateTime?>("al_effectiveto"),
-                DateTime.UtcNow))
+                effectiveFrom))
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix +
-                    "The target section is no longer part of the checklist.");
+                    "The target section is not part of the checklist on "
+                    + effectiveFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    + ", the day the move would take effect.");
+            }
+
+            var tooLong = AuditNameRefusal(questionCode, newCode);
+            if (tooLong != null)
+            {
+                throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + tooLong);
             }
 
             ChecklistQueries.EnsureQuestionCodeIsFree(userService, newCode);
-
-            var today = DateTime.UtcNow.Date;
-            var effectiveFrom = AddQuestionPlugin.ParseEffectiveFrom(effectiveFromArg, today);
 
             // Retire where it was. The version stays Active so its answers keep resolving.
             // One read carries everything the new version copies forward.
             var current = ChecklistQueries.CurrentVersionOf(
                 userService, questionId,
-                "al_versionnumber", "al_effectiveto", "al_questiontext", "al_responsetype", "al_ismandatory", "al_displayorder");
+                "al_versionnumber", "al_effectivefrom", "al_effectiveto", "al_questiontext", "al_responsetype", "al_ismandatory", "al_displayorder");
             if (current == null)
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix + "That question has no version to move.");
             }
 
-            var retiredRefusal = RetiredRefusal(current.GetAttributeValue<DateTime?>("al_effectiveto"), today);
+            // The move first: a pending move also dates the version out, and the retire-date
+            // refusal would send the administrator to a move date that is refused as well.
+            var retiredRefusal = ChecklistQueries.MovedRefusal(systemService, questionCode, "moved again")
+                ?? ChecklistQueries.ScheduledVersionRefusal(current, effectiveFrom)
+                ?? NotStartedRefusal(current.GetAttributeValue<DateTime?>("al_effectivefrom"), effectiveFrom)
+                ?? RetiredRefusal(current.GetAttributeValue<DateTime?>("al_effectiveto"), today, effectiveFrom);
             if (retiredRefusal != null)
             {
                 throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + retiredRefusal);
             }
+
+            // Read before the update below dates the current version out.
+            var carriedEnd = ChecklistQueries.CarriedEnd(current, effectiveFrom);
 
             // Dated out on the day the new version starts, not today. A move announced ahead
             // of time used to leave the question asked in neither section until that day: the
@@ -157,7 +177,6 @@ namespace OutcomeTesting.Plugins
                 ["statuscode"] = new OptionSetValue(1),
             };
 
-            var carriedEnd = ChecklistQueries.CarriedEnd(current, effectiveFrom);
             if (carriedEnd.HasValue)
             {
                 newVersion["al_effectiveto"] = carriedEnd.Value;
@@ -173,10 +192,21 @@ namespace OutcomeTesting.Plugins
 
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandMoveQuestion,
-                "MoveQuestion " + questionCode + " -> " + newCode,
+                ChecklistQueries.MoveAuditName(questionCode, newCode),
                 QuestionEntity, newQuestionId,
                 reason + " (moved to " + target.GetAttributeValue<string>("al_name") + ")",
                 newVersionId.ToString("D"), idempotencyKey, context);
+
+            // Open reviews keep the answer they already gave to the version dated out here. As
+            // SYSTEM (CreateOrganizationService(null)): PluginUserService is the calling
+            // administrator, who is not the checker, may read only their own answers, and would
+            // own every carried row. A move dated forward is carried at the review's next save
+            // or submit instead.
+            if (effectiveFrom <= today)
+            {
+                AnswerWriter.CarryMovedAnswers(
+                    localPluginContext.OrgSvcFactory.CreateOrganizationService(null), current.Id, newQuestionId);
+            }
 
             SetResponse(
                 context, current.Id.ToString("D"), newQuestionId.ToString("D"),
@@ -206,6 +236,46 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
+        /// Why a question not yet started cannot move before its start, or null when it has
+        /// started by then. Its version would end before it began, so the question it replaces
+        /// (a move's source, still asked until that start) and the moved copy would both be asked.
+        /// </summary>
+        public static string NotStartedRefusal(DateTime? currentEffectiveFrom, DateTime effectiveFrom)
+        {
+            if (!currentEffectiveFrom.HasValue || currentEffectiveFrom.Value.Date <= effectiveFrom.Date)
+            {
+                return null;
+            }
+
+            var on = currentEffectiveFrom.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return "That question does not start until " + on + ", so it cannot be moved before then. Date the move on or after " + on + ".";
+        }
+
+        /// <summary>
+        /// Why the move's audit name would not fit al_name, or null when it does. That name is
+        /// the only link from the old code to the new one, so it is refused rather than cut short.
+        /// </summary>
+        public static string AuditNameRefusal(string fromCode, string toCode)
+        {
+            // New codes are refused a space where they are made; an old code could still have
+            // one from before that rule, and the name would not read back as a move.
+            if (string.IsNullOrWhiteSpace(fromCode) || fromCode.Any(char.IsWhiteSpace))
+            {
+                return "The question's code is blank or contains a space, so a move could not be traced from it. Add it to the target section as a new question instead.";
+            }
+
+            if (ChecklistQueries.MoveAuditName(fromCode, toCode).Length <= ChecklistQueries.AuditNameMaxLength)
+            {
+                return null;
+            }
+
+            var room = ChecklistQueries.AuditNameMaxLength - ChecklistQueries.MoveAuditName(fromCode, string.Empty).Length;
+            return room > 0
+                ? "The new question code is too long. Alongside the old code " + fromCode + " it can be at most " + room + " characters."
+                : "The question's code is too long for a move to be recorded. Add it to the target section as a new question instead.";
+        }
+
+        /// <summary>
         /// Why a question already out of force cannot move, or null while it is live or
         /// dated out only in the future. Moving a retired question would date its version
         /// out again - later than it was - and so bring it back into force for the gap,
@@ -213,12 +283,29 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string RetiredRefusal(DateTime? currentEffectiveTo, DateTime today)
         {
-            if (currentEffectiveTo.HasValue && currentEffectiveTo.Value.Date <= today.Date)
+            return RetiredRefusal(currentEffectiveTo, today, today);
+        }
+
+        /// <summary>
+        /// As above, read against the day the move takes effect: a retirement planned for
+        /// before that day would otherwise be pushed back to it, so the question would be
+        /// asked for days it was due to be gone.
+        /// </summary>
+        public static string RetiredRefusal(DateTime? currentEffectiveTo, DateTime today, DateTime effectiveFrom)
+        {
+            if (!currentEffectiveTo.HasValue || currentEffectiveTo.Value.Date > effectiveFrom.Date)
+            {
+                return null;
+            }
+
+            if (currentEffectiveTo.Value.Date <= today.Date)
             {
                 return "That question is already retired, so it cannot be moved. Add it to the target section as a new question instead.";
             }
 
-            return null;
+            var on = currentEffectiveTo.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return "That question is due to retire on " + on + ", before the move would take effect, so it cannot be moved then. Date the move before "
+                + on + ", or add it to the target section as a new question instead.";
         }
 
         private static void SetResponse(

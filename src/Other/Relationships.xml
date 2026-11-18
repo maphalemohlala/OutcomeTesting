@@ -1,5 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <EntityRelationships xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <EntityRelationship Name="account_al_aqsqueueaccountid_al_outcomecase" />
   <EntityRelationship Name="al_checklist_checklistversion" />
   <EntityRelationship Name="al_checklistversion_reviewinstance" />
   <EntityRelationship Name="al_checklistversion_section" />
@@ -12,6 +13,7 @@
   <EntityRelationship Name="al_listoption_al_outcomecase_products" />
   <EntityRelationship Name="al_listoption_al_outcomecase_producttype" />
   <EntityRelationship Name="al_listoption_al_outcomecase_samplesource" />
+  <EntityRelationship Name="al_listoption_al_outcomecase_vulnerableclient" />
   <EntityRelationship Name="al_outcomecase_caseassignment" />
   <EntityRelationship Name="al_outcomecase_exportrecord" />
   <EntityRelationship Name="al_outcomecase_outcome" />
@@ -22,6 +24,7 @@
   <EntityRelationship Name="al_question_questionversion" />
   <EntityRelationship Name="al_questionversion_response" />
   <EntityRelationship Name="al_remediationaction_signoff" />
+  <EntityRelationship Name="al_reviewinstance_al_reviewinstanceid_al_caseassignment" />
   <EntityRelationship Name="al_reviewinstance_outcome" />
   <EntityRelationship Name="al_reviewinstance_remediationaction" />
   <EntityRelationship Name="al_reviewinstance_response" />
@@ -44,12 +47,16 @@
   <EntityRelationship Name="business_unit_al_role" />
   <EntityRelationship Name="business_unit_al_signoff" />
   <EntityRelationship Name="business_unit_al_userrolemapping" />
+  <EntityRelationship Name="contact_al_advisercontactid_al_outcomecase" />
   <EntityRelationship Name="contact_al_aqaccountablecontactid_al_outcome" />
+  <EntityRelationship Name="contact_al_aqscheckercontactid_al_outcomecase" />
   <EntityRelationship Name="contact_al_caseassignment" />
   <EntityRelationship Name="contact_al_fqaccountablecontactid_al_outcome" />
   <EntityRelationship Name="contact_al_recipientcontactid_al_notificationtemplate" />
   <EntityRelationship Name="contact_al_remediationaction" />
   <EntityRelationship Name="contact_al_reviewinstance" />
+  <EntityRelationship Name="contact_al_taxcheckercontactid_al_outcomecase" />
+  <EntityRelationship Name="contact_al_tcsupervisorcontactid_al_outcomecase" />
   <EntityRelationship Name="lk_al_advisermapping_createdby" />
   <EntityRelationship Name="lk_al_advisermapping_modifiedby" />
   <EntityRelationship Name="lk_al_auditevent_createdby" />

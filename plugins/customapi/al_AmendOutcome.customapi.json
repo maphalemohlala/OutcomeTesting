@@ -1,0 +1,81 @@
+{
+  "$comment": "Contract for the AmendOutcome server-side command (requirements log row 39). Deployed via the registration console (plugins/OutcomeTesting.Registration). Custom API parameter Type codes: 10=String.",
+  "customApi": {
+    "uniquename": "al_AmendOutcome",
+    "name": "al_AmendOutcome",
+    "displayname": "Amend Outcome",
+    "description": "Amends the File grade and/or the Advice grade a check first gave a case, at any stage, with a reason. The case does not move. Needs the case.amendoutcome capability; writes an Audit Event naming the grades before and after.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.AmendOutcomePlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "TargetId",
+      "name": "TargetId",
+      "displayname": "Target id",
+      "description": "Id of the al_outcomecase whose grades are amended.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "Reason",
+      "name": "Reason",
+      "displayname": "Reason",
+      "description": "Why the grades are amended; kept on the audit event.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay returns the same result.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "FileGrade",
+      "name": "FileGrade",
+      "displayname": "File grade",
+      "description": "New File grade: Pass or Fail. Empty leaves it as it is.",
+      "type": 10,
+      "isoptional": true
+    },
+    {
+      "uniquename": "AdviceGrade",
+      "name": "AdviceGrade",
+      "displayname": "Advice grade",
+      "description": "New Advice grade: Pass, Pass with issues, Insufficient evidence or Potential harm. Empty leaves it as it is.",
+      "type": 10,
+      "isoptional": true
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "Status",
+      "name": "Status",
+      "displayname": "Status",
+      "description": "Result status.",
+      "type": 10
+    },
+    {
+      "uniquename": "Summary",
+      "name": "Summary",
+      "displayname": "Summary",
+      "description": "The grades before and after, as written to the audit event.",
+      "type": 10
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written for this command.",
+      "type": 10
+    }
+  ]
+}

@@ -38,6 +38,7 @@ namespace OutcomeTesting.Plugins
         private const string CaseReferenceAttr = "al_casereference";
         private const string ReviewLookup = "al_reviewinstanceid";
         private const string FinalOutcomeAttr = "al_finaloutcome";
+        private const string AssignedContactAttr = "al_assignedcontactid";
 
         private const int StatusInProgress = Remediation.StatusInProgress;
         public const int DecisionApprovedValue = 120910720;
@@ -102,7 +103,8 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            Progress(localPluginContext.PluginUserService, context, signoff);
+            Progress(localPluginContext.PluginUserService, context, signoff,
+                localPluginContext.OrgSvcFactory.CreateOrganizationService(null));
         }
 
         /// <summary>
@@ -115,7 +117,8 @@ namespace OutcomeTesting.Plugins
         /// a test of its own.
         /// </summary>
         public static void Progress(
-            IOrganizationService service, IPluginExecutionContext context, Entity signoff)
+            IOrganizationService service, IPluginExecutionContext context, Entity signoff,
+            IOrganizationService systemService = null)
         {
 
             var decision = signoff.GetAttributeValue<OptionSetValue>(DecisionAttr);
@@ -159,7 +162,7 @@ namespace OutcomeTesting.Plugins
                 // (2026-10-08). The replay guard above means one rejection keeps it once.
                 var judged = service.Retrieve(ActionEntity, actionRef.Id, new ColumnSet(
                     "al_adviserresponse", "al_completedon", RemedialActions.ActionPerformedAttr,
-                    RemedialActions.ResponseHistoryAttr));
+                    RemedialActions.ResponseHistoryAttr, AssignedContactAttr));
                 var performed = judged.GetAttributeValue<OptionSetValue>(RemedialActions.ActionPerformedAttr);
                 var history = judged.GetAttributeValue<string>(RemedialActions.ResponseHistoryAttr);
                 var kept = RemedialActions.WithEarlierResponse(
@@ -172,14 +175,34 @@ namespace OutcomeTesting.Plugins
                     reopened[RemedialActions.ResponseHistoryAttr] = kept;
                 }
 
+                // Back to whoever the case's adviser email names now (AD-228). The email may
+                // have changed while the action was Completed, and an adviser email change
+                // moves only open actions, so the rework went to the adviser taken off the case.
+                // Only to a contact the email resolves to: where none does, the holder stays,
+                // rather than leaving the rework and its letter with nobody.
+                var adviser = caseId.HasValue
+                    ? Remediation.AdviserContact(service, new EntityReference(CaseEntity, caseId.Value))
+                    : null;
+                var holder = judged.GetAttributeValue<EntityReference>(AssignedContactAttr);
+                var reassigned = adviser != null && (holder == null || holder.Id != adviser.Id);
+                if (reassigned)
+                {
+                    reopened[AssignedContactAttr] = adviser;
+                }
+
                 service.Update(reopened);
+
+                if (reassigned)
+                {
+                    NotificationEmitterPlugin.QueueRemediationAssigned(service, context.CorrelationId, actionRef.Id);
+                }
             }
 
             var movedTheCase = false;
             if (caseId.HasValue)
             {
                 movedTheCase = MoveCase(service, caseId.Value, decision.Value, reviewId);
-                RecordFinalOutcome(service, context, signoff, caseId.Value, reviewId);
+                RecordFinalOutcome(service, systemService ?? service, context, signoff, caseId.Value, reviewId);
             }
 
             // One Audit Event per decision. A create raised by the al_SignOffRemediation
@@ -270,7 +293,7 @@ namespace OutcomeTesting.Plugins
         /// back unchanged. The reference is in no step's filtering attributes, so nothing else
         /// runs; a concurrent sign-off on the same case waits here until this one commits.
         /// </summary>
-        private static void LockCase(IOrganizationService service, Guid caseId)
+        public static void LockCase(IOrganizationService service, Guid caseId)
         {
             var current = service.Retrieve(CaseEntity, caseId, new ColumnSet(CaseReferenceAttr));
             service.Update(new Entity(CaseEntity, caseId)
@@ -417,15 +440,6 @@ namespace OutcomeTesting.Plugins
             }
 
             return CaseTransitions.CurrentStatus(service, caseId) == CaseLifecycle.AwaitingRecheck;
-        }
-
-        /// <summary>The notice's body. Public so its wording is pinned by a test.</summary>
-        public static string RecheckDueBody(string reference)
-        {
-            return "The remediation on case " + reference + " is approved and the case is now at "
-                + "Awaiting Recheck. It is waiting for you to record the final outcome, which is "
-                + "what closes it - until then it stays open and does not reach the export. "
-                + "Open the case's remediation page and use Record the final outcome.";
         }
 
         /// <summary>
@@ -773,6 +787,7 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         private static void RecordFinalOutcome(
             IOrganizationService service,
+            IOrganizationService systemService,
             IPluginExecutionContext context,
             Entity signoff,
             Guid caseId,
@@ -799,9 +814,13 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            // Written as SYSTEM: the sign-off guard and the command or portal request have already
+            // checked who may sign and that a grade rides only on an approval with notes. The
+            // outcome guard trusts SYSTEM and no longer takes the sign-off permission as leave to
+            // set a final grade directly.
             RegradeCasePlugin.Regrade(
-                service,
-                service,
+                systemService,
+                systemService,
                 outcomeId,
                 RegradeCasePlugin.FinalOutcomeLabel(finalOutcome.Value),
                 signoff.GetAttributeValue<string>(NotesAttr),

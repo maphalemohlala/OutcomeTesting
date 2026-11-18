@@ -111,8 +111,33 @@ namespace OutcomeTesting.Plugins
             if (!IsEmail(email))
             {
                 throw new InvalidPluginExecutionException(CommandHelpers.ValidationPrefix
-                    + "The " + who + "'s email \"" + email + "\" is not an email address.");
+                    + "The " + who + "'s email '" + email + "' is not an email address.");
             }
+        }
+
+        /// <summary>
+        /// <see cref="NotificationOutbox.MatchPerson"/> asked once per address for a whole
+        /// command - an import or an export batch - where the same few advisers and
+        /// para-planners recur on nearly every row. Keyed case-insensitively, as Dataverse
+        /// compares the email itself.
+        /// </summary>
+        public static System.Func<string, NotificationOutbox.PersonMatch> CachedMatcher(
+            IOrganizationService service, string role)
+        {
+            var cache = new System.Collections.Generic.Dictionary<string, NotificationOutbox.PersonMatch>(
+                System.StringComparer.OrdinalIgnoreCase);
+            return email =>
+            {
+                var key = Clean(email) ?? string.Empty;
+                NotificationOutbox.PersonMatch match;
+                if (!cache.TryGetValue(key, out match))
+                {
+                    match = NotificationOutbox.MatchPerson(service, email, role);
+                    cache[key] = match;
+                }
+
+                return match;
+            };
         }
     }
 }

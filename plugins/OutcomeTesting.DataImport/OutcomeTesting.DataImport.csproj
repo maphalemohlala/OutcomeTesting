@@ -31,14 +31,14 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.CrmSdk.XrmTooling.ConfigurationMigration.Wpf" Version="9.1.0.365" />
     <!-- CrmServiceClient's base types live here; without it the compiler cannot see them. -->
-    <PackageReference Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.*" />
+    <PackageReference Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.60" />
     <!--
       CrmServiceClient binds ADAL at runtime, not compile time, so leaving this out builds
       clean and then fails on the first connection with a FileNotFoundException. Pinned to
       the version the connector asks for by name.
     -->
     <PackageReference Include="Microsoft.IdentityModel.Clients.ActiveDirectory" Version="3.19.8" />
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.*" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="All" />
   </ItemGroup>
 
   <!-- ImportCrmDataHandler exposes a WPF Dispatcher property, so the host needs WindowsBase. -->

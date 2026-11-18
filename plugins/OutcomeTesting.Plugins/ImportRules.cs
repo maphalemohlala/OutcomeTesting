@@ -82,6 +82,20 @@ namespace OutcomeTesting.Plugins
             Choice,
         }
 
+        /// <summary>
+        /// The longest text each al_outcomecase column holds (src/Entities/al_OutcomeCase,
+        /// pinned by ImportAuditFixTests). Every imported text column is 100 except the two emails.
+        /// </summary>
+        public static int MaxTextLength(string attribute)
+        {
+            switch (attribute)
+            {
+                case "al_adviseremail": return 200;
+                case "al_paraplanneremail": return 320;
+                default: return 100;
+            }
+        }
+
         public sealed class ColumnDef
         {
             public ColumnDef(string header, string attribute, ColumnKind kind, IDictionary<int, string> choices)
@@ -429,10 +443,26 @@ namespace OutcomeTesting.Plugins
 
                 if (by.Length > 0 && string.IsNullOrEmpty(selection.CompletedBy))
                 {
+                    // Kept as al_checklistcompletedby; too long, it would fault the save of the whole file.
+                    if (by.Length > MaxTextLength("al_checklistcompletedby"))
+                    {
+                        selection.Error = "\"CompletedBy" + slot + "\" is longer than "
+                            + MaxTextLength("al_checklistcompletedby") + " characters.";
+                        return selection;
+                    }
+
                     selection.CompletedBy = by;
                 }
 
+                // A stamp that is there but cannot be read refuses the row, as every other date
+                // column does, rather than importing the case with no completion date.
                 var stamp = ParseDateTime(on);
+                if (on.Length > 0 && !stamp.HasValue)
+                {
+                    selection.Error = "\"CompletionDate" + slot + "\" is not a valid date: \"" + on + "\".";
+                    return selection;
+                }
+
                 if (stamp.HasValue && (!selection.CompletedOn.HasValue || stamp.Value < selection.CompletedOn.Value))
                 {
                     selection.CompletedOn = stamp.Value;
@@ -460,6 +490,7 @@ namespace OutcomeTesting.Plugins
             var row = new List<string>();
             var cell = new StringBuilder();
             var inQuotes = false;
+            var fieldStart = true;
             text = text ?? string.Empty;
 
             for (var i = 0; i < text.Length; i++)
@@ -487,14 +518,18 @@ namespace OutcomeTesting.Plugins
                     continue;
                 }
 
-                if (ch == Quote)
+                // RFC 4180: a quote opens a quoted field only as its first character; one
+                // inside an unquoted field (5" Ltd) is literal, or it swallows the rows after.
+                if (ch == Quote && fieldStart)
                 {
                     inQuotes = true;
+                    fieldStart = false;
                 }
                 else if (ch == Comma)
                 {
                     row.Add(cell.ToString());
                     cell.Length = 0;
+                    fieldStart = true;
                 }
                 else if (ch == NewLine)
                 {
@@ -502,10 +537,12 @@ namespace OutcomeTesting.Plugins
                     rows.Add(row);
                     row = new List<string>();
                     cell.Length = 0;
+                    fieldStart = true;
                 }
                 else if (ch != Return)
                 {
                     cell.Append(ch);
+                    fieldStart = false;
                 }
             }
 
@@ -561,7 +598,8 @@ namespace OutcomeTesting.Plugins
         }
 
         /// <summary>
-        /// Accepts dd/mm/yyyy (UK), yyyy-mm-dd, or any parseable date. UK order is tried
+        /// Accepts dd/mm/yyyy (UK, with or without a time), yyyy-mm-dd, or a written-out
+        /// date, and returns the calendar date alone. UK order is tried
         /// first and explicitly: an extract saying 03/09/2026 means 3 September, and letting
         /// a US-order parser read it as 9 March would import a wrong advice date silently.
         /// </summary>
@@ -573,16 +611,22 @@ namespace OutcomeTesting.Plugins
                 return null;
             }
 
+            // A UK date with a time ("18/08/2026 13:54", how the real extract writes stamps)
+            // imports as its UK date (project owner, 2026-11-17); the time is dropped.
             DateTime parsed;
-            var uk = new[] { "d/M/yyyy", "dd/MM/yyyy", "d/MM/yyyy", "dd/M/yyyy" };
+            var uk = new[] { "d/M/yyyy", "d/M/yyyy H:mm", "d/M/yyyy H:mm:ss", "d/M/yyyy h:mm tt", "d/M/yyyy h:mm:ss tt" };
             if (DateTime.TryParseExact(trimmed, uk, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
             {
                 return parsed.Date;
             }
 
+            // An ISO date keeps the date as written; what follows it must be a real time stamp
+            // (the workbook reader's "T13:54:00", optionally a zone), never arbitrary text.
             var isoHead = trimmed.Length > 10 ? trimmed.Substring(0, 10) : trimmed;
+            var isoTail = trimmed.Substring(isoHead.Length);
             var iso = new[] { "yyyy-MM-dd", "yyyy-M-d" };
-            if (DateTime.TryParseExact(isoHead, iso, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+            if (IsoTimeTail.IsMatch(isoTail)
+                && DateTime.TryParseExact(isoHead, iso, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
             {
                 return parsed.Date;
             }
@@ -597,8 +641,10 @@ namespace OutcomeTesting.Plugins
             // The DATE PART is what is judged, because a time attached to it used to carry
             // the whole value past this guard: the space and the colon made the test below
             // false, and the general parser underneath then read it month-first anyway
-            // (2026-09-20). A separator is required so a written-out "31 Jan 2026 10:00",
-            // which says outright which part is the month, is not caught by it.
+            // (2026-09-20). A UK date with a valid time has already been read above, so what
+            // reaches here is an impossible date or time. A separator is required so a
+            // written-out "31 Jan 2026 10:00", which says outright which part is the month,
+            // is not caught by it.
             var datePart = trimmed.Split(' ')[0];
             if (datePart.Length < trimmed.Length
                 && datePart.IndexOfAny(DateSeparators) >= 0
@@ -612,8 +658,10 @@ namespace OutcomeTesting.Plugins
                 return null;
             }
 
-            // Written-out forms are unambiguous, so "31 Jan 2026" still imports.
-            if (DateTime.TryParse(trimmed, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+            // Written-out forms are unambiguous, so "31 Jan 2026" still imports. A time
+            // alone ("13:54") carries no date; without NoCurrentDateDefault it read as today.
+            if (DateTime.TryParse(trimmed, CultureInfo.InvariantCulture, DateTimeStyles.NoCurrentDateDefault, out parsed)
+                && parsed.Date != DateTime.MinValue.Date)
             {
                 return parsed.Date;
             }
@@ -621,10 +669,14 @@ namespace OutcomeTesting.Plugins
             return null;
         }
 
-        /// <summary>True when the value is digits and date separators alone.</summary>
+        /// <summary>Empty, or a time after an ISO date: T or space, H:mm[:ss[.fff]], then Z or an offset.</summary>
+        private static readonly System.Text.RegularExpressions.Regex IsoTimeTail = new System.Text.RegularExpressions.Regex(
+            @"^(?:[T ](?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$");
+
         /// <summary>What separates the parts of a numeric date, in any order this accepts.</summary>
         private static readonly char[] DateSeparators = { '/', '-', '.' };
 
+        /// <summary>True when the value is digits and date separators alone.</summary>
         private static bool IsNumericDateForm(string value)
         {
             foreach (var ch in value)
@@ -684,6 +736,8 @@ namespace OutcomeTesting.Plugins
                 "d/M/yyyy H:mm:ss",
                 "d/M/yyyy HH:mm",
                 "d/M/yyyy HH:mm:ss",
+                "d/M/yyyy h:mm tt",
+                "d/M/yyyy h:mm:ss tt",
             };
             if (DateTime.TryParseExact(trimmed, uk, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
             {
@@ -708,7 +762,9 @@ namespace OutcomeTesting.Plugins
             // line would point every later rejection at the wrong row.
             var rows = new List<List<string>>();
             var lineNumbers = new List<int>();
-            var lines = Tokenise(csv);
+            // A spreadsheet's UTF-8 export starts with a byte-order mark, and Trim keeps it,
+            // so the first header would not read as "TaskID" and the file be refused.
+            var lines = Tokenise((csv ?? string.Empty).TrimStart('\uFEFF'));
             for (var i = 0; i < lines.Count; i++)
             {
                 foreach (var cell in lines[i])
@@ -773,6 +829,20 @@ namespace OutcomeTesting.Plugins
                     continue;
                 }
 
+                // Checked here, not left to the create: a value the column cannot hold faults the
+                // write, which fails the whole file with no word on which cell was too long.
+                if (reference.Length > MaxTextLength("al_casereference"))
+                {
+                    result.Invalid.Add(new ImportRowError
+                    {
+                        RowNumber = rowNumber,
+                        Reference = reference.Substring(0, MaxTextLength("al_casereference")),
+                        Reason = "\"TaskID\" is longer than " + MaxTextLength("al_casereference") + " characters.",
+                        Raw = raw,
+                    });
+                    continue;
+                }
+
                 // D2: one task is one case, so two tasks on one service case both import. It
                 // is a repeated TaskID that is the error.
                 if (seen.Contains(reference))
@@ -809,6 +879,12 @@ namespace OutcomeTesting.Plugins
 
                     if (column.Kind == ColumnKind.Text)
                     {
+                        if (value.Length > MaxTextLength(column.Attribute))
+                        {
+                            rowError = "\"" + column.Header + "\" is longer than " + MaxTextLength(column.Attribute) + " characters.";
+                            break;
+                        }
+
                         values[column.Attribute] = value;
                     }
                     else if (column.Kind == ColumnKind.Date)

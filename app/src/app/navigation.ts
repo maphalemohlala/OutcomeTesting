@@ -1,7 +1,7 @@
 import type { ResourceKey } from '../types/permissions';
 
 /** Navigation is grouped by operational task, not by table (09-Application-Screens). */
-export interface NavItem {
+interface NavItem {
   to: string;
   label: string;
   /** Page resource that gates visibility (AD-041). */

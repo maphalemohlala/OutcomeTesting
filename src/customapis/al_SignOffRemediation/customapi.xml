@@ -1,8 +1,8 @@
 <customapi uniquename="al_SignOffRemediation">
   <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
   <bindingtype>0</bindingtype>
-  <description default="T&amp;C Manager validates a completed remediation action (BR-008, FR-023). Records an Approved or Rejected sign-off; a Rejected sign-off requires notes and returns the action to the adviser. Enforces the transition guard, optimistic concurrency and idempotency, and writes an immutable Audit Event.">
-    <label description="T&amp;C Manager validates a completed remediation action (BR-008, FR-023). Records an Approved or Rejected sign-off; a Rejected sign-off requires notes and returns the action to the adviser. Enforces the transition guard, optimistic concurrency and idempotency, and writes an immutable Audit Event." languagecode="1033" />
+  <description default="T&amp;C Manager validates a completed remediation action. Records Approved or Rejected; a rejection needs notes and returns the action to the adviser. An approval may carry FinalOutcome, RecheckRequired and ChangesAdvice, recorded as the portal does; omitted, the case waits at Awaiting Recheck.">
+    <label description="T&amp;C Manager validates a completed remediation action. Records Approved or Rejected; a rejection needs notes and returns the action to the adviser. An approval may carry FinalOutcome, RecheckRequired and ChangesAdvice, recorded as the portal does; omitted, the case waits at Awaiting Recheck." languagecode="1033" />
   </description>
   <displayname default="Sign Off Remediation">
     <label description="Sign Off Remediation" languagecode="1033" />

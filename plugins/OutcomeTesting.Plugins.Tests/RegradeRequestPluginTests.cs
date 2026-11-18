@@ -314,7 +314,7 @@ namespace OutcomeTesting.Plugins.Tests
                     svc, ContactId, Request("Pass", "Evidence supplied on recheck."), Context()));
 
             Assert.Contains("Recording the final outcome is the T&C Manager mapped to its adviser", error.Message);
-            Assert.Contains("not the T&C Manager mapped to this case's adviser", error.Message);
+            Assert.Contains("not this case's T&C Manager", error.Message);
         }
 
         /// <summary>

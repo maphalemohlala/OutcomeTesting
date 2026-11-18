@@ -57,7 +57,16 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string BaseUrl(IOrganizationService service)
         {
-            return Normalise(FromVariable(service)) ?? Normalise(FromSiteRow(service));
+            string variable;
+            if (!EnvironmentVariable.TryRead(service, BaseUrlVariable, out variable))
+            {
+                // Could not be read, which is not the same as unset: the site row carries
+                // DEV's host on every imported environment, so a letter gets no link rather
+                // than a link into the wrong portal.
+                return null;
+            }
+
+            return Normalise(variable) ?? Normalise(FromSiteRow(service));
         }
 
         /// <summary>
@@ -88,15 +97,6 @@ namespace OutcomeTesting.Plugins
             return baseUrl == null
                 ? null
                 : baseUrl + "/remediation?case=" + caseId.ToString("D");
-        }
-
-        /// <summary>
-        /// The environment variable's current value, falling back to the default the
-        /// definition carries. Swallowed rather than thrown: see the remarks on the class.
-        /// </summary>
-        private static string FromVariable(IOrganizationService service)
-        {
-            return EnvironmentVariable.Read(service, BaseUrlVariable);
         }
 
         /// <summary>

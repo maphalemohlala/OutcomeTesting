@@ -583,11 +583,8 @@ namespace OutcomeTesting.Plugins
                         needed = headerHeight + RowHeight(table.Rows[header.Count], widths);
                     }
 
-                    if (y - needed < Margin && (drawnOnPage > 0 || current.Count > 0))
+                    void RepeatHeader()
                     {
-                        NewPage();
-                        drawnOnPage = 0;
-
                         if (!row.Header && header.Count > 0)
                         {
                             foreach (var repeat in header)
@@ -597,6 +594,44 @@ namespace OutcomeTesting.Plugins
                         }
                     }
 
+                    // The one exception to never splitting a row: a row taller than a whole
+                    // page would otherwise run off the foot of it, so its lines are carried
+                    // over a page at a time, the heading repeated above each part.
+                    var lineHeight = TableSize * LineGap;
+                    var fresh = pageHeight - (2 * Margin) - (row.Header ? 0 : headerHeight);
+                    if (height > fresh)
+                    {
+                        var total = (int)Math.Round((height - (2 * CellPad)) / lineHeight);
+                        var from = 0;
+                        var broke = false;
+                        while (from < total)
+                        {
+                            var room = (int)Math.Floor((y - Margin - (2 * CellPad)) / lineHeight);
+                            if (room < 1 && !broke)
+                            {
+                                NewPage();
+                                RepeatHeader();
+                                broke = true;
+                                continue;
+                            }
+
+                            broke = false;
+                            var take = Math.Min(Math.Max(room, 1), total - from);
+                            PlaceRow(row, widths, (2 * CellPad) + (take * lineHeight), table.Ruled, from, take);
+                            from += take;
+                        }
+
+                        drawnOnPage++;
+                        continue;
+                    }
+
+                    if (y - needed < Margin && (drawnOnPage > 0 || current.Count > 0))
+                    {
+                        NewPage();
+                        drawnOnPage = 0;
+                        RepeatHeader();
+                    }
+
                     PlaceRow(row, widths, height, table.Ruled);
                     drawnOnPage++;
                 }
@@ -604,7 +639,7 @@ namespace OutcomeTesting.Plugins
                 y -= BlockGap / 2;
             }
 
-            void PlaceRow(PdfTableRow row, double[] widths, double height, bool ruled)
+            void PlaceRow(PdfTableRow row, double[] widths, double height, bool ruled, int firstLine = 0, int lineCount = int.MaxValue)
             {
                 var top = y;
                 var column = 0;
@@ -644,9 +679,10 @@ namespace OutcomeTesting.Plugins
                     });
 
                     var lines = Flow(cell, width - (2 * CellPad));
-                    for (var l = 0; l < lines.Count; l++)
+                    var lastLine = (int)Math.Min(lines.Count, (long)firstLine + lineCount);
+                    for (var l = firstLine; l < lastLine; l++)
                     {
-                        var baseline = top - CellPad - (l * lineHeight) - (TableSize * 0.95);
+                        var baseline = top - CellPad - ((l - firstLine) * lineHeight) - (TableSize * 0.95);
                         var offset = cell.Centre
                             ? Math.Max(0, (width - (2 * CellPad) - lines[l].Width) / 2)
                             : 0;
@@ -1126,6 +1162,36 @@ namespace OutcomeTesting.Plugins
                 {
                     var word = words[w];
                     var wordWidth = Width(word, font, TableSize);
+
+                    // A word wider than the whole cell (a pasted link, say) is broken across
+                    // lines: kept whole, it would be drawn over the next column.
+                    if (wordWidth > width && width > 0)
+                    {
+                        if (cursor > 0)
+                        {
+                            Finish();
+                        }
+
+                        while (Width(word, font, TableSize) > width && word.Length > 1)
+                        {
+                            var fits = 1;
+                            while (fits < word.Length && Width(word.Substring(0, fits + 1), font, TableSize) <= width)
+                            {
+                                fits++;
+                            }
+
+                            line.Pieces.Add(new Piece { X = 0, Text = word.Substring(0, fits), Font = font });
+                            cursor = Width(word.Substring(0, fits), font, TableSize);
+                            Finish();
+                            word = word.Substring(fits);
+                        }
+
+                        line.Pieces.Add(new Piece { X = 0, Text = word, Font = font });
+                        cursor = Width(word, font, TableSize);
+                        afterBox = false;
+                        continue;
+                    }
+
                     var lead = cursor <= 0 ? 0 : (afterBox ? BoxGap : space);
 
                     // After a box the first word stays with it, whatever the width: the pair
@@ -1187,7 +1253,7 @@ namespace OutcomeTesting.Plugins
             var widths = font == Bold || font == BoldItalic ? BoldWidths : RegularWidths;
             double total = 0;
 
-            foreach (var ch in text)
+            foreach (var ch in Printable(text))
             {
                 var index = ch - 32;
                 total += index >= 0 && index < widths.Length ? widths[index] : 556;
@@ -1391,7 +1457,7 @@ namespace OutcomeTesting.Plugins
         {
             var escaped = new StringBuilder(text.Length + 8);
 
-            foreach (var ch in text)
+            foreach (var ch in Printable(text))
             {
                 if (ch == '\\' || ch == '(' || ch == ')')
                 {
@@ -1430,6 +1496,27 @@ namespace OutcomeTesting.Plugins
         /// as something else.
         /// </para>
         /// </summary>
+        /// <summary>
+        /// Spells out the symbols checkers type that WinAnsi has no glyph for, so they do not
+        /// print as '?' (requirements log row 36: "£2,840,901 → £3,989,939" became
+        /// "£2,840,901 ? £3,989,939"). Width and Escape both read through this, so a line is
+        /// measured as it is drawn.
+        /// shortcut: ASCII spellings rather than an embedded Unicode font; embed one if
+        /// checkers start using symbols with no sensible spelling.
+        /// </summary>
+        public static string Printable(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            return text
+                .Replace("→", "->").Replace("←", "<-").Replace("↔", "<->")
+                .Replace("⇒", "=>").Replace("≥", ">=").Replace("≤", "<=")
+                .Replace("≠", "!=").Replace("≈", "~").Replace("−", "-");
+        }
+
         private static int WinAnsi(char ch)
         {
             switch (ch)

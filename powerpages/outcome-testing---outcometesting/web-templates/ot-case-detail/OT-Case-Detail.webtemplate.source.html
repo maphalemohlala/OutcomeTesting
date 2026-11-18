@@ -54,10 +54,8 @@
       <attribute name="al_clientname" />
       <attribute name="al_vulnerableclient" />
       <attribute name="al_advisername" />
-      <attribute name="al_advisercode" />
       <attribute name="al_adviserstatus" />
       <attribute name="al_paraplanner" />
-      <attribute name="al_paraplannercode" />
       <attribute name="al_advicedate" />
       <attribute name="al_checkdate" />
       <attribute name="al_duedate" />
@@ -125,6 +123,7 @@
         <attribute name="al_sequence" />
         <attribute name="al_startedon" />
         <attribute name="al_submittedon" />
+        <attribute name="al_assignedcontactid" />
         <filter type="and">
           <condition attribute="al_outcomecaseid" operator="eq" value="{{ case_id | xml_escape }}" />
         </filter>
@@ -187,6 +186,11 @@
     </fetch>
     {% endfetchxml %}
 
+    {% comment %}
+      Sign-offs and the outcome are read only by the remediation block below, which is drawn
+      only for a case with actions, so a case with none does not ask for them.
+    {% endcomment %}
+    {% if actions.results.entities.size > 0 %}
     {% fetchxml case_signoffs %}
     <fetch>
       <entity name="al_signoff">
@@ -206,7 +210,6 @@
     {% fetchxml case_outcomes %}
     <fetch top="1">
       <entity name="al_outcome">
-        <attribute name="al_initialoutcome" />
         <attribute name="al_finaloutcome" />
         <attribute name="al_finalisedon" />
         <attribute name="al_regradedon" />
@@ -217,6 +220,7 @@
       </entity>
     </fetch>
     {% endfetchxml %}
+    {% endif %}
 
     {% comment %}
       Offered only once at least one review on the case has been submitted - a file printed
@@ -302,8 +306,9 @@
     {% endif %}
 
     {% assign submitted_reviews = 0 %}
+    {% assign has_submitted_aqs = false %}
     {% for r in reviews.results.entities %}
-      {% if r.al_submittedon %}{% assign submitted_reviews = submitted_reviews | plus: 1 %}{% endif %}
+      {% if r.al_submittedon %}{% assign submitted_reviews = submitted_reviews | plus: 1 %}{% if r.al_reviewtype.value == 120910201 %}{% assign has_submitted_aqs = true %}{% endif %}{% endif %}
     {% endfor %}
 
     {% if submitted_reviews > 0 %}
@@ -487,6 +492,15 @@
       {% if rt.al_requiresaqsreview %}{% assign requires_aqs = true %}{% endif %}
     {% endif %}
 
+    {% comment %}
+      A row backed by a review names whoever holds THAT review, not the case's checker-name
+      columns: those are stamped at allocation and can also arrive from the upload file, so
+      they can name someone who no longer holds the review, or nobody it was ever given to.
+      Read through default, because null != '' is true on this site.
+    {% endcomment %}
+    {% assign tax_holder = tax_review.al_assignedcontactid.name | default: '' %}
+    {% assign aqs_holder = aqs_review.al_assignedcontactid.name | default: '' %}
+
     {% assign show_tax = false %}
     {% if requires_tax or tax_review %}{% assign show_tax = true %}{% endif %}
     {% assign show_aqs = false %}
@@ -518,7 +532,7 @@
                     <td>{{ tax_review.al_sequence | default: 1 }}</td>
                     <td><a href="/review?id={{ tax_review.al_reviewinstanceid }}">{{ tax_review.al_name | default: 'Open review' | escape }}</a></td>
                     <td>{{ tax_review.al_reviewtype.label | escape }}</td>
-                    <td>{% if tax_checker != '' %}{{ tax_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
+                    <td>{% if tax_holder != '' %}{{ tax_holder | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
                     <td>{% include 'OT Status Badge' status: tax_review.al_reviewstatus.label %}</td>
                     <td>{{ tax_review.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</td>
                     <td>{{ tax_review.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>
@@ -541,14 +555,14 @@
                     <td>{{ aqs_review.al_sequence | default: 2 }}</td>
                     <td><a href="/review?id={{ aqs_review.al_reviewinstanceid }}">{{ aqs_review.al_name | default: 'Open review' | escape }}</a></td>
                     <td>{{ aqs_review.al_reviewtype.label | escape }}</td>
-                    <td>{% if aqs_checker != '' %}{{ aqs_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
+                    <td>{% if aqs_holder != '' %}{{ aqs_holder | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
                     <td>{% include 'OT Status Badge' status: aqs_review.al_reviewstatus.label %}</td>
                     <td>{{ aqs_review.al_startedon | date: 'dd MMM yyyy' | default: '—' }}</td>
                     <td>{{ aqs_review.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>
                   </tr>
                 {% else %}
                   <tr class="ot-row--owed">
-                    <td>2</td>
+                    <td>{% if show_tax %}2{% else %}1{% endif %}</td>
                     <td>AQS check</td>
                     <td>AQS</td>
                     <td>{% if aqs_checker != '' %}{{ aqs_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
@@ -582,7 +596,11 @@
       The AQS check's Case Notes and Even Better If (project owner, 2026-09-30), so an adviser
       reading their case sees what the AQS checker wrote without opening the review.
     {% endcomment %}
-    {% include 'OT AQS Notes' case_id: c.al_outcomecaseid %}
+    {% comment %}
+      OT AQS Notes reads submitted AQS reviews only and draws nothing without one, so it is
+      not asked when the reviews already fetched above hold none.
+    {% endcomment %}
+    {% if has_submitted_aqs %}{% include 'OT AQS Notes' case_id: c.al_outcomecaseid %}{% endif %}
 
     <section aria-labelledby="ot-case-remediation">
       <h2 id="ot-case-remediation">Remediation and escalation</h2>

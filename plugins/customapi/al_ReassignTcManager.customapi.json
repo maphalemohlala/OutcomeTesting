@@ -1,0 +1,73 @@
+{
+  "$comment": "Contract for the ReassignTcManager server-side command (requirements log row 4). Deployed via the registration console (plugins/OutcomeTesting.Registration). Custom API parameter Type codes: 10=String.",
+  "customApi": {
+    "uniquename": "al_ReassignTcManager",
+    "name": "al_ReassignTcManager",
+    "displayname": "Reassign T&C Manager",
+    "description": "Hands one case's remedial action and sign-off to another T&C Manager, in place of the one mapped to its adviser; an empty manager hands it back. Needs the case.reassignmanager capability; writes an Audit Event.",
+    "bindingtype": 0,
+    "boundentitylogicalname": null,
+    "isfunction": false,
+    "isprivate": false,
+    "allowedcustomprocessingsteptype": 0,
+    "executeprivilegename": null,
+    "pluginType": "OutcomeTesting.Plugins.ReassignTcManagerPlugin"
+  },
+  "requestParameters": [
+    {
+      "uniquename": "TargetId",
+      "name": "TargetId",
+      "displayname": "Target id",
+      "description": "Id of the al_outcomecase to hand over.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "Reason",
+      "name": "Reason",
+      "displayname": "Reason",
+      "description": "Why the case is handed over; kept on the audit event.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "IdempotencyKey",
+      "name": "IdempotencyKey",
+      "displayname": "Idempotency key",
+      "description": "Stable key for the intent; a replay returns the same result.",
+      "type": 10,
+      "isoptional": false
+    },
+    {
+      "uniquename": "ManagerId",
+      "name": "ManagerId",
+      "displayname": "Manager id",
+      "description": "Contact id of the T&C Manager who takes the case. Empty hands it back to the adviser mapping.",
+      "type": 10,
+      "isoptional": true
+    }
+  ],
+  "responseProperties": [
+    {
+      "uniquename": "Status",
+      "name": "Status",
+      "displayname": "Status",
+      "description": "Result status.",
+      "type": 10
+    },
+    {
+      "uniquename": "Summary",
+      "name": "Summary",
+      "displayname": "Summary",
+      "description": "Who the case moved from and to, as written to the audit event.",
+      "type": 10
+    },
+    {
+      "uniquename": "AuditEventId",
+      "name": "AuditEventId",
+      "displayname": "Audit event id",
+      "description": "Id of the Audit Event written for this command.",
+      "type": 10
+    }
+  ]
+}

@@ -115,6 +115,27 @@ namespace OutcomeTesting.Plugins.Tests
             return match.Success ? match.Groups[1].Value : null;
         }
 
+        /// <summary>
+        /// Dataverse refuses a Custom API, parameter or response property whose description is
+        /// longer than 300 characters, and registerall then stops half way (al_DeleteCase,
+        /// 2026-11-17). Checked here so it fails on the desk rather than in an environment.
+        /// </summary>
+        [Theory]
+        [MemberData(nameof(Contracts))]
+        public void NoDescriptionIsLongerThanDataverseAccepts(string fileName)
+        {
+            var json = File.ReadAllText(Path.Combine(RepoRoot(), "plugins", "customapi", fileName));
+            var descriptions = Regex.Matches(json, @"""description""\s*:\s*""((?:[^""\\]|\\.)*)""")
+                .Cast<Match>()
+                .Select(m => Regex.Unescape(m.Groups[1].Value))
+                .ToList();
+            var tooLong = descriptions.Where(text => text.Length > 300).ToList();
+
+            // The API and at least one parameter: a pattern that matched nothing would pass anything.
+            Assert.True(descriptions.Count >= 2, fileName + ": no descriptions were read.");
+            Assert.True(tooLong.Count == 0, fileName + " has a description over 300 characters: " + string.Join(" | ", tooLong));
+        }
+
         private static string RepoRoot()
         {
             var directory = new DirectoryInfo(AppContext.BaseDirectory);

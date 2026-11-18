@@ -5,6 +5,7 @@ import { addQuestion, moveQuestion, retireAndSucceedQuestion } from '../../servi
 import { today } from './effectiveDay';
 import { intentFor, refusalFor, type QuestionDraft } from './questionModalIntent';
 import { RESPONSE_TYPE_OPTIONS, type LibraryQuestion, type LibrarySection } from './useQuestionLibrary';
+import { messageForFailure } from '../../services/errors';
 
 /**
  * The question editor (AD-122). Add creates a question and its first version; edit dispatches
@@ -131,7 +132,7 @@ export function QuestionModal({ mode, sections, sectionId, question, intent, onC
       onSaved();
       onClose();
     } else {
-      setError(result.message);
+      setError(messageForFailure(result));
     }
   }
 

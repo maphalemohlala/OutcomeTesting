@@ -91,16 +91,6 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         [Fact]
-        public void Align_gives_each_item_its_own_words_in_item_order()
-        {
-            var texts = RemedialActions.Align(
-                new List<string> { "B", "A", "C" },
-                Map("A", "a words", "B", "b words"));
-
-            Assert.Equal(new[] { "b words", "a words", null }, texts.ToArray());
-        }
-
-        [Fact]
         public void EnsureWritten_refuses_a_review_that_parked_nothing()
         {
             var service = new FakeOrganizationService();

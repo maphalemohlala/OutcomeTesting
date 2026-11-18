@@ -208,6 +208,55 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "al_amendoutcome": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_AmendOutcome": {
+        "path": "/api/data/v9.2/al_AmendOutcome",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "TargetId",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Reason",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "FileGrade",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "AdviceGrade",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
   "al_assigncase": {
     "tableId": "",
     "version": "",
@@ -442,6 +491,49 @@ export const dataSourcesInfo = {
           },
           {
             "name": "WorkEmail",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "al_deletecase": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_DeleteCase": {
+        "path": "/api/data/v9.2/al_DeleteCase",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "TargetId",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "ConfirmReference",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Reason",
             "in": "body",
             "required": true,
             "type": "string"
@@ -724,6 +816,49 @@ export const dataSourcesInfo = {
     "primaryKey": "al_questionversionid",
     "dataSourceType": "Dataverse",
     "apis": {}
+  },
+  "al_reassigntcmanager": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "",
+    "dataSourceType": "Dataverse",
+    "apis": {
+      "al_ReassignTcManager": {
+        "path": "/api/data/v9.2/al_ReassignTcManager",
+        "method": "POST",
+        "parameters": [
+          {
+            "name": "TargetId",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "Reason",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "IdempotencyKey",
+            "in": "body",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "ManagerId",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responseInfo": {
+          "200": {
+            "type": "object"
+          }
+        }
+      }
+    }
   },
   "al_regradecase": {
     "tableId": "",
@@ -1053,6 +1188,12 @@ export const dataSourcesInfo = {
           },
           {
             "name": "AqContactId",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "FqAdministratorId",
             "in": "body",
             "required": false,
             "type": "string"

@@ -42,7 +42,11 @@ export async function loadPermissions(email: string): Promise<Resolved> {
   const product = loadProductName();
   const [rolesResult, permResult, userResult] = await Promise.all([
     executeCommand<{ RoleCodes: string }>('al_GetMyRoles', {}),
-    readAll((o) => Al_pagepermissionsService.getAll(o), { filter: 'statecode eq 0', orderBy: ['al_pagepermissionid asc'] }),
+    readAll((o) => Al_pagepermissionsService.getAll(o), {
+      filter: 'statecode eq 0',
+      orderBy: ['al_pagepermissionid asc'],
+      select: ['al_pagepermissionid', 'al_rolecode', 'al_approle', 'al_accesslevel', 'al_resourcekey'],
+    }),
     ContactsService.getAll({
       filter: `emailaddress1 eq '${odataEscape(email.trim().toLowerCase())}'`,
       select: ['statecode'],
@@ -54,7 +58,7 @@ export async function loadPermissions(email: string): Promise<Resolved> {
   // Deactivation (OD-010) withdraws access, so a deactivated registry row resolves to no
   // roles here as well as server-side. Mirrored rather than relied on: the server is the
   // gate, and this only stops the UI offering a leaver work it would then refuse.
-  if (isDeactivated(userResult.success ? userResult.data : [])) {
+  if (userResult.success && isDeactivated(userResult.data)) {
     return {
       roles: [],
       permissions: resolvePermissions([]),
@@ -85,7 +89,9 @@ export async function loadPermissions(email: string): Promise<Resolved> {
   // An empty answer is still an answer and is NOT this case: it means they genuinely hold
   // nothing, which the menu already reflects without any banner.
   let roles: string[] = [];
-  let accessUnknown = false;
+  // A failed read of the person's own contact row is not "still active": a leaver whose row
+  // could not be read would otherwise get their full menu. Treated like a failed roles call.
+  let accessUnknown = !userResult.success;
   if (!rolesResult.ok) {
     accessUnknown = true;
   } else {

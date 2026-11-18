@@ -100,11 +100,18 @@ namespace OutcomeTesting.Plugins
 
             // The clear-down in Apply writes this column back as empty, which re-enters this
             // step once at depth 2. An empty request is not a sign-off, so it stops here.
+            // Only truly empty: a whitespace value left standing reads as a sign-off in flight
+            // (RemediationResponseGuardPlugin.IsSignoffInFlight), so it goes through the
+            // normal path and is refused, which rolls the write back.
             var raw = entity.GetAttributeValue<string>(RequestAttr);
-            if (string.IsNullOrWhiteSpace(raw))
+            if (string.IsNullOrEmpty(raw))
             {
                 return;
             }
+
+            // Only the site's own write is a request: the app's Dataverse role can write this
+            // row too, and the request is trusted as the signed-in person's.
+            WriteProvenance.EnsurePortalCaller(localPluginContext.OrgSvcFactory.CreateOrganizationService(null), context);
 
             Apply(service, context.PrimaryEntityId, raw);
         }
@@ -142,26 +149,6 @@ namespace OutcomeTesting.Plugins
             // (project owner, 2026-09-21).
             EnsureMappedToCase(service, contactId, actionId);
 
-            // The two answers only this role may give (project owner, 2026-09-21), written
-            // BEFORE the sign-off is created: SignoffProgressPlugin runs on that Create and
-            // reads al_recheckrequired to decide whether the case closes here or waits at
-            // Awaiting Recheck, so writing them afterwards would route the case on the
-            // previous answer. Same transaction, so a refusal below rolls them back.
-            RecordFormAnswers(service, actionId, payload);
-
-            // Cleared before the sign-off is created, so the column never keeps a request
-            // after it has been acted on, and a second sign-off is a real second write rather
-            // than an unchanged value Dataverse may not raise an Update for. Both writes share
-            // this transaction: a refusal below rolls the clear back with it.
-            service.Update(new Entity(ContactEntity, contactId)
-            {
-                [RequestAttr] = null,
-            });
-
-            // Only the decision, the notes, the action and the signatory - the shape the
-            // browser used to POST, plus who signed it. The name, code, case and timestamp
-            // are stamped by SignoffGuardPlugin.
-            //
             // The signatory is contactId, never anything the payload supplied: it is
             // PrimaryEntityId, the contact row the Self-scoped permission limited to the
             // signed-in user, and it is the same value EnsureSupervisorRole was checked
@@ -173,6 +160,25 @@ namespace OutcomeTesting.Plugins
                 [SignedByIdAttr] = contactId.ToString("D"),
             };
 
+            // The two answers only this role may give (project owner, 2026-09-21), written
+            // BEFORE the sign-off is created: SignoffProgressPlugin runs on that Create and
+            // reads al_recheckrequired to decide whether the case closes here or waits at
+            // Awaiting Recheck, so writing them afterwards would route the case on the
+            // previous answer. Same transaction, so a refusal below rolls them back.
+            RecordSupervisorAnswers(service, actionId, payload, signoff);
+
+            // Cleared before the sign-off is created, so the column never keeps a request
+            // after it has been acted on, and a second sign-off is a real second write rather
+            // than an unchanged value Dataverse may not raise an Update for. Both writes share
+            // this transaction: a refusal below rolls the clear back with it.
+            service.Update(new Entity(ContactEntity, contactId)
+            {
+                [RequestAttr] = null,
+            });
+
+            // Only the decision, the notes, the action, the signatory and the final outcome -
+            // the shape the browser used to POST, plus who signed it. The name, code, case and
+            // timestamp are stamped by SignoffGuardPlugin.
             var signatory = CommandHelpers.ResolveActorName(service, contactId);
             if (!string.IsNullOrWhiteSpace(signatory))
             {
@@ -183,17 +189,30 @@ namespace OutcomeTesting.Plugins
                 signoff["al_notes"] = payload.Notes.Trim();
             }
 
-            // Carried through unvalidated, exactly as the decision and the notes are: the
-            // rules are SignoffGuardPlugin's, which refuses a grade on a rejection and a
-            // value the BR-005 scale does not define, and the consequences are
-            // SignoffProgressPlugin's. This plug-in only exists because the browser cannot
-            // make the association.
-            if (payload.FinalOutcome != 0)
-            {
-                signoff["al_finaloutcome"] = new OptionSetValue(payload.FinalOutcome);
-            }
-
             return service.Create(signoff);
+        }
+
+        /// <summary>
+        /// What the supervisor answers with a sign-off, recorded the same way whichever door
+        /// it came through (project owner, 2026-11-17): the two form answers onto the check
+        /// (<see cref="RecordFormAnswers"/>) and the final outcome onto the sign-off about to
+        /// be created. <see cref="SignOffRemediationPlugin.CreateSignoff"/> calls this too, so
+        /// the same approval through the command closes the case the portal's would.
+        ///
+        /// The final outcome is carried through unvalidated, exactly as the decision and the
+        /// notes are: the rules are SignoffGuardPlugin's, which refuses a grade on a rejection
+        /// and a value the BR-005 scale does not define, and the consequences are
+        /// SignoffProgressPlugin's. Zero means none was given.
+        /// </summary>
+        public static void RecordSupervisorAnswers(
+            IOrganizationService service, Guid actionId, SignoffRequestPayload answers, Entity signoff)
+        {
+            RecordFormAnswers(service, actionId, answers);
+
+            if (answers != null && answers.FinalOutcome != 0)
+            {
+                signoff["al_finaloutcome"] = new OptionSetValue(answers.FinalOutcome);
+            }
         }
 
         /// <summary>

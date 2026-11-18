@@ -110,7 +110,8 @@ namespace OutcomeTesting.Plugins
                 context.InitiatingUserId,
                 context.CorrelationId,
                 requireCallerOwnsReview: true,
-                details: null);
+                details: null,
+                systemService: localPluginContext.OrgSvcFactory.CreateOrganizationService(null));
 
             CommandHelpers.SetResponse(context, result.Status, result.AuditEventId, result.Conflict);
         }
@@ -147,7 +148,8 @@ namespace OutcomeTesting.Plugins
             Guid correlationId,
             bool requireCallerOwnsReview,
             string details,
-            string actorName = null)
+            string actorName = null,
+            IOrganizationService systemService = null)
         {
             // Idempotency: a replay with the same key is a success no-op (NFR-REL-01).
             var existingAudit = FindAuditByKey(service, idempotencyKey);
@@ -196,22 +198,35 @@ namespace OutcomeTesting.Plugins
                     PreconditionPrefix + "A review can only be submitted from Assigned or Review In Progress.");
             }
 
-            EnsureMandatoryQuestionsAnswered(service, targetId, review);
+            // An answer given before a forward-dated move took effect is carried to the moved
+            // question first, so the check below does not call it unanswered.
+            AnswerWriter.CarryMovedAnswers(service, targetId);
+
+            // The gates and the finalising below ask for the same few answers; each is read once.
+            var reads = new SubmitReads();
+
+            EnsureMandatoryQuestionsAnswered(service, targetId, review, reads);
             EnsureTaxPrecedesAqs(service, review);
+
+            // Before the status moves: the tick guard refuses changes to a submitted review.
+            // And before the grading check, so a retired fail point the checker cannot see
+            // does not make that check demand a File Quality Fail.
+            AnswerWriter.DropRetiredFailReasons(service, targetId);
 
             var submittedType = review.GetAttributeValue<OptionSetValue>("al_reviewtype");
             if (submittedType != null && submittedType.Value == ResponseRules.ReviewTypeAqs)
             {
-                EnsureConsistentGrading(service, targetId);
+                EnsureConsistentGrading(service, targetId, reads);
             }
 
-            // Before the status moves: the tick guard refuses changes to a submitted review.
-            AnswerWriter.DropRetiredFailReasons(service, targetId);
-
+            // The pair is written as SYSTEM, after the owner, answer and grading checks above: the
+            // review guard accepts it from nobody else, so a direct write cannot skip them.
+            var writer = systemService ?? service;
+            var stamp = DateTime.UtcNow;
             var update = new Entity(ReviewEntity, targetId)
             {
                 [ReviewStatus] = new OptionSetValue(StatusSubmitted),
-                [ReviewSubmittedOn] = DateTime.UtcNow,
+                [ReviewSubmittedOn] = stamp,
             };
 
             // Optimistic concurrency: reject a stale write with a distinct conflict code.
@@ -226,7 +241,7 @@ namespace OutcomeTesting.Plugins
 
                 try
                 {
-                    service.Execute(updateRequest);
+                    writer.Execute(updateRequest);
                 }
                 catch (System.ServiceModel.FaultException<OrganizationServiceFault> fault)
                 {
@@ -241,10 +256,13 @@ namespace OutcomeTesting.Plugins
             }
             else
             {
-                service.Update(update);
+                writer.Update(update);
             }
 
-            FinaliseReview(service, review, targetId, correlationId);
+            // From here the review's reference day is the stamp just written, as a re-read gives.
+            reads.Stamp(targetId, stamp);
+
+            FinaliseReview(service, review, targetId, correlationId, reads, writer);
 
             var auditId = WriteAuditEvent(service, targetId, idempotencyKey, actorId, correlationId, details, actorName);
 
@@ -332,7 +350,8 @@ namespace OutcomeTesting.Plugins
         private static void EnsureMandatoryQuestionsAnswered(
             IOrganizationService service,
             Guid targetId,
-            Entity review)
+            Entity review,
+            SubmitReads reads)
         {
             var checklistVersion = review.GetAttributeValue<EntityReference>(ReviewChecklistVersion);
             if (checklistVersion == null)
@@ -410,7 +429,7 @@ namespace OutcomeTesting.Plugins
             // review it never is, because S-GRADE is AQS-owned and the query above is already
             // scoped by discipline, so a Tax submit pays nothing for a rule that cannot apply
             // to it.
-            RemoveRootCauseWhenPassing(service, targetId, required);
+            RemoveRootCauseWhenPassing(service, targetId, required, reads);
             RemoveTaxFileQualityUnlessTaxOnly(service, review, required);
 
             if (required.Count == 0)
@@ -484,6 +503,15 @@ namespace OutcomeTesting.Plugins
             Guid targetId,
             List<Entity> required)
         {
+            RemoveRootCauseWhenPassing(service, targetId, required, null);
+        }
+
+        private static void RemoveRootCauseWhenPassing(
+            IOrganizationService service,
+            Guid targetId,
+            List<Entity> required,
+            SubmitReads reads)
+        {
             var rootCauses = new List<Entity>();
             foreach (var version in required)
             {
@@ -502,7 +530,7 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
-            var grade = AnswerChoiceFor(service, targetId, GradeQuestionCode);
+            var grade = AnswerChoiceFor(service, targetId, GradeQuestionCode, reads);
             if (GradingRules.RootCauseRequired(grade))
             {
                 return;
@@ -682,6 +710,49 @@ namespace OutcomeTesting.Plugins
         private static Entity AnswerFor(
             IOrganizationService service, Guid reviewId, string questionCode, params string[] columns)
         {
+            return AnswerFor(null, service, reviewId, questionCode, columns);
+        }
+
+        /// <summary>
+        /// What one Submit has already read, so its gates and its finalising do not each ask
+        /// again: the choice answered to a question code, and a review's reference day. Kept
+        /// for one Submit only. Nothing a submit writes changes an answer's choice, and the
+        /// reference day of the review being submitted is this moment before the submit
+        /// stamps it and the stamp just written after.
+        /// </summary>
+        // Public only so Stamp is testable: the assembly carries no InternalsVisibleTo.
+        public sealed class SubmitReads
+        {
+            public readonly Dictionary<string, int?> Choices = new Dictionary<string, int?>();
+            public readonly Dictionary<Guid, DateTime> ReferenceDays = new Dictionary<Guid, DateTime>();
+
+            /// <summary>
+            /// The submit has stamped this review: its reference day is the stamp from here on.
+            /// A gate that ran on the previous day (a submit straddling 00:00 UTC) may have
+            /// resolved a different question version, so that review's choices are read again.
+            /// </summary>
+            public void Stamp(Guid reviewId, DateTime stamp)
+            {
+                DateTime before;
+                if (ReferenceDays.TryGetValue(reviewId, out before) && before.Date != stamp.Date)
+                {
+                    var prefix = reviewId.ToString("N") + "|";
+                    foreach (var key in new List<string>(Choices.Keys))
+                    {
+                        if (key.StartsWith(prefix, StringComparison.Ordinal))
+                        {
+                            Choices.Remove(key);
+                        }
+                    }
+                }
+
+                ReferenceDays[reviewId] = stamp;
+            }
+        }
+
+        private static Entity AnswerFor(
+            SubmitReads reads, IOrganizationService service, Guid reviewId, string questionCode, params string[] columns)
+        {
             var versions = new QueryExpression(QuestionVersionEntity)
             {
                 ColumnSet = new ColumnSet("al_effectivefrom", "al_effectiveto"),
@@ -696,7 +767,17 @@ namespace OutcomeTesting.Plugins
                 return null;
             }
 
-            var asOf = ReferenceDay(service, reviewId);
+            DateTime asOf;
+            if (reads == null)
+            {
+                asOf = ReferenceDay(service, reviewId);
+            }
+            else if (!reads.ReferenceDays.TryGetValue(reviewId, out asOf))
+            {
+                asOf = ReferenceDay(service, reviewId);
+                reads.ReferenceDays[reviewId] = asOf;
+            }
+
             var effective = new List<Guid>();
             var any = new List<Guid>();
             foreach (var version in all)
@@ -758,16 +839,25 @@ namespace OutcomeTesting.Plugins
         /// The al_answerchoice this review recorded for a question, by business code.
         /// Returns null when the question was not answered.
         /// </summary>
-        private static int? AnswerChoiceFor(IOrganizationService service, Guid reviewId, string questionCode)
+        private static int? AnswerChoiceFor(
+            IOrganizationService service, Guid reviewId, string questionCode, SubmitReads reads = null)
         {
-            var response = AnswerFor(service, reviewId, questionCode, "al_answerchoice");
-            if (response == null)
+            var key = reviewId.ToString("N") + "|" + questionCode;
+            int? known;
+            if (reads != null && reads.Choices.TryGetValue(key, out known))
             {
-                return null;
+                return known;
             }
 
-            var choice = response.GetAttributeValue<OptionSetValue>("al_answerchoice");
-            return choice == null ? (int?)null : choice.Value;
+            var response = AnswerFor(reads, service, reviewId, questionCode, "al_answerchoice");
+            var choice = response == null ? null : response.GetAttributeValue<OptionSetValue>("al_answerchoice");
+            var value = choice == null ? (int?)null : choice.Value;
+            if (reads != null)
+            {
+                reads.Choices[key] = value;
+            }
+
+            return value;
         }
 
         /// <summary>
@@ -851,7 +941,7 @@ namespace OutcomeTesting.Plugins
         ///   (<see cref="SignoffProgressPlugin"/>), and it counts rows per case with no
         ///   review filter - a Tax row would leave every Tax-only case stalled at Awaiting
         ///   Recheck instead of closing.
-        /// - <c>GenerateExportPlugin.ResolveOutcome</c> reads one Outcome per case, and
+        /// - <c>GenerateExportPlugin.ResolveOutcomes</c> reads one Outcome per case, and
         ///   AD-075 blanks the two graded columns for a Tax-only case on purpose. A Tax row
         ///   would fill them with a grade the Trail Light contract does not define.
         ///
@@ -891,6 +981,15 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static void StampCheckDate(IOrganizationService service, Guid caseId)
         {
+            StampCheckDate(service, caseId, DateTime.UtcNow);
+        }
+
+        /// <summary>
+        /// The UK day of <paramref name="utcNow"/>, as the due date is: a submit after 23:00
+        /// UTC in British Summer Time is already the next day for the checker.
+        /// </summary>
+        public static void StampCheckDate(IOrganizationService service, Guid caseId, DateTime utcNow)
+        {
             if (service == null || caseId == Guid.Empty)
             {
                 return;
@@ -898,7 +997,7 @@ namespace OutcomeTesting.Plugins
 
             service.Update(new Entity(CaseEntity, caseId)
             {
-                ["al_checkdate"] = DateTime.UtcNow.Date,
+                ["al_checkdate"] = CaseHeaderRules.UkDate(utcNow),
             });
         }
 
@@ -925,7 +1024,8 @@ namespace OutcomeTesting.Plugins
         /// PassFailInsufficient scale of Q-TAX-02 (AD-055). The Tax grade stays on its
         /// response, and AD-039's export contract has no Tax column.
         /// </summary>
-        private static void FinaliseReview(IOrganizationService service, Entity review, Guid targetId, Guid correlationId)
+        private static void FinaliseReview(
+            IOrganizationService service, Entity review, Guid targetId, Guid correlationId, SubmitReads reads, IOrganizationService systemService)
         {
             var caseRef = review.GetAttributeValue<EntityReference>(ReviewOutcomeCase);
             if (caseRef == null)
@@ -952,7 +1052,8 @@ namespace OutcomeTesting.Plugins
                 AnswerChoiceFor(
                     service,
                     targetId,
-                    isAqs ? AqsRemedialQuestionCode : TaxRemedialQuestionCode));
+                    isAqs ? AqsRemedialQuestionCode : TaxRemedialQuestionCode,
+                    reads));
 
             bool requiresRemediation;
             string remediationReason;
@@ -967,7 +1068,7 @@ namespace OutcomeTesting.Plugins
 
             if (isAqs)
             {
-                var answer = AnswerChoiceFor(service, targetId, GradeQuestionCode);
+                var answer = AnswerChoiceFor(service, targetId, GradeQuestionCode, reads);
                 if (!answer.HasValue)
                 {
                     throw new InvalidPluginExecutionException(
@@ -990,14 +1091,14 @@ namespace OutcomeTesting.Plugins
                     RemedialActions.EnsureClientContact(service, targetId);
                 }
 
-                CreateOutcome(service, targetId, caseRef, caseReference, sequence, outcomeValue);
+                CreateOutcome(service, systemService, targetId, caseRef, caseReference, sequence, outcomeValue);
 
                 // The Tax fail this case may be carrying (project owner, 2026-09-20). The Tax
                 // submit stamped al_taxoutcome and moved the case to the queue without raising
                 // anything, so THIS submit is the only one that will ask the adviser for
                 // anything about either check. Read from the case rather than from the Tax
                 // review, because al_taxoutcome is where the Tax submit recorded its verdict.
-                deferredTaxFail = DeferredTaxFail(service, caseRef.Id);
+                deferredTaxFail = DeferredTaxFail(service, caseRef.Id, reads);
 
                 nextStatus = OutcomeRules.NextCaseStatusForAqs(
                     outcomeValue, remedialFlagged, deferredTaxFail != null);
@@ -1018,7 +1119,7 @@ namespace OutcomeTesting.Plugins
             }
             else
             {
-                var answer = AnswerChoiceFor(service, targetId, TaxOutcomeQuestionCode);
+                var answer = AnswerChoiceFor(service, targetId, TaxOutcomeQuestionCode, reads);
                 if (!answer.HasValue)
                 {
                     throw new InvalidPluginExecutionException(
@@ -1032,7 +1133,7 @@ namespace OutcomeTesting.Plugins
                         PreconditionPrefix + "The tax check outcome holds a value this solution does not recognise (" + answer.Value + ").");
                 }
 
-                remedialFlagged |= ParkTaxCategories(service, targetId);
+                remedialFlagged |= ParkTaxCategories(service, targetId, reads);
 
                 // Checked whether or not the raising is deferred to the AQS submit (AD-184): the
                 // Tax checker is the one who can write these, and after this submit they cannot.
@@ -1099,7 +1200,8 @@ namespace OutcomeTesting.Plugins
                     isAqs ? AqsObservationQuestionCode : TaxObservationQuestionCode,
                     deferredTaxFail,
                     ownOwesRemediation,
-                    ownReason);
+                    ownReason,
+                    reads);
             }
             else if (OutcomeRules.EarnsPassNotification(nextStatus, requiresRemediation))
             {
@@ -1115,10 +1217,15 @@ namespace OutcomeTesting.Plugins
             // pure function that nothing called, with the plug-in walking the same route by
             // hand — two descriptions that agreed only for as long as both were edited
             // together. CaseTransitions checks each hop against AD-057 in turn.
+            //
+            // The status is read once, here, and carried from hop to hop rather than read
+            // again before each: nothing a hop triggers writes al_casestatus.
+            var currentStatus = CaseTransitions.CurrentStatus(service, caseRef.Id);
             CaseTransitions.MoveThrough(
                 service,
                 caseRef.Id,
-                OutcomeRules.HopsFor(CaseTransitions.CurrentStatus(service, caseRef.Id), nextStatus));
+                currentStatus,
+                OutcomeRules.HopsFor(currentStatus, nextStatus));
         }
 
         /// <summary>
@@ -1130,6 +1237,7 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         private static void CreateOutcome(
             IOrganizationService service,
+            IOrganizationService systemService,
             Guid reviewId,
             EntityReference caseRef,
             string caseReference,
@@ -1162,7 +1270,9 @@ namespace OutcomeTesting.Plugins
             var applied = review != null
                 && AccountabilityRequestPlugin.ApplyParked(service, review, outcome);
 
-            AssignUserRolePlugin.Upsert(service, OutcomeEntity, "al_outcomecode", code, outcome);
+            // As SYSTEM: the checker holds no cases permission, and the outcome guard would ask
+            // for it before writing the parked flags the portal already checked.
+            AssignUserRolePlugin.Upsert(systemService, OutcomeEntity, "al_outcomecode", code, outcome);
 
             if (applied)
             {
@@ -1285,6 +1395,11 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static DeferredTax DeferredTaxFail(IOrganizationService service, Guid caseId)
         {
+            return DeferredTaxFail(service, caseId, null);
+        }
+
+        private static DeferredTax DeferredTaxFail(IOrganizationService service, Guid caseId, SubmitReads reads)
+        {
             var taxReview = SubmittedReviewId(service, caseId, ResponseRules.ReviewTypeTax);
             if (!taxReview.HasValue)
             {
@@ -1315,7 +1430,7 @@ namespace OutcomeTesting.Plugins
             // review's own response because there is no column on the case carrying it - the
             // Tax submit consumed it and stamped only the outcome.
             if (!OutcomeRules.RemedialActionFlagged(
-                    AnswerChoiceFor(service, taxReview.Value, TaxRemedialQuestionCode))
+                    AnswerChoiceFor(service, taxReview.Value, TaxRemedialQuestionCode, reads))
                 && TaxCategories.Parked(RemedialActions.Pending(service, taxReview.Value)).Count == 0)
             {
                 return null;
@@ -1402,7 +1517,8 @@ namespace OutcomeTesting.Plugins
             string observationQuestionCode,
             DeferredTax deferredTax,
             bool ownOwes,
-            string ownReason)
+            string ownReason,
+            SubmitReads reads)
         {
             var legs = new List<RemediationLeg>();
             string observation = null;
@@ -1412,12 +1528,12 @@ namespace OutcomeTesting.Plugins
             if (deferredTax != null)
             {
                 legs.Add(Collect(service, deferredTax.ReviewId, deferredTax.Reason, true));
-                observation = AnswerTextFor(service, deferredTax.ReviewId, TaxObservationQuestionCode);
+                observation = AnswerTextFor(service, deferredTax.ReviewId, TaxObservationQuestionCode, reads);
             }
 
             legs.Add(Collect(service, reviewId, ownReason, ownOwes));
 
-            var own = AnswerTextFor(service, reviewId, observationQuestionCode);
+            var own = AnswerTextFor(service, reviewId, observationQuestionCode, reads);
             if (!string.IsNullOrWhiteSpace(own))
             {
                 // Both checkers' words when both wrote some, rather than one silently winning.
@@ -1502,11 +1618,11 @@ namespace OutcomeTesting.Plugins
         /// from the answers on every submit: a category changed to No takes its words with it.
         /// True when any category owes a remedial action.
         /// </summary>
-        private static bool ParkTaxCategories(IOrganizationService service, Guid reviewId)
+        private static bool ParkTaxCategories(IOrganizationService service, Guid reviewId, SubmitReads reads)
         {
             var raised = TaxCategories.Raised(
-                code => AnswerChoiceFor(service, reviewId, code),
-                code => AnswerTextFor(service, reviewId, code));
+                code => AnswerChoiceFor(service, reviewId, code, reads),
+                code => AnswerTextFor(service, reviewId, code, reads));
 
             var refusal = TaxCategories.Refusal(raised);
             if (refusal != null)
@@ -1538,7 +1654,7 @@ namespace OutcomeTesting.Plugins
         /// Refuses an AQS check whose outcome answers disagree with its checking points and
         /// Suitability core checks (<see cref="GradingRules.For"/>).
         /// </summary>
-        private static void EnsureConsistentGrading(IOrganizationService service, Guid reviewId)
+        private static void EnsureConsistentGrading(IOrganizationService service, Guid reviewId, SubmitReads reads)
         {
             var query = new QueryExpression(ResponseEntity)
             {
@@ -1546,13 +1662,11 @@ namespace OutcomeTesting.Plugins
                 Criteria = new FilterExpression(),
             };
             query.Criteria.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
-            var responses = CommandHelpers.RetrieveAll(service, query);
+            var allResponses = CommandHelpers.RetrieveAll(service, query);
 
             var versionIds = new List<Guid>();
-            var responseIds = new List<object>();
-            foreach (var response in responses)
+            foreach (var response in allResponses)
             {
-                responseIds.Add(response.Id);
                 var version = response.GetAttributeValue<EntityReference>("al_questionversionid");
                 if (version != null)
                 {
@@ -1561,7 +1675,37 @@ namespace OutcomeTesting.Plugins
             }
 
             var versions = Remediation.ByIdIn(
-                service, "al_questionversion", new ColumnSet("al_responsetype", "al_questionid"), versionIds);
+                service, "al_questionversion",
+                new ColumnSet("al_responsetype", "al_questionid", "al_effectivefrom", "al_effectiveto"), versionIds);
+
+            // Only the answers to versions in force on the review's day count, the ones the
+            // checker sees: an answer left on a version since superseded is not on the form.
+            DateTime asOf;
+            if (!reads.ReferenceDays.TryGetValue(reviewId, out asOf))
+            {
+                asOf = ReferenceDay(service, reviewId);
+                reads.ReferenceDays[reviewId] = asOf;
+            }
+
+            var responses = new List<Entity>();
+            var responseIds = new List<object>();
+            foreach (var response in allResponses)
+            {
+                var versionRef = response.GetAttributeValue<EntityReference>("al_questionversionid");
+                Entity owedVersion;
+                if (versionRef == null || !versions.TryGetValue(versionRef.Id, out owedVersion)
+                    || !ResponseRules.IsVersionEffective(
+                        owedVersion.GetAttributeValue<DateTime?>("al_effectivefrom"),
+                        owedVersion.GetAttributeValue<DateTime?>("al_effectiveto"),
+                        asOf))
+                {
+                    continue;
+                }
+
+                responses.Add(response);
+                responseIds.Add(response.Id);
+            }
+
             var questionIds = new List<Guid>();
             foreach (var version in versions.Values)
             {
@@ -1619,9 +1763,9 @@ namespace OutcomeTesting.Plugins
 
             var refusal = GradingRules.Refusal(
                 GradingRules.For(suitability, checkingPoints, ticked),
-                AnswerChoiceFor(service, reviewId, "Q-FQ-01"),
-                AnswerChoiceFor(service, reviewId, AqsRemedialQuestionCode),
-                AnswerChoiceFor(service, reviewId, GradeQuestionCode));
+                AnswerChoiceFor(service, reviewId, "Q-FQ-01", reads),
+                AnswerChoiceFor(service, reviewId, AqsRemedialQuestionCode, reads),
+                AnswerChoiceFor(service, reviewId, GradeQuestionCode, reads));
             if (refusal != null)
             {
                 throw new InvalidPluginExecutionException(PreconditionPrefix + refusal);
@@ -1693,9 +1837,10 @@ namespace OutcomeTesting.Plugins
         /// The al_answertext this review recorded for a question, by business code.
         /// Returns null when the question was not answered.
         /// </summary>
-        private static string AnswerTextFor(IOrganizationService service, Guid reviewId, string questionCode)
+        private static string AnswerTextFor(
+            IOrganizationService service, Guid reviewId, string questionCode, SubmitReads reads = null)
         {
-            var response = AnswerFor(service, reviewId, questionCode, "al_answertext");
+            var response = AnswerFor(reads, service, reviewId, questionCode, "al_answertext");
             return response == null ? null : response.GetAttributeValue<string>("al_answertext");
         }
 

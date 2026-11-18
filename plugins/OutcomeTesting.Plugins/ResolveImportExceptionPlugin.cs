@@ -79,6 +79,10 @@ namespace OutcomeTesting.Plugins
             // Confirm it exists and the caller can read it before writing.
             var record = userService.Retrieve(ExceptionEntity, exceptionId, new ColumnSet(StatusAttr, "al_casereference"));
             EnsureOpen(record);
+            if (resolution == StatusResolved)
+            {
+                EnsureCaseImported(systemService, record.GetAttributeValue<string>("al_casereference"));
+            }
 
             userService.Update(new Entity(ExceptionEntity, exceptionId)
             {
@@ -123,6 +127,33 @@ namespace OutcomeTesting.Plugins
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix + "This import exception is already " +
                     ResolutionLabel(status.Value).ToLowerInvariant() + ".");
+            }
+        }
+
+        /// <summary>
+        /// "Resolved" says the row was corrected and re-imported, so it is refused until a case
+        /// carrying the row's TaskID exists; otherwise the row is closed while no case was ever
+        /// made from it. A row with no TaskID has nothing to look up and is left as it was.
+        /// Read as the system user: the check must not depend on the caller's case read scope.
+        /// </summary>
+        public static void EnsureCaseImported(IOrganizationService service, string caseReference)
+        {
+            if (string.IsNullOrWhiteSpace(caseReference))
+            {
+                return;
+            }
+
+            var query = new QueryExpression("al_outcomecase")
+            {
+                ColumnSet = new ColumnSet(false),
+                TopCount = 1,
+            };
+            query.Criteria.AddCondition("al_casereference", ConditionOperator.Equal, caseReference.Trim());
+            if (service.RetrieveMultiple(query).Entities.Count == 0)
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + "No case with TaskID " + caseReference.Trim() +
+                    " exists yet. Re-import the corrected row before marking this exception resolved, or close it as Ignored.");
             }
         }
 

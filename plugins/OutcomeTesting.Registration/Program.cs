@@ -175,6 +175,15 @@ using System.Text.Json.Nodes;
 //   change. A case whose stored email resolves to a contact named differently (MISMATCH) is
 //   skipped unless --include-mismatch is also passed.
 //
+// Clear a rule's app role: dotnet run -- clearrulapprole <orgUrl> [--confirm <orgUrl>]
+//   Dry run lists every active al_pagepermission rule carrying both al_rolecode and al_approle
+//   (the Adviser schema default); with --confirm sets al_approle to null on each.
+//
+// Direct permission writers: fixpermissions <orgUrl> --confirm <orgUrl>,
+//   seedadmin <orgUrl> <email> --confirm <orgUrl>, proveroles <orgUrl> --confirm <orgUrl>.
+//   The first two write al_pagepermission around al_SetPagePermission; proveroles grants and
+//   withdraws a real contact's portal role. All refuse without the repeated org URL.
+//
 // Add to solution: dotnet run -- addtosolution <orgUrl> [<solutionUniqueName>]
 //   Adds the plug-in assembly (and its plug-in type) to the target solution for clean ALM
 //   promotion. Idempotent. The Custom API is added separately via a solution-file import
@@ -407,7 +416,17 @@ if (args.Length >= 2 && args[0].Equals("grantapprole", StringComparison.OrdinalI
 
 if (args.Length >= 2 && args[0].Equals("fixpermissions", StringComparison.OrdinalIgnoreCase))
 {
-    return FixPermissions(args[1]);
+    return FixPermissions(args);
+}
+
+if (args.Length >= 2 && args[0].Equals("clearrulapprole", StringComparison.OrdinalIgnoreCase))
+{
+    return ClearRuleAppRole(args[1], ConfirmedFor(args, args[1]));
+}
+
+if (args.Length >= 2 && args[0].Equals("backfillinitialgrade", StringComparison.OrdinalIgnoreCase))
+{
+    return BackfillInitialGrade(args[1], ConfirmedFor(args, args[1]));
 }
 
 if (args.Length >= 3 && args[0].Equals("registertype", StringComparison.OrdinalIgnoreCase))
@@ -447,7 +466,7 @@ if (args.Length >= 2 && args[0].Equals("dedupepagepermissions", StringComparison
 {
     return DedupePagePermissions(
         args[1],
-        args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+        ConfirmedFor(args, args[1]));
 }
 
 if (args.Length >= 2 && args[0].Equals("createnotificationtemplate", StringComparison.OrdinalIgnoreCase))
@@ -459,7 +478,7 @@ if (args.Length >= 2 && args[0].Equals("seednotificationtemplates", StringCompar
 {
     return SeedNotificationTemplates(
         args[1],
-        args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+        ConfirmedFor(args, args[1]));
 }
 
 if (args.Length >= 4 && args[0].Equals("renderpdf", StringComparison.OrdinalIgnoreCase))
@@ -584,6 +603,13 @@ if (args.Length >= 3 && args[0].Equals("deleteplugintype", StringComparison.Ordi
 
 if (args.Length >= 3 && args[0].Equals("seedadmin", StringComparison.OrdinalIgnoreCase))
 {
+    if (!ConfirmedFor(args, args[1]))
+    {
+        Console.Error.WriteLine(
+            "This makes a person an application Administrator, bypassing al_SetPagePermission. Re-run as: seedadmin <orgUrl> <email> --confirm <orgUrl>");
+        return 1;
+    }
+
     return SeedAdmin(args[1], args[2]);
 }
 
@@ -615,7 +641,7 @@ if (args.Length >= 3 && args[0].Equals("repointremediation", StringComparison.Or
 
 if (args.Length >= 2 && args[0].Equals("backfilltaxoutcome", StringComparison.OrdinalIgnoreCase))
 {
-    return BackfillTaxOutcome(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+    return BackfillTaxOutcome(args[1], ConfirmedFor(args, args[1]));
 }
 
 if (args.Length >= 2 && args[0].Equals("backfillpeopleemail", StringComparison.OrdinalIgnoreCase))
@@ -626,19 +652,19 @@ if (args.Length >= 2 && args[0].Equals("backfillpeopleemail", StringComparison.O
 
 if (args.Length >= 2 && args[0].Equals("backfillioreference", StringComparison.OrdinalIgnoreCase))
 {
-    return BackfillIoReference(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+    return BackfillIoReference(args[1], ConfirmedFor(args, args[1]));
 }
 
 if (args.Length >= 2 && args[0].Equals("backfillcheckernames", StringComparison.OrdinalIgnoreCase))
 {
-    return BackfillCheckerNames(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+    return BackfillCheckerNames(args[1], ConfirmedFor(args, args[1]));
 }
 
 if (args.Length >= 5 && args[0].Equals("setpagepermission", StringComparison.OrdinalIgnoreCase))
 {
     return SetPagePermissionRule(
         args[1], args[2], args[3], args[4],
-        args.Length > 5 && args[5].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+        ConfirmedFor(args, args[1]));
 }
 
 if (args.Length >= 5 && args[0].Equals("setattributedescription", StringComparison.OrdinalIgnoreCase))
@@ -755,7 +781,7 @@ if (args.Length >= 3 && args[0].Equals("setchangetracking", StringComparison.Ord
 
 if (args.Length >= 2 && args[0].Equals("queueroutedcases", StringComparison.OrdinalIgnoreCase))
 {
-    return QueueRoutedCases(args[1], args.Length > 2 && args[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase));
+    return QueueRoutedCases(args[1], ConfirmedFor(args, args[1]));
 }
 
 if (args.Length >= 3 && args[0].Equals("requeuecase", StringComparison.OrdinalIgnoreCase))
@@ -783,11 +809,6 @@ if (args.Length >= 3 && args[0].Equals("importcases", StringComparison.OrdinalIg
     return ImportCasesFile(args[1], args[2], ConfirmedFor(args, args[1]));
 }
 
-if (args.Length >= 2 && args[0].Equals("migratetocontacts", StringComparison.OrdinalIgnoreCase))
-{
-    return MigrateToContacts(args);
-}
-
 if (args.Length >= 2 && args[0].Equals("proveexport", StringComparison.OrdinalIgnoreCase))
 {
     return ProveExport(args[1]);
@@ -810,7 +831,7 @@ if (args.Length >= 2 && args[0].Equals("seedwebroles", StringComparison.OrdinalI
 
 if (args.Length >= 2 && args[0].Equals("proveroles", StringComparison.OrdinalIgnoreCase))
 {
-    return ProveRoles(args[1]);
+    return ProveRoles(args);
 }
 
 if (args.Length >= 2 && args[0].Equals("proveadoption", StringComparison.OrdinalIgnoreCase))
@@ -873,10 +894,20 @@ if (args.Length >= 2 && args[0].Equals("enableportallogin", StringComparison.Ord
     return EnablePortalLogin(args);
 }
 
-if (args.Length < 1)
+// Only the exact legacy shape reaches Register: `<orgUrl> [<pluginDllPath>]`. Anything else
+// is an unknown verb or a known one with too few arguments, and must not register an
+// assembly against whatever URL-looking argument happens to come first.
+if (args.Length < 1 || args.Length > 2
+    || !Uri.TryCreate(args[0], UriKind.Absolute, out var legacyOrg)
+    || legacyOrg.Scheme != Uri.UriSchemeHttps
+    || (args.Length == 2 && !args[1].EndsWith(".dll", StringComparison.OrdinalIgnoreCase)))
 {
-    Console.Error.WriteLine("Usage: dotnet run -- <orgUrl> [<pluginDllPath>]   |   dotnet run -- verify <orgUrl>");
-    return 1;
+    Console.Error.WriteLine(args.Length == 0
+        ? "No verb given."
+        : $"Unknown verb, or too few arguments for '{args[0]}' ({args.Length - 1} given).");
+    Console.Error.WriteLine("Usage: dotnet run -- <verb> <orgUrl> ...   (each verb's arguments are listed at the top of Program.cs)");
+    Console.Error.WriteLine("       dotnet run -- <orgUrl> [<pluginDllPath>]   (legacy: register CompleteRemediation)");
+    return 2;
 }
 
 return Register(args);
@@ -1092,6 +1123,18 @@ int WebApiMany(string orgUrl, string requestsFile, string? outFile)
 
     var requests = JsonNode.Parse(File.ReadAllText(file))!.AsArray();
 
+    // A request with no verb is refused, not sent as a POST: a GET batch missing one key
+    // must never become a write. Checked for the whole file before anything is sent.
+    var verbless = Enumerable.Range(0, requests.Count)
+        .Where(i => !(requests[i]?["verb"] is JsonValue v && v.TryGetValue<string>(out var s) && !string.IsNullOrWhiteSpace(s)))
+        .ToList();
+    if (verbless.Count > 0)
+    {
+        Console.Error.WriteLine(
+            $"Refusing: request(s) {string.Join(", ", verbless)} have no \"verb\". Name GET, POST, PATCH or DELETE on every request. Nothing was sent.");
+        return 1;
+    }
+
     using var svc = Connect(orgUrl);
 
     var failed = 0;
@@ -1099,9 +1142,7 @@ int WebApiMany(string orgUrl, string requestsFile, string? outFile)
     for (var i = 0; i < requests.Count; i++)
     {
         var request = requests[i]!.AsObject();
-        var verb = (request.TryGetPropertyValue("verb", out var verbNode) && verbNode != null
-            ? verbNode.GetValue<string>()
-            : "POST").Trim().ToUpperInvariant();
+        var verb = request["verb"]!.GetValue<string>().Trim().ToUpperInvariant();
         var target = (request.TryGetPropertyValue("path", out var pathNode) && pathNode != null
             ? pathNode.GetValue<string>()
             : string.Empty).TrimStart('/');
@@ -2096,7 +2137,7 @@ int QueueRoutedCases(string orgUrl, bool confirm)
 
     if (!confirm)
     {
-        Console.WriteLine("Dry run. Re-run with --confirm to queue them.");
+        Console.WriteLine($"Dry run. Re-run with --confirm {orgUrl} to queue them.");
         return 0;
     }
 
@@ -2551,36 +2592,6 @@ int PushWebFile(string orgUrl, string componentIdArg, string path, string? mimeT
     return 0;
 }
 
-// One-off DEV migration onto the contact registry. DELETES al_user rows, REWRITES the
-// adviser and paraplanner on every case, ALLOCATES cases and CLOSES some of them, and the
-// Audit Events those commands write are immutable (NFR-AUD-01). The org URL is repeated
-// after --confirm for the same reason the verify modes repeat it: this must not happen by
-// muscle memory.
-int MigrateToContacts(string[] a)
-{
-    var orgUrl = a[1];
-    var confirmed = a.Length >= 4
-        && a[2].Equals("--confirm", StringComparison.OrdinalIgnoreCase)
-        && a[3].TrimEnd('/').Equals(orgUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
-
-    if (!confirmed)
-    {
-        Console.Error.WriteLine(
-            "This rewrites business data. Re-run as: migratetocontacts <orgUrl> --confirm <orgUrl>");
-        return 1;
-    }
-
-    using var svc = Connect(orgUrl);
-
-    var whoAmI = (WhoAmIResponse)svc.Execute(new WhoAmIRequest());
-    var caller = svc.Retrieve("systemuser", whoAmI.UserId, new ColumnSet("internalemailaddress"));
-    var callerEmail = (caller.GetAttributeValue<string>("internalemailaddress") ?? string.Empty).Trim();
-    Console.WriteLine($"Running as {callerEmail}.");
-    Console.WriteLine();
-
-    return ContactsMigration.Run(svc, callerEmail);
-}
-
 // Runs the Trail Light export the way the Exports page does — CreateExportBatch then
 // GenerateExport — and reports the row count and the records actually written. This is
 // the evidence that the Download control has something to download; the control disables
@@ -2794,9 +2805,19 @@ int SeedWebRoles(string[] a)
 
 // Proves the role path end to end through the commands the app calls: assign a web role to
 // a contact, confirm the association really exists, then withdraw it and confirm it is
-// gone. Leaves the environment as it found it.
-int ProveRoles(string orgUrl)
+// gone. Leaves the environment as it found it - the withdraw and the cleanup run in a
+// finally, so a failure half way never leaves a real person holding the probe role.
+// GRANTS A REAL CONTACT A REAL PORTAL ROLE for the length of the run, hence --confirm <orgUrl>.
+int ProveRoles(string[] a)
 {
+    var orgUrl = a[1];
+    if (!ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This grants a real contact a portal role for the length of the run. Re-run as: proveroles <orgUrl> --confirm <orgUrl>");
+        return 1;
+    }
+
     using var svc = Connect(orgUrl);
 
     const string probeRole = "AL Portal - Planner";
@@ -2821,42 +2842,67 @@ int ProveRoles(string orgUrl)
         return 1;
     }
 
-    var assign = svc.Execute(new OrganizationRequest("al_AssignUserRole")
+    string? mappingId = null;
+    var granted = false;
+    var removed = false;
+    var withdrawSent = false;
+
+    void Withdraw()
     {
-        ["UserEmail"] = email,
-        ["RoleCode"] = probeRole,
-        // Sent empty rather than omitted: the platform's request validator refuses a call
-        // that leaves an optional Custom API parameter out entirely.
-        ["AppRole"] = string.Empty,
-        ["IdempotencyKey"] = "PROVE-ROLES-ASSIGN-" + Guid.NewGuid().ToString("N"),
-    });
-    var mappingId = (string)assign["MappingId"];
-    Console.WriteLine($"  al_AssignUserRole -> mapping {mappingId}");
+        withdrawSent = true;
+        svc.Execute(new OrganizationRequest("al_SetRoleAssignmentActive")
+        {
+            ["MappingId"] = mappingId,
+            ["Active"] = false,
+            ["IdempotencyKey"] = "PROVE-ROLES-WITHDRAW-" + Guid.NewGuid().ToString("N"),
+        });
+    }
 
-    var after = RolesOf(svc, contact.Id);
-    Console.WriteLine($"  roles after assign: {string.Join(", ", after)}");
-    var granted = after.Contains(probeRole);
-    Console.WriteLine(granted
-        ? "  ASSIGN: PASS - the web role association exists, not just a mapping row."
-        : "  ASSIGN: FAIL - the mapping row was written but no association was made.");
-
-    svc.Execute(new OrganizationRequest("al_SetRoleAssignmentActive")
+    try
     {
-        ["MappingId"] = mappingId,
-        ["Active"] = false,
-        ["IdempotencyKey"] = "PROVE-ROLES-WITHDRAW-" + Guid.NewGuid().ToString("N"),
-    });
+        var assign = svc.Execute(new OrganizationRequest("al_AssignUserRole")
+        {
+            ["UserEmail"] = email,
+            ["RoleCode"] = probeRole,
+            // Sent empty rather than omitted: the platform's request validator refuses a call
+            // that leaves an optional Custom API parameter out entirely.
+            ["AppRole"] = string.Empty,
+            ["IdempotencyKey"] = "PROVE-ROLES-ASSIGN-" + Guid.NewGuid().ToString("N"),
+        });
+        mappingId = (string)assign["MappingId"];
+        Console.WriteLine($"  al_AssignUserRole -> mapping {mappingId}");
 
-    var withdrawn = RolesOf(svc, contact.Id);
-    Console.WriteLine($"  roles after withdraw: {(withdrawn.Count == 0 ? "(none)" : string.Join(", ", withdrawn))}");
-    var removed = !withdrawn.Contains(probeRole);
-    Console.WriteLine(removed
-        ? "  WITHDRAW: PASS - the association was removed, not just greyed out."
-        : "  WITHDRAW: FAIL - the person still holds the web role.");
+        var after = RolesOf(svc, contact.Id);
+        Console.WriteLine($"  roles after assign: {string.Join(", ", after)}");
+        granted = after.Contains(probeRole);
+        Console.WriteLine(granted
+            ? "  ASSIGN: PASS - the web role association exists, not just a mapping row."
+            : "  ASSIGN: FAIL - the mapping row was written but no association was made.");
 
-    // Clean up the mirror row the probe created, so the environment is left as found.
-    try { svc.Delete("al_userrolemapping", new Guid(mappingId)); Console.WriteLine("  cleanup: probe mapping deleted."); }
-    catch (Exception ex) { Console.Error.WriteLine("  cleanup failed: " + ex.Message); }
+        Withdraw();
+
+        var withdrawn = RolesOf(svc, contact.Id);
+        Console.WriteLine($"  roles after withdraw: {(withdrawn.Count == 0 ? "(none)" : string.Join(", ", withdrawn))}");
+        removed = !withdrawn.Contains(probeRole);
+        Console.WriteLine(removed
+            ? "  WITHDRAW: PASS - the association was removed, not just greyed out."
+            : "  WITHDRAW: FAIL - the person still holds the web role.");
+    }
+    finally
+    {
+        if (mappingId != null && !withdrawSent)
+        {
+            try { Withdraw(); Console.WriteLine("  cleanup: probe role withdrawn after a failure."); }
+            catch (Exception ex) { Console.Error.WriteLine($"  cleanup FAILED: {email} may still hold {probeRole}: " + ex.Message); }
+        }
+
+        // Clean up the mirror row the probe created, so the environment is left as found.
+        if (mappingId != null)
+        {
+            try { svc.Delete("al_userrolemapping", new Guid(mappingId)); Console.WriteLine("  cleanup: probe mapping deleted."); }
+            catch (Exception ex) { Console.Error.WriteLine("  cleanup failed: " + ex.Message); }
+        }
+    }
 
     return granted && removed ? 0 : 2;
 }
@@ -3410,7 +3456,7 @@ int BindIdentity(string[] a)
 // validates the authentication cookie against.
 //
 // Power Pages writes this itself for a contact it creates from an external sign-in. A
-// contact created by hand — by migratetocontacts, by a seed, or in the maker portal — gets
+// contact created by hand — by a seed or in the maker portal — gets
 // an external identity binding and no stamp, and the difference is invisible until someone
 // tries to sign in as them.
 //
@@ -5258,11 +5304,65 @@ int ImportSeed(string[] a)
         fields[name] = map;
     }
 
+    var data = System.Xml.Linq.XDocument.Load(dataPath);
+
+    // The whole package is checked against the schema BEFORE anything is written. The writes
+    // below run in no transaction, so a problem found half way used to leave the earlier
+    // rows written and the rest not - a seed applied by halves.
+    var problems = new List<string>();
+    foreach (var entityNode in data.Descendants("entity"))
+    {
+        var logicalName = (string?)entityNode.Attribute("name");
+        if (logicalName == null) continue;
+
+        if (!fields.TryGetValue(logicalName, out var fieldTypes))
+        {
+            problems.Add($"{logicalName}: not declared in data_schema.xml.");
+            continue;
+        }
+
+        foreach (var recordNode in entityNode.Descendants("record"))
+        {
+            var rawId = (string?)recordNode.Attribute("id");
+            if (rawId == null || !Guid.TryParse(rawId, out _))
+            {
+                problems.Add($"{logicalName}: a record has no usable id.");
+            }
+
+            foreach (var fieldNode in recordNode.Elements("field"))
+            {
+                var name = (string?)fieldNode.Attribute("name");
+                if (name == null) continue;
+
+                if (!fieldTypes.TryGetValue(name, out var type))
+                {
+                    problems.Add($"{logicalName}.{name}: not declared in data_schema.xml (record {rawId}).");
+                    continue;
+                }
+
+                try
+                {
+                    SeedValue(logicalName, name, type.Type, type.LookupType, (string?)fieldNode.Attribute("value"), fieldNode);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    problems.Add(ex.Message + $" (record {rawId})");
+                }
+            }
+        }
+    }
+
+    if (problems.Count > 0)
+    {
+        foreach (var problem in problems) Console.Error.WriteLine("  " + problem);
+        Console.Error.WriteLine($"{problems.Count} problem(s) in {folder}. Nothing was written.");
+        return 1;
+    }
+
     using var svc = Connect(orgUrl);
 
     var created = 0;
     var updated = 0;
-    var data = System.Xml.Linq.XDocument.Load(dataPath);
 
     // Package id -> the id the environment actually holds.
     //
@@ -6366,7 +6466,9 @@ int VerifyRegrade(string orgUrl, Guid caseId)
         ["al_reviewinstancecode"] = "VRI-" + stamp,
         ["al_checklistversionid"] = version.ToEntityReference(),
         ["al_outcomecaseid"] = caseRef.ToEntityReference(),
-        ["al_reviewstatus"] = new OptionSetValue(120910212), // Submitted
+        // Open, not Submitted: the review guard refuses a check created already submitted, and
+        // al_RegradeCase does not read the check's status.
+        ["al_reviewstatus"] = new OptionSetValue(120910210), // Assigned
         ["al_reviewtype"] = new OptionSetValue(120910201),   // AQS
         ["al_sequence"] = 2,
     });
@@ -8171,7 +8273,7 @@ int DedupePagePermissions(string orgUrl, bool confirm)
     Console.WriteLine(
         confirm
             ? $"Retired {retired} shadow rule(s); {refused} left for a person to decide."
-            : $"{retired} would be retired, {refused} left for a person. Re-run with --confirm.");
+            : $"{retired} would be retired, {refused} left for a person. Re-run with --confirm {orgUrl}.");
 
     return 0;
 }
@@ -8444,7 +8546,7 @@ int SeedNotificationTemplates(string orgUrl, bool confirm)
     Console.WriteLine(
         confirm
             ? $"Seeded {written} template(s); {kept} already existed and were left alone."
-            : $"{written} would be created, {kept} already exist. Re-run with --confirm to write them.");
+            : $"{written} would be created, {kept} already exist. Re-run with --confirm {orgUrl} to write them.");
     return 0;
 }
 
@@ -10528,7 +10630,7 @@ int BackfillIoReference(string orgUrl, bool confirm)
 
     if (!confirm)
     {
-        Console.WriteLine("Dry run. Re-run with --confirm to write.");
+        Console.WriteLine($"Dry run. Re-run with --confirm {orgUrl} to write.");
         return 0;
     }
 
@@ -10626,7 +10728,7 @@ int SetPagePermissionRule(string orgUrl, string role, string resourceKey, string
     if (!confirm)
     {
         Console.WriteLine();
-        Console.WriteLine($"Dry run. Re-run as: setpagepermission <orgUrl> \"{role}\" {resourceKey} {level} --confirm");
+        Console.WriteLine($"Dry run. Re-run as: setpagepermission {orgUrl} \"{role}\" {resourceKey} {level} --confirm {orgUrl}");
         return 0;
     }
 
@@ -10637,6 +10739,8 @@ int SetPagePermissionRule(string orgUrl, string role, string resourceKey, string
         ["al_rolecode"] = role,
         ["al_resourcekey"] = resourceKey,
         ["al_accesslevel"] = new OptionSetValue(levelValue),
+        // Explicitly null: al_approle defaults to Adviser, and a rule keyed on al_rolecode must not carry it.
+        ["al_approle"] = null,
     };
 
     if (existing.Count == 0)
@@ -10671,7 +10775,7 @@ int SetPagePermissionRule(string orgUrl, string role, string resourceKey, string
 /// Reads the expected list from the solution source rather than a hard-coded list, so a
 /// step added later is covered without anyone remembering to add it here.
 ///
-/// Usage: verifysteps &lt;orgUrl&gt; [&lt;pathToSrc&gt;]
+/// Usage: verifysteps &lt;orgUrl&gt; [&lt;pathToSrcSteps&gt; | &lt;solution.zip&gt;]
 /// </summary>
 int VerifySteps(string orgUrl, string srcPath)
 {
@@ -10696,16 +10800,50 @@ int VerifySteps(string orgUrl, string srcPath)
     }
 
     var expected = new List<(string Name, string Declared)>();
-    foreach (var file in Directory.GetFiles(folder, "*.xml"))
+
+    // A solution .zip: the steps the PACKAGE declares, read from its customizations.xml, so
+    // an import is checked against what was imported rather than the working tree. An
+    // exported package carries no <StateCode> (activation comes from --activate-plugins), so
+    // the "stamped Enabled" source check does not apply to it.
+    var fromPackage = folder.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+    if (fromPackage)
+    {
+        if (!File.Exists(folder))
+        {
+            Console.Error.WriteLine("Solution package not found: " + folder);
+            return 1;
+        }
+
+        using var zip = System.IO.Compression.ZipFile.OpenRead(folder);
+        var entry = zip.GetEntry("customizations.xml");
+        if (entry == null)
+        {
+            Console.Error.WriteLine("No customizations.xml in " + folder + ". Refusing to report a clean run.");
+            return 1;
+        }
+
+        using var reader = new StreamReader(entry.Open());
+        var customizations = reader.ReadToEnd();
+        foreach (System.Text.RegularExpressions.Match step in System.Text.RegularExpressions.Regex.Matches(
+                     customizations, "<SdkMessageProcessingStep Name=\"([^\"]*)\"[\\s\\S]*?</SdkMessageProcessingStep>"))
+        {
+            var state = System.Text.RegularExpressions.Regex.Match(step.Value, "<StateCode>([^<]*)</StateCode>");
+            expected.Add((System.Net.WebUtility.HtmlDecode(step.Groups[1].Value), state.Success ? state.Groups[1].Value : "(package)"));
+        }
+    }
+
+    foreach (var file in fromPackage ? Array.Empty<string>() : Directory.GetFiles(folder, "*.xml"))
     {
         var xml = File.ReadAllText(file);
         var name = System.Text.RegularExpressions.Regex.Match(xml, "<SdkMessageProcessingStep Name=\"([^\"]*)\"");
         var state = System.Text.RegularExpressions.Regex.Match(xml, "<StateCode>([^<]*)</StateCode>");
         if (name.Success)
         {
-            expected.Add((name.Groups[1].Value, state.Success ? state.Groups[1].Value : "(none)"));
+            expected.Add((System.Net.WebUtility.HtmlDecode(name.Groups[1].Value), state.Success ? state.Groups[1].Value : "(none)"));
         }
     }
+
+    Console.WriteLine(expected.Count + " expected step(s) read from " + (fromPackage ? "the package " : "the working tree (not a package) ") + folder);
 
     if (expected.Count == 0)
     {
@@ -10746,7 +10884,7 @@ int VerifySteps(string orgUrl, string srcPath)
 
     foreach (var (name, declared) in expected.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
     {
-        if (!declared.Equals("Enabled", StringComparison.OrdinalIgnoreCase))
+        if (declared != "(package)" && !declared.Equals("Enabled", StringComparison.OrdinalIgnoreCase))
         {
             // The solution file itself does not ask for Enabled, so an import would leave it
             // off whatever the flag said. Reported separately: this is a source defect, not
@@ -10882,7 +11020,7 @@ int BackfillCheckerNames(string orgUrl, bool confirm)
 
     if (!confirm)
     {
-        Console.WriteLine("Dry run. Re-run with --confirm to write.");
+        Console.WriteLine($"Dry run. Re-run with --confirm {orgUrl} to write.");
         return 0;
     }
 
@@ -10978,7 +11116,7 @@ int BackfillTaxOutcome(string orgUrl, bool confirm)
 
     if (!confirm)
     {
-        Console.WriteLine("Dry run. Re-run with --confirm to write.");
+        Console.WriteLine($"Dry run. Re-run with --confirm {orgUrl} to write.");
         return 0;
     }
 
@@ -11689,6 +11827,126 @@ int AddMetadataToSolution(string orgUrl, string entityName, string? attributeNam
 
 /// <summary>What a registered step is set to do, so a check can report it rather than restate it.</summary>
 
+// backfillinitialgrade <orgUrl> [--confirm <orgUrl>]: fills al_exportrecord.al_initialadvicequalitygrade
+// on rows snapshotted before the column existed (2026-11-16), so their daily Trail Light file
+// reports the grade first recorded rather than the one in force. The value is the label of
+// al_initialoutcome on the case's newest al_outcome - the row GenerateExport reads. A row with
+// no advice grade (Tax-only) is not owed one and is not read; a row whose case has no initial
+// grade is listed and left alone. Dry run by default; touches no other column.
+int BackfillInitialGrade(string orgUrl, bool confirm)
+{
+    const string Column = "al_initialadvicequalitygrade";
+    using var svc = Connect(orgUrl);
+
+    var columns = ((RetrieveEntityResponse)svc.Execute(new RetrieveEntityRequest
+    {
+        LogicalName = "al_exportrecord",
+        EntityFilters = EntityFilters.Attributes,
+    })).EntityMetadata.Attributes;
+    if (!columns.Any(a => a.LogicalName == Column))
+    {
+        Console.Error.WriteLine(
+            "This environment's export records have no column for the first-recorded Advice Quality grade yet. "
+            + "It arrives with the next solution import; run this again after that. Nothing was changed.");
+        return 1;
+    }
+
+    var query = new QueryExpression("al_exportrecord")
+    {
+        ColumnSet = new ColumnSet("al_exportrecordcode", "al_outcomecaseid"),
+        Criteria = new FilterExpression(),
+    };
+    query.Criteria.AddCondition(Column, ConditionOperator.Null);
+    query.Criteria.AddCondition("al_advicequalitygrade", ConditionOperator.NotNull);
+    var rows = RetrieveAll(svc, query);
+
+    var initialByCase = new Dictionary<Guid, string?>();
+    var filled = 0;
+    var leftAlone = 0;
+    foreach (var row in rows)
+    {
+        var code = row.GetAttributeValue<string>("al_exportrecordcode");
+        var caseRef = row.GetAttributeValue<EntityReference>("al_outcomecaseid");
+        string? initial = null;
+        if (caseRef != null && !initialByCase.TryGetValue(caseRef.Id, out initial))
+        {
+            var outcome = new QueryExpression("al_outcome")
+            {
+                ColumnSet = new ColumnSet("al_initialoutcome"),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            outcome.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseRef.Id);
+            outcome.AddOrder("createdon", OrderType.Descending);
+            var newest = svc.RetrieveMultiple(outcome).Entities.FirstOrDefault();
+            initial = newest != null && newest.FormattedValues.TryGetValue("al_initialoutcome", out var label) ? label : null;
+            initialByCase[caseRef.Id] = initial;
+        }
+
+        if (string.IsNullOrWhiteSpace(initial))
+        {
+            Console.WriteLine($"  {code}: the case has no first-recorded grade - left alone");
+            leftAlone++;
+            continue;
+        }
+
+        Console.WriteLine($"  {code}: {Column} = {initial}");
+        if (confirm)
+        {
+            svc.Update(new Entity("al_exportrecord", row.Id) { [Column] = initial });
+        }
+
+        filled++;
+    }
+
+    Console.WriteLine();
+    Console.WriteLine(confirm
+        ? $"Filled {filled} export record(s); left {leftAlone} alone."
+        : $"{filled} export record(s) would be filled and {leftAlone} left alone. Dry run. Re-run with --confirm {orgUrl} to write them.");
+    return 0;
+}
+
+// clearrulapprole <orgUrl> [--confirm <orgUrl>]: lists every ACTIVE al_pagepermission rule
+// that carries BOTH al_rolecode and al_approle, and with --confirm sets al_approle to null on
+// each. al_approle defaults to Adviser, so every rule written by role code before the writers
+// nulled it came back also naming Adviser. Dry run by default; touches no other column.
+int ClearRuleAppRole(string orgUrl, bool confirm)
+{
+    using var svc = Connect(orgUrl);
+
+    var query = new QueryExpression("al_pagepermission")
+    {
+        ColumnSet = new ColumnSet("al_pagepermissioncode", "al_rolecode", "al_resourcekey", "al_approle"),
+        Criteria = new FilterExpression
+        {
+            Conditions =
+            {
+                new ConditionExpression("statecode", ConditionOperator.Equal, 0),
+                new ConditionExpression("al_rolecode", ConditionOperator.NotNull),
+                new ConditionExpression("al_approle", ConditionOperator.NotNull),
+            },
+        },
+    };
+    var rows = svc.RetrieveMultiple(query).Entities;
+
+    foreach (var row in rows)
+    {
+        Console.WriteLine(
+            $"  [{row.GetAttributeValue<string>("al_rolecode")}] {row.GetAttributeValue<string>("al_resourcekey")} "
+            + $"al_approle={row.GetAttributeValue<OptionSetValue>("al_approle")?.Value} ({row.GetAttributeValue<string>("al_pagepermissioncode")})");
+        if (confirm)
+        {
+            svc.Update(new Entity("al_pagepermission", row.Id) { ["al_approle"] = null });
+        }
+    }
+
+    Console.WriteLine();
+    Console.WriteLine(confirm
+        ? $"Cleared al_approle on {rows.Count} active rule(s)."
+        : $"{rows.Count} active rule(s) carry both a role code and al_approle. Dry run. Re-run with --confirm {orgUrl} to clear al_approle on them.");
+    return 0;
+}
+
 /// <summary>
 /// AD-143. Brings al_pagepermission into line with the documented model, idempotently.
 ///
@@ -11711,8 +11969,16 @@ int AddMetadataToSolution(string orgUrl, string entityName, string? attributeNam
 ///      are what makes `stored.length > 0`, which is what switches DEFAULT_PERMISSIONS off,
 ///      and the Security page renders them as though they granted Manage.
 /// </summary>
-int FixPermissions(string orgUrl)
+int FixPermissions(string[] a)
 {
+    var orgUrl = a[1];
+    if (!ConfirmedFor(a, orgUrl))
+    {
+        Console.Error.WriteLine(
+            "This writes al_pagepermission rules directly, bypassing al_SetPagePermission. Re-run as: fixpermissions <orgUrl> --confirm <orgUrl>");
+        return 1;
+    }
+
     using var svc = Connect(orgUrl);
     const int None = 120910766, View = 120910767, Edit = 120910768, Manage = 120910769;
     var levelName = new Dictionary<int, string>
@@ -11837,6 +12103,8 @@ int FixPermissions(string orgUrl)
                 ["al_resourcekey"] = wanted.Resource,
                 ["al_rolecode"] = wanted.Role,
                 ["al_accesslevel"] = new OptionSetValue(wanted.Level),
+                // Explicitly null: al_approle defaults to Adviser, and a rule keyed on al_rolecode must not carry it.
+                ["al_approle"] = null,
             });
             created++;
             Console.WriteLine($"  created     [{wanted.Role}] {wanted.Resource} = {levelName[wanted.Level]}");
@@ -11854,7 +12122,7 @@ int FixPermissions(string orgUrl)
         var want = floorRoles.Contains(wanted.Role) ? Math.Max(have, wanted.Level) : wanted.Level;
         if (have != want)
         {
-            svc.Update(new Entity("al_pagepermission", keep.Id) { ["al_accesslevel"] = new OptionSetValue(want) });
+            svc.Update(new Entity("al_pagepermission", keep.Id) { ["al_accesslevel"] = new OptionSetValue(want), ["al_approle"] = null });
             relevelled++;
             Console.WriteLine($"  set         [{wanted.Role}] {wanted.Resource} = {levelName[want]} (was {levelName[have]})");
         }
@@ -12066,8 +12334,8 @@ static class NotificationTable
     };
 }
 
-// Shared by setcaseadviser, setcasepeople and ContactsMigration, so the three move open actions
-// by one rule and a fix to it reaches all three.
+// Shared by setcaseadviser and setcasepeople, so both move open actions
+// by one rule and a fix to it reaches both.
 static class AdviserEmailFollow
 {
     // Moves one case's OPEN remediation actions to follow its adviser email, by the rule
@@ -12078,8 +12346,7 @@ static class AdviserEmailFollow
     // many moved (or would). No "Remediation assigned" email: this is an operator's write, and the
     // adviser is told out of band, as repointremediation says.
     //
-    // ContactsMigration passes an adviser it already knows is the only active contact holding
-    // the email; the verbs pass ContactByEmail's answer.
+    // The verbs pass ContactByEmail's answer.
     public static int Follow(IOrganizationService svc, Guid caseId, string? reference, Entity? adviser, string email, bool write)
     {
         var actions = svc.RetrieveMultiple(new FetchExpression(

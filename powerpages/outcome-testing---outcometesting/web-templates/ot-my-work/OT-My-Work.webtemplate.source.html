@@ -100,7 +100,10 @@
     <filter type="and">
       <condition attribute="al_assignedcontactid" operator="eq" value="{{ me | xml_escape }}" />
       <condition attribute="al_submittedon" operator="null" />
+      {% comment %}The same case condition as the my_reviews list below, so the tile counts the reviews that list shows: a removed case is nobody's work.{% endcomment %}
+      <condition entityname="case" attribute="al_casestatus" operator="ne" value="120910592" />
     </filter>
+    <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="case" />
   </entity>
 </fetch>
 {% endfetchxml %}
@@ -117,7 +120,10 @@
     <filter type="and">
       <condition attribute="al_assignedcontactid" operator="eq" value="{{ me | xml_escape }}" />
       <condition attribute="al_submittedon" operator="not-null" />
+      {% comment %}Same case condition as the list this tile opens (state=done), so the count and the rows agree.{% endcomment %}
+      <condition entityname="case" attribute="al_casestatus" operator="ne" value="120910592" />
     </filter>
+    <link-entity name="al_outcomecase" from="al_outcomecaseid" to="al_outcomecaseid" link-type="inner" alias="case" />
   </entity>
 </fetch>
 {% endfetchxml %}
@@ -160,7 +166,6 @@
     <attribute name="al_reviewinstanceid" />
     <attribute name="al_reviewtype" />
     <attribute name="al_reviewstatus" />
-    <attribute name="al_startedon" />
     <attribute name="al_submittedon" />
     <filter type="and">
       <condition attribute="al_assignedcontactid" operator="eq" value="{{ me | xml_escape }}" />
@@ -187,6 +192,10 @@
       <attribute name="al_aqscheckername" />
       <attribute name="al_duedate" />
       <order attribute="al_duedate" descending="false" />
+      {% comment %}The route name decides which of the two checker empty states reads, as on OT Case List. Outer: a case with no route is still listed.{% endcomment %}
+      <link-entity name="al_reviewroute" from="al_reviewrouteid" to="al_reviewrouteid" link-type="outer" alias="route">
+        <attribute name="al_name" />
+      </link-entity>
     </link-entity>
   </entity>
 </fetch>
@@ -346,10 +355,12 @@
                 list carries. Captured rather than defaulted, for the reason OT Case List gives:
                 a null compared to blank renders as nothing here.
               {% endcomment %}
+              {% comment %}An absent name reads as OT Case List decides it: from the route name, and an unknown route owes both.{% endcomment %}
+              {% assign rt_name = r['route.al_name'] %}
               {% capture tax_checker %}{{ r['case.al_taxcheckername'] }}{% endcapture %}
               {% capture aqs_checker %}{{ r['case.al_aqscheckername'] }}{% endcapture %}
-              <td>{% if tax_checker != '' %}{{ tax_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
-              <td>{% if aqs_checker != '' %}{{ aqs_checker | escape }}{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
+              <td>{% if tax_checker != '' %}{{ tax_checker | escape }}{% elsif rt_name == 'AQS only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
+              <td>{% if aqs_checker != '' %}{{ aqs_checker | escape }}{% elsif rt_name == 'Tax only' %}<span class="ot-checker ot-checker--na">No check of this type</span>{% else %}<span class="ot-checker">Not yet allocated</span>{% endif %}</td>
               <td>{% include 'OT Status Badge' status: r.al_reviewstatus.label %}</td>
               <td>{{ r['case.al_duedate'] | date: 'dd MMM yyyy' }}</td>
               <td>{{ r.al_submittedon | date: 'dd MMM yyyy' | default: '—' }}</td>

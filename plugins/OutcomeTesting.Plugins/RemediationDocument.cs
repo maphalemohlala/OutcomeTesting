@@ -48,6 +48,17 @@ namespace OutcomeTesting.Plugins
         /// <summary>The form, or an empty list where the case cannot be read.</summary>
         public static List<PdfBlock> Blocks(IOrganizationService service, EntityReference caseRef, DateTime today)
         {
+            return Blocks(service, caseRef, today, null, null);
+        }
+
+        /// <summary>
+        /// As <see cref="Blocks(IOrganizationService, EntityReference, DateTime)"/>, with the
+        /// option labels and the product name a caller drawing several documents has already
+        /// read. Either may be null and is then read here.
+        /// </summary>
+        public static List<PdfBlock> Blocks(
+            IOrganizationService service, EntityReference caseRef, DateTime today, OptionLabels labels, string product)
+        {
             var blocks = new List<PdfBlock>();
             if (caseRef == null)
             {
@@ -65,12 +76,12 @@ namespace OutcomeTesting.Plugins
                 return blocks;
             }
 
-            var labels = new OptionLabels(service);
+            labels = labels ?? new OptionLabels(service);
             var actions = Actions(service, caseRef);
             List<Entity> decisions;
             var signoffs = Signoffs(service, actions, out decisions);
 
-            blocks.Add(PdfBlock.Note(ProductName.RemediationFooter(ProductName.Read(service))));
+            blocks.Add(PdfBlock.Note(ProductName.RemediationFooter(product ?? ProductName.Read(service))));
             blocks.Add(PdfBlock.Title("Remediation and escalation"));
 
             var head = new PdfTable(0.25, 0.25, 0.25, 0.25) { Ruled = false };
@@ -538,8 +549,8 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static string Age(DateTime opened, DateTime until)
         {
-            var from = opened.Date;
-            var to = until.Date;
+            var from = CompletedCheck.UkDay(opened);
+            var to = CompletedCheck.UkDay(until);
             var count = 0;
             for (var day = from; day <= to; day = day.AddDays(1))
             {

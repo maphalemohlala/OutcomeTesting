@@ -1,12 +1,14 @@
 import type { CaseStatus, Outcome, ReviewRoute } from '../../types/domain';
 import { OUTCOMES, REVIEW_ROUTES } from '../../types/domain';
 import {
+  Al_outcomecasesal_adviserstatus,
   Al_outcomecasesal_casestatus,
   Al_outcomecasesal_casetype,
   Al_outcomecasesal_preorpostcheck,
   Al_outcomecasesal_priority,
   Al_outcomecasesal_productsolutiontype,
   Al_outcomecasesal_taxoutcome,
+  Al_outcomecasesal_vulnerableclient,
   type Al_outcomecases,
 } from '../../generated/models/Al_outcomecasesModel';
 import {
@@ -14,7 +16,7 @@ import {
   Al_outcomesal_initialoutcome,
   type Al_outcomes,
 } from '../../generated/models/Al_outcomesModel';
-import { MIGRATED_LISTS, heldOptionLabels, listByKey, lookupLabelOn } from '../admin/listOptions';
+import { MIGRATED_LISTS, heldOptionLabels, listByKey, lookupLabelOn, managedList } from '../admin/listOptions';
 import { choiceLabel } from '../../lib/choiceLabel';
 import { lookupLabel } from './lookupLabel';
 import type { CaseRemediation } from './caseRemediation';
@@ -80,6 +82,9 @@ export interface CaseSummary {
   checkDate: string | null;
   preOrPostCheck: string | null;
   dueDate: string | null;
+  /** The case's "Vulnerable client?" answer and the adviser's CAS status (completed report). */
+  vulnerableClient?: string | null;
+  adviserStatus?: string | null;
   /** When each check was last submitted; absent where the reviews could not be read. */
   taxSubmittedOn?: string | null;
   aqsSubmittedOn?: string | null;
@@ -107,7 +112,7 @@ const NEXT_ACTION: Record<CaseStatus, string> = {
   'No Check Required': 'No action — bypassed, not graded',
 };
 
-function toRoute(name: string | null): ReviewRoute | null {
+export function toRoute(name: string | null): ReviewRoute | null {
   return REVIEW_ROUTES.find((route) => route === name) ?? null;
 }
 
@@ -233,6 +238,7 @@ export const CASE_SUMMARY_COLUMNS = [
   'al_aqscheckername', '_al_taxcheckercontactid_value', '_al_aqscheckercontactid_value', 'al_casetype',
   '_al_casetypeid_value', 'al_productsolutiontype', '_al_producttypeid_value', 'al_products',
   'al_advicedate', 'al_checkdate', 'al_preorpostcheck', '_al_preorpostcheckid_value', 'al_duedate',
+  'al_vulnerableclient', '_al_vulnerableclientid_value', 'al_adviserstatus',
 ];
 
 /** Every column gradesByCase and the reports read from an outcome. */
@@ -292,5 +298,17 @@ export function toSummary(record: Al_outcomecases, grades?: CaseOutcomeGrades): 
         record.al_preorpostcheckname,
       ),
     dueDate: record.al_duedate ?? null,
+    vulnerableClient:
+      lookupLabelOn(record as unknown as Record<string, unknown>, managedList('vulnerable-client')) ??
+      choiceLabel(
+        Al_outcomecasesal_vulnerableclient,
+        record.al_vulnerableclient,
+        record.al_vulnerableclientname,
+      ),
+    adviserStatus: choiceLabel(
+      Al_outcomecasesal_adviserstatus,
+      record.al_adviserstatus,
+      record.al_adviserstatusname,
+    ),
   };
 }

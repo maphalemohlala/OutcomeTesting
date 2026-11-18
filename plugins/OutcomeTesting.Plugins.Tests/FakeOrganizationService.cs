@@ -24,6 +24,9 @@ namespace OutcomeTesting.Plugins.Tests
     /// </summary>
     public sealed class FakeOrganizationService : IOrganizationService
     {
+        /// <summary>What WhoAmI answers: this fake stands in for the SYSTEM service too.</summary>
+        public static readonly Guid SystemUserId = Guid.Parse("92ebbeb4-6b8e-4f28-8fe0-b2087ffd268d");
+
         private readonly Dictionary<string, Dictionary<Guid, Entity>> _store =
             new Dictionary<string, Dictionary<Guid, Entity>>(StringComparer.OrdinalIgnoreCase);
 
@@ -676,6 +679,15 @@ namespace OutcomeTesting.Plugins.Tests
 
             // Sharing (AD-218). Recorded in Requests like everything else, so a test asserts
             // on WHO was granted or revoked rather than on a response nobody reads.
+            if (request.RequestName == "WhoAmI")
+            {
+                var who = new OrganizationResponse { ResponseName = "WhoAmI" };
+                who.Results["UserId"] = SystemUserId;
+                who.Results["BusinessUnitId"] = Guid.Empty;
+                who.Results["OrganizationId"] = Guid.Empty;
+                return who;
+            }
+
             if (request.RequestName == "GrantAccess" || request.RequestName == "RevokeAccess")
             {
                 return new OrganizationResponse();

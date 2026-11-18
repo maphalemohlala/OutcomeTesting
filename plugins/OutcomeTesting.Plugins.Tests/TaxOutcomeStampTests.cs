@@ -125,7 +125,7 @@ namespace OutcomeTesting.Plugins.Tests
         {
             // The regression guard for the other two reasons. HasOutcome is what closes a
             // case after sign-off and counts rows per case with no review filter, and
-            // GenerateExportPlugin.ResolveOutcome reads one Outcome per case while AD-075
+            // GenerateExportPlugin.ResolveOutcomes reads one Outcome per case while AD-075
             // blanks the graded columns for a Tax-only case on purpose. An al_outcome row
             // here would stall closure and fill an export column the contract leaves empty.
             var svc = TaxOnlyCase(ResponseRules.ChoicePass);

@@ -70,7 +70,7 @@ describe('case edit submit sequencing (AD-040, BR-012)', () => {
     const result = describeSubmit(ok, [alloc('AQS', failed('That check is already submitted.'))]);
 
     expect(result.error).toBe(
-      'Case details were saved, but one check could not be allocated — AQS: That check is already submitted. Nothing else has been changed.',
+      'Case details were saved, but one check could not be allocated — AQS: That check is already submitted.',
     );
     expect(result.notice).toBeNull();
     expect(result.close).toBe(false);
@@ -85,7 +85,7 @@ describe('case edit submit sequencing (AD-040, BR-012)', () => {
     ]);
 
     expect(result.error).toBe(
-      'Tax check allocated, but one check could not be allocated — AQS: No unsubmitted check of that type. Nothing else has been changed.',
+      'Tax check allocated, but one check could not be allocated — AQS: No unsubmitted check of that type.',
     );
     expect(result.reload).toBe(true);
   });

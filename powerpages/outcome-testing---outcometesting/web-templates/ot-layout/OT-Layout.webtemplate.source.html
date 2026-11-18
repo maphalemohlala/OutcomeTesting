@@ -21,8 +21,155 @@
   on 2026-09-11 and was reported both times as not showing.
 {% endcomment %}
 <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
 <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=roundo@300,400,500,600&display=swap">
-<link rel="stylesheet" href="/outcome-testing.css?v=25">
+<link rel="stylesheet" href="/outcome-testing.css?v=29">
+
+{% comment %}
+  The one place a failed Web API call is put into words (project owner, 2026-11-17: every
+  error says exactly what failed and why). Every page script that calls the Web API uses it,
+  and Check-PortalTemplates.ps1 (rule F) fails a template that reads the error body itself.
+
+    window.otApi.ok(xhr)              true only for a 2xx from the Web API itself, so a
+                                      request bounced to the sign-in page is not success
+    window.otApi.error(action, xhr)   "<action> failed. <why>" - the action in the user's
+                                      words, from the call site ("Signing off")
+    window.otApi.refusal(xhr)         the plug-in's own sentence, prefix taken off, or ''
+
+  The why is the plug-in's own sentence when the body carries one of the refusal prefixes
+  CommandHelpers.cs throws. Anything else - platform text, JSON, codes, ids, a stack - goes
+  to the console for support and the reader is told what the HTTP outcome means instead.
+  A null xhr means no request was sent (the page's token could not be had).
+
+  Defined here, ahead of the content block, so it exists before any page script runs.
+{% endcomment %}
+<script>
+  (function () {
+    'use strict';
+
+    // UNEXPECTED last: a refusal one command passes up through another can arrive wrapped in
+    // it, and the sentence that matters is the inner one (CommandHelpers.RefusalWithin).
+    var PREFIXES = ['VALIDATION:', 'PRECONDITION:', 'UNAUTHORIZED:', 'CONFLICT:', 'NOTFOUND:', 'NOT FOUND:'];
+    var UNEXPECTED = 'UNEXPECTED:';
+
+    var WHY = {
+      session: 'Your session has ended - reload the page and sign in again.',
+      role: 'Your role does not allow this.',
+      gone: 'The record no longer exists - reload the page.',
+      changed: 'Someone else changed it first - reload and try again.',
+      server: 'The server could not finish it - try again.',
+      offline: 'The page could not reach the server - check your connection and try again.',
+      // Status 0 while online: usually the sign-in service, on another site, took the request.
+      dropped: 'The connection to the server failed, or your session may have ended - reload the page, sign in again if asked, and try again.',
+      notData: 'The server answered with a page instead of a result, so the change may not have been made - reload the page, sign in again if asked, and check.',
+      rejected: 'The server did not accept what the page sent. Reload the page and try again, and report it if it happens again.',
+      notLoaded: 'This page did not load completely - refresh it and try again.'
+    };
+
+    // Text a person should never be shown: markup or JSON, an id, a .NET type or our class names.
+    var TECHNICAL = /[{}<>]|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-|Exception\b|OrganizationServiceFault|OutcomeTesting\.|could not complete\.|\b0x[0-9a-f]{4,}/i;
+
+    // Path of the URL that finally answered, lower-case; the page's own path when the browser gave none.
+    function finalPath(xhr) {
+      try { return new URL(xhr.responseURL || '', location.href).pathname.toLowerCase(); } catch (e) { return ''; }
+    }
+
+    function fromApi(xhr) { return finalPath(xhr).indexOf('/_api/') === 0; }
+
+    // Sent to the sign-in page: a lapsed session answers with it (an answer with no final URL
+    // is judged by its status).
+    function redirected(xhr) {
+      return !!xhr.responseURL && /signin|login/.test(finalPath(xhr));
+    }
+
+    function isJson(xhr) {
+      var type = xhr.getResponseHeader ? xhr.getResponseHeader('Content-Type') : '';
+      return /json/i.test(type || '');
+    }
+
+    function messagesIn(xhr) {
+      var found = [];
+      try {
+        var body = JSON.parse(xhr.responseText || '');
+        var error = body && body.error ? body.error : body;
+        if (error && error.innererror && error.innererror.message) { found.push(String(error.innererror.message)); }
+        if (error && error.message) { found.push(String(error.message)); }
+      } catch (e) { /* not JSON: nothing in it is meant for a person */ }
+      return found;
+    }
+
+    // { prefix, sentence } for the first message carrying a refusal prefix, or null.
+    function refusalOf(xhr) {
+      if (!xhr) { return null; }
+      var messages = messagesIn(xhr);
+      for (var m = 0; m < messages.length; m++) {
+        var text = messages[m];
+        var at = -1;
+        var prefix = '';
+        for (var p = 0; p < PREFIXES.length; p++) {
+          var i = text.indexOf(PREFIXES[p]);
+          if (i !== -1 && (at === -1 || i < at)) { at = i; prefix = PREFIXES[p]; }
+        }
+        if (at === -1) { at = text.indexOf(UNEXPECTED); prefix = UNEXPECTED; }
+        if (at !== -1) {
+          return { prefix: prefix, sentence: text.substring(at + prefix.length).replace(/\s+/g, ' ').trim() };
+        }
+      }
+      return null;
+    }
+
+    function byStatus(xhr) {
+      var status = xhr.status;
+      if (status === 401 || status === 440 || redirected(xhr)) { return WHY.session; }
+      if (status === 0) { return navigator.onLine === false ? WHY.offline : WHY.dropped; }
+      if (status >= 200 && status < 300) { return WHY.notData; }
+      if (status === 400) { return WHY.rejected; }
+      if (status === 403) { return WHY.role; }
+      if (status === 404) { return WHY.gone; }
+      if (status === 412) { return WHY.changed; }
+      return WHY.server;
+    }
+
+    function why(xhr) {
+      if (!xhr) { return WHY.notLoaded; }
+      if (redirected(xhr)) { return WHY.session; }
+      var refusal = refusalOf(xhr);
+      if (refusal) {
+        // A machine-readable tail such as "[unanswered:...]" is for the page, not the reader.
+        var sentence = refusal.sentence.replace(/\s*\[[a-z]+:[^\]]*\]\s*$/i, '');
+        if (sentence && !TECHNICAL.test(sentence)) {
+          return sentence.charAt(0).toUpperCase() + sentence.substring(1);
+        }
+        if (refusal.prefix === UNEXPECTED) { return WHY.server; }
+      }
+      return byStatus(xhr);
+    }
+
+    window.otApi = {
+      // A sign-in page can arrive as a 200, even at an /_api/ URL: success also needs a
+      // Web API body (none, or JSON) from a final URL still under /_api/.
+      ok: function (xhr) {
+        return !!xhr && xhr.status >= 200 && xhr.status < 300 &&
+          (xhr.status === 204 || isJson(xhr)) && fromApi(xhr) && !redirected(xhr);
+      },
+      refusal: function (xhr) {
+        var refusal = refusalOf(xhr);
+        return refusal ? refusal.sentence : '';
+      },
+      error: function (action, xhr) {
+        if (window.console && console.error) {
+          console.error('[portal] ' + action + ' failed',
+            xhr ? { status: xhr.status, url: xhr.responseURL, body: xhr.responseText } : 'no request was sent');
+        }
+        var reason = why(xhr);
+        if (!/[.!?]$/.test(reason)) { reason += '.'; }
+        // The server's sentence already names the action: prefixing it would say it twice.
+        if (reason.indexOf(' could not be completed because ') !== -1) { return reason; }
+        return action + ' failed. ' + reason;
+      }
+    };
+  })();
+</script>
 
 <main class="ot-page" id="ot-main">
   <div class="ot-page__inner">
@@ -53,3 +200,70 @@
 
   </div>
 </main>
+
+{% comment %}
+  A text box prints at its screen height and hides the rest of a long answer, in portrait
+  and in landscape; a one-line field cuts a long value off at its edge. While the page
+  prints, each filled box, and each one-line field whose value does not fit, is stood in
+  for by a plain copy of its text, which wraps to the paper and grows; the print rules in
+  outcome-testing.css hide the field and show the copy. An empty box is left as it is, so
+  the form still prints a space to write in. Everything is undone after the print.
+{% endcomment %}
+<script>
+  (function () {
+    'use strict';
+
+    // The box being typed in when the print started: hiding it drops the focus, so it is
+    // handed back afterwards.
+    var typingIn = null;
+
+    function clear() {
+      var copies = document.querySelectorAll('.ot-print-copy');
+      for (var i = 0; i < copies.length; i++) { copies[i].parentNode.removeChild(copies[i]); }
+      var boxes = document.querySelectorAll('.ot-printed-as-copy');
+      for (var j = 0; j < boxes.length; j++) { boxes[j].classList.remove('ot-printed-as-copy'); }
+      if (typingIn && document.body.contains(typingIn) && document.activeElement !== typingIn) {
+        try { typingIn.focus({ preventScroll: true }); } catch (e) { /* nothing to restore */ }
+      }
+      typingIn = null;
+    }
+
+    function copy() {
+      var active = document.activeElement;
+      var held = typingIn;
+      typingIn = null;
+      clear();
+      typingIn = held || (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT') ? active : null);
+      var boxes = document.querySelectorAll('textarea, input[type="text"], input[type="email"]');
+      for (var i = 0; i < boxes.length; i++) {
+        var box = boxes[i];
+        if (!box.value) { continue; }
+        // A one-line field is copied only when its value already runs past its edge; one
+        // that fits prints as it is.
+        if (box.tagName === 'INPUT' && box.scrollWidth <= box.clientWidth + 1) { continue; }
+        var stand = document.createElement('div');
+        // Ruled where the box is ruled on screen (the remediation form), unruled where it
+        // is not (the checklist).
+        var ruled = parseFloat(window.getComputedStyle(box).borderTopWidth) > 0;
+        stand.className = ruled ? 'ot-print-copy ot-print-copy--ruled' : 'ot-print-copy';
+        stand.setAttribute('aria-hidden', 'true');
+        if (box.id) { stand.setAttribute('data-ot-print-copy-of', box.id); }
+        stand.textContent = box.value;
+        box.parentNode.insertBefore(stand, box.nextSibling);
+        box.classList.add('ot-printed-as-copy');
+      }
+    }
+
+    window.addEventListener('beforeprint', copy);
+    window.addEventListener('afterprint', clear);
+
+    // The same switch from the print media query, for a browser that prints without
+    // raising the two events. Both paths are safe to run twice.
+    if (window.matchMedia) {
+      var paper = window.matchMedia('print');
+      var onPaper = function (e) { if (e.matches) { copy(); } else { clear(); } };
+      if (paper.addEventListener) { paper.addEventListener('change', onPaper); }
+      else if (paper.addListener) { paper.addListener(onPaper); }
+    }
+  })();
+</script>

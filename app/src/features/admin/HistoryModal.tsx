@@ -1,12 +1,13 @@
 import { Modal } from '../../components/feedback/Modal';
+import { dateTime } from '../../lib/format';
 import type { LibraryQuestion, LibrarySection } from './useQuestionLibrary';
 import { useQuestionHistory, type HistoryState } from './useQuestionHistory';
 import { useSectionHistory } from './useSectionHistory';
 
 function formatWhen(iso: string | null): string {
   if (!iso) return 'Date not recorded';
-  const time = new Date(iso).getTime();
-  return Number.isNaN(time) ? 'Date not recorded' : new Date(time).toLocaleString('en-GB');
+  const shown = dateTime(iso);
+  return shown === '—' ? 'Date not recorded' : shown;
 }
 
 /**

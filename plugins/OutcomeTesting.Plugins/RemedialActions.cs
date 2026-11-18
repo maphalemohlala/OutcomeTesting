@@ -158,23 +158,6 @@ namespace OutcomeTesting.Plugins
             return text.Trim();
         }
 
-        /// <summary>Each item's words, in item order, with null where there are none.</summary>
-        public static List<string> Align(IList<string> items, IDictionary<string, string> map)
-        {
-            var texts = new List<string>();
-            if (items == null)
-            {
-                return texts;
-            }
-
-            foreach (var item in items)
-            {
-                texts.Add(TextFor(map, item));
-            }
-
-            return texts;
-        }
-
         /// <summary>
         /// Each item with its words, each followed by any further actions written against it,
         /// numbered order. The item repeats, which is what gives every query its own action.
@@ -294,6 +277,14 @@ namespace OutcomeTesting.Plugins
 
         /// <summary>The length <see cref="ResponseHistoryAttr"/> is created with.</summary>
         public const int ResponseHistoryLength = 20000;
+
+        /// <summary>
+        /// The most one answer adds to the history: the blank line before it, its heading, and
+        /// the adviser's words, which <c>al_adviserresponse</c> holds to 2000 characters. So
+        /// the most the oldest answers ever give way by at once, which is what lets the guard
+        /// tell that trim from a rewrite.
+        /// </summary>
+        public const int LongestHistoryEntry = 2100;
 
         /// <summary>
         /// The history with one more answer on the end: its completion date and Yes / No on one

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -6,7 +7,8 @@ namespace OutcomeTesting.Plugins
 {
     /// <summary>
     /// Server-side command GenerateExport (AD-003, AD-039, AD-034 manual only). Registered
-    /// against the Custom API <c>al_GenerateExport</c>. Snapshots each Closed case into an
+    /// against the Custom API <c>al_GenerateExport</c>. Snapshots each Closed case, and each
+    /// graded case not yet closed (marked by <see cref="NotYetClosedMarker"/>), into an
     /// al_exportrecord in the AD-039 20-column Trail Light shape, so the delivered values
     /// are preserved for reconciliation (BR-012). Columns B and D carry CODES again from
     /// 2026-09-22 (AD-207, superseding AD-183's emails), resolved from the REGISTRY and
@@ -50,6 +52,11 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public const string FqAccountableContactAttr = "al_fqaccountablecontactid";
         public const string AqAccountableContactAttr = "al_aqaccountablecontactid";
+
+        // The administrator carrying a File Quality fail (requirements log row 10). Read only
+        // by IsAccountable - it is never written to an export column.
+        public const string FqAdministratorContactAttr = "al_fqadministratorcontactid";
+        private const string TaxOutcomeAttr = "al_taxoutcome";
         private const int CaseStatusClosed = 120910591;
         private const int BatchStatusDraft = 120910770;
         private const int BatchStatusGenerated = 120910771;
@@ -117,59 +124,105 @@ namespace OutcomeTesting.Plugins
                     "al_productsolutiontype", ListOptionRules.ProductTypeAttribute,
                     "al_checkdate", "al_clientname",
                     "al_preorpostcheck", ListOptionRules.PreOrPostCheckAttribute,
-                    CaseReviewRouteAttr),
+                    CaseReviewRouteAttr, TaxOutcomeAttr),
                 Criteria = new FilterExpression(),
             };
             cases.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
-            cases.Criteria.AddCondition("al_casestatus", ConditionOperator.Equal, CaseStatusClosed);
+
+            // Every Closed case, for the quarterly file, and every graded case still open and
+            // dated, for the daily file: any non-pass goes to remediation on its check day, so
+            // a Closed-only snapshot held none of the daily file's fails (owner, 2026-11-17).
+            var wanted = new FilterExpression(LogicalOperator.Or);
+            wanted.AddCondition("al_casestatus", ConditionOperator.Equal, CaseStatusClosed);
+            var gradedOpen = new FilterExpression();
+            gradedOpen.AddCondition("al_casestatus", ConditionOperator.In, GradedOpenStatuses);
+            gradedOpen.AddCondition("al_checkdate", ConditionOperator.NotNull);
+            wanted.AddFilter(gradedOpen);
+            cases.Criteria.AddFilter(wanted);
+            cases.ColumnSet.AddColumn("al_casestatus");
 
             // Paged: a bare RetrieveMultiple stops at 5000 and the batch would then stamp
             // that truncated figure as its complete row count (AD-042), leaving no way to
             // detect the shortfall during reconciliation.
             var rows = 0;
-            foreach (var outcomeCase in CommandHelpers.RetrieveAll(userService, cases))
+
+            // Per-batch memos. Every batch walks every Closed and graded open case, and the same
+            // few routes, advisers, para-planners and named contacts recur on nearly all, so each
+            // is asked once per batch rather than once per case inside the two-minute budget.
+            var routeRequiresAqs = new System.Collections.Generic.Dictionary<Guid, bool>();
+            var staffCodes = new System.Collections.Generic.Dictionary<Guid, string>();
+            var matchAdviser = CasePeople.CachedMatcher(userService, "adviser");
+            var matchParaplanner = CasePeople.CachedMatcher(userService, "para-planner");
+
+            // A case that cannot be exported complete is left out and named on the batch's
+            // audit event, rather than refusing the whole batch: a Closed case has no way back,
+            // so one such case used to block every export from then on.
+            var leftOutClosed = new System.Collections.Generic.List<string>();
+            var leftOutOpen = new System.Collections.Generic.List<string>();
+
+            // Every batch re-snapshots every Closed case ever, so the per-case reads are what grow:
+            // the outcomes are read in chunks up front rather than one query per case.
+            var allCases = CommandHelpers.RetrieveAll(userService, cases).ToList();
+            var outcomes = ResolveOutcomes(userService, allCases.Select(c => c.Id).ToList());
+
+            foreach (var outcomeCase in allCases)
             {
                 var caseRef = outcomeCase.GetAttributeValue<string>("al_casereference") ?? outcomeCase.Id.ToString("D");
-                var outcomeRow = ResolveOutcome(userService, outcomeCase.Id);
-                var aqsExpected = AqsExpected(userService, outcomeCase);
+                var isClosed = outcomeCase.GetAttributeValue<OptionSetValue>("al_casestatus")?.Value == CaseStatusClosed;
+                var leftOut = isClosed ? leftOutClosed : leftOutOpen;
+                Entity outcomeRow;
+                outcomes.TryGetValue(outcomeCase.Id, out outcomeRow);
+                var aqsOwed = AqsExpected(userService, outcomeCase, outcomeRow, routeRequiresAqs);
+                if (!aqsOwed.HasValue)
+                {
+                    leftOut.Add("Case " + caseRef + " " + UnknownRouteReason);
+                    continue;
+                }
+
+                var aqsExpected = aqsOwed.Value;
 
                 // A Tax-only case reports File Quality and nothing else (client, 2026-11-06),
                 // so an outcome left behind by a route change does not reach the advice columns.
                 var adviceRow = aqsExpected ? outcomeRow : null;
                 var adviceGrade = Outcomes.EffectiveOutcomeLabel(adviceRow);
-                // One resolution, both values. Asking twice ran the same query twice per
-                // case for no gain.
-                var fileQualityAnswer = FileQuality.Resolve(userService, outcomeCase.Id);
+                // One resolution, both values, from the reviews the route owes: a Tax-only
+                // case's grade is its Tax answer, never one an abandoned AQS review left.
+                var fileQualityAnswer = FileQuality.Resolve(userService, outcomeCase.Id, aqsExpected);
                 var fileQualityGrade = FileQuality.Label(fileQualityAnswer);
                 var fileQualityChoice = FileQuality.Choice(fileQualityAnswer);
                 var effectiveOutcome = Outcomes.EffectiveOutcome(adviceRow);
-
-                // Someone named in place of the case's own adviser or paraplanner (project
-                // owner, 2026-09-19). Read once per case; FlaggedText decides per column
-                // whether it applies, since only the slot the flags point at is filled.
-                var fqNamedPerson = NamedPerson(userService, outcomeRow, FqAccountableContactAttr);
-                var aqNamedPerson = NamedPerson(userService, outcomeRow, AqAccountableContactAttr);
-
-                // One resolution per person, reused by every column that needs it (the same
-                // rule the file-quality read above follows). The para-planner's match feeds
-                // BOTH column D's email and column D's code, and the codes resolved here feed
-                // columns B and D as well as the four accountability code columns L, N, R and
-                // T - so asking again per column ran the identical query up to three times
-                // per case for no gain.
-                var paraplannerMatch = ParaplannerMatch(userService, outcomeCase);
-                var registryCodes = new RegistryCodes
-                {
-                    Adviser = AdviserCode(userService, outcomeCase),
-                    Paraplanner = ParaplannerCodeOf(paraplannerMatch),
-                };
-                var code = "EXR-" + batchCode + "-" + caseRef;
+                var initialOutcome = adviceRow?.GetAttributeValue<OptionSetValue>(Outcomes.InitialOutcomeAttr)?.Value;
 
                 var incomplete = DescribeIncompleteRow(outcomeRow, fileQualityGrade, aqsExpected);
                 if (incomplete != null)
                 {
-                    throw new InvalidPluginExecutionException(
-                        CommandHelpers.PreconditionPrefix + "Case " + caseRef + " " + incomplete);
+                    leftOut.Add("Case " + caseRef + " " + incomplete);
+                    continue;
                 }
+
+                // Someone named in place of the case's own adviser or paraplanner (project
+                // owner, 2026-09-19). Read once per case; FlaggedText decides per column
+                // whether it applies, since only the slot the flags point at is filled.
+                //
+                // A Tax-only case has no outcome for the Tax checker's choice to be applied to,
+                // so it stays on their submitted review, and is read from there.
+                var judgementRow = aqsExpected ? outcomeRow : (TaxOnlyJudgement(userService, outcomeCase.Id) ?? outcomeRow);
+                var fqNamedPerson = NamedPerson(userService, judgementRow, FqAccountableContactAttr, staffCodes);
+                var aqNamedPerson = NamedPerson(userService, judgementRow, AqAccountableContactAttr, staffCodes);
+
+                // One resolution per person, reused by every column that needs it. The
+                // para-planner's match feeds BOTH column D's email and column D's code, and the
+                // codes resolved here feed columns B and D as well as the four accountability
+                // code columns L, N, R and T.
+                var paraplannerMatch = matchParaplanner(
+                    outcomeCase.GetAttributeValue<string>(ImportRules.ParaplannerEmailAttribute));
+                var adviserMatch = matchAdviser(outcomeCase.GetAttributeValue<string>("al_adviseremail"));
+                var registryCodes = new RegistryCodes
+                {
+                    Adviser = adviserMatch != null && adviserMatch.IsMatch ? adviserMatch.StaffCode : null,
+                    Paraplanner = ParaplannerCodeOf(paraplannerMatch),
+                };
+                var code = "EXR-" + batchCode + "-" + caseRef;
 
                 var record = new Entity(RecordEntity)
                 {
@@ -201,8 +254,17 @@ namespace OutcomeTesting.Plugins
                     ["al_preorpostcheck"] = ManagedOption(
                         outcomeCase, ListOptionRules.PreOrPostCheckAttribute, "al_preorpostcheck"),
                     ["al_advicequalitygrade"] = adviceGrade,
+                    // The daily file reports the grade first recorded, the quarterly file the
+                    // one in force (client, 2026-11-16); one batch serves both, so both are kept.
+                    ["al_initialadvicequalitygrade"] = adviceRow == null
+                        ? null : CommandHelpers.Formatted(adviceRow, Outcomes.InitialOutcomeAttr),
+                    // A Tax-only case's own verdict, which no Trail Light column carries; the
+                    // daily file includes the row on it (client, 2026-11-16).
+                    ["al_taxoutcome"] = aqsExpected ? null : CommandHelpers.Formatted(outcomeCase, TaxOutcomeAttr),
                     ["al_filequalitygrade"] = fileQualityGrade,
-                    ["al_separator"] = string.Empty,
+                    // The separator left the file (AD-224), so the column now says which rows
+                    // were not yet closed: the quarterly file leaves those out.
+                    ["al_separator"] = isClosed ? string.Empty : NotYetClosedMarker,
                     ["statecode"] = new OptionSetValue(0),
                     ["statuscode"] = new OptionSetValue(1),
                 };
@@ -213,8 +275,8 @@ namespace OutcomeTesting.Plugins
                 // reading the wiring (2026-09-22 review: a one-variable swap here would have
                 // passed every test FlaggedText and NamedPerson had in isolation).
                 foreach (var column in AccountabilityColumns(
-                    outcomeRow, outcomeCase, fqNamedPerson, aqNamedPerson, registryCodes,
-                    fileQualityChoice, effectiveOutcome))
+                    judgementRow, outcomeCase, fqNamedPerson, aqNamedPerson, registryCodes,
+                    fileQualityChoice, AccountabilityGate(effectiveOutcome, initialOutcome)))
                 {
                     record[column.Key] = column.Value;
                 }
@@ -225,7 +287,9 @@ namespace OutcomeTesting.Plugins
                     record["al_checkdate"] = checkDate.Value;
                 }
 
-                AssignUserRolePlugin.Upsert(userService, RecordEntity, "al_exportrecordcode", code, record);
+                // A create, not an upsert: the batch is Draft (checked above), a failed run rolls
+                // back whole, and the code carries the batch code, so no row with it can exist.
+                userService.Create(record);
                 rows++;
             }
 
@@ -237,9 +301,17 @@ namespace OutcomeTesting.Plugins
             };
             userService.Update(update);
 
+            foreach (var line in leftOutClosed.Concat(leftOutOpen))
+            {
+                localPluginContext.Trace("Left out of " + batchCode + ": " + line);
+            }
+
+            // Kept on the batch's audit event, the record of this run, so the cases left out
+            // of the file can be found and put right. al_details stays the row count, because
+            // the idempotent replay reads it back as one.
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandGenerateExport, "GenerateExport " + batchCode, BatchEntity, batchId,
-                null, rows.ToString(), idempotencyKey, context);
+                LeftOutReason(leftOutClosed, leftOutOpen), rows.ToString(), idempotencyKey, context);
 
             SetResponse(context, batchId.ToString("D"), rows.ToString(), "Generated", auditId, false);
         }
@@ -430,32 +502,157 @@ namespace OutcomeTesting.Plugins
             }
         }
 
+        /// <summary>
+        /// The "who carries this fail" choice a Tax checker made on a Tax-only case, as the
+        /// four flags and two people an outcome row would carry, or null where none was made.
+        ///
+        /// The portal parks the choice on the review until an outcome exists to apply it to
+        /// (AccountabilityRequestPlugin). A Tax-only case never gets one, so the choice used
+        /// to be dropped and the file fell back to its default person. Once that review is
+        /// submitted the choice can no longer be changed, so the parked value is the record.
+        /// </summary>
+        public static Entity TaxOnlyJudgement(IOrganizationService service, Guid caseId)
+        {
+            var query = new QueryExpression(ReviewEntity)
+            {
+                ColumnSet = new ColumnSet("al_pendingaccountability"),
+                TopCount = 1,
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+            query.Criteria.AddCondition("al_reviewtype", ConditionOperator.Equal, ResponseRules.ReviewTypeTax);
+            query.Criteria.AddCondition("al_pendingaccountability", ConditionOperator.NotNull);
+            query.AddOrder("al_submittedon", OrderType.Descending);
+
+            var found = service.RetrieveMultiple(query).Entities;
+            var judgement = new Entity(OutcomeEntity);
+            if (found.Count == 0 || !AccountabilityRequestPlugin.ApplyParked(service, found[0], judgement))
+            {
+                return null;
+            }
+
+            // The parked choice holds ids only; the name column needs the person's name.
+            foreach (var attribute in new[] { FqAccountableContactAttr, AqAccountableContactAttr })
+            {
+                var person = judgement.GetAttributeValue<EntityReference>(attribute);
+                if (person == null)
+                {
+                    continue;
+                }
+
+                // A query, not a Retrieve: a contact deleted since answers with no row rather
+                // than a fault, which a plug-in may not catch and carry on from.
+                var contact = new QueryExpression(ContactRegistry.Entity)
+                {
+                    ColumnSet = new ColumnSet(ContactRegistry.FullNameAttr),
+                    TopCount = 1,
+                    Criteria = new FilterExpression(),
+                };
+                contact.Criteria.AddCondition("contactid", ConditionOperator.Equal, person.Id);
+                var rows = service.RetrieveMultiple(contact).Entities;
+                person.Name = rows.Count == 0 ? null : rows[0].GetAttributeValue<string>(ContactRegistry.FullNameAttr);
+            }
+
+            return judgement;
+        }
+
+        private const string UnknownRouteReason =
+            "has no review route and an Advice Quality check that is no longer active, so whether "
+            + "its advice grades are owed cannot be told. It was left out of this export; set the "
+            + "case's review route and generate a new batch.";
+
+        /// <summary>
+        /// The cases a batch left out, for its audit event: a count and each case's reason,
+        /// cut to what the column holds. Null when every Closed case was exported.
+        /// </summary>
+        public static string LeftOutReason(System.Collections.Generic.IList<string> leftOut)
+        {
+            return LeftOutReason(leftOut, null);
+        }
+
+        /// <summary>As above, with the graded cases not yet closed counted on their own.</summary>
+        public static string LeftOutReason(
+            System.Collections.Generic.IList<string> closed, System.Collections.Generic.IList<string> open)
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            if (closed != null && closed.Count > 0)
+            {
+                parts.Add(closed.Count + " closed case(s) left out of this export: " + string.Join(" | ", closed));
+            }
+
+            if (open != null && open.Count > 0)
+            {
+                parts.Add(open.Count + " case(s) not yet closed left out of this export: " + string.Join(" | ", open));
+            }
+
+            return parts.Count == 0 ? null : CommandHelpers.Truncate(string.Join(" || ", parts), 2000);
+        }
+
+        /// <summary>
+        /// What al_separator holds on a row whose case was graded but not yet closed when the
+        /// batch was generated. Closed rows keep it empty, as every batch before 2026-11-17 did.
+        /// The column holds ten characters.
+        /// </summary>
+        public const string NotYetClosedMarker = "Open";
+
+        /// <summary>Graded, so dated and holding its first grades, but not yet closed.</summary>
+        private static readonly object[] GradedOpenStatuses =
+        {
+            CaseLifecycle.Submitted, CaseLifecycle.AwaitingRemediation, CaseLifecycle.RemediationInProgress,
+            CaseLifecycle.AwaitingSignoff, CaseLifecycle.AwaitingRecheck,
+        };
+
         // AD-039 col 15 Advice Quality grade = final outcome, or initial when not yet
         // finalised (BR-007). Also returns the raw outcome value and the four OD-024
         // accountability flags (Task 2), so the caller has both the grade and the
         // accountability judgement without a second read.
-        private static Entity ResolveOutcome(IOrganizationService service, Guid caseId)
+        /// <summary>Cases per outcome query: an In list well inside the URL and FetchXML limits.</summary>
+        private const int OutcomeLookupChunk = 200;
+
+        /// <summary>
+        /// The newest al_outcome of each case, read in chunks. A case with none is absent.
+        ///
+        /// One Outcome per case is the intent, but nothing in the schema enforces it and a
+        /// re-review can leave a second. This row decides the exported grade and the
+        /// accountability gate, so picking whichever row Dataverse returned first would make the
+        /// export non-deterministic. Newest wins.
+        /// </summary>
+        public static System.Collections.Generic.Dictionary<Guid, Entity> ResolveOutcomes(
+            IOrganizationService service, System.Collections.Generic.IList<Guid> caseIds)
         {
-            var query = new QueryExpression(OutcomeEntity)
+            var newest = new System.Collections.Generic.Dictionary<Guid, Entity>();
+            for (var start = 0; start < caseIds.Count; start += OutcomeLookupChunk)
             {
-                ColumnSet = new ColumnSet(
-                    "al_finaloutcome", "al_initialoutcome",
-                    "al_fqadviseraccountable", "al_fqparaplanneraccountable",
-                    "al_aqadviseraccountable", "al_aqparaplanneraccountable",
-                    FqAccountableContactAttr, AqAccountableContactAttr),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, caseId);
+                var chunk = caseIds.Skip(start).Take(OutcomeLookupChunk).Cast<object>().ToArray();
+                var query = new QueryExpression(OutcomeEntity)
+                {
+                    ColumnSet = OutcomeColumns(),
+                    Criteria = new FilterExpression(),
+                };
+                query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.In, chunk);
+                query.AddOrder("createdon", OrderType.Descending);
 
-            // One Outcome per case is the intent, but nothing in the schema enforces it and
-            // a re-review can leave a second. This row decides the exported grade and the
-            // accountability gate, so picking whichever row Dataverse happened to return
-            // first would make the export non-deterministic. Newest wins.
-            query.AddOrder("createdon", OrderType.Descending);
+                foreach (var row in CommandHelpers.RetrieveAll(service, query))
+                {
+                    var caseRef = row.GetAttributeValue<EntityReference>("al_outcomecaseid");
+                    if (caseRef != null && !newest.ContainsKey(caseRef.Id))
+                    {
+                        newest[caseRef.Id] = row;
+                    }
+                }
+            }
 
-            var found = service.RetrieveMultiple(query).Entities;
-            return found.Count == 0 ? null : found[0];
+            return newest;
+        }
+
+        private static ColumnSet OutcomeColumns()
+        {
+            return new ColumnSet(
+                "al_finaloutcome", "al_initialoutcome",
+                "al_fqadviseraccountable", "al_fqparaplanneraccountable",
+                "al_aqadviseraccountable", "al_aqparaplanneraccountable",
+                FqAccountableContactAttr, AqAccountableContactAttr, FqAdministratorContactAttr, "al_outcomecaseid");
         }
 
         /// <summary>
@@ -464,8 +661,9 @@ namespace OutcomeTesting.Plugins
         ///
         /// AD-039 is a fixed-position contract, so a blank in a graded column does not read
         /// downstream as "not assessed" — it reads as an assessment that came back empty.
-        /// An incomplete row therefore refuses the batch and names the case, which is how
-        /// the OD-024 accountability check already behaved.
+        /// An incomplete row is therefore left out of the batch and named on its audit event.
+        /// It used to refuse the whole batch, but a Closed case cannot be reopened, so one
+        /// such case blocked every export after it.
         ///
         /// <paramref name="aqsExpected"/> is what separates incomplete from finished.
         /// Both graded columns are sourced from the AQS review — column 10 from Q-FQ-01,
@@ -488,8 +686,8 @@ namespace OutcomeTesting.Plugins
             if (outcomeRow == null)
             {
                 return aqsExpected
-                    ? "is closed with no outcome recorded, so the Advice Quality grade would be blank. "
-                        + "Record the outcome, or reopen the case if it was closed in error."
+                    ? "has no outcome recorded, so the Advice Quality grade would be blank. "
+                        + "It was left out of this export."
                     : null;
             }
 
@@ -498,7 +696,7 @@ namespace OutcomeTesting.Plugins
             {
                 return aqsExpected
                     ? "has an outcome carrying neither an initial nor a final grade, so the "
-                        + "Advice Quality grade would be blank."
+                        + "Advice Quality grade would be blank. It was left out of this export."
                     : null;
             }
 
@@ -512,7 +710,7 @@ namespace OutcomeTesting.Plugins
             if (aqsExpected && string.IsNullOrWhiteSpace(fileQualityGrade))
             {
                 return "has no answer to Q-FQ-01 File quality outcome, so the File Quality "
-                    + "grade would be blank. Record the file quality outcome before generating the export.";
+                    + "grade would be blank. It was left out of this export.";
             }
 
             return null;
@@ -527,27 +725,53 @@ namespace OutcomeTesting.Plugins
         /// before the route seed existed — fall back to whether an AQS instance exists, the
         /// same fallback <c>SubmitReviewPlugin.AqsStillToCome</c> uses, so a legacy case is
         /// not silently reclassified as Tax-only.
+        ///
+        /// Null when it cannot be told: no route and no active AQS review, yet an AQS review
+        /// that is no longer active, or an outcome (which only an AQS submit writes), says the
+        /// advice was graded once. Read as Tax-only that case would export blank advice grades,
+        /// so the caller leaves it out instead. Route answers are memoised per batch in
+        /// <paramref name="routeCache"/>.
         /// </summary>
-        private static bool AqsExpected(IOrganizationService service, Entity outcomeCase)
+        public static bool? AqsExpected(
+            IOrganizationService service, Entity outcomeCase, Entity outcomeRow,
+            System.Collections.Generic.IDictionary<Guid, bool> routeCache)
         {
             var routeRef = outcomeCase.GetAttributeValue<EntityReference>(CaseReviewRouteAttr);
             if (routeRef != null)
             {
-                var route = service.Retrieve(RouteEntity, routeRef.Id, new ColumnSet(RouteRequiresAqsAttr));
-                return route.GetAttributeValue<bool?>(RouteRequiresAqsAttr) ?? false;
+                bool requires;
+                if (routeCache == null || !routeCache.TryGetValue(routeRef.Id, out requires))
+                {
+                    var route = service.Retrieve(RouteEntity, routeRef.Id, new ColumnSet(RouteRequiresAqsAttr));
+                    requires = route.GetAttributeValue<bool?>(RouteRequiresAqsAttr) ?? false;
+                    if (routeCache != null)
+                    {
+                        routeCache[routeRef.Id] = requires;
+                    }
+                }
+
+                return requires;
             }
 
             var query = new QueryExpression(ReviewEntity)
             {
-                ColumnSet = new ColumnSet(false),
-                TopCount = 1,
+                ColumnSet = new ColumnSet("statecode"),
                 Criteria = new FilterExpression(),
             };
-            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
             query.Criteria.AddCondition("al_outcomecaseid", ConditionOperator.Equal, outcomeCase.Id);
             query.Criteria.AddCondition("al_reviewtype", ConditionOperator.Equal, ResponseRules.ReviewTypeAqs);
 
-            return service.RetrieveMultiple(query).Entities.Count > 0;
+            var reviews = service.RetrieveMultiple(query).Entities;
+            foreach (var review in reviews)
+            {
+                var state = review.GetAttributeValue<OptionSetValue>("statecode");
+                if (state != null && state.Value == 0)
+                {
+                    return true;
+                }
+            }
+
+            return reviews.Count == 0 && outcomeRow == null ? false : (bool?)null;
         }
 
         private static bool Flagged(Entity outcomeRow, string flag)
@@ -564,6 +788,18 @@ namespace OutcomeTesting.Plugins
         {
             return effectiveOutcome == OutcomeRules.OutcomeInsufficient
                 || effectiveOutcome == OutcomeRules.OutcomePotentialHarm;
+        }
+
+        /// <summary>
+        /// The advice outcome the accountable people are snapshotted against: the one in force
+        /// when it is a fail, else the initial one. The daily file reports the initial grade
+        /// and the quarterly file the final one (client, 2026-11-16), and a fail regraded to a
+        /// pass must still name someone in the daily file - so the names are kept whenever
+        /// either grade failed, and the app blanks them in the file whose grade did not.
+        /// </summary>
+        public static int? AccountabilityGate(int? effectiveOutcome, int? initialOutcome)
+        {
+            return AdviceQualityFailed(effectiveOutcome) ? effectiveOutcome : initialOutcome;
         }
 
         /// <summary>
@@ -681,6 +917,17 @@ namespace OutcomeTesting.Plugins
         public static AccountablePerson NamedPerson(
             IOrganizationService service, Entity outcomeRow, string lookupAttribute)
         {
+            return NamedPerson(service, outcomeRow, lookupAttribute, null);
+        }
+
+        /// <summary>
+        /// As the three-argument overload, with each contact's staff code read once per
+        /// <paramref name="staffCodeCache"/> (one export batch), however many cases name them.
+        /// </summary>
+        public static AccountablePerson NamedPerson(
+            IOrganizationService service, Entity outcomeRow, string lookupAttribute,
+            System.Collections.Generic.IDictionary<Guid, string> staffCodeCache)
+        {
             if (outcomeRow == null)
             {
                 return null;
@@ -704,7 +951,13 @@ namespace OutcomeTesting.Plugins
             // afterwards, producing a file that reads as "none of these people have codes"
             // when the truth is "the export could not read Contact at all" (2026-09-22
             // review, overruling this task's own brief, which had written the blanket catch).
-            string staffCode = null;
+            string staffCode;
+            if (staffCodeCache != null && staffCodeCache.TryGetValue(reference.Id, out staffCode))
+            {
+                return new AccountablePerson { Name = reference.Name, StaffCode = staffCode };
+            }
+
+            staffCode = null;
             try
             {
                 var contact = service.Retrieve(
@@ -721,6 +974,11 @@ namespace OutcomeTesting.Plugins
                 }
 
                 staffCode = null;
+            }
+
+            if (staffCodeCache != null)
+            {
+                staffCodeCache[reference.Id] = staffCode;
             }
 
             return new AccountablePerson { Name = reference.Name, StaffCode = staffCode };
@@ -808,8 +1066,12 @@ namespace OutcomeTesting.Plugins
                 return false;
             }
 
+            // An administrator named for the file is a judgement too (requirements log row 10):
+            // the fail is theirs, so the paraplanner is not derived, and the administrator
+            // themselves is never exported - the File Quality person columns stay blank.
             var recorded = fileFlag
                 ? Flagged(outcomeRow, FqAdviserFlag) || Flagged(outcomeRow, FqParaplannerFlag)
+                    || outcomeRow?.GetAttributeValue<EntityReference>(FqAdministratorContactAttr) != null
                 : Flagged(outcomeRow, AqAdviserFlag) || Flagged(outcomeRow, AqParaplannerFlag);
 
             // The adviser does not carry the file and the paraplanner does not carry the

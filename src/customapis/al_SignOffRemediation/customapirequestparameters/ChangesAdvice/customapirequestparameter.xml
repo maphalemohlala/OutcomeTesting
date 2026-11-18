@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="ChangesAdvice">
+  <description default="Optional. The supervisor's 'Do the remedial actions change the advice?' answer, written to every action of this check: 120910798 Yes, 120910799 No. Omit or 0 to leave the stored answer.">
+    <label description="Optional. The supervisor's 'Do the remedial actions change the advice?' answer, written to every action of this check: 120910798 Yes, 120910799 No. Omit or 0 to leave the stored answer." languagecode="1033" />
+  </description>
+  <displayname default="Changes advice">
+    <label description="Changes advice" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>ChangesAdvice</name>
+  <type>7</type>
+</customapirequestparameter>

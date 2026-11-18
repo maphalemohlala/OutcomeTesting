@@ -5,7 +5,8 @@
   <PluginTypeId>41982ebd-7ab7-f111-aaac-e4fade069307</PluginTypeId>
   <PrimaryEntity>al_outcomecase</PrimaryEntity>
   <AsyncAutoDelete>0</AsyncAutoDelete>
-  <FilteringAttributes>al_taxcheckercontactid,al_aqscheckercontactid,al_aqsqueueaccountid,al_aqsqueuedon,al_advisercontactid,al_tcsupervisorcontactid</FilteringAttributes>
+  <FilteringAttributes>al_taxcheckercontactid,al_aqscheckercontactid,al_aqsqueueaccountid,al_aqsqueuedon,al_advisercontactid,al_tcsupervisorcontactid,al_tcmanageroverrideid</FilteringAttributes>
+  <ImpersonatingUserIdName></ImpersonatingUserIdName>
   <InvocationSource>1</InvocationSource>
   <Mode>0</Mode>
   <Rank>1</Rank>

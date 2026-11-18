@@ -39,7 +39,7 @@ export type AppRole = (typeof APP_ROLES)[number];
  * from the app's role list: granting business access to "everyone who is signed in" is not
  * a decision any requirement makes.
  */
-export const SYSTEM_WEB_ROLES: readonly string[] = ['Anonymous Users', 'Authenticated Users'];
+const SYSTEM_WEB_ROLES: readonly string[] = ['Anonymous Users', 'Authenticated Users'];
 
 export function isSystemWebRole(name: string): boolean {
   return SYSTEM_WEB_ROLES.some((role) => role.toLowerCase() === name.trim().toLowerCase());
@@ -53,7 +53,7 @@ export function isSystemWebRole(name: string): boolean {
  * but the server still reads it, so an existing assignment keeps working and nothing is
  * silently revoked.
  */
-export const LEGACY_APP_ROLE_VALUES: Record<string, number> = {
+const LEGACY_APP_ROLE_VALUES: Record<string, number> = {
   'Tax Checker': 120910760,
   'AQS Checker': 120910761,
   Adviser: 120910762,
@@ -92,6 +92,9 @@ export const RESOURCE_KEYS = [
   'command.regrade',
   'command.signoff',
   'case.duedate',
+  'case.delete',
+  'case.amendoutcome',
+  'case.reassignmanager',
   'remediation.complete',
   'question.retire',
   'export.generate',
@@ -105,7 +108,7 @@ export const ACCESS_LEVELS = ['None', 'View', 'Edit', 'Manage'] as const;
 
 export type AccessLevel = (typeof ACCESS_LEVELS)[number];
 
-export const ACCESS_LEVEL_VALUES: Record<AccessLevel, number> = {
+const ACCESS_LEVEL_VALUES: Record<AccessLevel, number> = {
   None: 120910766,
   View: 120910767,
   Edit: 120910768,
@@ -232,6 +235,22 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   { role: 'AL Portal - Outcome Testing Manager', resource: 'case.duedate', level: 'Edit' },
   { role: 'Administrators', resource: 'case.duedate', level: 'Edit' },
 
+  // Deleting a case outright, with everything on it (requirements log row 40). The manager
+  // and the two administrator roles - the people the log names for correcting a case - and
+  // nobody who checks or remediates. Its own key, because nothing brings a deleted case back.
+  ...(['AL Portal - Outcome Testing Manager', 'AL Portal - Portal Administrator', 'Administrators'] as const).map(
+    (role) => ({ role, resource: 'case.delete' as ResourceKey, level: 'Edit' as AccessLevel }),
+  ),
+
+  // Amending a case's original grades for an appeal (requirements log row 39), and handing one
+  // case to another T&C Manager while the mapped one is away (row 4): the same admins.
+  ...(['AL Portal - Outcome Testing Manager', 'AL Portal - Portal Administrator', 'Administrators'] as const).flatMap(
+    (role) => [
+      { role, resource: 'case.amendoutcome' as ResourceKey, level: 'Edit' as AccessLevel },
+      { role, resource: 'case.reassignmanager' as ResourceKey, level: 'Edit' as AccessLevel },
+    ],
+  ),
+
   // Portal Administrator and Administrators both manage configuration and the permission
   // model. Two roles carry it because Administrators is the Power Pages built-in that real
   // administrators already hold, and dropping it would lock the current admins out.
@@ -253,15 +272,19 @@ export const DEFAULT_PERMISSIONS: readonly PermissionRule[] = [
   ]),
 ];
 
-/** Collapse a set of rules for one or more roles into the highest level per resource. */
+/**
+ * Collapse a set of rules for one or more roles into the highest level per resource. Role
+ * names are compared without regard to case or surrounding space, as the server gate does.
+ */
 export function resolvePermissions(
   roles: readonly string[],
   rules: readonly PermissionRule[] = DEFAULT_PERMISSIONS,
 ): PermissionSet {
-  const roleSet = new Set<string>(roles);
+  const fold = (role: string) => role.trim().toLowerCase();
+  const roleSet = new Set<string>(roles.map(fold));
   const effective: PermissionSet = {};
   for (const rule of rules) {
-    if (!roleSet.has(rule.role)) continue;
+    if (!roleSet.has(fold(rule.role))) continue;
     const current = effective[rule.resource];
     if (!current || accessMeets(rule.level, current)) {
       effective[rule.resource] = rule.level;
@@ -342,25 +365,6 @@ export function levelFor(set: PermissionSet, resource: ResourceKey): AccessLevel
 /** True when the set grants at least `need` on `resource`. */
 export function can(set: PermissionSet, resource: ResourceKey, need: AccessLevel = 'View'): boolean {
   return accessMeets(levelFor(set, resource), need);
-}
-
-/** Map a nav path to its governing page resource key, or null when ungated. */
-export function pageResourceForPath(path: string): ResourceKey | null {
-  if (path === '/') return 'page.dashboard';
-  if (path.startsWith('/cases')) return 'page.cases';
-  if (path.startsWith('/imports')) return 'page.imports';
-  if (path.startsWith('/reviews')) return 'page.reviews';
-  if (path.startsWith('/reports')) return 'page.reports';
-  if (path.startsWith('/exports')) return 'page.exports';
-  if (path.startsWith('/admin/questions')) return 'page.admin.questions';
-  if (path.startsWith('/admin/advisers')) return 'page.admin.advisers';
-  if (path.startsWith('/admin/templates')) return 'page.admin.templates';
-  if (path.startsWith('/admin/lists')) return 'page.admin.lists';
-  if (path.startsWith('/admin/security')) return 'page.admin.security';
-  // The registry (Task 9, 2026-09-22): its Role column writes al_userrolemapping, an
-  // authorisation source, so it is gated as administration rather than page.cases.
-  if (path.startsWith('/admin/people')) return 'page.admin.users';
-  return null;
 }
 
 /**

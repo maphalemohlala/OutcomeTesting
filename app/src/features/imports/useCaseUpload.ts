@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { importCases, type ImportReportRow } from '../../services/commands/importCases';
 import { useIntentKeys } from '../../hooks/useIntentKey';
-import { checkExtract, decodeCsv, type ValidationReportRow } from './caseUpload';
+import { messageForFailure } from '../../services/errors';
+import { checkExtract, decodeCsv, readFailureMessage, type ValidationReportRow } from './caseUpload';
 import { workbookToCsv } from './xlsx';
 
-export interface UploadResult {
+interface UploadResult {
   batchReference: string;
   total: number;
   imported: number;
@@ -58,7 +59,7 @@ export function useCaseUpload(onUploaded: () => void) {
     } catch (error) {
       setState({
         phase: 'error',
-        message: error instanceof Error ? error.message : 'The file could not be read.',
+        message: readFailureMessage(error),
       });
       return;
     }
@@ -88,7 +89,7 @@ export function useCaseUpload(onUploaded: () => void) {
     });
 
     if (!result.ok) {
-      setState({ phase: 'error', message: result.message });
+      setState({ phase: 'error', message: messageForFailure(result) });
       // The command may have written the batch before failing, and a failure that turns
       // out to be a timed-out success leaves rows in place. Reload either way, so the
       // screen shows what Dataverse actually holds rather than what the error implies.

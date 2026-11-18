@@ -6,7 +6,7 @@
     The companion to Check-ComponentIds.ps1. That script asks whether the site
     will deploy intact; this one asks whether it is safe to deploy at all.
 
-    Ten assertions, each traceable to the portal security design:
+    Sixteen assertions, each traceable to the portal security design:
 
       1. No table permission grants an anonymous role anything.
       2. No PROVISIONAL permission survives into a release artefact.
@@ -34,14 +34,29 @@
          rather than raising anything.
      12. Every web template parses: no real Liquid tag inside a comment, and
          no unbalanced block tag. Both deploy cleanly and break at render.
-     13. No permission over CASE DATA is bound to Authenticated Users. Reading
-         a case is deliberately broad - every business role may view every
-         case - but "signed in" is not a business role, and an account
+     13. No permission over CASE DATA is bound to Authenticated Users. Since
+         2026-09-24 Global read of case data is for oversight only, and every
+         other role reads the cases of its own team through its own Case -
+         permission; "signed in" is not a business role, and an account
          carrying none must not inherit the whole case file.
+     14. No Webapi/<table>/fields allowlist is '*'. A wildcard lets the browser
+         write every column the table permission reaches, status included.
+     15. Webapi/al_remediationaction/fields never lists al_recheckrequired,
+         al_changesadvice (the T&C Manager's sign-off answers) or
+         al_clientcontactrequired (the AQS checker's answer). The adviser's
+         page PATCHes that table, so a column on this list is one an adviser
+         can write from the browser.
+     16. Every table with Webapi/<table>/enabled = true is one a page script
+         is known to call. A newly enabled table must be added here, and to
+         the README, on purpose.
 
-    Three guards refuse to treat a broken scan as a clean one: an empty page
-    scan, an empty web-template scan, and a webrole.yml where no role can be
-    identified as anonymous.
+    A Restrict Read rule written with an explicit empty role list ([]) is an
+    intentional deny-all and passes assertions 4 and 8; a Restrict Read rule
+    with no role list at all fails, so a lost list is not mistaken for one.
+
+    Four guards refuse to treat a broken scan as a clean one: an empty page
+    scan, an empty web-template scan, a webrole.yml where no role can be
+    identified as anonymous, and a sitesetting.yml with no Web API setting.
 
     Run before every `pac pages upload`, alongside Check-ComponentIds.ps1.
 
@@ -99,6 +114,8 @@ function Read-YamlDoc {
             $key = $Matches[1]
             $val = $Matches[2].Trim()
             if ($val -eq '') { $listKey = $key; $doc[$key] = @() }
+            # An inline empty list is an empty list, not the two-character text '[]'.
+            elseif ($val -eq '[]') { $listKey = $null; $doc[$key] = @(); $doc["_emptylist_$key"] = $true }
             else { $listKey = $null; $doc[$key] = $val }
             continue
         }
@@ -138,6 +155,9 @@ function Read-YamlList {
             $key = $Matches[1]
             $val = $Matches[2].Trim()
             if ($val -eq '') { $listKey = $key; $current[$key] = @() }
+            # Read as a list, as Read-YamlDoc does: the text '[]' read as a role id is what
+            # made the deny-all Profile rule fail assertions 4 and 8 from 2026-09-24.
+            elseif ($val -eq '[]') { $listKey = $null; $current[$key] = @(); $current["_emptylist_$key"] = $true }
             else { $listKey = $null; $current[$key] = $val }
         }
     }
@@ -258,9 +278,10 @@ foreach ($p in $permissions) {
     }
 
     # Assertion 13 (audit 2026-09, finding 1): the four tables below hold client and
-    # case data. Every business role may read them - that is the project owner's
-    # direction of 2026-09-20, and it is why they are Global scope rather than
-    # contact-scoped - but the binding must name those roles. Authenticated Users is
+    # case data. Since 2026-09-24 their Global read binds oversight only (Administrators
+    # and Outcome Testing Manager), and every other role reads its own team's cases
+    # through the Contact- and Parent-scoped "Case - ..." permissions - but whatever the
+    # scope, the binding must name business roles. Authenticated Users is
     # held by every account that can sign in, including one nobody has given a job to
     # and one whose role was withdrawn, so binding case data to it grants the whole
     # case file by default rather than by decision.
@@ -292,6 +313,15 @@ foreach ($rule in $rules) {
     # filter it out rather than let the anonymous-role and dangling-role checks
     # compare against it.
     $boundRoles = @($rule.adx_webpageaccesscontrolrule_webrole) | Where-Object { $_ }
+
+    # A Restrict Read rule naming no role admits nobody but Administrators (through
+    # Grant Change), which is how Profile is closed: its stock form lets a contact edit
+    # their own email, and people are identified by email. That deny-all must be written
+    # as an explicit [] - a rule whose role list is simply missing is a lost list, not a
+    # decision, and is refused.
+    if ($rule.adx_right -eq '2' -and @($boundRoles).Count -eq 0 -and -not $rule['_emptylist_adx_webpageaccesscontrolrule_webrole']) {
+        Add-Failure '8 dangling-role' "Restrict Read rule '$($rule.adx_name)' has no role list. Write 'adx_webpageaccesscontrolrule_webrole: []' if a deny-all is intended."
+    }
 
     foreach ($id in $boundRoles) {
         if ($anonRoleIds -contains $id) {
@@ -505,9 +535,20 @@ if (Test-Path -LiteralPath $templateDir) {
 # both read a case's products through the intersect. Adding it here is the fix, and
 # NOT adding a table permission for it - Power Pages would not consult one. Both of
 # its ends are granted read today: 'List Option - read' and 'Outcome Case All Read'.
+#
+#   powerpagecomponent_mspp_webrole_contact ends: contact, the web role (powerpagecomponent)
+#
+# The third went in on 2026-11-17 for the "who carries this fail" list on OT Review Detail,
+# which shows only holders of the Adviser Remediation and Planner web roles. It is the one
+# whose ends are NOT both readable: contact is ('Contact - directory read'), the web role is
+# not - no portal role is granted read on powerpagecomponent, and the fetch filters on the
+# role's id rather than joining the role row for that reason. NOT verified on a live site
+# that the portal returns the intersect without the second grant: if TEST (which has role
+# holders) draws that list empty, a read-only permission on the role end is the fix.
 $intersectTables = @(
     'al_al_failreason_al_response',
-    'al_listoption_al_outcomecase_products'
+    'al_listoption_al_outcomecase_products',
+    'powerpagecomponent_mspp_webrole_contact'
 )
 
 $readableTables = @{}
@@ -593,6 +634,56 @@ if (Test-Path -LiteralPath $templateDir) {
         if ($depth -gt 0) { Add-Failure '12 template parses' "$($f.Name) leaves a {% comment %} unclosed." }
         if ($stack.Count -gt 0) { Add-Failure '12 template parses' "$($f.Name) leaves $($stack -join ', ') unclosed." }
     }
+}
+
+# ---------------------------------------------------------------- 14, 15, 16
+# The portal Web API is the one route by which a browser writes Dataverse directly, and
+# it is governed by site settings rather than by anything the other assertions read: a
+# table permission says which rows a role reaches, Webapi/<table>/fields says which
+# columns of them the browser may send.
+
+# Tables the page scripts call through /_api, and what for. Add one here only with the
+# script that needs it, and say so in the README.
+#   al_remediationaction  the adviser's response PATCH (OT Remediation)
+#   al_reviewinstance     submit and answer requests (OT Review Detail)
+#   al_questionversion    the checklist freshness read (OT Review Detail)
+#   al_outcomecase        the case status read-back (OT Review Detail, OT Remediation)
+#   contact               the request columns on the user's own contact (claim, sign-off,
+#                         regrade, case header, accountability, remedial actions)
+$expectedWebApiTables = @('al_remediationaction', 'al_reviewinstance', 'al_questionversion', 'al_outcomecase', 'contact')
+
+# The sign-off answers and the checker's client-contact answer: written server-side only
+# (SignoffRequestPlugin, and Remediation when the action is raised), never by the adviser.
+$remediationForbidden = @('al_recheckrequired', 'al_changesadvice', 'al_clientcontactrequired')
+
+$webApiCount = 0
+foreach ($name in $settingByName.Keys) {
+    if ($name -notmatch '^Webapi/([^/]+)/(enabled|fields)$') { continue }
+    $table = $Matches[1]
+    $kind = $Matches[2]
+    $webApiCount++
+    $value = ([string]$settingByName[$name] -replace "^'|'$", '' -replace '^"|"$', '').Trim()
+
+    if ($kind -eq 'fields') {
+        $columns = @($value -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        if ($columns -contains '*') {
+            Add-Failure '14 webapi-wildcard' "Site setting '$name' is '*'. List the columns the page writes instead."
+        }
+        if ($table -eq 'al_remediationaction') {
+            foreach ($column in $remediationForbidden) {
+                if ($columns -contains $column) {
+                    Add-Failure '15 webapi-remediation-columns' "Site setting '$name' lists $column, which an adviser must not write from the browser."
+                }
+            }
+        }
+    }
+    elseif ($value -match '^(?i)true$' -and $expectedWebApiTables -notcontains $table) {
+        Add-Failure '16 webapi-unexpected-table' "Site setting '$name' enables the Web API on '$table', which no page script is known to call. Add it to `$expectedWebApiTables and the README if it is meant."
+    }
+}
+
+if ($webApiCount -eq 0) {
+    Add-Failure 'guard empty-webapi-scan' "No Webapi/<table>/enabled or /fields setting found in sitesetting.yml. The site uses the Web API, so the scan is broken; refusing to treat that as a clean site."
 }
 
 # ---------------------------------------------------------------- report

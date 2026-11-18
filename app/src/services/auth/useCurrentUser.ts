@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getContext } from '@microsoft/power-apps/app';
 
-export interface CurrentUser {
+interface CurrentUser {
   fullName?: string;
   userPrincipalName?: string;
   objectId?: string;

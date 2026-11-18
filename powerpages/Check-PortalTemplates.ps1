@@ -25,6 +25,10 @@
          in that fetch can fill.
       D  Every '{% include 'OT ...' %}' names a web template that exists in this tree.
       E  No template uses a Liquid construct this site's engine rejects.
+      F  A failed Web API call is worded only by OT Layout's window.otApi: no other template
+         reads the error body, and every template that writes to the Web API uses it.
+      G  The "who carries this fail" list on OT Review Detail is filtered to the two web
+         roles that make a person an adviser or a paraplanner, by the ids webrole.yml gives.
 
     B is the one that catches finding 14. C catches its mirror image - selecting a column
     nothing in the query will ever populate.
@@ -328,12 +332,113 @@ foreach ($file in $templates) {
     }
 }
 
+# ---------------------------------------------------------------- F: one way to word a failed call
+#
+# Project owner, 2026-11-17: every error says exactly what failed and why. The wording lives
+# once, in OT Layout's window.otApi, which every page extends. A template that parses the
+# error body itself is how raw platform text, JSON and status codes used to reach the screen,
+# so reading it anywhere else fails here, and so does a write to the Web API whose failure is
+# not worded through the helper.
+$layoutName = 'ot-layout\OT-Layout.webtemplate.source.html'
+$helperDefinitions = 0
+$apiTemplates = 0
+$ownReaders = @(
+    @{ Pattern = 'innererror';                 Detail = 'reads innererror' },
+    @{ Pattern = '\.error\.message';           Detail = 'reads error.message off the body' },
+    @{ Pattern = 'statusText';                 Detail = 'shows statusText' },
+    @{ Pattern = '\(status '' \+';            Detail = 'prints the HTTP status code' },
+    @{ Pattern = 'function\s+(friendlyError|serverMessage|friendly)\s*\('; Detail = 'defines its own error reader' }
+)
+
+# A write to the Web API however it is sent: XHR open() with the verb in either quote or a
+# variable verb on an _api/ URL, fetch() or $.ajax/jQuery.ajax naming _api/ and a write verb.
+# [^;]* keeps each match inside one statement, which an options object literal is.
+$apiWrites = @(
+    'open\(\s*[''"](PATCH|POST|PUT|DELETE)[''"]',
+    'open\(\s*[A-Za-z_$][\w$]*\s*,\s*[''"]/?_api/',
+    '(?s)\bfetch\((?=[^;]*_api/)(?=[^;]*\bmethod\s*:\s*[''"](PATCH|POST|PUT|DELETE)[''"])',
+    '(?s)(\$|\bjQuery)\.ajax\((?=[^;]*_api/)(?=[^;]*\b(type|method)\s*:\s*[''"](PATCH|POST|PUT|DELETE)[''"])'
+)
+function Test-ApiWrite([string]$code) {
+    foreach ($pattern in $apiWrites) { if ($code -match $pattern) { return $true } }
+    return $false
+}
+
+foreach ($file in $templates) {
+    $rel = $file.FullName.Substring($TemplateRoot.Length + 1)
+    $text = [IO.File]::ReadAllText($file.FullName)
+    $code = [regex]::Replace($text, '(?s)<!--.*?-->', '')
+    $code = [regex]::Replace($code, '(?s)\{%-?\s*comment\s*-?%\}.*?\{%-?\s*endcomment\s*-?%\}', '')
+
+    $helperDefinitions += [regex]::Matches($code, 'window\.otApi\s*=').Count
+    if ($rel -eq $layoutName) { continue }
+
+    foreach ($rule in $ownReaders) {
+        if ($code -match $rule.Pattern) {
+            Add-Failure 'F' ("$rel $($rule.Detail). Word a failed Web API call with " +
+                "window.otApi.error(action, xhr) from OT Layout, so nothing raw reaches the screen.")
+        }
+    }
+
+    if (Test-ApiWrite $code) {
+        $apiTemplates++
+        if ($code -notmatch 'window\.otApi\.error\(') {
+            Add-Failure 'F' "$rel writes to the Web API but never words a failure with window.otApi.error."
+        }
+    }
+}
+
+if ($helperDefinitions -ne 1) {
+    Add-Failure 'F' ("window.otApi is defined $helperDefinitions time(s); it must be defined once, " +
+        "in $layoutName, so every page words a failure the same way.")
+}
+
+# ---------------------------------------------------------------- G: the named-person list is advisers and paraplanners
+#
+# Project owner, 2026-11-17: an adviser or paraplanner is defined by the web role they hold.
+# OT Review Detail's "who carries this fail" list matches the two roles by record id (it
+# cannot read powerpagecomponent to match by name), so the ids must go on naming them.
+$webRoleFile = Join-Path (Split-Path $TemplateRoot -Parent) 'webrole.yml'
+$personRoles = @('AL Portal - Adviser Remediation', 'AL Portal - Planner')
+$roleIdOf = @{}
+$currentRole = $null
+foreach ($line in (Get-Content $webRoleFile)) {
+    if ($line -match '^\s*-?\s*adx_name\s*:\s*(.+?)\s*$') { $currentRole = $Matches[1] }
+    elseif ($line -match '^\s*-?\s*adx_webroleid\s*:\s*([0-9a-f-]{36})\s*$' -and $currentRole) {
+        $roleIdOf[$currentRole] = $Matches[1].ToLowerInvariant()
+    }
+}
+
+$reviewDetail = Join-Path $TemplateRoot 'ot-review-detail\OT-Review-Detail.webtemplate.source.html'
+$directory = [regex]::Match([IO.File]::ReadAllText($reviewDetail), '(?s)\{%\s*fetchxml directory\s*%\}(.*?)\{%\s*endfetchxml\s*%\}')
+if (-not $directory.Success) {
+    Add-Failure 'G' 'OT Review Detail has no "directory" fetch; the who-carries-this-fail list could not be checked.'
+}
+else {
+    $listed = @([regex]::Matches($directory.Groups[1].Value, '<value>\s*([0-9a-f-]{36})\s*</value>') | ForEach-Object { $_.Groups[1].Value.ToLowerInvariant() } | Sort-Object)
+    $expectedIds = @()
+    foreach ($role in $personRoles) {
+        if (-not $roleIdOf.ContainsKey($role)) { Add-Failure 'G' "webrole.yml has no role named '$role'." }
+        else { $expectedIds += $roleIdOf[$role] }
+    }
+    $expectedIds = @($expectedIds | Sort-Object)
+    if ($directory.Groups[1].Value -notmatch 'powerpagecomponent_mspp_webrole_contact') {
+        Add-Failure 'G' 'The who-carries-this-fail list is not filtered by web role membership.'
+    }
+    if (($listed -join ',') -ne ($expectedIds -join ',')) {
+        Add-Failure 'G' ("The who-carries-this-fail list filters on role id(s) [$($listed -join ', ')], " +
+            "but '$($personRoles -join "' and '")' are [$($expectedIds -join ', ')] in webrole.yml.")
+    }
+}
+
 # ---------------------------------------------------------------- result
 
 Write-Host ("Checked {0} template(s) and {1} fetch block(s); {2} name a question AND read an answer column, which is the pairing this checks, against {3} question(s) typed from {4}." -f `
     $templates.Count, $fetchCount, $pairChecks, $responseTypeOf.Count, $source)
 Write-Host ("Resolved every 'OT ...' include against {0} template name(s), scanned for {1} construct(s) this engine rejects, and checked every entities[0] for a .size guard." -f `
     $templateNames.Count, $rejected.Count)
+Write-Host ("Checked that {0} template(s) writing to the Web API word every failure through OT Layout's window.otApi (defined {1} time(s)), and that the who-carries-this-fail list is limited to the Adviser and Planner role holders." -f `
+    $apiTemplates, $helperDefinitions)
 
 if (-not $OrgUrl) {
     Write-Host ''

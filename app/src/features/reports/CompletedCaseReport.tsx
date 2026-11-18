@@ -7,11 +7,16 @@ import { OUTCOMES } from '../../types/domain';
 import { COMPLETED_CASE_HEADERS, completedCaseRow } from '../cases/caseExport';
 import type { CaseSummary } from '../cases/caseWorklistMapping';
 import { checkerLabel } from '../cases/checkerNames';
+import { ukDayOf } from '../cases/caseHeaderDates';
 import './CompletedCaseReport.css';
 
 /** The check date is the business date of the report; where it is missing, intake date stands in. */
-function reportDate(item: { checkDate: string | null; createdOn: string | null }): string {
-  return (item.checkDate ?? item.createdOn ?? '').slice(0, 10);
+// eslint-disable-next-line react-refresh/only-export-components -- exported for its test
+export function reportDate(item: { checkDate: string | null; createdOn: string | null }): string {
+  // The check date is a date column, read from its digits; intake is a timestamp, so its day
+  // is the UK one the report's filters compare against.
+  if (item.checkDate) return item.checkDate.slice(0, 10);
+  return item.createdOn ? (ukDayOf(item.createdOn) ?? '') : '';
 }
 
 /**
@@ -60,6 +65,7 @@ export function CompletedCaseReport({
       }),
     [completed, outcome, product, from, to, closedOnly],
   );
+  const exportRows = useMemo(() => filtered.map(completedCaseRow), [filtered]);
 
   const isFiltered = Boolean(outcome || product || from || to || closedOnly);
 
@@ -73,7 +79,7 @@ export function CompletedCaseReport({
             stem="completed-cases"
             sheetName="Completed cases"
             headers={COMPLETED_CASE_HEADERS}
-            rows={filtered.map(completedCaseRow)}
+            rows={exportRows}
             caption={`Exports the ${filtered.length} completed case${filtered.length === 1 ? '' : 's'} currently listed`}
           />
         ) : null}

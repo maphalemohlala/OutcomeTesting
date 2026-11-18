@@ -22,8 +22,8 @@ namespace OutcomeTesting.Plugins
     /// </summary>
     public class ResponseGuardPlugin : PluginBase
     {
-        private const string PreconditionPrefix = "PRECONDITION: ";
-        private const string ConflictPrefix = "CONFLICT: ";
+        private const string PreconditionPrefix = CommandHelpers.PreconditionPrefix;
+        private const string ConflictPrefix = CommandHelpers.ConflictPrefix;
 
         private const string ResponseEntity = "al_response";
         private const string ReviewEntity = "al_reviewinstance";
@@ -48,7 +48,7 @@ namespace OutcomeTesting.Plugins
             {
                 case "Create":
                 case "Update":
-                    GuardWrite(service, context);
+                    GuardWrite(service, context, IsGradeAmendment(localPluginContext.OrgSvcFactory.CreateOrganizationService(null), context));
                     return;
                 case "Associate":
                 case "Disassociate":
@@ -59,7 +59,32 @@ namespace OutcomeTesting.Plugins
             }
         }
 
-        private static void GuardWrite(IOrganizationService service, IPluginExecutionContext context)
+        /// <summary>
+        /// al_AmendOutcome changing a submitted File Quality answer (requirements log row 39): an
+        /// Update from SYSTEM - which no app user or portal write can be - that changes the answer
+        /// choice and none of the answer's other content or links. Only the submitted lock and the
+        /// retired-version rule step aside for it; the answer must still fit the question.
+        /// A deny-list, not "the choice alone": at pre-operation the platform has already added
+        /// modifiedon and modifiedby to the Target (DEV, 2026-11-17).
+        /// </summary>
+        public static bool IsGradeAmendment(IOrganizationService systemService, IPluginExecutionContext context)
+        {
+            object raw;
+            var target = context.InputParameters.TryGetValue("Target", out raw) ? raw as Entity : null;
+            return target != null
+                && string.Equals(context.MessageName, "Update", StringComparison.OrdinalIgnoreCase)
+                && target.Contains("al_answerchoice")
+                && !AmendmentLeavesAlone.Any(target.Contains)
+                && WriteProvenance.IsSystemWrite(systemService, context);
+        }
+
+        private static readonly string[] AmendmentLeavesAlone =
+        {
+            "al_answertext", "al_answerchoices", "al_answerdate", "al_answerrichtext",
+            "al_reviewinstanceid", "al_questionversionid", "al_responsecode", "al_name",
+        };
+
+        private static void GuardWrite(IOrganizationService service, IPluginExecutionContext context, bool amendment = false)
         {
             if (!context.InputParameters.Contains("Target"))
             {
@@ -92,12 +117,20 @@ namespace OutcomeTesting.Plugins
                 reviewRef.Id,
                 new ColumnSet("al_reviewstatus", "al_reviewtype", "al_checklistversionid"));
 
-            EnsureNotSubmitted(review);
+            if (!amendment)
+            {
+                EnsureNotSubmitted(review);
+            }
 
-            var questionVersion = service.Retrieve(
-                "al_questionversion",
-                questionVersionRef.Id,
-                new ColumnSet("al_responsetype", "al_questionid", "al_effectivefrom", "al_effectiveto"));
+            // One linked read where version, question and section are all there, which is
+            // every answer on a healthy checklist. A broken chain returns no row, and the
+            // chained reads below then find the break and give it the refusal it always had.
+            Entity section;
+            var questionVersion = VersionWithSection(service, questionVersionRef.Id, out section)
+                ?? service.Retrieve(
+                    "al_questionversion",
+                    questionVersionRef.Id,
+                    new ColumnSet(VersionColumns));
 
             var responseType = questionVersion.GetAttributeValue<OptionSetValue>("al_responsetype");
             if (responseType == null)
@@ -110,7 +143,7 @@ namespace OutcomeTesting.Plugins
             // ones: the page renders the version in force, and an answer written against a
             // superseded one would be a second answer to the same question that nothing
             // reads back consistently.
-            if (!ResponseRules.IsVersionEffective(
+            if (!amendment && !ResponseRules.IsVersionEffective(
                 questionVersion.GetAttributeValue<DateTime?>("al_effectivefrom"),
                 questionVersion.GetAttributeValue<DateTime?>("al_effectiveto"),
                 DateTime.UtcNow))
@@ -119,7 +152,7 @@ namespace OutcomeTesting.Plugins
                     PreconditionPrefix + "This question has been replaced by a newer version, so this version can no longer be answered.");
             }
 
-            EnsureSectionBelongsToReview(service, questionVersion, review);
+            EnsureSectionBelongsToReview(service, questionVersion, review, section);
             SanitiseRichText(target);
             EnsureAnswerShape(target, pre, responseType.Value);
 
@@ -133,6 +166,52 @@ namespace OutcomeTesting.Plugins
                     target["al_name"] = questionVersionRef.Name ?? "Answer";
                 }
             }
+        }
+
+        private static readonly string[] VersionColumns =
+            { "al_responsetype", "al_questionid", "al_effectivefrom", "al_effectiveto" };
+
+        /// <summary>The section columns the guard reads; AnswerWriter checks a carry against the same ones.</summary>
+        internal static readonly string[] SectionColumns =
+            { "al_ownerrole", "al_checklistversionid", "al_effectivefrom", "al_effectiveto" };
+
+        /// <summary>
+        /// The question version and, through its question, the section it sits in, in one
+        /// read. Null when any link of the chain is missing.
+        /// </summary>
+        private static Entity VersionWithSection(IOrganizationService service, Guid versionId, out Entity section)
+        {
+            section = null;
+
+            var query = new QueryExpression("al_questionversion")
+            {
+                ColumnSet = new ColumnSet(VersionColumns),
+                TopCount = 1,
+            };
+            query.Criteria.AddCondition("al_questionversionid", ConditionOperator.Equal, versionId);
+
+            var questionLink = query.AddLink("al_question", "al_questionid", "al_questionid");
+            var sectionLink = questionLink.AddLink("al_section", "al_sectionid", "al_sectionid");
+            sectionLink.EntityAlias = "s";
+            sectionLink.Columns = new ColumnSet(SectionColumns);
+
+            var found = service.RetrieveMultiple(query).Entities;
+            if (found.Count == 0)
+            {
+                return null;
+            }
+
+            section = new Entity("al_section");
+            foreach (var column in SectionColumns)
+            {
+                var aliased = found[0].GetAttributeValue<AliasedValue>("s." + column);
+                if (aliased != null)
+                {
+                    section[column] = aliased.Value;
+                }
+            }
+
+            return found[0];
         }
 
         private static void EnsureNotSubmitted(Entity review)
@@ -153,27 +232,28 @@ namespace OutcomeTesting.Plugins
         private static void EnsureSectionBelongsToReview(
             IOrganizationService service,
             Entity questionVersion,
-            Entity review)
+            Entity review,
+            Entity section)
         {
-            var questionRef = questionVersion.GetAttributeValue<EntityReference>("al_questionid");
-            if (questionRef == null)
+            if (section == null)
             {
-                throw new InvalidPluginExecutionException(
-                    PreconditionPrefix + "This question is not attached to a section.");
-            }
+                var questionRef = questionVersion.GetAttributeValue<EntityReference>("al_questionid");
+                if (questionRef == null)
+                {
+                    throw new InvalidPluginExecutionException(
+                        PreconditionPrefix + "This question is not attached to a section.");
+                }
 
-            var question = service.Retrieve("al_question", questionRef.Id, new ColumnSet("al_sectionid"));
-            var sectionRef = question.GetAttributeValue<EntityReference>("al_sectionid");
-            if (sectionRef == null)
-            {
-                throw new InvalidPluginExecutionException(
-                    PreconditionPrefix + "This question is not attached to a section.");
-            }
+                var question = service.Retrieve("al_question", questionRef.Id, new ColumnSet("al_sectionid"));
+                var sectionRef = question.GetAttributeValue<EntityReference>("al_sectionid");
+                if (sectionRef == null)
+                {
+                    throw new InvalidPluginExecutionException(
+                        PreconditionPrefix + "This question is not attached to a section.");
+                }
 
-            var section = service.Retrieve(
-                "al_section",
-                sectionRef.Id,
-                new ColumnSet("al_ownerrole", "al_checklistversionid", "al_effectivefrom", "al_effectiveto"));
+                section = service.Retrieve("al_section", sectionRef.Id, new ColumnSet(SectionColumns));
+            }
 
             var reviewType = review.GetAttributeValue<OptionSetValue>("al_reviewtype");
             if (reviewType == null)

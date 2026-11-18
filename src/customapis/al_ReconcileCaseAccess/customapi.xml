@@ -1,0 +1,18 @@
+<customapi uniquename="al_ReconcileCaseAccess">
+  <allowedcustomprocessingsteptype>0</allowedcustomprocessingsteptype>
+  <bindingtype>0</bindingtype>
+  <description default="Brings one case's access columns and team shares into line with its current state (AD-218). The backfill and repair path for role-scoped access.">
+    <label description="Brings one case's access columns and team shares into line with its current state (AD-218). The backfill and repair path for role-scoped access." languagecode="1033" />
+  </description>
+  <displayname default="Reconcile Case Access">
+    <label description="Reconcile Case Access" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isfunction>0</isfunction>
+  <isprivate>0</isprivate>
+  <name>al_ReconcileCaseAccess</name>
+  <plugintypeid>
+    <plugintypeexportkey>613f4b04-7ab7-f111-aaac-e4fade069307</plugintypeexportkey>
+  </plugintypeid>
+  <workflowsdkstepenabled>0</workflowsdkstepenabled>
+</customapi>

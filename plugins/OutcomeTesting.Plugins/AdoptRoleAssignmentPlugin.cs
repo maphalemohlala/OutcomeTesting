@@ -112,6 +112,11 @@ namespace OutcomeTesting.Plugins
 
             var result = Apply(userService, systemService, email, roleCode, adopt);
 
+            if (!adopt)
+            {
+                PermissionHelpers.EnsureSomeoneCanManagePermissions(systemService);
+            }
+
             var auditTargetTable = result.MappingId.HasValue ? MappingEntity : ContactRegistry.Entity;
             var auditTargetId = result.MappingId ?? result.ContactId;
 

@@ -13,6 +13,66 @@
         <Description description="An action required because a check produced a non-pass outcome (BR-006). The adviser completes it and the T&amp;C Manager validates Insufficient evidence and Potential harm (BR-008, AD-020, AD-031). Validation outcomes and sign-off are recorded on al_Signoff, and initial/final outcomes on al_Outcome (Wave H)." languagecode="1033" />
       </Descriptions>
       <attributes>
+        <attribute PhysicalName="al_ActionPerformed">
+          <Type>picklist</Type>
+          <Name>al_actionperformed</Name>
+          <LogicalName>al_actionperformed</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.13.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <optionset Name="al_remediationaction_al_actionperformed">
+            <OptionSetType>picklist</OptionSetType>
+            <IntroducedVersion>1.0.13.0</IntroducedVersion>
+            <IsCustomizable>1</IsCustomizable>
+            <displaynames>
+              <displayname description="Action performed" languagecode="1033" />
+            </displaynames>
+            <Descriptions>
+              <Description description="The adviser's answer: was the checker's remedial action performed? (2026-09-29)" languagecode="1033" />
+            </Descriptions>
+            <options>
+              <option value="120910815" IsHidden="0">
+                <labels>
+                  <label description="Yes" languagecode="1033" />
+                </labels>
+              </option>
+              <option value="120910816" IsHidden="0">
+                <labels>
+                  <label description="No" languagecode="1033" />
+                </labels>
+              </option>
+            </options>
+          </optionset>
+          <displaynames>
+            <displayname description="Action performed" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The adviser's answer: was the checker's remedial action performed? (2026-09-29)" languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_ActionStatus">
           <Type>picklist</Type>
           <Name>al_actionstatus</Name>
@@ -682,6 +742,45 @@
             <Description description="Whether the adviser believes the case needs a recheck after remediation (AD-095)." languagecode="1033" />
           </Descriptions>
         </attribute>
+        <attribute PhysicalName="al_RemedialAction">
+          <Type>ntext</Type>
+          <Name>al_remedialaction</Name>
+          <LogicalName>al_remedialaction</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.13.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>textarea</Format>
+          <MaxLength>4000</MaxLength>
+          <displaynames>
+            <displayname description="Remedial action" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The checker's remedial action for this row, written once when the check is submitted (2026-09-29)." languagecode="1033" />
+          </Descriptions>
+        </attribute>
         <attribute PhysicalName="al_RemediationActionCode">
           <Type>nvarchar</Type>
           <Name>al_remediationactioncode</Name>
@@ -757,6 +856,45 @@
           </displaynames>
           <Descriptions>
             <Description description="Unique identifier for the remediation action." languagecode="1033" />
+          </Descriptions>
+        </attribute>
+        <attribute PhysicalName="al_ResponseHistory">
+          <Type>ntext</Type>
+          <Name>al_responsehistory</Name>
+          <LogicalName>al_responsehistory</LogicalName>
+          <RequiredLevel>none</RequiredLevel>
+          <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+          <ImeMode>auto</ImeMode>
+          <ValidForUpdateApi>1</ValidForUpdateApi>
+          <ValidForReadApi>1</ValidForReadApi>
+          <ValidForCreateApi>1</ValidForCreateApi>
+          <IsCustomField>1</IsCustomField>
+          <IsAuditEnabled>1</IsAuditEnabled>
+          <IsSecured>0</IsSecured>
+          <IntroducedVersion>1.0.25.0</IntroducedVersion>
+          <IsCustomizable>1</IsCustomizable>
+          <IsRenameable>1</IsRenameable>
+          <CanModifySearchSettings>1</CanModifySearchSettings>
+          <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+          <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+          <SourceType>0</SourceType>
+          <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+          <IsSortableEnabled>0</IsSortableEnabled>
+          <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+          <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+          <IsDataSourceSecret>0</IsDataSourceSecret>
+          <AutoNumberFormat></AutoNumberFormat>
+          <IsSearchable>0</IsSearchable>
+          <IsFilterable>0</IsFilterable>
+          <IsRetrievable>0</IsRetrievable>
+          <IsLocalizable>0</IsLocalizable>
+          <Format>textarea</Format>
+          <MaxLength>20000</MaxLength>
+          <displaynames>
+            <displayname description="Response history" languagecode="1033" />
+          </displaynames>
+          <Descriptions>
+            <Description description="The adviser's answers the T&amp;C Manager sent back, oldest first. Written by the sign-off when it rejects; read-only." languagecode="1033" />
           </Descriptions>
         </attribute>
         <attribute PhysicalName="al_reviewinstanceid">

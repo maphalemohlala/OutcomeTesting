@@ -503,15 +503,6 @@ namespace OutcomeTesting.Plugins.Tests
             Assert.False(SignoffProgressPlugin.ParkedAtRecheck(svc, CaseId, Rejected));
         }
 
-        [Fact]
-        public void The_parked_notice_names_the_case_and_what_is_owed()
-        {
-            var body = SignoffProgressPlugin.RecheckDueBody("254398988");
-
-            Assert.Contains("254398988", body);
-            Assert.Contains("final outcome", body, StringComparison.OrdinalIgnoreCase);
-        }
-
         // ---- recheck required = No skips the recheck (AD-138) ---------------------------
 
         private static readonly Guid ReviewId = Guid.Parse("dddddddd-4444-4444-8444-dddddddddddd");

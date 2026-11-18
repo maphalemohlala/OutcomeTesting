@@ -49,5 +49,39 @@ namespace OutcomeTesting.Plugins.Tests
 
             Assert.Null(CaseAccessPlugin.CaseIdFor(context, svc));
         }
+
+        [Fact]
+        public void The_first_action_on_a_case_reconciles_and_a_second_does_not()
+        {
+            var svc = new FakeOrganizationService();
+            svc.Seed("team", Guid.NewGuid(), "name", ProductName.TaxTeam(ProductName.Default));
+            svc.Seed("team", Guid.NewGuid(), "name", ProductName.AqsTeam(ProductName.Default));
+            svc.Seed("al_outcomecase", CaseId, "al_casestatus", new OptionSetValue(CaseLifecycle.Submitted));
+
+            // The reconciler always grants or revokes each team's share, so those two
+            // requests are what a reconcile looks like from outside.
+            RaiseAction(svc);
+            Assert.Equal(2, svc.Requests.Count);
+
+            RaiseAction(svc);
+            Assert.Equal(2, svc.Requests.Count);
+        }
+
+        // Post-operation: the action exists by the time the step runs.
+        private static void RaiseAction(FakeOrganizationService svc)
+        {
+            var caseRef = new EntityReference("al_outcomecase", CaseId);
+            var actionId = Guid.NewGuid();
+            svc.Seed("al_remediationaction", actionId, "al_outcomecaseid", caseRef);
+
+            var provider = new FakeServiceProvider(svc);
+            provider.Context.MessageName = "Create";
+            provider.Context.PrimaryEntityName = "al_remediationaction";
+            provider.Context.PrimaryEntityId = actionId;
+            provider.Context.InputParameters["Target"] =
+                new Entity("al_remediationaction", actionId) { ["al_outcomecaseid"] = caseRef };
+
+            new CaseAccessPlugin(null, null).Execute(provider);
+        }
     }
 }

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildDirectory,
   caseloadByIdentity,
   casesForPerson,
   checkerIdentity,
@@ -49,68 +48,6 @@ function caseRow(overrides: Partial<CaseSummary>): CaseSummary {
     ...overrides,
   };
 }
-
-describe('buildDirectory', () => {
-  it('counts one person once per position they hold on a case', () => {
-    const directory = buildDirectory([
-      caseRow({ id: 'a', adviser: 'Jane Adviser', aqsChecker: 'Jane Adviser' }),
-    ]);
-
-    expect(directory.map((p) => p.role).sort()).toEqual(['Adviser', 'Checker']);
-    expect(directory.every((p) => p.totalCases === 1)).toBe(true);
-  });
-
-  it('splits open from closed and records the oldest open case', () => {
-    const directory = buildDirectory([
-      caseRow({ id: 'a', adviser: 'Jane', status: 'Closed', ageInDays: 90 }),
-      caseRow({ id: 'b', adviser: 'Jane', status: 'Assigned', ageInDays: 12 }),
-      caseRow({ id: 'c', adviser: 'Jane', status: 'No Check Required', ageInDays: 40 }),
-    ]);
-
-    const jane = directory[0];
-    expect(jane.totalCases).toBe(3);
-    expect(jane.openCases).toBe(1);
-    expect(jane.closedCases).toBe(2);
-    expect(jane.oldestOpenDays).toBe(12);
-  });
-
-  it('tallies the BR-005 grades and what remains ungraded', () => {
-    const directory = buildDirectory([
-      caseRow({ id: 'a', adviser: 'Jane', latestOutcome: 'Pass' }),
-      caseRow({ id: 'b', adviser: 'Jane', latestOutcome: 'Potential harm' }),
-      caseRow({ id: 'c', adviser: 'Jane' }),
-    ]);
-
-    const jane = directory[0];
-    expect(jane.outcomes.Pass).toBe(1);
-    expect(jane.outcomes['Potential harm']).toBe(1);
-    expect(jane.outcomes['Pass with issues']).toBe(0);
-    expect(jane.notGraded).toBe(1);
-  });
-
-  it('keeps the adviser code from whichever case carries it', () => {
-    const directory = buildDirectory([
-      caseRow({ id: 'a', adviser: 'Jane' }),
-      caseRow({ id: 'b', adviser: 'Jane', adviserCode: 'ADV-01' }),
-    ]);
-
-    expect(directory[0].code).toBe('ADV-01');
-  });
-
-  it('ignores blank and whitespace-only names rather than creating a nameless person', () => {
-    expect(buildDirectory([caseRow({ adviser: '   ', paraplanner: '' })])).toEqual([]);
-  });
-
-  it('orders the busiest person first', () => {
-    const directory = buildDirectory([
-      caseRow({ id: 'a', adviser: 'Quiet' }),
-      caseRow({ id: 'b', adviser: 'Busy' }),
-      caseRow({ id: 'c', adviser: 'Busy' }),
-    ]);
-
-    expect(directory[0].name).toBe('Busy');
-  });
-});
 
 describe('casesForPerson', () => {
   const cases = [

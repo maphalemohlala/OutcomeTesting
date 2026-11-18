@@ -15,9 +15,9 @@ import source from './router.tsx?raw';
  * What makes it worth a guard rather than a one-line fix is how completely it was hidden.
  * `page.dashboard` is a declared ResourceKey; `al_pagepermission` grants it to eight roles;
  * `navigation.ts` filters the menu item on it, so the menu DID disappear; and
- * `pageResourceForPath('/')` returns it, with a test asserting so. Every mirror of the rule
+ * `pageResourceForPath('/')` (since deleted) returned it, with a test asserting so. Every mirror of the rule
  * was present and correct. The authoritative gate was the only missing piece, and no test
- * touched it because `pageResourceForPath` is called by tests and by nothing else.
+ * touched it because `pageResourceForPath` was called by tests and by nothing else.
  *
  * So this checks the router's own text. A route is exempt only if it navigates elsewhere -
  * a redirect lands on a route that IS gated - or if it is the catch-all, which deliberately
@@ -54,6 +54,30 @@ describe('every route is permission-gated', () => {
     // screen: it is what a role-less sign-in sees before it sees anything else.
     const dashboard = routes.find((route: string) => /path="\/"/.test(route)) ?? '';
     expect(dashboard).toContain('resource="page.dashboard"');
+  });
+});
+
+/**
+ * The menu hides an entry on the same resource the route checks. A menu gated on one key and
+ * a route on another either shows a link that opens "no access" or hides a screen the person
+ * may open. This replaces a path-to-resource map that only tests called and that disagreed
+ * with the router on two paths.
+ */
+describe('the menu and the router agree', () => {
+  const routes = source.match(/<Route\b[\s\S]*?\/>/g) ?? [];
+  const resourceByPath = new Map(
+    routes
+      .map((route: string) => [route.match(/path="([^"]*)"/)?.[1], route.match(/resource="([^"]*)"/)?.[1]] as const)
+      .filter(([path, resource]) => path && resource) as [string, string][],
+  );
+
+  it('gates every menu entry on the resource its route checks', async () => {
+    const { NAV_GROUPS } = await import('./navigation');
+    const items = NAV_GROUPS.flatMap((group) => group.items);
+    expect(items.length).toBeGreaterThan(5);
+    for (const item of items) {
+      expect(resourceByPath.get(item.to), `route for ${item.to}`).toBe(item.resource);
+    }
   });
 });
 

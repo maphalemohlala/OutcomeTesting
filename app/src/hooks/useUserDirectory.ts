@@ -3,6 +3,7 @@ import { ContactsService } from '../generated';
 import type { Contacts } from '../generated/models/ContactsModel';
 import { logTechnical } from '../services/errors';
 import { readAll } from '../services/readAll';
+import { contactName } from '../lib/contactName';
 
 export interface DirectoryUser {
   id: string;
@@ -28,26 +29,8 @@ export type UserDirectoryState =
   | { status: 'unavailable'; reason: string }
   | { status: 'ready'; users: DirectoryUser[] };
 
-/**
- * The display name for a contact.
- *
- * `fullname` is a calculated column, so it is present on a read but absent from anything
- * the app writes. Falling back through the parts it is calculated from means a contact
- * created in the same session still shows a name, and a contact with neither still
- * resolves to something a person can recognise rather than an empty cell.
- */
-export function contactName(contact: Contacts): string {
-  const full = contact.fullname?.trim();
-  if (full) return full;
-
-  const parts = [contact.firstname?.trim(), contact.lastname?.trim()].filter(Boolean);
-  if (parts.length > 0) return parts.join(' ');
-
-  return contact.emailaddress1?.trim() ?? '';
-}
-
 /** One contact as a directory row, or null when it cannot serve as an application user. */
-export function toDirectoryUser(contact: ContactWithStaffCode): DirectoryUser | null {
+function toDirectoryUser(contact: ContactWithStaffCode): DirectoryUser | null {
   const email = contact.emailaddress1?.trim();
   // AD-010 keys the registry on work email, and al_AssignCase resolves both the
   // systemuser and the contact from it. A contact with no email cannot be allocated to,
@@ -63,6 +46,67 @@ export function toDirectoryUser(contact: ContactWithStaffCode): DirectoryUser | 
     rowVersion: contact.versionnumber != null ? String(contact.versionnumber) : null,
     staffCode: contact.al_staffcode?.trim() || null,
   };
+}
+
+/** Exactly what contactName and toDirectoryUser read; contact has hundreds of columns. */
+const DIRECTORY_COLUMNS = [
+  'contactid', 'fullname', 'firstname', 'lastname', 'emailaddress1', 'statecode', 'createdon',
+  'versionnumber', 'al_staffcode',
+];
+
+const UNAVAILABLE: UserDirectoryState = {
+  status: 'unavailable',
+  reason: 'The user list could not be loaded right now.',
+};
+
+/** How long one read serves every caller. Past it, somebody else's change to a person shows. */
+const DIRECTORY_MAX_AGE_MS = 5 * 60 * 1000;
+
+/** The read in flight or done for one reload key, shared by every caller on every screen. */
+let shared: { key: number; startedAt: number; read: Promise<UserDirectoryState> } | null = null;
+
+/**
+ * One read per reload key, however many hooks ask, for five minutes. A changed key reads
+ * again (the People page bumps it after an edit), as does a caller arriving after the limit;
+ * a failed read is forgotten, so the next caller retries. Never rejects.
+ */
+export function loadUserDirectory(reloadKey = 0): Promise<UserDirectoryState> {
+  if (shared?.key === reloadKey && Date.now() - shared.startedAt < DIRECTORY_MAX_AGE_MS) {
+    return shared.read;
+  }
+
+  const read: Promise<UserDirectoryState> = readAll((o) => ContactsService.getAll(o), {
+    orderBy: ['fullname asc', 'contactid asc'],
+    select: DIRECTORY_COLUMNS,
+  })
+    .then((result): UserDirectoryState => {
+      if (!result.success) {
+        logTechnical('user directory load', result.error);
+        return UNAVAILABLE;
+      }
+      return {
+        status: 'ready',
+        users: result.data
+          .map(toDirectoryUser)
+          .filter((user): user is DirectoryUser => user !== null),
+      };
+    })
+    .catch((error): UserDirectoryState => {
+      logTechnical('user directory load', error);
+      return UNAVAILABLE;
+    })
+    .then((state) => {
+      if (state.status !== 'ready' && shared?.read === read) shared = null;
+      return state;
+    });
+
+  shared = { key: reloadKey, startedAt: Date.now(), read };
+  return read;
+}
+
+/** Test seam: forget what was read. */
+export function resetUserDirectoryForTests(): void {
+  shared = null;
 }
 
 /**
@@ -84,26 +128,9 @@ export function useUserDirectory(reloadKey = 0): UserDirectoryState {
   useEffect(() => {
     let cancelled = false;
 
-    readAll((o) => ContactsService.getAll(o), { orderBy: ['fullname asc', 'contactid asc'] })
-      .then((result) => {
-        if (cancelled) return;
-        if (!result.success) {
-          logTechnical('user directory load', result.error);
-          setState({ status: 'unavailable', reason: 'The user list could not be loaded right now.' });
-          return;
-        }
-        setState({
-          status: 'ready',
-          users: result.data
-            .map(toDirectoryUser)
-            .filter((user): user is DirectoryUser => user !== null),
-        });
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        logTechnical('user directory load', error);
-        setState({ status: 'unavailable', reason: 'The user list could not be loaded right now.' });
-      });
+    void loadUserDirectory(reloadKey).then((next) => {
+      if (!cancelled) setState(next);
+    });
 
     return () => {
       cancelled = true;

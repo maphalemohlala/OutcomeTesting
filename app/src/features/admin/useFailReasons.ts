@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Al_failreasonsService } from '../../generated';
 import type { Al_failreasonsal_category } from '../../generated/models/Al_failreasonsModel';
 import { logTechnical } from '../../services/errors';
-import { describeSaveFailure } from './listOptionFailure';
 import {
+  describeFailPointSaveFailure,
   nextFailReasonCode,
   toFailReasonRows,
   type FailReasonDraft,
@@ -54,12 +54,12 @@ async function write(what: string, run: () => Promise<{ success: boolean; error?
     const result = await run();
     if (!result.success) {
       logTechnical(what, result.error);
-      return { ok: false, reason: describeSaveFailure(result.error) };
+      return { ok: false, reason: describeFailPointSaveFailure(result.error) };
     }
     return { ok: true };
   } catch (error) {
     logTechnical(what, error);
-    return { ok: false, reason: describeSaveFailure(error) };
+    return { ok: false, reason: describeFailPointSaveFailure(error) };
   }
 }
 

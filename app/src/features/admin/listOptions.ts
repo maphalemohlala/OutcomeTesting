@@ -1,4 +1,5 @@
 import { inForceOn, notStarted } from '../../lib/effectiveWindow';
+import { lookupLabel } from '../cases/lookupLabel';
 
 /**
  * The case-header lists whose options are stored as ROWS rather than as picklist metadata,
@@ -50,7 +51,7 @@ export const LIST_VULNERABLE_CLIENT = 120910845 as const;
  * instead of failing at runtime on somebody's save. It is the same trick trailLight.ts uses
  * to pin a generated column, and it costs nothing.
  */
-export type ListValue =
+type ListValue =
   | typeof LIST_PRODUCT_SOLUTION_TYPE
   | typeof LIST_SAMPLE_SOURCE
   | typeof LIST_CASE_TYPE
@@ -84,7 +85,7 @@ export interface ManagedList {
    * The choice column this list replaces.
    *
    * Kept after migration, deliberately. A case imported before the change carries the integer
-   * and no lookup, and it has to keep reading correctly - see `caseOptionLabel`. Dropping the
+   * and no lookup, and it has to keep reading correctly. Dropping the
    * column is a later, separate step once nothing is left holding only the integer.
    */
   readonly legacyAttribute: string;
@@ -153,6 +154,13 @@ export const MIGRATED_LISTS: readonly ManagedList[] = MANAGED_LISTS.filter(
   (list) => list.caseAttribute !== null || list.caseRelationship !== null,
 );
 
+/** MIGRATED_LISTS is the single place that says which lists have a lookup on the case. */
+export function managedList(key: string): ManagedList {
+  const found = MIGRATED_LISTS.find((list) => list.key === key);
+  if (!found) throw new Error(`No migrated list '${key}'`);
+  return found;
+}
+
 /** The lists a case holds ONE of: the ones drawn as a single-choice dropdown. */
 export const SINGLE_CHOICE_LISTS: readonly ManagedList[] = MANAGED_LISTS.filter(
   (list) => list.caseAttribute !== null,
@@ -165,10 +173,6 @@ export const MULTI_CHOICE_LISTS: readonly ManagedList[] = MANAGED_LISTS.filter(
 
 export function listByKey(key: string): ManagedList | null {
   return MANAGED_LISTS.find((list) => list.key === key) ?? null;
-}
-
-export function listByValue(value: number): ManagedList | null {
-  return MANAGED_LISTS.find((list) => list.value === value) ?? null;
 }
 
 /** The Web API field carrying a case's chosen option id, e.g. `_al_producttypeid_value`. */
@@ -192,6 +196,12 @@ export interface RawListOption {
   al_effectivefrom?: string | null;
   al_effectiveto?: string | null;
 }
+
+/** RawListOption's columns: all that a read feeding toOptionRows or heldOptionLabels needs. */
+export const LIST_OPTION_COLUMNS = [
+  'al_listoptionid', 'al_name', 'al_list', 'al_sortorder', 'al_legacyvalue', 'al_effectivefrom',
+  'al_effectiveto',
+];
 
 export interface ListOptionRow {
   id: string;
@@ -340,32 +350,6 @@ export function validateDraft(
 }
 
 /**
- * The label to show for a case's chosen option.
- *
- * The lookup first, then the choice value the case was imported with. That fallback is the
- * whole migration safety net: a case written before the lookup existed carries only the
- * integer, and it has to keep reading correctly on every page until it is backfilled. It is
- * matched through `legacyValue` rather than a second hard-coded map, so renaming an option
- * renames it on the old cases too.
- *
- * Returns null rather than a placeholder: the caller decides how an empty field is drawn.
- */
-export function caseOptionLabel(
-  lookupFormatted: string | null | undefined,
-  legacyValue: number | null | undefined,
-  rows: readonly ListOptionRow[],
-): string | null {
-  const labelled = (lookupFormatted ?? '').trim();
-  if (labelled !== '') return labelled;
-
-  if (legacyValue == null) return null;
-
-  const match = rows.find((row) => row.legacyValue === legacyValue);
-  const label = (match?.label ?? '').trim();
-  return label === '' ? null : label;
-}
-
-/**
  * The choices an edit control offers for a case that currently holds `heldId`.
  *
  * The options in force, plus - only when the case holds one that is not among them - the
@@ -382,16 +366,19 @@ export function caseOptionLabel(
  */
 export function choicesIncludingHeld(
   rows: readonly ListOptionRow[],
-  heldId: string | null | undefined,
+  held: string | readonly string[] | null | undefined,
 ): ListOptionRow[] {
   const offered = offeredOptions(rows);
-  const held = (heldId ?? '').trim();
-  if (held === '' || offered.some((row) => row.id === held)) return offered;
+  // One id for a dropdown, every ticked id for a tick list: each held retired one is offered.
+  const heldIds = (typeof held === 'string' ? [held] : (held ?? []))
+    .map((id) => id.trim())
+    .filter((id) => id !== '' && !offered.some((row) => row.id === id));
 
-  const stillHeld = rows.find((row) => row.id === held);
-  if (!stillHeld) return offered;
+  const stillHeld = rows
+    .filter((row) => heldIds.includes(row.id))
+    .map((row) => ({ ...row, label: `${row.label} (retired)` }));
 
-  return [...offered, { ...stillHeld, label: `${stillHeld.label} (retired)` }];
+  return [...offered, ...stillHeld];
 }
 
 /**
@@ -486,21 +473,8 @@ export function lookupLabelOn(
   list: ManagedList,
 ): string | null {
   if (list.caseAttribute === null) return null;
-
-  const annotation = lookupFormattedField(list);
-  const candidates = [
-    annotation === null ? undefined : record[annotation],
-    record[`${list.caseAttribute}name`],
-  ];
-
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string') {
-      const label = candidate.trim();
-      if (label !== '') return label;
-    }
-  }
-
-  return null;
+  const name = record[`${list.caseAttribute}name`];
+  return lookupLabel(record, list.caseAttribute, typeof name === 'string' ? name : undefined);
 }
 
 /**

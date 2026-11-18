@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { CaseSummary } from './caseWorklistMapping';
-import { applyFilters, EMPTY_FILTERS, type Filters } from './worklistFilters';
+import { applyFilters, FILTER_KEYS, type Filters } from './worklistFilters';
+
+const EMPTY_FILTERS = Object.fromEntries(FILTER_KEYS.map((key) => [key, ''])) as Filters;
 
 function row(id: string, overrides: Partial<CaseSummary> = {}): CaseSummary {
   return {
@@ -115,5 +117,18 @@ describe('removed cases on the worklist', () => {
 
   it('shows them when someone filters to their status', () => {
     expect(filtered(cases, { status: 'No Check Required' })).toEqual(['removed']);
+  });
+});
+
+describe('the pre or post check filter (requirements log row 2)', () => {
+  it('picks out post-sale cases, ignoring case, and leaves the rest when unset', () => {
+    const cases = [
+      row('pre', { preOrPostCheck: 'Pre' }),
+      row('post', { preOrPostCheck: 'Post' }),
+      row('unknown', { preOrPostCheck: null }),
+    ];
+    expect(filtered(cases, { check: 'post' })).toEqual(['post']);
+    expect(filtered(cases, { check: 'Pre' })).toEqual(['pre']);
+    expect(filtered(cases, {})).toEqual(['pre', 'post', 'unknown']);
   });
 });

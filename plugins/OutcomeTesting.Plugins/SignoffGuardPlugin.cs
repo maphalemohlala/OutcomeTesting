@@ -31,6 +31,7 @@ namespace OutcomeTesting.Plugins
         private const string ActionLookup = "al_remediationactionid";
         private const string CaseLookup = "al_outcomecaseid";
         private const string FinalOutcomeAttr = "al_finaloutcome";
+        private const string ClockStartedOnAttr = "al_clockstartedon";
 
         private const int StatusCompleted = Remediation.StatusCompleted;
         private const int DecisionRejectedValue = 120910721;
@@ -62,6 +63,12 @@ namespace OutcomeTesting.Plugins
                 return;
             }
 
+            // A create made straight on the table skips al_SignOffRemediation's own gate, and the
+            // app's Dataverse role creates here at Global depth.
+            var system = localPluginContext.OrgSvcFactory.CreateOrganizationService(null);
+            WriteProvenance.EnsureTrustedOrPermitted(
+                system, context, SignOffRemediationPlugin.SignOffResource, PermissionHelpers.AccessEdit);
+
             var decision = signoff.GetAttributeValue<OptionSetValue>(DecisionAttr);
             var notes = signoff.GetAttributeValue<string>(NotesAttr);
             var finalOutcome = signoff.GetAttributeValue<OptionSetValue>(FinalOutcomeAttr);
@@ -82,13 +89,29 @@ namespace OutcomeTesting.Plugins
                     CommandHelpers.ValidationPrefix + "A sign-off must name the remediation action it relates to.");
             }
 
-            var action = service.Retrieve(ActionEntity, actionRef.Id, new ColumnSet(ActionStatus, CaseLookup));
+            var action = service.Retrieve(ActionEntity, actionRef.Id, new ColumnSet(ActionStatus, CaseLookup, ClockStartedOnAttr));
 
             var status = action.GetAttributeValue<OptionSetValue>(ActionStatus);
             if (status == null || status.Value != StatusCompleted)
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.PreconditionPrefix + "Only a completed remediation action can be signed off.");
+            }
+
+            // The action alone is not enough: a Pass-with-issues case closes on its last
+            // completion, and a rejection recorded after that reopened the action on a Closed
+            // case that can never move again.
+            var caseRef = action.GetAttributeValue<EntityReference>(CaseLookup);
+            if (caseRef != null)
+            {
+                var caseStatus = CaseTransitions.CurrentStatus(service, caseRef.Id);
+                if (caseStatus != CaseLifecycle.AwaitingSignoff)
+                {
+                    throw new InvalidPluginExecutionException(
+                        CommandHelpers.PreconditionPrefix + "This case is "
+                        + (caseStatus.HasValue ? CaseLifecycle.NameOf(caseStatus.Value) : "(none)")
+                        + ", not Awaiting Sign-off, so its remediation cannot be signed off.");
+                }
             }
 
             // An approval happens once. Without this the same action can be approved twice,
@@ -110,15 +133,28 @@ namespace OutcomeTesting.Plugins
             }
 
             signoff["al_name"] = "SignOff " + actionRef.Id.ToString("D");
-            signoff["al_signoffcode"] = "SO-" + DateTime.UtcNow.ToString("yyyyMMddHHmmssfff")
-                + "-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            signoff["al_signoffcode"] = SignoffCode(actionRef.Id, action.GetAttributeValue<DateTime?>(ClockStartedOnAttr));
             signoff["al_signedoffon"] = DateTime.UtcNow;
 
-            var caseRef = action.GetAttributeValue<EntityReference>(CaseLookup);
             if (caseRef != null)
             {
                 signoff[CaseLookup] = caseRef;
             }
+        }
+
+        /// <summary>
+        /// One code per action per decision round, so two decisions racing on the same round
+        /// collide on the al_signoffcode alternate key instead of both being recorded - the
+        /// approved-already check cannot see a sign-off that has not committed yet. A rejection
+        /// restarts the action's clock (<see cref="SignoffProgressPlugin.ReopenedAction"/>),
+        /// and that is what makes the reworked action's next decision a new code.
+        /// </summary>
+        public static string SignoffCode(Guid actionId, DateTime? clockStartedOn)
+        {
+            var code = "SO-" + actionId.ToString("N");
+            return clockStartedOn.HasValue
+                ? code + "-" + clockStartedOn.Value.ToUniversalTime().ToString("yyyyMMddHHmmssfff")
+                : code;
         }
 
         /// <summary>
@@ -164,10 +200,14 @@ namespace OutcomeTesting.Plugins
                     "A rejected sign-off returns the remediation to the adviser, so it cannot record a final outcome.";
             }
 
-            if (!OutcomeRules.IsFinalOutcome(finalOutcome.Value))
+            // An approval settles the case, so only Pass or Potential harm (requirements log row
+            // 25): an outstanding point is a rejection with notes, not an unclear final grade.
+            // The page already offered only these two; this refuses a payload sent by hand.
+            if (finalOutcome.Value != OutcomeRules.FinalOutcomePass
+                && finalOutcome.Value != OutcomeRules.FinalOutcomePotentialHarm)
             {
                 return CommandHelpers.ValidationPrefix +
-                    "The final outcome must be Pass, Pass with issues, Insufficient evidence or Potential harm.";
+                    "An approved sign-off's final outcome must be Pass or Potential harm.";
             }
 
             if (noNotes)

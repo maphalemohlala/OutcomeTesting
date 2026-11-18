@@ -13,8 +13,8 @@ import { useReports } from './useReports';
 import './ReportsPage.css';
 
 export function ReportsPage() {
-  const state = useReports();
   const worklist = useCaseWorklist();
+  const state = useReports(worklist);
   const directory = useUserDirectory();
   const [filters, setFilter, clearFilters] = useReportFilters();
 

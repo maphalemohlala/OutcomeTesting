@@ -1,0 +1,12 @@
+<customapirequestparameter uniquename="FqContactId">
+  <description default="Id of the contact named as accountable for the File Quality fail, when someone other than the case's own adviser or paraplanner carries it. Empty means the case's own people carry it, and is written as null so a previous name is cleared rather than left behind.">
+    <label description="Id of the contact named as accountable for the File Quality fail, when someone other than the case's own adviser or paraplanner carries it. Empty means the case's own people carry it, and is written as null so a previous name is cleared rather than left behind." languagecode="1033" />
+  </description>
+  <displayname default="FQ accountable contact">
+    <label description="FQ accountable contact" languagecode="1033" />
+  </displayname>
+  <iscustomizable>1</iscustomizable>
+  <isoptional>1</isoptional>
+  <name>FqContactId</name>
+  <type>10</type>
+</customapirequestparameter>

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   RESOURCE_KEYS,
   DEFAULT_PERMISSIONS,
-  pageResourceForPath,
   resolvePermissions,
   can,
 } from '../../types/permissions';
@@ -22,10 +21,6 @@ import {
 describe('the adviser mapping page permission', () => {
   it('is a known resource key', () => {
     expect(RESOURCE_KEYS).toContain('page.admin.advisers');
-  });
-
-  it('is the resource for its path', () => {
-    expect(pageResourceForPath('/admin/advisers')).toBe('page.admin.advisers');
   });
 
   it('is granted to the administrators who run the configuration', () => {

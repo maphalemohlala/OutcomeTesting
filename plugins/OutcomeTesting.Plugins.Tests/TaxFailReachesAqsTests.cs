@@ -150,6 +150,31 @@ namespace OutcomeTesting.Plugins.Tests
         }
 
         /// <summary>
+        /// The grading gate and the finalising both need the advice quality grade. One submit
+        /// looks the question up by its code once and both use the answer.
+        /// </summary>
+        [Fact]
+        public void An_aqs_submit_looks_the_grade_up_once()
+        {
+            var svc = Case(ResponseRules.ChoicePass, ResponseRules.ChoicePassWithIssues);
+            Submit(svc, TaxReviewId);
+            PickUp(svc);
+
+            var counting = new CountingOrganizationService(svc);
+            SubmitReviewPlugin.Submit(
+                counting, AqsReviewId, "grade-once", null, Guid.NewGuid(), Guid.NewGuid(),
+                requireCallerOwnsReview: false, details: "grade read once");
+
+            var gradeLookups = counting.Queries.Count(q =>
+                q.EntityName == "al_questionversion"
+                && q.LinkEntities.Any(link => link.LinkCriteria.Conditions.Any(
+                    c => c.Values.Contains(GradingRules.GradeQuestionCode))));
+
+            Assert.Equal(1, gradeLookups);
+            Assert.Single(ActionsOn(svc));
+        }
+
+        /// <summary>
         /// The Tax half, which is what APP-051 asks for: the case goes back to the queue for
         /// the AQS checker and nobody is asked to do anything yet.
         /// </summary>

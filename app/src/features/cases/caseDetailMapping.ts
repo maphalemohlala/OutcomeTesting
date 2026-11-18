@@ -1,6 +1,5 @@
 import type { CaseStatus, ReviewRoute } from '../../types/domain';
 import { adviserUnmatched } from './allocationScope';
-import { REVIEW_ROUTES } from '../../types/domain';
 import {
   Al_outcomecasesal_casestatus,
   Al_outcomecasesal_priority,
@@ -14,6 +13,7 @@ import {
 } from '../reviews/checklistForm';
 import { choiceLabel as choice } from '../../lib/choiceLabel';
 import { lookupLabel } from './lookupLabel';
+import { ageInDays, toRoute } from './caseWorklistMapping';
 import { date, text } from '../../lib/format';
 
 /**
@@ -109,17 +109,6 @@ export interface CaseDetail {
    */
   checklist: CaseChecklist;
   edit: CaseEditValues;
-}
-
-function toRoute(name: string | null): ReviewRoute | null {
-  return REVIEW_ROUTES.find((route) => route === name) ?? null;
-}
-
-function ageInDays(createdOn: string | undefined): number {
-  if (!createdOn) return 0;
-  const created = new Date(createdOn).getTime();
-  if (Number.isNaN(created)) return 0;
-  return Math.max(0, Math.floor((Date.now() - created) / 86_400_000));
 }
 
 

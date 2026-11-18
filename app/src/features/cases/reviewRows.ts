@@ -24,6 +24,10 @@ export interface CaseReview {
   submittedOn: string | null;
   /** Who holds the check. `al_AssignCase` makes the checker the review's record owner. */
   owner: string | null;
+  /** Sent back to al_AssignCase, so an allocation over somebody else's is refused, not lost. */
+  rowVersion: string | null;
+  /** The owner's record id: al_AssignCase makes the checker the owner, so a change means someone allocated it. */
+  ownerId: string | null;
 }
 
 /**
@@ -53,5 +57,13 @@ export function toReview(record: Al_reviewinstances): CaseReview {
     startedOn: date(record.al_startedon),
     submittedOn: date(record.al_submittedon),
     owner: lookupLabel(record, 'ownerid', record.owneridname),
+    rowVersion: record.versionnumber != null ? String(record.versionnumber) : null,
+    ownerId: ownerIdOf(record),
   };
+}
+
+/** The raw owner id the Web API returns beside the label annotation, or null. */
+export function ownerIdOf(record: object): string | null {
+  const value = (record as Record<string, unknown>)['_ownerid_value'];
+  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : null;
 }

@@ -68,7 +68,7 @@ namespace OutcomeTesting.Plugins
             try
             {
                 before = userService.Retrieve(
-                    MappingEntity, mappingId, new ColumnSet("al_useremail", "al_rolecode", "statecode"));
+                    MappingEntity, mappingId, new ColumnSet("al_useremail", "al_rolecode", "al_approle", "statecode"));
             }
             catch (System.ServiceModel.FaultException<OrganizationServiceFault>)
             {
@@ -78,6 +78,15 @@ namespace OutcomeTesting.Plugins
 
             var email = before.GetAttributeValue<string>("al_useremail");
             var wasActive = CommandHelpers.IsActive(before);
+
+            // The same refusal al_AssignUserRole and al_AdoptRoleAssignment make: a retired
+            // role is not granted again, by a fresh assignment or by restoring an old one.
+            var effectiveRole = PermissionHelpers.EffectiveRoleCode(before);
+            if (active && WebRoleRegistry.IsRetired(systemService, effectiveRole))
+            {
+                throw new InvalidPluginExecutionException(
+                    CommandHelpers.PreconditionPrefix + effectiveRole + " is retired, so this assignment cannot be restored.");
+            }
 
             CommandHelpers.SetState(userService, MappingEntity, mappingId, active);
 
@@ -95,10 +104,18 @@ namespace OutcomeTesting.Plugins
                         AssignUserRolePlugin.AssociateWebRole(systemService, email, webRole.Id);
                     }
                 }
-                else
+                else if (!AnotherActiveMapping(systemService, mappingId, email, roleCode))
                 {
+                    // Only when no other active row still grants the same role: the
+                    // association is shared by every row for the pair, so removing it while
+                    // one remains withdraws a grant the app still shows as active.
                     AssignUserRolePlugin.DisassociateWebRole(systemService, email, roleCode.Trim());
                 }
+            }
+
+            if (!active)
+            {
+                PermissionHelpers.EnsureSomeoneCanManagePermissions(systemService);
             }
 
             var details = "Active " + wasActive + " -> " + active;
@@ -108,6 +125,29 @@ namespace OutcomeTesting.Plugins
                 MappingEntity, mappingId, null, details, idempotencyKey, context);
 
             SetResponse(context, mappingId.ToString("D"), active, auditId);
+        }
+
+        /// <summary>Whether a row other than <paramref name="mappingId"/> still actively grants the role to the email.</summary>
+        private static bool AnotherActiveMapping(IOrganizationService service, Guid mappingId, string email, string roleCode)
+        {
+            var query = new QueryExpression(MappingEntity)
+            {
+                ColumnSet = new ColumnSet("al_rolecode", "al_approle", "statecode"),
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("al_useremail", ConditionOperator.Equal, email.Trim());
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            PermissionHelpers.AddRoleIdentityFilter(query.Criteria, roleCode);
+
+            foreach (var row in CommandHelpers.RetrieveAll(service, query))
+            {
+                if (row.Id != mappingId && PermissionHelpers.MatchesRole(row, roleCode))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void SetResponse(IPluginExecutionContext context, string mappingId, bool active, Guid auditId)

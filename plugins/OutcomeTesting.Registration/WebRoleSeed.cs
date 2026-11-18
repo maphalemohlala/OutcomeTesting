@@ -119,6 +119,16 @@ public static class WebRoleSeed
         // Portal Administrator holds page.cases at View and so cannot reach the command that
         // would use this.
         yield return (Administrators, "case.duedate", AccessEdit);
+
+        // Deleting a case outright (requirements log row 40): the manager and both admin roles.
+        foreach (var role in new[] { OutcomeTestingManager, PortalAdministrator, Administrators })
+        {
+            yield return (role, "case.delete", AccessEdit);
+
+            // Amending the original grades (row 39) and handing one case to another T&C Manager (row 4).
+            yield return (role, "case.amendoutcome", AccessEdit);
+            yield return (role, "case.reassignmanager", AccessEdit);
+        }
     }
 
     public static int Run(IOrganizationService svc)
@@ -206,6 +216,9 @@ public static class WebRoleSeed
                 ["al_rolecode"] = role,
                 ["al_resourcekey"] = resource,
                 ["al_accesslevel"] = new OptionSetValue(level),
+                // Explicitly null: al_approle defaults to Adviser, and a rule keyed on
+                // al_rolecode must not also carry a picklist role nobody assigned.
+                ["al_approle"] = null,
                 ["statecode"] = new OptionSetValue(0),
                 ["statuscode"] = new OptionSetValue(1),
             };

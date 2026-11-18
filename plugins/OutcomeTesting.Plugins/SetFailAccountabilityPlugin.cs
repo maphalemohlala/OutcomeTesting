@@ -26,6 +26,9 @@ namespace OutcomeTesting.Plugins
         // clears it and puts the case's own person back in the extract.
         private const string InFqContactId = "FqContactId";
         private const string InAqContactId = "AqContactId";
+        // Optional (requirements log row 10): the administrator who carries a File Quality
+        // fail. Any contact - no Adviser or Planner role - and never exported.
+        private const string InFqAdministratorId = "FqAdministratorId";
         private const string InIdempotencyKey = "IdempotencyKey";
 
         private const string OutStatus = "Status";
@@ -65,6 +68,7 @@ namespace OutcomeTesting.Plugins
             var aqParaplanner = CommandHelpers.GetRequiredBool(context, InAqParaplanner);
             var fqContactId = ParseOptionalContact(context, InFqContactId);
             var aqContactId = ParseOptionalContact(context, InAqContactId);
+            var fqAdministratorId = ParseOptionalContact(context, InFqAdministratorId);
 
             PermissionHelpers.EnsureAppPermission(systemService, context, "page.cases", PermissionHelpers.AccessEdit);
 
@@ -77,7 +81,8 @@ namespace OutcomeTesting.Plugins
 
             var outcome = CommandHelpers.RetrieveOrNotFound(
                 userService, OutcomeEntity, targetId,
-                new ColumnSet(Outcomes.InitialOutcomeAttr, Outcomes.FinalOutcomeAttr, CaseAttr),
+                new ColumnSet(Outcomes.InitialOutcomeAttr, Outcomes.FinalOutcomeAttr, CaseAttr,
+                    "al_fqaccountablecontactid", "al_aqaccountablecontactid"),
                 "That outcome no longer exists, so accountability cannot be recorded "
                 + "against it. Refresh and try again.");
 
@@ -89,6 +94,13 @@ namespace OutcomeTesting.Plugins
             {
                 throw new InvalidPluginExecutionException(CommandHelpers.PreconditionPrefix + refusal);
             }
+
+            // A named person must hold the Adviser or Planner role (owner, 2026-11-17); the one
+            // already named passes, so re-saving the ticks survives a withdrawn role.
+            WebRoleRegistry.EnsureAccountable(
+                systemService, fqContactId, outcome.GetAttributeValue<EntityReference>("al_fqaccountablecontactid"));
+            WebRoleRegistry.EnsureAccountable(
+                systemService, aqContactId, outcome.GetAttributeValue<EntityReference>("al_aqaccountablecontactid"));
 
             userService.Update(new Entity(OutcomeEntity, targetId)
             {
@@ -102,12 +114,14 @@ namespace OutcomeTesting.Plugins
                 // leaving a stale name the extract would keep using.
                 ["al_fqaccountablecontactid"] = fqContactId,
                 ["al_aqaccountablecontactid"] = aqContactId,
+                [GenerateExportPlugin.FqAdministratorContactAttr] = fqAdministratorId,
             });
 
             var details = "FQ adviser " + fqAdviser + ", FQ paraplanner " + fqParaplanner
                 + ", AQ adviser " + aqAdviser + ", AQ paraplanner " + aqParaplanner
                 + ", FQ named " + Describe(fqContactId, NameOf(userService, fqContactId))
-                + ", AQ named " + Describe(aqContactId, NameOf(userService, aqContactId));
+                + ", AQ named " + Describe(aqContactId, NameOf(userService, aqContactId))
+                + ", FQ administrator " + DescribeAdministrator(fqAdministratorId, NameOf(userService, fqAdministratorId));
 
             var auditId = CommandHelpers.WriteAuditEvent(
                 systemService, CommandSetFailAccountability, "SetFailAccountability", OutcomeEntity, targetId,
@@ -116,21 +130,6 @@ namespace OutcomeTesting.Plugins
             SetResponse(context, "Recorded", auditId);
         }
 
-        /// <summary>
-        /// Why there is no fail on this case to attribute, or null when there is one.
-        ///
-        /// Accountability describes a fail: recording it against a clean case would put a
-        /// name in a Trail Light column that AD-039 only ever fills for a fail.
-        ///
-        /// A file quality fail counts on its own. The guard used to read the advice quality
-        /// outcome alone, which refused every case that passed on advice and failed on the
-        /// file - five of the seven closed cases in DEV, and exactly the population the
-        /// export now names the paraplanner for. Refusing to override a pair the export had
-        /// already derived is the wrong way round.
-        ///
-        /// Pure so the decision can be read off a test without a fake organisation service,
-        /// as GenerateExportPlugin.IsAccountable is.
-        /// </summary>
         /// <summary>
         /// The contact a parameter names, or null where none was sent or it was cleared.
         ///
@@ -180,6 +179,12 @@ namespace OutcomeTesting.Plugins
             return string.IsNullOrWhiteSpace(fullName) ? id : fullName.Trim() + " (" + id + ")";
         }
 
+        /// <summary>The administrator in the audit line: as a named person, or "(none)".</summary>
+        public static string DescribeAdministrator(EntityReference contact, string fullName)
+        {
+            return contact == null ? "(none)" : Describe(contact, fullName);
+        }
+
         /// <summary>
         /// The contact's name for the audit line, or null when it cannot be read.
         ///
@@ -205,6 +210,21 @@ namespace OutcomeTesting.Plugins
             }
         }
 
+        /// <summary>
+        /// Why there is no fail on this case to attribute, or null when there is one.
+        ///
+        /// Accountability describes a fail: recording it against a clean case would put a
+        /// name in a Trail Light column that AD-039 only ever fills for a fail.
+        ///
+        /// A file quality fail counts on its own. The guard used to read the advice quality
+        /// outcome alone, which refused every case that passed on advice and failed on the
+        /// file - five of the seven closed cases in DEV, and exactly the population the
+        /// export now names the paraplanner for. Refusing to override a pair the export had
+        /// already derived is the wrong way round.
+        ///
+        /// Pure so the decision can be read off a test without a fake organisation service,
+        /// as GenerateExportPlugin.IsAccountable is.
+        /// </summary>
         public static string RefusalFor(int? effectiveOutcome, bool fileQualityFailed)
         {
             if (fileQualityFailed)

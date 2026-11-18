@@ -97,13 +97,16 @@ namespace OutcomeTesting.Plugins
             // it has to be what actually withdraws their access. The mappings are left in
             // place deliberately — they are history, and reactivation restores the person
             // to the roles they had — so the registry row is what decides, not the mapping.
-            if (!IsRegisteredActive(systemService, email))
+            // The registry row is read once and serves both questions asked of it: whether the
+            // person is deactivated, here, and which contact's web roles to read, below.
+            var reads = new RoleReads { Contact = RegistryRow(systemService, email), ContactRead = true };
+            if (reads.Contact != null && !ContactRegistry.IsActive(reads.Contact))
             {
                 throw new InvalidPluginExecutionException(
                     CommandHelpers.UnauthorizedPrefix + "Your application account is deactivated. Ask an administrator to reactivate it.");
             }
 
-            var roles = GetActiveRoles(systemService, email);
+            var roles = GetActiveRoles(systemService, email, reads);
             if (roles.Count == 0)
             {
                 throw new InvalidPluginExecutionException(
@@ -172,21 +175,47 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static bool IsRegisteredActive(IOrganizationService service, string email)
         {
-            var query = new QueryExpression(ContactRegistry.Entity)
-            {
-                ColumnSet = new ColumnSet(ContactRegistry.StateCodeAttr),
-                TopCount = 1,
-                Criteria = new FilterExpression(),
-            };
-            query.Criteria.AddCondition(ContactRegistry.EmailAttr, ConditionOperator.Equal, email);
+            var row = RegistryRow(service, email);
+            return row == null || ContactRegistry.IsActive(row);
+        }
 
-            var found = service.RetrieveMultiple(query).Entities;
-            if (found.Count == 0)
+        /// <summary>
+        /// What one resolution has already read, so it does not ask again: the caller's
+        /// registry row, and whether a role name is left out of resolution. A role held both
+        /// by mapping and by web role is otherwise looked up once for each. The name is the
+        /// key exactly as it was asked, so the platform still makes every comparison of
+        /// names; only an identical question is answered from here. Kept for one resolution.
+        /// </summary>
+        private sealed class RoleReads
+        {
+            public readonly Dictionary<string, bool> Excluded =
+                new Dictionary<string, bool>(StringComparer.Ordinal);
+
+            public bool ContactRead;
+            public Entity Contact;
+        }
+
+        private static bool ExcludedFromResolution(IOrganizationService service, string roleName, RoleReads reads)
+        {
+            var key = roleName ?? string.Empty;
+            bool excluded;
+            if (!reads.Excluded.TryGetValue(key, out excluded))
             {
-                return true;
+                excluded = WebRoleRegistry.ExcludedFromResolution(service, roleName);
+                reads.Excluded[key] = excluded;
             }
 
-            return ContactRegistry.IsActive(found[0]);
+            return excluded;
+        }
+
+        /// <summary>
+        /// The registry row holding this email, or null when there is none. The same ordered
+        /// pick as the web role lookup (an active row first), so a deactivated duplicate cannot
+        /// decide for a person who also has an active row.
+        /// </summary>
+        private static Entity RegistryRow(IOrganizationService service, string email)
+        {
+            return WebRoleRegistry.FindContactByEmail(service, email);
         }
 
         /// <summary>
@@ -219,7 +248,7 @@ namespace OutcomeTesting.Plugins
         /// </summary>
         public static List<string> ResolveRoleCodesForEmail(IOrganizationService service, string email)
         {
-            var roles = GetActiveRoles(service, (email ?? string.Empty).Trim());
+            var roles = GetActiveRoles(service, (email ?? string.Empty).Trim(), new RoleReads());
 
             // A person whose only active mapping carries the legacy al_approle picklist (no
             // al_rolecode) has to show up here too. RoleCodes alone used to be returned, so
@@ -249,16 +278,17 @@ namespace OutcomeTesting.Plugins
         /// and a rule written against an AD-044 custom role are indistinguishable to the
         /// gate — as they should be.
         /// </summary>
-        private static CallerRoles GetActiveRoles(IOrganizationService service, string email)
+        private static CallerRoles GetActiveRoles(IOrganizationService service, string email, RoleReads reads)
         {
-            var roles = GetMappedRoles(service, email);
+            var roles = GetMappedRoles(service, email, reads);
 
-            var contact = WebRoleRegistry.FindContactByEmail(service, email);
+            // The same row the gate already read for this email, where it has read one.
+            var contact = reads.ContactRead ? reads.Contact : WebRoleRegistry.FindContactByEmail(service, email);
             if (contact != null)
             {
                 foreach (var webRole in WebRoleRegistry.RolesForContact(service, contact.Id))
                 {
-                    if (WebRoleRegistry.ExcludedFromResolution(service, webRole))
+                    if (ExcludedFromResolution(service, webRole, reads))
                     {
                         continue;
                     }
@@ -273,7 +303,7 @@ namespace OutcomeTesting.Plugins
             return roles;
         }
 
-        private static CallerRoles GetMappedRoles(IOrganizationService service, string email)
+        private static CallerRoles GetMappedRoles(IOrganizationService service, string email, RoleReads reads)
         {
             var query = new QueryExpression(MappingEntity)
             {
@@ -306,7 +336,7 @@ namespace OutcomeTesting.Plugins
                     // resolver both write paths feed, is what makes AD-090 true for every
                     // writer that exists today and every one added later, rather than only
                     // for the ones a reviewer remembered to guard individually.
-                    if (WebRoleRegistry.ExcludedFromResolution(service, trimmed))
+                    if (ExcludedFromResolution(service, trimmed, reads))
                     {
                         continue;
                     }
@@ -328,38 +358,37 @@ namespace OutcomeTesting.Plugins
         {
             var query = new QueryExpression(PermissionEntity)
             {
-                ColumnSet = new ColumnSet("al_accesslevel"),
+                ColumnSet = new ColumnSet("al_accesslevel", "al_rolecode", "al_approle"),
                 Criteria = new FilterExpression(),
             };
             query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
             query.Criteria.AddCondition("al_resourcekey", ConditionOperator.Equal, resourceKey);
 
-            // A permission rule names its role the same two ways a mapping does, so a rule
-            // matches if EITHER identifier is one the caller holds.
-            var roleFilter = new FilterExpression(LogicalOperator.Or);
-            if (roles.AppRoles.Count > 0)
+            // A rule is matched on the role it actually names, under the same precedence a
+            // mapping is read with (EffectiveRoleCode): its role code when it has one, the
+            // picklist label only when it has none. This used to match a rule on EITHER
+            // column, and al_approle carries a schema default (Adviser), so every rule written
+            // with a role code also matched anyone holding a picklist-only Adviser mapping -
+            // permission.manage among them. The app reads rules the same way (loadPermissions).
+            var held = new HashSet<string>(roles.RoleCodes, StringComparer.OrdinalIgnoreCase);
+            foreach (var appRole in roles.AppRoles)
             {
-                var appRoleValues = new object[roles.AppRoles.Count];
-                for (var i = 0; i < roles.AppRoles.Count; i++)
+                var label = AppRoleLabel(appRole);
+                if (label != null)
                 {
-                    appRoleValues[i] = roles.AppRoles[i];
+                    held.Add(label);
                 }
-                roleFilter.AddCondition("al_approle", ConditionOperator.In, appRoleValues);
             }
-            if (roles.RoleCodes.Count > 0)
-            {
-                var roleCodeValues = new object[roles.RoleCodes.Count];
-                for (var i = 0; i < roles.RoleCodes.Count; i++)
-                {
-                    roleCodeValues[i] = roles.RoleCodes[i];
-                }
-                roleFilter.AddCondition("al_rolecode", ConditionOperator.In, roleCodeValues);
-            }
-            query.Criteria.AddFilter(roleFilter);
 
             var max = AccessNone;
             foreach (var entity in service.RetrieveMultiple(query).Entities)
             {
+                var ruleRole = EffectiveRoleCode(entity);
+                if (ruleRole == null || !held.Contains(ruleRole))
+                {
+                    continue;
+                }
+
                 var level = entity.GetAttributeValue<OptionSetValue>("al_accesslevel");
                 if (level != null && level.Value > max)
                 {
@@ -367,6 +396,67 @@ namespace OutcomeTesting.Plugins
                 }
             }
             return max;
+        }
+
+        /// <summary>
+        /// Refuses when nobody active would still hold <c>permission.manage</c> at Manage.
+        ///
+        /// Called AFTER a command's write, inside its transaction, so the reads see the state
+        /// the write leaves and the refusal rolls the write back. Withdrawing the last
+        /// administrator's assignment, retiring their role, withdrawing or lowering the last
+        /// rule, or revoking the last holder all used to succeed, and the only way back was a
+        /// System Administrator writing the tables by hand.
+        ///
+        /// A holder is counted the way the gate would admit them: an active mapping or a web
+        /// role association for a role that a Manage rule names, on a role that is neither
+        /// retired nor auto-granted, for an email whose registry row is active. While no
+        /// mapping exists the gate admits everyone, so there is nobody to lock out.
+        /// </summary>
+        public static void EnsureSomeoneCanManagePermissions(IOrganizationService service)
+        {
+            if (!AnyMappingExists(service))
+            {
+                return;
+            }
+
+            var query = new QueryExpression(PermissionEntity)
+            {
+                ColumnSet = new ColumnSet("al_accesslevel", "al_rolecode", "al_approle"),
+                Criteria = new FilterExpression(),
+            };
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition("al_resourcekey", ConditionOperator.Equal, "permission.manage");
+
+            var reads = new RoleReads();
+            var asked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var rule in service.RetrieveMultiple(query).Entities)
+            {
+                var level = rule.GetAttributeValue<OptionSetValue>("al_accesslevel");
+                var roleCode = EffectiveRoleCode(rule);
+                if (level == null || level.Value < AccessManage || roleCode == null || !asked.Add(roleCode))
+                {
+                    continue;
+                }
+
+                if (ExcludedFromResolution(service, roleCode, reads) || WebRoleRegistry.IsRetired(service, roleCode))
+                {
+                    continue;
+                }
+
+                foreach (var holder in GetRoleHoldersPlugin.Read(service, roleCode))
+                {
+                    if ((holder.MappingActive == true || holder.Associated)
+                        && !string.IsNullOrWhiteSpace(holder.Email)
+                        && IsRegisteredActive(service, holder.Email))
+                    {
+                        return;
+                    }
+                }
+            }
+
+            throw new InvalidPluginExecutionException(
+                CommandHelpers.PreconditionPrefix +
+                "That would leave nobody able to manage security configuration. Give that access to someone else first.");
         }
 
         /// <summary>

@@ -12,8 +12,9 @@ import {
   regradeCase,
   type FinalOutcome,
 } from '../../services/commands/regradeCase';
+import { mayRegradeAt } from '../../types/domain';
 import { useCaseDetail } from './useCaseDetail';
-import { useCaseOutcomes } from './useCaseOutcomes';
+import { useCaseOutcome } from './useCaseOutcome';
 
 import './RecheckPage.css';
 
@@ -37,7 +38,7 @@ export function RecheckPage() {
   const [reloadKey, setReloadKey] = useState(0);
 
   const detail = useCaseDetail(caseId, reloadKey);
-  const outcomes = useCaseOutcomes(caseId, reloadKey);
+  const outcomes = useCaseOutcome(caseId, reloadKey);
 
   const [outcomeId, setOutcomeId] = useState('');
   const [finalOutcome, setFinalOutcome] = useState<FinalOutcome | ''>('');
@@ -49,6 +50,9 @@ export function RecheckPage() {
   const intent = useIntentKeys();
 
   const mayRegrade = can('command.regrade', 'Edit');
+  // al_RegradeCase refuses a case anywhere but the recheck, so the form waits for it there.
+  const caseStatus = detail.status === 'ready' ? detail.detail.status : null;
+  const atRecheck = detail.status === 'ready' && mayRegradeAt(caseStatus);
   const rows = outcomes.status === 'ready' ? outcomes.outcomes : [];
   // With one outcome the choice is not a choice, so the form settles it rather than
   // asking. A Tax-then-AQS case records one per review instance, and then it matters.
@@ -151,7 +155,14 @@ export function RecheckPage() {
       {notice ? <Notice tone="success">{notice}</Notice> : null}
       {failure ? <Notice tone="error">{failure}</Notice> : null}
 
-      {mayRegrade && rows.length > 0 ? (
+      {mayRegrade && rows.length > 0 && detail.status === 'ready' && !atRecheck ? (
+        <Notice tone="info">
+          This case is at {caseStatus}. A regrade is recorded at the recheck, once every
+          remedial action has been signed off and the case reaches Awaiting Recheck.
+        </Notice>
+      ) : null}
+
+      {mayRegrade && rows.length > 0 && atRecheck ? (
         <form className="recheck__form" onSubmit={onSubmit} noValidate>
           <ValidationSummary errors={errors} />
 

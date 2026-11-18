@@ -28,7 +28,7 @@
   -->
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.PowerApps.MSBuild.Solution" Version="1.*" />
+    <PackageReference Include="Microsoft.PowerApps.MSBuild.Solution" Version="1.52.1" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.0" PrivateAssets="All" />
   </ItemGroup>
 
@@ -47,6 +47,21 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <!--
+    AD-062: the plug-in assembly reaches an environment through `pac plugin push` only. The
+    round trip puts an older committed DLL back under src/PluginAssemblies, and packing it
+    would make an import roll the live assembly back. So it is removed from the packager's
+    working copy after the SDK copies src/ there and before it packs - the same strip
+    plugins/deploy/Pack-Schema-Solution.ps1 applies. RemoveDir rather than an exclusion, so a
+    copy left in obj/ by an earlier build is removed too. src/ itself is never touched.
+  -->
+  <Target Name="StripPluginAssemblies" AfterTargets="CopyCdsSolutionContent">
+    <RemoveDir Directories="$(SolutionPackagerMetadataWorkingDirectory)\PluginAssemblies" />
+    <Error Condition="Exists('$(SolutionPackagerMetadataWorkingDirectory)\PluginAssemblies')"
+           Text="PluginAssemblies is still in $(SolutionPackagerMetadataWorkingDirectory); refusing to pack an assembly (AD-062)." />
+    <Message Importance="High" Text="Stripped PluginAssemblies from the packager working copy (AD-062)." />
+  </Target>
 
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
   <Import Project="$(PowerAppsTargetsPath)\Microsoft.PowerApps.VisualStudio.Solution.targets" Condition="Exists('$(PowerAppsTargetsPath)\Microsoft.PowerApps.VisualStudio.Solution.targets')" />

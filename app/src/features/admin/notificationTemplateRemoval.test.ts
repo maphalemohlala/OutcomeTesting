@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   REMOVE_FALLBACK,
-  UNREACHABLE,
   describeRemoveFailure,
   removalPrompt,
 } from './notificationTemplateRemoval';
+import { UNREACHABLE } from '../../services/commands/failures';
 import type { TemplateRow } from './useNotificationTemplates';
 
 /**

@@ -61,6 +61,8 @@ export function ExportMenu({
       className="export-menu"
       onKeyDown={(e) => {
         if (e.key === 'Escape' && open) {
+          // Handled here, so a pop-up this menu sits in stays open (closesOnEscape).
+          e.preventDefault();
           setOpen(false);
           e.currentTarget.querySelector<HTMLButtonElement>('.export-menu__trigger')?.focus();
         }

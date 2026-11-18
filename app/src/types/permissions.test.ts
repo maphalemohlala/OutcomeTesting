@@ -5,7 +5,6 @@ import {
   can,
   DEFAULT_PERMISSIONS,
   levelFor,
-  pageResourceForPath,
   resolvePermissions,
   resolveRules,
   RESOURCE_KEYS,
@@ -67,28 +66,6 @@ describe('resolvePermissions', () => {
     for (const role of APP_ROLES.filter((r) => r !== 'AL Portal - Planner')) {
       expect(can(resolvePermissions([role]), 'page.dashboard', 'View')).toBe(true);
     }
-  });
-});
-
-describe('pageResourceForPath', () => {
-  it('maps nav and deep paths to their governing page resource', () => {
-    expect(pageResourceForPath('/')).toBe('page.dashboard');
-    expect(pageResourceForPath('/cases')).toBe('page.cases');
-    expect(pageResourceForPath('/cases/123/remediation')).toBe('page.cases');
-    expect(pageResourceForPath('/admin/security')).toBe('page.admin.security');
-    expect(pageResourceForPath('/admin/questions')).toBe('page.admin.questions');
-    expect(pageResourceForPath('/exports')).toBe('page.exports');
-  });
-
-  it('returns null for an ungated path', () => {
-    expect(pageResourceForPath('/nowhere')).toBeNull();
-  });
-
-  it('routes the people directory to the administration resource, not the cases one (2026-09-22)', () => {
-    // Required, not cosmetic. The page's Role column writes al_userrolemapping, which is an
-    // authorisation source, so leaving the directory on page.cases would let every
-    // case-worker grant themselves and anyone else access.
-    expect(pageResourceForPath('/admin/people')).toBe('page.admin.users');
   });
 });
 
@@ -212,9 +189,8 @@ describe('AD-218 roles', () => {
   });
 
   // The team workload page was withdrawn on 2026-09-25 (project owner: "it is not needed").
-  it('has no workload page: no resource, no gate, nobody granted it', () => {
+  it('has no workload page: no resource, nobody granted it', () => {
     expect(RESOURCE_KEYS).not.toContain('page.workload');
-    expect(pageResourceForPath('/workload')).toBeNull();
     expect(DEFAULT_PERMISSIONS.some((rule) => String(rule.resource).includes('workload'))).toBe(false);
   });
 });
