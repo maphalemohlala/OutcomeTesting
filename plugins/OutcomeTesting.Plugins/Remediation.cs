@@ -32,7 +32,7 @@ namespace OutcomeTesting.Plugins
         /// case the Tax items are raised against the AQS review, so this is what lets the Tax
         /// check's own document show them too.
         /// </summary>
-        public const string RaisedByAttr = "al_raisedbyreviewid";
+        public const string RaisedByAttr = CheckRemedialActions.RaisedByAttr;
 
         // al_remediationaction.al_actionstatus.
         public const int StatusOpen = 120910600;

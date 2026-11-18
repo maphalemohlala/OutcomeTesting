@@ -44,7 +44,7 @@ namespace OutcomeTesting.Plugins
         public const int PreOrPostCheckPost = 120910541;
 
         /// <summary>al_outcomecase.al_businessunit (requirements log row 6).</summary>
-        public const string BusinessUnitAttribute = "al_businessunit";
+        public const string BusinessUnitAttribute = CaseHeaderRules.BusinessUnitAttribute;
 
         /// <summary>The extract's column H, which IO fills with the adviser's market.</summary>
         public const string BusinessUnitHeader = "Group2";

@@ -12,7 +12,7 @@ namespace OutcomeTesting.Plugins
     ///
     /// <para>
     /// Only this check's actions: those whose <c>al_reviewinstanceid</c> is the review, or which
-    /// it raised (<see cref="Remediation.RaisedByAttr"/>). A Tax fail deferred to the AQS submit
+    /// it raised (<see cref="RaisedByAttr"/>). A Tax fail deferred to the AQS submit
     /// is raised against the AQS review, so it is drawn under the AQS check and, since
     /// requirements log row 18 (2026-11-18), under the Tax check as well. The case's whole
     /// Remediation and escalation form stays its own document (<see cref="RemediationDocument"/>).
@@ -32,6 +32,13 @@ namespace OutcomeTesting.Plugins
     {
         /// <summary>The section's heading, on the page and in the document.</summary>
         public const string Heading = "Remedial actions";
+
+        /// <summary>
+        /// al_remediationaction.al_raisedbyreviewid: the check whose answers raised the action
+        /// (requirements log row 18). Here rather than on Remediation because the registration
+        /// tool compiles this file and not that one.
+        /// </summary>
+        public const string RaisedByAttr = "al_raisedbyreviewid";
 
         /// <summary>
         /// The section, or an empty list when the check raised nothing or the drawing itself
@@ -131,7 +138,7 @@ namespace OutcomeTesting.Plugins
             // items sit on the AQS review (requirements log row 18).
             var whose = new FilterExpression(LogicalOperator.Or);
             whose.AddCondition("al_reviewinstanceid", ConditionOperator.Equal, reviewId);
-            whose.AddCondition(Remediation.RaisedByAttr, ConditionOperator.Equal, reviewId);
+            whose.AddCondition(RaisedByAttr, ConditionOperator.Equal, reviewId);
             query.Criteria.AddFilter(whose);
             query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
             query.AddOrder("createdon", OrderType.Ascending);

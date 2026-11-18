@@ -14,6 +14,9 @@ namespace OutcomeTesting.Plugins
     /// </summary>
     public static class CaseHeaderRules
     {
+        /// <summary>al_outcomecase.al_businessunit, imported from Group2 (requirements log row 6).</summary>
+        public const string BusinessUnitAttribute = "al_businessunit";
+
         /// <summary>
         /// The label the business gives al_advicedate (item 9, 2026-09-19). The schema name
         /// is unchanged, so nothing that reads the column breaks; this is the wording every
